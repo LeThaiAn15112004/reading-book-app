@@ -1,0 +1,15 @@
+cho import sách từ file hệ thống + link mạng
+chuyển màu bg khi đọc để tối ưu trải nghiệm (tránh mỏi mắt)
+có thể chỉnh cả màu text tương phản với màn để tránh đau mắt
+xoay màn được
+next trang nhanh phải có
+đánh dấu trang
+lưu yêu thích
+có thể làm con AI tóm tắt nội dung vì có thể có sách quá dài
+cho phép search từ trong docs
+note văn bản
+có thêm đọc audio cho ai lười nhìn
+
+đọc sách ít khi để 2 trang khi ngang màn, 1 căn giữa, có khung chia phân 2 trang
+cho chọn kiểu đọc
+bỏ quản lý user, chỉ cần super app (gg books, icloud books), khi đồng bộ là load list sách lên, ở app cũng cho đồng bộ

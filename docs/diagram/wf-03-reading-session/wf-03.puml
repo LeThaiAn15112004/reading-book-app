@@ -1,0 +1,29 @@
+@startuml wf-03
+title WF-03 - Phien doc
+skinparam shadowing false
+skinparam backgroundColor #FFFFFF
+skinparam defaultFontName Arial
+skinparam ActivityBorderColor #856404
+skinparam ActivityBackgroundColor #FFF3CD
+skinparam ActivityStartColor #28A745
+skinparam ActivityEndColor #DC3545
+
+start
+:1. Mo sach tu Library;
+:2. Reader - Chrome an;
+:3. Trang thai Dang doc;
+
+partition "Cac hanh dong trong phien" {
+  :A. Dieu huong: Lat / Cuon;
+  :Cap nhat vi tri vao DB;
+  :B. UI: Hien / An Toolbar;
+  :C. Cau hinh: Theme / Font;
+  :D. Nam tri thuc: Boi chon text -> WF-04;
+}
+
+:4. Thoat sach / Dong app;
+:5. Flush progress local;
+:6. Mo lai: Khoi phuc dung vi tri;
+stop
+
+@enduml

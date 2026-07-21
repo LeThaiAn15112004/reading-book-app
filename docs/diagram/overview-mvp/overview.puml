@@ -1,0 +1,22 @@
+@startuml overview
+title Tong quan Main Workflows (MVP)
+left to right direction
+skinparam shadowing false
+skinparam backgroundColor #FFFFFF
+skinparam defaultFontName Arial
+skinparam roundCorner 8
+skinparam ArrowColor #333333
+
+rectangle "WF-01\nLibrary" as WF01 #FFF3CD
+rectangle "WF-02\nImport" as WF02 #FFF3CD
+rectangle "WF-03\nPhien doc" as WF03 #FFF3CD
+rectangle "WF-04\nNam tri thuc" as WF04 #FFF3CD
+
+WF01 -[#333333]-> WF02 : Import
+WF02 -[#333333]-> WF01 : Quay lai
+WF01 -[#333333]-> WF03 : Mo sach
+WF03 -[#333333]-> WF04 : Boi chon
+WF04 -[#333333]-> WF03 : Jump ve doan
+WF03 -[#333333]-> WF01 : Thoat
+
+@enduml

@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Thử Nghiệm Trực Quan: Highlight Chuẩn vs Highlight Đau Mắt</title>
+    <!-- Nhúng Tailwind CSS qua CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        // Màu nền sách chuẩn (Sepia & Day & Night)
+                        sepiaBg: '#F4ECD8',
+                        sepiaText: '#5C4738',
+                        dayBg: '#F8F9FA',
+                        dayText: '#2B2D42',
+                        nightBg: '#1E1E1E',
+                        nightText: '#CCCCCC',
+
+                        // Màu Highlight chuẩn (Dịu, Muted, đã tính toán Opacity tương đương)
+                        hlYellowOk: 'rgba(255, 209, 102, 0.35)', // Vàng chanh nhạt + Opacity 35%
+                        hlGreenOk: 'rgba(6, 214, 160, 0.35)',   // Xanh mạ nhạt + Opacity 35%
+                        hlBlueOk: 'rgba(17, 138, 178, 0.35)',    // Xanh biển nhạt + Opacity 35%
+                        hlPinkOk: 'rgba(239, 71, 111, 0.30)',    // Hồng đất nhạt + Opacity 30%
+
+                        // Màu Highlight sai (Nguyên bản, rực chói, Opacity 100%)
+                        hlYellowBad: '#FFFF00',
+                        hlGreenBad: '#00FF00',
+                        hlBlueBad: '#0000FF',
+                        hlPinkBad: '#FF007F',
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-slate-100 min-h-screen p-6 font-sans">
+
+    <div class="max-w-7xl mx-auto">
+        <h1 class="text-3xl font-extrabold text-center text-slate-800 mb-2">THIẾT KẾ CÔNG THÁI HỌC: TÍNH NĂNG HIGHLIGHT</h1>
+        <p class="text-center text-slate-600 mb-8 font-medium">Hãy rê chuột và đọc thử các đoạn văn bản dưới đây để thấy sự khác biệt về độ điều tiết thị lực.</p>
+
+        <!-- =========================================================
+             SECTION 1: CÁC TRƯỜNG HỢP HIGHLIGHT ĐÚNG (DỊU MẮT, NÊN DÙNG)
+             ========================================================= -->
+        <h2 class="text-xl font-bold text-emerald-700 mb-4 flex items-center gap-2">
+            <span class="bg-emerald-100 p-1.5 rounded-full text-lg">✅</span> 1. Highlight Chuẩn Công Thái Học (Bảo Vệ Thị Lực)
+        </h2>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
+
+            <!-- Trường hợp 1A: Muted Colors + Low Opacity (Nền Sepia) -->
+            <div class="bg-sepiaBg border border-[#E4DAC2] rounded-xl p-6 shadow-sm flex flex-col justify-between h-[320px]">
+                <div>
+                    <span class="text-xs font-bold uppercase tracking-wider text-[#8C7665] bg-[#5C4738]/10 px-2 py-1 rounded">1A. Giảm Opacity xuống 30% - 35%</span>
+                    <p class="text-sepiaText text-base leading-relaxed mt-4 text-justify">
+                        Khi người dùng đọc trên nền giấy ngà ấm, ta sử dụng lớp phủ <span class="bg-[#FFD166]/35 px-1 rounded font-semibold text-sepiaText">Highlight Vàng Chanh Nhạt (Opacity 35%)</span> hoặc <span class="bg-[#06D6A0]/35 px-1 rounded font-semibold text-sepiaText">Highlight Xanh Mạ Pastel</span>. 
+                        Lớp màu chỉ như dải sương mỏng lướt nhẹ, giữ nguyên độ tương phản sắc nét ban đầu của chữ đen trên giấy nền.
+                    </p>
+                </div>
+                <div class="text-xs text-[#8C7665] font-mono">Giải pháp: Giữ tương phản gốc của văn bản[cite: 1]</div>
+            </div>
+
+            <!-- Trường hợp 1B: Highlight mỏng dưới chân chữ (Underline/Underlay) -->
+            <div class="bg-dayBg border border-slate-200 rounded-xl p-6 shadow-sm flex flex-col justify-between h-[320px]">
+                <div>
+                    <span class="text-xs font-bold uppercase tracking-wider text-slate-500 bg-slate-200 px-2 py-1 rounded">1B. Highlight Cuộn Dưới Chân Chữ</span>
+                    <p class="text-dayText text-base leading-relaxed mt-4 text-justify">
+                        Thay vì phủ đè màu lên toàn bộ thân chữ[cite: 1], ta thiết kế một dải màu mỏng nằm ở nửa dưới của dòng chữ[cite: 1]. 
+                        Ví dụ: <span class="inline-block leading-none bg-gradient-to-t from-[#FFD166]/50 to-transparent from-40% to-40% font-semibold">Nửa trên của chữ vẫn chạm vào nền trắng xám</span>[cite: 1], giúp giải phóng hoàn toàn thị lực khỏi sự ảnh hưởng của màu sắc khác[cite: 1].
+                    </p>
+                </div>
+                <div class="text-xs text-slate-500 font-mono">Giải pháp: Tránh đè nét chữ, giảm mỏi mắt[cite: 1]</div>
+            </div>
+
+            <!-- Trường hợp 1C: Highlight tự động giảm độ sáng ban đêm (Night Mode) -->
+            <div class="bg-nightBg border border-zinc-800 rounded-xl p-6 shadow-sm flex flex-col justify-between h-[320px]">
+                <div>
+                    <span class="text-xs font-bold uppercase tracking-wider text-zinc-500 bg-zinc-800 px-2 py-1 rounded">1C. Tự Động Hạ Tông Ban Đêm</span>
+                    <p class="text-nightText text-base leading-relaxed mt-4 text-justify">
+                        Ở chế độ ban đêm, hệ thống tự động giảm độ rực của các màu highlight xuống[cite: 1]. 
+                        Đoạn text này được bôi màu <span class="bg-[#EF476F]/20 text-nightText px-1 rounded border border-[#EF476F]/30">Hồng San Hô cực nhạt (Opacity 20%)</span>[cite: 1]. Khi đọc trong tối, màu highlight không biến thành "vệt sáng chói" phá nát không gian dịu mắt[cite: 1].
+                    </p>
+                </div>
+                <div class="text-xs text-zinc-500 font-mono">Giải pháp: Đồng bộ độ sáng thích ứng môi trường[cite: 1]</div>
+            </div>
+
+        </div>
+
+        <!-- =========================================================
+             SECTION 2: CÁC TRƯỜNG HỢP HIGHLIGHT SAI (GÂY ĐAU MẮT TỐI KỴ)
+             ========================================================= -->
+        <h2 class="text-xl font-bold text-rose-700 mb-4 flex items-center gap-2">
+            <span class="bg-rose-100 p-1.5 rounded-full text-lg">❌</span> 2. Các Trường Hợp Highlight Sai Cách (Gây Mỏi & Lóa Mắt)
+        </h2>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+
+            <!-- Trường hợp 2A: Highlight rực chói 100% Opacity (Dạ quang thuần) -->
+            <div class="bg-white border border-slate-200 rounded-xl p-6 shadow-md flex flex-col justify-between h-[340px]">
+                <div>
+                    <span class="text-xs font-bold uppercase tracking-wider text-rose-600 bg-rose-50 px-2 py-1 rounded">2A. Màu Neon Nguyên Bản 100% Opacity</span>
+                    <p class="text-slate-800 text-base leading-relaxed mt-4 text-justify">
+                        Dùng màu dạ quang nguyên bản cực chói như <span class="bg-hlYellowBad text-black font-bold px-1 rounded">Vàng Chói (#FFFF00)</span>[cite: 1] hoặc <span class="bg-hlGreenBad text-black font-bold px-1 rounded">Xanh Chuối Neon (#00FF00)</span>[cite: 1] đè đục 100% lên chữ. 
+                        Sự kích thích màu sắc quá lớn này bắt tế bào võng mạc phải căng ra xử lý, gây lóa và mỏi mắt cực nhanh[cite: 1].
+                    </p>
+                </div>
+                <div class="text-xs text-rose-600 font-mono font-bold">Hậu quả: Lóa võng mạc, mỏi cơ mắt tức thì[cite: 1]</div>
+            </div>
+
+            <!-- Trường hợp 2B: Mất độ tương phản của chữ (Chữ chìm vào Highlight) -->
+            <div class="bg-white border border-slate-200 rounded-xl p-6 shadow-md flex flex-col justify-between h-[340px]">
+                <div>
+                    <span class="text-xs font-bold uppercase tracking-wider text-rose-600 bg-rose-50 px-2 py-1 rounded">2B. Triệt Tiêu Độ Tương Phản Chữ</span>
+                    <p class="text-slate-800 text-base leading-relaxed mt-4 text-justify">
+                        Khi ta sử dụng các màu highlight có sắc độ quá đậm đè lên chữ[cite: 1]: <span class="bg-hlBlueBad text-white font-semibold px-1 rounded">Chữ màu đen nằm lọt thỏm giữa khối nền xanh lam đậm (#0000FF)</span>[cite: 1].
+                        Người đọc buộc phải nheo mắt và căng cơ mặt hết cỡ[cite: 1] chỉ để cố gắng phân biệt xem các nét chữ đang bị nuốt chửng kia viết cái gì.
+                    </p>
+                </div>
+                <div class="text-xs text-rose-600 font-mono font-bold">Hậu quả: Nheo mắt liên tục, gây cận thị kỹ thuật số[cite: 1]</div>
+            </div>
+
+            <!-- Trường hợp 2C: Highlight chói trong chế độ ban đêm (Đọc ban đêm) -->
+            <div class="bg-nightBg border border-zinc-800 rounded-xl p-6 shadow-md flex flex-col justify-between h-[340px]">
+                <div>
+                    <span class="text-xs font-bold uppercase tracking-wider text-rose-500 bg-rose-950/50 border border-rose-900 px-2 py-1 rounded">2C. "Đèn Pha" Trong Đêm</span>
+                    <p class="text-nightText text-base leading-relaxed mt-4 text-justify">
+                        Trong phòng tối (Night Mode), toàn bộ màn hình đang màu đen xám dịu mắt[cite: 1], đột nhiên xuất hiện một đoạn <span class="bg-hlPinkBad text-white font-bold px-1 rounded">Highlight Hồng Cánh Sen rực rỡ 100% Opacity</span>[cite: 1] hoặc <span class="bg-hlYellowBad text-black font-bold px-1 rounded">Highlight Vàng Chói 100% Opacity</span>[cite: 1].
+                        Nó giống như đèn pha ô tô rọi thẳng vào mắt, gây ra hiện tượng lưu ảnh (bóng ma võng mạc)[cite: 1].
+                    </p>
+                </div>
+                <div class="text-xs text-rose-400 font-mono font-bold">Hậu quả: Tạo bóng ma lưu ảnh, lóa mắt ban đêm[cite: 1]</div>
+            </div>
+
+        </div>
+    </div>
+
+</body>
+</html>

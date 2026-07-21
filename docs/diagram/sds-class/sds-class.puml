@@ -1,0 +1,217 @@
+@startuml sds-class
+title Class Diagram - Domain + Application (MVP)
+skinparam shadowing false
+skinparam backgroundColor #FFFFFF
+skinparam defaultFontName Arial
+skinparam classAttributeIconSize 0
+skinparam packageStyle rectangle
+
+enum DocumentFormat {
+  EPUB
+  PDF
+  TXT
+  MD
+}
+
+abstract class Location {
+  + toString() : string
+  + {static} parse(raw : string) : Location
+}
+
+class CfiLocation {
+  + cfi : string
+}
+
+class PageRectLocation {
+  + page : int
+  + rect : Rect?
+}
+
+class TextOffsetLocation {
+  + offset : int
+  + blockId : string?
+}
+
+Location <|-- CfiLocation
+Location <|-- PageRectLocation
+Location <|-- TextOffsetLocation
+
+class Author {
+  + id : string
+  + name : string
+  + sortName : string?
+  + createdAt : Date
+}
+
+class Book {
+  + id : string
+  + title : string
+  + filePath : string
+  + normalizedPath : string?
+  + format : DocumentFormat
+  + coverPath : string?
+  + sha256 : string
+  + fileSizeBytes : number?
+  + isFavorite : boolean
+  + addedAt : Date
+  + updatedAt : Date
+  + authors : Author[]
+}
+
+class BookAuthor {
+  + bookId : string
+  + authorId : string
+  + sortOrder : number
+}
+
+class ReadingSessionState {
+  + bookId : string
+  + lastReadLocation : Location
+  + percent : number
+  + bgColor : string
+  + textColor : string
+  + fontSize : number
+  + fontFamily : string?
+  + lineHeight : number?
+  + themePreset : string?
+  + isLandscape : boolean
+  + updatedAt : Date
+}
+
+class Highlight {
+  + id : string
+  + bookId : string
+  + locationStart : Location
+  + locationEnd : Location
+  + selectedText : string
+  + colorHex : string
+  + createdAt : Date
+}
+
+class Note {
+  + id : string
+  + bookId : string
+  + highlightId : string?
+  + locationRef : Location
+  + selectedText : string?
+  + content : string
+  + createdAt : Date
+  + updatedAt : Date
+}
+
+class Bookmark {
+  + id : string
+  + bookId : string
+  + locationRef : Location
+  + label : string?
+  + createdAt : Date
+}
+
+class BookChunk {
+  + id : string
+  + bookId : string
+  + chunkIndex : number
+  + content : string
+  + locationStart : Location?
+  + locationEnd : Location?
+  + embedding : Uint8Array?
+  + createdAt : Date
+}
+
+class Collection {
+  + id : string
+  + name : string
+  + description : string?
+  + createdAt : Date
+  + updatedAt : Date
+}
+
+class CollectionBook {
+  + collectionId : string
+  + bookId : string
+  + sortOrder : number
+  + addedAt : Date
+}
+
+Book "n" -- "n" Author : "n - n"
+(Book, Author) .. BookAuthor
+
+Book "n" -- "n" Collection : "n - n"
+(Book, Collection) .. CollectionBook
+
+Book "1" -- "1" ReadingSessionState : "1 - 1"
+Book "1" -- "0..*" Highlight : "1 - n"
+Book "1" -- "0..*" Note : "1 - n"
+Book "1" -- "0..*" Bookmark : "1 - n"
+Book "1" -- "0..*" BookChunk : "1 - n"
+Highlight "1" -- "0..*" Note : "1 - n"
+
+Book --> DocumentFormat
+
+package "Application services" #FFF3CD {
+  class ImportBookService {
+    + importFromPath(path : string) : Book
+  }
+  class ReaderService {
+    + open(bookId : string) : BookSession
+    + saveSessionState(state : ReadingSessionState) : void
+  }
+  class AnnotationService {
+    + addHighlight(h : Highlight) : Highlight
+    + addNote(n : Note) : Note
+    + addBookmark(b : Bookmark) : Bookmark
+    + listByBook(bookId : string) : Annotations
+  }
+  class CollectionService {
+    + create(name : string, description : string?) : Collection
+    + addBook(collectionId : string, bookId : string) : CollectionBook
+    + removeBook(collectionId : string, bookId : string) : void
+    + listBooks(collectionId : string) : Book[]
+  }
+}
+
+package "Ports <<interface>>" #E8F5E9 {
+  interface LibraryStore {
+    + findById(id : string) : Book?
+    + findBySha256(hash : string) : Book?
+    + findByAuthor(authorId : string) : Book[]
+    + save(book : Book) : void
+    + linkAuthors(bookId : string, authors : BookAuthor[]) : void
+    + deleteCascade(bookId : string) : void
+  }
+  interface CollectionStore {
+    + findById(id : string) : Collection?
+    + listAll() : Collection[]
+    + save(collection : Collection) : void
+    + delete(collectionId : string) : void
+    + linkBook(link : CollectionBook) : void
+    + unlinkBook(collectionId : string, bookId : string) : void
+    + listBooks(collectionId : string) : Book[]
+  }
+  interface OverlayStore {
+    + getSessionState(bookId : string) : ReadingSessionState?
+    + saveSessionState(s : ReadingSessionState) : void
+    + saveHighlight(h : Highlight) : void
+    + saveNote(n : Note) : void
+    + saveBookmark(b : Bookmark) : void
+  }
+  interface ChunkIndexStore {
+    + replaceChunks(bookId : string, chunks : BookChunk[]) : void
+    + search(bookId : string, query : string) : BookChunk[]
+  }
+  interface DocumentImporter {
+    + canHandle(path : string) : boolean
+    + import(path : string) : ImportResult
+  }
+}
+
+ImportBookService ..> LibraryStore
+ImportBookService ..> DocumentImporter
+ImportBookService ..> ChunkIndexStore
+ReaderService ..> LibraryStore
+ReaderService ..> OverlayStore
+AnnotationService ..> OverlayStore
+CollectionService ..> CollectionStore
+CollectionService ..> LibraryStore
+
+@enduml

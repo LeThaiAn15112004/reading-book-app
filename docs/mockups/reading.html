@@ -1,0 +1,2656 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#0f172a">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <title>Readmate — Premium Interactive Reader</title>
+  
+  <!-- Phục vụ kết nối Google Fonts cho kiểu chữ văn học chân thực -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Literata:opsz,wght@7..72,300;7..72,400;7..72,500;7..72,600;7..72,700&family=Source+Sans+3:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,600;1,600&display=swap" rel="stylesheet">
+  
+  <style>
+    :root {
+      /* Theme mặc định: Night Mode - Chống ánh sáng xanh tối ưu */
+      --bg-deep: #0f172a;
+      --bg-mid: #1e293b;
+      --surface: rgba(30, 41, 59, 0.45);
+      --surface-strong: rgba(15, 23, 42, 0.95);
+      --border: rgba(51, 65, 85, 0.45);
+      --border-soft: rgba(51, 65, 85, 0.22);
+      --text: #cbd5e1;
+      --text-strong: #f1f5f9;
+      --muted: #94a3b8;
+      --faint: #64748b;
+      --accent: #f59e0b;
+      --accent-hover: #d97706;
+      --accent-soft: rgba(245, 158, 11, 0.14);
+      --shadow: 0 12px 32px rgba(0, 0, 0, 0.4);
+      --radius: 12px;
+      --font-ui: "Source Sans 3", sans-serif;
+      --font-reading: "Literata", Georgia, serif;
+      --reading-size: 18px;
+      --reading-line-height: 1.65;
+      --reading-weight: 400;
+      --reading-align: justify;
+      --safe-top: env(safe-area-inset-top, 0px);
+      --safe-bottom: env(safe-area-inset-bottom, 0px);
+      --safe-left: env(safe-area-inset-left, 0px);
+      --safe-right: env(safe-area-inset-right, 0px);
+      --topbar-h: 56px;
+      --footer-h: 56px;
+
+      /* Book Layout Widths */
+      --reader-max-width: 680px;
+    }
+
+    /* Theme: Giấy Sepia ấm cúng cổ điển */
+    body.theme-sepia {
+      --bg-deep: #16120e;
+      --bg-mid: #251f19;
+      --surface: rgba(45, 38, 31, 0.45);
+      --surface-strong: rgba(22, 18, 14, 0.95);
+      --border: rgba(94, 80, 63, 0.4);
+      --border-soft: rgba(94, 80, 63, 0.2);
+      --text: #e1cfb3;
+      --text-strong: #f4edd4;
+      --muted: #a69175;
+      --faint: #7a6a54;
+      --accent: #d97706;
+      --accent-soft: rgba(217, 119, 6, 0.15);
+      --shadow: 0 12px 32px rgba(22, 18, 14, 0.5);
+    }
+
+    /* Theme: Giấy trắng mịn ban ngày */
+    body.theme-paper {
+      --bg-deep: #f1f5f9;
+      --bg-mid: #ffffff;
+      --surface: rgba(226, 232, 240, 0.5);
+      --surface-strong: rgba(255, 255, 255, 0.98);
+      --border: rgba(148, 163, 184, 0.35);
+      --border-soft: rgba(148, 163, 184, 0.2);
+      --text: #334155;
+      --text-strong: #0f172a;
+      --muted: #475569;
+      --faint: #94a3b8;
+      --accent: #d97706;
+      --accent-soft: rgba(217, 119, 6, 0.08);
+      --shadow: 0 12px 32px rgba(15, 23, 42, 0.06);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100dvh;
+      overflow: hidden;
+    }
+
+    body {
+      background-color: var(--bg-deep);
+      color: var(--text);
+      font-family: var(--font-ui);
+      -webkit-font-smoothing: antialiased;
+      transition: background-color 0.3s ease, color 0.3s ease;
+      user-select: none;
+      overscroll-behavior: none;
+    }
+
+    .reader-app {
+      position: relative;
+      width: 100%;
+      height: 100dvh;
+      display: flex;
+      flex-direction: column;
+      z-index: 10;
+      padding-left: var(--safe-left);
+      padding-right: var(--safe-right);
+    }
+
+    .topbar {
+      height: calc(var(--topbar-h) + var(--safe-top));
+      padding: var(--safe-top) 16px 0 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      border-bottom: 1px solid var(--border-soft);
+      background: var(--surface-strong);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      z-index: 50;
+      transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.3s;
+      flex-shrink: 0;
+    }
+
+    .topbar.hide {
+      transform: translateY(-100%);
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .topbar-left {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      min-width: 0;
+      flex: 1;
+    }
+
+    .back-btn {
+      width: 40px;
+      height: 40px;
+      border: none;
+      border-radius: 8px;
+      background: transparent;
+      color: var(--muted);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      transition: color 0.15s, background 0.15s;
+    }
+
+    .back-btn:hover {
+      color: var(--text-strong);
+      background: rgba(255, 255, 255, 0.05);
+    }
+
+    /* Edge Interactive Actions (Mục lục, Ribbon Bookmark) */
+    .toc-edge-btn {
+      position: fixed;
+      left: var(--safe-left);
+      top: 0;
+      bottom: 0;
+      z-index: 80;
+      width: 28px;
+      height: 100dvh;
+      padding: 0;
+      margin: 0;
+      border: none;
+      background: transparent;
+      color: var(--muted);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: color 0.15s, background 0.15s, width 0.15s, opacity 0.2s;
+      touch-action: manipulation;
+    }
+
+    .toc-edge-btn::before {
+      content: "";
+      position: absolute;
+      left: 0;
+      top: 0;
+      bottom: 0;
+      width: 3px;
+      background: transparent;
+      transition: background 0.15s, width 0.15s;
+    }
+
+    .toc-edge-btn svg {
+      width: 16px;
+      height: 16px;
+      opacity: 0.55;
+      transition: opacity 0.15s, color 0.15s;
+      pointer-events: none;
+    }
+
+    .toc-edge-btn:hover,
+    .toc-edge-btn:focus-visible {
+      width: 34px;
+      color: var(--accent);
+      background: linear-gradient(90deg, rgba(15, 23, 42, 0.55), transparent);
+      outline: none;
+    }
+
+    .toc-edge-btn:hover::before,
+    .toc-edge-btn:focus-visible::before {
+      width: 3px;
+      background: var(--accent);
+    }
+
+    .toc-edge-btn:hover svg,
+    .toc-edge-btn:focus-visible svg {
+      opacity: 1;
+    }
+
+    .toc-edge-btn.is-hidden {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .bookmark-edge-btn {
+      position: fixed;
+      left: var(--safe-left);
+      top: calc(var(--topbar-h) + var(--safe-top) + 8px);
+      z-index: 81;
+      width: 36px;
+      height: 48px;
+      padding: 0 0 0 4px;
+      border: none;
+      border-radius: 0 8px 8px 0;
+      background: rgba(15, 23, 42, 0.75);
+      border: 1px solid var(--border-soft);
+      border-left: none;
+      color: var(--muted);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 2px 2px 10px rgba(0, 0, 0, 0.25);
+      transition: color 0.15s, background 0.15s, width 0.15s, opacity 0.2s;
+    }
+
+    .bookmark-edge-btn svg {
+      width: 20px;
+      height: 20px;
+    }
+
+    .bookmark-edge-btn:hover {
+      width: 42px;
+      color: var(--accent);
+      background: rgba(15, 23, 42, 0.95);
+    }
+
+    .bookmark-edge-btn.is-active {
+      color: var(--accent);
+      background: rgba(245, 158, 11, 0.18);
+      border-color: rgba(245, 158, 11, 0.35);
+    }
+
+    .bookmark-edge-btn.is-hidden {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .book-meta {
+      min-width: 0;
+      flex: 1;
+    }
+
+    .book-title {
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--text-strong);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: min(45vw, 240px);
+    }
+
+    .chapter-indicator {
+      font-size: 11px;
+      color: var(--faint);
+      margin-top: 2px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: min(45vw, 240px);
+    }
+
+    .topbar-right {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+
+    .topbar-actions {
+      position: relative;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .tool-btn {
+      height: 40px;
+      width: 40px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--surface);
+      color: var(--muted);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      font-family: inherit;
+      touch-action: manipulation;
+      flex-shrink: 0;
+      transition: all 0.2s ease;
+    }
+
+    .tool-btn:hover {
+      color: var(--text-strong);
+      border-color: var(--muted);
+    }
+
+    .tool-btn:active, .tool-btn.active {
+      border-color: var(--accent);
+      color: var(--text-strong);
+      background: var(--accent-soft);
+    }
+
+    .tool-btn span {
+      display: none;
+    }
+
+    .reader-scroll-container {
+      flex: 1;
+      overflow-x: hidden;
+      overflow-y: auto;
+      padding: 32px 24px calc(var(--footer-h) + var(--safe-bottom) + 32px) 32px;
+      position: relative;
+      scroll-behavior: smooth;
+      -webkit-overflow-scrolling: touch;
+      overscroll-behavior-y: contain;
+    }
+
+    .reading-area {
+      width: 100%;
+      max-width: var(--reader-max-width);
+      margin: 0 auto;
+      transition: max-width 0.3s cubic-bezier(0.25, 1, 0.5, 1);
+    }
+
+    /* CHẾ ĐỘ 1 TRANG CĂN GIỮA (Mặc định cho trải nghiệm tối giản) */
+    .reader-app.mode-single-page .reading-area {
+      max-width: var(--reader-max-width);
+      columns: 1 !important;
+      column-rule: none !important;
+    }
+
+    /* CHẾ ĐỘ 2 TRANG SONG SONG (Chỉ kích hoạt khi được chọn và màn hình đủ rộng) */
+    .reader-app.mode-dual-page .reading-area {
+      max-width: min(1200px, 95vw);
+      columns: 2;
+      column-gap: 64px;
+      /* Khung phân tách 2 trang sách (Spine line) chân thực */
+      column-rule: 1px dashed var(--border);
+      column-fill: auto;
+      text-align: justify;
+    }
+
+    /* Fallback cho màn hình hẹp: Dù chọn 2 trang vẫn trả về 1 trang để chống tràn chữ */
+    @media (max-width: 899px) {
+      .reader-app.mode-dual-page .reading-area {
+        columns: 1 !important;
+        column-rule: none !important;
+        max-width: var(--reader-max-width);
+      }
+    }
+
+    /* Custom các thuộc tính lề trang linh hoạt */
+    .reading-area.margin-narrow { max-width: 580px; }
+    .reading-area.margin-wide { max-width: 780px; }
+    .reading-area.margin-off {
+      max-width: 100% !important;
+      padding-left: 12px;
+      padding-right: 12px;
+    }
+
+    .chapter-content {
+      font-family: var(--font-reading);
+      font-size: var(--reading-size);
+      font-weight: var(--reading-weight);
+      line-height: var(--reading-line-height);
+      color: var(--text);
+      text-align: var(--reading-align);
+      user-select: text;
+    }
+
+    /* Khung chứa đoạn văn phục vụ comment tương tác */
+    .paragraph-wrapper {
+      position: relative;
+      margin-bottom: 1.5em;
+      padding-right: 44px;
+      break-inside: avoid-column;
+    }
+
+    .chapter-content p {
+      margin-bottom: 0;
+      text-indent: 1.5em;
+      display: inline;
+    }
+
+    .paragraph-wrapper.first-p p {
+      text-indent: 0;
+    }
+
+    .paragraph-wrapper.first-p p::first-letter {
+      font-family: "Playfair Display", Georgia, serif;
+      font-size: clamp(2.2em, 8vw, 3.2em);
+      float: left;
+      line-height: 0.85;
+      padding-right: 10px;
+      margin-top: 4px;
+      color: var(--accent);
+      font-weight: bold;
+    }
+
+    .dropdown-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(15, 23, 42, 0.6);
+      backdrop-filter: blur(4px);
+      z-index: 90;
+      display: none;
+      opacity: 0;
+      transition: opacity 0.25s ease;
+    }
+
+    .dropdown-overlay.show {
+      display: block;
+      opacity: 1;
+    }
+
+    .dropdown-menu {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      max-height: min(88dvh, 740px);
+      overflow-y: auto;
+      background: var(--surface-strong);
+      border-top: 1px solid var(--border);
+      border-radius: 16px 16px 0 0;
+      padding: 24px 16px calc(24px + var(--safe-bottom));
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      z-index: 100;
+      transform: translateY(100%);
+      transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+      -webkit-overflow-scrolling: touch;
+      overscroll-behavior: contain;
+    }
+
+    .dropdown-menu.show {
+      transform: translateY(0);
+    }
+
+    .dropdown-pull-bar {
+      width: 36px;
+      height: 4px;
+      background: var(--border-soft);
+      border-radius: 2px;
+      margin: -12px auto 12px;
+    }
+
+    .dropdown-menu-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .dropdown-menu-header h2 {
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--text-strong);
+    }
+
+    .settings-close-btn {
+      width: 32px;
+      height: 32px;
+      border: none;
+      border-radius: 8px;
+      background: transparent;
+      color: var(--muted);
+      cursor: pointer;
+      font-size: 18px;
+    }
+
+    .dropdown-section-title {
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--faint);
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      margin-bottom: 10px;
+    }
+
+    .toggle-group {
+      display: flex;
+      gap: 6px;
+      background: rgba(15, 23, 42, 0.45);
+      padding: 4px;
+      border: 1px solid var(--border-soft);
+      border-radius: 8px;
+    }
+
+    .toggle-item {
+      flex: 1;
+      height: 38px;
+      border: none;
+      background: transparent;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 600;
+      border-radius: 6px;
+      cursor: pointer;
+      padding: 0 4px;
+      white-space: nowrap;
+      transition: all 0.15s ease;
+    }
+
+    .toggle-item.active {
+      background: var(--bg-deep);
+      color: var(--accent);
+      box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+    }
+
+    .custom-dialog-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(15, 23, 42, 0.75);
+      backdrop-filter: blur(4px);
+      z-index: 300;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      opacity: 0;
+      transition: opacity 0.2s ease;
+    }
+
+    .custom-dialog-overlay.show {
+      display: flex;
+      opacity: 1;
+    }
+
+    .custom-dialog {
+      background: var(--surface-strong);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      width: 100%;
+      max-width: 400px;
+      padding: 24px;
+      box-shadow: var(--shadow);
+      transform: scale(0.9);
+      transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .custom-dialog-overlay.show .custom-dialog {
+      transform: scale(1);
+    }
+
+    .custom-dialog-title {
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--text-strong);
+      margin-bottom: 12px;
+    }
+
+    .custom-dialog-desc {
+      font-size: 14px;
+      color: var(--text);
+      line-height: 1.5;
+      margin-bottom: 24px;
+    }
+
+    .custom-dialog-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 12px;
+    }
+
+    .dialog-btn {
+      padding: 10px 18px;
+      font-size: 13px;
+      font-weight: 600;
+      border-radius: 8px;
+      cursor: pointer;
+      font-family: inherit;
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--text);
+      transition: all 0.15s ease;
+    }
+
+    .dialog-btn.confirm-danger {
+      background: #ef4444;
+      border-color: #ef4444;
+      color: #ffffff;
+    }
+
+    .dialog-btn.confirm-danger:hover {
+      background: #dc2626;
+      border-color: #dc2626;
+    }
+
+    .dialog-btn:hover {
+      background: var(--surface);
+    }
+
+    .comment-trigger-btn {
+      position: absolute;
+      right: 0;
+      top: 2px;
+      background: var(--surface);
+      border: 1px solid var(--border-soft);
+      border-radius: 10px;
+      color: var(--muted);
+      font-size: 10px;
+      font-weight: 700;
+      padding: 4px 8px;
+      min-height: 26px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      z-index: 5;
+      transition: all 0.2s;
+      opacity: 0.7;
+      touch-action: manipulation;
+    }
+
+    .comment-trigger-btn.has-comments,
+    .paragraph-wrapper:hover .comment-trigger-btn,
+    .reader-app.comment-mode .comment-trigger-btn {
+      opacity: 1;
+    }
+
+    .comment-trigger-btn.has-comments {
+      color: var(--accent);
+      border-color: rgba(245, 158, 11, 0.45);
+      background: var(--accent-soft);
+    }
+
+    .comment-trigger-btn:hover {
+      color: var(--accent);
+      border-color: var(--accent);
+      transform: scale(1.05);
+      opacity: 1;
+    }
+
+    .paragraph-wrapper.has-comments {
+      border-left: 2px solid rgba(245, 158, 11, 0.45);
+      padding-left: 12px;
+      margin-left: -14px;
+    }
+
+    .reader-app.comment-mode .paragraph-wrapper {
+      cursor: pointer;
+    }
+
+    .reader-app.comment-mode .paragraph-wrapper:hover {
+      background: rgba(245, 158, 11, 0.06);
+      border-radius: 6px;
+    }
+
+    /* Trình chiếu các cấu trúc bổ sung */
+    .chapter-header-decor {
+      text-align: center;
+      margin-bottom: 36px;
+      padding-bottom: 24px;
+      border-bottom: 1px dashed var(--border-soft);
+      break-inside: avoid-column;
+    }
+
+    .chapter-num {
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--accent);
+      text-transform: uppercase;
+      letter-spacing: 0.2em;
+      margin-bottom: 8px;
+    }
+
+    .chapter-title {
+      font-family: "Playfair Display", Georgia, serif;
+      font-size: clamp(24px, 6vw, 32px);
+      font-weight: 600;
+      color: var(--text-strong);
+      line-height: 1.25;
+      padding: 0 8px;
+    }
+
+    .highlight-tooltip {
+      position: absolute;
+      background: var(--surface-strong);
+      border: 1px solid var(--border);
+      border-radius: 24px;
+      padding: 6px 12px;
+      display: none;
+      align-items: center;
+      gap: 10px;
+      box-shadow: var(--shadow);
+      z-index: 200;
+      max-width: calc(100vw - 24px);
+    }
+
+    .hl-color-btn {
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      border: 1px solid rgba(255,255,255,0.2);
+      cursor: pointer;
+      transition: transform 0.15s ease;
+    }
+
+    .hl-color-btn:hover {
+      transform: scale(1.12);
+    }
+
+    .hl-yellow { background: rgba(245, 158, 11, 0.45); border-color: #f59e0b; }
+    .hl-green { background: rgba(16, 185, 129, 0.45); border-color: #10b981; }
+    .hl-pink { background: rgba(236, 72, 153, 0.45); border-color: #ec4899; }
+    
+    .hl-text-marker-yellow { background-color: rgba(245, 158, 11, 0.25); border-bottom: 2px solid #f59e0b; }
+    .hl-text-marker-green { background-color: rgba(16, 185, 129, 0.25); border-bottom: 2px solid #10b981; }
+    .hl-text-marker-pink { background-color: rgba(236, 72, 153, 0.25); border-bottom: 2px solid #ec4899; }
+
+    .tooltip-divider {
+      width: 1px;
+      height: 18px;
+      background: var(--border-soft);
+    }
+
+    .tooltip-btn {
+      background: transparent;
+      border: none;
+      color: var(--text-strong);
+      font-size: 13px;
+      font-weight: 600;
+      padding: 6px 4px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .tooltip-btn svg {
+      width: 16px;
+      height: 16px;
+    }
+
+    /* Modal Ghi chú & Đánh dấu */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(15, 23, 42, 0.6);
+      backdrop-filter: blur(4px);
+      z-index: 250;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+    }
+
+    .modal-overlay.show {
+      display: flex;
+    }
+
+    .note-modal {
+      background: var(--surface-strong);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      width: 100%;
+      max-width: 450px;
+      box-shadow: var(--shadow);
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .modal-title {
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--text-strong);
+    }
+
+    .quote-preview {
+      font-family: var(--font-reading);
+      font-size: 14px;
+      font-style: italic;
+      color: var(--muted);
+      border-left: 3px solid var(--accent);
+      padding-left: 10px;
+      line-height: 1.4;
+    }
+
+    .note-textarea {
+      width: 100%;
+      height: 100px;
+      background: var(--bg-deep);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text-strong);
+      font-family: var(--font-ui);
+      font-size: 16px;
+      padding: 10px;
+      resize: none;
+      outline: none;
+    }
+
+    .note-textarea:focus {
+      border-color: var(--accent);
+    }
+
+    .modal-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+    }
+
+    .modal-btn {
+      padding: 8px 16px;
+      font-size: 13px;
+      font-weight: 600;
+      border-radius: 6px;
+      cursor: pointer;
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--muted);
+    }
+
+    .modal-btn.primary {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #000;
+    }
+
+    .sidebar-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(15, 23, 42, 0.4);
+      backdrop-filter: blur(4px);
+      z-index: 150;
+      display: none;
+      opacity: 0;
+      transition: opacity 0.25s ease;
+    }
+
+    .sidebar-overlay.show {
+      display: block;
+      opacity: 1;
+    }
+
+    .toc-sidebar {
+      position: fixed;
+      top: 0;
+      left: 0;
+      bottom: 0;
+      width: min(100%, 340px);
+      max-width: 86vw;
+      padding-top: var(--safe-top);
+      padding-bottom: var(--safe-bottom);
+      background: var(--surface-strong);
+      border-right: 1px solid var(--border);
+      z-index: 160;
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      transform: translateX(-100%);
+      transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+      display: flex;
+      flex-direction: column;
+    }
+
+    .toc-sidebar.show {
+      transform: translateX(0);
+    }
+
+    .toc-header {
+      padding: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--border-soft);
+    }
+
+    .toc-title {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--text-strong);
+    }
+
+    .dialog-close {
+      width: 36px;
+      height: 36px;
+      border: none;
+      background: transparent;
+      color: var(--muted);
+      font-size: 18px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .toc-tabs {
+      display: flex;
+      padding: 8px 8px;
+      background: rgba(15, 23, 42, 0.3);
+      border-bottom: 1px solid var(--border-soft);
+      gap: 2px;
+    }
+
+    .toc-tab {
+      flex: 1;
+      height: 36px;
+      border: none;
+      background: transparent;
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 600;
+      border-radius: 6px;
+      cursor: pointer;
+      padding: 0 2px;
+      white-space: nowrap;
+    }
+
+    .toc-tab.active {
+      background: var(--surface);
+      color: var(--accent);
+    }
+
+    .toc-scroll {
+      flex: 1;
+      overflow-y: auto;
+      padding: 12px;
+    }
+
+    .toc-list {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .toc-item {
+      width: 100%;
+      padding: 12px;
+      border: none;
+      border-radius: 8px;
+      background: transparent;
+      color: var(--text);
+      font-size: 14px;
+      font-weight: 500;
+      text-align: left;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    .toc-item-label {
+      min-width: 0;
+      flex: 1;
+      line-height: 1.35;
+    }
+
+    .toc-comment-badge {
+      flex-shrink: 0;
+      min-width: 22px;
+      height: 22px;
+      padding: 0 6px;
+      border-radius: 999px;
+      background: var(--accent-soft);
+      color: var(--accent);
+      border: 1px solid rgba(245, 158, 11, 0.35);
+      font-size: 11px;
+      font-weight: 700;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .toc-item.active {
+      background: rgba(255,255,255,0.05);
+      color: var(--text-strong);
+      border-left: 3px solid var(--accent);
+      border-radius: 0 8px 8px 0;
+      padding-left: 9px;
+    }
+
+    .bookmarks-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .bookmark-card {
+      width: 100%;
+      text-align: left;
+      border: 1px solid var(--border-soft);
+      border-radius: 8px;
+      background: rgba(15, 23, 42, 0.35);
+      color: inherit;
+      padding: 12px;
+      cursor: pointer;
+      font-family: inherit;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      transition: border-color 0.15s, background 0.15s;
+    }
+
+    .bookmark-card:hover {
+      border-color: rgba(245, 158, 11, 0.28);
+      background: rgba(30, 41, 59, 0.55);
+    }
+
+    .bookmark-card-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-strong);
+    }
+
+    .bookmark-card-meta {
+      font-size: 11px;
+      color: var(--faint);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .bookmark-card-del {
+      border: none;
+      background: transparent;
+      color: var(--faint);
+      cursor: pointer;
+      font-size: 12px;
+      padding: 2px 4px;
+    }
+
+    .bookmark-card-del:hover {
+      color: #f87171;
+    }
+
+    .comments-drawer {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: min(78%, 560px);
+      max-height: calc(100dvh - var(--safe-top) - 48px);
+      background: var(--surface-strong);
+      border-top: 1px solid var(--border);
+      border-radius: 16px 16px 0 0;
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      z-index: 180;
+      transform: translateY(100%);
+      transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+      display: flex;
+      flex-direction: column;
+      padding-bottom: var(--safe-bottom);
+    }
+
+    .comments-drawer.show {
+      transform: translateY(0);
+    }
+
+    .drawer-header {
+      padding: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--border-soft);
+    }
+
+    .drawer-title {
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--text-strong);
+    }
+
+    .comments-scroll {
+      flex: 1;
+      overflow-y: auto;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .comment-item {
+      background: rgba(15, 23, 42, 0.3);
+      border: 1px solid var(--border-soft);
+      border-radius: 8px;
+      padding: 12px;
+    }
+
+    .comment-meta {
+      display: flex;
+      justify-content: space-between;
+      font-size: 11px;
+      color: var(--faint);
+      margin-bottom: 6px;
+    }
+
+    .comment-user {
+      font-weight: 600;
+      color: var(--accent);
+    }
+
+    .comment-text {
+      font-size: 13px;
+      color: var(--text);
+      line-height: 1.4;
+    }
+
+    .comment-input-area {
+      padding: 12px 16px 16px;
+      border-top: 1px solid var(--border-soft);
+      display: flex;
+      gap: 8px;
+      background: var(--surface-strong);
+    }
+
+    .comment-input {
+      flex: 1;
+      height: 44px;
+      background: var(--bg-deep);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text-strong);
+      padding: 0 12px;
+      font-family: var(--font-ui);
+      font-size: 15px;
+      outline: none;
+    }
+
+    .comment-send-btn {
+      height: 44px;
+      padding: 0 16px;
+      background: var(--accent);
+      border: none;
+      border-radius: 8px;
+      color: #000;
+      font-weight: 600;
+      font-size: 13px;
+      cursor: pointer;
+      touch-action: manipulation;
+      flex-shrink: 0;
+    }
+
+    /* Trình đơn Thêm tùy chọn (Dropdown) */
+    .more-menu {
+      position: absolute;
+      top: calc(100% + 8px);
+      right: 0;
+      min-width: min(220px, calc(100vw - 24px));
+      max-width: calc(100vw - 16px);
+      padding: 6px;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      background: var(--surface-strong);
+      box-shadow: var(--shadow);
+      display: none;
+      z-index: 120;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .more-menu.show {
+      display: flex;
+    }
+
+    .more-menu-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      width: 100%;
+      padding: 12px;
+      min-height: 40px;
+      border: none;
+      border-radius: 8px;
+      background: transparent;
+      color: var(--text);
+      font-family: inherit;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      text-align: left;
+      touch-action: manipulation;
+    }
+
+    .more-menu-item:hover {
+      background: rgba(255, 255, 255, 0.06);
+      color: var(--text-strong);
+    }
+
+    .more-menu-item.danger {
+      color: #f87171;
+    }
+
+    .more-menu-divider {
+      height: 1px;
+      background: var(--border-soft);
+      margin: 4px 6px;
+    }
+
+    .more-menu-item svg {
+      width: 18px;
+      height: 18px;
+      flex-shrink: 0;
+    }
+
+    .tools-menu {
+      position: absolute;
+      top: calc(100% + 8px);
+      right: 0;
+      min-width: min(220px, calc(100vw - 24px));
+      max-width: calc(100vw - 16px);
+      padding: 6px;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      background: var(--surface-strong);
+      box-shadow: var(--shadow);
+      display: none;
+      z-index: 120;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .tools-menu.show {
+      display: flex;
+    }
+
+    .tools-menu-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      width: 100%;
+      padding: 12px;
+      min-height: 44px;
+      border: none;
+      border-radius: 8px;
+      background: transparent;
+      color: var(--text);
+      font-family: inherit;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      text-align: left;
+      touch-action: manipulation;
+    }
+
+    .tools-menu-item:hover {
+      background: rgba(255, 255, 255, 0.06);
+      color: var(--text-strong);
+    }
+
+    .tools-menu-item.active {
+      color: var(--accent);
+      background: var(--accent-soft);
+    }
+
+    .tools-menu-item svg {
+      width: 18px;
+      height: 18px;
+      flex-shrink: 0;
+    }
+
+    .active-tool-chip {
+      display: none;
+      align-items: center;
+      gap: 6px;
+      height: 36px;
+      max-width: min(42vw, 140px);
+      padding: 0 10px 0 12px;
+      border: 1px solid rgba(245, 158, 11, 0.45);
+      border-radius: 999px;
+      background: var(--accent-soft);
+      color: var(--accent);
+      font-family: inherit;
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+      touch-action: manipulation;
+      flex-shrink: 1;
+      min-width: 0;
+    }
+
+    .active-tool-chip.show {
+      display: inline-flex;
+    }
+
+    .active-tool-chip-label {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .active-tool-chip-x {
+      flex-shrink: 0;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 11px;
+      line-height: 1;
+      background: rgba(245, 158, 11, 0.2);
+    }
+
+    /* FOOTER BAR (Thanh tiến trình) */
+    .footer-bar {
+      height: calc(var(--footer-h) + var(--safe-bottom));
+      padding: 0 16px var(--safe-bottom);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-top: 1px solid var(--border-soft);
+      background: var(--surface-strong);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      z-index: 50;
+      transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.3s;
+      flex-shrink: 0;
+    }
+
+    .footer-bar.hide {
+      transform: translateY(100%);
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .progress-slider-container {
+      flex: 1;
+      width: 100%;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .progress-slider {
+      flex: 1;
+      height: 20px;
+      display: flex;
+      align-items: center;
+      position: relative;
+      cursor: pointer;
+    }
+
+    .progress-slider-track {
+      width: 100%;
+      height: 4px;
+      background: var(--border-soft);
+      border-radius: 2px;
+      position: relative;
+    }
+
+    .progress-slider-fill {
+      height: 100%;
+      background: var(--accent);
+      border-radius: 2px;
+      width: 0%;
+    }
+
+    .progress-slider-handle {
+      position: absolute;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: #ffffff;
+      border: 3px solid var(--accent);
+      left: 0%;
+    }
+
+    .progress-percent-label {
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--muted);
+      width: 36px;
+    }
+
+    /* Toast Notifications */
+    #toastContainer {
+      position: fixed;
+      top: 24px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 999;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      pointer-events: none;
+    }
+
+    .toast {
+      background: var(--surface-strong);
+      border: 1px solid var(--border);
+      color: var(--text-strong);
+      padding: 10px 18px;
+      border-radius: 30px;
+      font-size: 13px;
+      font-weight: 600;
+      box-shadow: var(--shadow);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      opacity: 0;
+      transform: translateY(-20px);
+      transition: opacity 0.3s, transform 0.3s;
+    }
+
+    .toast.show {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    @media (min-width: 768px) {
+      :root {
+        --topbar-h: 64px;
+        --footer-h: 64px;
+      }
+
+      .topbar {
+        padding: var(--safe-top) 24px 0;
+      }
+
+      .tool-btn {
+        width: auto;
+        height: 40px;
+        padding: 0 14px;
+        gap: 8px;
+        font-size: 13px;
+        font-weight: 600;
+      }
+
+      .tool-btn span {
+        display: inline;
+      }
+
+      .dropdown-menu {
+        position: fixed;
+        top: calc(var(--topbar-h) + var(--safe-top) + 8px);
+        right: 16px;
+        left: auto;
+        bottom: auto;
+        width: 380px;
+        max-height: min(78vh, 660px);
+        border-radius: var(--radius);
+        border: 1px solid var(--border);
+        padding: 20px 20px 24px;
+        transform: translateY(10px);
+        opacity: 0;
+        display: none;
+        pointer-events: none;
+        box-shadow: var(--shadow);
+      }
+
+      .dropdown-menu.show {
+        display: flex;
+        transform: translateY(0);
+        opacity: 1;
+        pointer-events: auto;
+      }
+
+      .dropdown-overlay {
+        display: none !important;
+      }
+
+      .dropdown-pull-bar {
+        display: none;
+      }
+
+      .reader-scroll-container {
+        padding: 40px 32px 80px;
+      }
+
+      .comments-drawer {
+        top: 0;
+        bottom: 0;
+        right: 0;
+        left: auto;
+        width: min(360px, 90vw);
+        height: 100%;
+        max-height: none;
+        border-left: 1px solid var(--border);
+        border-top: none;
+        border-radius: 0;
+        transform: translateX(100%);
+        padding-bottom: 0;
+      }
+
+      .comments-drawer.show {
+        transform: translateX(0);
+      }
+    }
+  </style>
+</head>
+<body class="theme-dark">
+
+  <div class="reader-app mode-single-page" id="readerApp">
+
+    <button
+      class="toc-edge-btn"
+      id="tocEdgeBtn"
+      type="button"
+      onclick="event.stopPropagation(); toggleToCSidebar(true)"
+      title="Mở mục lục — bấm vào dải cạnh trái"
+      aria-label="Mở mục lục"
+      aria-expanded="false"
+    >
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.4" stroke="currentColor" aria-hidden="true">
+        <path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
+      </svg>
+    </button>
+
+    <!-- Bookmark Edge Ribbon -->
+    <button
+      class="bookmark-edge-btn"
+      id="bookmarkEdgeBtn"
+      type="button"
+      onclick="event.stopPropagation(); onBookmarkEdgeClick()"
+      title="Đánh dấu chương hiện tại"
+      aria-label="Bookmark"
+      aria-pressed="false"
+    >
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" aria-hidden="true">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M17.593 3.322c1.1.128 1.907 1.077 1.907 2.185V21L12 17.25 4.5 21V5.507c0-1.108.806-2.057 1.907-2.185a48.507 48.507 0 0 1 11.186 0Z" />
+      </svg>
+    </button>
+    
+    <!-- TOPBAR -->
+    <header class="topbar" id="topbar" onclick="event.stopPropagation()">
+      <div class="topbar-left">
+        <button class="back-btn" type="button" onclick="goBackToLibrary()" title="Quay lại thư viện" aria-label="Quay lại thư viện">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.2" stroke="currentColor" style="width:22px; height:22px;">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" />
+          </svg>
+        </button>
+        <div class="book-meta">
+          <h1 class="book-title" id="bookTitle">Thinking in Systems</h1>
+          <p class="chapter-indicator" id="chapterIndicator">Chương 1</p>
+        </div>
+      </div>
+
+      <div class="topbar-right">
+        <div class="topbar-actions">
+          <button class="active-tool-chip" id="activeToolChip" type="button" onclick="clearAnnotateTool(event)" title="Tắt công cụ" aria-label="Tắt công cụ đang dùng" hidden>
+            <span class="active-tool-chip-label" id="activeToolChipLabel">Highlight</span>
+            <span class="active-tool-chip-x" aria-hidden="true">✕</span>
+          </button>
+
+          <!-- Annotate Tools -->
+          <button class="tool-btn" id="toolsBtn" type="button" onclick="toggleToolsMenu(event)" title="Công cụ tương tác" aria-label="Công cụ chú thích" aria-haspopup="true" aria-expanded="false">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" style="width:20px; height:20px;" aria-hidden="true">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M11.42 15.17 17.25 21A2.652 2.652 0 0 0 21 17.25l-5.877-5.877M11.42 15.17l2.496-3.03c.317-.384.74-.626 1.208-.766M11.42 15.17l-4.655 5.653a2.548 2.548 0 1 1-3.586-3.586l6.837-5.63m5.108-.233c.55-.05 1.023-.288 1.415-.68l3.97-3.97a.75.75 0 0 0-1.06-1.06l-3.97 3.97c-.392.391-.63.864-.68 1.415m-5.108.233c-.55.05-1.023.288-1.415.68l-3.97 3.97a.75.75 0 1 0 1.06 1.06l3.97-3.97c.392-.391.63-.864.68-1.415" />
+            </svg>
+            <span>Công cụ</span>
+          </button>
+
+          <div class="tools-menu" id="toolsMenu" role="menu" onclick="event.stopPropagation()">
+            <button class="tools-menu-item" type="button" role="menuitem" data-tool="note" onclick="selectAnnotateTool('note')">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10" />
+              </svg>
+              Ghi chú
+            </button>
+            <button class="tools-menu-item" type="button" role="menuitem" data-tool="highlight" onclick="selectAnnotateTool('highlight')">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M9.53 16.122a3 3 0 0 0-5.78 1.128 2.25 2.25 0 0 1-2.4 2.245 4.5 4.5 0 0 0 8.4-2.245c0-.399-.078-.78-.22-1.128Zm0 0a15.998 15.998 0 0 0 3.388-1.62m-5.043-.025a15.994 15.994 0 0 1 1.622-3.395m3.42 3.42a15.995 15.995 0 0 0 4.764-4.648l3.876-5.814a1.151 1.151 0 0 0-1.597-1.597L14.146 6.32a15.996 15.996 0 0 0-4.649 4.763m3.42 3.42a6.776 6.776 0 0 0-3.42-3.42" />
+              </svg>
+              Tô sáng
+            </button>
+            <button class="tools-menu-item" type="button" role="menuitem" data-tool="comment" onclick="selectAnnotateTool('comment')">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M7.5 8.25h9m-9 3H12m-9.75 1.51c0 1.6 1.123 2.994 2.707 3.227 1.129.166 2.27.293 3.423.379.35.026.67.21.865.501L12 21l2.755-4.133a1.14 1.14 0 0 1 .865-.501 48.172 48.172 0 0 0 3.423-.379c1.584-.233 2.707-1.626 2.707-3.228V6.741c0-1.602-1.123-2.995-2.707-3.228A48.394 48.394 0 0 0 12 3c-2.392 0-4.744.175-7.043.513C3.373 3.746 2.25 5.14 2.25 6.741v6.018Z" />
+              </svg>
+              Bình luận (Điền đáp án)
+            </button>
+          </div>
+
+          <!-- Format settings -->
+          <button class="tool-btn" id="aaBtn" type="button" onclick="toggleDropdown(event)" title="Cài đặt hiển thị" aria-label="Cấu hình định dạng">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" style="width:20px; height:20px;" aria-hidden="true">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.325.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 0 1 1.37.49l1.296 2.247a1.125 1.125 0 0 1-.26 1.431l-1.003.827c-.293.241-.438.613-.43.992a7.723 7.723 0 0 1 0 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.955.26 1.43l-1.298 2.247a1.125 1.125 0 0 1-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.47 6.47 0 0 1-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.94-1.11.94h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 0 1-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 0 1-1.369-.49l-1.297-2.247a1.125 1.125 0 0 1 .26-1.431l1.004-.827c.292-.24.437-.613.43-.991a6.932 6.932 0 0 1 0-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 0 1-.26-1.43l1.297-2.247a1.125 1.125 0 0 1 1.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.087.22-.128.332-.183.582-.495.644-.869l.214-1.28Z" />
+              <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
+            </svg>
+            <span>Cài đặt</span>
+          </button>
+
+          <!-- More options -->
+          <button class="tool-btn" id="moreBtn" type="button" onclick="toggleMoreMenu(event)" title="Tùy chọn khác" aria-label="Thêm tùy chọn" aria-haspopup="true" aria-expanded="false">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" style="width:20px; height:20px;" aria-hidden="true">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M12 6.75a.75.75 0 1 1 0-1.5.75.75 0 0 1 0 1.5ZM12 12.75a.75.75 0 1 1 0-1.5.75.75 0 0 1 0 1.5ZM12 18.75a.75.75 0 1 1 0-1.5.75.75 0 0 1 0 1.5Z" />
+            </svg>
+          </button>
+
+          <div class="more-menu" id="moreMenu" role="menu" onclick="event.stopPropagation()">
+            <button class="more-menu-item" type="button" role="menuitem" onclick="shareDocument()">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M9 8.25H7.5a2.25 2.25 0 0 0-2.25 2.25v9a2.25 2.25 0 0 0 2.25 2.25h9a2.25 2.25 0 0 0 2.25-2.25v-9a2.25 2.25 0 0 0-2.25-2.25H15m0-3-3-3m0 0-3 3m3-3V15" />
+              </svg>
+              Chia sẻ tài liệu
+            </button>
+            <button class="more-menu-item" type="button" role="menuitem" onclick="addToFavorites()">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M11.48 3.499a.562.562 0 0 1 1.04 0l2.125 5.111a.563.563 0 0 0 .475.345l5.518.442c.499.04.701.663.321.988l-4.204 3.602a.563.563 0 0 0-.182.557l1.285 5.385a.562.562 0 0 1-.84.61l-4.725-2.885a.562.562 0 0 0-.586 0L6.982 20.54a.562.562 0 0 1-.84-.61l1.285-5.386a.562.562 0 0 0-.182-.557l-4.204-3.602a.562.562 0 0 1 .321-.988l5.518-.442a.563.563 0 0 0 .475-.345L11.48 3.5Z" />
+              </svg>
+              Thêm vào Favorites
+            </button>
+            <button class="more-menu-item" type="button" role="menuitem" onclick="showBookInfo()">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" d="m11.25 11.25.041-.02a.75.75 0 0 1 1.063.852l-.708 2.836a.75.75 0 0 0 1.063.853l.041-.021M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9-3.75h.008v.008H12V8.25Z" />
+              </svg>
+              Thông tin sách
+            </button>
+            <div class="more-menu-divider"></div>
+            <button class="more-menu-item danger" type="button" role="menuitem" onclick="triggerTrashConfirmation()">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
+              </svg>
+              Xóa vào thùng rác
+            </button>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <div class="dropdown-overlay" id="aaOverlay" onclick="closeDropdown()"></div>
+    <div class="dropdown-menu" id="aaDropdown" onclick="event.stopPropagation()">
+      <div class="dropdown-pull-bar"></div>
+
+      <div class="dropdown-menu-header">
+        <h2>Cấu hình trang đọc</h2>
+        <button class="settings-close-btn" type="button" onclick="closeDropdown()" aria-label="Đóng">✕</button>
+      </div>
+
+      <!-- LỰA CHỌN KIỂU ĐỌC: 1 TRANG VS 2 TRANG SỐNG SÁCH -->
+      <div class="dropdown-section">
+        <div class="dropdown-section-title">Bố cục dàn trang (Layout)</div>
+        <div class="toggle-group">
+          <button class="toggle-item active" id="layoutSingleBtn" type="button" onclick="changeReadingLayout('single')">1 Trang căn giữa</button>
+          <button class="toggle-item" id="layoutDualBtn" type="button" onclick="changeReadingLayout('dual')">2 Trang song song</button>
+        </div>
+        <p style="margin: 8px 0 0; font-size: 11px; color: var(--muted); line-height: 1.45;">Bố cục 2 trang tự động bật vạch sống sách mô phỏng chân thực khi hiển thị ngang màn hình lớn.</p>
+      </div>
+
+      <div class="dropdown-section">
+        <div class="dropdown-section-title">Màu nền</div>
+        <div class="theme-grid">
+          <button class="theme-swatch active" type="button" style="background: #0f172a; color: #cbd5e1; border-color: rgba(51, 65, 85, 0.45); height: 42px; border-radius: 8px; font-family: inherit; font-size: 13px; font-weight: 600; cursor: pointer;" onclick="setTheme('dark', this)">Đêm</button>
+          <button class="theme-swatch" type="button" style="background: #251f19; color: #e1cfb3; border-color: #5e503f; height: 42px; border-radius: 8px; font-family: inherit; font-size: 13px; font-weight: 600; cursor: pointer;" onclick="setTheme('sepia', this)">Sepia</button>
+          <button class="theme-swatch" type="button" style="background: #ffffff; color: #334155; border-color: #cbd5e1; height: 42px; border-radius: 8px; font-family: inherit; font-size: 13px; font-weight: 600; cursor: pointer;" onclick="setTheme('paper', this)">Giấy</button>
+        </div>
+      </div>
+
+      <div class="dropdown-section">
+        <div class="dropdown-section-title">Cỡ chữ</div>
+        <div class="font-size-control" style="display: flex; align-items: center; gap: 8px;">
+          <button class="font-size-btn" type="button" style="flex: 1; height: 40px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface); color: var(--text-strong); font-size: 14px; font-weight: bold; cursor: pointer;" onclick="adjustFontSize(-1)">A-</button>
+          <div class="font-size-indicator" id="fontSizeLabel" style="width: 60px; text-align: center; font-weight: 700;">18px</div>
+          <button class="font-size-btn" type="button" style="flex: 1; height: 40px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface); color: var(--text-strong); font-size: 14px; font-weight: bold; cursor: pointer;" onclick="adjustFontSize(1)">A+</button>
+        </div>
+      </div>
+
+      <div class="dropdown-section">
+        <div class="dropdown-section-title">Font chữ</div>
+        <div class="toggle-group">
+          <button class="toggle-item active" id="fontSerif" type="button" onclick="setFontFamily('serif')">Serif</button>
+          <button class="toggle-item" id="fontSans" type="button" onclick="setFontFamily('sans')">Sans-serif</button>
+          <button class="toggle-item" id="fontMono" type="button" onclick="setFontFamily('mono')">Mono</button>
+        </div>
+      </div>
+
+      <div class="dropdown-section">
+        <div class="dropdown-section-title">Độ đậm</div>
+        <div class="toggle-group">
+          <button class="toggle-item" id="weightLight" type="button" onclick="setFontWeight(300)">Mỏng</button>
+          <button class="toggle-item active" id="weightNormal" type="button" onclick="setFontWeight(400)">Vừa</button>
+          <button class="toggle-item" id="weightBold" type="button" onclick="setFontWeight(600)">Đậm</button>
+        </div>
+      </div>
+
+      <div class="dropdown-section">
+        <div class="dropdown-section-title">Lề trang</div>
+        <div class="toggle-group" style="margin-bottom: 10px;">
+          <button class="toggle-item active" id="marginOn" type="button" onclick="setMarginEnabled(true)">Bật lề</button>
+          <button class="toggle-item" id="marginOff" type="button" onclick="setMarginEnabled(false)">Tắt lề</button>
+        </div>
+        <div class="toggle-group" id="marginSizeGroup">
+          <button class="toggle-item" id="marginNarrow" type="button" onclick="setMargin('narrow')">Hẹp</button>
+          <button class="toggle-item active" id="marginNormal" type="button" onclick="setMargin('normal')">Vừa</button>
+          <button class="toggle-item" id="marginWide" type="button" onclick="setMargin('wide')">Rộng</button>
+        </div>
+      </div>
+
+      <div class="dropdown-section">
+        <div class="dropdown-section-title">Khoảng cách dòng</div>
+        <div class="slider-row" style="display: flex; align-items: center; gap: 12px;">
+          <input type="range" id="lineHeightSlider" min="1.3" max="2.3" step="0.05" value="1.65" style="flex:1; accent-color: var(--accent);" oninput="setLineHeight(this.value)">
+          <span class="slider-value" id="lineHeightLabel" style="font-weight: 700; font-size:12px; min-width:32px; text-align:right;">1.65</span>
+        </div>
+      </div>
+
+      <div class="dropdown-section">
+        <div class="dropdown-section-title">Cách lật trang</div>
+        <div class="toggle-group">
+          <button class="toggle-item active" id="pageModeScroll" type="button" onclick="setPageMode('scroll')">Cuộn dọc</button>
+          <button class="toggle-item" id="pageModePaginated" type="button" onclick="setPageMode('paginated')">Lật trang</button>
+        </div>
+      </div>
+    </div>
+
+    <main class="reader-scroll-container" id="readerScroll" onclick="onReaderBackgroundClicked()">
+      <div class="reading-area" id="readingArea">
+        <div class="chapter-header-decor">
+          <p class="chapter-num" id="chapterNumDisplay">CHƯƠNG I</p>
+          <h2 class="chapter-title" id="chapterTitleDisplay">Các Hệ Thống Động</h2>
+        </div>
+        
+        <div class="chapter-content" id="chapterContent">
+          <!-- Phục vụ kết cấu render động thông qua Javascript -->
+        </div>
+      </div>
+    </main>
+
+    <!-- FLOATING HIGHLIGHT & NOTE TOOLTIP -->
+    <div class="highlight-tooltip" id="highlightTooltip">
+      <button class="hl-color-btn hl-yellow" onclick="applyHighlight('yellow')" title="Tô sáng màu vàng"></button>
+      <button class="hl-color-btn hl-green" onclick="applyHighlight('green')" title="Tô sáng màu xanh lá"></button>
+      <button class="hl-color-btn hl-pink" onclick="applyHighlight('pink')" title="Tô sáng màu hồng"></button>
+      <div class="tooltip-divider"></div>
+      
+      <button class="tooltip-btn" onclick="openNoteModal()">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10" />
+        </svg>
+        Ghi chú
+      </button>
+
+      <button class="tooltip-btn" onclick="copySelectedText()">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 17.25v3.375c0 .621-.504 1.125-1.125 1.125h-9.75a1.125 1.125 0 01-1.125-1.125V7.875c0-.621.504-1.125 1.125-1.125H5.4M7.5 16.5h.008v.008H7.5V16.5zm0-3h.008v.008H7.5v-.008zm0-3h.008v.008H7.5V10.5zm1.125-6H21m-1.125 13.5H9.75M9.75 18V6H21v12H9.75z" />
+        </svg>
+        Sao chép
+      </button>
+    </div>
+
+    <!-- MODAL ĐÍNH KÈM GHI CHÚ -->
+    <div class="modal-overlay" id="noteModalOverlay" onclick="closeNoteModal()">
+      <div class="note-modal" onclick="event.stopPropagation()">
+        <div class="modal-title">Đính kèm Ghi chú</div>
+        <div class="quote-preview" id="noteQuotePreview">Đoạn trích đang chọn...</div>
+        <textarea class="note-textarea" id="noteInput" placeholder="Nội dung thảo luận hoặc phân tích của riêng bạn..."></textarea>
+        <div class="modal-actions">
+          <button class="modal-btn" onclick="closeNoteModal()">Hủy</button>
+          <button class="modal-btn primary" onclick="saveNote()">Lưu Ghi Chú</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- KHAY ĐÁP ÁN / COMMENTS THEO TỪNG ĐOẠN -->
+    <div class="comments-drawer" id="commentsDrawer">
+      <div class="drawer-header">
+        <h3 class="drawer-title" id="drawerParaTitle">Comment & Ghi đáp án</h3>
+        <button class="dialog-close" onclick="toggleCommentsDrawer(false)">✕</button>
+      </div>
+      
+      <div class="comments-scroll" id="commentsList"></div>
+
+      <div class="comment-input-area" onclick="event.stopPropagation()">
+        <input type="text" class="comment-input" id="commentInput" placeholder="Viết phản hồi hoặc điền câu trả lời...">
+        <button class="comment-send-btn" onclick="submitComment()">Lưu</button>
+      </div>
+    </div>
+
+    <div class="sidebar-overlay" id="sidebarOverlay" onclick="toggleToCSidebar(false)"></div>
+    <div class="toc-sidebar" id="tocSidebar">
+      <div class="toc-header">
+        <h2 class="toc-title">Thư viện & Tiện ích</h2>
+        <button class="dialog-close" onclick="toggleToCSidebar(false)">✕</button>
+      </div>
+      <div class="toc-tabs">
+        <button class="toc-tab active" id="tabChaptersBtn" onclick="switchSidebarTab('chapters')">Chương</button>
+        <button class="toc-tab" id="tabBookmarksBtn" onclick="switchSidebarTab('bookmarks')">Bookmarks</button>
+        <button class="toc-tab" id="tabHighlightsBtn" onclick="switchSidebarTab('highlights')">Notes</button>
+        <button class="toc-tab" id="tabCommentsBtn" onclick="switchSidebarTab('comments')">Comments</button>
+      </div>
+
+      <div class="toc-scroll">
+        <!-- Tab Danh sách chương -->
+        <div id="tabChaptersContent">
+          <ul class="toc-list" id="tocList"></ul>
+        </div>
+
+        <!-- Tab Bookmarks -->
+        <div id="tabBookmarksContent" style="display: none;">
+          <div style="padding: 12px 12px 4px;">
+            <button class="bookmark-add-btn" type="button" style="width: 100%; height: 40px; border: 1px dashed var(--border); border-radius: 8px; background: transparent; color: var(--muted); font-family: inherit; font-size: 13px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px;" onclick="toggleBookmarkHere()">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" style="width:18px;height:18px" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M17.593 3.322c1.1.128 1.907 1.077 1.907 2.185V21L12 17.25 4.5 21V5.507c0-1.108.806-2.057 1.907-2.185a48.507 48.507 0 0 1 11.186 0Z" />
+              </svg>
+              <span id="bookmarkAddLabel">Đánh dấu trang hiện tại</span>
+            </button>
+          </div>
+          <div class="bookmarks-list" id="bookmarksList" style="padding: 12px 12px 24px;"></div>
+          <p id="bookmarksEmpty" style="padding: 24px 16px; text-align: center; font-size: 13px; color: var(--faint);">Chưa có bookmark nào được lưu.</p>
+        </div>
+
+        <!-- Tab Highlight & Notes -->
+        <div id="tabHighlightsContent" style="display: none;">
+          <div id="savedHighlightsList" style="display: flex; flex-direction: column; gap: 12px; padding: 12px;"></div>
+        </div>
+
+        <!-- Tab Comments -->
+        <div id="tabCommentsContent" style="display: none;">
+          <p style="font-size: 11px; line-height:1.45; color: var(--muted); padding: 8px 12px; background: rgba(245, 158, 11, 0.08); border-radius:8px; border: 1px solid rgba(245, 158, 11, 0.15); margin: 0 12px 12px;">Đóng góp bài làm, đáp án hoặc giải nghĩa cụ thể theo từng đoạn văn để lưu trữ đồng bộ.</p>
+          <div id="savedCommentsList" style="padding: 0 12px;"></div>
+          <p id="commentsEmpty" style="padding: 24px 16px; text-align: center; font-size: 13px; color: var(--faint);">Chưa có bình luận hoặc lời giải.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- PROGRESS SLIDER BAR (Thanh trượt Tiến độ) -->
+    <footer class="footer-bar" id="footerBar">
+      <div class="progress-slider-container">
+        <span class="progress-percent-label" id="progressPercentLeft">0%</span>
+        <div class="progress-slider" id="progressSlider" onclick="handleProgressBarClick(event)">
+          <div class="progress-slider-track">
+            <div class="progress-slider-fill" id="progressFill"></div>
+            <div class="progress-slider-handle" id="progressHandle"></div>
+          </div>
+        </div>
+        <span class="progress-percent-label" id="progressPercentRight" style="text-align: right;">100%</span>
+      </div>
+    </footer>
+
+    <div class="custom-dialog-overlay" id="confirmDialog">
+      <div class="custom-dialog">
+        <div class="custom-dialog-title" id="confirmDialogTitle">Xác nhận tác vụ</div>
+        <div class="custom-dialog-desc" id="confirmDialogDesc">Nội dung yêu cầu xác thực...</div>
+        <div class="custom-dialog-actions">
+          <button class="dialog-btn" id="confirmCancelBtn" onclick="closeCustomConfirm(false)">Hủy</button>
+          <button class="dialog-btn confirm-danger" id="confirmOkBtn" onclick="closeCustomConfirm(true)">Xác nhận</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Container chứa các thông báo nổi Toast -->
+    <div id="toastContainer"></div>
+
+  </div>
+
+  <script>
+    // Cơ sở dữ liệu Mock gốc của tác phẩm văn học / học tập
+    const bookData = {
+      title: "Thinking in Systems",
+      author: "Donella H. Meadows",
+      chapters: [
+        {
+          num: "CHƯƠNG I",
+          title: "Các Hệ Thống Động",
+          paragraphs: [
+            "Hệ thống (system) xuất hiện ở khắp mọi nơi xung quanh chúng ta. Từ cơ thể sống của một con sinh vật nhỏ bé cho đến guồng quay phức tạp của các siêu đô thị hay mạng lưới khí hậu toàn cầu. Một hệ thống không chỉ đơn thuần là tập hợp ngẫu nhiên của các thành phần, mà nó là một thể thống nhất được thiết kế có tổ chức, nhằm đạt được một chức năng hay mục tiêu nhất định nào đó.",
+            "Hãy tưởng tượng một chiếc bồn tắm có vòi nước đang chảy và lỗ thoát nước đang mở. Đây chính là mô hình hệ thống động học cơ bản nhất mà bạn có thể tìm thấy. Lượng nước hiện có trong bồn đại diện cho Kho chứa (Stock). Dòng nước từ vòi chảy vào đại diện cho Dòng vào (Inflow). Dòng nước thoát ra đại diện cho Dòng ra (Outflow). Sự cân bằng của toàn bộ hệ thống này phụ thuộc vào tốc độ tương đối giữa hai dòng vào và ra đó.",
+            "Các kho chứa là nền móng của mọi hệ thống. Chúng thay đổi chậm chạp và thường đóng vai trò như một bộ giảm xóc hoặc chất đệm đối với các thay đổi đột ngột từ bên ngoài. Trái lại, các luồng dòng chảy luôn biến động liên tục dưới sự kiểm soát của hệ thống thông tin phản hồi."
+          ]
+        },
+        {
+          num: "CHƯƠNG II",
+          title: "Vòng Phản Hồi Âm & Dương",
+          paragraphs: [
+            "Vòng phản hồi (feedback loops) là cơ chế tự điều chỉnh cốt lõi của tất cả mọi hệ thống. Có hai loại phản hồi chính: Phản hồi cân bằng (Balancing) và Phản hồi gia tăng (Reinforcing).",
+            "Vòng phản hồi cân bằng hoạt động giống như một chiếc máy điều hòa nhiệt độ trong phòng. Khi nhiệt độ vượt quá ngưỡng cho phép, cảm biến kích hoạt hệ thống làm mát hoạt động mạnh để kéo nhiệt độ đi xuống. Cơ chế này luôn có xu hướng chống lại sự thay đổi, giữ cho hệ thống luôn ở trạng thái ổn định lý tưởng.",
+            "Vòng phản hồi gia tăng lại hoạt động theo chiều hướng ngược lại - nhân cấp lũy thừa. Nó giống như tài khoản tiết kiệm sinh lãi kép hoặc phản ứng dây chuyền. Sự gia tăng của kho chứa dẫn đến sự gia tăng của dòng vào, và dòng vào lại tiếp tục bồi đắp kho chứa lớn hơn nữa. Đây là gốc rễ của sự tăng trưởng vượt bậc hoặc sự sụp đổ dây chuyền."
+          ]
+        }
+      ]
+    };
+
+    // Database chứa Comments, lời giải đáp án
+    let commentsDatabase = {
+      "0-0": [
+        { user: "Đại học Sư Phạm", text: "Hệ thống bao gồm 3 yếu tố cốt lõi: các yếu tố, các mối quan hệ, và mục tiêu chung.", date: "10 phút trước" }
+      ],
+      "0-1": [
+        { user: "Học viên A", text: "Bài tập nộp: Kho chứa (Stock) là chỉ số lưu trữ, vòi chảy là Inflow.", date: "1 giờ trước" }
+      ]
+    };
+
+    // State của ứng dụng đọc sách
+    let currentChapterIndex = 0;
+    let isUiHidden = false;
+    let savedHighlights = [];
+    let savedBookmarks = [];
+    let bookmarkIdSeq = 1;
+    let selectedTextRange = null;
+    let selectedTextString = "";
+    let activeCommentTargetKey = null;
+    let activeAnnotateTool = null;
+    let currentReadingLayout = "single"; // Mặc định là 1 trang căn giữa (Single Column Centered)
+
+    // Biến xử lý Callback cho Custom Confirm dialog
+    let confirmDialogCallback = null;
+
+    window.onload = function() {
+      loadChapter(0);
+      buildToC();
+      
+      // Khởi tạo layout mặc định: 1 trang căn giữa (Single)
+      changeReadingLayout('single');
+      setPageMode('scroll');
+
+      window.addEventListener('resize', syncDualPageRule);
+      window.addEventListener('orientationchange', syncDualPageRule);
+      
+      document.addEventListener('click', () => {
+        closeMoreMenu();
+        closeToolsMenu();
+      });
+    };
+
+    function changeReadingLayout(mode) {
+      currentReadingLayout = mode;
+      const app = document.getElementById('readerApp');
+      const singleBtn = document.getElementById('layoutSingleBtn');
+      const dualBtn = document.getElementById('layoutDualBtn');
+
+      if (mode === 'dual') {
+        app.classList.remove('mode-single-page');
+        app.classList.add('mode-dual-page');
+        if (singleBtn) singleBtn.classList.remove('active');
+        if (dualBtn) dualBtn.classList.add('active');
+      } else {
+        app.classList.remove('mode-dual-page');
+        app.classList.add('mode-single-page');
+        if (singleBtn) singleBtn.classList.add('active');
+        if (dualBtn) dualBtn.classList.remove('active');
+      }
+
+      syncDualPageRule();
+    }
+
+    // Điều hướng phân chia cột dựa vào hướng xoay màn hình khi ở chế độ 2 trang
+    function syncDualPageRule() {
+      // Logic xử lý nội bộ tự đồng bộ theo kích thước của CSS engine
+    }
+
+    function loadChapter(index) {
+      currentChapterIndex = index;
+      const chapter = bookData.chapters[index];
+
+      document.getElementById('readerScroll').scrollTop = 0;
+      document.getElementById('chapterIndicator').textContent = `${chapter.num}: ${chapter.title}`;
+      document.getElementById('chapterNumDisplay').textContent = chapter.num;
+      document.getElementById('chapterTitleDisplay').textContent = chapter.title;
+
+      syncBookmarkEdgeState();
+
+      const contentEl = document.getElementById('chapterContent');
+      contentEl.innerHTML = '';
+
+      chapter.paragraphs.forEach((p, pIdx) => {
+        const wrapper = document.createElement('div');
+        wrapper.className = `paragraph-wrapper ${pIdx === 0 ? 'first-p' : ''}`;
+        wrapper.dataset.paraKey = `${index}-${pIdx}`;
+        wrapper.dataset.paraIdx = String(pIdx);
+        
+        const paragraphNode = document.createElement('p');
+        paragraphNode.textContent = p;
+        wrapper.appendChild(paragraphNode);
+
+        const key = `${index}-${pIdx}`;
+        const count = commentsDatabase[key] ? commentsDatabase[key].length : 0;
+        if (count > 0) wrapper.classList.add('has-comments');
+        
+        const commentBtn = document.createElement('button');
+        commentBtn.className = 'comment-trigger-btn' + (count > 0 ? ' has-comments' : '');
+        commentBtn.type = 'button';
+        commentBtn.title = count > 0 ? `${count} comment — xem đáp án` : 'Ghi đáp án / bình luận';
+        commentBtn.innerHTML = `
+          <svg viewBox="0 0 24 24" fill="currentColor" style="width:11px;height:11px;">
+            <path d="M12 2C6.477 2 2 6.119 2 11.2c0 2.894 1.455 5.485 3.738 7.11-.122.955-.541 2.502-1.341 3.513-.1.127-.035.314.126.35 1.95.434 4.056-.23 5.347-.94A10.155 10.155 0 0 0 12 20.4c5.523 0 10-4.119 10-9.2C22 6.119 17.523 2 12 2Z"/>
+          </svg>
+          <span>${count}</span>
+        `;
+        commentBtn.onclick = (e) => {
+          e.stopPropagation();
+          openCommentsDrawer(key, pIdx);
+        };
+        wrapper.appendChild(commentBtn);
+
+        // Kích hoạt khi công cụ Bình luận đang được chọn làm Active Tool
+        wrapper.addEventListener('click', (e) => {
+          if (activeAnnotateTool !== 'comment') return;
+          if (e.target.closest('.comment-trigger-btn')) return;
+          e.stopPropagation();
+          openCommentsDrawer(key, pIdx);
+        });
+
+        contentEl.appendChild(wrapper);
+      });
+
+      refreshTocCommentBadges();
+      document.querySelectorAll('.toc-item').forEach((item, i) => {
+        item.classList.toggle('active', i === index);
+      });
+
+      updateProgressBar((index / (bookData.chapters.length - 1)) * 100);
+    }
+
+    function showCustomConfirm(title, desc, callback) {
+      const dialog = document.getElementById('confirmDialog');
+      document.getElementById('confirmDialogTitle').textContent = title;
+      document.getElementById('confirmDialogDesc').textContent = desc;
+      confirmDialogCallback = callback;
+      
+      dialog.style.display = 'flex';
+      setTimeout(() => dialog.classList.add('show'), 50);
+    }
+
+    function closeCustomConfirm(status) {
+      const dialog = document.getElementById('confirmDialog');
+      dialog.classList.remove('show');
+      setTimeout(() => {
+        dialog.style.display = 'none';
+        if (confirmDialogCallback) {
+          confirmDialogCallback(status);
+          confirmDialogCallback = null;
+        }
+      }, 200);
+    }
+
+    function triggerTrashConfirmation() {
+      closeMoreMenu();
+      showCustomConfirm(
+        "Xác nhận xóa tài liệu",
+        "Bạn có chắc chắn muốn chuyển tài liệu này vào thùng rác? Bạn có thể khôi phục lại từ trình quản lý lưu trữ bất cứ lúc nào.",
+        function(isConfirmed) {
+          if (isConfirmed) {
+            showToast("Đã chuyển tài liệu vào thùng rác.", "info");
+          }
+        }
+      );
+    }
+
+    function toggleDropdown(event) {
+      if (event) event.stopPropagation();
+      closeMoreMenu();
+      closeToolsMenu();
+      const dropdown = document.getElementById('aaDropdown');
+      const overlay = document.getElementById('aaOverlay');
+      const isVisible = dropdown.classList.contains('show');
+
+      if (!isVisible) {
+        dropdown.classList.add('show');
+        overlay.classList.add('show');
+        document.getElementById('aaBtn').classList.add('active');
+      } else {
+        closeDropdown();
+      }
+    }
+
+    function closeDropdown() {
+      document.getElementById('aaDropdown').classList.remove('show');
+      const overlay = document.getElementById('aaOverlay');
+      if (overlay) overlay.classList.remove('show');
+      document.getElementById('aaBtn').classList.remove('active');
+    }
+
+    function toggleToolsMenu(event) {
+      if (event) event.stopPropagation();
+      closeDropdown();
+      closeMoreMenu();
+      const menu = document.getElementById('toolsMenu');
+      const btn = document.getElementById('toolsBtn');
+      const willShow = !menu.classList.contains('show');
+      menu.classList.toggle('show', willShow);
+      btn.classList.toggle('active', willShow);
+      btn.setAttribute('aria-expanded', willShow ? 'true' : 'false');
+    }
+
+    function closeToolsMenu() {
+      const menu = document.getElementById('toolsMenu');
+      const btn = document.getElementById('toolsBtn');
+      if (!menu) return;
+      menu.classList.remove('show');
+      if (btn) {
+        btn.classList.remove('active');
+        btn.setAttribute('aria-expanded', 'false');
+        btn.classList.toggle('has-active-tool', !!activeAnnotateTool);
+      }
+    }
+
+    function toggleMoreMenu(event) {
+      if (event) event.stopPropagation();
+      closeDropdown();
+      closeToolsMenu();
+      const menu = document.getElementById('moreMenu');
+      const btn = document.getElementById('moreBtn');
+      const willShow = !menu.classList.contains('show');
+      menu.classList.toggle('show', willShow);
+      btn.classList.toggle('active', willShow);
+      btn.setAttribute('aria-expanded', willShow ? 'true' : 'false');
+    }
+
+    function closeMoreMenu() {
+      const menu = document.getElementById('moreMenu');
+      const btn = document.getElementById('moreBtn');
+      if (!menu) return;
+      menu.classList.remove('show');
+      if (btn) {
+        btn.classList.remove('active');
+        btn.setAttribute('aria-expanded', 'false');
+      }
+    }
+
+    document.addEventListener('selectionchange', () => {
+      const selection = window.getSelection();
+      if (!selection || selection.isCollapsed || selection.toString().trim() === "") {
+        document.getElementById('highlightTooltip').style.display = 'none';
+        return;
+      }
+
+      selectedTextString = selection.toString();
+      selectedTextRange = selection.getRangeAt(0);
+
+      const rect = selectedTextRange.getBoundingClientRect();
+      const tooltip = document.getElementById('highlightTooltip');
+      
+      tooltip.style.display = 'flex';
+      
+      const containerScroll = document.getElementById('readerScroll');
+      let leftOffset = rect.left + (rect.width / 2) - (tooltip.offsetWidth / 2);
+      let topOffset = rect.top - tooltip.offsetHeight - 12 + containerScroll.scrollTop;
+
+      if (leftOffset < 10) leftOffset = 10;
+      if (leftOffset + tooltip.offsetWidth > window.innerWidth - 10) {
+        leftOffset = window.innerWidth - tooltip.offsetWidth - 10;
+      }
+
+      tooltip.style.left = `${leftOffset}px`;
+      tooltip.style.top = `${topOffset}px`;
+    });
+
+    function applyHighlight(colorClass) {
+      if (!selectedTextRange) return;
+
+      const span = document.createElement('span');
+      span.className = `hl-text-marker-${colorClass}`;
+      selectedTextRange.surroundContents(span);
+
+      savedHighlights.push({
+        id: Date.now(),
+        text: selectedTextString,
+        color: colorClass,
+        note: "",
+        chapter: bookData.chapters[currentChapterIndex].title
+      });
+
+      window.getSelection().removeAllRanges();
+      document.getElementById('highlightTooltip').style.display = 'none';
+      showToast("Tô sáng đoạn trích thành công!");
+    }
+
+    function openNoteModal() {
+      if (!selectedTextString) return;
+      document.getElementById('noteQuotePreview').textContent = `"${selectedTextString}"`;
+      document.getElementById('noteInput').value = "";
+      document.getElementById('noteModalOverlay').classList.add('show');
+    }
+
+    function closeNoteModal() {
+      document.getElementById('noteModalOverlay').classList.remove('show');
+    }
+
+    function saveNote() {
+      const noteText = document.getElementById('noteInput').value.trim();
+      if (!noteText) {
+        showToast("Vui lòng điền nội dung ghi chú!", "info");
+        return;
+      }
+
+      const span = document.createElement('span');
+      span.className = 'hl-text-marker-yellow';
+      selectedTextRange.surroundContents(span);
+
+      savedHighlights.push({
+        id: Date.now(),
+        text: selectedTextString,
+        color: 'yellow',
+        note: noteText,
+        chapter: bookData.chapters[currentChapterIndex].title
+      });
+
+      closeNoteModal();
+      window.getSelection().removeAllRanges();
+      document.getElementById('highlightTooltip').style.display = 'none';
+      showToast("Lưu ghi chú thành công!");
+    }
+
+    function openCommentsDrawer(key, pIdx) {
+      activeCommentTargetKey = key;
+      const chapter = bookData.chapters[currentChapterIndex];
+      document.getElementById('drawerParaTitle').textContent =
+        `${chapter.num} · Đoạn ${pIdx + 1} — Bình luận`;
+      renderComments();
+      toggleCommentsDrawer(true);
+    }
+
+    function toggleCommentsDrawer(show) {
+      const drawer = document.getElementById('commentsDrawer');
+      if (show) {
+        drawer.classList.add('show');
+      } else {
+        drawer.classList.remove('show');
+      }
+    }
+
+    function renderComments() {
+      const container = document.getElementById('commentsList');
+      container.innerHTML = '';
+      
+      const list = commentsDatabase[activeCommentTargetKey] || [];
+      if (list.length === 0) {
+        container.innerHTML = `<p style="font-size: 13px; color: var(--faint); text-align: center; margin-top: 32px;">Chưa có bình luận hay đáp án. Hãy viết phản hồi đầu tiên bên dưới.</p>`;
+        return;
+      }
+
+      list.forEach(c => {
+        const div = document.createElement('div');
+        div.className = 'comment-item';
+        div.innerHTML = `
+          <div class="comment-meta">
+            <span class="comment-user">${c.user}</span>
+            <span>${c.date}</span>
+          </div>
+          <div class="comment-text">${c.text}</div>
+        `;
+        container.appendChild(div);
+      });
+    }
+
+    function submitComment() {
+      const input = document.getElementById('commentInput');
+      const text = input.value.trim();
+      if (!text) return;
+
+      if (!commentsDatabase[activeCommentTargetKey]) {
+        commentsDatabase[activeCommentTargetKey] = [];
+      }
+
+      commentsDatabase[activeCommentTargetKey].push({
+        user: "Bạn",
+        text: text,
+        date: "Vừa xong"
+      });
+
+      input.value = '';
+      renderComments();
+      loadChapter(currentChapterIndex);
+      renderSidebarComments();
+      refreshTocCommentBadges();
+      showToast("Đã gửi phản hồi của bạn!");
+    }
+
+    function findBookmarkForChapter(chapterIndex) {
+      return savedBookmarks.find(b => b.chapterIndex === chapterIndex);
+    }
+
+    function syncBookmarkEdgeState() {
+      const btn = document.getElementById('bookmarkEdgeBtn');
+      const label = document.getElementById('bookmarkAddLabel');
+      const existing = findBookmarkForChapter(currentChapterIndex);
+      if (btn) {
+        btn.classList.toggle('is-active', !!existing);
+        btn.setAttribute('aria-pressed', existing ? 'true' : 'false');
+      }
+      if (label) {
+        label.textContent = existing ? "Xóa Bookmark chương này" : "Đánh dấu vị trí chương này";
+      }
+    }
+
+    function toggleBookmarkHere() {
+      const existing = findBookmarkForChapter(currentChapterIndex);
+      if (existing) {
+        savedBookmarks = savedBookmarks.filter(b => b.id !== existing.id);
+        showToast('Đã gỡ bookmark', 'info');
+      } else {
+        const chapter = bookData.chapters[currentChapterIndex];
+        savedBookmarks.unshift({
+          id: bookmarkIdSeq++,
+          chapterIndex: currentChapterIndex,
+          label: chapter.num + ': ' + chapter.title,
+          createdAt: new Date().toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' })
+        });
+        showToast('Đã lưu bookmark thành công!');
+      }
+      syncBookmarkEdgeState();
+      renderBookmarks();
+    }
+
+    function onBookmarkEdgeClick() {
+      toggleBookmarkHere();
+      toggleToCSidebar(true);
+      switchSidebarTab('bookmarks');
+    }
+
+    function renderBookmarks() {
+      const list = document.getElementById('bookmarksList');
+      const empty = document.getElementById('bookmarksEmpty');
+      if (!list || !empty) return;
+
+      list.innerHTML = '';
+      empty.style.display = savedBookmarks.length > 0 ? 'none' : 'block';
+
+      savedBookmarks.forEach(bm => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'bookmark-card';
+        btn.onclick = () => { loadChapter(bm.chapterIndex); toggleToCSidebar(false); };
+        btn.innerHTML = `
+          <div class="bookmark-card-title">${bm.label}</div>
+          <div class="bookmark-card-meta">
+            <span>${bm.createdAt}</span>
+            <span class="bookmark-card-del" onclick="event.stopPropagation(); deleteBookmark(${bm.id})">✕ Xóa</span>
+          </div>
+        `;
+        list.appendChild(btn);
+      });
+    }
+
+    function deleteBookmark(id) {
+      savedBookmarks = savedBookmarks.filter(b => b.id !== id);
+      syncBookmarkEdgeState();
+      renderBookmarks();
+      showToast('Đã xóa bookmark.', 'info');
+    }
+
+    function adjustFontSize(dir) {
+      let currentSize = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--reading-size'), 10);
+      let newSize = currentSize + (dir * 2);
+      if (newSize < 12) newSize = 12;
+      if (newSize > 32) newSize = 32;
+      document.documentElement.style.setProperty('--reading-size', newSize + 'px');
+      document.getElementById('fontSizeLabel').textContent = newSize + 'px';
+    }
+
+    function setFontFamily(type) {
+      const fonts = {
+        serif: '"Literata", Georgia, serif',
+        sans: '"Source Sans 3", sans-serif',
+        mono: 'ui-monospace, "Cascadia Code", Consolas, monospace'
+      };
+      document.documentElement.style.setProperty('--font-reading', fonts[type] || fonts.serif);
+      document.getElementById('fontSerif').classList.toggle('active', type === 'serif');
+      document.getElementById('fontSans').classList.toggle('active', type === 'sans');
+      document.getElementById('fontMono').classList.toggle('active', type === 'mono');
+    }
+
+    function setFontWeight(weight) {
+      document.documentElement.style.setProperty('--reading-weight', String(weight));
+      document.getElementById('weightLight').classList.toggle('active', weight === 300);
+      document.getElementById('weightNormal').classList.toggle('active', weight === 400);
+      document.getElementById('weightBold').classList.toggle('active', weight === 600);
+    }
+
+    function setLineHeight(value) {
+      const v = Number(value);
+      document.documentElement.style.setProperty('--reading-line-height', String(v));
+      document.getElementById('lineHeightLabel').textContent = v.toFixed(2);
+    }
+
+    function setMarginEnabled(enabled) {
+      const area = document.getElementById('readingArea');
+      area.classList.toggle('margin-off', !enabled);
+      document.getElementById('marginOn').classList.toggle('active', enabled);
+      document.getElementById('marginOff').classList.toggle('active', !enabled);
+    }
+
+    function setMargin(marginType) {
+      const area = document.getElementById('readingArea');
+      area.classList.remove('margin-narrow', 'margin-wide');
+      if (marginType !== 'normal') {
+        area.classList.add(`margin-${marginType}`);
+      }
+      document.getElementById('marginNarrow').classList.toggle('active', marginType === 'narrow');
+      document.getElementById('marginNormal').classList.toggle('active', marginType === 'normal');
+      document.getElementById('marginWide').classList.toggle('active', marginType === 'wide');
+    }
+
+    function setPageMode(mode) {
+      const scroll = document.getElementById('readerScroll');
+      scroll.classList.toggle('mode-paginated', mode === 'paginated');
+      document.getElementById('pageModeScroll').classList.toggle('active', mode === 'scroll');
+      document.getElementById('pageModePaginated').classList.toggle('active', mode === 'paginated');
+    }
+
+    function setTheme(theme, el) {
+      document.body.className = '';
+      document.body.classList.add('theme-' + theme);
+      document.querySelectorAll('.theme-swatch').forEach(sw => sw.classList.remove('active'));
+      if (el) el.classList.add('active');
+    }
+
+    function selectAnnotateTool(tool) {
+      const labels = {
+        note: 'Note',
+        highlight: 'Highlight',
+        comment: 'Comment'
+      };
+
+      if (activeAnnotateTool === tool) {
+        clearAnnotateTool();
+        return;
+      }
+
+      activeAnnotateTool = tool;
+      document.getElementById('readerApp').classList.toggle('comment-mode', tool === 'comment');
+      document.querySelectorAll('.tools-menu-item').forEach(btn => {
+        btn.classList.toggle('active', btn.getAttribute('data-tool') === tool);
+      });
+      
+      syncActiveToolChip(labels[tool] || tool);
+      closeToolsMenu();
+    }
+
+    function clearAnnotateTool(event) {
+      if (event) event.stopPropagation();
+      activeAnnotateTool = null;
+      document.getElementById('readerApp').classList.remove('comment-mode');
+      document.querySelectorAll('.tools-menu-item').forEach(btn => btn.classList.remove('active'));
+      syncActiveToolChip(null);
+      closeToolsMenu();
+    }
+
+    function syncActiveToolChip(label) {
+      const chip = document.getElementById('activeToolChip');
+      const chipLabel = document.getElementById('activeToolChipLabel');
+      const toolsBtn = document.getElementById('toolsBtn');
+      if (!chip) return;
+
+      if (label && activeAnnotateTool) {
+        chipLabel.textContent = label;
+        chip.hidden = false;
+        chip.classList.add('show');
+      } else {
+        chip.hidden = true;
+        chip.classList.remove('show');
+      }
+      if (toolsBtn) {
+        toolsBtn.classList.toggle('has-active-tool', !!activeAnnotateTool);
+      }
+    }
+
+    function switchSidebarTab(tab) {
+      const tabs = ['chapters', 'bookmarks', 'highlights', 'comments'];
+      tabs.forEach(t => {
+        const btn = document.getElementById(`tab${t.charAt(0).toUpperCase() + t.slice(1)}Btn`);
+        const content = document.getElementById(`tab${t.charAt(0).toUpperCase() + t.slice(1)}Content`);
+        if (btn) btn.classList.toggle('active', t === tab);
+        if (content) content.style.display = t === tab ? 'block' : 'none';
+      });
+
+      if (tab === 'bookmarks') renderBookmarks();
+      if (tab === 'highlights') renderSavedHighlights();
+      if (tab === 'comments') renderSidebarComments();
+    }
+
+    function toggleToCSidebar(show) {
+      const sidebar = document.getElementById('tocSidebar');
+      const overlay = document.getElementById('sidebarOverlay');
+      sidebar.classList.toggle('show', show);
+      overlay.classList.toggle('show', show);
+    }
+
+    function buildToC() {
+      const tocList = document.getElementById('tocList');
+      tocList.innerHTML = '';
+      bookData.chapters.forEach((chapter, idx) => {
+        const li = document.createElement('li');
+        li.innerHTML = `
+          <button type="button" class="toc-item ${idx === 0 ? 'active' : ''}" data-chapter-index="${idx}" onclick="loadChapter(${idx}); toggleToCSidebar(false);">
+            <span class="toc-item-label">${chapter.num}: ${chapter.title}</span>
+          </button>
+        `;
+        tocList.appendChild(li);
+      });
+    }
+
+    function refreshTocCommentBadges() {
+      // Đếm bình luận hiển thị trên thanh mục lục
+    }
+
+    function renderSavedHighlights() {
+      const listContainer = document.getElementById('savedHighlightsList');
+      listContainer.innerHTML = '';
+      if (savedHighlights.length === 0) {
+        listContainer.innerHTML = `<p style="font-size: 13px; color: var(--faint); text-align: center; margin-top: 24px;">Chưa có trích dẫn hoặc ghi chú.</p>`;
+        return;
+      }
+      savedHighlights.forEach(hl => {
+        const div = document.createElement('div');
+        div.style.cssText = `background: rgba(15, 23, 42, 0.35); border: 1px solid var(--border-soft); border-radius: 8px; padding:12px; display:flex; flex-direction:column; gap:8px;`;
+        div.innerHTML = `
+          <div class="highlight-card-text hl-${hl.color}" style="font-family: var(--font-reading); font-size:13px; font-style:italic; padding-left:8px;">"${hl.text}"</div>
+          ${hl.note ? `<div style="font-size: 13px; background: rgba(0,0,0,0.2); padding: 8px; border-radius:6px; color: var(--text-strong);">Ghi chú: ${hl.note}</div>` : ''}
+          <div style="display:flex; justify-content:space-between; font-size:11px; color:var(--faint);">
+            <span>${hl.chapter}</span>
+            <span style="cursor:pointer;" onclick="deleteHighlight(${hl.id})">✕ Xóa</span>
+          </div>
+        `;
+        listContainer.appendChild(div);
+      });
+    }
+
+    function deleteHighlight(id) {
+      savedHighlights = savedHighlights.filter(hl => hl.id !== id);
+      renderSavedHighlights();
+      showToast("Đã xóa trích dẫn/ghi chú.", "info");
+    }
+
+    function renderSidebarComments() {
+      const container = document.getElementById('savedCommentsList');
+      const empty = document.getElementById('commentsEmpty');
+      container.innerHTML = '';
+      
+      let total = 0;
+      Object.keys(commentsDatabase).forEach(key => {
+        const comments = commentsDatabase[key] || [];
+        total += comments.length;
+
+        comments.forEach(c => {
+          const div = document.createElement('div');
+          div.className = 'bookmark-card';
+          div.style.marginBottom = '8px';
+          div.onclick = () => {
+            const parts = key.split('-');
+            loadChapter(parseInt(parts[0], 10));
+            toggleToCSidebar(false);
+          };
+          div.innerHTML = `
+            <div class="bookmark-card-title" style="color:var(--accent);">Đoạn văn ${parseInt(key.split('-')[1])+1}</div>
+            <div class="comment-text" style="font-size:13px; margin:4px 0;">${c.text}</div>
+            <div class="bookmark-card-meta"><span>${c.user}</span></div>
+          `;
+          container.appendChild(div);
+        });
+      });
+
+      empty.style.display = total > 0 ? 'none' : 'block';
+    }
+
+    function updateProgressBar(percentage) {
+      document.getElementById('progressFill').style.width = `${percentage}%`;
+      document.getElementById('progressHandle').style.left = `${percentage}%`;
+      document.getElementById('progressPercentLeft').textContent = `${Math.round(percentage)}%`;
+    }
+
+    function handleProgressBarClick(event) {
+      const slider = document.getElementById('progressSlider');
+      const rect = slider.getBoundingClientRect();
+      const clickX = event.clientX - rect.left;
+      const percentage = Math.max(0, Math.min(100, (clickX / rect.width) * 100));
+      updateProgressBar(percentage);
+
+      const calculatedIndex = Math.round((percentage / 100) * (bookData.chapters.length - 1));
+      if (calculatedIndex !== currentChapterIndex) {
+        loadChapter(calculatedIndex);
+      }
+    }
+
+    function onReaderBackgroundClicked() {
+      // Đóng toàn bộ dropdown/drawer phụ trước khi chuyển UI Chrome
+      closeDropdown();
+      closeMoreMenu();
+      closeToolsMenu();
+      toggleCommentsDrawer(false);
+      
+      isUiHidden = !isUiHidden;
+      const topbar = document.getElementById('topbar');
+      const footerBar = document.getElementById('footerBar');
+      if (isUiHidden) {
+        topbar.classList.add('hide');
+        footerBar.classList.add('hide');
+      } else {
+        topbar.classList.remove('hide');
+        footerBar.classList.remove('hide');
+      }
+    }
+
+    function copySelectedText() {
+      if (!selectedTextString) return;
+      document.execCommand('copy');
+      showToast("Đã sao chép vào khay nhớ tạm!");
+      window.getSelection().removeAllRanges();
+      document.getElementById('highlightTooltip').style.display = 'none';
+    }
+
+    function showToast(message, type = 'success') {
+      const container = document.getElementById('toastContainer');
+      const toast = document.createElement('div');
+      toast.className = 'toast';
+      toast.innerHTML = `<span>${message}</span>`;
+      container.appendChild(toast);
+      setTimeout(() => toast.classList.add('show'), 50);
+      setTimeout(() => {
+        toast.classList.remove('show');
+        setTimeout(() => toast.remove(), 300);
+      }, 3000);
+    }
+
+    function goBackToLibrary() {
+      showToast("Đang quay lại tủ sách cá nhân...", "info");
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,29 @@
+@startuml sds-electron-process
+title Electron Process Architecture - Desktop MVP
+skinparam shadowing false
+skinparam backgroundColor #FFFFFF
+skinparam defaultFontName Arial
+skinparam ArrowColor #333333
+
+rectangle "Renderer\n(React UI + Reader)" as Renderer #E3F2FD
+rectangle "Preload\n(contextBridge API hep)" as Preload #FFF3CD
+rectangle "Main process\n(import, sandbox, SQLite, convert)" as Main #FCE4EC
+database "SQLite\n(+ FTS5)" as DB
+folder "App data files\n(books sandbox)" as Files
+
+Renderer -right-> Preload : invoke
+Preload -right-> Main : IPC
+Main --> DB
+Main --> Files
+
+note bottom of Renderer
+  Presentation
+  Khong: path tuy y, SQL, ghi de file sach
+end note
+
+note bottom of Main
+  Infrastructure
+  Khong: render UI React
+end note
+
+@enduml

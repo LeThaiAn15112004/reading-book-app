@@ -1,0 +1,176 @@
+@startuml sds-database
+title Database Diagram - SQLite Overlay Schema (MVP)
+skinparam shadowing false
+skinparam backgroundColor #FFFFFF
+skinparam defaultFontName Arial
+skinparam linetype ortho
+hide circle
+hide methods
+
+entity "books" as books {
+  * id : TEXT <<PK>>
+  --
+  title : TEXT NOT NULL
+  file_path : TEXT NOT NULL
+  normalized_path : TEXT NULL
+  file_format : TEXT NOT NULL
+  cover_path : TEXT NULL
+  * sha256 : TEXT NOT NULL <<UNIQUE>>
+  file_size_bytes : INTEGER NULL
+  is_favorite : INTEGER NOT NULL DEFAULT 0
+  added_at : TEXT NOT NULL
+  updated_at : TEXT NOT NULL
+}
+
+entity "authors" as authors {
+  * id : TEXT <<PK>>
+  --
+  name : TEXT NOT NULL
+  sort_name : TEXT NULL
+  created_at : TEXT NOT NULL
+}
+
+entity "book_authors" as book_authors {
+  * book_id : TEXT <<PK, FK>>
+  * author_id : TEXT <<PK, FK>>
+  --
+  sort_order : INTEGER NOT NULL DEFAULT 0
+}
+
+entity "reading_session_states" as session {
+  * book_id : TEXT <<PK, FK>>
+  --
+  last_read_location : TEXT NOT NULL
+  percent : REAL NOT NULL DEFAULT 0
+  bg_color : TEXT NULL
+  text_color : TEXT NULL
+  font_size : REAL NULL
+  font_family : TEXT NULL
+  line_height : REAL NULL
+  theme_preset : TEXT NULL
+  is_landscape : INTEGER NOT NULL DEFAULT 0
+  updated_at : TEXT NOT NULL
+}
+
+entity "highlights" as highlights {
+  * id : TEXT <<PK>>
+  --
+  * book_id : TEXT <<FK>>
+  location_start : TEXT NOT NULL
+  location_end : TEXT NOT NULL
+  selected_text : TEXT NOT NULL
+  color_hex : TEXT NOT NULL
+  created_at : TEXT NOT NULL
+}
+
+entity "notes" as notes {
+  * id : TEXT <<PK>>
+  --
+  * book_id : TEXT <<FK>>
+  highlight_id : TEXT NULL <<FK>>
+  location_ref : TEXT NOT NULL
+  selected_text : TEXT NULL
+  content : TEXT NOT NULL
+  created_at : TEXT NOT NULL
+  updated_at : TEXT NOT NULL
+}
+
+entity "bookmarks" as bookmarks {
+  * id : TEXT <<PK>>
+  --
+  * book_id : TEXT <<FK>>
+  location_ref : TEXT NOT NULL
+  label : TEXT NULL
+  created_at : TEXT NOT NULL
+}
+
+entity "book_chunks" as chunks {
+  * id : TEXT <<PK>>
+  --
+  * book_id : TEXT <<FK>>
+  * chunk_index : INTEGER NOT NULL
+  content : TEXT NOT NULL
+  location_start : TEXT NULL
+  location_end : TEXT NULL
+  embedding : BLOB NULL
+  created_at : TEXT NOT NULL
+}
+
+entity "collections" as collections {
+  * id : TEXT <<PK>>
+  --
+  name : TEXT NOT NULL
+  description : TEXT NULL
+  created_at : TEXT NOT NULL
+  updated_at : TEXT NOT NULL
+}
+
+entity "collection_books" as collection_books {
+  * collection_id : TEXT <<PK, FK>>
+  * book_id : TEXT <<PK, FK>>
+  --
+  sort_order : INTEGER NOT NULL DEFAULT 0
+  added_at : TEXT NOT NULL
+}
+
+books ||--o{ book_authors : "1 - n\nON DELETE CASCADE"
+authors ||--o{ book_authors : "1 - n\nON DELETE RESTRICT"
+
+books ||--|| session : "1 - 1\nON DELETE CASCADE"
+books ||--o{ highlights : "1 - n\nON DELETE CASCADE"
+books ||--o{ notes : "1 - n\nON DELETE CASCADE"
+books ||--o{ bookmarks : "1 - n\nON DELETE CASCADE"
+books ||--o{ chunks : "1 - n\nON DELETE CASCADE"
+highlights ||--o{ notes : "1 - n\nON DELETE SET NULL"
+
+collections ||--o{ collection_books : "1 - n\nON DELETE CASCADE"
+books ||--o{ collection_books : "1 - n\nON DELETE CASCADE"
+
+note right of books
+  Indexes:
+  - UNIQUE(sha256)
+  - INDEX(is_favorite)
+  - INDEX(updated_at)
+  file_format CHECK:
+  epub|pdf|txt|md
+  Khong luu author tren books
+end note
+
+note right of book_authors
+  PK (book_id, author_id)
+  INDEX(author_id)
+  sort_order: thu tu hien thi
+  **books <-> authors = n - n**
+end note
+
+note right of authors
+  UNIQUE(name) optional
+  hoac UNIQUE(sort_name)
+end note
+
+note right of chunks
+  UNIQUE(book_id, chunk_index)
+  FTS5 virtual table (rieng):
+  book_chunks_fts(content)
+  embedding: Phase 2
+end note
+
+note bottom of notes
+  INDEX(book_id)
+  INDEX(highlight_id)
+end note
+
+note right of collections
+  INDEX(updated_at)
+  name UNIQUE optional (MVP: cho phep trung ten)
+end note
+
+note right of collection_books
+  PK (collection_id, book_id)
+  INDEX(book_id)
+  sort_order: thu tu trong tap
+  **books <-> collections = n - n**
+  Xoa book khong xoa collection
+end note
+
+@enduml

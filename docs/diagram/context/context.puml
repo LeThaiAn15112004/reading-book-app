@@ -1,0 +1,32 @@
+@startuml context
+title Context Diagram - Reading Book App
+skinparam shadowing false
+skinparam backgroundColor #FFFFFF
+skinparam defaultFontName Arial
+skinparam ArrowColor #333333
+
+' Actor = hinh vuong
+rectangle "User" as User #87CEEB
+rectangle "AI Assistance" as AI #87CEEB
+rectangle "Google Drive /\nGoogle Books /\nApple Books" as ExtLibs #98FB98
+
+' He thong = hinh tron, chu nam trong (khong hien stereotype)
+skinparam rectangle<<app>> {
+  BackgroundColor #FFD700
+  BorderColor #333333
+  FontStyle bold
+  roundCorner 200
+  stereotypeFontSize 0
+  stereotypeFontColor #FFD700
+}
+
+rectangle "Reading\nBook App" as App <<app>>
+
+User -[#333333]-> App : Import, Cau hinh,\nDoc, Highlight, Ghi chu
+App -[#333333]-> User : Noi dung,\nKet qua AI
+App -[#333333]-> AI : Ngu canh / Cau hoi
+AI -[#333333]-> App : Tom tat / Giai thich
+ExtLibs -[#333333]-> App : Danh muc tai lieu\n(Phase 3 connector)
+App -[#333333]-> ExtLibs : Link folder / catalog\n(khong OAuth2 identity)
+
+@enduml

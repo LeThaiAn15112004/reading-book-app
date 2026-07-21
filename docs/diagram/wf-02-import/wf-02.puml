@@ -1,0 +1,56 @@
+@startuml wf-02
+title WF-02 - Import (device or URL)
+skinparam shadowing false
+skinparam backgroundColor #FFFFFF
+skinparam defaultFontName Arial
+skinparam ActivityBorderColor #856404
+skinparam ActivityBackgroundColor #FFF3CD
+skinparam ActivityDiamondBackgroundColor #CCE5FF
+skinparam ActivityDiamondBorderColor #004085
+skinparam ActivityStartColor #28A745
+skinparam ActivityEndColor #004085
+
+start
+:1. From Library - Add / Import;
+:2. Choose source;
+
+if (Source?) then (Device)
+  :3a. Open File Picker;
+  if (User cancel?) then (Yes)
+    :End - Library unchanged;
+    stop
+  else (No)
+    if (File valid?) then (No)
+      :Show error;
+      stop
+    else (Yes)
+      :4. Copy into App Data;
+    endif
+  endif
+else (URL)
+  :3b. Enter / paste URL;
+  if (User cancel?) then (Yes)
+    :End - Library unchanged;
+    stop
+  else (No)
+    :Download via Main (https, timeout, size limit);
+    if (Download + format OK?) then (No)
+      :Show network / format error;
+      stop
+    else (Yes)
+      :4. Write into App Data;
+    endif
+  endif
+endif
+
+:5. Extract metadata (+ optional source_url);
+if (SHA-256 duplicate?) then (Yes)
+  :Notify - do not duplicate;
+  stop
+else (No)
+  :6. Save SQLite record + default progress;
+  :End - Library shows new book (offline);
+  stop
+endif
+
+@enduml

@@ -1,0 +1,2095 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#0f172a">
+  <title>Readmate — Settings</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Literata:opsz,wght@7..72,400;7..72,600;7..72,700&family=Source+Sans+3:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-deep: #0f172a;
+      --bg-mid: #1e293b;
+      --surface: rgba(30, 41, 59, 0.45);
+      --surface-strong: rgba(15, 23, 42, 0.88);
+      --surface-card: rgba(30, 41, 59, 0.55);
+      --border: rgba(51, 65, 85, 0.45);
+      --border-soft: rgba(51, 65, 85, 0.28);
+      --text: #e2e8f0;
+      --text-strong: #f1f5f9;
+      --muted: #94a3b8;
+      --faint: #64748b;
+      --accent: #f59e0b;
+      --accent-hover: #d97706;
+      --accent-soft: rgba(245, 158, 11, 0.14);
+      --accent-ring: rgba(245, 158, 11, 0.28);
+      --danger: #fc8181;
+      --danger-soft: rgba(252, 129, 129, 0.12);
+      --success: #34d399;
+      --shadow: 0 12px 32px rgba(0, 0, 0, 0.35);
+      --radius: 12px;
+      --sidebar-w: 248px;
+      --cat-w: 220px;
+      --header-h: 64px;
+      --font-ui: "Source Sans 3", "Segoe UI", sans-serif;
+      --font-display: "Literata", Georgia, serif;
+      --page-bg:
+        radial-gradient(ellipse 80% 50% at 20% -10%, rgba(245, 158, 11, 0.08), transparent 55%),
+        radial-gradient(circle at 80% 100%, rgba(30, 58, 138, 0.18), transparent 45%),
+        radial-gradient(circle, var(--bg-mid) 0%, var(--bg-deep) 100%);
+      --swatch-night: #0f172a;
+      --swatch-sepia: #251f19;
+      --swatch-day: #f8fafc;
+    }
+
+    body.theme-sepia {
+      --bg-deep: #1c1814;
+      --bg-mid: #2a241c;
+      --surface: rgba(58, 48, 38, 0.5);
+      --surface-strong: rgba(32, 26, 20, 0.92);
+      --surface-card: rgba(58, 48, 38, 0.55);
+      --border: rgba(94, 80, 63, 0.45);
+      --border-soft: rgba(94, 80, 63, 0.28);
+      --text: #e1cfb3;
+      --text-strong: #f3e6d0;
+      --muted: #b8a48a;
+      --faint: #8a7a66;
+      --accent: #e0a45a;
+      --accent-hover: #c9893f;
+      --accent-soft: rgba(224, 164, 90, 0.16);
+      --accent-ring: rgba(224, 164, 90, 0.3);
+      --page-bg:
+        radial-gradient(ellipse 80% 50% at 18% -8%, rgba(224, 164, 90, 0.1), transparent 55%),
+        radial-gradient(circle at 85% 100%, rgba(90, 60, 30, 0.22), transparent 45%),
+        radial-gradient(circle, var(--bg-mid) 0%, var(--bg-deep) 100%);
+    }
+
+    body.theme-day {
+      --bg-deep: #e8eef6;
+      --bg-mid: #f1f5f9;
+      --surface: rgba(255, 255, 255, 0.72);
+      --surface-strong: rgba(255, 255, 255, 0.92);
+      --surface-card: rgba(255, 255, 255, 0.78);
+      --border: rgba(148, 163, 184, 0.45);
+      --border-soft: rgba(148, 163, 184, 0.28);
+      --text: #334155;
+      --text-strong: #0f172a;
+      --muted: #64748b;
+      --faint: #94a3b8;
+      --accent: #d97706;
+      --accent-hover: #b45309;
+      --accent-soft: rgba(217, 119, 6, 0.12);
+      --accent-ring: rgba(217, 119, 6, 0.25);
+      --shadow: 0 12px 28px rgba(15, 23, 42, 0.1);
+      --page-bg:
+        radial-gradient(ellipse 70% 45% at 15% -5%, rgba(245, 158, 11, 0.12), transparent 50%),
+        radial-gradient(circle at 90% 110%, rgba(59, 130, 246, 0.1), transparent 42%),
+        linear-gradient(180deg, #f8fafc 0%, #e2e8f0 100%);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+    }
+
+    body {
+      overflow: hidden;
+      background: var(--page-bg);
+      font-family: var(--font-ui);
+      color: var(--text);
+      user-select: none;
+      -webkit-font-smoothing: antialiased;
+      transition: background 0.35s ease, color 0.25s ease;
+    }
+
+    button, input, select {
+      font-family: inherit;
+    }
+
+    .app {
+      display: flex;
+      width: 100%;
+      height: 100%;
+      position: relative;
+    }
+
+    /* ——— App sidebar ——— */
+    .sidebar {
+      width: var(--sidebar-w);
+      height: 100%;
+      flex-shrink: 0;
+      display: flex;
+      flex-direction: column;
+      background: var(--surface-strong);
+      border-right: 1px solid var(--border);
+      backdrop-filter: blur(14px);
+      z-index: 40;
+    }
+
+    .sidebar-header {
+      height: var(--header-h);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 18px;
+      border-bottom: 1px solid var(--border-soft);
+      gap: 8px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      min-width: 0;
+      text-decoration: none;
+    }
+
+    .brand-icon {
+      width: 22px;
+      height: 22px;
+      color: var(--accent);
+      flex-shrink: 0;
+      filter: drop-shadow(0 0 8px rgba(245, 158, 11, 0.35));
+    }
+
+    .brand-name {
+      font-size: 15px;
+      font-weight: 700;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+      color: var(--text-strong);
+    }
+
+    .icon-btn {
+      width: 36px;
+      height: 36px;
+      border: none;
+      border-radius: 8px;
+      background: transparent;
+      color: var(--faint);
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      transition: color 0.2s, background 0.2s;
+      flex-shrink: 0;
+    }
+
+    .icon-btn:hover {
+      color: var(--accent);
+      background: rgba(255, 255, 255, 0.05);
+    }
+
+    body.theme-day .icon-btn:hover {
+      background: rgba(15, 23, 42, 0.05);
+    }
+
+    .icon-btn svg { width: 20px; height: 20px; }
+
+    .nav {
+      list-style: none;
+      padding: 20px 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      flex: 1;
+    }
+
+    .nav-link {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 16px;
+      color: var(--muted);
+      text-decoration: none;
+      font-size: 14px;
+      font-weight: 500;
+      border-radius: 8px;
+      transition: color 0.2s, background 0.2s;
+      background: transparent;
+      border: none;
+      width: 100%;
+      text-align: left;
+      cursor: pointer;
+      position: relative;
+    }
+
+    .nav-link svg {
+      width: 20px;
+      height: 20px;
+      flex-shrink: 0;
+    }
+
+    .nav-link:hover {
+      color: var(--text-strong);
+      background: rgba(255, 255, 255, 0.05);
+    }
+
+    body.theme-day .nav-link:hover {
+      background: rgba(15, 23, 42, 0.05);
+    }
+
+    .nav-link.active {
+      color: var(--text-strong);
+      background: rgba(255, 255, 255, 0.06);
+    }
+
+    body.theme-day .nav-link.active {
+      background: rgba(15, 23, 42, 0.06);
+    }
+
+    .nav-link.active::before {
+      content: "";
+      position: absolute;
+      left: 0;
+      top: 8px;
+      bottom: 8px;
+      width: 3px;
+      border-radius: 0 2px 2px 0;
+      background: var(--accent);
+    }
+
+    .sidebar-footer {
+      padding: 16px 10px 10px;
+      border-top: 1px solid var(--border-soft);
+    }
+
+    .user-profile {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 8px;
+      background: rgba(255, 255, 255, 0.02);
+      border-radius: 12px;
+      border: 1px solid rgba(255, 255, 255, 0.04);
+      min-width: 0;
+    }
+
+    body.theme-day .user-profile {
+      background: rgba(15, 23, 42, 0.03);
+      border-color: rgba(15, 23, 42, 0.06);
+    }
+
+    .user-avatar {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      background: var(--bg-mid);
+      border: 1px solid var(--border);
+      flex-shrink: 0;
+      object-fit: cover;
+    }
+
+    .user-info {
+      display: flex;
+      flex-direction: column;
+      flex: 1;
+      min-width: 0;
+      overflow: hidden;
+    }
+
+    .user-name {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-strong);
+      white-space: nowrap;
+      text-overflow: ellipsis;
+      overflow: hidden;
+    }
+
+    .user-role {
+      font-size: 11px;
+      color: var(--faint);
+    }
+
+    .logout-btn {
+      background: none;
+      border: none;
+      color: var(--faint);
+      cursor: pointer;
+      padding: 6px;
+      border-radius: 6px;
+      transition: color 0.2s, background 0.2s;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .logout-btn:hover {
+      color: var(--danger);
+      background: var(--danger-soft);
+    }
+
+    .logout-btn svg { width: 16px; height: 16px; }
+
+    /* ——— Main ——— */
+    .main {
+      flex: 1;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+    }
+
+    .topbar {
+      height: var(--header-h);
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 28px;
+      border-bottom: 1px solid var(--border-soft);
+      background: rgba(15, 23, 42, 0.25);
+      backdrop-filter: blur(10px);
+      gap: 16px;
+    }
+
+    body.theme-day .topbar {
+      background: rgba(255, 255, 255, 0.45);
+    }
+
+    .topbar-title-block {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      min-width: 0;
+    }
+
+    .topbar-eyebrow {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--faint);
+    }
+
+    .topbar-title {
+      font-family: var(--font-display);
+      font-size: 20px;
+      font-weight: 600;
+      color: var(--text-strong);
+    }
+
+    .topbar-actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      height: 38px;
+      padding: 0 16px;
+      border-radius: 9px;
+      border: 1px solid transparent;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s, border-color 0.2s, color 0.2s, transform 0.15s;
+    }
+
+    .btn svg { width: 16px; height: 16px; }
+
+    .btn:active { transform: scale(0.98); }
+
+    .btn-primary {
+      background: var(--accent);
+      color: #0f172a;
+    }
+
+    body.theme-day .btn-primary { color: #fff; }
+
+    .btn-primary:hover { background: var(--accent-hover); }
+
+    .btn-ghost {
+      background: transparent;
+      border-color: var(--border);
+      color: var(--text);
+    }
+
+    .btn-ghost:hover {
+      border-color: var(--accent-ring);
+      color: var(--text-strong);
+      background: var(--accent-soft);
+    }
+
+    .btn-danger {
+      background: var(--danger-soft);
+      border-color: rgba(252, 129, 129, 0.35);
+      color: var(--danger);
+    }
+
+    .btn-danger:hover {
+      background: rgba(252, 129, 129, 0.2);
+    }
+
+    .settings-shell {
+      flex: 1;
+      min-height: 0;
+      display: flex;
+      overflow: hidden;
+    }
+
+    /* ——— Category rail ——— */
+    .cat-rail {
+      width: var(--cat-w);
+      flex-shrink: 0;
+      border-right: 1px solid var(--border-soft);
+      padding: 20px 12px;
+      overflow-y: auto;
+      background: rgba(15, 23, 42, 0.18);
+    }
+
+    body.theme-day .cat-rail {
+      background: rgba(255, 255, 255, 0.35);
+    }
+
+    .cat-label {
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: var(--faint);
+      padding: 0 12px 10px;
+    }
+
+    .cat-btn {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 11px 12px;
+      margin-bottom: 4px;
+      border: none;
+      border-radius: 9px;
+      background: transparent;
+      color: var(--muted);
+      font-size: 13.5px;
+      font-weight: 500;
+      cursor: pointer;
+      text-align: left;
+      transition: background 0.2s, color 0.2s;
+    }
+
+    .cat-btn svg {
+      width: 18px;
+      height: 18px;
+      flex-shrink: 0;
+    }
+
+    .cat-btn:hover {
+      color: var(--text-strong);
+      background: rgba(255, 255, 255, 0.05);
+    }
+
+    body.theme-day .cat-btn:hover {
+      background: rgba(15, 23, 42, 0.05);
+    }
+
+    .cat-btn.active {
+      color: var(--text-strong);
+      background: var(--accent-soft);
+      box-shadow: inset 0 0 0 1px var(--accent-ring);
+    }
+
+    .cat-btn.active svg { color: var(--accent); }
+
+    /* ——— Content ——— */
+    .settings-content {
+      flex: 1;
+      min-width: 0;
+      overflow-y: auto;
+      padding: 28px 36px 48px;
+      scroll-behavior: smooth;
+    }
+
+    .settings-content::-webkit-scrollbar { width: 8px; }
+    .settings-content::-webkit-scrollbar-thumb {
+      background: var(--border);
+      border-radius: 4px;
+    }
+
+    .panel {
+      display: none;
+      max-width: 720px;
+      animation: panelIn 0.28s ease;
+    }
+
+    .panel.active { display: block; }
+
+    @keyframes panelIn {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .panel-header {
+      margin-bottom: 22px;
+    }
+
+    .panel-title {
+      font-family: var(--font-display);
+      font-size: 26px;
+      font-weight: 600;
+      color: var(--text-strong);
+      margin-bottom: 6px;
+    }
+
+    .panel-desc {
+      font-size: 14px;
+      color: var(--muted);
+      line-height: 1.55;
+      max-width: 52ch;
+    }
+
+    .card {
+      background: var(--surface-card);
+      border: 1px solid var(--border-soft);
+      border-radius: var(--radius);
+      overflow: hidden;
+      margin-bottom: 16px;
+      backdrop-filter: blur(8px);
+    }
+
+    .card-header {
+      padding: 14px 18px 10px;
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .card-title {
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: var(--faint);
+    }
+
+    .row {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      padding: 14px 18px;
+      border-top: 1px solid var(--border-soft);
+      min-height: 64px;
+    }
+
+    .row:first-of-type { border-top: none; }
+
+    .row-icon {
+      width: 40px;
+      height: 40px;
+      border-radius: 10px;
+      background: var(--accent-soft);
+      color: var(--accent);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .row-icon svg { width: 20px; height: 20px; }
+
+    .row-body {
+      flex: 1;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+
+    .row-label {
+      font-size: 14.5px;
+      font-weight: 600;
+      color: var(--text-strong);
+    }
+
+    .row-hint {
+      font-size: 12.5px;
+      color: var(--faint);
+      line-height: 1.4;
+    }
+
+    .row-control {
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    /* Account block */
+    .account-hero {
+      display: flex;
+      align-items: center;
+      gap: 18px;
+      padding: 20px 18px;
+    }
+
+    .account-avatar {
+      width: 64px;
+      height: 64px;
+      border-radius: 50%;
+      border: 2px solid var(--accent-ring);
+      background: var(--bg-mid);
+      object-fit: cover;
+      flex-shrink: 0;
+    }
+
+    .account-avatar.guest {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--faint);
+      border-style: dashed;
+      border-color: var(--border);
+    }
+
+    .account-avatar.guest svg { width: 28px; height: 28px; }
+
+    .account-meta { flex: 1; min-width: 0; }
+
+    .account-name {
+      font-family: var(--font-display);
+      font-size: 20px;
+      font-weight: 600;
+      color: var(--text-strong);
+    }
+
+    .account-email {
+      font-size: 13px;
+      color: var(--muted);
+      margin-top: 2px;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      margin-top: 8px;
+      padding: 3px 9px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      background: var(--accent-soft);
+      color: var(--accent);
+      border: 1px solid var(--accent-ring);
+    }
+
+    .badge.guest-badge {
+      background: rgba(148, 163, 184, 0.12);
+      color: var(--muted);
+      border-color: var(--border-soft);
+    }
+
+    /* Theme swatches */
+    .theme-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+      padding: 6px 18px 18px;
+    }
+
+    .theme-swatch {
+      position: relative;
+      height: 88px;
+      border-radius: 12px;
+      border: 2px solid var(--border);
+      cursor: pointer;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+      padding: 10px 12px;
+      transition: border-color 0.2s, transform 0.2s, box-shadow 0.2s;
+      font-size: 13px;
+      font-weight: 600;
+    }
+
+    .theme-swatch:hover {
+      transform: translateY(-2px);
+      box-shadow: var(--shadow);
+    }
+
+    .theme-swatch.active {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px var(--accent-soft);
+    }
+
+    .theme-swatch .check {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      background: var(--accent);
+      color: #0f172a;
+      display: none;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .theme-swatch.active .check { display: inline-flex; }
+
+    .theme-swatch .check svg { width: 12px; height: 12px; }
+
+    .theme-swatch.night {
+      background:
+        linear-gradient(160deg, #1e293b 0%, #0f172a 100%);
+      color: #cbd5e1;
+    }
+
+    .theme-swatch.sepia {
+      background:
+        linear-gradient(160deg, #3a3026 0%, #251f19 100%);
+      color: #e1cfb3;
+    }
+
+    .theme-swatch.day {
+      background:
+        linear-gradient(160deg, #ffffff 0%, #e2e8f0 100%);
+      color: #334155;
+    }
+
+    .theme-preview-line {
+      height: 4px;
+      border-radius: 2px;
+      width: 70%;
+      margin-bottom: 6px;
+      opacity: 0.55;
+      background: currentColor;
+    }
+
+    .theme-preview-line.short { width: 45%; opacity: 0.35; }
+
+    /* Segmented / toggle group */
+    .segment {
+      display: inline-flex;
+      padding: 3px;
+      border-radius: 10px;
+      background: rgba(15, 23, 42, 0.35);
+      border: 1px solid var(--border-soft);
+      gap: 2px;
+    }
+
+    body.theme-day .segment {
+      background: rgba(15, 23, 42, 0.06);
+    }
+
+    .segment-btn {
+      border: none;
+      background: transparent;
+      color: var(--muted);
+      font-size: 12.5px;
+      font-weight: 600;
+      padding: 7px 12px;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background 0.2s, color 0.2s;
+      white-space: nowrap;
+    }
+
+    .segment-btn.active {
+      background: var(--accent);
+      color: #0f172a;
+    }
+
+    body.theme-day .segment-btn.active { color: #fff; }
+
+    .segment-btn:hover:not(.active) {
+      color: var(--text-strong);
+    }
+
+    /* Switch */
+    .switch {
+      position: relative;
+      width: 44px;
+      height: 24px;
+      flex-shrink: 0;
+    }
+
+    .switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+      position: absolute;
+    }
+
+    .switch-track {
+      position: absolute;
+      inset: 0;
+      border-radius: 999px;
+      background: rgba(100, 116, 139, 0.45);
+      border: 1px solid var(--border);
+      cursor: pointer;
+      transition: background 0.2s, border-color 0.2s;
+    }
+
+    .switch-track::after {
+      content: "";
+      position: absolute;
+      top: 2px;
+      left: 2px;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: #f1f5f9;
+      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
+      transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+
+    .switch input:checked + .switch-track {
+      background: var(--accent);
+      border-color: transparent;
+    }
+
+    .switch input:checked + .switch-track::after {
+      transform: translateX(20px);
+      background: #0f172a;
+    }
+
+    body.theme-day .switch input:checked + .switch-track::after {
+      background: #fff;
+    }
+
+    .switch input:focus-visible + .switch-track {
+      outline: 2px solid var(--accent);
+      outline-offset: 2px;
+    }
+
+    /* Select */
+    .select {
+      appearance: none;
+      height: 36px;
+      padding: 0 34px 0 12px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background:
+        var(--surface-strong)
+        url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%2394a3b8'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='m19.5 8.25-7.5 7.5-7.5-7.5'/%3E%3C/svg%3E")
+        no-repeat right 10px center / 14px;
+      color: var(--text-strong);
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      min-width: 140px;
+    }
+
+    .select:hover, .select:focus {
+      border-color: var(--accent);
+      outline: none;
+      box-shadow: 0 0 0 3px var(--accent-soft);
+    }
+
+    /* Folder list */
+    .folder-list {
+      padding: 0 18px 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .folder-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 12px;
+      border-radius: 10px;
+      background: rgba(15, 23, 42, 0.28);
+      border: 1px solid var(--border-soft);
+    }
+
+    body.theme-day .folder-item {
+      background: rgba(15, 23, 42, 0.04);
+    }
+
+    .folder-item svg {
+      width: 18px;
+      height: 18px;
+      color: var(--accent);
+      flex-shrink: 0;
+    }
+
+    .folder-path {
+      flex: 1;
+      min-width: 0;
+      font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
+      font-size: 12px;
+      color: var(--text);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .folder-meta {
+      font-size: 11px;
+      color: var(--faint);
+      flex-shrink: 0;
+    }
+
+    .icon-tiny {
+      width: 30px;
+      height: 30px;
+      border: none;
+      border-radius: 7px;
+      background: transparent;
+      color: var(--faint);
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      transition: color 0.2s, background 0.2s;
+    }
+
+    .icon-tiny:hover {
+      color: var(--danger);
+      background: var(--danger-soft);
+    }
+
+    .icon-tiny svg { width: 15px; height: 15px; }
+
+    .scan-progress {
+      display: none;
+      padding: 0 18px 16px;
+    }
+
+    .scan-progress.show { display: block; }
+
+    .scan-bar {
+      height: 4px;
+      border-radius: 2px;
+      background: rgba(100, 116, 139, 0.3);
+      overflow: hidden;
+      margin-bottom: 8px;
+    }
+
+    .scan-bar-fill {
+      height: 100%;
+      width: 0%;
+      background: var(--accent);
+      box-shadow: 0 0 8px rgba(245, 158, 11, 0.45);
+      transition: width 0.25s ease;
+    }
+
+    .scan-status {
+      font-size: 12px;
+      color: var(--muted);
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .chip-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      padding: 0 18px 16px;
+    }
+
+    .chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 11px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s, border-color 0.2s, color 0.2s;
+    }
+
+    .chip.active {
+      background: var(--accent-soft);
+      border-color: var(--accent-ring);
+      color: var(--accent);
+    }
+
+    .chip:hover:not(.active) {
+      border-color: var(--accent-ring);
+      color: var(--text-strong);
+    }
+
+    .kbd {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 28px;
+      height: 22px;
+      padding: 0 6px;
+      border-radius: 5px;
+      border: 1px solid var(--border);
+      background: rgba(15, 23, 42, 0.35);
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--muted);
+      font-family: ui-monospace, Consolas, monospace;
+    }
+
+    body.theme-day .kbd {
+      background: rgba(15, 23, 42, 0.05);
+    }
+
+    .hint-banner {
+      display: flex;
+      gap: 12px;
+      align-items: flex-start;
+      padding: 12px 14px;
+      margin: 0 18px 16px;
+      border-radius: 10px;
+      background: var(--accent-soft);
+      border: 1px solid var(--accent-ring);
+      color: var(--text);
+      font-size: 12.5px;
+      line-height: 1.45;
+    }
+
+    .hint-banner svg {
+      width: 18px;
+      height: 18px;
+      color: var(--accent);
+      flex-shrink: 0;
+      margin-top: 1px;
+    }
+
+    /* Overlays */
+    .overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(15, 23, 42, 0.65);
+      backdrop-filter: blur(8px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      z-index: 1000;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.25s ease;
+    }
+
+    .overlay.show {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .dialog {
+      background: var(--surface-strong);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      width: 100%;
+      max-width: 420px;
+      box-shadow: var(--shadow);
+      transform: scale(0.95);
+      transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+      overflow: hidden;
+    }
+
+    .overlay.show .dialog { transform: scale(1); }
+
+    .dialog-header {
+      padding: 20px 24px 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--border-soft);
+    }
+
+    .dialog-title {
+      font-family: var(--font-display);
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--text-strong);
+    }
+
+    .dialog-close {
+      background: transparent;
+      border: none;
+      color: var(--faint);
+      cursor: pointer;
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+    }
+
+    .dialog-close:hover {
+      color: var(--text-strong);
+      background: rgba(255, 255, 255, 0.06);
+    }
+
+    .dialog-body { padding: 20px 24px; }
+
+    .dialog-footer {
+      padding: 14px 24px 20px;
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+    }
+
+    .field {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      margin-bottom: 14px;
+    }
+
+    .field label {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--muted);
+    }
+
+    .field input {
+      height: 42px;
+      padding: 0 14px;
+      border-radius: 9px;
+      border: 1px solid var(--border);
+      background: rgba(15, 23, 42, 0.35);
+      color: var(--text-strong);
+      font-size: 14px;
+      outline: none;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+
+    body.theme-day .field input {
+      background: rgba(255, 255, 255, 0.9);
+    }
+
+    .field input:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px var(--accent-soft);
+    }
+
+    .field input::placeholder { color: var(--faint); }
+
+    .dialog-note {
+      font-size: 12px;
+      color: var(--faint);
+      line-height: 1.45;
+      margin-top: 4px;
+    }
+
+    /* Toast */
+    .toast-host {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      z-index: 2000;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      pointer-events: none;
+    }
+
+    .toast {
+      min-width: 240px;
+      max-width: 360px;
+      padding: 12px 16px;
+      border-radius: 10px;
+      background: var(--surface-strong);
+      border: 1px solid var(--border);
+      box-shadow: var(--shadow);
+      color: var(--text-strong);
+      font-size: 13px;
+      font-weight: 500;
+      opacity: 0;
+      transform: translateY(8px);
+      transition: opacity 0.25s, transform 0.25s;
+      pointer-events: auto;
+    }
+
+    .toast.show {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    .toast.info { border-left: 3px solid var(--accent); }
+    .toast.success { border-left: 3px solid var(--success); }
+    .toast.warn { border-left: 3px solid var(--danger); }
+
+    /* Fullscreen mock chrome */
+    body.is-fullscreen .sidebar,
+    body.is-fullscreen .cat-rail {
+      display: none;
+    }
+
+    body.is-fullscreen .topbar {
+      position: absolute;
+      left: 0;
+      right: 0;
+      top: 0;
+      z-index: 50;
+      opacity: 0;
+      transform: translateY(-8px);
+      transition: opacity 0.25s, transform 0.25s;
+      pointer-events: none;
+    }
+
+    body.is-fullscreen:hover .topbar,
+    body.is-fullscreen .topbar:focus-within {
+      opacity: 1;
+      transform: translateY(0);
+      pointer-events: auto;
+    }
+
+    body.is-fullscreen .settings-content {
+      padding-top: 40px;
+    }
+
+    .fs-exit-hint {
+      display: none;
+      position: fixed;
+      top: 16px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 60;
+      padding: 8px 14px;
+      border-radius: 999px;
+      background: var(--surface-strong);
+      border: 1px solid var(--border);
+      font-size: 12px;
+      color: var(--muted);
+      box-shadow: var(--shadow);
+      animation: fadeHint 3s ease forwards;
+    }
+
+    body.is-fullscreen .fs-exit-hint { display: block; }
+
+    @keyframes fadeHint {
+      0%, 70% { opacity: 1; }
+      100% { opacity: 0; pointer-events: none; }
+    }
+
+    /* Responsive */
+    @media (max-width: 960px) {
+      .sidebar { display: none; }
+      .cat-rail {
+        width: 100%;
+        border-right: none;
+        border-bottom: 1px solid var(--border-soft);
+        display: flex;
+        flex-wrap: nowrap;
+        gap: 4px;
+        overflow-x: auto;
+        padding: 12px;
+      }
+      .cat-label { display: none; }
+      .cat-btn {
+        width: auto;
+        white-space: nowrap;
+        margin-bottom: 0;
+        flex-shrink: 0;
+      }
+      .settings-shell { flex-direction: column; }
+      .settings-content { padding: 20px 18px 40px; }
+      .theme-grid { grid-template-columns: 1fr; }
+      .account-hero { flex-wrap: wrap; }
+      .row {
+        flex-wrap: wrap;
+        align-items: flex-start;
+      }
+      .row-control {
+        width: 100%;
+        justify-content: flex-end;
+        margin-top: 4px;
+      }
+    }
+  </style>
+</head>
+<body class="theme-night">
+  <div class="fs-exit-hint" id="fsExitHint" aria-hidden="true">
+    Press <span class="kbd">Esc</span> or move the cursor to the top to exit fullscreen
+  </div>
+
+  <div class="app">
+    <aside class="sidebar" aria-label="Main navigation">
+      <div class="sidebar-header">
+        <a class="brand" href="library.html" title="Back to library">
+          <svg class="brand-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 6.042A8.967 8.967 0 0 0 6 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 0 1 6 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 0 1 6-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0 0 18 18a8.967 8.967 0 0 0-6 2.292m0-14.25v14.25" />
+          </svg>
+          <span class="brand-name">Readmate</span>
+        </a>
+        <button class="icon-btn" type="button" title="Collapse" aria-label="Collapse sidebar" onclick="showToast('Sidebar collapsed (mockup).', 'info')">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" />
+          </svg>
+        </button>
+      </div>
+
+      <ul class="nav">
+        <li>
+          <a class="nav-link" href="library.html">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 12 11.204 3.045c.44-.439 1.152-.439 1.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h8.25" />
+            </svg>
+            <span>Library</span>
+          </a>
+        </li>
+        <li>
+          <button class="nav-link" type="button" onclick="showToast('Favorites coming soon.', 'info')">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M11.48 3.499a.562.562 0 0 1 1.04 0l2.125 5.111a.563.563 0 0 0 .475.345l5.518.442c.499.04.701.663.321.988l-4.204 3.602a.563.563 0 0 0-.182.557l1.285 5.385a.562.562 0 0 1-.84.61l-4.725-2.885a.562.562 0 0 0-.586 0L6.982 20.54a.562.562 0 0 1-.84-.61l1.285-5.386a.562.562 0 0 0-.182-.557l-4.204-3.602a.562.562 0 0 1 .321-.988l5.518-.442a.563.563 0 0 0 .475-.345L11.48 3.5Z" />
+            </svg>
+            <span>Favorites</span>
+          </button>
+        </li>
+        <li>
+          <button class="nav-link active" type="button" aria-current="page">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.325.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 0 1 1.37.49l1.296 2.247a1.125 1.125 0 0 1-.26 1.43l-1.003.828c-.293.241-.438.613-.43.992a7.723 7.723 0 0 1 0 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.955.26 1.43l-1.298 2.247a1.125 1.125 0 0 1-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.47 6.47 0 0 1-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.94-1.11.94h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 0 1-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 0 1-1.369-.49l-1.297-2.247a1.125 1.125 0 0 1 .26-1.43l1.004-.827c.292-.24.437-.613.43-.991a6.932 6.932 0 0 1 0-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 0 1-.26-1.43l1.297-2.247a1.125 1.125 0 0 1 1.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.086.22-.128.332-.183.582-.495.645-.869L9.594 3.94Z" />
+              <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
+            </svg>
+            <span>Settings</span>
+          </button>
+        </li>
+      </ul>
+
+      <div class="sidebar-footer">
+        <div class="user-profile" id="sidebarUser">
+          <img class="user-avatar" id="sidebarAvatar" src="https://api.dicebear.com/7.x/shapes/svg?seed=local-device" alt="" width="36" height="36">
+          <div class="user-info">
+            <span class="user-name" id="sidebarName">This device</span>
+            <span class="user-role" id="sidebarRole">Local-only</span>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <div class="topbar-title-block">
+          <span class="topbar-eyebrow">Application</span>
+          <h1 class="topbar-title">Settings</h1>
+        </div>
+        <div class="topbar-actions">
+          <button class="btn btn-ghost" type="button" onclick="toggleFullscreen()" id="fsTopBtn">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" aria-hidden="true">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 3.75v4.5m0-4.5h4.5m-4.5 0L9 9M3.75 20.25v-4.5m0 4.5h4.5m-4.5 0L9 15M20.25 3.75h-4.5m4.5 0v4.5m0-4.5L15 9m5.25 11.25h-4.5m4.5 0v-4.5m0 4.5L15 15" />
+            </svg>
+            <span id="fsTopLabel">Fullscreen</span>
+          </button>
+          <a class="btn btn-ghost" href="library.html">Back to library</a>
+        </div>
+      </header>
+
+      <div class="settings-shell">
+        <nav class="cat-rail" aria-label="Settings groups">
+          <div class="cat-label">Group</div>
+          <button class="cat-btn active" type="button" data-panel="libraries" onclick="showPanel('libraries', this)">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 21v-8.25M15.75 21v-8.25M8.25 21v-8.25M3 9l9-6 9 6m-1.5 12V10.332A48.069 48.069 0 0 0 12 9.75c-2.551 0-5.056.2-7.5.582V21M3 21h18M12 6.75h.008v.008H12V6.75Z" /></svg>
+            Linked libraries
+          </button>
+          <button class="cat-btn" type="button" data-panel="theme" onclick="showPanel('theme', this)">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 3v2.25m6.364.386-1.591 1.591M21 12h-2.25m-.386 6.364-1.591-1.591M12 18.75V21m-4.773-4.227-1.591 1.591M5.25 12H3m4.227-4.773L5.636 5.636M15.75 12a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0Z" /></svg>
+            Appearance
+          </button>
+          <button class="cat-btn" type="button" data-panel="scan" onclick="showPanel('scan', this)">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607ZM10.5 7.5v6m3-3h-6" /></svg>
+            File scan
+          </button>
+          <button class="cat-btn" type="button" data-panel="multidoc" onclick="showPanel('multidoc', this)">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3.75h8.25A2.25 2.25 0 0 1 17.25 6v10.5A2.25 2.25 0 0 1 15 18.75H6.75A2.25 2.25 0 0 1 4.5 16.5V6A2.25 2.25 0 0 1 6.75 3.75ZM19.5 8.25v9.75A2.25 2.25 0 0 1 17.25 20.25H8.25" /></svg>
+            Multi-document
+          </button>
+          <button class="cat-btn" type="button" data-panel="language" onclick="showPanel('language', this)">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 21a9.004 9.004 0 0 0 8.716-6.747M12 21a9.004 9.004 0 0 1-8.716-6.747M12 21c2.485 0 4.5-4.03 4.5-9S14.485 3 12 3m0 18c-2.485 0-4.5-4.03-4.5-9S9.515 3 12 3m0 0a8.997 8.997 0 0 1 7.843 4.582M12 3a8.997 8.997 0 0 0-7.843 4.582m15.686 0A11.953 11.953 0 0 1 12 10.5c-2.998 0-5.74-1.1-7.843-2.918m15.686 0A8.959 8.959 0 0 1 21 12c0 .778-.099 1.533-.284 2.253m0 0A17.919 17.919 0 0 1 12 16.5c-3.162 0-6.133-.815-8.716-2.247m0 0A9.015 9.015 0 0 1 3 12c0-1.605.42-3.113 1.157-4.418" /></svg>
+            Language
+          </button>
+          <button class="cat-btn" type="button" data-panel="fullscreen" onclick="showPanel('fullscreen', this)">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 3.75v4.5m0-4.5h4.5m-4.5 0L9 9M3.75 20.25v-4.5m0 4.5h4.5m-4.5 0L9 15M20.25 3.75h-4.5m4.5 0v4.5m0-4.5L15 9m5.25 11.25h-4.5m4.5 0v-4.5m0 4.5L15 15" /></svg>
+            Fullscreen
+          </button>
+        </nav>
+
+        <div class="settings-content" id="settingsContent">
+          <!-- Linked libraries (no app account / no OAuth2 identity) -->
+          <section class="panel active" id="panel-libraries" aria-labelledby="title-libraries">
+            <div class="panel-header">
+              <h2 class="panel-title" id="title-libraries">Linked libraries</h2>
+              <p class="panel-desc">Pull document lists from Google Drive, Google Books, or Apple Books. No app sign-in — data stays local-first.</p>
+            </div>
+
+            <div class="card">
+              <div class="account-hero">
+                <div class="account-avatar guest" aria-hidden="true">
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75m-3-7.036A11.959 11.959 0 0 1 3.598 6 11.99 11.99 0 0 0 3 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285Z" /></svg>
+                </div>
+                <div class="account-meta">
+                  <div class="account-name">This device</div>
+                  <div class="account-email">No Reading Book App account — library is local on this machine</div>
+                  <span class="badge guest-badge">Local-only</span>
+                </div>
+              </div>
+              <div class="hint-banner">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m11.25 11.25.041-.02a.75.75 0 0 1 1.063.852l-.708 2.836a.75.75 0 0 0 1.063.853l.041-.021M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9-3.75h.008v.008H12V8.25Z" /></svg>
+                <span>No email/password and no OAuth2 app login. Special phase links folders / catalogs from super apps.</span>
+              </div>
+            </div>
+
+            <div class="card">
+              <div class="row">
+                <div class="row-body">
+                  <div class="row-label">Google Drive</div>
+                  <div class="row-hint">Link a Drive Desktop folder → sync document list into Library.</div>
+                </div>
+                <div class="row-control">
+                  <button class="btn btn-ghost" type="button" onclick="showToast('Google Drive connector — Special (mock stub).', 'info')">Link folder</button>
+                </div>
+              </div>
+              <div class="row">
+                <div class="row-body">
+                  <div class="row-label">Google Books</div>
+                  <div class="row-hint">Pull your Books library / catalog list, then import selected titles.</div>
+                </div>
+                <div class="row-control">
+                  <button class="btn btn-ghost" type="button" onclick="showToast('Google Books connector — Special (mock stub).', 'info')">Link library</button>
+                </div>
+              </div>
+              <div class="row">
+                <div class="row-body">
+                  <div class="row-label">Apple Books</div>
+                  <div class="row-hint">Link the Books library folder on this Mac / device.</div>
+                </div>
+                <div class="row-control">
+                  <button class="btn btn-ghost" type="button" onclick="showToast('Apple Books connector — Special (mock stub).', 'info')">Link library</button>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- Theme -->
+          <section class="panel" id="panel-theme" aria-labelledby="title-theme">
+            <div class="panel-header">
+              <h2 class="panel-title" id="title-theme">Appearance</h2>
+              <p class="panel-desc">Choose a theme for the whole app. The reader uses the same Night / Sepia / Day palette.</p>
+            </div>
+
+            <div class="card">
+              <div class="card-header">
+                <span class="card-title">Theme</span>
+              </div>
+              <div class="theme-grid" role="radiogroup" aria-label="Choose theme">
+                <button class="theme-swatch night active" type="button" role="radio" aria-checked="true" data-theme="night" onclick="setTheme('night', this)">
+                  <span class="check" aria-hidden="true">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="3" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" /></svg>
+                  </span>
+                  <span class="theme-preview-line"></span>
+                  <span class="theme-preview-line short"></span>
+                  Night
+                </button>
+                <button class="theme-swatch sepia" type="button" role="radio" aria-checked="false" data-theme="sepia" onclick="setTheme('sepia', this)">
+                  <span class="check" aria-hidden="true">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="3" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" /></svg>
+                  </span>
+                  <span class="theme-preview-line"></span>
+                  <span class="theme-preview-line short"></span>
+                  Sepia
+                </button>
+                <button class="theme-swatch day" type="button" role="radio" aria-checked="false" data-theme="day" onclick="setTheme('day', this)">
+                  <span class="check" aria-hidden="true">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="3" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" /></svg>
+                  </span>
+                  <span class="theme-preview-line"></span>
+                  <span class="theme-preview-line short"></span>
+                  Day
+                </button>
+              </div>
+            </div>
+
+            <div class="card">
+              <div class="row">
+                <div class="row-icon">
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>
+                </div>
+                <div class="row-body">
+                  <div class="row-label">Follow system</div>
+                  <div class="row-hint">Auto-switch Night/Day with the OS schedule (Sepia stays manual).</div>
+                </div>
+                <div class="row-control">
+                  <label class="switch">
+                    <input type="checkbox" id="followSystemTheme" onchange="onFollowSystem(this.checked)">
+                    <span class="switch-track"></span>
+                  </label>
+                </div>
+              </div>
+              <div class="row">
+                <div class="row-icon">
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9.53 16.122a3 3 0 0 0-5.78 1.128 2.25 2.25 0 0 1-2.4 2.245 4.5 4.5 0 0 0 8.4-2.245c0-.362-.032-.721-.094-1.07ZM15.75 6.75a4.5 4.5 0 1 1-9 0 4.5 4.5 0 0 1 9 0ZM18.75 18a3 3 0 0 0-5.78 1.128 2.25 2.25 0 0 1-2.4 2.245 4.5 4.5 0 0 0 8.4-2.245c0-.362-.032-.721-.094-1.07Z" /></svg>
+                </div>
+                <div class="row-body">
+                  <div class="row-label">Reduce motion</div>
+                  <div class="row-hint">Turn off non-essential animations when changing themes and opening panels.</div>
+                </div>
+                <div class="row-control">
+                  <label class="switch">
+                    <input type="checkbox" onchange="showToast(this.checked ? 'Reduce motion on.' : 'Reduce motion off.', 'info')">
+                    <span class="switch-track"></span>
+                  </label>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- File scan -->
+          <section class="panel" id="panel-scan" aria-labelledby="title-scan">
+            <div class="panel-header">
+              <h2 class="panel-title" id="title-scan">File scan</h2>
+              <p class="panel-desc">Watch folders on this device and detect new EPUB / PDF files for your library.</p>
+            </div>
+
+            <div class="card">
+              <div class="row">
+                <div class="row-icon">
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75Z" /></svg>
+                </div>
+                <div class="row-body">
+                  <div class="row-label">Watch folders</div>
+                  <div class="row-hint">Background scan when files are added or renamed in watched folders.</div>
+                </div>
+                <div class="row-control">
+                  <label class="switch">
+                    <input type="checkbox" id="watchFolders" checked onchange="toggleWatch(this.checked)">
+                    <span class="switch-track"></span>
+                  </label>
+                </div>
+              </div>
+              <div class="row">
+                <div class="row-icon">
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" /></svg>
+                </div>
+                <div class="row-body">
+                  <div class="row-label">Auto-import on detect</div>
+                  <div class="row-hint">Copy into the app library (original file stays Read-Only).</div>
+                </div>
+                <div class="row-control">
+                  <label class="switch">
+                    <input type="checkbox" id="autoImport" checked onchange="showToast(this.checked ? 'Auto-import enabled.' : 'Notify only — no auto-import.', 'info')">
+                    <span class="switch-track"></span>
+                  </label>
+                </div>
+              </div>
+            </div>
+
+            <div class="card">
+              <div class="card-header">
+                <span class="card-title">Watched folders</span>
+                <button class="btn btn-ghost" type="button" style="height:32px;padding:0 12px;font-size:12px" onclick="addFolder()">
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
+                  Add
+                </button>
+              </div>
+              <div class="folder-list" id="folderList">
+                <div class="folder-item" data-path="C:\Users\ADMIN\Documents\Books">
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 12.75V12A2.25 2.25 0 0 1 4.5 9.75h15A2.25 2.25 0 0 1 21.75 12v.75m-8.69-6.44-2.12-2.12a1.5 1.5 0 0 0-1.061-.44H4.5A2.25 2.25 0 0 0 2.25 6v12a2.25 2.25 0 0 0 2.25 2.25h15A2.25 2.25 0 0 0 21.75 18V9a2.25 2.25 0 0 0-2.25-2.25h-5.379a1.5 1.5 0 0 1-1.06-.44Z" /></svg>
+                  <span class="folder-path" title="C:\Users\ADMIN\Documents\Books">C:\Users\ADMIN\Documents\Books</span>
+                  <span class="folder-meta">42 files</span>
+                  <button class="icon-tiny" type="button" title="Remove folder" aria-label="Remove folder" onclick="removeFolder(this)">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" /></svg>
+                  </button>
+                </div>
+                <div class="folder-item" data-path="D:\Library\EPUB">
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 12.75V12A2.25 2.25 0 0 1 4.5 9.75h15A2.25 2.25 0 0 1 21.75 12v.75m-8.69-6.44-2.12-2.12a1.5 1.5 0 0 0-1.061-.44H4.5A2.25 2.25 0 0 0 2.25 6v12a2.25 2.25 0 0 0 2.25 2.25h15A2.25 2.25 0 0 0 21.75 18V9a2.25 2.25 0 0 0-2.25-2.25h-5.379a1.5 1.5 0 0 1-1.06-.44Z" /></svg>
+                  <span class="folder-path" title="D:\Library\EPUB">D:\Library\EPUB</span>
+                  <span class="folder-meta">18 files</span>
+                  <button class="icon-tiny" type="button" title="Remove folder" aria-label="Remove folder" onclick="removeFolder(this)">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" /></svg>
+                  </button>
+                </div>
+              </div>
+              <div class="card-header" style="padding-top:4px">
+                <span class="card-title">Formats</span>
+              </div>
+              <div class="chip-row" id="formatChips">
+                <button class="chip active" type="button" data-ext="epub" onclick="toggleChip(this)">.epub</button>
+                <button class="chip active" type="button" data-ext="pdf" onclick="toggleChip(this)">.pdf</button>
+                <button class="chip" type="button" data-ext="mobi" onclick="toggleChip(this)">.mobi</button>
+                <button class="chip" type="button" data-ext="txt" onclick="toggleChip(this)">.txt</button>
+              </div>
+              <div style="padding:0 18px 18px;display:flex;gap:10px;flex-wrap:wrap">
+                <button class="btn btn-primary" type="button" id="scanNowBtn" onclick="runScan()">
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" /></svg>
+                  Scan now
+                </button>
+                <button class="btn btn-ghost" type="button" onclick="showToast('Scan history: last run 2 hours ago.', 'info')">History</button>
+              </div>
+              <div class="scan-progress" id="scanProgress">
+                <div class="scan-bar"><div class="scan-bar-fill" id="scanBarFill"></div></div>
+                <div class="scan-status">
+                  <span id="scanStatusText">Scanning…</span>
+                  <span id="scanPercent">0%</span>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- Multi-document -->
+          <section class="panel" id="panel-multidoc" aria-labelledby="title-multidoc">
+            <div class="panel-header">
+              <h2 class="panel-title" id="title-multidoc">Multi-document</h2>
+              <p class="panel-desc">Open multiple books at once — tabs or windows — and restore your last reading session.</p>
+            </div>
+
+            <div class="card">
+              <div class="row">
+                <div class="row-icon">
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3.75h8.25A2.25 2.25 0 0 1 17.25 6v10.5A2.25 2.25 0 0 1 15 18.75H6.75A2.25 2.25 0 0 1 4.5 16.5V6A2.25 2.25 0 0 1 6.75 3.75ZM19.5 8.25v9.75A2.25 2.25 0 0 1 17.25 20.25H8.25" /></svg>
+                </div>
+                <div class="row-body">
+                  <div class="row-label">Allow multiple documents</div>
+                  <div class="row-hint">Open a new book without closing the one you are reading.</div>
+                </div>
+                <div class="row-control">
+                  <label class="switch">
+                    <input type="checkbox" id="multiDocEnabled" checked onchange="onMultiDocToggle(this.checked)">
+                    <span class="switch-track"></span>
+                  </label>
+                </div>
+              </div>
+              <div class="row" id="layoutRow">
+                <div class="row-icon">
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6A2.25 2.25 0 0 1 6 3.75h2.25A2.25 2.25 0 0 1 10.5 6v2.25a2.25 2.25 0 0 1-2.25 2.25H6a2.25 2.25 0 0 1-2.25-2.25V6ZM3.75 15.75A2.25 2.25 0 0 1 6 13.5h2.25a2.25 2.25 0 0 1 2.25 2.25V18A2.25 2.25 0 0 1 8.25 20.25H6A2.25 2.25 0 0 1 3.75 18v-2.25ZM13.5 6a2.25 2.25 0 0 1 2.25-2.25H18A2.25 2.25 0 0 1 20.25 6v2.25A2.25 2.25 0 0 1 18 10.5h-2.25a2.25 2.25 0 0 1-2.25-2.25V6ZM13.5 15.75a2.25 2.25 0 0 1 2.25-2.25H18a2.25 2.25 0 0 1 2.25 2.25V18A2.25 2.25 0 0 1 18 20.25h-2.25A2.25 2.25 0 0 1 13.5 18v-2.25Z" /></svg>
+                </div>
+                <div class="row-body">
+                  <div class="row-label">Display mode</div>
+                  <div class="row-hint">Tabs in one window, or a separate window per book.</div>
+                </div>
+                <div class="row-control">
+                  <div class="segment" role="group" aria-label="Multi-document layout">
+                    <button class="segment-btn active" type="button" data-layout="tabs" onclick="setLayout('tabs', this)">Tab</button>
+                    <button class="segment-btn" type="button" data-layout="windows" onclick="setLayout('windows', this)">Windows</button>
+                    <button class="segment-btn" type="button" data-layout="split" onclick="setLayout('split', this)">Split</button>
+                  </div>
+                </div>
+              </div>
+              <div class="row" id="maxTabsRow">
+                <div class="row-icon">
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25H12" /></svg>
+                </div>
+                <div class="row-body">
+                  <div class="row-label">Maximum documents</div>
+                  <div class="row-hint">Limit open books to keep performance steady with large EPUBs.</div>
+                </div>
+                <div class="row-control">
+                  <select class="select" id="maxDocs" onchange="showToast('Limit: ' + this.value + ' documents.', 'info')">
+                    <option value="3">3</option>
+                    <option value="5" selected>5</option>
+                    <option value="8">8</option>
+                    <option value="12">12</option>
+                  </select>
+                </div>
+              </div>
+              <div class="row">
+                <div class="row-icon">
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182" /></svg>
+                </div>
+                <div class="row-body">
+                  <div class="row-label">Restore previous session</div>
+                  <div class="row-hint">Reopen reading tabs/windows when the app starts.</div>
+                </div>
+                <div class="row-control">
+                  <label class="switch">
+                    <input type="checkbox" checked onchange="showToast(this.checked ? 'Will restore reading session.' : 'Will not restore session.', 'info')">
+                    <span class="switch-track"></span>
+                  </label>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- Language -->
+          <section class="panel" id="panel-language" aria-labelledby="title-language">
+            <div class="panel-header">
+              <h2 class="panel-title" id="title-language">Language</h2>
+              <p class="panel-desc">App interface language. Book content still follows the file language.</p>
+            </div>
+
+            <div class="card">
+              <div class="row">
+                <div class="row-icon">
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M10.5 21l5.25-11.25L21 21m-9-3h7.5M3 5.621a48.474 48.474 0 0 1 6-.371m0 0c1.12 0 2.233.038 3.334.114M9 5.25V3m3.334 2.364C11.176 10.658 7.69 15.08 3 17.502" /></svg>
+                </div>
+                <div class="row-body">
+                  <div class="row-label">Interface language</div>
+                  <div class="row-hint">Applies immediately to menus, settings, and toasts.</div>
+                </div>
+                <div class="row-control">
+                  <div class="segment" role="group" aria-label="Language">
+                    <button class="segment-btn" type="button" data-lang="vi" onclick="setLanguage('vi', this)">Tiếng Việt</button>
+                    <button class="segment-btn active" type="button" data-lang="en" onclick="setLanguage('en', this)">English</button>
+                  </div>
+                </div>
+              </div>
+              <div class="row">
+                <div class="row-icon">
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>
+                </div>
+                <div class="row-body">
+                  <div class="row-label">Date & time format</div>
+                  <div class="row-hint">Follow the selected locale (e.g. 17/07/2026 · Jul 17, 2026).</div>
+                </div>
+                <div class="row-control">
+                  <select class="select" id="dateLocale" onchange="showToast('Date format: ' + this.options[this.selectedIndex].text, 'info')">
+                    <option value="auto" selected>Match UI language</option>
+                    <option value="vi-VN">vi-VN</option>
+                    <option value="en-US">en-US</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <div class="hint-banner">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m11.25 11.25.041-.02a.75.75 0 0 1 1.063.852l-.708 2.836a.75.75 0 0 0 1.063.853l.041-.021M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9-3.75h.008v.008H12V8.25Z" /></svg>
+              <span id="langHint">Using English. Switch to Tiếng Việt to update UI labels (mockup).</span>
+            </div>
+          </section>
+
+          <!-- Fullscreen -->
+          <section class="panel" id="panel-fullscreen" aria-labelledby="title-fullscreen">
+            <div class="panel-header">
+              <h2 class="panel-title" id="title-fullscreen">Fullscreen</h2>
+              <p class="panel-desc">Maximize reading space — hide chrome when you need deep focus.</p>
+            </div>
+
+            <div class="card">
+              <div class="row">
+                <div class="row-icon">
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 3.75v4.5m0-4.5h4.5m-4.5 0L9 9M3.75 20.25v-4.5m0 4.5h4.5m-4.5 0L9 15M20.25 3.75h-4.5m4.5 0v4.5m0-4.5L15 9m5.25 11.25h-4.5m4.5 0v-4.5m0 4.5L15 15" /></svg>
+                </div>
+                <div class="row-body">
+                  <div class="row-label">Fullscreen mode</div>
+                  <div class="row-hint">Expand the window and hide the sidebar. Shortcut <span class="kbd">F11</span>.</div>
+                </div>
+                <div class="row-control">
+                  <button class="btn btn-primary" type="button" id="fsToggleBtn" onclick="toggleFullscreen()">Enter now</button>
+                </div>
+              </div>
+              <div class="row">
+                <div class="row-icon">
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.347a1.125 1.125 0 0 1 0 1.972l-11.54 6.347a1.125 1.125 0 0 1-1.667-.986V5.653Z" /></svg>
+                </div>
+                <div class="row-body">
+                  <div class="row-label">Launch in fullscreen</div>
+                  <div class="row-hint">Start the app in fullscreen (exit anytime with Esc).</div>
+                </div>
+                <div class="row-control">
+                  <label class="switch">
+                    <input type="checkbox" id="launchFullscreen" onchange="showToast(this.checked ? 'Will launch in fullscreen.' : 'Launch in normal window.', 'info')">
+                    <span class="switch-track"></span>
+                  </label>
+                </div>
+              </div>
+              <div class="row">
+                <div class="row-icon">
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3.98 8.223A10.477 10.477 0 0 0 1.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.451 10.451 0 0 1 12 4.5c4.756 0 8.773 3.162 10.065 7.498a10.522 10.522 0 0 1-4.293 5.774M6.228 6.228 3 3m3.228 3.228 3.65 3.65m7.894 7.894L21 21m-3.228-3.228-3.65-3.65m0 0a3 3 0 1 0-4.243-4.243m4.242 4.242L9.88 9.88" /></svg>
+                </div>
+                <div class="row-body">
+                  <div class="row-label">Hide toolbar while reading</div>
+                  <div class="row-hint">In the reader: chrome stays hidden by default; tap center to show it.</div>
+                </div>
+                <div class="row-control">
+                  <label class="switch">
+                    <input type="checkbox" checked onchange="showToast(this.checked ? 'Invisible UI: hide chrome while reading.' : 'Always show toolbar.', 'info')">
+                    <span class="switch-track"></span>
+                  </label>
+                </div>
+              </div>
+              <div class="row">
+                <div class="row-icon">
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 17.25v1.007a3 3 0 0 1-.879 2.122L7.5 21h9l-.621-.621A3 3 0 0 1 15 18.257V17.25m6-12V15a2.25 2.25 0 0 1-2.25 2.25H5.25A2.25 2.25 0 0 1 3 15V5.25A2.25 2.25 0 0 1 5.25 3h13.5A2.25 2.25 0 0 1 21 5.25Z" /></svg>
+                </div>
+                <div class="row-body">
+                  <div class="row-label">Keyboard shortcuts</div>
+                  <div class="row-hint"><span class="kbd">F11</span> toggle · <span class="kbd">Esc</span> exit</div>
+                </div>
+              </div>
+            </div>
+          </section>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Link library stub dialog (Special) -->
+  <div class="overlay" id="linkOverlay" role="dialog" aria-modal="true" aria-labelledby="linkTitle" hidden onclick="if(event.target===this)closeLinkDialog()">
+    <div class="dialog">
+      <div class="dialog-header">
+        <h3 class="dialog-title" id="linkTitle">Link library</h3>
+        <button class="dialog-close" type="button" aria-label="Close" onclick="closeLinkDialog()">✕</button>
+      </div>
+      <div class="dialog-body">
+        <p class="dialog-note">Special phase — pick a synced folder / catalog path. No email, password, or OAuth2 app login.</p>
+      </div>
+      <div class="dialog-footer">
+        <button class="btn btn-ghost" type="button" onclick="closeLinkDialog()">Cancel</button>
+        <button class="btn btn-primary" type="button" onclick="closeLinkDialog(); showToast('Linked (mock stub).', 'success')">Choose folder</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast-host" id="toastHost" aria-live="polite"></div>
+
+  <script>
+    const state = {
+      theme: 'night',
+      language: 'en',
+      fullscreen: false,
+      scanning: false
+    };
+
+    const i18n = {
+      vi: {
+        settingsEyebrow: 'Ứng dụng',
+        settingsTitle: 'Cài đặt',
+        backLibrary: 'Về thư viện',
+        fsBtn: 'Toàn màn hình',
+        fsExit: 'Thoát',
+        langHint: 'Đang dùng Tiếng Việt. Đổi sang English sẽ cập nhật nhãn UI (mockup).'
+      },
+      en: {
+        settingsEyebrow: 'Application',
+        settingsTitle: 'Settings',
+        backLibrary: 'Back to library',
+        fsBtn: 'Fullscreen',
+        fsExit: 'Exit',
+        langHint: 'Using English. Switch to Tiếng Việt to update UI labels (mockup).'
+      }
+    };
+
+    function showToast(message, type) {
+      const host = document.getElementById('toastHost');
+      const el = document.createElement('div');
+      el.className = 'toast ' + (type || 'info');
+      el.textContent = message;
+      host.appendChild(el);
+      requestAnimationFrame(() => el.classList.add('show'));
+      setTimeout(() => {
+        el.classList.remove('show');
+        setTimeout(() => el.remove(), 250);
+      }, 2600);
+    }
+
+    function showPanel(id, btn) {
+      document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+      document.querySelectorAll('.cat-btn').forEach(b => b.classList.remove('active'));
+      const panel = document.getElementById('panel-' + id);
+      if (panel) panel.classList.add('active');
+      if (btn) btn.classList.add('active');
+      document.getElementById('settingsContent').scrollTop = 0;
+    }
+
+    /* —— Linked libraries —— */
+    function closeLinkDialog() {
+      const el = document.getElementById('linkOverlay');
+      if (el) {
+        el.hidden = true;
+        el.classList.remove('show');
+      }
+    }
+
+    /* —— Theme —— */
+    function setTheme(theme, el) {
+      state.theme = theme;
+      document.body.classList.remove('theme-night', 'theme-sepia', 'theme-day');
+      document.body.classList.add('theme-' + theme);
+      document.querySelectorAll('.theme-swatch').forEach(s => {
+        s.classList.remove('active');
+        s.setAttribute('aria-checked', 'false');
+      });
+      if (el) {
+        el.classList.add('active');
+        el.setAttribute('aria-checked', 'true');
+      }
+      const follow = document.getElementById('followSystemTheme');
+      if (follow) follow.checked = false;
+      const labels = { night: 'Night', sepia: 'Sepia', day: 'Day' };
+      showToast('Theme: ' + labels[theme], 'success');
+    }
+
+    function onFollowSystem(on) {
+      if (!on) {
+        showToast('Follow system off — keeping manual theme.', 'info');
+        return;
+      }
+      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      const theme = prefersDark ? 'night' : 'day';
+      const swatch = document.querySelector('.theme-swatch[data-theme="' + theme + '"]');
+      setTheme(theme, swatch);
+      document.getElementById('followSystemTheme').checked = true;
+      showToast('Follow system → ' + (prefersDark ? 'Night' : 'Day'), 'info');
+    }
+
+    /* —— Scan —— */
+    function toggleWatch(on) {
+      showToast(on ? 'Watching folders.' : 'Folder watch disabled.', on ? 'success' : 'info');
+    }
+
+    function toggleChip(btn) {
+      btn.classList.toggle('active');
+      const active = [...document.querySelectorAll('#formatChips .chip.active')].map(c => c.dataset.ext);
+      if (!active.length) {
+        btn.classList.add('active');
+        showToast('Keep at least one format selected.', 'warn');
+        return;
+      }
+      showToast('Scan: ' + active.map(e => '.' + e).join(', '), 'info');
+    }
+
+    function addFolder() {
+      const samples = [
+        'C:\\Users\\ADMIN\\Downloads\\ebooks',
+        'E:\\Reading\\PDF',
+        'C:\\Users\\ADMIN\\OneDrive\\Books'
+      ];
+      const existing = [...document.querySelectorAll('#folderList .folder-item')].map(i => i.dataset.path);
+      const path = samples.find(p => !existing.includes(p));
+      if (!path) {
+        showToast('All sample folders already added.', 'info');
+        return;
+      }
+      const list = document.getElementById('folderList');
+      const item = document.createElement('div');
+      item.className = 'folder-item';
+      item.dataset.path = path;
+      item.innerHTML =
+        '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 12.75V12A2.25 2.25 0 0 1 4.5 9.75h15A2.25 2.25 0 0 1 21.75 12v.75m-8.69-6.44-2.12-2.12a1.5 1.5 0 0 0-1.061-.44H4.5A2.25 2.25 0 0 0 2.25 6v12a2.25 2.25 0 0 0 2.25 2.25h15A2.25 2.25 0 0 0 21.75 18V9a2.25 2.25 0 0 0-2.25-2.25h-5.379a1.5 1.5 0 0 1-1.06-.44Z" /></svg>' +
+        '<span class="folder-path" title="' + path + '">' + path + '</span>' +
+        '<span class="folder-meta">0 files</span>' +
+        '<button class="icon-tiny" type="button" title="Remove folder" aria-label="Remove folder" onclick="removeFolder(this)">' +
+        '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" /></svg>' +
+        '</button>';
+      list.appendChild(item);
+      showToast('Watched folder added.', 'success');
+    }
+
+    function removeFolder(btn) {
+      const item = btn.closest('.folder-item');
+      if (!item) return;
+      item.remove();
+      showToast('Folder removed from watch list.', 'info');
+    }
+
+    function runScan() {
+      if (state.scanning) return;
+      state.scanning = true;
+      const wrap = document.getElementById('scanProgress');
+      const fill = document.getElementById('scanBarFill');
+      const text = document.getElementById('scanStatusText');
+      const pct = document.getElementById('scanPercent');
+      const btn = document.getElementById('scanNowBtn');
+      wrap.classList.add('show');
+      btn.disabled = true;
+      btn.style.opacity = '0.6';
+
+      let progress = 0;
+      const files = ['Atomic Habits.epub', 'Deep Work.pdf', 'Sapiens.epub', 'Thinking Fast.pdf'];
+      const timer = setInterval(() => {
+        progress += 8 + Math.random() * 12;
+        if (progress >= 100) progress = 100;
+        fill.style.width = progress + '%';
+        pct.textContent = Math.round(progress) + '%';
+        text.textContent = progress < 100
+          ? 'Scanning · ' + files[Math.min(files.length - 1, Math.floor(progress / 25))]
+          : 'Done · found 3 new files';
+        if (progress >= 100) {
+          clearInterval(timer);
+          state.scanning = false;
+          btn.disabled = false;
+          btn.style.opacity = '';
+          showToast('Scan complete · 3 new files ready to import.', 'success');
+          setTimeout(() => wrap.classList.remove('show'), 1800);
+        }
+      }, 220);
+    }
+
+    /* —— Multi-doc —— */
+    function onMultiDocToggle(on) {
+      document.getElementById('layoutRow').style.opacity = on ? '1' : '0.45';
+      document.getElementById('maxTabsRow').style.opacity = on ? '1' : '0.45';
+      document.getElementById('maxDocs').disabled = !on;
+      showToast(on ? 'Multi-document enabled.' : 'Only one book open at a time.', on ? 'success' : 'info');
+    }
+
+    function setLayout(layout, btn) {
+      btn.parentElement.querySelectorAll('.segment-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      const labels = { tabs: 'Tabs', windows: 'Separate windows', split: 'Split view' };
+      showToast('Layout: ' + labels[layout], 'info');
+    }
+
+    /* —— Language —— */
+    function setLanguage(lang, btn) {
+      state.language = lang;
+      btn.parentElement.querySelectorAll('.segment-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      applyLanguage(lang);
+      showToast(lang === 'vi' ? 'Language: Tiếng Việt' : 'Language: English', 'success');
+    }
+
+    function applyLanguage(lang) {
+      const t = i18n[lang];
+      document.querySelector('.topbar-eyebrow').textContent = t.settingsEyebrow;
+      document.querySelector('.topbar-title').textContent = t.settingsTitle;
+      document.querySelector('.topbar-actions a.btn').textContent = t.backLibrary;
+      document.getElementById('langHint').textContent = t.langHint;
+      updateFsLabels();
+      document.documentElement.lang = lang;
+    }
+
+    /* —— Fullscreen —— */
+    function toggleFullscreen() {
+      state.fullscreen = !state.fullscreen;
+      document.body.classList.toggle('is-fullscreen', state.fullscreen);
+      updateFsLabels();
+      if (state.fullscreen) {
+        const hint = document.getElementById('fsExitHint');
+        hint.style.animation = 'none';
+        void hint.offsetWidth;
+        hint.style.animation = '';
+        showToast('Entered fullscreen.', 'success');
+      } else {
+        showToast('Exited fullscreen.', 'info');
+      }
+    }
+
+    function updateFsLabels() {
+      const t = i18n[state.language];
+      const label = state.fullscreen ? t.fsExit : t.fsBtn;
+      document.getElementById('fsTopLabel').textContent = label;
+      document.getElementById('fsToggleBtn').textContent = state.fullscreen
+        ? (state.language === 'vi' ? 'Thoát ngay' : 'Exit now')
+        : (state.language === 'vi' ? 'Bật ngay' : 'Enter now');
+    }
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'F11') {
+        e.preventDefault();
+        toggleFullscreen();
+      }
+      if (e.key === 'Escape') {
+        if (document.getElementById('linkOverlay') && !document.getElementById('linkOverlay').hidden) {
+          closeLinkDialog();
+          return;
+        }
+        if (state.fullscreen) toggleFullscreen();
+      }
+    });
+  </script>
+</body>
+</html>

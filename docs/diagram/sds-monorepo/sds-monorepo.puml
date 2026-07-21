@@ -1,0 +1,50 @@
+@startuml sds-monorepo
+title Monorepo Package Map - source/
+skinparam shadowing false
+skinparam backgroundColor #FFFFFF
+skinparam defaultFontName Arial
+skinparam ArrowColor #333333
+skinparam packageStyle rectangle
+
+package "source/" {
+  package "apps/" as Apps {
+    package "reading-book-desktop" as Desktop #E3F2FD {
+      [src/ Presentation]
+      [electron/ Infrastructure]
+    }
+    package "reading-book-mobile" as Mobile #E3F2FD {
+      [src/ Presentation]
+    }
+  }
+
+  package "packages/" as Pkgs {
+    package "domain" as Domain #E8F5E9 {
+      [Domain models + Ports]
+    }
+    package "shared" as Shared #FFF3CD {
+      [Application use cases\n+ Domain helpers]
+    }
+    package "config" as Config {
+      [theme, formats, flags]
+    }
+  }
+}
+
+Desktop --> Shared
+Desktop --> Domain
+Desktop --> Config
+Mobile --> Shared
+Mobile --> Domain
+Mobile --> Config
+Shared --> Domain
+Shared --> Config
+
+note bottom of Domain
+  Khong I/O, khong Electron
+end note
+
+note bottom of Desktop
+  MVP primary
+end note
+
+@enduml

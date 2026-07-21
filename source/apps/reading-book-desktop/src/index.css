@@ -1,0 +1,125 @@
+@import "tailwindcss";
+@import "./styles/theme.css";
+
+/* Design tokens → Tailwind utilities: bg-bg, text-fg, bg-accent, text-accent */
+@theme {
+  --color-bg: var(--bg);
+  --color-fg: var(--text);
+  --color-accent: var(--accent);
+
+  /*
+   * SCR-01 Library chrome — concrete values from docs/mockups/library.html
+   * (not dependent on scoped CSS vars, so utilities always resolve).
+   */
+  --color-lib-bg-deep: #0f172a;
+  --color-lib-bg-mid: #1e293b;
+  --color-lib-surface: rgb(30 41 59 / 0.45);
+  --color-lib-surface-strong: rgb(15 23 42 / 0.85);
+  --color-lib-border: rgb(51 65 85 / 0.45);
+  --color-lib-border-soft: rgb(51 65 85 / 0.28);
+  --color-lib-text: #e2e8f0;
+  --color-lib-text-strong: #f1f5f9;
+  --color-lib-muted: #94a3b8;
+  --color-lib-faint: #64748b;
+  --color-lib-accent: #f59e0b;
+  --color-lib-accent-hover: #d97706;
+  --color-lib-accent-soft: rgb(245 158 11 / 0.14);
+  --color-lib-accent-ring: rgb(245 158 11 / 0.28);
+  --color-lib-input: rgb(15 23 42 / 0.45);
+  --color-lib-topbar: rgb(15 23 42 / 0.35);
+  --color-lib-hint: rgb(15 23 42 / 0.28);
+  --color-lib-chip: rgb(51 65 85 / 0.35);
+
+  /* SCR-00 Splash brand motion */
+  --animate-splash-pulse: splash-pulse 2.5s ease-in-out infinite;
+  --animate-splash-draw-book: splash-draw-book 2s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+  --animate-splash-fade-in-up: splash-fade-in-up 0.8s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+
+  @keyframes splash-pulse {
+    0%,
+    100% {
+      transform: scale(1);
+      filter: drop-shadow(0 0 15px rgba(245, 158, 11, 0.2));
+    }
+    50% {
+      transform: scale(1.03);
+      filter: drop-shadow(0 0 25px rgba(245, 158, 11, 0.4));
+    }
+  }
+
+  @keyframes splash-draw-book {
+    to {
+      stroke-dashoffset: 0;
+    }
+  }
+
+  @keyframes splash-fade-in-up {
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+}
+
+@layer base {
+  :root {
+    font-family: system-ui, sans-serif;
+    line-height: 1.5;
+    color: var(--text);
+    background-color: var(--bg);
+  }
+
+  body {
+    margin: 0;
+    min-width: 320px;
+    min-height: 100vh;
+    color: var(--text);
+    background-color: var(--bg);
+  }
+
+  #root {
+    min-height: 100vh;
+  }
+
+  a {
+    color: var(--accent);
+  }
+
+  /* Library chrome: do not inherit Reader/app accent link color */
+  .lib-chrome a {
+    color: inherit;
+  }
+}
+
+/* Custom vertical scrollbar — sidebar nav (avoid OS chrome on Electron/Windows) */
+.lib-sidebar-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(100 116 139 / 0.45) transparent;
+}
+
+.lib-sidebar-scroll::-webkit-scrollbar {
+  width: 6px;
+}
+
+.lib-sidebar-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.lib-sidebar-scroll::-webkit-scrollbar-thumb {
+  background: rgb(100 116 139 / 0.45);
+  border-radius: 999px;
+}
+
+.lib-sidebar-scroll::-webkit-scrollbar-thumb:hover {
+  background: rgb(148 163 184 / 0.55);
+}
+
+.lib-sidebar-scroll::-webkit-scrollbar-button {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+.lib-sidebar-scroll::-webkit-scrollbar-corner {
+  background: transparent;
+}

@@ -1,0 +1,38 @@
+@startuml use-case
+title Use Case Diagram - Reading Book App (MVP)
+left to right direction
+skinparam shadowing false
+skinparam backgroundColor #FFFFFF
+skinparam defaultFontName Arial
+skinparam packageBorderColor #333333
+skinparam usecaseBorderColor #333333
+skinparam usecaseBackgroundColor #FFF3CD
+skinparam actorBorderColor #333333
+skinparam ArrowColor #333333
+
+actor "User" as User
+
+rectangle "Reading Book App" {
+  usecase "UC-01\nImport sach" as UC01
+  usecase "UC-02\nDoc sach" as UC02
+  usecase "UC-03\nHighlight" as UC03
+  usecase "UC-04\nNote" as UC04
+  usecase "UC-05\nDanh dau" as UC05
+  usecase "UC-06\nXem note" as UC06
+}
+
+User --> UC01
+User --> UC02
+User --> UC06
+
+UC03 .up.> UC02 : <<extend>>
+UC04 .up.> UC02 : <<extend>>
+UC05 .up.> UC02 : <<extend>>
+
+note right of UC02
+  Extension points:
+  - khi boi chon text (Highlight / Note)
+  - khi danh dau trang
+end note
+
+@enduml

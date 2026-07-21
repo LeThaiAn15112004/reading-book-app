@@ -1,0 +1,37 @@
+@startuml wf-01
+title WF-01 - Library (hub)
+skinparam shadowing false
+skinparam backgroundColor #FFFFFF
+skinparam defaultFontName Arial
+skinparam ActivityBorderColor #856404
+skinparam ActivityBackgroundColor #FFF3CD
+skinparam ActivityDiamondBackgroundColor #CCE5FF
+skinparam ActivityDiamondBorderColor #004085
+skinparam ActivityStartColor #28A745
+skinparam ActivityEndColor #DC3545
+
+start
+:1. Mo app / ve Library;
+:2. Man hinh Library;
+
+if (3. User chon?) then (Continue Reading)
+  if (Co sach gan nhat?) then (Co)
+    :Mo sach dung vi tri da luu;
+  else (Khong)
+    :Chon sach trong danh sach;
+  endif
+  :Mo Reader;
+  :Ket thuc -> WF-03;
+  stop
+elseif (Chon sach) then
+  :Chon sach trong danh sach;
+  :Mo Reader;
+  :Ket thuc -> WF-03;
+  stop
+else (Import)
+  :Chuyen WF-02 Import;
+  :Ket thuc -> WF-02;
+  stop
+endif
+
+@enduml

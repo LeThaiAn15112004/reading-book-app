@@ -1,0 +1,24 @@
+@startuml sds-layered
+title Layered Architecture - Reading Book App
+skinparam shadowing false
+skinparam backgroundColor #FFFFFF
+skinparam defaultFontName Arial
+skinparam ArrowColor #333333
+skinparam packageBorderColor #333333
+
+rectangle "Presentation (UI)\nReact screens, gestures, theme tokens, Invisible UI" as P #E3F2FD
+rectangle "Application (Use cases)\nImportBook, OpenReader, SaveProgress, AddHighlight..." as A #FFF3CD
+rectangle "Domain (shared model & rules)\nBook, Location, Highlight, Note, Overlay invariants" as D #E8F5E9
+rectangle "Infrastructure (adapters & technical services)\nSQLite/FTS5, FileStore, DocumentAdapters, IPC, AI stub" as I #FCE4EC
+
+P -down-> A : depends
+A -down-> D : depends
+I .up.> A : implements ports
+I .up.> D : implements ports
+
+note right of P
+  Quy tac: chi phu thuoc xuong duoi.
+  Domain khong import React / Electron / SQLite.
+end note
+
+@enduml

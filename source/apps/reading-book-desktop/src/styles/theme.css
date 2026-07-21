@@ -1,0 +1,19 @@
+/* App chrome theme tokens — Design §4 / packages/config/theme.ts (T0.12) */
+:root,
+[data-theme="day"] {
+  --bg: #FDFBF7;
+  --text: #2D2D2D;
+  --accent: #4A90E2;
+}
+
+[data-theme="sepia"] {
+  --bg: #F4ECD8;
+  --text: #2D2D2D;
+  --accent: #4A90E2;
+}
+
+[data-theme="night"] {
+  --bg: #1A1A1A;
+  --text: #E8E6E3;
+  --accent: #4A90E2;
+}

@@ -1,0 +1,11 @@
+@import "tailwindcss/theme.css" layer(theme);
+@import "tailwindcss/preflight.css" layer(base);
+@import "tailwindcss/utilities.css";
+@import "nativewind/theme";
+
+/* Design tokens → Tailwind utilities: bg-bg, text-fg, bg-accent, text-accent */
+@theme {
+  --color-bg: #fdfbf7;
+  --color-fg: #2d2d2d;
+  --color-accent: #4a90e2;
+}

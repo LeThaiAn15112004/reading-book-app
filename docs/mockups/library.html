@@ -1,0 +1,3406 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Readmate — Library (Redesigned)</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Literata:opsz,wght@7..72,400;7..72,600;7..72,700&family=Source+Sans+3:wght@400;500;600;700&display=swap" rel="stylesheet">
+  
+  <style>
+    :root {
+      --bg-deep: #0f172a;
+      --bg-mid: #1e293b;
+      --surface: rgba(30, 41, 59, 0.45);
+      --surface-strong: rgba(15, 23, 42, 0.85);
+      --border: rgba(51, 65, 85, 0.45);
+      --border-soft: rgba(51, 65, 85, 0.28);
+      --text: #e2e8f0;
+      --text-strong: #f1f5f9;
+      --muted: #94a3b8;
+      --faint: #64748b;
+      --accent: #f59e0b;
+      --accent-hover: #d97706;
+      --accent-soft: rgba(245, 158, 11, 0.14);
+      --accent-ring: rgba(245, 158, 11, 0.28);
+      --shadow: 0 12px 32px rgba(0, 0, 0, 0.35);
+      --radius: 12px;
+      --sidebar-w: 248px;
+      --sidebar-collapsed: 72px;
+      --header-h: 64px;
+      --bottom-nav-h: 64px;
+      --cover-w: 132px;
+      --font-ui: "Source Sans 3", "Segoe UI", sans-serif;
+      --font-display: "Literata", Georgia, serif;
+      
+      /* Premium Gradients for coverless books (Lỗi 4 fix) */
+      --cover-grad-1: linear-gradient(135deg, #1e3a8a, #3b82f6);
+      --cover-grad-2: linear-gradient(135deg, #064e3b, #10b981);
+      --cover-grad-3: linear-gradient(135deg, #7c2d12, #f97316);
+      --cover-grad-4: linear-gradient(135deg, #581c87, #8b5cf6);
+      --cover-grad-5: linear-gradient(135deg, #831843, #ec4899);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+    }
+
+    body {
+      overflow: hidden;
+      background:
+        radial-gradient(ellipse 80% 50% at 20% -10%, rgba(245, 158, 11, 0.08), transparent 55%),
+        radial-gradient(circle at 80% 100%, rgba(30, 58, 138, 0.18), transparent 45%),
+        radial-gradient(circle, var(--bg-mid) 0%, var(--bg-deep) 100%);
+      font-family: var(--font-ui);
+      color: var(--text);
+      user-select: none;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    button, input {
+      font-family: inherit;
+    }
+
+    .app {
+      display: flex;
+      width: 100%;
+      height: 100%;
+      position: relative;
+    }
+
+    .sidebar {
+      width: var(--sidebar-w);
+      height: 100%;
+      flex-shrink: 0;
+      display: flex;
+      flex-direction: column;
+      background: var(--surface-strong);
+      border-right: 1px solid var(--border);
+      backdrop-filter: blur(14px);
+      transition: width 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+      z-index: 40;
+    }
+
+    .sidebar.collapsed {
+      width: var(--sidebar-collapsed);
+    }
+
+    .sidebar-header {
+      height: var(--header-h);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 18px;
+      border-bottom: 1px solid var(--border-soft);
+      gap: 8px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      min-width: 0;
+      overflow: hidden;
+      white-space: nowrap;
+      transition: opacity 0.2s ease;
+    }
+
+    .sidebar.collapsed .brand {
+      opacity: 0;
+      width: 0;
+      pointer-events: none;
+    }
+
+    .brand-icon {
+      width: 22px;
+      height: 22px;
+      color: var(--accent);
+      flex-shrink: 0;
+      filter: drop-shadow(0 0 8px rgba(245, 158, 11, 0.35));
+    }
+
+    .brand-name {
+      font-size: 15px;
+      font-weight: 700;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+      color: var(--text-strong);
+    }
+
+    .icon-btn {
+      width: 36px;
+      height: 36px;
+      border: none;
+      border-radius: 8px;
+      background: transparent;
+      color: var(--faint);
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      transition: color 0.2s, background 0.2s;
+      flex-shrink: 0;
+    }
+
+    .icon-btn:hover {
+      color: var(--accent);
+      background: rgba(255, 255, 255, 0.05);
+    }
+
+    .icon-btn svg {
+      width: 20px;
+      height: 20px;
+    }
+
+    .sidebar.collapsed .sidebar-header {
+      justify-content: center;
+      padding: 0;
+    }
+
+    .nav {
+      list-style: none;
+      padding: 20px 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      flex: 1;
+      margin-top: 4px;
+    }
+
+    .nav-link {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 16px;
+      color: var(--muted);
+      text-decoration: none;
+      font-size: 14px;
+      font-weight: 500;
+      border-radius: 8px;
+      transition: color 0.2s, background 0.2s;
+      white-space: nowrap;
+      position: relative;
+      background: transparent;
+      border: none;
+      width: 100%;
+      text-align: left;
+      cursor: pointer;
+      font-family: inherit;
+    }
+
+    .nav-link svg {
+      width: 20px;
+      height: 20px;
+      flex-shrink: 0;
+    }
+
+    .nav-label {
+      transition: opacity 0.2s;
+    }
+
+    .sidebar.collapsed .nav-label {
+      opacity: 0;
+      width: 0;
+      overflow: hidden;
+    }
+
+    .sidebar.collapsed .nav-link {
+      justify-content: center;
+      padding: 12px;
+    }
+
+    .nav-link:hover {
+      color: var(--text-strong);
+      background: rgba(255, 255, 255, 0.05);
+    }
+
+    .nav-link.active {
+      color: var(--text-strong);
+      background: rgba(255, 255, 255, 0.06);
+    }
+
+    .nav-link.active::before {
+      content: "";
+      position: absolute;
+      left: 0;
+      top: 8px;
+      bottom: 8px;
+      width: 3px;
+      border-radius: 0 2px 2px 0;
+      background: var(--accent);
+    }
+
+    .sidebar.collapsed .nav-link.active::before {
+      display: none;
+    }
+
+    .sidebar-footer {
+      padding: 16px 10px 10px;
+      border-top: 1px solid var(--border-soft);
+      margin-top: auto;
+    }
+
+    .user-profile {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 8px;
+      background: rgba(255, 255, 255, 0.02);
+      border-radius: 12px;
+      border: 1px solid rgba(255, 255, 255, 0.04);
+      min-width: 0;
+    }
+
+    .user-avatar {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      background: #1e293b;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      flex-shrink: 0;
+      object-fit: cover;
+    }
+
+    .user-info {
+      display: flex;
+      flex-direction: column;
+      flex: 1;
+      min-width: 0;
+      overflow: hidden;
+      transition: opacity 0.2s;
+    }
+
+    .user-name {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-strong);
+      white-space: nowrap;
+      text-overflow: ellipsis;
+      overflow: hidden;
+    }
+
+    .user-role {
+      font-size: 11px;
+      color: var(--faint);
+    }
+
+    .logout-btn {
+      background: none;
+      border: none;
+      color: var(--faint);
+      cursor: pointer;
+      padding: 6px;
+      border-radius: 6px;
+      transition: color 0.2s, background 0.2s;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .logout-btn:hover {
+      color: #fc8181;
+      background: rgba(252, 129, 129, 0.1);
+    }
+
+    .logout-btn svg {
+      width: 16px;
+      height: 16px;
+    }
+
+    .sidebar.collapsed .user-info,
+    .sidebar.collapsed .logout-btn {
+      opacity: 0;
+      width: 0;
+      overflow: hidden;
+      padding: 0;
+      pointer-events: none;
+    }
+
+    .sidebar.collapsed .user-profile {
+      justify-content: center;
+      padding: 8px 0;
+      background: transparent;
+      border-color: transparent;
+    }
+
+    .sidebar.collapsed .sidebar-footer {
+      padding-left: 8px;
+      padding-right: 8px;
+    }
+
+    .overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(15, 23, 42, 0.65);
+      backdrop-filter: blur(8px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      z-index: 1000;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.25s ease;
+    }
+
+    .overlay.show {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .dialog {
+      background: var(--surface-strong);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      width: 100%;
+      max-width: 440px;
+      box-shadow: var(--shadow);
+      transform: scale(0.95);
+      transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+      overflow: hidden;
+    }
+
+    .overlay.show .dialog {
+      transform: scale(1);
+    }
+
+    .dialog-header {
+      padding: 20px 24px 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--border-soft);
+    }
+
+    .dialog-title {
+      font-family: var(--font-display);
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--text-strong);
+    }
+
+    .dialog-close {
+      background: transparent;
+      border: none;
+      color: var(--faint);
+      cursor: pointer;
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.15s, color 0.15s;
+    }
+
+    .dialog-close:hover {
+      background: rgba(255, 255, 255, 0.05);
+      color: var(--text-strong);
+    }
+
+    .dialog-body {
+      padding: 20px 24px 24px;
+    }
+
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+
+    .form-label {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--faint);
+    }
+
+    .input-wrapper {
+      position: relative;
+      display: flex;
+      align-items: center;
+    }
+
+    .input-icon {
+      position: absolute;
+      left: 12px;
+      width: 16px;
+      height: 16px;
+      color: var(--faint);
+      pointer-events: none;
+    }
+
+    .input-field {
+      width: 100%;
+      height: 42px;
+      background: rgba(15, 23, 42, 0.45);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 0 14px 0 38px;
+      color: var(--text-strong);
+      font-size: 14px;
+      outline: none;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+
+    .input-field:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px var(--accent-soft);
+    }
+
+    .input-field::placeholder {
+      color: var(--faint);
+    }
+
+    .format-hint {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 4px;
+    }
+
+    .format-tag {
+      font-size: 9px;
+      font-weight: 700;
+      color: var(--faint);
+      background: rgba(51, 65, 85, 0.22);
+      border: 1px solid var(--border-soft);
+      padding: 2px 6px;
+      border-radius: 4px;
+    }
+
+    /* Custom Toast Notification System (Lỗi 5 fix) */
+    .toast-container {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      z-index: 2000;
+    }
+
+    .toast {
+      background: #1e293b;
+      border: 1px solid var(--accent-ring);
+      border-radius: var(--radius);
+      padding: 14px 18px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      box-shadow: var(--shadow);
+      transform: translateY(20px);
+      opacity: 0;
+      transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.3s;
+    }
+
+    .toast.show {
+      transform: translateY(0);
+      opacity: 1;
+    }
+
+    .toast-icon {
+      width: 20px;
+      height: 20px;
+      color: var(--accent);
+      flex-shrink: 0;
+    }
+
+    .toast-text {
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text-strong);
+    }
+
+    .import-split-group {
+      display: inline-flex;
+      align-items: center;
+      background: var(--accent);
+      border-radius: 8px;
+      box-shadow: 0 4px 14px rgba(245, 158, 11, 0.22);
+      position: relative;
+    }
+
+    .btn-split-main {
+      height: 38px;
+      padding: 0 14px 0 16px;
+      border: none;
+      background: transparent;
+      font-size: 13px;
+      font-weight: 600;
+      color: #0f172a;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      border-top-left-radius: 8px;
+      border-bottom-left-radius: 8px;
+    }
+
+    .btn-split-main:hover {
+      background: rgba(0, 0, 0, 0.05);
+    }
+
+    .btn-split-main svg {
+      width: 16px;
+      height: 16px;
+    }
+
+    .btn-split-divider {
+      width: 1px;
+      height: 22px;
+      background: rgba(15, 23, 42, 0.15);
+    }
+
+    .btn-split-chevron {
+      height: 38px;
+      width: 32px;
+      border: none;
+      background: transparent;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #0f172a;
+      border-top-right-radius: 8px;
+      border-bottom-right-radius: 8px;
+    }
+
+    .btn-split-chevron:hover {
+      background: rgba(0, 0, 0, 0.05);
+    }
+
+    .btn-split-chevron svg {
+      width: 14px;
+      height: 14px;
+    }
+
+    .split-dropdown-menu {
+      position: absolute;
+      top: calc(100% + 6px);
+      right: 0;
+      background: var(--surface-strong);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      width: 190px;
+      padding: 6px;
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(16px);
+      display: none;
+      flex-direction: column;
+      gap: 4px;
+      z-index: 100;
+    }
+
+    .split-dropdown-menu.show {
+      display: flex;
+    }
+
+    .split-dropdown-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 12px;
+      color: var(--text);
+      font-size: 13px;
+      text-decoration: none;
+      border-radius: 6px;
+      background: transparent;
+      border: none;
+      cursor: pointer;
+      width: 100%;
+      text-align: left;
+      transition: background 0.15s, color 0.15s;
+    }
+
+    .split-dropdown-item:hover {
+      background: rgba(255, 255, 255, 0.05);
+      color: var(--text-strong);
+    }
+
+    .split-dropdown-item svg {
+      width: 16px;
+      height: 16px;
+      color: var(--muted);
+      flex-shrink: 0;
+    }
+
+    .main {
+      flex: 1;
+      min-width: 0;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .topbar {
+      height: var(--header-h);
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 0 28px;
+      border-bottom: 1px solid var(--border-soft);
+      background: rgba(15, 23, 42, 0.35);
+      backdrop-filter: blur(8px);
+      position: relative;
+      z-index: 35;
+    }
+
+    .search {
+      position: relative;
+      flex: 1;
+      max-width: 320px;
+    }
+
+    .search-icon {
+      position: absolute;
+      left: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 16px;
+      height: 16px;
+      color: var(--faint);
+      pointer-events: none;
+    }
+
+    .search-input {
+      width: 100%;
+      height: 38px;
+      padding: 0 14px 0 36px;
+      font-size: 14px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: rgba(15, 23, 42, 0.45);
+      color: var(--text-strong);
+      outline: none;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+
+    .search-input::placeholder {
+      color: var(--faint);
+    }
+
+    .search-input:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px var(--accent-soft);
+    }
+
+    .content {
+      flex: 1;
+      overflow-x: hidden;
+      overflow-y: auto;
+      padding: 28px 0 40px;
+      scroll-behavior: smooth;
+    }
+
+    .content-inner {
+      width: 100%;
+      max-width: 1180px;
+      margin: 0 auto;
+      padding: 0 28px;
+    }
+
+    .section {
+      margin-bottom: 36px;
+    }
+
+    .section-head {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 14px;
+    }
+
+    .section-title {
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--faint);
+    }
+
+    .continue-card {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 20px;
+      padding: 20px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      backdrop-filter: blur(6px);
+    }
+
+    .continue-info {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+      min-width: 0;
+      flex: 1;
+    }
+
+    .cover-lg {
+      width: 72px;
+      height: 100px;
+      flex-shrink: 0;
+      border-radius: 6px;
+      border: 1px solid var(--accent-ring);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 10px;
+      text-align: center;
+      box-shadow: var(--shadow);
+    }
+
+    .cover-lg span {
+      font-family: var(--font-display);
+      font-size: 11px;
+      line-height: 1.35;
+      color: var(--text);
+      display: -webkit-box;
+      -webkit-line-clamp: 4;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+
+    .continue-meta {
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      flex: 1;
+    }
+
+    .book-title {
+      font-family: var(--font-display);
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--text-strong);
+      line-height: 1.3;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .book-author {
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    .book-sub {
+      font-size: 12px;
+      color: var(--faint);
+      margin-top: 2px;
+    }
+
+    .progress {
+      width: 100%;
+      max-width: 280px;
+      margin-top: 12px;
+    }
+
+    .progress-row {
+      display: flex;
+      justify-content: space-between;
+      font-size: 11px;
+      color: var(--muted);
+      margin-bottom: 6px;
+    }
+
+    .progress-track {
+      height: 4px;
+      border-radius: 2px;
+      background: rgba(51, 65, 85, 0.55);
+      overflow: hidden;
+    }
+
+    .progress-fill {
+      height: 100%;
+      border-radius: 2px;
+      background: var(--accent);
+      box-shadow: 0 0 8px rgba(245, 158, 11, 0.45);
+    }
+
+    .continue-actions {
+      display: flex;
+      gap: 10px;
+      flex-shrink: 0;
+    }
+
+    .btn-primary {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      height: 38px;
+      padding: 0 16px;
+      font-size: 13px;
+      font-weight: 600;
+      color: #0f172a;
+      background: var(--accent);
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background 0.2s, transform 0.15s;
+      flex-shrink: 0;
+      box-shadow: 0 4px 14px rgba(245, 158, 11, 0.22);
+    }
+
+    .btn-primary:hover {
+      background: var(--accent-hover);
+    }
+
+    .btn-ghost {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      height: 38px;
+      padding: 0 14px;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text);
+      background: transparent;
+      border: 1px solid rgba(148, 163, 184, 0.28);
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background 0.2s, border-color 0.2s;
+      flex-shrink: 0;
+    }
+
+    .btn-ghost:hover {
+      background: rgba(255, 255, 255, 0.05);
+      border-color: var(--muted);
+    }
+
+    .shelf-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+      position: relative;
+    }
+
+    .shelf {
+      margin-bottom: 32px;
+      position: relative;
+      transition: opacity 0.15s ease, transform 0.15s ease, background-color 0.2s ease, box-shadow 0.2s ease;
+      touch-action: pan-y;
+      border-radius: 12px;
+      border: 1px solid transparent;
+    }
+
+    .shelf[hidden] {
+      display: none !important;
+    }
+
+    .shelf.is-dragging {
+      opacity: 0.9;
+      z-index: 200;
+      background: rgba(30, 41, 59, 0.8);
+      backdrop-filter: blur(12px);
+      border-color: var(--accent-ring);
+      transform: scale(0.99);
+      box-shadow: 
+        0 20px 25px -5px rgba(0, 0, 0, 0.5),
+        0 10px 10px -5px rgba(0, 0, 0, 0.4),
+        0 0 0 1px var(--accent-soft);
+    }
+
+    .shelf.drag-over-before::before,
+    .shelf.drag-over-after::after {
+      content: "";
+      display: block;
+      height: 4px;
+      margin: 0 28px 0;
+      border-radius: 2px;
+      background: var(--accent);
+      box-shadow: 0 0 14px var(--accent);
+    }
+
+    .shelf.drag-over-before::before {
+      margin-bottom: 14px;
+    }
+
+    .shelf.drag-over-after::after {
+      margin-top: 8px;
+    }
+
+    .shelf-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 12px;
+      padding: 0 28px;
+      max-width: 1180px;
+      margin-left: auto;
+      margin-right: auto;
+      width: 100%;
+      min-height: 40px;
+    }
+
+    .shelf-heading {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-width: 0;
+      min-height: 40px;
+    }
+
+    .drag-handle {
+      display: inline-flex;
+      justify-content: center;
+      align-items: center;
+      width: 36px;
+      height: 36px;
+      padding: 0;
+      border: none;
+      border-radius: 8px;
+      background: transparent;
+      color: var(--faint);
+      cursor: grab;
+      flex-shrink: 0;
+      touch-action: none; /* Strictly block scrolling only on the drag handle (Lỗi 2 fix) */
+      user-select: none;
+      -webkit-user-select: none;
+      transition: color 0.15s, background-color 0.15s, transform 0.1s ease;
+    }
+
+    .drag-handle:active {
+      transform: scale(1.1);
+    }
+
+    .drag-handle svg {
+      width: 20px;
+      height: 20px;
+    }
+
+    .drag-handle:hover,
+    .drag-handle:focus-visible {
+      color: var(--accent);
+      background: rgba(255, 255, 255, 0.05);
+      outline: none;
+    }
+
+    .drag-handle:active,
+    .shelf.is-dragging .drag-handle {
+      cursor: grabbing;
+      color: var(--accent);
+    }
+
+    .shelf-title {
+      font-family: var(--font-display);
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--text-strong);
+      letter-spacing: 0.01em;
+      line-height: 1;
+      margin: 0;
+    }
+
+    .shelf-meta {
+      font-size: 13px;
+      color: var(--faint);
+      font-weight: 500;
+      flex-shrink: 0;
+      line-height: 1;
+    }
+
+    .shelf-actions {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-shrink: 0;
+      min-height: 40px;
+    }
+
+    /* Refactored Chevron trigger (Lỗi 3 fix) */
+    .shelf-open-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 36px;
+      height: 36px;
+      border: none;
+      border-radius: 8px;
+      background: transparent;
+      color: var(--muted);
+      cursor: pointer;
+      transition: color 0.15s, background-color 0.15s, transform 0.15s;
+    }
+
+    .shelf-open-btn:hover {
+      color: var(--accent);
+      background: rgba(255, 255, 255, 0.05);
+      transform: translateX(2px);
+    }
+
+    .shelf-open-btn svg {
+      width: 20px;
+      height: 20px;
+    }
+
+    body.is-reordering {
+      cursor: grabbing;
+    }
+
+    body.is-reordering .shelf-rail {
+      pointer-events: none;
+    }
+
+    .shelf-rail {
+      display: flex;
+      gap: 18px;
+      overflow-x: auto;
+      overflow-y: hidden;
+      padding: 4px 28px 14px;
+      scroll-snap-type: x mandatory;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    .shelf-rail::-webkit-scrollbar {
+      height: 5px;
+    }
+
+    .shelf-rail::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    .shelf-rail::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.12);
+      border-radius: 3px;
+    }
+
+    .shelf-rail::after {
+      content: "";
+      flex: 0 0 12px;
+    }
+
+    /* SEMANTIC ACCESSIBLE BOOK CARD (Lỗi 1 & Lỗi 6 fix) */
+    .book-card {
+      flex: 0 0 var(--cover-w);
+      width: var(--cover-w);
+      scroll-snap-align: start;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      position: relative;
+    }
+
+    .book-cover-button {
+      width: 100%;
+      position: relative;
+      aspect-ratio: 3 / 4;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      overflow: hidden;
+      box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18);
+      cursor: pointer;
+      background: transparent;
+      outline: none;
+      transition: border-color 0.2s, box-shadow 0.2s, transform 0.2s;
+    }
+
+    .book-cover-button:hover,
+    .book-cover-button:focus-visible {
+      transform: translateY(-3px);
+      border-color: var(--accent);
+      box-shadow: 0 6px 18px rgba(245, 158, 11, 0.18), var(--shadow);
+    }
+
+    .cover-face {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 14px;
+      text-align: center;
+    }
+
+    .cover-face span {
+      font-family: var(--font-display);
+      font-size: 13px;
+      font-weight: 700;
+      line-height: 1.35;
+      color: var(--text-strong);
+      display: -webkit-box;
+      -webkit-line-clamp: 4;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+      text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+    }
+
+    .cover-bar {
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      height: 4px;
+      background: rgba(255, 255, 255, 0.1);
+    }
+
+    .cover-bar > i {
+      display: block;
+      height: 100%;
+      background: var(--accent);
+    }
+
+    .fav-star {
+      position: absolute;
+      top: 6px;
+      left: 6px;
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--accent);
+      background: rgba(15, 23, 42, 0.82);
+      border: 1px solid var(--accent-ring);
+      backdrop-filter: blur(4px);
+      font-size: 11px;
+    }
+
+    /* Standalone action triggers to prevent nested button HTML syntax errors (Lỗi 6 fix) */
+    .book-meta-row {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 4px;
+      min-width: 0;
+    }
+
+    .book-text-info {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      min-width: 0;
+      flex: 1;
+    }
+
+    .book-info-title {
+      font-family: var(--font-display);
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-strong);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .book-info-author {
+      font-size: 11px;
+      color: var(--faint);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .book-more-btn {
+      width: 24px;
+      height: 24px;
+      border: none;
+      border-radius: 4px;
+      background: transparent;
+      color: var(--faint);
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      transition: color 0.15s, background-color 0.15s;
+    }
+
+    .book-more-btn:hover {
+      color: var(--text-strong);
+      background: rgba(255, 255, 255, 0.08);
+    }
+
+    .book-more-btn svg {
+      width: 14px;
+      height: 14px;
+    }
+
+    .book-chip {
+      margin-top: 4px;
+      width: fit-content;
+      font-size: 10px;
+      font-weight: 600;
+      padding: 2px 6px;
+      border-radius: 4px;
+      background: rgba(51, 65, 85, 0.45);
+      color: var(--muted);
+    }
+
+    .book-chip.done {
+      background: var(--accent-soft);
+      color: var(--accent);
+    }
+
+    .format-badge {
+      position: absolute;
+      right: 6px;
+      top: 6px;
+      z-index: 1;
+      font-size: 8px;
+      font-weight: 800;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      padding: 2px 5px;
+      border-radius: 4px;
+      color: var(--text-strong);
+      background: rgba(15, 23, 42, 0.88);
+      border: 1px solid var(--border);
+      backdrop-filter: blur(4px);
+    }
+
+    /* Contextual Book Actions Menu (Lỗi 1 fix) */
+    .book-context-menu {
+      position: absolute;
+      bottom: 40px;
+      right: 4px;
+      background: #1e293b;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      width: 140px;
+      padding: 4px;
+      box-shadow: var(--shadow);
+      display: none;
+      flex-direction: column;
+      gap: 2px;
+      z-index: 50;
+    }
+
+    .book-context-menu.show {
+      display: flex;
+    }
+
+    .context-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px;
+      background: transparent;
+      border: none;
+      color: var(--text);
+      font-size: 12px;
+      font-weight: 500;
+      width: 100%;
+      text-align: left;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+
+    .context-item:hover {
+      background: rgba(255, 255, 255, 0.05);
+      color: var(--text-strong);
+    }
+
+    .context-item.delete {
+      color: #ef4444;
+    }
+
+    .context-item.delete:hover {
+      background: rgba(239, 68, 68, 0.1);
+      color: #f87171;
+    }
+
+    .view {
+      display: none;
+      flex-direction: column;
+      flex: 1;
+      min-height: 0;
+      overflow: hidden;
+    }
+
+    .view.is-active {
+      display: flex;
+    }
+
+    .collections-topbar {
+      height: var(--header-h);
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 0 28px;
+      border-bottom: 1px solid var(--border-soft);
+      background: rgba(15, 23, 42, 0.35);
+      backdrop-filter: blur(8px);
+    }
+
+    .collections-heading h1 {
+      font-family: var(--font-display);
+      font-size: 22px;
+      font-weight: 600;
+      color: var(--text-strong);
+      letter-spacing: -0.02em;
+    }
+
+    .collections-heading p {
+      margin-top: 2px;
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    .collections-body {
+      flex: 1;
+      min-height: 0;
+      overflow: auto;
+      padding: 28px;
+    }
+
+    .collections-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+      gap: 16px;
+      max-width: 1100px;
+    }
+
+    .collection-card {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      padding: 18px;
+      border: 1px solid var(--border-soft);
+      border-radius: var(--radius);
+      background: var(--surface);
+      text-align: left;
+      color: inherit;
+      cursor: pointer;
+      transition: border-color 0.15s, background 0.15s, transform 0.15s;
+      font-family: inherit;
+    }
+
+    .collection-card:hover {
+      border-color: var(--accent-ring);
+      background: rgba(30, 41, 59, 0.65);
+      transform: translateY(-1px);
+    }
+
+    .collection-stack {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 6px;
+      height: 72px;
+    }
+
+    .collection-stack span {
+      border-radius: 6px;
+      opacity: 0.9;
+    }
+
+    .collection-meta h2 {
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--text-strong);
+      margin-bottom: 4px;
+    }
+
+    .collection-meta p {
+      font-size: 13px;
+      color: var(--muted);
+      line-height: 1.4;
+    }
+
+    .collection-count {
+      margin-top: 10px;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--faint);
+      letter-spacing: 0.02em;
+      text-transform: uppercase;
+    }
+
+    .detail-topbar {
+      height: var(--header-h);
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 0 20px;
+      border-bottom: 1px solid var(--border-soft);
+      background: rgba(15, 23, 42, 0.35);
+      backdrop-filter: blur(8px);
+    }
+
+    /* Touch target optimized back button (Lỗi 7 fix) */
+    .detail-back-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 44px;
+      height: 44px;
+      border: none;
+      border-radius: 8px;
+      background: transparent;
+      color: var(--muted);
+      cursor: pointer;
+      transition: color 0.15s, background-color 0.15s;
+    }
+
+    .detail-back-btn:hover {
+      color: var(--accent);
+      background: rgba(255, 255, 255, 0.05);
+    }
+
+    .detail-back-btn svg {
+      width: 24px;
+      height: 24px;
+    }
+
+    .detail-heading {
+      min-width: 0;
+      flex: 1;
+    }
+
+    .detail-title {
+      font-family: var(--font-display);
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--text-strong);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .detail-sub {
+      font-size: 12px;
+      color: var(--faint);
+      margin-top: 2px;
+    }
+
+    .detail-body {
+      flex: 1;
+      overflow-y: auto;
+      padding: 16px 20px 32px;
+    }
+
+    .vert-list {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      max-width: 720px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .vert-item {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 12px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: var(--surface);
+      cursor: pointer;
+      text-align: left;
+      width: 100%;
+      color: inherit;
+      font: inherit;
+      transition: border-color 0.15s, background 0.15s, transform 0.15s;
+    }
+
+    .vert-item:hover {
+      border-color: var(--accent-ring);
+      background: rgba(30, 41, 59, 0.55);
+      transform: translateY(-1px);
+    }
+
+    .vert-cover {
+      position: relative;
+      width: 52px;
+      height: 72px;
+      flex-shrink: 0;
+      border-radius: 5px;
+      border: 1px solid var(--border);
+      overflow: hidden;
+    }
+
+    .vert-cover .cover-face {
+      padding: 6px;
+    }
+
+    .vert-cover .cover-face span {
+      font-size: 9px;
+      -webkit-line-clamp: 4;
+    }
+
+    .vert-info {
+      min-width: 0;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .vert-chevron {
+      color: var(--faint);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .vert-chevron svg {
+      width: 20px;
+      height: 20px;
+    }
+
+    .library-hint {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px 16px;
+      margin-bottom: 28px;
+      padding: 12px 14px;
+      border: 1px dashed var(--border);
+      border-radius: 10px;
+      background: rgba(15, 23, 42, 0.28);
+    }
+
+    .library-hint-copy {
+      min-width: 0;
+    }
+
+    .library-hint-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-strong);
+      margin-bottom: 2px;
+    }
+
+    .library-hint-desc {
+      font-size: 12px;
+      color: var(--faint);
+      line-height: 1.4;
+    }
+
+    .format-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .format-list span {
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      padding: 4px 7px;
+      border-radius: 4px;
+      color: var(--muted);
+      background: rgba(51, 65, 85, 0.35);
+      border: 1px solid var(--border-soft);
+    }
+
+    .empty-shelf {
+      padding: 8px 28px 0;
+      font-size: 13px;
+      color: var(--faint);
+      max-width: 1180px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .no-results {
+      display: none;
+      padding: 48px 28px;
+      text-align: center;
+      color: var(--faint);
+      font-size: 14px;
+    }
+
+    .no-results.show {
+      display: block;
+    }
+
+    .bottom-nav {
+      display: none;
+    }
+
+    .more-sheet-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 80;
+      background: rgba(15, 23, 42, 0.55);
+      backdrop-filter: blur(4px);
+      align-items: flex-end;
+      justify-content: center;
+    }
+
+    .more-sheet-overlay.show {
+      display: flex;
+    }
+
+    .more-sheet {
+      width: 100%;
+      max-width: 480px;
+      background: rgba(15, 23, 42, 0.96);
+      border: 1px solid var(--border);
+      border-bottom: none;
+      border-radius: 16px 16px 0 0;
+      padding: 12px 12px calc(16px + env(safe-area-inset-bottom, 0px));
+      box-shadow: 0 -8px 28px rgba(0, 0, 0, 0.35);
+    }
+
+    .more-sheet-handle {
+      width: 36px;
+      height: 4px;
+      border-radius: 2px;
+      background: rgba(148, 163, 184, 0.35);
+      margin: 0 auto 14px;
+    }
+
+    .more-sheet-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      width: 100%;
+      padding: 14px 12px;
+      border: none;
+      border-radius: 10px;
+      background: transparent;
+      color: var(--text);
+      font-size: 15px;
+      font-weight: 500;
+      text-align: left;
+      cursor: pointer;
+    }
+
+    .more-sheet-item:hover {
+      background: rgba(255, 255, 255, 0.05);
+      color: var(--text-strong);
+    }
+
+    .more-sheet-item svg {
+      width: 20px;
+      height: 20px;
+      color: var(--muted);
+      flex-shrink: 0;
+    }
+
+    /* System Progress Spinner styles */
+    .progress-content {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      padding: 4px 0;
+    }
+
+    .spinner-ring {
+      width: 36px;
+      height: 36px;
+      border: 3px solid var(--border-soft);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      flex-shrink: 0;
+    }
+
+    .progress-details {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      min-width: 0;
+    }
+
+    .progress-status {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text-strong);
+    }
+
+    .progress-filename {
+      font-family: ui-monospace, monospace;
+      font-size: 11px;
+      color: var(--faint);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 240px;
+    }
+
+    .progress-bar-container {
+      width: 100%;
+      height: 4px;
+      background: rgba(51, 65, 85, 0.3);
+      border-radius: 2px;
+      overflow: hidden;
+    }
+
+    .progress-bar-fill {
+      height: 100%;
+      background: var(--accent);
+      width: 0%;
+      transition: width 0.3s ease;
+      box-shadow: 0 0 8px rgba(245, 158, 11, 0.45);
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    /* ——— TABLET & RESPONSIVE ——— */
+    @media (max-width: 1024px) {
+      .sidebar {
+        width: var(--sidebar-collapsed);
+      }
+
+      .sidebar .brand,
+      .sidebar .nav-label,
+      .sidebar .user-info,
+      .sidebar .logout-btn {
+        opacity: 0;
+        width: 0;
+        overflow: hidden;
+        pointer-events: none;
+      }
+
+      .sidebar .nav-link {
+        justify-content: center;
+        padding: 12px;
+      }
+
+      .sidebar .nav-link.active::before {
+        display: none;
+      }
+
+      .sidebar .user-profile {
+        justify-content: center;
+        padding: 8px 0;
+        background: transparent;
+        border-color: transparent;
+      }
+
+      .sidebar-header {
+        justify-content: center;
+        padding: 0;
+      }
+
+      .topbar {
+        padding: 0 20px;
+      }
+
+      .content-inner,
+      .shelf-head,
+      .empty-shelf {
+        padding-left: 20px;
+        padding-right: 20px;
+      }
+
+      .shelf-rail {
+        padding-left: 20px;
+        padding-right: 20px;
+      }
+    }
+
+    /* ——— MOBILE ——— */
+    @media (max-width: 720px) {
+      :root {
+        --cover-w: 118px;
+        --header-h: 56px;
+      }
+
+      .sidebar {
+        display: none;
+      }
+
+      .collections-topbar {
+        padding: 12px 16px;
+        flex-wrap: wrap;
+        height: auto;
+        min-height: var(--header-h);
+      }
+
+      .collections-body {
+        padding: 16px;
+      }
+
+      .bottom-nav {
+        display: flex;
+        position: fixed;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        height: var(--bottom-nav-h);
+        background: rgba(15, 23, 42, 0.92);
+        border-top: 1px solid var(--border);
+        backdrop-filter: blur(12px);
+        z-index: 50;
+        justify-content: space-around;
+        align-items: center;
+        padding: 0 8px;
+        padding-bottom: env(safe-area-inset-bottom, 0);
+      }
+
+      .bottom-nav a {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 4px;
+        padding: 8px 4px;
+        text-decoration: none;
+        color: var(--muted);
+        font-size: 11px;
+        font-weight: 500;
+        border-radius: 8px;
+      }
+
+      .bottom-nav a svg {
+        width: 22px;
+        height: 22px;
+      }
+
+      .bottom-nav a.active {
+        color: var(--accent);
+      }
+
+      .main {
+        height: 100%;
+        padding-bottom: calc(var(--bottom-nav-h) + env(safe-area-inset-bottom, 0px));
+      }
+
+      .topbar {
+        padding: 0 16px;
+        gap: 10px;
+      }
+
+      .search {
+        max-width: none;
+      }
+
+      .import-split-group .btn-split-main span {
+        display: none;
+      }
+
+      .import-split-group .btn-split-main {
+        padding: 0 12px;
+        width: 38px;
+      }
+
+      .content {
+        padding: 20px 0 28px;
+      }
+
+      .content-inner,
+      .shelf-head,
+      .empty-shelf {
+        padding-left: 16px;
+        padding-right: 16px;
+      }
+
+      .shelf-rail {
+        padding-left: 16px;
+        padding-right: 16px;
+        gap: 12px;
+      }
+
+      .continue-card {
+        flex-direction: column;
+        align-items: stretch;
+        padding: 16px;
+        gap: 16px;
+      }
+
+      .continue-info {
+        gap: 14px;
+      }
+
+      .cover-lg {
+        width: 64px;
+        height: 90px;
+      }
+
+      .continue-actions {
+        width: 100%;
+      }
+
+      .continue-actions .btn-primary,
+      .continue-actions .btn-ghost {
+        flex: 1;
+      }
+      
+      .drag-handle {
+        width: 42px; /* Large touch target for finger control on mobile (Lỗi 2 fix) */
+        height: 42px;
+        color: var(--muted);
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar" id="sidebar" aria-label="Main navigation">
+      <div class="sidebar-header">
+        <div class="brand">
+          <svg class="brand-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 6.042A8.967 8.967 0 0 0 6 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 0 1 6 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 0 1 6-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0 0 18 18a8.967 8.967 0 0 0-6 2.292m0-14.25v14.25" />
+          </svg>
+          <span class="brand-name">Readmate</span>
+        </div>
+        <button class="icon-btn toggle-btn" type="button" onclick="toggleSidebar()" title="Collapse / expand menu" aria-label="Collapse menu">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
+          </svg>
+        </button>
+      </div>
+
+      <ul class="nav" id="sidebarNav">
+        <li>
+          <button class="nav-link active" type="button" data-nav="library" onclick="showMainView('library')" aria-current="page">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M12 6.042A8.967 8.967 0 0 0 6 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 0 1 6 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 0 1 6-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0 0 18 18a8.967 8.967 0 0 0-6 2.292m0-14.25v14.25" />
+            </svg>
+            <span class="nav-label">Library</span>
+          </button>
+        </li>
+        <li>
+          <button class="nav-link" type="button" data-nav="favorites" onclick="showMainView('favorites')">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M11.48 3.499a.562.562 0 0 1 1.04 0l2.125 5.111a.563.563 0 0 0 .475.345l5.518.442c.499.04.701.663.321.988l-4.204 3.602a.563.563 0 0 0-.182.557l1.285 5.385a.562.562 0 0 1-.84.61l-4.725-2.885a.562.562 0 0 0-.586 0L6.982 20.54a.562.562 0 0 1-.84-.61l1.285-5.386a.562.562 0 0 0-.182-.557l-4.204-3.602a.562.562 0 0 1 .321-.988l5.518-.442a.563.563 0 0 0 .475-.345L11.48 3.5Z" />
+            </svg>
+            <span class="nav-label">Favorites</span>
+          </button>
+        </li>
+        <li>
+          <button class="nav-link" type="button" data-nav="completed" onclick="showMainView('completed')">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+            </svg>
+            <span class="nav-label">Completed</span>
+          </button>
+        </li>
+        <li>
+          <button class="nav-link" type="button" data-nav="to-read" onclick="showMainView('to-read')">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M17.593 3.322c1.1.128 1.907 1.077 1.907 2.185V21L12 17.25 4.5 21V5.507c0-1.108.806-2.057 1.907-2.185a48.507 48.507 0 0 1 11.186 0Z" />
+            </svg>
+            <span class="nav-label">To read</span>
+          </button>
+        </li>
+        <li>
+          <button class="nav-link" type="button" data-nav="collections" onclick="showMainView('collections')">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M6 6.878V6a2.25 2.25 0 0 1 2.25-2.25h7.5A2.25 2.25 0 0 1 18 6v.878m-12 0c.235-.083.487-.128.75-.128h10.5c.263 0 .515.045.75.128m-12 0A2.25 2.25 0 0 0 4.5 9v.878m13.5-3A2.25 2.25 0 0 1 19.5 9v.878m0 0a2.246 2.246 0 0 0-.75-.128H5.25c-.263 0-.515.045-.75.128m15 0A2.25 2.25 0 0 1 21 12v6a2.25 2.25 0 0 1-2.25 2.25H5.25A2.25 2.25 0 0 1 3 18v-6c0-.98.626-1.813 1.5-2.122" />
+            </svg>
+            <span class="nav-label">Collections</span>
+          </button>
+        </li>
+        <li>
+          <button class="nav-link" type="button" onclick="showToast('Notes module is coming soon!', 'info')">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true">
+              <path stroke-linecap="round" stroke-linejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10" />
+            </svg>
+            <span class="nav-label">Notes</span>
+          </button>
+        </li>
+        <li>
+          <button class="nav-link" type="button" onclick="showToast('Settings panel is coming soon!', 'info')">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.325.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 0 1 1.37.49l1.296 2.247a1.125 1.125 0 0 1-.26 1.43l-1.003.828c-.293.241-.438.613-.43.992a7.723 7.723 0 0 1 0 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.955.26 1.43l-1.298 2.247a1.125 1.125 0 0 1-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.47 6.47 0 0 1-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.94-1.11.94h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 0 1-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 0 1-1.369-.49l-1.297-2.247a1.125 1.125 0 0 1 .26-1.43l1.004-.827c.292-.24.437-.613.43-.991a6.932 6.932 0 0 1 0-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 0 1-.26-1.43l1.297-2.247a1.125 1.125 0 0 1 1.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.086.22-.128.332-.183.582-.495.645-.869L9.594 3.94Z" />
+              <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
+            </svg>
+            <span class="nav-label">Settings</span>
+          </button>
+        </li>
+      </ul>
+
+      <div class="sidebar-footer">
+        <div class="user-profile">
+          <img
+            class="user-avatar"
+            src="https://api.dicebear.com/7.x/shapes/svg?seed=local-device"
+            alt=""
+            width="36"
+            height="36"
+          >
+          <div class="user-info">
+            <span class="user-name">This device</span>
+            <span class="user-role">Local-only</span>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <main class="main">
+      <div class="view is-active" id="libraryView">
+      <header class="topbar">
+        <div class="search">
+          <svg class="search-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
+          </svg>
+          <input
+            id="searchBar"
+            class="search-input"
+            type="search"
+            placeholder="Search imported files…"
+            aria-label="Search local library"
+            oninput="applySearch()"
+          >
+        </div>
+
+        <!-- REFACTORED SPLIT BUTTON (SCR-02 Entry Point UI) -->
+        <div class="import-split-group" id="importSplitGroup">
+          <button class="btn-split-main" type="button" onclick="triggerFilePicker()" aria-label="Import document from local system">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+            </svg>
+            <span>Add file</span>
+          </button>
+          <div class="btn-split-divider"></div>
+          <button class="btn-split-chevron" type="button" onclick="toggleImportDropdown(event)" aria-label="More import targets">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
+            </svg>
+          </button>
+          <div class="split-dropdown-menu" id="importDropdown">
+            <button type="button" class="split-dropdown-item" onclick="triggerFilePicker()">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M9 17.25v1.007a3 3 0 0 1-.879 2.122L7.5 21h9l-.621-.621A3 3 0 0 1 15 18.257V17.25m6-12V15a2.25 2.25 0 0 1-2.25 2.25H5.25A2.25 2.25 0 0 1 3 15V5.25m18 0A2.25 2.25 0 0 0 18.75 3H5.25A2.25 2.25 0 0 0 3 5.25m18 0V12a2.25 2.25 0 0 1-2.25 2.25H5.25A2.25 2.25 0 0 1 3 12V5.25" />
+              </svg>
+              From device
+            </button>
+            <button type="button" class="split-dropdown-item" onclick="openUrlDialog()">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M13.19 8.688a4.5 4.5 0 0 1 1.242 7.244l-4.5 4.5a4.5 4.5 0 0 1-6.364-6.364l1.757-1.757m13.35-.622 1.757-1.757a4.5 4.5 0 0 0-6.364-6.364l-4.5 4.5a4.5 4.5 0 0 0 1.242 7.244" />
+              </svg>
+              From Link / URL
+            </button>
+          </div>
+        </div>
+        <!-- Native Hidden File Selector -->
+        <input type="file" id="nativeFilePicker" style="display: none;" accept=".epub,.pdf,.txt,.md" onchange="handleDeviceFileSelected(event)">
+      </header>
+
+      <div class="content" id="contentScroll">
+        <div class="content-inner">
+          <div class="library-hint">
+            <div class="library-hint-copy">
+              <p class="library-hint-title">Your library on this device</p>
+              <p class="library-hint-desc">Only files you imported from your device. MVP supports 4 formats (covers most real-world needs):</p>
+            </div>
+            <div class="format-list" aria-label="Supported formats">
+              <span>EPUB</span>
+              <span>PDF</span>
+              <span>TXT</span>
+              <span>MD</span>
+            </div>
+          </div>
+
+          <section class="section" aria-labelledby="continue-title">
+            <div class="section-head">
+              <h2 class="section-title" id="continue-title">Continue reading</h2>
+            </div>
+            <div class="continue-card">
+              <div class="continue-info">
+                <div class="cover-lg" style="background: var(--cover-grad-1);" aria-hidden="true"><span>Nature and Life</span></div>
+                <div class="continue-meta">
+                  <h3 class="book-title">Nature and Life</h3>
+                  <p class="book-author">Nguyen Van A</p>
+                  <p class="continue-format">
+                    <span class="tag">EPUB</span>
+                    <span class="file-name">nature-and-life.epub</span>
+                  </p>
+                  <p class="book-sub">Last read · 15 minutes ago</p>
+                  <div class="progress" aria-label="Progress 65%">
+                    <div class="progress-row">
+                      <span>Progress</span>
+                      <span>65%</span>
+                    </div>
+                    <div class="progress-track">
+                      <div class="progress-fill" style="width: 65%"></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="continue-actions">
+                <button class="btn-primary" type="button" onclick="launchReader('nature-and-life.epub')">Resume</button>
+                <button class="btn-ghost" type="button" onclick="showToast('Displaying annotated logs...', 'info')">Notes (12)</button>
+              </div>
+            </div>
+          </section>
+        </div>
+
+        <!-- Shelves = reading status of imported files (drag = to reorder) -->
+        <div class="shelf-list" id="shelfList">
+        <section class="shelf" data-shelf="reading" aria-labelledby="shelf-reading">
+          <div class="shelf-head">
+            <div class="shelf-heading">
+              <button type="button" class="drag-handle" aria-label="Drag to reorder Reading section" title="Drag to reorder">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 9h16.5m-16.5 6h16.5" />
+                </svg>
+              </button>
+              <h2 class="shelf-title" id="shelf-reading">Reading</h2>
+            </div>
+            <div class="shelf-actions">
+              <span class="shelf-meta" data-count>4 files</span>
+              <button type="button" class="shelf-open-btn" data-open-shelf aria-label="View Reading list" title="View list">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3" />
+                </svg>
+              </button>
+            </div>
+          </div>
+          <div class="shelf-rail" role="list">
+            <!-- Book 1 -->
+            <article class="book-card" role="listitem" data-title="Nature and Life" data-author="Nguyen Van A" data-file="nature-and-life.epub" data-format="epub" data-progress="65" data-favorite="true">
+              <button class="book-cover-button" type="button" onclick="launchReader('nature-and-life.epub')">
+                <span class="format-badge">EPUB</span>
+                <div class="cover-face" style="background: var(--cover-grad-1);"><span>Nature and Life</span></div>
+                <div class="fav-star" aria-label="Favorite">★</div>
+                <div class="cover-bar"><i style="width: 65%"></i></div>
+              </button>
+              <div class="book-meta-row">
+                <div class="book-text-info">
+                  <h3 class="book-info-title">Nature and Life</h3>
+                  <p class="book-info-author">Nguyen Van A</p>
+                  <div class="chip-row"><span class="book-chip">65%</span></div>
+                </div>
+                <button class="book-more-btn" type="button" onclick="toggleBookMenu(event)" aria-label="Context options">
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.2" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 6.75a.75.75 0 1 1 0-1.5.75.75 0 0 1 0 1.5ZM12 12.75a.75.75 0 1 1 0-1.5.75.75 0 0 1 0 1.5ZM12 18.75a.75.75 0 1 1 0-1.5.75.75 0 0 1 0 1.5?" />
+                  </svg>
+                </button>
+                <div class="book-context-menu">
+                  <button type="button" class="context-item" onclick="toggleFavorite(this)">★ Unfavorite</button>
+                  <button type="button" class="context-item" onclick="showToast('Initiating FTS engine indexing...', 'info')">Re-index</button>
+                  <button type="button" class="context-item delete" onclick="deleteBook(this)">Delete</button>
+                </div>
+              </div>
+            </article>
+
+            <!-- Book 2 -->
+            <article class="book-card" role="listitem" data-title="Practical System Design" data-author="Tran Van B" data-file="system-design.pdf" data-format="pdf" data-progress="12" data-favorite="false">
+              <button class="book-cover-button" type="button" onclick="launchReader('system-design.pdf')">
+                <span class="format-badge">PDF</span>
+                <div class="cover-face" style="background: var(--cover-grad-2);"><span>Practical System Design</span></div>
+                <div class="cover-bar"><i style="width: 12%"></i></div>
+              </button>
+              <div class="book-meta-row">
+                <div class="book-text-info">
+                  <h3 class="book-info-title">Practical System Design</h3>
+                  <p class="book-info-author">Tran Van B</p>
+                  <div class="chip-row"><span class="book-chip">12%</span></div>
+                </div>
+                <button class="book-more-btn" type="button" onclick="toggleBookMenu(event)" aria-label="Context options">
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.2" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 6.75a.75.75 0 1 1 0-1.5.75.75 0 0 1 0 1.5ZM12 12.75a.75.75 0 1 1 0-1.5.75.75 0 0 1 0 1.5ZM12 18.75a.75.75 0 1 1 0-1.5.75.75 0 0 1 0 1.5?" />
+                  </svg>
+                </button>
+                <div class="book-context-menu">
+                  <button type="button" class="context-item" onclick="toggleFavorite(this)">★ Favorite</button>
+                  <button type="button" class="context-item delete" onclick="deleteBook(this)">Delete</button>
+                </div>
+              </div>
+            </article>
+
+            <!-- Book 3 -->
+            <article class="book-card" role="listitem" data-title="Architecture Notes" data-author="Personal notes" data-file="architecture-notes.md" data-format="md" data-progress="41" data-favorite="false">
+              <button class="book-cover-button" type="button" onclick="launchReader('architecture-notes.md')">
+                <span class="format-badge">MD</span>
+                <div class="cover-face" style="background: var(--cover-grad-4);"><span>Architecture Notes</span></div>
+                <div class="cover-bar"><i style="width: 41%"></i></div>
+              </button>
+              <div class="book-meta-row">
+                <div class="book-text-info">
+                  <h3 class="book-info-title">Architecture Notes</h3>
+                  <p class="book-info-author">Personal notes</p>
+                  <div class="chip-row"><span class="book-chip">41%</span></div>
+                </div>
+                <button class="book-more-btn" type="button" onclick="toggleBookMenu(event)" aria-label="Context options">
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.2" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 6.75a.75.75 0 1 1 0-1.5.75.75 0 0 1 0 1.5ZM12 12.75a.75.75 0 1 1 0-1.5.75.75 0 0 1 0 1.5ZM12 18.75a.75.75 0 1 1 0-1.5.75.75 0 0 1 0 1.5?" />
+                  </svg>
+                </button>
+                <div class="book-context-menu">
+                  <button type="button" class="context-item" onclick="toggleFavorite(this)">★ Favorite</button>
+                  <button type="button" class="context-item delete" onclick="deleteBook(this)">Delete</button>
+                </div>
+              </div>
+            </article>
+
+            <!-- Book 4 -->
+            <article class="book-card" role="listitem" data-title="Domain-Driven Design" data-author="Eric Evans" data-file="ddd-evans.epub" data-format="epub" data-progress="28" data-favorite="true">
+              <button class="book-cover-button" type="button" onclick="launchReader('ddd-evans.epub')">
+                <span class="format-badge">EPUB</span>
+                <div class="cover-face" style="background: var(--cover-grad-5);"><span>Domain-Driven Design</span></div>
+                <div class="fav-star" aria-label="Favorite">★</div>
+                <div class="cover-bar"><i style="width: 28%"></i></div>
+              </button>
+              <div class="book-meta-row">
+                <div class="book-text-info">
+                  <h3 class="book-info-title">Domain-Driven Design</h3>
+                  <p class="book-info-author">Eric Evans</p>
+                  <div class="chip-row"><span class="book-chip">28%</span></div>
+                </div>
+                <button class="book-more-btn" type="button" onclick="toggleBookMenu(event)" aria-label="Context options">
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.2" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 6.75a.75.75 0 1 1 0-1.5.75.75 0 0 1 0 1.5ZM12 12.75a.75.75 0 1 1 0-1.5.75.75 0 0 1 0 1.5ZM12 18.75a.75.75 0 1 1 0-1.5.75.75 0 0 1 0 1.5?" />
+                  </svg>
+                </button>
+                <div class="book-context-menu">
+                  <button type="button" class="context-item" onclick="toggleFavorite(this)">★ Unfavorite</button>
+                  <button type="button" class="context-item delete" onclick="deleteBook(this)">Delete</button>
+                </div>
+              </div>
+            </article>
+          </div>
+        </section>
+
+        <!-- Shelf: Completed -->
+        <section class="shelf" data-shelf="completed" aria-labelledby="shelf-done">
+          <div class="shelf-head">
+            <div class="shelf-heading">
+              <button type="button" class="drag-handle" aria-label="Drag to reorder Completed section" title="Drag to reorder">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 9h16.5m-16.5 6h16.5" />
+                </svg>
+              </button>
+              <h2 class="shelf-title" id="shelf-done">Completed</h2>
+            </div>
+            <div class="shelf-actions">
+              <span class="shelf-meta" data-count>3 files</span>
+              <button type="button" class="shelf-open-btn" data-open-shelf aria-label="View Completed list" title="View list">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3" />
+                </svg>
+              </button>
+            </div>
+          </div>
+          <div class="shelf-rail" role="list">
+            <article class="book-card" role="listitem" data-title="Clean Architecture" data-author="Robert C. Martin" data-file="clean-architecture.epub" data-format="epub" data-progress="100" data-favorite="true">
+              <button class="book-cover-button" type="button" onclick="launchReader('clean-architecture.epub')">
+                <span class="format-badge">EPUB</span>
+                <div class="cover-face" style="background: var(--cover-grad-3);"><span>Clean Architecture</span></div>
+                <div class="fav-star" aria-label="Favorite">★</div>
+                <div class="cover-bar"><i style="width: 100%"></i></div>
+              </button>
+              <div class="book-meta-row">
+                <div class="book-text-info">
+                  <h3 class="book-info-title">Clean Architecture</h3>
+                  <p class="book-info-author">Robert C. Martin</p>
+                  <div class="chip-row"><span class="book-chip done">Completed</span></div>
+                </div>
+                <button class="book-more-btn" type="button" onclick="toggleBookMenu(event)" aria-label="Context options">
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.2" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 6.75a.75.75 0 1 1 0-1.5.75.75 0 0 1 0 1.5ZM12 12.75a.75.75 0 1 1 0-1.5.75.75 0 0 1 0 1.5ZM12 18.75a.75.75 0 1 1 0-1.5.75.75 0 0 1 0 1.5?" />
+                  </svg>
+                </button>
+                <div class="book-context-menu">
+                  <button type="button" class="context-item" onclick="toggleFavorite(this)">★ Unfavorite</button>
+                  <button type="button" class="context-item delete" onclick="deleteBook(this)">Delete</button>
+                </div>
+              </div>
+            </article>
+
+            <article class="book-card" role="listitem" data-title="Internal Spec Document" data-author="Team docs" data-file="spec-v1.txt" data-format="txt" data-progress="100" data-favorite="false">
+              <button class="book-cover-button" type="button" onclick="launchReader('spec-v1.txt')">
+                <span class="format-badge">TXT</span>
+                <div class="cover-face" style="background: var(--cover-grad-1);"><span>Internal Spec Document</span></div>
+                <div class="cover-bar"><i style="width: 100%"></i></div>
+              </button>
+              <div class="book-meta-row">
+                <div class="book-text-info">
+                  <h3 class="book-info-title">Internal Spec Document</h3>
+                  <p class="book-info-author">Team docs</p>
+                  <div class="chip-row"><span class="book-chip done">Completed</span></div>
+                </div>
+                <button class="book-more-btn" type="button" onclick="toggleBookMenu(event)" aria-label="Context options">
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.2" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 6.75a.75.75 0 1 1 0-1.5.75.75 0 0 1 0 1.5ZM12 12.75a.75.75 0 1 1 0-1.5.75.75 0 0 1 0 1.5ZM12 18.75a.75.75 0 1 1 0-1.5.75.75 0 0 1 0 1.5?" />
+                  </svg>
+                </button>
+                <div class="book-context-menu">
+                  <button type="button" class="context-item" onclick="toggleFavorite(this)">★ Favorite</button>
+                  <button type="button" class="context-item delete" onclick="deleteBook(this)">Delete</button>
+                </div>
+              </div>
+            </article>
+
+            <article class="book-card" role="listitem" data-title="Refactoring" data-author="Martin Fowler" data-file="refactoring.pdf" data-format="pdf" data-progress="100" data-favorite="true">
+              <button class="book-cover-button" type="button" onclick="launchReader('refactoring.pdf')">
+                <span class="format-badge">PDF</span>
+                <div class="cover-face" style="background: var(--cover-grad-2);"><span>Refactoring</span></div>
+                <div class="fav-star" aria-label="Favorite">★</div>
+                <div class="cover-bar"><i style="width: 100%"></i></div>
+              </button>
+              <div class="book-meta-row">
+                <div class="book-text-info">
+                  <h3 class="book-info-title">Refactoring</h3>
+                  <p class="book-info-author">Martin Fowler</p>
+                  <div class="chip-row"><span class="book-chip done">Completed</span></div>
+                </div>
+                <button class="book-more-btn" type="button" onclick="toggleBookMenu(event)" aria-label="Context options">
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.2" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 6.75a.75.75 0 1 1 0-1.5.75.75 0 0 1 0 1.5ZM12 12.75a.75.75 0 1 1 0-1.5.75.75 0 0 1 0 1.5ZM12 18.75a.75.75 0 1 1 0-1.5.75.75 0 0 1 0 1.5?" />
+                  </svg>
+                </button>
+                <div class="book-context-menu">
+                  <button type="button" class="context-item" onclick="toggleFavorite(this)">★ Unfavorite</button>
+                  <button type="button" class="context-item delete" onclick="deleteBook(this)">Delete</button>
+                </div>
+              </div>
+            </article>
+          </div>
+        </section>
+
+        <!-- Shelf: Not started -->
+        <section class="shelf" data-shelf="queue" aria-labelledby="shelf-queue">
+          <div class="shelf-head">
+            <div class="shelf-heading">
+              <button type="button" class="drag-handle" aria-label="Drag to reorder Not started section" title="Drag to reorder">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 9h16.5m-16.5 6h16.5" />
+                </svg>
+              </button>
+              <h2 class="shelf-title" id="shelf-queue">Not started</h2>
+            </div>
+            <div class="shelf-actions">
+              <span class="shelf-meta" data-count>4 files</span>
+              <button type="button" class="shelf-open-btn" data-open-shelf aria-label="View Not started list" title="View list">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3" />
+                </svg>
+              </button>
+            </div>
+          </div>
+          <div class="shelf-rail" role="list">
+            <article class="book-card" role="listitem" data-title="Machine Learning Basics" data-author="Pham Minh C" data-file="ml-basics.pdf" data-format="pdf" data-progress="0" data-favorite="false">
+              <button class="book-cover-button" type="button" onclick="launchReader('ml-basics.pdf')">
+                <span class="format-badge">PDF</span>
+                <div class="cover-face" style="background: var(--cover-grad-4);"><span>Machine Learning Basics</span></div>
+                <div class="cover-bar"><i style="width: 0%"></i></div>
+              </button>
+              <div class="book-meta-row">
+                <div class="book-text-info">
+                  <h3 class="book-info-title">Machine Learning Basics</h3>
+                  <p class="book-info-author">Pham Minh C</p>
+                  <div class="chip-row"><span class="book-chip">Not started</span></div>
+                </div>
+                <button class="book-more-btn" type="button" onclick="toggleBookMenu(event)" aria-label="Context options">
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.2" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 6.75a.75.75 0 1 1 0-1.5.75.75 0 0 1 0 1.5ZM12 12.75a.75.75 0 1 1 0-1.5.75.75 0 0 1 0 1.5ZM12 18.75a.75.75 0 1 1 0-1.5.75.75 0 0 1 0 1.5?" />
+                  </svg>
+                </button>
+                <div class="book-context-menu">
+                  <button type="button" class="context-item" onclick="toggleFavorite(this)">★ Favorite</button>
+                  <button type="button" class="context-item delete" onclick="deleteBook(this)">Delete</button>
+                </div>
+              </div>
+            </article>
+
+            <article class="book-card" role="listitem" data-title="Project README" data-author="Local file" data-file="README.txt" data-format="txt" data-progress="0" data-favorite="false">
+              <button class="book-cover-button" type="button" onclick="launchReader('README.txt')">
+                <span class="format-badge">TXT</span>
+                <div class="cover-face" style="background: var(--cover-grad-2);"><span>Project README</span></div>
+                <div class="cover-bar"><i style="width: 0%"></i></div>
+              </button>
+              <div class="book-meta-row">
+                <div class="book-text-info">
+                  <h3 class="book-info-title">Project README</h3>
+                  <p class="book-info-author">Local file</p>
+                  <div class="chip-row"><span class="book-chip">Not started</span></div>
+                </div>
+                <button class="book-more-btn" type="button" onclick="toggleBookMenu(event)" aria-label="Context options">
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.2" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 6.75a.75.75 0 1 1 0-1.5.75.75 0 0 1 0 1.5ZM12 12.75a.75.75 0 1 1 0-1.5.75.75 0 0 1 0 1.5ZM12 18.75a.75.75 0 1 1 0-1.5.75.75 0 0 1 0 1.5?" />
+                  </svg>
+                </button>
+                <div class="book-context-menu">
+                  <button type="button" class="context-item" onclick="toggleFavorite(this)">★ Favorite</button>
+                  <button type="button" class="context-item delete" onclick="deleteBook(this)">Delete</button>
+                </div>
+              </div>
+            </article>
+
+            <article class="book-card" role="listitem" data-title="Internal Handbook" data-author="—" data-file="internal-handbook.md" data-format="md" data-progress="0" data-favorite="false">
+              <button class="book-cover-button" type="button" onclick="launchReader('internal-handbook.md')">
+                <span class="format-badge">MD</span>
+                <div class="cover-face" style="background: var(--cover-grad-5);"><span>Internal Handbook</span></div>
+                <div class="cover-bar"><i style="width: 0%"></i></div>
+              </button>
+              <div class="book-meta-row">
+                <div class="book-text-info">
+                  <h3 class="book-info-title">Internal Handbook</h3>
+                  <p class="book-info-author">—</p>
+                  <div class="chip-row"><span class="book-chip">Not started</span></div>
+                </div>
+                <button class="book-more-btn" type="button" onclick="toggleBookMenu(event)" aria-label="Context options">
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.2" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 6.75a.75.75 0 1 1 0-1.5.75.75 0 0 1 0 1.5ZM12 12.75a.75.75 0 1 1 0-1.5.75.75 0 0 1 0 1.5ZM12 18.75a.75.75 0 1 1 0-1.5.75.75 0 0 1 0 1.5?" />
+                  </svg>
+                </button>
+                <div class="book-context-menu">
+                  <button type="button" class="context-item" onclick="toggleFavorite(this)">★ Favorite</button>
+                  <button type="button" class="context-item delete" onclick="deleteBook(this)">Delete</button>
+                </div>
+              </div>
+            </article>
+
+            <article class="book-card" role="listitem" data-title="Thinking in Systems" data-author="Donella Meadows" data-file="thinking-in-systems.epub" data-format="epub" data-progress="0" data-favorite="false">
+              <button class="book-cover-button" type="button" onclick="launchReader('thinking-in-systems.epub')">
+                <span class="format-badge">EPUB</span>
+                <div class="cover-face" style="background: var(--cover-grad-3);"><span>Thinking in Systems</span></div>
+                <div class="cover-bar"><i style="width: 0%"></i></div>
+              </button>
+              <div class="book-meta-row">
+                <div class="book-text-info">
+                  <h3 class="book-info-title">Thinking in Systems</h3>
+                  <p class="book-info-author">Donella Meadows</p>
+                  <div class="chip-row"><span class="book-chip">Not started</span></div>
+                </div>
+                <button class="book-more-btn" type="button" onclick="toggleBookMenu(event)" aria-label="Context options">
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.2" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 6.75a.75.75 0 1 1 0-1.5.75.75 0 0 1 0 1.5ZM12 12.75a.75.75 0 1 1 0-1.5.75.75 0 0 1 0 1.5ZM12 18.75a.75.75 0 1 1 0-1.5.75.75 0 0 1 0 1.5?" />
+                  </svg>
+                </button>
+                <div class="book-context-menu">
+                  <button type="button" class="context-item" onclick="toggleFavorite(this)">★ Favorite</button>
+                  <button type="button" class="context-item delete" onclick="deleteBook(this)">Delete</button>
+                </div>
+              </div>
+            </article>
+          </div>
+        </section>
+        </div>
+
+        <p class="no-results" id="noResults">No matching imported files found.</p>
+      </div>
+      </div>
+
+      <!-- Filtered list — Favorites / Completed / To read -->
+      <div class="view" id="filteredListView" aria-hidden="true">
+        <header class="detail-topbar">
+          <div class="detail-heading">
+            <h1 class="detail-title" id="filteredListTitle">Favorites</h1>
+            <p class="detail-sub" id="filteredListSub">0 books</p>
+          </div>
+        </header>
+        <div class="detail-body">
+          <ul class="vert-list" id="filteredList" role="list"></ul>
+          <p class="detail-empty" id="filteredListEmpty" hidden>No books in this list yet.</p>
+        </div>
+      </div>
+
+      <!-- Collections — user-curated sets of books -->
+      <div class="view" id="collectionsView" aria-hidden="true">
+        <header class="collections-topbar">
+          <div class="collections-heading">
+            <h1>Collections</h1>
+            <p>Group books into sets you curate yourself</p>
+          </div>
+          <button class="btn-primary" type="button" onclick="showToast('Create collection dialog — coming in product build.', 'info')">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" style="width:16px;height:16px">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+            </svg>
+            <span>New collection</span>
+          </button>
+        </header>
+        <div class="collections-body">
+          <div class="collections-grid" role="list">
+            <button class="collection-card" type="button" role="listitem" onclick="openCollection('Architecture deep dive')">
+              <div class="collection-stack" aria-hidden="true">
+                <span style="background: var(--cover-grad-1);"></span>
+                <span style="background: var(--cover-grad-4);"></span>
+                <span style="background: var(--cover-grad-2);"></span>
+              </div>
+              <div class="collection-meta">
+                <h2>Architecture deep dive</h2>
+                <p>System design, DDD, and clean architecture notes</p>
+                <div class="collection-count">5 books</div>
+              </div>
+            </button>
+            <button class="collection-card" type="button" role="listitem" onclick="openCollection('Weekend fiction')">
+              <div class="collection-stack" aria-hidden="true">
+                <span style="background: var(--cover-grad-3);"></span>
+                <span style="background: var(--cover-grad-5);"></span>
+                <span style="background: var(--cover-grad-1);"></span>
+              </div>
+              <div class="collection-meta">
+                <h2>Weekend fiction</h2>
+                <p>Light reads for evenings off</p>
+                <div class="collection-count">3 books</div>
+              </div>
+            </button>
+            <button class="collection-card" type="button" role="listitem" onclick="openCollection('Work reading')">
+              <div class="collection-stack" aria-hidden="true">
+                <span style="background: var(--cover-grad-2);"></span>
+                <span style="background: var(--cover-grad-1);"></span>
+                <span style="background: var(--cover-grad-4);"></span>
+              </div>
+              <div class="collection-meta">
+                <h2>Work reading</h2>
+                <p>Specs, handbooks, and project references</p>
+                <div class="collection-count">4 books</div>
+              </div>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Vertical list screen for a shelf -->
+      <div class="view" id="shelfDetailView" aria-hidden="true">
+        <header class="detail-topbar">
+          <button type="button" class="detail-back-btn" id="detailBack" aria-label="Back to library" title="Back">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" />
+            </svg>
+          </button>
+          <div class="detail-heading">
+            <h1 class="detail-title" id="detailTitle">Section</h1>
+            <p class="detail-sub" id="detailSub">0 files</p>
+          </div>
+        </header>
+        <div class="detail-body">
+          <ul class="vert-list" id="vertList" role="list"></ul>
+          <p class="detail-empty" id="detailEmpty" hidden>No files in this section.</p>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Mobile navigation helper sheet -->
+  <nav class="bottom-nav" id="bottomNav" aria-label="Mobile navigation">
+    <a href="#" class="active" data-nav="library" aria-current="page" onclick="showMainView('library'); return false;">
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M12 6.042A8.967 8.967 0 0 0 6 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 0 1 6 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 0 1 6-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0 0 18 18a8.967 8.967 0 0 0-6 2.292m0-14.25v14.25" />
+      </svg>
+      Library
+    </a>
+    <a href="#" data-nav="collections" onclick="showMainView('collections'); return false;">
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M6 6.878V6a2.25 2.25 0 0 1 2.25-2.25h7.5A2.25 2.25 0 0 1 18 6v.878m-12 0c.235-.083.487-.128.75-.128h10.5c.263 0 .515.045.75.128m-12 0A2.25 2.25 0 0 0 4.5 9v.878m13.5-3A2.25 2.25 0 0 1 19.5 9v.878m0 0a2.246 2.246 0 0 0-.75-.128H5.25c-.263 0-.515.045-.75.128m15 0A2.25 2.25 0 0 1 21 12v6a2.25 2.25 0 0 1-2.25 2.25H5.25A2.25 2.25 0 0 1 3 18v-6c0-.98.626-1.813 1.5-2.122" />
+      </svg>
+      Collections
+    </a>
+    <a href="#" onclick="showToast('Notes segment coming soon!', 'info'); return false;">
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true">
+        <path stroke-linecap="round" stroke-linejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10" />
+      </svg>
+      Notes
+    </a>
+    <a href="#" onclick="openMoreSheet(); return false;" aria-haspopup="dialog">
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
+      </svg>
+      More
+    </a>
+  </nav>
+
+  <div class="more-sheet-overlay" id="moreSheet" onclick="if (event.target === this) closeMoreSheet()">
+    <div class="more-sheet" role="dialog" aria-label="More options">
+      <div class="more-sheet-handle" aria-hidden="true"></div>
+      <button type="button" class="more-sheet-item" onclick="closeMoreSheet(); showMainView('favorites');">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M11.48 3.499a.562.562 0 0 1 1.04 0l2.125 5.111a.563.563 0 0 0 .475.345l5.518.442c.499.04.701.663.321.988l-4.204 3.602a.563.563 0 0 0-.182.557l1.285 5.385a.562.562 0 0 1-.84.61l-4.725-2.885a.562.562 0 0 0-.586 0L6.982 20.54a.562.562 0 0 1-.84-.61l1.285-5.386a.562.562 0 0 0-.182-.557l-4.204-3.602a.562.562 0 0 1 .321-.988l5.518-.442a.563.563 0 0 0 .475-.345L11.48 3.5Z" />
+        </svg>
+        Favorites
+      </button>
+      <button type="button" class="more-sheet-item" onclick="closeMoreSheet(); showMainView('completed');">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+        </svg>
+        Completed
+      </button>
+      <button type="button" class="more-sheet-item" onclick="closeMoreSheet(); showMainView('to-read');">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M17.593 3.322c1.1.128 1.907 1.077 1.907 2.185V21L12 17.25 4.5 21V5.507c0-1.108.806-2.057 1.907-2.185a48.507 48.507 0 0 1 11.186 0Z" />
+        </svg>
+        To read
+      </button>
+      <button type="button" class="more-sheet-item" onclick="closeMoreSheet(); showToast('Settings console is under construction.', 'info');">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.325.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 0 1 1.37.49l1.296 2.247a1.125 1.125 0 0 1-.26 1.43l-1.003.828c-.293.241-.438.613-.43.992a7.723 7.723 0 0 1 0 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.955.26 1.43l-1.298 2.247a1.125 1.125 0 0 1-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.47 6.47 0 0 1-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.94-1.11.94h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 0 1-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 0 1-1.369-.49l-1.297-2.247a1.125 1.125 0 0 1 .26-1.43l1.004-.827c.292-.24.437-.613.43-.991a6.932 6.932 0 0 1 0-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 0 1-.26-1.43l1.297-2.247a1.125 1.125 0 0 1 1.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.086.22-.128.332-.183.582-.495.645-.869L9.594 3.94Z" />
+          <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
+        </svg>
+        Settings
+      </button>
+      <button type="button" class="more-sheet-item" onclick="closeMoreSheet(); openInfoDialog('about');">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true">
+          <path stroke-linecap="round" stroke-linejoin="round" d="m11.25 11.25.041-.02a.75.75 0 0 1 1.063.852l-.708 2.836a.75.75 0 0 0 1.063.853l.041-.021M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9-3.75h.008v.008H12V8.25Z" />
+        </svg>
+        About this app
+      </button>
+      <button type="button" class="more-sheet-item" onclick="closeMoreSheet(); openInfoDialog('help');">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-.203.179-.43.326-.67.442-.745.361-1.45.999-1.45 1.827v.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 5.25h.008v.008H12v-.008Z" />
+        </svg>
+        Help &amp; Support
+      </button>
+    </div>
+  </div>
+
+  <div class="info-dialog-overlay" id="infoDialog" onclick="if (event.target === this) closeInfoDialog()">
+    <div class="info-dialog" role="dialog" aria-modal="true" aria-labelledby="infoDialogTitle">
+      <h2 id="infoDialogTitle">About</h2>
+      <div id="infoDialogBody"></div>
+      <button type="button" class="btn-primary" style="width: 100%; margin-top: 16px;" onclick="closeInfoDialog()">Close</button>
+    </div>
+  </div>
+
+  <!-- ——— SCR-02 Flow B: Download from URL Dialog (Import Modal) ——— -->
+  <div class="overlay" id="urlOverlay" onclick="if (event.target === this) closeDialog('urlOverlay')">
+    <div class="dialog">
+      <div class="dialog-header">
+        <h2 class="dialog-title">Import from URL</h2>
+        <button class="dialog-close" type="button" onclick="closeDialog('urlOverlay')">✕</button>
+      </div>
+      <div class="dialog-body">
+        <div class="form-group">
+          <label class="form-label" for="urlInput">Direct File Link (HTTPS)</label>
+          <div class="input-wrapper">
+            <svg class="input-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M13.19 8.688a4.5 4.5 0 0 1 1.242 7.244l-4.5 4.5a4.5 4.5 0 0 1-6.364-6.364l1.757-1.757m13.35-.622 1.757-1.757a4.5 4.5 0 0 0-6.364-6.364l-4.5 4.5a4.5 4.5 0 0 0 1.242 7.244" />
+            </svg>
+            <input type="url" id="urlInput" class="input-field" placeholder="https://example.com/book.epub" autocomplete="off">
+          </div>
+          <div class="format-hint">
+            <span class="format-tag">EPUB</span>
+            <span class="format-tag">PDF</span>
+            <span class="format-tag">TXT</span>
+            <span class="format-tag">MD</span>
+          </div>
+        </div>
+        <div class="dialog-actions" style="display:flex; gap:10px; justify-content:flex-end;">
+          <button class="btn-ghost" type="button" onclick="closeDialog('urlOverlay')" style="border-radius:8px;">Cancel</button>
+          <button class="btn-primary" type="button" onclick="executeUrlImport()">Download</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Progress Overlay (SCR-02 PIPELINE LOADING DIALOG) -->
+  <div class="overlay" id="progressOverlay">
+    <div class="dialog" style="max-width: 380px;">
+      <div class="dialog-body" style="padding: 24px;">
+        <div class="progress-content">
+          <div class="spinner-ring"></div>
+          <div class="progress-details">
+            <div class="progress-status" id="progressStatus">Downloading to Sandbox...</div>
+            <div class="progress-filename" id="progressFilename">nature-of-design.epub</div>
+            <div class="progress-bar-container">
+              <div class="progress-bar-fill" id="progressBarFill"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Conflict Warning Dialog (BR-03: SHA-256 Dup Checker) -->
+  <div class="overlay" id="conflictOverlay" onclick="if (event.target === this) closeDialog('conflictOverlay')">
+    <div class="dialog" style="max-width: 400px;">
+      <div class="dialog-header" style="border-bottom: none; padding-bottom: 0;">
+        <h2 class="dialog-title" style="color: var(--accent);">File already exists</h2>
+      </div>
+      <div class="dialog-body">
+        <p style="font-size: 14px; line-height: 1.5; color: var(--muted); margin-bottom: 20px;" id="conflictText">
+          This document is already saved in your local library. Would you like to open the existing copy?
+        </p>
+        <div class="dialog-actions" style="margin-top: 0; display:flex; gap:10px; justify-content:flex-end;">
+          <button class="btn-ghost" type="button" onclick="closeDialog('conflictOverlay')" style="border-radius:8px;">Discard</button>
+          <button class="btn-primary" type="button" id="conflictOpenBtn">Open existing</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast-container" id="toastContainer"></div>
+
+  <script>
+    function toggleSidebar() {
+      document.getElementById('sidebar').classList.toggle('collapsed');
+    }
+
+    var FILTERED_VIEWS = {
+      favorites: {
+        title: 'Favorites',
+        empty: 'No favorites yet. Star a book from the library to see it here.',
+        match: function (card) { return card.dataset.favorite === 'true'; },
+        showStar: true
+      },
+      completed: {
+        title: 'Completed',
+        empty: 'No completed books yet. Finish a book to see it here.',
+        match: function (card) { return parseInt(card.dataset.progress || '0', 10) >= 100; },
+        showStar: false
+      },
+      'to-read': {
+        title: 'To read',
+        empty: 'Nothing queued yet. Books you have not started appear here.',
+        match: function (card) { return parseInt(card.dataset.progress || '0', 10) <= 0; },
+        showStar: false
+      }
+    };
+
+    function showMainView(name) {
+      const libraryView = document.getElementById('libraryView');
+      const filteredListView = document.getElementById('filteredListView');
+      const collectionsView = document.getElementById('collectionsView');
+      const detailView = document.getElementById('shelfDetailView');
+      if (!libraryView || !collectionsView || !filteredListView) return;
+
+      const showLibrary = name === 'library';
+      const showFiltered = !!FILTERED_VIEWS[name];
+      const showCollections = name === 'collections';
+
+      libraryView.classList.toggle('is-active', showLibrary);
+      libraryView.setAttribute('aria-hidden', showLibrary ? 'false' : 'true');
+      filteredListView.classList.toggle('is-active', showFiltered);
+      filteredListView.setAttribute('aria-hidden', showFiltered ? 'false' : 'true');
+      collectionsView.classList.toggle('is-active', showCollections);
+      collectionsView.setAttribute('aria-hidden', showCollections ? 'false' : 'true');
+      if (detailView) {
+        detailView.classList.remove('is-active');
+        detailView.setAttribute('aria-hidden', 'true');
+      }
+
+      if (showFiltered) renderFilteredList(name);
+
+      document.querySelectorAll('#sidebarNav [data-nav], #bottomNav [data-nav]').forEach(function (el) {
+        const active = el.getAttribute('data-nav') === name;
+        el.classList.toggle('active', active);
+        if (active) el.setAttribute('aria-current', 'page');
+        else el.removeAttribute('aria-current');
+      });
+    }
+
+    function renderFilteredList(name) {
+      const config = FILTERED_VIEWS[name];
+      const list = document.getElementById('filteredList');
+      const empty = document.getElementById('filteredListEmpty');
+      const sub = document.getElementById('filteredListSub');
+      const title = document.getElementById('filteredListTitle');
+      if (!config || !list || !empty || !sub || !title) return;
+
+      const cards = Array.from(document.querySelectorAll('#libraryView .book-card')).filter(config.match);
+      title.textContent = config.title;
+      empty.textContent = config.empty;
+      list.innerHTML = '';
+      sub.textContent = cards.length + (cards.length === 1 ? ' book' : ' books');
+      empty.hidden = cards.length > 0;
+
+      cards.forEach(function (card, index) {
+        const titleText = card.dataset.title || '';
+        const author = card.dataset.author || '';
+        const file = card.dataset.file || '';
+        const format = (card.dataset.format || '').toUpperCase();
+        const progress = parseInt(card.dataset.progress || '0', 10);
+        const isFav = card.dataset.favorite === 'true';
+        const grad = (index % 5) + 1;
+        const chip = card.querySelector('.book-chip');
+        const chipText = chip ? chip.textContent.trim() : (progress + '%');
+        const chipDone = progress >= 100;
+        const showStar = config.showStar || isFav;
+
+        const li = document.createElement('li');
+        li.innerHTML =
+          '<button type="button" class="vert-item" role="listitem">' +
+            '<div class="vert-cover" style="background: var(--cover-grad-' + grad + ');" aria-hidden="true">' +
+              (format ? '<span class="format-badge">' + format + '</span>' : '') +
+              '<div class="cover-face"><span></span></div>' +
+              (showStar ? '<div class="fav-star">★</div>' : '') +
+              '<div class="cover-bar"><i style="width:' + progress + '%"></i></div>' +
+            '</div>' +
+            '<div class="vert-info">' +
+              '<h3 class="book-info-title"></h3>' +
+              '<p class="book-info-author"></p>' +
+              '<p class="file-name" style="font-size:11px; color:var(--faint); font-family:monospace;"></p>' +
+              '<div class="chip-row"><span class="book-chip' + (chipDone ? ' done' : '') + '"></span></div>' +
+            '</div>' +
+            '<span class="vert-chevron" aria-hidden="true">' +
+              '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" /></svg>' +
+            '</span>' +
+          '</button>';
+
+        li.querySelector('.cover-face span').textContent = titleText;
+        li.querySelector('.book-info-title').textContent = titleText;
+        li.querySelector('.book-info-author').textContent = author;
+        li.querySelector('.file-name').textContent = file;
+        li.querySelector('.book-chip').textContent = chipText;
+        li.querySelector('.vert-item').addEventListener('click', function () {
+          launchReader(file);
+        });
+        list.appendChild(li);
+      });
+    }
+
+    function openCollection(title) {
+      showToast('Opening “' + title + '” — collection detail in product build.', 'info');
+    }
+
+    function openMoreSheet() {
+      document.getElementById('moreSheet').classList.add('show');
+    }
+
+    function closeMoreSheet() {
+      document.getElementById('moreSheet').classList.remove('show');
+    }
+
+    function openInfoDialog(kind) {
+      const title = document.getElementById('infoDialogTitle');
+      const body = document.getElementById('infoDialogBody');
+      if (kind === 'about') {
+        title.textContent = 'About this app';
+        body.innerHTML =
+          '<p><strong style="color:var(--text-strong)">Readmate</strong> is a local-first secure reader for files you import from your device or direct links.</p>' +
+          '<p style="margin-top:8px;">Version 1.0.0 (Premium UI Build) · No bookstore tracking · Your files remain securely in your sandboxed local storage.</p>';
+      } else {
+        title.textContent = 'Help & Support';
+        body.innerHTML =
+          '<p>Import EPUB, PDF, TXT, or Markdown from your device storage or secure HTTPS file URLs.</p>' +
+          '<p style="margin-top:8px;">Need help? Reach our placeholder mailbox: <span style="color:var(--accent)">support@readmate.app</span>.</p>';
+      }
+      document.getElementById('infoDialog').classList.add('show');
+    }
+
+    function closeInfoDialog() {
+      document.getElementById('infoDialog').classList.remove('show');
+    }
+
+    // Modal helpers
+    function openDialog(id) {
+      document.getElementById(id).classList.add('show');
+    }
+
+    function closeDialog(id) {
+      document.getElementById(id).classList.remove('show');
+    }
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        closeInfoDialog();
+        closeMoreSheet();
+        closeDialog('urlOverlay');
+        closeDialog('conflictOverlay');
+        closeAllBookMenus();
+      }
+    });
+
+    // Custom non-blocking Toast feedback system (Replaces alert)
+    function showToast(message, type = 'success') {
+      const container = document.getElementById('toastContainer');
+      const toast = document.createElement('div');
+      toast.className = 'toast';
+      
+      const iconSVG = type === 'success' 
+        ? `<svg class="toast-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="m4.5 12.75 6 6 9-13.5" /></svg>`
+        : `<svg class="toast-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" style="color:#60a5fa;"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M11.25 11.25l.041-.02a.75.75 0 0 1 1.063.852l-.708 2.836a.75.75 0 0 0 1.063.853l.041-.021M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9-3.75h.008v.008H12V8.25Z" /></svg>`;
+
+      toast.innerHTML = `
+        ${iconSVG}
+        <span class="toast-text">${message}</span>
+      `;
+      
+      container.appendChild(toast);
+      setTimeout(() => toast.classList.add('show'), 50);
+      
+      setTimeout(() => {
+        toast.classList.remove('show');
+        setTimeout(() => toast.remove(), 300);
+      }, 3500);
+    }
+
+    function launchReader(filename) {
+      showToast(`Launching secure offline reader: ${filename}`);
+    }
+
+    // --- SPLIT IMPORT BUTTON & DROPDOWN ACTIONS ---
+    function toggleImportDropdown(event) {
+      event.stopPropagation();
+      document.getElementById('importDropdown').classList.toggle('show');
+    }
+
+    window.addEventListener('click', () => {
+      document.getElementById('importDropdown').classList.remove('show');
+    });
+
+    function triggerFilePicker() {
+      document.getElementById('nativeFilePicker').click();
+    }
+
+    function openUrlDialog() {
+      openDialog('urlOverlay');
+      const input = document.getElementById('urlInput');
+      input.value = '';
+      setTimeout(() => input.focus(), 150);
+    }
+
+    // --- FLOW A: DEVICE FILE LOADING ---
+    function handleDeviceFileSelected(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      // BR-03 SHA-256 Duplication verification simulation
+      if (file.name === "clean-architecture.epub" || file.name.includes("duplicate")) {
+        document.getElementById('conflictText').textContent = `"${file.name}" is already saved inside your local database. Would you like to launch the existing copy?`;
+        document.getElementById('conflictOpenBtn').onclick = () => {
+          closeDialog('conflictOverlay');
+          launchReader(file.name);
+        };
+        openDialog('conflictOverlay');
+        return;
+      }
+
+      executeImportPipeline(file.name, "Copying to secure sandbox...");
+    }
+
+    // --- FLOW B: URL FILE CAPTURE ---
+    function executeUrlImport() {
+      const url = document.getElementById('urlInput').value.trim();
+      if (!url) return;
+
+      // HTTPS validation rule
+      if (!url.startsWith('https://')) {
+        closeDialog('urlOverlay');
+        showToast("Access Denied: Only secure HTTPS links allowed.", "info");
+        return;
+      }
+
+      closeDialog('urlOverlay');
+      const filename = url.substring(url.lastIndexOf('/') + 1) || 'downloaded-file.epub';
+
+      if (filename.includes("private") || filename.includes("restricted")) {
+        showToast("Download failed: Access Forbidden (Error 403)", "info");
+        return;
+      }
+
+      executeImportPipeline(filename, "Downloading to offline Sandbox...");
+    }
+
+    // Simulated copy -> parse -> hash -> normalize -> Index FTS pipeline (SCR-02)
+    function executeImportPipeline(filename, initialStatus) {
+      const overlay = document.getElementById('progressOverlay');
+      const fill = document.getElementById('progressBarFill');
+      const status = document.getElementById('progressStatus');
+      const progressFile = document.getElementById('progressFilename');
+
+      progressFile.textContent = filename;
+      status.textContent = initialStatus;
+      fill.style.width = '0%';
+      openDialog('progressOverlay');
+
+      let progress = 0;
+      const interval = setInterval(() => {
+        progress += 10;
+        fill.style.width = progress + '%';
+
+        if (progress === 30) {
+          status.textContent = "Unzipping and extracting book cover...";
+        } else if (progress === 60) {
+          status.textContent = "Computing SHA-256 Hash identifier...";
+        } else if (progress === 80) {
+          status.textContent = "Indexing Full-Text search records...";
+        } else if (progress >= 100) {
+          clearInterval(interval);
+          setTimeout(() => {
+            closeDialog('progressOverlay');
+            addNewBookToLibrary(filename);
+            showToast("Successfully imported to offline database!");
+          }, 300);
+        }
+      }, 150);
+    }
+
+    function addNewBookToLibrary(filename) {
+      const shelfRail = document.querySelector('[data-shelf="reading"] .shelf-rail');
+      if (!shelfRail) return;
+
+      const title = filename.replace(/\.[^/.]+$/, "").replace(/[-_]/g, ' ');
+      const capitalizedTitle = title.charAt(0).toUpperCase() + title.slice(1);
+      const format = filename.split('.').pop().toUpperCase();
+      const gradIndex = Math.floor(Math.random() * 5) + 1; // Assign random covers grad (Lỗi 4 fix)
+
+      const card = document.createElement('article');
+      card.className = 'book-card';
+      card.setAttribute('role', 'listitem');
+      card.dataset.title = capitalizedTitle;
+      card.dataset.author = 'Local Document';
+      card.dataset.file = filename;
+      card.dataset.format = format.toLowerCase();
+      card.dataset.progress = '0';
+      card.dataset.favorite = 'false';
+
+      card.innerHTML = `
+        <button class="book-cover-button" type="button" onclick="launchReader('${filename}')">
+          <span class="format-badge">${format}</span>
+          <div class="cover-face" style="background: var(--cover-grad-${gradIndex});"><span>${capitalizedTitle}</span></div>
+          <div class="cover-bar"><i style="width: 0%"></i></div>
+        </button>
+        <div class="book-meta-row">
+          <div class="book-text-info">
+            <h3 class="book-info-title">${capitalizedTitle}</h3>
+            <p class="book-info-author">Local Document</p>
+            <div class="chip-row"><span class="book-chip">0%</span></div>
+          </div>
+          <button class="book-more-btn" type="button" onclick="toggleBookMenu(event)" aria-label="Book choices">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.2" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M12 6.75a.75.75 0 1 1 0-1.5.75.75 0 0 1 0 1.5ZM12 12.75a.75.75 0 1 1 0-1.5.75.75 0 0 1 0 1.5ZM12 18.75a.75.75 0 1 1 0-1.5.75.75 0 0 1 0 1.5?" />
+            </svg>
+          </button>
+          <div class="book-context-menu">
+            <button type="button" class="context-item" onclick="toggleFavorite(this)">★ Favorite</button>
+            <button type="button" class="context-item delete" onclick="deleteBook(this)">Delete</button>
+          </div>
+        </div>
+      `;
+
+      shelfRail.insertBefore(card, shelfRail.firstChild);
+      applySearch();
+    }
+
+    // --- BOOK ACTION CONTROLS (Lỗi 1 fix) ---
+    function toggleBookMenu(event) {
+      event.stopPropagation();
+      const trigger = event.currentTarget;
+      const menu = trigger.nextElementSibling;
+      const isOpen = menu.classList.contains('show');
+      
+      closeAllBookMenus();
+      if (!isOpen) {
+        menu.classList.add('show');
+      }
+    }
+
+    function closeAllBookMenus() {
+      document.querySelectorAll('.book-context-menu').forEach(m => m.classList.remove('show'));
+    }
+
+    window.addEventListener('click', closeAllBookMenus);
+
+    function toggleFavorite(btn) {
+      const card = btn.closest('.book-card');
+      const cover = card.querySelector('.book-cover-button');
+      const isFav = card.dataset.favorite === 'true';
+
+      if (isFav) {
+        card.dataset.favorite = 'false';
+        btn.textContent = '★ Favorite';
+        const star = cover.querySelector('.fav-star');
+        if (star) star.remove();
+        showToast("Removed from favorites");
+      } else {
+        card.dataset.favorite = 'true';
+        btn.textContent = '★ Unfavorite';
+        const star = document.createElement('div');
+        star.className = 'fav-star';
+        star.innerHTML = '★';
+        cover.appendChild(star);
+        showToast("Added to favorites!");
+      }
+
+      const filteredListView = document.getElementById('filteredListView');
+      if (filteredListView && filteredListView.classList.contains('is-active')) {
+        const activeNav = document.querySelector('#sidebarNav [data-nav].active');
+        const filterName = activeNav ? activeNav.getAttribute('data-nav') : 'favorites';
+        if (FILTERED_VIEWS[filterName]) renderFilteredList(filterName);
+      }
+    }
+
+    function deleteBook(btn) {
+      const card = btn.closest('.book-card');
+      const name = card.dataset.title;
+      card.remove();
+      showToast(`Permanently deleted: ${name}`);
+      applySearch();
+    }
+
+    // --- SEARCH ALGORITHM ---
+    function applySearch() {
+      const q = document.getElementById('searchBar').value.trim().toLowerCase();
+      let visibleTotal = 0;
+
+      document.querySelectorAll('.shelf').forEach((shelf) => {
+        let visibleInShelf = 0;
+        shelf.querySelectorAll('.book-card').forEach((card) => {
+          const title = (card.dataset.title || '').toLowerCase();
+          const author = (card.dataset.author || '').toLowerCase();
+          const file = (card.dataset.file || '').toLowerCase();
+          const format = (card.dataset.format || '').toLowerCase();
+          const match = !q || title.includes(q) || author.includes(q) || file.includes(q) || format.includes(q);
+          card.hidden = !match;
+          if (match) visibleInShelf += 1;
+        });
+
+        shelf.hidden = visibleInShelf === 0;
+        const countEl = shelf.querySelector('[data-count]');
+        if (countEl) {
+          countEl.textContent = visibleInShelf + (visibleInShelf === 1 ? ' file' : ' files');
+        }
+        visibleTotal += visibleInShelf;
+      });
+
+      document.getElementById('noResults').classList.toggle('show', q.length > 0 && visibleTotal === 0);
+    }
+
+    // --- SHELF DETAILED MODE ---
+    (function initShelfDetail() {
+      const libraryView = document.getElementById('libraryView');
+      const detailView = document.getElementById('shelfDetailView');
+      const detailTitle = document.getElementById('detailTitle');
+      const detailSub = document.getElementById('detailSub');
+      const vertList = document.getElementById('vertList');
+      const detailEmpty = document.getElementById('detailEmpty');
+      const detailBack = document.getElementById('detailBack');
+      if (!libraryView || !detailView) return;
+
+      function progressLabel(card) {
+        const chip = card.querySelector('.book-chip');
+        if (chip) return chip.textContent.trim();
+        const p = parseInt(card.dataset.progress || '0', 10);
+        if (p >= 100) return 'Completed';
+        if (p <= 0) return 'Not started';
+        return p + '%';
+      }
+
+      function openShelf(shelf) {
+        const title = (shelf.querySelector('.shelf-title') || {}).textContent || 'Section';
+        const cards = Array.from(shelf.querySelectorAll('.book-card')).filter((c) => !c.hidden);
+
+        detailTitle.textContent = title.trim();
+        detailSub.textContent = cards.length + (cards.length === 1 ? ' file' : ' files');
+        vertList.innerHTML = '';
+
+        cards.forEach((card) => {
+          const titleText = card.dataset.title || '';
+          const author = card.dataset.author || '';
+          const file = card.dataset.file || '';
+          const format = (card.dataset.format || '').toUpperCase();
+          const progress = parseInt(card.dataset.progress || '0', 10);
+          const isFav = card.dataset.favorite === 'true';
+          const chipText = progressLabel(card);
+          const chipDone = progress >= 100;
+          const randomGrad = Math.floor(Math.random() * 5) + 1; // Elegant Cover Gradient (Lỗi 4 fix)
+
+          const li = document.createElement('li');
+          li.innerHTML =
+            `<button type="button" class="vert-item" role="listitem">` +
+              `<div class="vert-cover" style="background: var(--cover-grad-${randomGrad});" aria-hidden="true">` +
+                (format ? '<span class="format-badge">' + format + '</span>' : '') +
+                '<div class="cover-face"><span></span></div>' +
+                (isFav ? '<div class="fav-star">★</div>' : '') +
+                '<div class="cover-bar"><i style="width:' + progress + '%"></i></div>' +
+              '</div>' +
+              '<div class="vert-info">' +
+                '<h3 class="book-info-title"></h3>' +
+                '<p class="book-info-author"></p>' +
+                '<p class="file-name" style="font-size:11px; color:var(--faint); font-family:monospace;"></p>' +
+                '<div class="chip-row"><span class="book-chip' + (chipDone ? ' done' : '') + '"></span></div>' +
+              '</div>' +
+              '<span class="vert-chevron" aria-hidden="true">' +
+                '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" /></svg>' +
+              '</span>' +
+            '</button>';
+
+          li.querySelector('.cover-face span').textContent = titleText;
+          li.querySelector('.book-info-title').textContent = titleText;
+          li.querySelector('.book-info-author').textContent = author;
+          li.querySelector('.file-name').textContent = file;
+          li.querySelector('.book-chip').textContent = chipText;
+
+          li.querySelector('.vert-item').addEventListener('click', () => {
+            launchReader(file);
+          });
+
+          vertList.appendChild(li);
+        });
+
+        detailEmpty.hidden = cards.length > 0;
+        libraryView.classList.remove('is-active');
+        ['collectionsView', 'filteredListView'].forEach(function (id) {
+          const el = document.getElementById(id);
+          if (el) {
+            el.classList.remove('is-active');
+            el.setAttribute('aria-hidden', 'true');
+          }
+        });
+        detailView.classList.add('is-active');
+        detailView.setAttribute('aria-hidden', 'false');
+        detailView.querySelector('.detail-body').scrollTop = 0;
+      }
+
+      function closeShelf() {
+        detailView.classList.remove('is-active');
+        detailView.setAttribute('aria-hidden', 'true');
+        libraryView.classList.add('is-active');
+        libraryView.setAttribute('aria-hidden', 'false');
+        document.querySelectorAll('#sidebarNav [data-nav], #bottomNav [data-nav]').forEach(function (el) {
+          const active = el.getAttribute('data-nav') === 'library';
+          el.classList.toggle('active', active);
+          if (active) el.setAttribute('aria-current', 'page');
+          else el.removeAttribute('aria-current');
+        });
+      }
+
+      document.querySelectorAll('[data-open-shelf]').forEach((btn) => {
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const shelf = btn.closest('.shelf');
+          if (shelf) openShelf(shelf);
+        });
+      });
+
+      detailBack.addEventListener('click', closeShelf);
+    })();
+
+    // --- REORDER SHELVES (Pointer Events Desktop & Mobile drag-handle) (Lỗi 2 fix) ---
+    (function initShelfReorder() {
+      const list = document.getElementById('shelfList');
+      const scrollRoot = document.getElementById('contentScroll');
+      if (!list) return;
+
+      let activeShelf = null;
+      let placeholderIndex = -1;
+      let pointerId = null;
+      let autoScrollId = 0;
+
+      function visibleShelves() {
+        return Array.from(list.querySelectorAll('.shelf')).filter((s) => !s.hidden);
+      }
+
+      function clearDropMarkers() {
+        list.querySelectorAll('.shelf').forEach((s) => {
+          s.classList.remove('drag-over-before', 'drag-over-after');
+        });
+      }
+
+      function stopAutoScroll() {
+        if (autoScrollId) {
+          cancelAnimationFrame(autoScrollId);
+          autoScrollId = 0;
+        }
+      }
+
+      function autoScrollStep(clientY) {
+        stopAutoScroll();
+        const edge = 56;
+        const rect = scrollRoot.getBoundingClientRect();
+        let delta = 0;
+        if (clientY < rect.top + edge) delta = -10;
+        else if (clientY > rect.bottom - edge) delta = 10;
+        if (!delta) return;
+        const tick = () => {
+          scrollRoot.scrollTop += delta;
+          autoScrollId = requestAnimationFrame(tick);
+        };
+        autoScrollId = requestAnimationFrame(tick);
+      }
+
+      function updateDropTarget(clientY) {
+        const shelves = visibleShelves().filter((s) => s !== activeShelf);
+        clearDropMarkers();
+        if (!shelves.length) {
+          placeholderIndex = 0;
+          return;
+        }
+
+        let target = null;
+        let placeBefore = true;
+
+        for (const shelf of shelves) {
+          const rect = shelf.getBoundingClientRect();
+          const mid = rect.top + rect.height / 2;
+          if (clientY < mid) {
+            target = shelf;
+            placeBefore = true;
+            break;
+          }
+          target = shelf;
+          placeBefore = false;
+        }
+
+        if (!target) return;
+
+        target.classList.add(placeBefore ? 'drag-over-before' : 'drag-over-after');
+        const all = visibleShelves().filter((s) => s !== activeShelf);
+        const idx = all.indexOf(target);
+        placeholderIndex = placeBefore ? idx : idx + 1;
+      }
+
+      function commitReorder() {
+        if (!activeShelf || placeholderIndex < 0) return;
+        const others = visibleShelves().filter((s) => s !== activeShelf);
+        const ref = others[placeholderIndex] || null;
+        if (ref) list.insertBefore(activeShelf, ref);
+        else list.appendChild(activeShelf);
+      }
+
+      function endDrag() {
+        if (!activeShelf) return;
+        commitReorder();
+        activeShelf.classList.remove('is-dragging');
+        clearDropMarkers();
+        document.body.classList.remove('is-reordering');
+        stopAutoScroll();
+        activeShelf = null;
+        pointerId = null;
+        placeholderIndex = -1;
+      }
+
+      function onPointerMove(e) {
+        if (!activeShelf || e.pointerId !== pointerId) return;
+        e.preventDefault();
+        updateDropTarget(e.clientY);
+        autoScrollStep(e.clientY);
+      }
+
+      function onPointerUp(e) {
+        if (e.pointerId !== pointerId) return;
+        try {
+          e.currentTarget.releasePointerCapture(pointerId);
+        } catch (_) {}
+        endDrag();
+      }
+
+      list.querySelectorAll('.drag-handle').forEach((handle) => {
+        handle.addEventListener('pointerdown', (e) => {
+          if (e.button !== undefined && e.button !== 0) return;
+          const shelf = handle.closest('.shelf');
+          if (!shelf || shelf.hidden) return;
+
+          activeShelf = shelf;
+          pointerId = e.pointerId;
+          placeholderIndex = visibleShelves().indexOf(shelf);
+          
+          shelf.classList.add('is-dragging');
+          document.body.classList.add('is-reordering');
+          
+          // Triggers fine haptic feedback vibration on Android devices if supported (Lỗi 2 fix)
+          if (navigator.vibrate) {
+            navigator.vibrate(12);
+          }
+          
+          handle.setPointerCapture(e.pointerId);
+          updateDropTarget(e.clientY);
+          e.preventDefault();
+        });
+
+        handle.addEventListener('pointermove', onPointerMove);
+        handle.addEventListener('pointerup', onPointerUp);
+        handle.addEventListener('pointercancel', onPointerUp);
+      });
+    })();
+  </script>
+</body>
+</html>

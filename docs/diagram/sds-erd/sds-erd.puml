@@ -1,0 +1,139 @@
+@startuml sds-erd
+title ERD - Reading Book App (Overlay + Chunk)
+skinparam shadowing false
+skinparam backgroundColor #FFFFFF
+skinparam defaultFontName Arial
+skinparam linetype ortho
+hide circle
+
+entity "BOOK" as BOOK {
+  * id : string <<PK>>
+  --
+  title : string
+  file_path : string
+  normalized_path : string
+  file_format : string
+  cover_path : string
+  sha256 : string
+  file_size_bytes : int
+  is_favorite : boolean
+  added_at : datetime
+  updated_at : datetime
+}
+
+entity "AUTHOR" as AUTHOR {
+  * id : string <<PK>>
+  --
+  name : string
+  sort_name : string
+  created_at : datetime
+}
+
+entity "BOOK_AUTHOR" as BA {
+  * book_id : string <<PK,FK>>
+  * author_id : string <<PK,FK>>
+  --
+  sort_order : int
+}
+
+entity "READING_SESSION_STATE" as SESSION {
+  * book_id : string <<PK,FK>>
+  --
+  last_read_location : string
+  percent : float
+  bg_color : string
+  text_color : string
+  font_size : float
+  font_family : string
+  line_height : float
+  theme_preset : string
+  is_landscape : boolean
+  updated_at : datetime
+}
+
+entity "HIGHLIGHT" as HL {
+  * id : string <<PK>>
+  --
+  * book_id : string <<FK>>
+  location_start : string
+  location_end : string
+  selected_text : string
+  color_hex : string
+  created_at : datetime
+}
+
+entity "NOTE" as NOTE {
+  * id : string <<PK>>
+  --
+  * book_id : string <<FK>>
+  highlight_id : string <<FK>>
+  location_ref : string
+  selected_text : string
+  content : string
+  created_at : datetime
+  updated_at : datetime
+}
+
+entity "BOOKMARK" as BM {
+  * id : string <<PK>>
+  --
+  * book_id : string <<FK>>
+  location_ref : string
+  label : string
+  created_at : datetime
+}
+
+entity "BOOK_CHUNK" as CHUNK {
+  * id : string <<PK>>
+  --
+  * book_id : string <<FK>>
+  chunk_index : int
+  content : string
+  location_start : string
+  location_end : string
+  embedding : blob
+  created_at : datetime
+}
+
+entity "COLLECTION" as COL {
+  * id : string <<PK>>
+  --
+  name : string
+  description : string
+  created_at : datetime
+  updated_at : datetime
+}
+
+entity "COLLECTION_BOOK" as CB {
+  * collection_id : string <<PK,FK>>
+  * book_id : string <<PK,FK>>
+  --
+  sort_order : int
+  added_at : datetime
+}
+
+BOOK ||--o{ BA : "1 - n"
+AUTHOR ||--o{ BA : "1 - n"
+
+BOOK ||--|| SESSION : "1 - 1"
+BOOK ||--o{ HL : "1 - n"
+BOOK ||--o{ NOTE : "1 - n"
+BOOK ||--o{ BM : "1 - n"
+BOOK ||--o{ CHUNK : "1 - n"
+HL ||--o{ NOTE : "1 - n"
+
+COL ||--o{ CB : "1 - n"
+BOOK ||--o{ CB : "1 - n"
+
+note bottom of BA
+  BOOK <-> AUTHOR = **n - n**
+  (qua bang lien ket BOOK_AUTHOR)
+end note
+
+note bottom of CB
+  BOOK <-> COLLECTION = **n - n**
+  (qua bang lien ket COLLECTION_BOOK)
+  Xoa BOOK / COLLECTION -> cascade membership
+end note
+
+@enduml

@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>So Sánh Hệ Màu Chuẩn vs Hệ Màu Gây Đau Mắt</title>
+    <!-- Nhúng Tailwind CSS qua CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        // --- HỆ MÀU CHUẨN CÔNG THÁI HỌC ---
+                        sepiaBg: '#F4ECD8',
+                        sepiaText: '#5C4738',
+                        dayBg: '#F8F9FA',
+                        dayText: '#2B2D42',
+                        nightBg: '#1E1E1E',
+                        nightText: '#CCCCCC',
+                        accentIndigo: '#4C6EF5',
+                        
+                        // --- HỆ MÀU LỖI (GÂY ĐAU MẮT) ---
+                        pureBlack: '#000000',
+                        pureWhite: '#FFFFFF',
+                        neonBlue: '#0000FF',
+                        midGray: '#7F7F7F',
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-slate-100 min-h-screen p-6 font-sans">
+
+    <div class="max-w-7xl mx-auto">
+        <h1 class="text-3xl font-extrabold text-center text-slate-800 mb-2">THỬ NGHIỆM LÂM SÀNG: MÀU SẮC APP ĐỌC SÁCH</h1>
+        <p class="text-center text-slate-600 mb-8 font-medium">Hãy nhìn vào từng ô dưới đây trong 10 giây để cảm nhận sự khác biệt rõ rệt về độ điều tiết của cơ mắt.</p>
+
+        <!-- SECTION 1: HỆ MÀU CHUẨN (NÊN DÙNG) -->
+        <h2 class="text-xl font-bold text-emerald-700 mb-4 flex items-center gap-2">
+            <span class="bg-emerald-100 p-1.5 rounded-full text-lg">✅</span> 1. Hệ Màu Chuẩn Công Thái Học (Bảo Vệ Thị Lực)
+        </h2>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
+
+            <!-- Sepia -->
+            <div class="bg-sepiaBg border border-[#E4DAC2] rounded-xl p-5 shadow-sm flex flex-col justify-between h-[280px]">
+                <div>
+                    <span class="text-xs font-bold uppercase tracking-wider text-[#8C7665] bg-[#5C4738]/10 px-2 py-1 rounded">Chủ đề Sepia (Khuyên dùng)</span>
+                    <p class="text-sepiaText text-base leading-relaxed mt-4 text-justify">
+                        Sự kết hợp giữa <strong>nền ngà ấm (#F4ECD8)</strong> và <strong>chữ nâu đất tối (#5C4738)</strong> mô phỏng trang sách giấy cổ. Độ tương phản ở mức vừa vặn hoàn hảo (vùng tỷ lệ vàng từ 4.5:1 đến 7:1), triệt tiêu hoàn toàn hiện tượng lóa võng mạc khi đọc ban ngày[cite: 1].
+                    </p>
+                </div>
+                <div class="text-xs text-[#8C7665] font-mono">Độ tương phản: Công thái học chuẩn vàng</div>
+            </div>
+
+            <!-- Light Mode dịu -->
+            <div class="bg-dayBg border border-slate-200 rounded-xl p-5 shadow-sm flex flex-col justify-between h-[280px]">
+                <div>
+                    <span class="text-xs font-bold uppercase tracking-wider text-slate-500 bg-slate-200 px-2 py-1 rounded">Day Mode (Ánh sáng mạnh)</span>
+                    <p class="text-dayText text-base leading-relaxed mt-4 text-justify">
+                        Sử dụng <strong>nền trắng xám nhạt (#F8F9FA)</strong> đi kèm với <strong>chữ xanh đen thẫm (#2B2D42)</strong>[cite: 1]. Mắt phân biệt chữ cực kỳ rõ ràng mồn một nhưng không hề bị chói chang hay gắt như khi nhìn vào màn hình trắng tinh[cite: 1].
+                    </p>
+                </div>
+                <div class="text-xs text-slate-500 font-mono">Độ tương phản: Đạt chuẩn mượt mà</div>
+            </div>
+
+            <!-- Night Mode dịu -->
+            <div class="bg-nightBg border border-zinc-800 rounded-xl p-5 shadow-sm flex flex-col justify-between h-[280px]">
+                <div>
+                    <span class="text-xs font-bold uppercase tracking-wider text-zinc-500 bg-zinc-800 px-2 py-1 rounded">Night Mode (Đọc ban đêm)</span>
+                    <p class="text-nightText text-base leading-relaxed mt-4 text-justify">
+                        Nền được hạ tông xuống <strong>màu đen xám dịu (#1E1E1E)</strong> và chữ sử dụng <strong>màu bạc mờ (#CCCCCC)</strong>[cite: 1]. Khi đọc trong phòng tối, biên chữ không bị nhòe, không tạo cảm giác các dòng chữ tự phát sáng đập thẳng vào mắt[cite: 1].
+                    </p>
+                </div>
+                <div class="text-xs text-zinc-500 font-mono">Độ tương phản: Chống bóng ma võng mạc</div>
+            </div>
+
+        </div>
+
+        <!-- SECTION 2: CÁC TRƯỜNG HỢP GÂY ĐAU MẮT TỐI KỴ -->
+        <h2 class="text-xl font-bold text-rose-700 mb-4 flex items-center gap-2">
+            <span class="bg-rose-100 p-1.5 rounded-full text-lg">❌</span> 2. Các Trường Hợp Gây Đau Mắt Kinh Điển (Tuyệt Đối Tránh)
+        </h2>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+
+            <!-- Lỗi 1: Đen tuyền + Trắng tinh -->
+            <div class="bg-pureBlack border border-black rounded-xl p-5 shadow-md flex flex-col justify-between h-[300px]">
+                <div>
+                    <span class="text-xs font-bold uppercase tracking-wider text-rose-500 bg-rose-950/50 border border-rose-900 px-2 py-1 rounded">Lỗi 1: Tương phản cực đoan</span>
+                    <p class="text-pureWhite text-base leading-relaxed mt-4 text-justify">
+                        Sử dụng <strong>nền đen thui (#000000)</strong> và <strong>chữ trắng tinh (#FFFFFF)</strong>. Bạn nhìn thử xem, chữ sẽ bị hiện tượng <strong>"Halos" (mờ biên chữ như có hào quang)</strong>[cite: 1]. Đọc lâu ban đêm, mắt phải nheo lại liên tục để lấy nét, gây nhức mỏi và chảy nước mắt cực nhanh[cite: 1].
+                    </p>
+                </div>
+                <div class="text-xs text-rose-400 font-mono font-bold">Hậu quả: Hiện tượng Halos & Mỏi cơ mắt nhanh</div>
+            </div>
+
+            <!-- Lỗi 2: Màu Neon bão hòa cao -->
+            <div class="bg-white border border-slate-200 rounded-xl p-5 shadow-md flex flex-col justify-between h-[300px]">
+                <div>
+                    <span class="text-xs font-bold uppercase tracking-wider text-rose-600 bg-rose-50 px-2 py-1 rounded">Lỗi 2: Chữ Neon / Highlight đậm đặc</span>
+                    <p class="text-slate-800 text-base leading-relaxed mt-4 text-justify">
+                        Sử dụng các màu nguyên bản rực rỡ như <span class="text-neonBlue font-bold">Chữ màu xanh lam nguyên bản (#0000FF)</span> sẽ gây ảo giác giật giật (Chromostereopsis). Hoặc bôi phủ đoạn văn bản bằng <span class="bg-[#FFFF00] text-black font-bold px-1">Màu Highlight Dạ Quang 100% không chỉnh Opacity</span>[cite: 1]. Màu sắc gắt như đấm vào mắt, triệt tiêu sự tập trung của não bộ[cite: 1].
+                    </p>
+                </div>
+                <div class="text-xs text-rose-600 font-mono font-bold">Hậu quả: Nhức đầu, ảo giác dịch chuyển chữ</div>
+            </div>
+
+            <!-- Lỗi 3: Nền xám tro thiếu tương phản -->
+            <div class="bg-midGray border border-zinc-500 rounded-xl p-5 shadow-md flex flex-col justify-between h-[300px]">
+                <div>
+                    <span class="text-xs font-bold uppercase tracking-wider text-yellow-300 bg-zinc-900 px-2 py-1 rounded">Lỗi 3: Thiếu tương phản (Nền mù sương)</span>
+                    <p class="text-zinc-900 text-base leading-relaxed mt-4 text-justify font-medium">
+                        Sử dụng <strong>nền màu xám tro đục (#7F7F7F)</strong> đi với chữ màu đen xám. Khi nhìn vào, bạn sẽ có cảm giác như đang nhìn qua một tấm kính bẩn bị phủ sương mù. Mắt người đọc buộc phải căng ra hết cỡ, nheo mắt liên tục để cố phân biệt ký tự, tạo áp lực khủng khiếp lên thị lực.
+                    </p>
+                </div>
+                <div class="text-xs text-zinc-900 font-mono font-bold">Hậu quả: Cận thị kỹ thuật số, nhức mỏi võng mạc</div>
+            </div>
+
+        </div>
+    </div>
+
+</body>
+</html>

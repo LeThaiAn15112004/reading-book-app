@@ -1,0 +1,56 @@
+@startuml sds-architecture-overview
+title Architecture Overview - MVP Desktop
+skinparam shadowing false
+skinparam backgroundColor #FFFFFF
+skinparam defaultFontName Arial
+skinparam ArrowColor #333333
+skinparam componentStyle rectangle
+
+actor User
+
+package "Presentation (Renderer)" as Pres #E3F2FD {
+  component "React UI" as UI
+  component "Reader Shell" as Shell
+  UI --> Shell
+}
+
+package "Application" as App #FFF3CD {
+  component "ImportBook" as UC1
+  component "OpenReader / Progress" as UC2
+  component "Highlight / Note / Bookmark" as UC3
+}
+
+package "Domain" as Dom #E8F5E9 {
+  component "Book Progress\nHighlight Note Location" as Model
+  component "ReadOnly +\nOverlay rules" as Rules
+  Model --> Rules
+}
+
+package "Infrastructure" as Infra #FCE4EC {
+  component "IPC Bridge\n(Preload)" as IPC
+  component "Electron Main" as Main
+  database "SQLite + FTS5" as DB
+  component "File Sandbox" as FS
+  component "Document Adapters" as Adapters
+  component "Renderers\n(DOM or Canvas)" as Renderers
+}
+
+User --> UI
+Shell --> UC2
+Shell --> UC3
+UI --> UC1
+UC1 --> Model
+UC2 --> Model
+UC3 --> Model
+UC1 --> IPC
+UC2 --> IPC
+UC3 --> IPC
+IPC --> Main
+Main --> DB
+Main --> FS
+Main --> Adapters
+Shell --> Renderers
+Adapters --> FS
+Renderers --> Adapters
+
+@enduml

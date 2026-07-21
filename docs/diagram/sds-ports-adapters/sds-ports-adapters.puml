@@ -1,0 +1,53 @@
+@startuml sds-ports-adapters
+title Ports & Adapters - Document / Overlay / Extensibility
+skinparam shadowing false
+skinparam backgroundColor #FFFFFF
+skinparam defaultFontName Arial
+skinparam ArrowColor #333333
+skinparam componentStyle rectangle
+
+package "Application / Domain\n(chi goi Port)" as Core #E8F5E9 {
+  component "Use cases" as UC
+}
+
+package "Ports (interfaces)" as Ports #FFF3CD {
+  component "DocumentImporter" as P1
+  component "DocumentNormalizer" as P2
+  component "DocumentRenderer" as P3
+  component "OverlayPainter" as P4
+  component "LocationCodec" as P5
+  component "LibraryStore /\nCollectionStore /\nOverlayStore" as P6
+  component "AiProvider" as P7
+  component "ExternalLibraryConnector" as P8
+}
+
+package "Adapters (Infrastructure)" as Adapters #FCE4EC {
+  component "Epub/Pdf/Txt/Md\nImporters" as A1
+  component "NoOp Normalizer\n(MVP — 4 formats)" as A2
+  component "ReflowHtmlRenderer\nPdfPageRenderer" as A3
+  component "DomCssOverlay\nPdfCanvasOverlay" as A4
+  component "Cfi / PageRect /\nTextOffset Codecs" as A5
+  component "SqliteStore + FTS5" as A6
+  component "NoOpAiProvider\n(MVP)" as A7
+  component "NoOpExternalLibraryConnector\n(MVP)" as A8
+}
+
+UC --> P1
+UC --> P2
+UC --> P3
+UC --> P4
+UC --> P5
+UC --> P6
+UC --> P7
+UC --> P8
+
+A1 ..|> P1
+A2 ..|> P2
+A3 ..|> P3
+A4 ..|> P4
+A5 ..|> P5
+A6 ..|> P6
+A7 ..|> P7
+A8 ..|> P8
+
+@enduml

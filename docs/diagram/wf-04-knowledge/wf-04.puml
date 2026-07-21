@@ -1,0 +1,34 @@
+@startuml wf-04
+title WF-04 - Nam tri thuc
+skinparam shadowing false
+skinparam backgroundColor #FFFFFF
+skinparam defaultFontName Arial
+skinparam ActivityBorderColor #856404
+skinparam ActivityBackgroundColor #FFF3CD
+skinparam ActivityDiamondBackgroundColor #CCE5FF
+skinparam ActivityDiamondBorderColor #004085
+skinparam ActivityStartColor #28A745
+skinparam ActivityEndColor #004085
+
+start
+:1. Dang doc trong Reader;
+:2. Boi chon text;
+:3. Context menu;
+
+if (4. Chon hanh dong?) then (Highlight)
+  :Luu Highlight local;
+elseif (Note) then
+  :Nhap noi dung note;
+  :Luu Note local;
+else (Huy)
+endif
+
+:Tiep tuc doc;
+:5. Mo Highlights and Notes;
+:6. Danh sach theo sach;
+:7. Chon highlight / note;
+:8. Jump dung vi tri trong Reader;
+:Ket thuc - Doc lai doan da danh dau;
+stop
+
+@enduml
