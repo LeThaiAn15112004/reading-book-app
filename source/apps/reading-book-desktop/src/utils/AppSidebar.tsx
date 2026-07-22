@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react'
+import { useState, type MouseEvent, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 
 /** SDS SCR-01 nav ids (no global Notes). */
@@ -19,6 +19,11 @@ export type AppSidebarProps = {
   activeId: AppNavId
   /** Called for stub destinations until real views are wired. */
   onStubNav?: (id: Exclude<AppNavId, 'library' | 'settings'>) => void
+  /**
+   * When set, Library nav calls this (e.g. reset in-screen view) instead of
+   * only relying on the route — useful when already on `/library`.
+   */
+  onLibraryNav?: () => void
 }
 
 function BookIcon({ className }: { className?: string }) {
@@ -379,6 +384,7 @@ function renderNavItem(
   activeId: AppNavId,
   collapsed: boolean,
   onStubNav?: AppSidebarProps['onStubNav'],
+  onLibraryNav?: AppSidebarProps['onLibraryNav'],
   sublabel?: string,
 ) {
   const active = item.id === activeId
@@ -409,6 +415,26 @@ function renderNavItem(
     : undefined
 
   if ('to' in item) {
+    if (item.id === 'library' && onLibraryNav) {
+      return (
+        <li key={item.id}>
+          <Link
+            to={item.to}
+            className={className}
+            aria-current={active ? 'page' : undefined}
+            title={title}
+            onClick={(e: MouseEvent<HTMLAnchorElement>) => {
+              // Already on Library route → reset hub view without a remount.
+              e.preventDefault()
+              onLibraryNav()
+            }}
+          >
+            {item.icon}
+            {label}
+          </Link>
+        </li>
+      )
+    }
     return (
       <li key={item.id}>
         <Link
@@ -443,7 +469,11 @@ function renderNavItem(
  * Shared app chrome sidebar (SCR-01). Lives in utils so Library / Settings / etc. can reuse it.
  * Colors match docs/mockups/library.html (slate + amber).
  */
-export function AppSidebar({ activeId, onStubNav }: AppSidebarProps) {
+export function AppSidebar({
+  activeId,
+  onStubNav,
+  onLibraryNav,
+}: AppSidebarProps) {
   const [collapsed, setCollapsed] = useState(false)
 
   return (
@@ -484,7 +514,7 @@ export function AppSidebar({ activeId, onStubNav }: AppSidebarProps) {
       <nav className="lib-sidebar-scroll mt-1 flex min-h-0 flex-1 flex-col overflow-y-auto px-2.5 py-5">
         <ul className="flex list-none flex-col gap-2">
           {PRIMARY_ITEMS.map((item) =>
-            renderNavItem(item, activeId, collapsed, onStubNav),
+            renderNavItem(item, activeId, collapsed, onStubNav, onLibraryNav),
           )}
           <NavDivider collapsed={collapsed} />
           {CLOUD_ITEMS.map((item) =>
@@ -493,6 +523,7 @@ export function AppSidebar({ activeId, onStubNav }: AppSidebarProps) {
               activeId,
               collapsed,
               onStubNav,
+              onLibraryNav,
               item.id === 'cloud-sources' ? CLOUD_SOURCES_SUBLABEL : undefined,
             ),
           )}
@@ -501,7 +532,7 @@ export function AppSidebar({ activeId, onStubNav }: AppSidebarProps) {
         <ul className="mt-auto flex list-none flex-col gap-2 pt-4">
           <NavDivider collapsed={collapsed} />
           {FOOTER_ITEMS.map((item) =>
-            renderNavItem(item, activeId, collapsed, onStubNav),
+            renderNavItem(item, activeId, collapsed, onStubNav, onLibraryNav),
           )}
         </ul>
       </nav>

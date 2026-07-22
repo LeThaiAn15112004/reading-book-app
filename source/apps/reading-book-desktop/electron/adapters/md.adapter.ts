@@ -1,4 +1,5 @@
-/** Stub — document importer for Markdown (phase Import / Giai đoạn 6). */
-export const mdAdapter = {
-  format: 'md' as const,
-}
+import { DocumentFormat } from '@reading-book/domain'
+import { createFilenameFallbackImporter } from './filename-fallback-importer'
+
+/** Markdown DocumentImporter — filename stub (T2.9); deeper metadata / render → G6. */
+export const mdAdapter = createFilenameFallbackImporter(DocumentFormat.Md)

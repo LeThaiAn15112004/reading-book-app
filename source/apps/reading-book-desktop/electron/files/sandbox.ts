@@ -1,5 +1,7 @@
 import { app } from 'electron'
+import { randomUUID } from 'node:crypto'
 import fs from 'node:fs'
+import fsp from 'node:fs/promises'
 import path from 'node:path'
 
 /** Absolute path to `{userData}/books`. */
@@ -39,4 +41,30 @@ export function assertPathAllowed(candidate: string): string {
     throw new Error(`Path not allowed outside books sandbox: ${resolved}`)
   }
   return resolved
+}
+
+/**
+ * Copy a local file into `{userData}/books/{uuid}/{originalBasename}`.
+ * Never moves or mutates the source (BR-01). Destination is set read-only.
+ * On failure, removes the partial UUID folder.
+ */
+export async function copyIntoBooksSandbox(sourcePath: string): Promise<string> {
+  const root = ensureBooksSandbox()
+  const basename = path.basename(sourcePath)
+  if (!basename || basename === '.' || basename === '..') {
+    throw new Error('Invalid source filename')
+  }
+
+  const destDir = path.join(root, randomUUID())
+  const destPath = path.join(destDir, basename)
+
+  try {
+    await fsp.mkdir(destDir, { recursive: true })
+    await fsp.copyFile(sourcePath, destPath)
+    await fsp.chmod(destPath, 0o444)
+    return assertPathAllowed(destPath)
+  } catch (err) {
+    await fsp.rm(destDir, { recursive: true, force: true }).catch(() => {})
+    throw err
+  }
 }

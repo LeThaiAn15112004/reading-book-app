@@ -1,12 +1,15 @@
 /** Narrow Desktop API exposed to the renderer via contextBridge (`window.api`). */
 
-export type DocumentFormatDto = 'epub' | 'pdf' | 'txt' | 'md' | 'docx'
+export type DocumentFormatDto = 'epub' | 'pdf' | 'txt' | 'md' | 'docx' | 'doc'
 
 export interface AppInfo {
   name: string
   version: string
   platform: NodeJS.Platform
 }
+
+/** Shelf / nav reading status (user-marked completed; not derived from %). */
+export type ReadingStatusDto = 'reading' | 'completed' | 'not-started'
 
 /** Plain book metadata for IPC (not a domain class). */
 export interface BookSummaryDto {
@@ -16,15 +19,41 @@ export interface BookSummaryDto {
   coverPath?: string
   addedAt: string
   updatedAt: string
+  /** Display author(s); optional until import metadata lands (G2). */
+  author?: string
+  /** Original filename for Library search (FR-08). */
+  fileName?: string
+  isFavorite?: boolean
+  readingStatus?: ReadingStatusDto
+  /** Human-readable last-read location; when set, enables Continue Reading. */
+  lastReadLocation?: string
+  lastReadAt?: string
+  noteCount?: number
 }
 
 export interface OkResult {
   ok: boolean
 }
 
+/** Stable codes for import failures (URL download / copy / format / dedup). */
+export type ImportErrorCode =
+  | 'scheme'
+  | 'timeout'
+  | 'too_large'
+  | 'network'
+  | 'not_direct_file'
+  | 'http_status'
+  | 'copy_failed'
+  | 'unsupported_format'
+  /** SHA-256 already in library (BR-03); bookId is the existing row. */
+  | 'duplicate'
+
 export interface ImportResult {
   ok: boolean
   bookId: string | null
+  errorCode?: ImportErrorCode
+  /** Short user-facing message when ok is false. */
+  errorMessage?: string
 }
 
 export interface MutationResult {

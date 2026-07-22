@@ -13,6 +13,8 @@
   },
   "dependencies": {
     "better-sqlite3": "^12.11.1",
+    "fast-xml-parser": "^5.10.1",
+    "jszip": "^3.10.1",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-router-dom": "^7.18.1"
@@ -21,6 +23,7 @@
     "@electron/rebuild": "^4.2.0",
     "@tailwindcss/vite": "^4.3.3",
     "@types/better-sqlite3": "^7.6.13",
+    "@types/jszip": "^3.4.0",
     "@types/react": "^18.2.64",
     "@types/react-dom": "^18.2.21",
     "@typescript-eslint/eslint-plugin": "^7.1.1",

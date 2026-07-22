@@ -1,4 +1,4 @@
-/** MVP format chips shown on SCR-01 (SDS / library mockup — no DOCX). */
+/** MVP format chips shown on SCR-01 (SDS / library mockup). */
 const MVP_FORMAT_CHIPS = ['EPUB', 'PDF', 'TXT', 'MD', 'DOCX', 'DOC'] as const
 
 /** Local-library hint + supported format chips. */
@@ -10,8 +10,7 @@ export function LibraryHint() {
           Your library on this device
         </p>
         <p className="text-xs leading-snug text-lib-faint">
-          Only files you imported from your device. MVP supports 4 formats (covers most
-          real-world needs):
+          Only files you imported from your device. MVP supports 6 formats:
         </p>
       </div>
       <div className="flex flex-wrap gap-1.5" aria-label="Supported formats">

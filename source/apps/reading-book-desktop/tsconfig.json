@@ -2,7 +2,11 @@
   "compilerOptions": {
     "paths": {
       "@reading-book/shared": ["../../packages/shared/index.ts"],
-      "@reading-book/shared/*": ["../../packages/shared/*"]
+      "@reading-book/shared/*": ["../../packages/shared/*"],
+      "@reading-book/config": ["../../packages/config/index.ts"],
+      "@reading-book/config/*": ["../../packages/config/*"],
+      "@reading-book/domain": ["../../packages/domain/index.ts"],
+      "@reading-book/domain/*": ["../../packages/domain/*"]
     },
     "target": "ES2020",
     "useDefineForClassFields": true,

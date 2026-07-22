@@ -1,5 +1,6 @@
 import type { Database } from 'better-sqlite3'
 import migration001 from './migrations/001_initial.sql?raw'
+import migration002 from './migrations/002_expand_file_formats.sql?raw'
 
 interface Migration {
   name: string
@@ -8,6 +9,7 @@ interface Migration {
 
 const MIGRATIONS: Migration[] = [
   { name: '001_initial.sql', sql: migration001 },
+  { name: '002_expand_file_formats.sql', sql: migration002 },
 ]
 
 /**

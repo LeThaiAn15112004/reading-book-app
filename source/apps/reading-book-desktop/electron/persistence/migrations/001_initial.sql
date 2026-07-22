@@ -6,7 +6,7 @@ CREATE TABLE IF NOT EXISTS books (
   title TEXT NOT NULL,
   file_path TEXT NOT NULL,
   normalized_path TEXT,
-  file_format TEXT NOT NULL CHECK (file_format IN ('epub', 'pdf', 'txt', 'md')),
+  file_format TEXT NOT NULL CHECK (file_format IN ('epub', 'pdf', 'txt', 'md', 'docx', 'doc')),
   cover_path TEXT,
   sha256 TEXT NOT NULL,
   file_size_bytes INTEGER,

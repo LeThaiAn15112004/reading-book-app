@@ -9,6 +9,8 @@ export default defineConfig({
   resolve: {
     alias: {
       '@reading-book/shared': path.resolve(__dirname, '../../packages/shared'),
+      '@reading-book/config': path.resolve(__dirname, '../../packages/config'),
+      '@reading-book/domain': path.resolve(__dirname, '../../packages/domain'),
     },
   },
   plugins: [
@@ -19,6 +21,13 @@ export default defineConfig({
         // Shortcut of `build.lib.entry`.
         entry: 'electron/main.ts',
         vite: {
+          resolve: {
+            alias: {
+              '@reading-book/shared': path.resolve(__dirname, '../../packages/shared'),
+              '@reading-book/config': path.resolve(__dirname, '../../packages/config'),
+              '@reading-book/domain': path.resolve(__dirname, '../../packages/domain'),
+            },
+          },
           build: {
             rollupOptions: {
               external: ['better-sqlite3'],
