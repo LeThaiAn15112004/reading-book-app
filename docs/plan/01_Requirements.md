@@ -109,7 +109,7 @@ Phase: 1 | 2 | 3
 | FR-07 | Thêm / sửa / xóa note gắn đoạn | Habit #4 |
 | FR-08 | Danh sách thư viện + Continue Reading | Habit #2 |
 | FR-09 | Trang tổng hợp highlight & note theo sách | Habit #6 |
-| FR-10 | Progress bar mỏng / % hoàn thành | Habit #8 |
+| FR-10 | Last-read location (không % hoàn thành) | Habit #8 |
 
 ### Should — Phase 2
 

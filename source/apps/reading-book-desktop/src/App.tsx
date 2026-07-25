@@ -1,4 +1,5 @@
 import { HashRouter, Navigate, Route, Routes } from 'react-router-dom'
+import { AppTitlebar, AppTitleProvider } from './chrome'
 import { LibraryScreen } from './screens/Library/LibraryScreen'
 import { ReaderScreen } from './screens/Reader/ReaderScreen'
 import { SettingsScreen } from './screens/Settings/SettingsScreen'
@@ -7,13 +8,20 @@ import { SplashScreen } from './screens/Splash/SplashScreen'
 function App() {
   return (
     <HashRouter>
-      <Routes>
-        <Route path="/" element={<SplashScreen />} />
-        <Route path="/library" element={<LibraryScreen />} />
-        <Route path="/reader/:bookId" element={<ReaderScreen />} />
-        <Route path="/settings" element={<SettingsScreen />} />
-        <Route path="*" element={<Navigate to="/library" replace />} />
-      </Routes>
+      <AppTitleProvider>
+        <div className="flex h-screen flex-col overflow-hidden">
+          <AppTitlebar />
+          <div className="min-h-0 flex-1 overflow-hidden">
+            <Routes>
+              <Route path="/" element={<SplashScreen />} />
+              <Route path="/library" element={<LibraryScreen />} />
+              <Route path="/reader/:bookId" element={<ReaderScreen />} />
+              <Route path="/settings" element={<SettingsScreen />} />
+              <Route path="*" element={<Navigate to="/library" replace />} />
+            </Routes>
+          </div>
+        </div>
+      </AppTitleProvider>
     </HashRouter>
   )
 }

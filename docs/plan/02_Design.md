@@ -79,7 +79,7 @@ Phase 3 thêm: Linked libraries (Drive / Books / Apple Books), Stats, Tags, Know
 | Long-press | Context menu tương đương |
 | Floating AI (Phase 2) | Mở panel; không auto-run |
 
-Progress: thanh mỏng đáy màn hình, luôn tinh tế (không chiếm attention).
+Location: scrubber mỏng đáy màn hình + nhãn chương/trang (bản đồ vị trí để nhảy cóc — không phải % hoàn thành).
 
 ## 4. Design tokens (implement)
 

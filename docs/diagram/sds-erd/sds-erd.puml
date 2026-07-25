@@ -17,8 +17,18 @@ entity "BOOK" as BOOK {
   sha256 : string
   file_size_bytes : int
   is_favorite : boolean
+  is_signed : boolean
   added_at : datetime
   updated_at : datetime
+}
+
+entity "BOOK_SIGNATURE" as BSIG {
+  * id : string <<PK>>
+  --
+  * book_id : string <<FK>>
+  signer_name : string
+  signature_status : string
+  signed_at : datetime
 }
 
 entity "AUTHOR" as AUTHOR {
@@ -74,6 +84,18 @@ entity "NOTE" as NOTE {
   updated_at : datetime
 }
 
+entity "COMMENT" as CM {
+  * id : string <<PK>>
+  --
+  * book_id : string <<FK>>
+  page_number : int
+  position_data : string
+  content : string
+  author_name : string
+  created_at : datetime
+  updated_at : datetime
+}
+
 entity "BOOKMARK" as BM {
   * id : string <<PK>>
   --
@@ -115,9 +137,11 @@ entity "COLLECTION_BOOK" as CB {
 BOOK ||--o{ BA : "1 - n"
 AUTHOR ||--o{ BA : "1 - n"
 
+BOOK ||--o{ BSIG : "1 - n"
 BOOK ||--|| SESSION : "1 - 1"
 BOOK ||--o{ HL : "1 - n"
 BOOK ||--o{ NOTE : "1 - n"
+BOOK ||--o{ CM : "1 - n"
 BOOK ||--o{ BM : "1 - n"
 BOOK ||--o{ CHUNK : "1 - n"
 HL ||--o{ NOTE : "1 - n"

@@ -485,8 +485,8 @@ export function AppSidebar({
       data-collapsed={collapsed ? 'true' : 'false'}
     >
       <div
-        className={`flex h-16 items-center gap-2 border-b border-lib-border-soft ${
-          collapsed ? 'justify-center px-0' : 'justify-between px-[18px]'
+        className={`app-sidebar-titlebar flex h-16 items-center gap-2 border-b border-lib-border-soft ${
+          collapsed ? 'justify-center pr-0' : 'justify-between pr-[18px]'
         }`}
       >
         <div

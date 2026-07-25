@@ -1,3 +1,5 @@
+export { BookCover } from './BookCover'
+export type { BookCoverProps } from './BookCover'
 export { BootErrorBanner } from './BootErrorBanner'
 export { CollectionsHub } from './CollectionsHub'
 export type { CollectionsHubProps } from './CollectionsHub'

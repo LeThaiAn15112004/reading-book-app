@@ -26,7 +26,7 @@ export function FilteredListView({
       role="region"
       aria-label={title}
     >
-      <header className="flex h-16 shrink-0 items-center gap-3 border-b border-lib-border-soft bg-lib-topbar px-7 backdrop-blur-sm">
+      <header className="app-titlebar flex h-16 shrink-0 items-center gap-3 border-b border-lib-border-soft bg-lib-topbar pl-7 backdrop-blur-sm">
         <div className="min-w-0 flex-1">
           <h1 className="m-0 truncate text-lg leading-tight font-semibold tracking-tight text-lib-text-strong">
             {title}

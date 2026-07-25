@@ -48,7 +48,7 @@ Người dùng có thể:
 
 | Task | Chi tiết | FR |
 | :--- | :--- | :--- |
-| B1 | Màn Library: list sách (title, cover nếu có, % tiến độ) | FR-08 |
+| B1 | Màn Library: list sách (title, cover nếu có, last-read location) | FR-08 |
 | B2 | Continue Reading (sách cập nhật gần nhất có progress) | FR-08 |
 | B3 | Flow Import (chọn file → copy vào app data → metadata) | FR-01 |
 | B4 | Book detail tối giản: mở đọc / xem highlights | FR-09 |
@@ -61,7 +61,7 @@ Người dùng có thể:
 | C1 | Tích hợp EPUB renderer | FR-02 |
 | C2 | Navigation trang / scroll mượt | FR-03 |
 | C3 | Invisible chrome: tap center toggle toolbar | FR-03, NFR-01 |
-| C4 | Progress bar mỏng + persist location (CFI/offset) | FR-05, FR-10 |
+| C4 | Persist location (CFI/offset) + location scrubber / nhãn last-read (không % hoàn thành) | FR-05, FR-10 |
 | C5 | Reading settings: theme, font, size, line-height | FR-04 |
 | C6 | CSS variables / theme switch không reload doc | NFR-03 |
 

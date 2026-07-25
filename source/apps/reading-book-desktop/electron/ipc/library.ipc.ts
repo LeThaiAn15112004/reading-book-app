@@ -1,6 +1,7 @@
 import path from 'node:path'
 import { ipcMain } from 'electron'
 import type { Book } from '@reading-book/domain'
+import { coverUrlForBookId } from '../files/cover-protocol'
 import { getLibraryStore } from '../persistence/sqlite-library-store'
 import type { BookSummaryDto, DocumentFormatDto, OkResult } from './api-types'
 import { LibraryChannels } from './channels'
@@ -16,7 +17,7 @@ function toSummaryDto(book: Book, authorNames: string): BookSummaryDto {
     fileName,
     isFavorite: book.isFavorite,
   }
-  if (book.coverPath) dto.coverPath = book.coverPath
+  if (book.coverPath) dto.coverUrl = coverUrlForBookId(book.id)
   if (authorNames.trim()) dto.author = authorNames
   return dto
 }

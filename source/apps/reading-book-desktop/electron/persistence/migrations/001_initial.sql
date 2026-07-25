@@ -124,8 +124,3 @@ CREATE TABLE IF NOT EXISTS book_chunks (
 );
 
 CREATE UNIQUE INDEX IF NOT EXISTS idx_book_chunks_book_index ON book_chunks (book_id, chunk_index);
-
-CREATE TABLE IF NOT EXISTS app_settings (
-  key TEXT PRIMARY KEY NOT NULL,
-  value TEXT NOT NULL
-);

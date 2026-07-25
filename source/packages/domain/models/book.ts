@@ -11,6 +11,8 @@ export interface BookProps {
   sha256: string;
   fileSizeBytes?: number;
   isFavorite?: boolean;
+  /** Denormalized flag: book has ≥ 1 digital signature row. */
+  isSigned?: boolean;
   sourceUrl?: string;
   addedAt: string;
   updatedAt: string;
@@ -31,6 +33,7 @@ export class Book {
   readonly sha256: string;
   fileSizeBytes?: number;
   isFavorite: boolean;
+  isSigned: boolean;
   sourceUrl?: string;
   readonly addedAt: string;
   updatedAt: string;
@@ -51,6 +54,7 @@ export class Book {
     this.sha256 = props.sha256;
     this.fileSizeBytes = props.fileSizeBytes;
     this.isFavorite = props.isFavorite ?? false;
+    this.isSigned = props.isSigned ?? false;
     this.sourceUrl = props.sourceUrl;
     this.addedAt = props.addedAt;
     this.updatedAt = props.updatedAt;
@@ -67,6 +71,11 @@ export class Book {
 
   setFavorite(value: boolean): void {
     this.isFavorite = value;
+    this.touch();
+  }
+
+  setSigned(value: boolean): void {
+    this.isSigned = value;
     this.touch();
   }
 

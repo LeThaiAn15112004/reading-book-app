@@ -1,3 +1,5 @@
+import { BookCover } from './BookCover'
+
 export type ShelfDetailItemData = {
   id: string
   title: string
@@ -5,6 +7,8 @@ export type ShelfDetailItemData = {
   fileName?: string
   /** Display format (e.g. EPUB); shown as cover badge. */
   format?: string
+  /** Renderer-safe cover URL when available. */
+  coverUrl?: string
   /** Progress chip or last-read line (G4 fills real location). */
   progressLabel?: string
   progressKind?: 'chip' | 'last'
@@ -12,20 +16,6 @@ export type ShelfDetailItemData = {
   isFavorite?: boolean
   /** Stable cover gradient 1–5; omit → hash from id. */
   coverGradientIndex?: 1 | 2 | 3 | 4 | 5
-}
-
-const COVER_GRADS: Record<1 | 2 | 3 | 4 | 5, string> = {
-  1: 'linear-gradient(135deg, #1e3a8a, #3b82f6)',
-  2: 'linear-gradient(135deg, #064e3b, #10b981)',
-  3: 'linear-gradient(135deg, #7c2d12, #f97316)',
-  4: 'linear-gradient(135deg, #581c87, #8b5cf6)',
-  5: 'linear-gradient(135deg, #831843, #ec4899)',
-}
-
-function coverIndexForId(id: string): 1 | 2 | 3 | 4 | 5 {
-  let hash = 0
-  for (let i = 0; i < id.length; i++) hash = (hash + id.charCodeAt(i)) % 5
-  return ((hash % 5) + 1) as 1 | 2 | 3 | 4 | 5
 }
 
 function ChevronIcon({ className }: { className?: string }) {
@@ -55,8 +45,6 @@ export type ShelfDetailItemProps = {
 
 /** One SCR-01a vertical row: cover · meta · progress · › */
 export function ShelfDetailItem({ item, onOpen }: ShelfDetailItemProps) {
-  const grad =
-    COVER_GRADS[item.coverGradientIndex ?? coverIndexForId(item.id)]
   const formatBadge = item.format?.trim().toUpperCase()
   const progressKind = item.progressKind ?? (item.progressLabel ? 'chip' : undefined)
 
@@ -67,30 +55,16 @@ export function ShelfDetailItem({ item, onOpen }: ShelfDetailItemProps) {
         className="flex w-full cursor-pointer items-center gap-3.5 rounded-[10px] border border-lib-border bg-lib-surface p-3 text-left font-[inherit] text-inherit transition-[border-color,background-color,transform] hover:-translate-y-px hover:border-lib-accent-ring hover:bg-[rgb(30_41_59/0.55)] focus-visible:border-lib-accent-ring focus-visible:outline-none"
         onClick={() => onOpen(item.id)}
       >
-        <div
-          className="relative h-[72px] w-[52px] shrink-0 overflow-hidden rounded-[5px] border border-lib-border"
-          style={{ background: grad }}
-          aria-hidden
-        >
-          {formatBadge ? (
-            <span className="absolute top-1 right-1 z-[1] rounded px-1 py-px text-[8px] font-bold tracking-wide text-white/90 bg-black/45">
-              {formatBadge}
-            </span>
-          ) : null}
-          <div className="flex h-full items-end p-1.5">
-            <span className="line-clamp-4 text-[9px] leading-tight font-semibold text-white [text-shadow:0_2px_4px_rgba(0,0,0,0.5)]">
-              {item.title}
-            </span>
-          </div>
-          {item.isFavorite ? (
-            <div
-              className="absolute top-1.5 left-1.5 flex size-5 items-center justify-center rounded-full border border-lib-accent-ring bg-[rgb(15_23_42/0.82)] text-[11px] text-lib-accent backdrop-blur-sm"
-              aria-label="Favorite"
-            >
-              ★
-            </div>
-          ) : null}
-        </div>
+        <BookCover
+          bookId={item.id}
+          title={item.title}
+          coverUrl={item.coverUrl}
+          format={formatBadge}
+          isFavorite={item.isFavorite}
+          compact
+          className="h-[72px] w-[52px] shrink-0 rounded-[5px]"
+          titleClassName="line-clamp-4 text-[9px] leading-tight font-semibold text-white [text-shadow:0_2px_4px_rgba(0,0,0,0.5)]"
+        />
 
         <div className="flex min-w-0 flex-1 flex-col gap-0.5">
           <h3 className="m-0 truncate text-[13px] leading-snug font-semibold text-lib-text-strong">

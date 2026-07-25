@@ -2,20 +2,7 @@ import {
   formatRelativeLastRead,
   type LibraryBook,
 } from '../libraryModel'
-
-const COVER_GRADS = [
-  'linear-gradient(135deg, #1e3a8a, #3b82f6)',
-  'linear-gradient(135deg, #064e3b, #10b981)',
-  'linear-gradient(135deg, #7c2d12, #f97316)',
-  'linear-gradient(135deg, #581c87, #8b5cf6)',
-  'linear-gradient(135deg, #831843, #ec4899)',
-] as const
-
-function coverGrad(id: string): string {
-  let hash = 0
-  for (let i = 0; i < id.length; i++) hash = (hash + id.charCodeAt(i)) % 5
-  return COVER_GRADS[hash % 5]
-}
+import { BookCover } from './BookCover'
 
 export type ContinueReadingProps = {
   book: LibraryBook
@@ -50,15 +37,13 @@ export function ContinueReading({
 
       <div className="flex flex-wrap items-center justify-between gap-5 rounded-xl border border-lib-border bg-lib-surface p-5 backdrop-blur-[6px]">
         <div className="flex min-w-0 flex-1 items-center gap-5">
-          <div
-            className="flex h-[100px] w-[72px] shrink-0 items-center justify-center rounded-md border border-lib-accent-ring p-2.5 text-center shadow-[0_12px_32px_rgba(0,0,0,0.35)]"
-            style={{ background: coverGrad(book.id) }}
-            aria-hidden
-          >
-            <span className="line-clamp-4 text-[11px] leading-snug font-semibold text-lib-text [text-shadow:0_2px_4px_rgba(0,0,0,0.5)]">
-              {book.title}
-            </span>
-          </div>
+          <BookCover
+            bookId={book.id}
+            title={book.title}
+            coverUrl={book.coverUrl}
+            className="h-[100px] w-[72px] shrink-0 rounded-md border-lib-accent-ring shadow-[0_12px_32px_rgba(0,0,0,0.35)]"
+            titleClassName="line-clamp-4 text-[11px] leading-snug font-semibold text-lib-text [text-shadow:0_2px_4px_rgba(0,0,0,0.5)]"
+          />
 
           <div className="flex min-w-0 flex-1 flex-col gap-1">
             <h3 className="m-0 truncate text-lg font-semibold tracking-tight text-lib-text-strong">

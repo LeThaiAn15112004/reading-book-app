@@ -22,8 +22,8 @@ package "Ports (interfaces)" as Ports #FFF3CD {
 }
 
 package "Adapters (Infrastructure)" as Adapters #FCE4EC {
-  component "Epub/Pdf/Txt/Md\nImporters" as A1
-  component "NoOp Normalizer\n(MVP — 4 formats)" as A2
+  component "Epub/Pdf/Txt/Md\nDocx/Doc Importers" as A1
+  component "Doc/Docx Normalizer\n(+ pass-through)" as A2
   component "ReflowHtmlRenderer\nPdfPageRenderer" as A3
   component "DomCssOverlay\nPdfCanvasOverlay" as A4
   component "Cfi / PageRect /\nTextOffset Codecs" as A5

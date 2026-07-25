@@ -95,7 +95,9 @@ Sau khi thiết lập, họ ít thay đổi.
 
 ## 8. Theo dõi tiến độ
 
-Quan tâm: - % hoàn thành. - Trang còn lại. - Thời gian đọc.
+Quan tâm: chỗ dừng gần nhất (chương / trang), thời gian đọc gần đây.
+
+Lưu ý sản phẩm: **không** dựa vào % hoàn thành — người đọc thường nhảy cóc (TOC, search, bookmark), nên % dễ gây hiểu nhầm.
 
 ------------------------------------------------------------------------
 

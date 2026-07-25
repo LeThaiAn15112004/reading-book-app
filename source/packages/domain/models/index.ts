@@ -23,6 +23,9 @@ export type { AuthorProps, BookAuthorProps } from './author.js';
 export { Book } from './book.js';
 export type { BookProps } from './book.js';
 
+export { BookSignature } from './book-signature.js';
+export type { BookSignatureProps, SignatureStatus } from './book-signature.js';
+
 export { Collection, CollectionBook } from './collection.js';
 export type { CollectionProps, CollectionBookProps } from './collection.js';
 
@@ -34,6 +37,9 @@ export type { HighlightProps } from './highlight.js';
 
 export { Note } from './note.js';
 export type { NoteProps } from './note.js';
+
+export { Comment } from './comment.js';
+export type { CommentProps } from './comment.js';
 
 export { Bookmark } from './bookmark.js';
 export type { BookmarkProps } from './bookmark.js';

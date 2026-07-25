@@ -28,7 +28,7 @@
 | T5.3 | `DomCssOverlay` vẽ lại khi mở / sau khi thêm | FR-06 |
 | T5.4 | Note CRUD gắn selection / location | FR-07 |
 | T5.5 | Bookmark add / list / jump / xóa | FR-11 |
-| T5.6 | Comment theo đoạn (nếu mockup có — tối thiểu = note ngắn hoặc stub rõ) | SDS SCR-03 |
+| T5.6 | Comment theo trang: IPC + UI drawer/sidebar trên bảng `comments` (`page_number`, `position_data`) — **schema + domain `Comment` đã có** (migration `004`) | SDS SCR-03 |
 | T5.7 | Sidebar tabs: Note · Comment · Bookmark — filter theo `bookId` | FR-09 |
 | T5.8 | Jump từ list → scroll/navigate đúng CFI | FR-09 |
 | T5.9 | Đếm notes trên Continue Reading → mở tab Note | FR-09 |
@@ -55,3 +55,4 @@ T5.1 → T5.2 → T5.3
 
 - Overlay Canvas cho PDF → G6 (cùng lúc làm PDF renderer)
 - Export notes / quote cards → G8+
+- Comment trên EPUB có thể map `page_number`/spine index tạm — chuẩn hóa location chung nếu cần sau G3

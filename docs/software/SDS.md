@@ -1,8 +1,8 @@
 # Software Design Specification (SDS)
 
 **Sản phẩm:** Reading Book App — Trình đọc sách / tài liệu thông minh (Trợ lý tri thức cá nhân)  
-**Phiên bản tài liệu:** 1.11  
-**Ngày:** 2026-07-20  
+**Phiên bản tài liệu:** 1.17  
+**Ngày:** 2026-07-25  
 **Trạng thái:** Draft — căn cứ SRS + Design Plan (MVP Free Core) + mockups  
 **Tài liệu liên quan:** [SRS.md](./SRS.md), [docs/mockups/](../mockups/)  
 **Changelog 1.2:** Import từ URL (direct file → sandbox) đưa vào MVP — SDS §1.2, §2.6–2.8, §3.5–3.7; SRS FR-13 / UC-01 / WF-02.  
@@ -14,7 +14,13 @@
 **Changelog 1.8:** Đổi entity `READING_PROGRESS` / `ReadingProgress` → **`READING_SESSION_STATE` / `ReadingSessionState`** (resume vị trí + setting per-book; không hàm ý đọc hết / đọc tuần tự).  
 **Changelog 1.9:** Đổi package `packages/types` → **`packages/domain`** (`@reading-book/domain`) — khớp lớp Domain (models + ports), không còn tên “types” gây hiểu nhầm.  
 **Changelog 1.10:** Thêm **`COLLECTION` / `COLLECTION_BOOK`** (bộ sưu tập user-curated, quan hệ n–n với `BOOK`) — khớp sidebar Collections (mockup Library) + SRS FR-14.  
-**Changelog 1.11:** **Bỏ tài khoản app** (email/password, OAuth2). SCR-06 nhóm **Linked libraries** thay Account; Phase 3 = `ExternalLibraryConnector` (Google Drive / Google Books / Apple Books) kéo danh mục tài liệu — SRS FR-30, NFR-11, BR-08.
+**Changelog 1.11:** **Bỏ tài khoản app** (email/password, OAuth2). SCR-06 nhóm **Linked libraries** thay Account; Phase 3 = `ExternalLibraryConnector` (Google Drive / Google Books / Apple Books) kéo danh mục tài liệu — SRS FR-30, NFR-11, BR-08.  
+**Changelog 1.12:** FR-10 — **bỏ UI % hoàn thành / thanh fill tiến độ đọc**; Library & Continue Reading hiện **last-read location**; Reader scrubber = bản đồ vị trí (nhãn chương/trang), không frame “% đọc xong”. Completed = user-marked, không suy từ %.  
+**Changelog 1.13:** Phạm vi định dạng MVP = **6 format**: EPUB, PDF, TXT, Markdown, **DOCX**, **DOC** — cập nhật enum `file_format`, adapter, mockup chips; ngoài MVP: MOBI/AZW3/PPTX.  
+**Changelog 1.14:** Thêm **§3.10 Catalog bảng & thuộc tính** (SQLite vật lý: từng cột / kiểu / ràng buộc) — khớp migration `001_initial.sql`; desktop & mobile dùng cùng schema logic.  
+**Changelog 1.15:** Thêm **`BOOK.is_signed`** + bảng **`BOOK_SIGNATURE` / `book_signatures`** (chi tiết chữ ký số; cascade khi xóa sách) — migration `003_book_signatures.sql`.  
+**Changelog 1.16:** Thêm bảng **`COMMENT` / `comments`** (overlay comment theo trang + `position_data`; cascade khi xóa sách) — migration `004_comments.sql`; SCR-03 tab Comment.  
+**Changelog 1.17:** **Bỏ bảng `app_settings`** khỏi SQLite overlay — app preferences theo platform (desktop: `electron-store`; mobile: MMKV / AsyncStorage); model `AppPreferences` vẫn dùng chung; migration `005_drop_app_settings.sql`.
 
 ---
 
@@ -47,6 +53,7 @@
   - [3.7. Quyết định đã chốt (data)](#37-quyết-định-đã-chốt-data)
   - [3.8. Class Diagram](#38-class-diagram)
   - [3.9. Database Diagram](#39-database-diagram)
+  - [3.10. Catalog bảng & thuộc tính (SQLite)](#310-catalog-bảng--thuộc-tính-sqlite)
 - [4. Screen Design](#4-screen-design)
   - [4.1. Bản đồ màn hình (MVP)](#41-bản-đồ-màn-hình-mvp)
   - [4.2. SCR-00 — Splash](#42-scr-00--splash)
@@ -78,7 +85,7 @@ SDS phiên bản này thiết kế chi tiết cho **MVP (Phase 1 — Free Core)*
 
 #### Định dạng tài liệu trong phạm vi thiết kế
 
-MVP **tạm chấp nhận đúng 4 định dạng** — đủ bao phủ phần lớn nhu cầu thực tế (PDF + EPUB là nhóm “quốc dân”; TXT/Markdown bổ sung tài liệu văn bản thuần):
+MVP **chấp nhận 6 định dạng**:
 
 
 | Định dạng      | Phần mở rộng | Kiểu hiển thị       | Location                      | Overlay & ghi chú thiết kế                                                                                                                          |
@@ -87,19 +94,21 @@ MVP **tạm chấp nhận đúng 4 định dạng** — đủ bao phủ phần l
 | **PDF**        | `.pdf`       | Fixed-layout        | Trang + rect / offset         | Định dạng phổ biến nhất (học thuật, in ấn, tài liệu công việc). Overlay: annotation trên **lớp Canvas trong suốt**, không chèn CSS vào nội dung PDF. |
 | **Plain Text** | `.txt`       | Reflowable          | Offset ký tự / dòng           | Nhẹ nhất, không style/ảnh. Dễ extract cho FTS5 và AI (Phase 2). Overlay highlight theo range văn bản.                                               |
 | **Markdown**   | `.md`        | Reflowable (render) | Offset / block + range        | Văn bản markup đơn giản; ghi chú & tài liệu kỹ thuật. Render → HTML; Overlay trên DOM đã render.                                                    |
+| **DOCX**       | `.docx`      | Reflowable (render) | Offset / block + range        | Word Open XML. Import copy sandbox; đọc qua extract/render HTML (không mutate file gốc). Overlay DOM như Markdown.                                  |
+| **DOC**        | `.doc`       | Reflowable (render) | Offset / block + range        | Word binary legacy. Import chấp nhận; normalize/extract sang dạng đọc được (có thể qua `normalized_path`); Overlay DOM.                             |
 
 
-**Không đưa vào phạm vi MVP (tạm thời):** MOBI / AZW3, DOCX, PPTX, `.doc` binary cũ, và các định dạng ít phổ biến khác. Nếu User chọn file ngoài 4 định dạng trên → từ chối với thông báo rõ (format không được hỗ trợ).
+**Không đưa vào phạm vi MVP:** MOBI / AZW3, PPTX, và các định dạng ít phổ biến khác. Nếu User chọn file ngoài 6 định dạng trên → từ chối với thông báo rõ (format không được hỗ trợ).
 
 **Nguyên tắc đa định dạng**
 
 - Thư viện, progress, highlight/note/bookmark dùng **domain model chung**; mỗi format gắn `format` + **Document Adapter** (import, metadata, mở nội dung, map location ↔ UI).
 - Reader là **shell chung** (Invisible UI, theme); phần render là **pluggable renderer** theo format (reflow HTML vs fixed PDF).
 - Hai họ Overlay:
-  - **DOM/CSS Overlay** — EPUB, TXT, Markdown.
+  - **DOM/CSS Overlay** — EPUB, TXT, Markdown, DOCX, DOC.
   - **Canvas Overlay** — PDF (lớp trong suốt theo trang).
 - File gốc mọi định dạng đều **Read-Only**; annotation chỉ nằm ở Overlay (SQLite).
-- Thứ tự ưu tiên triển khai: **EPUB → PDF → TXT → Markdown**. Contract chỉ cần đủ cho **bốn** format trên.
+- Thứ tự ưu tiên triển khai: **EPUB → PDF → TXT → Markdown → DOCX → DOC**. Contract cần đủ cho **sáu** format trên.
 
 
 
@@ -108,8 +117,8 @@ MVP **tạm chấp nhận đúng 4 định dạng** — đủ bao phủ phần l
 
 | Trong phạm vi thiết kế (MVP)                                                             | Ngoài phạm vi thiết kế chi tiết (MVP)                        |
 | ---------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
-| Import **EPUB, PDF, TXT, Markdown** từ **file hệ thống** hoặc **URL** (download → sandbox local) | Marketplace / DRM store / Kindle store                     |
-| Document Adapter + pluggable renderer (4 format)                                         | MOBI/AZW3, DOCX, PPTX, `.doc` legacy; convert pipeline nặng  |
+| Import **EPUB, PDF, TXT, Markdown, DOCX, DOC** từ **file hệ thống** hoặc **URL** (download → sandbox local) | Marketplace / DRM store / Kindle store                     |
+| Document Adapter + pluggable renderer (6 format)                                         | MOBI/AZW3, PPTX; convert pipeline nặng ngoài Word           |
 | Reader shell chung: Invisible UI, theme / typography (theo khả năng từng họ hiển thị)    | AI Chat, RAG, tóm tắt, semantic search (Phase 2)             |
 | Highlight, Note, Bookmark (Overlay SQLite); location theo format                         | Flashcards + spaced repetition (Phase 2)                     |
 | Lưu / khôi phục vị trí đọc (CFI / page+rect / text offset / block range)                 | Đồng bộ account đa thiết bị / login app (không thuộc sản phẩm) |
@@ -124,7 +133,7 @@ MVP **tạm chấp nhận đúng 4 định dạng** — đủ bao phủ phần l
 
 Nguyên tắc bất biến xuyên suốt thiết kế (theo SRS BR-01, BR-02):
 
-1. File tài liệu gốc **Read-Only** — không ghi đè `.epub` / `.pdf` / `.txt` / `.md` trên đĩa.
+1. File tài liệu gốc **Read-Only** — không ghi đè `.epub` / `.pdf` / `.txt` / `.md` / `.docx` / `.doc` trên đĩa.
 2. Theme, highlight, note, bookmark là **Overlay** — lưu riêng và áp dụng lúc runtime (DOM/CSS hoặc Canvas tùy format).
 3. **Local-first** — không phụ thuộc cloud hay API trả phí trong MVP.
 
@@ -170,7 +179,7 @@ Nguyên tắc bất biến xuyên suốt thiết kế (theo SRS BR-01, BR-02):
 | Khía cạnh                         | Kiểu                                                                       | Lý do                                                                                           |
 | --------------------------------- | -------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
 | **Logic trong app**               | **Layered** (Presentation → Application → Domain → Infrastructure)         | Luồng rõ: UI không đụng DB/FS trực tiếp; domain dùng chung desktop/mobile; dễ test và mở phase. |
-| **Biên đa định dạng / AI / Sync** | **Ports & Adapters** (hexagonal nhẹ) trên lớp Infrastructure / Application | EPUB/PDF/TXT… và AI provider thay thế được mà không phá domain.                                 |
+| **Biên đa định dạng / AI / Sync** | **Ports & Adapters** (hexagonal nhẹ) trên lớp Infrastructure / Application | EPUB/PDF/TXT/MD/DOCX/DOC và AI provider thay thế được mà không phá domain. |
 | **Desktop runtime**               | **Multi-process (Electron)** — Main / Preload / Renderer                   | Bảo mật path sandbox, tách quyền hệ thống khỏi UI.                                              |
 
 
@@ -268,9 +277,9 @@ Ports & Adapters — Document / Overlay / Extensibility
 
 | Port (interface)                | Adapter MVP / gần MVP                        | Ghi chú                                                |
 | ------------------------------- | -------------------------------------------- | ------------------------------------------------------ |
-| `DocumentImporter`              | Epub / Pdf / Txt / Md Importers              | Validate extension (4 format), copy sandbox, metadata  |
+| `DocumentImporter`              | Epub / Pdf / Txt / Md / Docx / Doc Importers | Validate extension (6 format), copy sandbox, metadata  |
 | `UrlDocumentFetcher`            | `HttpUrlFetcher` (Main)                      | Download direct file URL → temp → cùng pipeline import |
-| `DocumentNormalizer`            | (không bắt buộc MVP)                         | Dự phòng mở rộng sau; MVP đọc trực tiếp 4 format      |
+| `DocumentNormalizer`            | Doc/Docx extract (optional); pass-through khác | DOC/DOCX có thể ghi `normalized_path`; format khác thường null |
 | `DocumentRenderer`              | ReflowHtmlRenderer, PdfPageRenderer          | Reader shell chọn theo `Book.format`                   |
 | `OverlayPainter`                | DomCssOverlay, PdfCanvasOverlay              | Hai họ Overlay đã chốt ở §1.2                          |
 | `LocationCodec`                 | CfiCodec, PageRectCodec, TextOffsetCodec…    | Resume location / highlight / jump             |
@@ -339,7 +348,7 @@ MVP giữ port trống (`NoOp*`) để UI/feature flag không phải đập lạ
 | Desktop process        | Electron Main / Preload / Renderer                     |
 | Chia sẻ desktop–mobile | Domain + Application trong `packages/`                 |
 | Đa định dạng           | Pluggable Document Adapter / Renderer / OverlayPainter |
-| Persistence MVP        | SQLite (+ FTS5) phía Main / Infrastructure             |
+| Persistence MVP        | SQLite (+ FTS5) overlay sách phía Main; **app prefs** = electron-store (desktop) / MMKV (mobile) |
 | AI / Sync MVP          | Interface + NoOp; chưa implement                       |
 | Identity               | **Không** tài khoản app (SRS NFR-11 / BR-08)           |
 | Phase 3 catalog sync   | Folder / library path connectors — không OAuth2 login app |
@@ -391,7 +400,7 @@ source/
 │   │   │   ├── reader/                   # Reader shell + chọn renderer
 │   │   │   │   ├── ReaderShell.tsx
 │   │   │   │   ├── overlays/             # DomCssOverlay | PdfCanvasOverlay
-│   │   │   │   └── renderers/            # epub | pdf | txt | md | html-reflow
+│   │   │   │   └── renderers/            # epub | pdf | txt | md | docx | doc | html-reflow
 │   │   │   ├── bridge/                   # typed wrappers gọi window.api (IPC)
 │   │   │   ├── stores/                   # UI state (Zustand…) — không chứa SQL
 │   │   │   ├── styles/                   # theme tokens CSS variables
@@ -423,7 +432,7 @@ source/
     │   ├── bookmark.ts
     │   ├── book-chunk.ts
     │   ├── preferences.ts
-    │   ├── document-format.ts            # epub | pdf | txt | md
+    │   ├── document-format.ts            # epub | pdf | txt | md | docx | doc
     │   ├── ports/                        # interface Ports (§2.6)
     │   │   ├── document-importer.ts
     │   │   ├── document-renderer.ts
@@ -510,9 +519,9 @@ source/
 ### 3.1. Nguyên tắc mô hình dữ liệu
 
 - File sách/tài liệu gốc **không** nằm trong DB — chỉ lưu `file_path` (và optional `normalized_path` nếu đã convert). Nội dung gốc Read-Only trên đĩa.
-- Highlight / Note / Bookmark / ReadingSessionState / Preferences-theo-sách là **Overlay** trong SQLite.
+- Highlight / Note / Comment / Bookmark / ReadingSessionState / Preferences-theo-sách là **Overlay** trong SQLite.
 - `BOOK_CHUNK` phục vụ tìm kiếm nhanh + RAG (Phase 2); MVP có thể tạo chunk text cho FTS5, embedding để sau.
-- Xóa `BOOK` → **cascade** xóa `BOOK_AUTHOR`, `COLLECTION_BOOK` (membership), ReadingSessionState, Highlight, Note, Bookmark, Chunk (SRS BR-06). `AUTHOR` / `COLLECTION` giữ lại nếu còn liên kết khác.
+- Xóa `BOOK` → **cascade** xóa `BOOK_AUTHOR`, `COLLECTION_BOOK` (membership), `BOOK_SIGNATURE`, ReadingSessionState, Highlight, Note, Comment, Bookmark, Chunk (SRS BR-06). `AUTHOR` / `COLLECTION` giữ lại nếu còn liên kết khác.
 
 
 
@@ -531,12 +540,14 @@ Bảng đối chiếu khi implement: mỗi entity dùng để làm gì, gắn v�
 
 | Thực thể           | Tác dụng thực tế trong ứng dụng                                                                                                                                                                                          | Giải quyết nỗi đau / hành vi nào?                                                                                                 | Ví dụ thực tế (User Story)                                                                                                                                       |
 | ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `BOOK`             | Lưu metadata cuốn sách/tài liệu; quản lý đường dẫn file vật lý trong sandbox; định danh bằng SHA-256 để tránh import trùng; gắn `file_format` và (nếu có) `normalized_path`. Tác giả qua quan hệ **n - n** với `AUTHOR`. | Tránh thất lạc và trùng lặp sách — thư viện ngăn nắp, biết chính xác file nằm đâu để mở đọc.                                      | Bạn import `De-men-phieu-luu-ky.epub`. Hệ thống tính SHA-256, lưu `file_path`, liên kết tác giả (có thể nhiều người), hiện title + danh sách author lên Library. |
+| `BOOK`             | Lưu metadata cuốn sách/tài liệu; quản lý đường dẫn file vật lý trong sandbox; định danh bằng SHA-256 để tránh import trùng; gắn `file_format` và (nếu có) `normalized_path`; cờ `is_signed` khi có chữ ký số. Tác giả qua quan hệ **n - n** với `AUTHOR`. | Tránh thất lạc và trùng lặp sách — thư viện ngăn nắp, biết chính xác file nằm đâu để mở đọc; biết tài liệu đã ký hay chưa. | Bạn import `De-men-phieu-luu-ky.epub`. Hệ thống tính SHA-256, lưu `file_path`, liên kết tác giả (có thể nhiều người), hiện title + danh sách author lên Library. |
 | `AUTHOR`           | Lưu hồ sơ tác giả dùng chung (`name`, `sort_name`). Một tác giả gắn được nhiều sách.                                                                                                                                     | Tìm / lọc theo tác giả; không nhân đôi chuỗi author trên từng sách; hỗ trợ sách nhiều đồng tác giả.                               | Import sách có 2 đồng tác giả → tạo/reuse 2 `AUTHOR`, gắn qua `BOOK_AUTHOR`. Sách khác cùng 1 tác giả tái sử dụng bản ghi author đó.                             |
 | `BOOK_AUTHOR`      | Bảng liên kết **n - n** giữa `BOOK` và `AUTHOR`; có `sort_order` để hiển thị thứ tự tên trên bìa/Library.                                                                                                                | Cho phép 1 sách nhiều tác giả và 1 tác giả nhiều sách.                                                                            | Sách A: author X (order 0), Y (order 1). Sách B cũng gắn author X.                                                                                               |
+| `BOOK_SIGNATURE`   | Chi tiết chữ ký số trên tài liệu (`signer_name`, `signature_status`, `signed_at`). Quan hệ **1 - n** với `BOOK`. Cờ `BOOK.is_signed` = denormalized khi có ≥ 1 dòng chữ ký.                                              | Xác thực nguồn / tính toàn vẹn tài liệu đã ký (PDF signed, v.v.); lọc sách đã ký trong Library.                                   | Import PDF có chữ ký của “Acme Corp” → `is_signed = 1` + một dòng `BOOK_SIGNATURE` status `valid`.                                                              |
 | `READING_SESSION_STATE` | Lưu vị trí đọc cuối (`last_read_location`); lưu cấu hình đọc per-book (màu nền, màu chữ, font, landscape…). Quan hệ **1 - 1** với `BOOK`. Không hàm ý đã đọc hết hay đọc tuần tự. | “Mở xong đóng, mở lại đúng chỗ” — không mất đoạn đang đọc; không phải chỉnh lại theme chống mỏi mắt mỗi lần mở. | Bạn đọc tới Chương 3 (hoặc nhảy cóc sang đoạn khác), bật Sepia rồi tắt app. Hôm sau mở lại: nền Sepia + nhảy đúng vị trí lần trước. |
 | `HIGHLIGHT`        | Lưu đoạn bôi màu (`location_start`/`end`, `selected_text`, `color_hex`) như Overlay đè lên nội dung gốc (không sửa file).                                                                                                | Ghi nhớ thông tin cốt lõi — xem lại nhanh trích dẫn / kiến thức đã đánh dấu, không lật lại từng trang.                            | Bôi câu *“Đi một ngày đàng, học một sàng khôn”*, chọn màu Vàng → hiện trong danh sách Highlight và jump lại đúng chỗ.                                            |
 | `NOTE`             | Lưu suy nghĩ / phân tích cá nhân gắn vị trí sách; có thể gắn `highlight_id` (nullable).                                                                                                                                  | Active reading — ghi chép học tập / nghiên cứu “trên lề sách” như sách giấy.                                                      | Bôi thuật ngữ khó, ghi *“Cần tra thêm trên Wikipedia”* → icon note cạnh đoạn văn để mở lại.                                                                      |
+| `COMMENT`          | Overlay ghi chú / đáp án gắn **trang + vị trí trên trang** (`page_number`, `position_data`, `content`); local theo `bookId` — **không** phải mạng xã hội. Tab Comment trên SCR-03.                                      | Gắn đáp án / chú thích lên đúng chỗ trên tài liệu (vd. bài tập PDF được gửi); xem lại & jump từ sidebar.                          | Mở file bài tập → comment chữ đỏ “đáp án: B” tại trang 3 → badge Comment trên sidebar; tap → nhảy đúng chỗ.                                                      |
 | `BOOKMARK`         | Lưu điểm đánh dấu trang (`location_ref`, `label` tùy chọn) để quay lại nhanh.                                                                                                                                            | Đánh dấu chỗ cần đọc tiếp / chỗ quan trọng mà không cần bôi cả đoạn.                                                              | Đang giữa chương, chọn Bookmark “Ôn lại phần này” → sau mở từ danh sách bookmark và nhảy đúng vị trí.                                                            |
 | `BOOK_CHUNK`       | Chia nội dung extract thành đoạn (vd. ~1000–2000 từ) theo `chunk_index`; đầu vào FTS5, AI tóm tắt / RAG, và (khi cần) prefetch text theo đoạn.                                                                           | Hiệu năng & tìm trong sách — không phụ thuộc nạp cả file lớn một lần cho search/AI; lật/đọc mượt hơn khi kết hợp cache theo đoạn. | Sách dài: index chunk 0..n. User search hoặc AI chỉ lấy các chunk liên quan; khi đọc, có thể prefetch chunk kế tiếp thay vì load toàn bộ 1000 trang vào RAM.     |
 | `COLLECTION`       | Bộ sưu tập do user tự tạo (`name`, optional `description`) — nhóm sách theo chủ đề / mục đích riêng, **không** phải shelf trạng thái (Reading / Completed). Quan hệ **n - n** với `BOOK` qua `COLLECTION_BOOK`.           | Người sưu tầm muốn gom sách thành tập riêng (vd. “Work reading”, “Weekend fiction”) thay vì chỉ lọc theo tiến độ / favorite.      | Tạo collection “Architecture deep dive”, thêm 5 sách → mở từ nav Collections → list sách trong tập.                                                             |
@@ -553,9 +564,11 @@ Bảng đối chiếu khi implement: mỗi entity dùng để làm gì, gắn v�
 | `BOOK` ↔ `AUTHOR`           | **n - n**   | Qua bảng liên kết `BOOK_AUTHOR` (`sort_order`). 1 sách nhiều tác giả; 1 tác giả nhiều sách. |
 | `BOOK` → `BOOK_AUTHOR`      | **1 - n**   | Cascade khi xóa sách.                                                                       |
 | `AUTHOR` → `BOOK_AUTHOR`    | **1 - n**   | Xóa author: RESTRICT nếu còn sách gắn (hoặc cascade unlink tùy policy).                     |
+| `BOOK` → `BOOK_SIGNATURE`   | **1 - n**   | Chi tiết chữ ký số; cascade khi xóa sách. Cờ `is_signed` trên `BOOK` đồng bộ khi có/không còn signature. |
 | `BOOK` → `READING_SESSION_STATE` | **1 - 1**   | Mỗi sách một bản ghi resume + setting đọc gần nhất. Tạo khi import hoặc lần mở đầu. |
 | `BOOK` → `HIGHLIGHT`        | **1 - n**   | Overlay; cascade khi xóa sách.                                                              |
 | `BOOK` → `NOTE`             | **1 - n**   | Note độc lập hoặc gắn highlight (`highlight_id` nullable).                                  |
+| `BOOK` → `COMMENT`          | **1 - n**   | Comment theo trang + vị trí; cascade khi xóa sách.                                          |
 | `BOOK` → `BOOKMARK`         | **1 - n**   | Đánh dấu trang (FR-11).                                                                     |
 | `BOOK` → `BOOK_CHUNK`       | **1 - n**   | Chunk text cho FTS / AI; rebuild khi re-index.                                              |
 | `HIGHLIGHT` → `NOTE`        | **1 - n**   | `NOTE.highlight_id` nullable; xóa highlight → **SET NULL** (giữ nội dung note).             |
@@ -568,7 +581,7 @@ Bảng đối chiếu khi implement: mỗi entity dùng để làm gì, gắn v�
 
 ### 3.5. Ghi chú field quan trọng
 
-`file_format` — enum: `epub` | `pdf` | `txt` | `md`.
+`file_format` — enum: `epub` | `pdf` | `txt` | `md` | `docx` | `doc`.
 
 `last_read_location` **/** `location_`* — chuỗi ổn định theo format (không lưu tọa độ pixel tạm):
 
@@ -582,9 +595,17 @@ Bảng đối chiếu khi implement: mỗi entity dùng để làm gì, gắn v�
 
 `sha256` — trước khi copy / sau khi download: nếu hash đã tồn tại → báo trùng / mở sách cũ (không nhân bản vô ích).
 
+`percent` (trên `READING_SESSION_STATE`, optional) — ước lượng vị trí trên **bản đồ tài liệu** để đặt scrubber (0–100 map position). **Không** hiển thị như “% đã đọc / hoàn thành”; UI Library dùng nhãn `last_read_location` (chương/trang), Completed là trạng thái user đánh dấu.
+
 `source_url` — optional `TEXT` trên `books`: URL gốc nếu import từ mạng; null nếu từ file máy. Chỉ tham chiếu; không bắt buộc re-fetch khi mở Reader.
 
-`normalized_path` — dự phòng mở rộng sau (convert format ngoài scope); MVP thường null vì đọc trực tiếp 4 format.
+`normalized_path` — dùng khi DOC/DOCX (hoặc format khác) cần extract/convert nhẹ để đọc; format đọc trực tiếp thường null.
+
+`is_signed` — `INTEGER` 0/1 trên `books`: cờ nhanh “có chữ ký số”. Chi tiết từng chữ ký nằm ở `book_signatures` (một sách có thể nhiều signer).
+
+`signature_status` — trên `book_signatures`: `valid` \| `invalid` \| `expired` \| `unknown`.
+
+`page_number` / `position_data` (trên `comments`) — neo comment theo trang (1-based) + chuỗi vị trí trên trang (JSON tọa độ / bounding box). Ưu tiên PDF; format khác map tương đương khi renderer hỗ trợ.
 
 `BOOK_CHUNK.embedding` — Phase 2; MVP có thể chỉ lưu `content` + FTS5 virtual table trên `content` / `selected_text` / `NOTE.content`.
 
@@ -595,7 +616,7 @@ Bảng đối chiếu khi implement: mỗi entity dùng để làm gì, gắn v�
 | ---------------------------------- | --------------------------------------------------------------------------------- |
 | File `.epub` / `.pdf` / … trên đĩa | Binary ngoài DB; DB chỉ trỏ path                                                  |
 | FTS5 virtual tables                | Chỉ mục SQLite (vd. `books_fts`, `annotations_fts`) — không phải entity nghiệp vụ |
-| App preferences (key-value)        | Theme app, language, fullscreen, multi-doc, watch-folder flags — `preferences.ts` / bảng `app_settings` đơn giản; không lên ERD nghiệp vụ sách |
+| App preferences (key-value)        | Theme app, language, fullscreen, multi-doc, watch-folder flags — model `AppPreferences` (`preferences.ts`); **không** lưu trong SQLite overlay. Desktop: `electron-store` (JSON); Mobile: MMKV hoặc AsyncStorage. SCR-06 UI gọi adapter từng platform. |
 | Watched folders                    | Danh sách path thư mục theo dõi (File scan — SCR-06); lưu local; Main process watch FS |
 | `AiProvider` / linked libraries    | Phase 2–3; bổ sung bảng `AI_SESSION`, `EXTERNAL_LIBRARY_LINK` khi tới phase           |
 
@@ -611,10 +632,12 @@ Bảng đối chiếu khi implement: mỗi entity dùng để làm gì, gắn v�
 | Book ↔ Author    | **n - n** qua `BOOK_AUTHOR` / `book_authors` (+ `sort_order`)      |
 | Resume / session | 1 - 1 với BOOK qua `READING_SESSION_STATE`; gộp cả setting đọc per-book (màu, font, landscape) |
 | Favorite         | Cột `BOOK.is_favorite`                                             |
+| Digital signature | Cột `BOOK.is_signed` + bảng `BOOK_SIGNATURE` / `book_signatures` (1–n) |
 | Bookmark         | Bảng riêng `BOOKMARK` (không gộp vào highlight)                    |
+| Comment          | Bảng riêng `COMMENT` / `comments` (page + position_data; khác NOTE) |
 | Note ↔ Highlight | Optional FK `highlight_id`                                         |
 | Chunk            | Có trong schema sớm; embedding nullable đến Phase 2                |
-| Cascade xóa sách | book_authors + collection_books + ReadingSessionState + Highlight + Note + Bookmark + Chunk |
+| Cascade xóa sách | book_authors + collection_books + book_signatures + ReadingSessionState + Highlight + Note + Comment + Bookmark + Chunk |
 | Collections      | `COLLECTION` + `COLLECTION_BOOK` (n–n); xóa collection cascade membership, **không** xóa sách |
 | Nguồn import     | File máy **và** URL direct file; optional cột `books.source_url`   |
 
@@ -633,7 +656,7 @@ Class Diagram — Domain + Application (MVP)
 - `Book` ↔ `Author` là **n - n** (association class `BookAuthor` kèm `sortOrder`).
 - `Book` ↔ `Collection` là **n - n** (association class `CollectionBook` kèm `sortOrder` / `addedAt`).
 - Application services điều phối use case; chỉ phụ thuộc **Ports** (`LibraryStore`, `CollectionStore`, `OverlayStore`, …), không phụ thuộc SQLite/Electron.
-- Cardinality khác: `Book` **1 - 1** `ReadingSessionState`; **1 - n** Highlight / Note / Bookmark / BookChunk; Highlight **1 - n** Note (optional qua `highlightId`).
+- Cardinality khác: `Book` **1 - 1** `ReadingSessionState`; **1 - n** Highlight / Note / Comment / Bookmark / BookChunk / BookSignature; Highlight **1 - n** Note (optional qua `highlightId`).
 
 
 
@@ -648,9 +671,182 @@ Database Diagram — SQLite Overlay Schema (MVP)
 - Tên bảng snake_case (`books`, `authors`, `book_authors`, …); datetime lưu `TEXT` ISO-8601; boolean lưu `INTEGER` 0/1.
 - **Author không nằm trên** `books` — quan hệ **n - n** qua `book_authors` (PK `book_id` + `author_id`, `sort_order`).
 - File sách **không** trong DB — chỉ `file_path` / `normalized_path`.
-- Xóa `books` → **CASCADE** `book_authors`, `collection_books`, progress, highlights, notes, bookmarks, book_chunks; xóa highlight → notes.`highlight_id` **SET NULL**.
+- Xóa `books` → **CASCADE** `book_authors`, `collection_books`, `book_signatures`, progress, highlights, notes, comments, bookmarks, book_chunks; xóa highlight → notes.`highlight_id` **SET NULL**.
 - Xóa `collections` → **CASCADE** `collection_books` (sách vẫn còn trong Library).
 - `sha256` **UNIQUE**; `book_chunks` **UNIQUE(book_id, chunk_index)**; FTS5 là virtual table riêng (không vẽ như entity nghiệp vụ).
+
+### 3.10. Catalog bảng & thuộc tính (SQLite)
+
+Catalog vật lý khớp migration desktop [`001_initial.sql`](../../source/apps/reading-book-desktop/electron/persistence/migrations/001_initial.sql) (+ `002`…`005_drop_app_settings`). **Mobile dùng cùng schema overlay** (adapter Expo SQLite riêng; không dùng `better-sqlite3`). **App settings không nằm trong catalog này** — xem §3.6.
+
+**Quy ước chung**
+
+| Quy ước | Giá trị |
+| :--- | :--- |
+| Tên bảng / cột | `snake_case` |
+| PK sách / author / overlay | `TEXT` UUID |
+| Datetime | `TEXT` ISO-8601 |
+| Boolean | `INTEGER` `0` / `1` |
+| Nội dung file sách | **Không** trong DB — chỉ path sandbox |
+
+#### `books` — metadata tài liệu trong thư viện
+
+| Cột | Kiểu | Ràng buộc | Mô tả |
+| :--- | :--- | :--- | :--- |
+| `id` | TEXT | PK, NOT NULL | UUID sách |
+| `title` | TEXT | NOT NULL | Tiêu đề hiển thị |
+| `file_path` | TEXT | NOT NULL | Path file trong sandbox (Read-Only) |
+| `normalized_path` | TEXT | NULL | Path bản extract/convert (DOC/DOCX…); thường null với EPUB/PDF |
+| `file_format` | TEXT | NOT NULL, CHECK | `epub` \| `pdf` \| `txt` \| `md` \| `docx` \| `doc` |
+| `cover_path` | TEXT | NULL | Path cover đã extract (nếu có) |
+| `sha256` | TEXT | NOT NULL, **UNIQUE** | Hash nội dung — dedup import (**BR-03**) |
+| `file_size_bytes` | INTEGER | NULL | Kích thước file (byte) |
+| `is_favorite` | INTEGER | NOT NULL, DEFAULT `0` | Favorite (0/1) |
+| `is_signed` | INTEGER | NOT NULL, DEFAULT `0` | Có chữ ký số (0 = chưa ký, 1 = đã ký); chi tiết ở `book_signatures` |
+| `source_url` | TEXT | NULL | URL gốc nếu import từ mạng; null nếu từ máy |
+| `added_at` | TEXT | NOT NULL | Thời điểm import |
+| `updated_at` | TEXT | NOT NULL | Lần cập nhật metadata gần nhất |
+
+**Index:** `UNIQUE(sha256)`; `INDEX(is_favorite)`; `INDEX(is_signed)`; `INDEX(updated_at)`.
+
+#### `book_signatures` — chi tiết chữ ký số trên tài liệu
+
+| Cột | Kiểu | Ràng buộc | Mô tả |
+| :--- | :--- | :--- | :--- |
+| `id` | TEXT | PK, NOT NULL | UUID signature |
+| `book_id` | TEXT | NOT NULL, FK → `books.id` **ON DELETE CASCADE** | Sách được ký |
+| `signer_name` | TEXT | NOT NULL | Tên cá nhân / tổ chức ký |
+| `signature_status` | TEXT | NOT NULL, DEFAULT `'unknown'`, CHECK | `valid` \| `invalid` \| `expired` \| `unknown` |
+| `signed_at` | TEXT | NULL | Thời điểm áp dụng chữ ký (ISO-8601), nếu biết |
+
+**Index:** `INDEX(book_id)`. Một sách có thể có nhiều dòng chữ ký.
+
+#### `authors` — hồ sơ tác giả dùng chung
+
+| Cột | Kiểu | Ràng buộc | Mô tả |
+| :--- | :--- | :--- | :--- |
+| `id` | TEXT | PK, NOT NULL | UUID author |
+| `name` | TEXT | NOT NULL | Tên hiển thị |
+| `sort_name` | TEXT | NULL | Tên để sắp xếp (tùy chọn) |
+| `created_at` | TEXT | NOT NULL | Thời điểm tạo hồ sơ |
+
+#### `book_authors` — liên kết n–n sách ↔ tác giả
+
+| Cột | Kiểu | Ràng buộc | Mô tả |
+| :--- | :--- | :--- | :--- |
+| `book_id` | TEXT | PK, FK → `books.id` **ON DELETE CASCADE** | Sách |
+| `author_id` | TEXT | PK, FK → `authors.id` **ON DELETE RESTRICT** | Tác giả |
+| `sort_order` | INTEGER | NOT NULL, DEFAULT `0` | Thứ tự tên trên bìa / Library (thấp trước) |
+
+**Index:** `INDEX(author_id)`. PK composite `(book_id, author_id)`.
+
+#### `collections` — bộ sưu tập user-curated (FR-14)
+
+| Cột | Kiểu | Ràng buộc | Mô tả |
+| :--- | :--- | :--- | :--- |
+| `id` | TEXT | PK, NOT NULL | UUID collection |
+| `name` | TEXT | NOT NULL | Tên tập (MVP cho phép trùng tên) |
+| `description` | TEXT | NULL | Mô tả tùy chọn |
+| `created_at` | TEXT | NOT NULL | Thời điểm tạo |
+| `updated_at` | TEXT | NOT NULL | Lần đổi gần nhất |
+
+**Index:** `INDEX(updated_at)`.
+
+#### `collection_books` — liên kết n–n collection ↔ sách
+
+| Cột | Kiểu | Ràng buộc | Mô tả |
+| :--- | :--- | :--- | :--- |
+| `collection_id` | TEXT | PK, FK → `collections.id` **ON DELETE CASCADE** | Tập |
+| `book_id` | TEXT | PK, FK → `books.id` **ON DELETE CASCADE** | Sách (xóa sách chỉ gỡ membership) |
+| `sort_order` | INTEGER | NOT NULL, DEFAULT `0` | Thứ tự trong tập |
+| `added_at` | TEXT | NOT NULL | Khi gắn sách vào tập |
+
+**Index:** `INDEX(book_id)`. PK composite `(collection_id, book_id)`.
+
+#### `reading_session_states` — resume + setting đọc per-book (1–1 với `books`)
+
+| Cột | Kiểu | Ràng buộc | Mô tả |
+| :--- | :--- | :--- | :--- |
+| `book_id` | TEXT | PK, FK → `books.id` **ON DELETE CASCADE** | Một sách một session |
+| `last_read_location` | TEXT | NOT NULL | Vị trí ổn định theo format (CFI / page-rect / offset) |
+| `percent` | REAL | NOT NULL, DEFAULT `0` | Map vị trí scrubber (0–100); **không** dùng làm “% đã đọc xong” trên UI (FR-10) |
+| `bg_color` | TEXT | NULL | Màu nền đọc (per-book) |
+| `text_color` | TEXT | NULL | Màu chữ |
+| `font_size` | REAL | NULL | Cỡ chữ |
+| `font_family` | TEXT | NULL | Font |
+| `line_height` | REAL | NULL | Giãn dòng |
+| `theme_preset` | TEXT | NULL | Preset theme (vd. night / sepia / day) |
+| `is_landscape` | INTEGER | NOT NULL, DEFAULT `0` | Landscape (0/1) |
+| `updated_at` | TEXT | NOT NULL | Lần autosave gần nhất |
+
+#### `highlights` — overlay bôi chọn
+
+| Cột | Kiểu | Ràng buộc | Mô tả |
+| :--- | :--- | :--- | :--- |
+| `id` | TEXT | PK, NOT NULL | UUID highlight |
+| `book_id` | TEXT | NOT NULL, FK → `books.id` **ON DELETE CASCADE** | Sách sở hữu |
+| `location_start` | TEXT | NOT NULL | Điểm đầu đoạn (theo format) |
+| `location_end` | TEXT | NOT NULL | Điểm cuối đoạn |
+| `selected_text` | TEXT | NOT NULL | Snapshot text đã chọn |
+| `color_hex` | TEXT | NOT NULL | Màu highlight (vd. `#F5D76E`) |
+| `created_at` | TEXT | NOT NULL | Thời điểm tạo |
+
+#### `notes` — ghi chú gắn vị trí (optional gắn highlight)
+
+| Cột | Kiểu | Ràng buộc | Mô tả |
+| :--- | :--- | :--- | :--- |
+| `id` | TEXT | PK, NOT NULL | UUID note |
+| `book_id` | TEXT | NOT NULL, FK → `books.id` **ON DELETE CASCADE** | Sách sở hữu |
+| `highlight_id` | TEXT | NULL, FK → `highlights.id` **ON DELETE SET NULL** | Optional; xóa highlight giữ note |
+| `location_ref` | TEXT | NOT NULL | Vị trí neo note |
+| `selected_text` | TEXT | NULL | Đoạn liên quan (nếu có) |
+| `content` | TEXT | NOT NULL | Nội dung note (không rỗng ở tầng use case) |
+| `created_at` | TEXT | NOT NULL | Tạo |
+| `updated_at` | TEXT | NOT NULL | Sửa gần nhất |
+
+**Index:** `INDEX(book_id)`; `INDEX(highlight_id)`.
+
+#### `comments` — overlay comment theo trang (SCR-03)
+
+| Cột | Kiểu | Ràng buộc | Mô tả |
+| :--- | :--- | :--- | :--- |
+| `id` | TEXT | PK, NOT NULL | UUID comment |
+| `book_id` | TEXT | NOT NULL, FK → `books.id` **ON DELETE CASCADE** | Sách sở hữu |
+| `page_number` | INTEGER | NOT NULL | Số trang (1-based) trong tài liệu |
+| `position_data` | TEXT | NOT NULL | Vị trí trên trang (JSON tọa độ / bounding box) |
+| `content` | TEXT | NOT NULL | Nội dung chữ viết / gõ (vd. đáp án, chú thích) |
+| `author_name` | TEXT | NULL | Tên người viết comment (nếu cần) |
+| `created_at` | TEXT | NOT NULL | Thời điểm tạo |
+| `updated_at` | TEXT | NOT NULL | Lần sửa gần nhất |
+
+**Index:** `INDEX(book_id)`. Khác `notes`: neo theo **page + position**, không gắn highlight.
+
+#### `bookmarks` — đánh dấu trang
+
+| Cột | Kiểu | Ràng buộc | Mô tả |
+| :--- | :--- | :--- | :--- |
+| `id` | TEXT | PK, NOT NULL | UUID bookmark |
+| `book_id` | TEXT | NOT NULL, FK → `books.id` **ON DELETE CASCADE** | Sách sở hữu |
+| `location_ref` | TEXT | NOT NULL | Vị trí nhảy tới |
+| `label` | TEXT | NULL | Nhãn tùy chọn |
+| `created_at` | TEXT | NOT NULL | Thời điểm tạo |
+
+#### `book_chunks` — đoạn text extract (FTS / Phase 2 AI)
+
+| Cột | Kiểu | Ràng buộc | Mô tả |
+| :--- | :--- | :--- | :--- |
+| `id` | TEXT | PK, NOT NULL | UUID chunk |
+| `book_id` | TEXT | NOT NULL, FK → `books.id` **ON DELETE CASCADE** | Sách nguồn |
+| `chunk_index` | INTEGER | NOT NULL | Thứ tự chunk trong sách |
+| `content` | TEXT | NOT NULL | Text extract của đoạn |
+| `location_start` | TEXT | NULL | Vị trí đầu đoạn (nếu map được) |
+| `location_end` | TEXT | NULL | Vị trí cuối đoạn |
+| `embedding` | BLOB | NULL | Vector embedding — Phase 2; MVP để null |
+| `created_at` | TEXT | NOT NULL | Thời điểm index |
+
+**Index:** `UNIQUE(book_id, chunk_index)`.
+
+> **Không có `app_settings` trong SQLite.** Cấu hình app (SCR-06) lưu theo platform — desktop `electron-store`, mobile MMKV/AsyncStorage — để tránh nhân đôi store và lệch API giữa Electron / Expo.
 
 ---
 
@@ -696,8 +892,8 @@ SCR-00 Splash  →  (ready)  →  SCR-01 Library
                                  ├─ Add (device | URL)         → UX-IMP overlay (trên Library)
                                  │                                 └─ success → đóng overlay + toast + refresh Library
                                  ├─ Favorites (nav)            → Starred books list
-                                 ├─ Completed (nav)            → progress >= 100%
-                                 ├─ To read (nav)              → progress = 0%
+                                 ├─ Completed (nav)            → status = completed (user-marked)
+                                 ├─ To read (nav)              → status = not-started (chưa từng mở / chưa có last_read)
                                  ├─ Collections (nav)          → Collections hub
                                  └─ Settings (nav)             → SCR-06 App Settings
                                                                       └─ Back to library → SCR-01
@@ -805,8 +1001,8 @@ Hub sau Splash: **duyệt file đã import** (từ máy hoặc URL đã tải v�
 | ----------------- | ------------------------------------------------------------------------ | -------------------------------------------------------------------------------- |
 | Sidebar (desktop) | **Library**, **Favorites**, **Completed**, **To read**, **Collections**, **Settings** | Completed = done; To read = not started. **Không** nav Notes toàn cục — note theo sách trong Reader. Mobile: More sheet. |
 | Top bar           | Search (“Search imported files…”) + **Add file**                         | Search lọc title / author / filename / format.                                   |
-| Hint              | “Your library on this device” + format chips (EPUB, PDF, TXT, MD) | Nhấn mạnh local-import; 4 định dạng MVP; không gợi bookstore.              |
-| Continue reading  | Cover + title + author + format + filename + progress + Resume / Notes (n) | Chỉ hiện nếu có `last_read` gần nhất. **Notes (n)** → SCR-03 + mở tab Note (scoped sách đó). |
+| Hint              | “Your library on this device” + format chips (EPUB, PDF, TXT, MD, DOCX, DOC) | Nhấn mạnh local-import; 6 định dạng MVP; không gợi bookstore.              |
+| Continue reading  | Cover + title + author + format + filename + **last-read location** + Resume / Notes (n) | Chỉ hiện nếu có `last_read` gần nhất. Hiện chỗ dừng (chương/trang) — **không** % / thanh fill. **Notes (n)** → SCR-03 tab Note. |
 | Shelves (dọc)     | **Reading** → **Completed** → **Not started**                            | Mỗi shelf = rail sách **scroll ngang**; không dùng tab mini filter.              |
 | Shelf header      | `=` (drag reorder) · title · `N files` · `›` (mở SCR-01a)                | `=` ≠ menu; `›` tap target lớn, căn hàng với title.                              |
 
@@ -822,8 +1018,8 @@ Hub sau Splash: **duyệt file đã import** (từ máy hoặc URL đã tải v�
 | Tap `›`                           | → **SCR-01a** list dọc của shelf đó                  |
 | Search                            | Ẩn shelf không còn card khớp; empty state nếu 0 kết quả |
 | Favorites (nav)                   | List sách is_favorite — quay lại nhanh sách đã gắn sao |
-| Completed (nav)                   | List sách đã đọc xong (progress >= 100%) |
-| To read (nav)                     | List sách sẽ đọc / chưa bắt đầu (progress = 0%) |
+| Completed (nav)                   | List sách user đánh dấu completed (không suy ra từ %) |
+| To read (nav)                     | List sách chưa bắt đầu (chưa có `last_read`) |
 | Collections (nav)                 | Hub `COLLECTION` do user tạo (FR-14); tạo / đổi tên / xóa tập; mở collection → list sách (`COLLECTION_BOOK`); gắn / gỡ sách khỏi tập |
 | Notes (n) trên Continue Reading   | → **SCR-03** Reader của sách đó, mở sidebar tab **Note** |
 | Settings (nav)                    | → **SCR-06** App Settings (`setting.html`)           |
@@ -924,7 +1120,7 @@ Sau khi xong: **đóng overlay** → user vẫn ở **SCR-01 Library** (toast + 
 | Bước | Hành vi                                                                                          |
 | ---- | ------------------------------------------------------------------------------------------------ |
 | 1    | User chọn **From this device**.                                                                  |
-| 2    | Main mở native file picker; filter: `.epub`, `.pdf`, `.txt`, `.md`.                         |
+| 2    | Main mở native file picker; filter: `.epub`, `.pdf`, `.txt`, `.md`, `.docx`, `.doc`. |
 | 3a   | User hủy → đóng; Library không đổi DB.                                                           |
 | 3b   | File hợp lệ → (optional) progress dialog nhỏ → copy sandbox → metadata → FTS → toast + refresh.  |
 | 3c   | Extension / file hỏng → dialog lỗi ngắn (vẫn overlay), không tạo bản ghi rỗng.                   |
@@ -1007,7 +1203,7 @@ Không gian đọc **content-first**: render tài liệu, lưu vị trí, highli
 | Content canvas       | Full     | Reflow (EPUB/TXT/MD) hoặc fixed page (PDF — Phase renderer)                |
 | Top chrome           | Ẩn       | Back · title / chapter · **Tools** · **Settings** · **More (⋮)**           |
 | Active-tool chip     | Ẩn       | Khi đang chọn tool: chip ngắn (vd. `Highlight ✕`) cạnh Tools — 1 tap tắt   |
-| Bottom chrome        | Ẩn       | Progress slider mỏng (0%…100%)                                             |
+| Bottom chrome        | Ẩn       | Location scrubber mỏng + nhãn vị trí hiện tại (chương/trang) — **không** % hoàn thành |
 | TOC edge (trái)      | Luôn sẵn | Dải chạm cạnh trái mở sidebar mục lục                                      |
 | Bookmark edge        | Luôn sẵn | Ribbon trái — đánh dấu chương hiện tại / mở tab Bookmark                   |
 | Sidebar trái         | Đóng     | Tabs: **Chapters** · **Bookmark** · **Note** · **Comment**                 |
@@ -1083,7 +1279,7 @@ Empty Note/Comment: “No notes yet” / tương đương — CTA quay vùng đ�
 | 3   | Highlight ≤ 2 thao tác từ selection; lưu overlay SQLite (**BR-02**).                  |
 | 4   | Note / Bookmark / Comment lưu local; jump lại đúng location (sidebar hoặc drawer).    |
 | 5   | Tab Note liệt kê đúng theo `bookId` đang mở; jump đúng location (**FR-09**, **WF-04**). |
-| 6   | Progress mỏng không phá immersion khi chrome ẩn.                                      |
+| 6   | Location scrubber / nhãn vị trí mỏng không phá immersion khi chrome ẩn; không hiện % hoàn thành. |
 | 7   | Hash file gốc không đổi sau highlight / đổi theme (**NFR-08**).                       |
 | 8   | Mobile: Tools trong header; chip tắt tool; Settings = bottom sheet; dual-page tắt.    |
 | 9   | Chapters có badge khi có comment; tab Comment liệt kê theo trang/chương.              |
@@ -1210,7 +1406,7 @@ Theme app có thể làm **default** khi mở sách mới; preference per-book (
 | Watch folders | Bật theo dõi FS (Main process) trên các path đã thêm |
 | Auto-import on detect | Copy vào sandbox khi phát hiện file mới (gốc Read-Only — **BR-01**) |
 | Watched folder list | Add / remove path; hiện số file ước lượng |
-| Formats | Chip `.epub` · `.pdf` · (`.txt` / `.md` theo scope MVP 4 format) |
+| Formats | Chip `.epub` · `.pdf` · `.txt` · `.md` · `.docx` · `.doc` |
 | Scan now | Quét thủ công + progress; kết quả → toast / sẵn sàng import |
 | History | Lần quét gần nhất (local log tối giản) |
 

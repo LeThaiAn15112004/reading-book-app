@@ -29,7 +29,7 @@ Người dùng quên họ đang dùng phần mềm và “sống” cùng nội 
 
 | Persona           | Pain chính                          | Gói đáp ứng                                  | Phase         |
 | ----------------- | ----------------------------------- | -------------------------------------------- | ------------- |
-| Nhà chiêm nghiệm  | Quên nội dung, cần flow             | Free: đọc sạch, highlight, tiến độ           | MVP           |
+| Nhà chiêm nghiệm  | Quên nội dung, cần flow             | Free: đọc sạch, highlight, last-read location | MVP           |
 | Thợ săn thông tin | Tìm chậm trong tài liệu dài         | Premium: Chat/RAG, tóm tắt, semantic search  | Phase 2       |
 | Người sưu tầm     | Thư viện lộn xộn, không biết đọc gì | Free cơ bản + Special: auto-tag, gợi ý, linked libraries | MVP → Phase 3 |
 | Người kết nối     | Cô độc khi đọc                      | Special / sau: quote cards, chia sẻ          | Phase 3+      |
@@ -66,7 +66,7 @@ flowchart LR
 - Reader Invisible UI (theme light / sepia / dark, font, size, line-height)
 - Thư viện + “Đọc tiếp”
 - Highlight (1–2 thao tác) + note
-- Lưu tiến độ đọc local
+- Lưu vị trí đọc (last-read) local — không dùng % hoàn thành làm UX chính
 - Trang tổng hợp highlight / note theo sách
 
 **Done when:** Người dùng mở sách → đọc phiên ngắn → đóng → mở lại đúng vị trí; highlight/note xem lại được.

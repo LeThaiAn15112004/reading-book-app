@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
+import type { ShelfId } from '@reading-book/shared/models'
 
-export type ShelfId = 'reading' | 'completed' | 'not-started'
+export type { ShelfId }
 
 function DragHandleIcon({ className }: { className?: string }) {
   return (

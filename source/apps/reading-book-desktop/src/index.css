@@ -91,6 +91,13 @@
     line-height: 1.5;
     color: var(--text);
     background-color: var(--bg);
+    /*
+     * Native caption buttons (Electron titleBarOverlay on Windows/Linux).
+     * Boot sets an accurate value via syncWindowControlsInset(); 148px is the
+     * Windows fallback (~46px × 3) so the window titlebar clears the controls.
+     */
+    --window-controls-width: 148px;
+    --app-titlebar-h: 36px;
   }
 
   body {
@@ -115,35 +122,190 @@
   }
 }
 
-/* Custom vertical scrollbar — sidebar nav (avoid OS chrome on Electron/Windows) */
+/*
+ * Electron custom title bar helpers
+ * — drag empty header chrome; interactive controls stay clickable.
+ */
+.app-drag {
+  -webkit-app-region: drag;
+}
+
+.app-no-drag {
+  -webkit-app-region: no-drag;
+}
+
+.app-drag button,
+.app-drag a,
+.app-drag input,
+.app-drag textarea,
+.app-drag select,
+.app-drag [role='button'],
+.app-drag [role='menuitem'],
+.app-drag [role='combobox'],
+.app-drag [data-no-drag] {
+  -webkit-app-region: no-drag;
+}
+
+/*
+ * App window titlebar — optional document title (center on Reader),
+ * reader search (right), native caption buttons (Electron titleBarOverlay).
+ */
+.app-window-titlebar {
+  position: relative;
+  z-index: 100;
+  display: flex;
+  height: var(--app-titlebar-h);
+  flex-shrink: 0;
+  align-items: center;
+  overflow: hidden;
+  border-bottom: 1px solid rgb(51 65 85 / 0.35);
+  background: #0f172a;
+  color: #e2e8f0;
+  -webkit-app-region: drag;
+  user-select: none;
+  padding-left: max(12px, env(titlebar-area-x, 0px));
+  padding-right: max(12px, calc(var(--window-controls-width) + 8px));
+}
+
+.app-window-titlebar-center {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  z-index: 0;
+  max-width: min(46vw, 420px);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transform: translate(-50%, -50%);
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  color: #cbd5e1;
+  pointer-events: none;
+}
+
+.app-window-titlebar.is-reader .app-window-titlebar-center {
+  /* Keep clear of the search field on the right. */
+  left: calc(50% - 70px);
+  max-width: min(34vw, 280px);
+}
+
+.app-window-titlebar-search {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  margin-left: auto;
+  width: min(220px, 30vw);
+  min-width: 140px;
+  -webkit-app-region: no-drag;
+}
+
+.app-window-titlebar-search-icon {
+  position: absolute;
+  left: 8px;
+  width: 13px;
+  height: 13px;
+  color: #64748b;
+  pointer-events: none;
+}
+
+.app-window-titlebar-search input {
+  box-sizing: border-box;
+  width: 100%;
+  height: 26px;
+  margin: 0;
+  border: 1px solid rgb(51 65 85 / 0.55);
+  border-radius: 6px;
+  background: rgb(15 23 42 / 0.65);
+  padding: 0 8px 0 26px;
+  font: inherit;
+  font-size: 12px;
+  line-height: 1;
+  color: #e2e8f0;
+  outline: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.app-window-titlebar-search input::placeholder {
+  color: #64748b;
+}
+
+.app-window-titlebar-search input::-webkit-search-cancel-button {
+  -webkit-appearance: none;
+}
+
+.app-window-titlebar-search input:focus {
+  border-color: rgb(245 158 11 / 0.55);
+  box-shadow: 0 0 0 2px rgb(245 158 11 / 0.18);
+}
+
+/* Content headers below the window titlebar (drag chrome only). */
+.app-titlebar {
+  -webkit-app-region: drag;
+}
+
+.app-titlebar button,
+.app-titlebar a,
+.app-titlebar input,
+.app-titlebar textarea,
+.app-titlebar select,
+.app-titlebar [role='button'],
+.app-titlebar [role='menuitem'],
+.app-titlebar [role='combobox'],
+.app-titlebar [data-no-drag] {
+  -webkit-app-region: no-drag;
+}
+
+/* macOS traffic lights overlay the left edge of the sidebar header. */
+.app-sidebar-titlebar {
+  -webkit-app-region: drag;
+  padding-left: max(0.5rem, env(titlebar-area-x, 0px));
+}
+
+.app-sidebar-titlebar button {
+  -webkit-app-region: no-drag;
+}
+
+/*
+ * Themed thin scrollbar (Electron/Windows). Pseudo-elements cannot be expressed
+ * as Tailwind utilities alone — apply via className `app-scroll`.
+ */
+.app-scroll,
 .lib-sidebar-scroll {
   scrollbar-width: thin;
   scrollbar-color: rgb(100 116 139 / 0.45) transparent;
 }
 
+.app-scroll::-webkit-scrollbar,
 .lib-sidebar-scroll::-webkit-scrollbar {
   width: 6px;
 }
 
+.app-scroll::-webkit-scrollbar-track,
 .lib-sidebar-scroll::-webkit-scrollbar-track {
   background: transparent;
 }
 
+.app-scroll::-webkit-scrollbar-thumb,
 .lib-sidebar-scroll::-webkit-scrollbar-thumb {
   background: rgb(100 116 139 / 0.45);
   border-radius: 999px;
 }
 
+.app-scroll::-webkit-scrollbar-thumb:hover,
 .lib-sidebar-scroll::-webkit-scrollbar-thumb:hover {
   background: rgb(148 163 184 / 0.55);
 }
 
+.app-scroll::-webkit-scrollbar-button,
 .lib-sidebar-scroll::-webkit-scrollbar-button {
   display: none;
   width: 0;
   height: 0;
 }
 
+.app-scroll::-webkit-scrollbar-corner,
 .lib-sidebar-scroll::-webkit-scrollbar-corner {
   background: transparent;
 }

@@ -6,7 +6,11 @@
   "main": "./index.ts",
   "types": "./index.ts",
   "exports": {
-    ".": "./index.ts"
+    ".": "./index.ts",
+    "./hooks": "./hooks/index.ts",
+    "./hooks/library": "./hooks/library/index.ts",
+    "./models": "./models/index.ts",
+    "./services": "./services/index.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit"
@@ -14,7 +18,12 @@
   "dependencies": {
     "@reading-book/domain": "*"
   },
+  "peerDependencies": {
+    "react": "^18.2.0 || ^19.0.0"
+  },
   "devDependencies": {
+    "@types/react": "^18.2.64",
+    "react": "^18.2.0",
     "typescript": "^5.2.2"
   }
 }

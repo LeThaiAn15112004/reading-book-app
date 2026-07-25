@@ -44,7 +44,8 @@ export interface AppPreferencesProps {
 
 /**
  * App-level preferences (SDS §3.6 + SCR-06).
- * Stored in app_settings / key-value — not on the book ERD.
+ * Stored via platform preferences (desktop: electron-store; mobile: MMKV / AsyncStorage)
+ * — not in the SQLite book overlay schema.
  */
 export class AppPreferences {
   appTheme: AppTheme;

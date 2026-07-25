@@ -1411,11 +1411,15 @@
       left: 0%;
     }
 
-    .progress-percent-label {
-      font-size: 12px;
-      font-weight: 700;
+    .progress-location-label {
+      font-size: 11px;
+      font-weight: 600;
       color: var(--muted);
-      width: 36px;
+      max-width: 140px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      flex-shrink: 0;
     }
 
     /* Toast Notifications */
@@ -1859,17 +1863,16 @@
       </div>
     </div>
 
-    <!-- PROGRESS SLIDER BAR (Thanh trượt Tiến độ) -->
+    <!-- LOCATION SCRUBBER (bản đồ vị trí tài liệu — không phải % hoàn thành) -->
     <footer class="footer-bar" id="footerBar">
       <div class="progress-slider-container">
-        <span class="progress-percent-label" id="progressPercentLeft">0%</span>
-        <div class="progress-slider" id="progressSlider" onclick="handleProgressBarClick(event)">
+        <span class="progress-location-label" id="progressLocationLabel" title="Current location">Ch. 1</span>
+        <div class="progress-slider" id="progressSlider" onclick="handleProgressBarClick(event)" aria-label="Jump to location in document">
           <div class="progress-slider-track">
             <div class="progress-slider-fill" id="progressFill"></div>
             <div class="progress-slider-handle" id="progressHandle"></div>
           </div>
         </div>
-        <span class="progress-percent-label" id="progressPercentRight" style="text-align: right;">100%</span>
       </div>
     </footer>
 
@@ -2592,7 +2595,12 @@
     function updateProgressBar(percentage) {
       document.getElementById('progressFill').style.width = `${percentage}%`;
       document.getElementById('progressHandle').style.left = `${percentage}%`;
-      document.getElementById('progressPercentLeft').textContent = `${Math.round(percentage)}%`;
+      const chapter = bookData.chapters[currentChapterIndex];
+      const label = document.getElementById('progressLocationLabel');
+      if (label && chapter) {
+        label.textContent = chapter.title || ('Ch. ' + (currentChapterIndex + 1));
+        label.title = 'Last / current location · ' + (chapter.title || '');
+      }
     }
 
     function handleProgressBarClick(event) {

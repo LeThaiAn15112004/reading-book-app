@@ -18,8 +18,19 @@ entity "books" as books {
   * sha256 : TEXT NOT NULL <<UNIQUE>>
   file_size_bytes : INTEGER NULL
   is_favorite : INTEGER NOT NULL DEFAULT 0
+  is_signed : INTEGER NOT NULL DEFAULT 0
+  source_url : TEXT NULL
   added_at : TEXT NOT NULL
   updated_at : TEXT NOT NULL
+}
+
+entity "book_signatures" as book_signatures {
+  * id : TEXT <<PK>>
+  --
+  * book_id : TEXT <<FK>>
+  signer_name : TEXT NOT NULL
+  signature_status : TEXT NOT NULL
+  signed_at : TEXT NULL
 }
 
 entity "authors" as authors {
@@ -75,6 +86,18 @@ entity "notes" as notes {
   updated_at : TEXT NOT NULL
 }
 
+entity "comments" as comments {
+  * id : TEXT <<PK>>
+  --
+  * book_id : TEXT <<FK>>
+  page_number : INTEGER NOT NULL
+  position_data : TEXT NOT NULL
+  content : TEXT NOT NULL
+  author_name : TEXT NULL
+  created_at : TEXT NOT NULL
+  updated_at : TEXT NOT NULL
+}
+
 entity "bookmarks" as bookmarks {
   * id : TEXT <<PK>>
   --
@@ -116,9 +139,11 @@ entity "collection_books" as collection_books {
 books ||--o{ book_authors : "1 - n\nON DELETE CASCADE"
 authors ||--o{ book_authors : "1 - n\nON DELETE RESTRICT"
 
+books ||--o{ book_signatures : "1 - n\nON DELETE CASCADE"
 books ||--|| session : "1 - 1\nON DELETE CASCADE"
 books ||--o{ highlights : "1 - n\nON DELETE CASCADE"
 books ||--o{ notes : "1 - n\nON DELETE CASCADE"
+books ||--o{ comments : "1 - n\nON DELETE CASCADE"
 books ||--o{ bookmarks : "1 - n\nON DELETE CASCADE"
 books ||--o{ chunks : "1 - n\nON DELETE CASCADE"
 highlights ||--o{ notes : "1 - n\nON DELETE SET NULL"
@@ -130,10 +155,19 @@ note right of books
   Indexes:
   - UNIQUE(sha256)
   - INDEX(is_favorite)
+  - INDEX(is_signed)
   - INDEX(updated_at)
   file_format CHECK:
-  epub|pdf|txt|md
+  epub|pdf|txt|md|docx|doc
+  is_signed: denormalized flag
   Khong luu author tren books
+end note
+
+note right of book_signatures
+  INDEX(book_id)
+  signature_status CHECK:
+  valid|invalid|expired|unknown
+  1 book -> n signatures
 end note
 
 note right of book_authors
@@ -158,6 +192,13 @@ end note
 note bottom of notes
   INDEX(book_id)
   INDEX(highlight_id)
+end note
+
+note right of comments
+  INDEX(book_id)
+  page_number 1-based
+  position_data: JSON coords/bbox
+  SCR-03 Comment tab (local)
 end note
 
 note right of collections

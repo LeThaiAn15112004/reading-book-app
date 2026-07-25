@@ -30,7 +30,7 @@ flowchart TD
   g2 --> g3[G3_Reader_EPUB]
   g3 --> g4[G4_Progress_Settings]
   g4 --> g5[G5_Highlight_Note]
-  g5 --> g6[G6_PDF_TXT_MD_AppSettings]
+  g5 --> g6[G6_MultiFormat_AppSettings]
   g6 --> mvpDone[MVP_Desktop_xong]
   mvpDone --> g7[G7_Premium_AI]
   g7 --> g8[G8_LinkedLibs_Mobile]
@@ -45,9 +45,9 @@ flowchart TD
 | **G1** Splash + Library            | Mở app thấy brand → thư viện (có thể trống) | FR-08                      | splash, library    |
 | **G2** Import                      | Thêm EPUB từ máy / URL vào thư viện         | FR-01, FR-13               | import             |
 | **G3** Reader EPUB                 | Mở sách, đọc, Invisible UI                  | FR-02, FR-03               | reading            |
-| **G4** Tiến độ + Reading Settings  | Resume đúng chỗ; đổi theme/font             | FR-04, FR-05, FR-10        | reading (Settings) |
+| **G4** Last-read + Reading Settings | Resume đúng chỗ; đổi theme/font; hiện chỗ dừng (không %) | FR-04, FR-05, FR-10        | reading (Settings) |
 | **G5** Highlight / Note / Bookmark | Bôi chọn → lưu → xem lại trong sidebar      | FR-06, FR-07, FR-09, FR-11 | reading sidebar    |
-| **G6** Đa format + App Settings    | PDF/TXT/MD + SCR-06 + xóa sách              | FR-02 (rộng), FR-12, NFR   | setting            |
+| **G6** Đa format + App Settings    | PDF/TXT/MD/DOCX/DOC + SCR-06 + xóa sách     | FR-02 (rộng), FR-12, NFR   | setting            |
 | **G7** Premium AI                  | Chat/RAG, tóm tắt, flashcards (opt-in)      | FR-20+                     | panel AI           |
 | **G8** Linked libraries + Mobile   | Connector Drive/Books/Apple Books; mobile   | FR-30 + Phase 3            | setting (libraries) |
 
@@ -88,6 +88,18 @@ Mỗi giai đoạn đạt khi:
 - [ ] Không còn hack “tạm” chặn giai đoạn sau (hoặc đã ghi nợ rõ trong PR/note)
 - [ ] Checklist ở [10_Checklist_nghiem_thu.md](./10_Checklist_nghiem_thu.md) đã cập nhật
 
+### 5.1. Snapshot tiến độ (2026-07-25)
+
+| Giai đoạn | Outcome | Trạng thái |
+| :--- | :--- | :--- |
+| G0 | App + DB + IPC | **Đạt** |
+| G1 | Splash → Library | **Đạt** (nợ: last-read / favorite data; collections persist) |
+| G2 | Import file/URL + dedup | **Đạt** |
+| G3 | Đọc EPUB | **T3.0 đạt** (UI + fake); EPUB thật còn lại |
+| Schema | `is_signed`, `book_signatures`, `comments`; **không** `app_settings` | Overlay SQLite; app prefs = electron-store / MMKV |
+
+Chi tiết: [10_Checklist_nghiem_thu.md](./10_Checklist_nghiem_thu.md) · [README](./README.md).
+
 
 
 ## 6. Phạm vi cố ý không làm sớm
@@ -99,7 +111,7 @@ Mỗi giai đoạn đạt khi:
 | Linked libraries / không đăng nhập app | Connector Drive/Books/Apple Books thuộc G8; **không** email/password hay OAuth2 identity |
 | Sync account đa thiết bị             | **Không làm** — đã loại khỏi sản phẩm |
 | Marketplace / DRM                | Ngoài phạm vi sản phẩm |
-| MOBI / AZW3 / DOCX               | Ngoài MVP              |
+| MOBI / AZW3 / PPTX               | Ngoài MVP              |
 | Màn Highlights toàn cục (SCR-04) | Đã gỡ khỏi SDS 1.7     |
 | OCR PDF scan hàng loạt           | Spike riêng nếu cần    |
 

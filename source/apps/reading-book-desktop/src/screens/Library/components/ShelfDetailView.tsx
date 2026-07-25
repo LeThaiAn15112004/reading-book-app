@@ -54,7 +54,7 @@ export function ShelfDetailView({
       role="region"
       aria-label={`${title} shelf`}
     >
-      <header className="flex h-16 shrink-0 items-center gap-3 border-b border-lib-border-soft bg-lib-topbar px-5 backdrop-blur-sm">
+      <header className="app-titlebar flex h-16 shrink-0 items-center gap-3 border-b border-lib-border-soft bg-lib-topbar pl-5 backdrop-blur-sm">
         <button
           type="button"
           className="inline-flex size-11 shrink-0 cursor-pointer items-center justify-center rounded-lg border-none bg-transparent text-lib-muted transition-[color,background-color] hover:bg-white/5 hover:text-lib-accent focus-visible:bg-white/5 focus-visible:text-lib-accent focus-visible:outline-none"

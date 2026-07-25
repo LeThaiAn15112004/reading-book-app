@@ -808,32 +808,30 @@
       margin-top: 2px;
     }
 
-    .progress {
+    .last-read-loc {
       width: 100%;
-      max-width: 280px;
-      margin-top: 12px;
-    }
-
-    .progress-row {
-      display: flex;
-      justify-content: space-between;
-      font-size: 11px;
+      max-width: 320px;
+      margin-top: 10px;
+      font-size: 12px;
+      font-weight: 500;
       color: var(--muted);
-      margin-bottom: 6px;
+      line-height: 1.4;
     }
 
-    .progress-track {
-      height: 4px;
-      border-radius: 2px;
-      background: rgba(51, 65, 85, 0.55);
+    .last-read-loc strong {
+      color: var(--text);
+      font-weight: 600;
+    }
+
+    .book-last-read {
+      margin-top: 4px;
+      font-size: 10px;
+      font-weight: 500;
+      color: var(--muted);
+      line-height: 1.35;
+      white-space: nowrap;
       overflow: hidden;
-    }
-
-    .progress-fill {
-      height: 100%;
-      border-radius: 2px;
-      background: var(--accent);
-      box-shadow: 0 0 8px rgba(245, 158, 11, 0.45);
+      text-overflow: ellipsis;
     }
 
     .continue-actions {
@@ -1145,20 +1143,6 @@
       text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
     }
 
-    .cover-bar {
-      position: absolute;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      height: 4px;
-      background: rgba(255, 255, 255, 0.1);
-    }
-
-    .cover-bar > i {
-      display: block;
-      height: 100%;
-      background: var(--accent);
-    }
 
     .fav-star {
       position: absolute;
@@ -2089,7 +2073,7 @@
           </div>
         </div>
         <!-- Native Hidden File Selector -->
-        <input type="file" id="nativeFilePicker" style="display: none;" accept=".epub,.pdf,.txt,.md" onchange="handleDeviceFileSelected(event)">
+        <input type="file" id="nativeFilePicker" style="display: none;" accept=".epub,.pdf,.txt,.md,.docx,.doc" onchange="handleDeviceFileSelected(event)">
       </header>
 
       <div class="content" id="contentScroll">
@@ -2097,13 +2081,15 @@
           <div class="library-hint">
             <div class="library-hint-copy">
               <p class="library-hint-title">Your library on this device</p>
-              <p class="library-hint-desc">Only files you imported from your device. MVP supports 4 formats (covers most real-world needs):</p>
+              <p class="library-hint-desc">Only files you imported from your device. MVP supports 6 formats:</p>
             </div>
             <div class="format-list" aria-label="Supported formats">
               <span>EPUB</span>
               <span>PDF</span>
               <span>TXT</span>
               <span>MD</span>
+              <span>DOCX</span>
+              <span>DOC</span>
             </div>
           </div>
 
@@ -2122,15 +2108,7 @@
                     <span class="file-name">nature-and-life.epub</span>
                   </p>
                   <p class="book-sub">Last read · 15 minutes ago</p>
-                  <div class="progress" aria-label="Progress 65%">
-                    <div class="progress-row">
-                      <span>Progress</span>
-                      <span>65%</span>
-                    </div>
-                    <div class="progress-track">
-                      <div class="progress-fill" style="width: 65%"></div>
-                    </div>
-                  </div>
+                  <p class="last-read-loc" aria-label="Last read location">Last at · <strong>Ch. 3 · Forests</strong></p>
                 </div>
               </div>
               <div class="continue-actions">
@@ -2164,18 +2142,17 @@
           </div>
           <div class="shelf-rail" role="list">
             <!-- Book 1 -->
-            <article class="book-card" role="listitem" data-title="Nature and Life" data-author="Nguyen Van A" data-file="nature-and-life.epub" data-format="epub" data-progress="65" data-favorite="true">
+            <article class="book-card" role="listitem" data-title="Nature and Life" data-author="Nguyen Van A" data-file="nature-and-life.epub" data-format="epub" data-status="reading" data-last-read="Ch. 3 · Forests" data-favorite="true">
               <button class="book-cover-button" type="button" onclick="launchReader('nature-and-life.epub')">
                 <span class="format-badge">EPUB</span>
                 <div class="cover-face" style="background: var(--cover-grad-1);"><span>Nature and Life</span></div>
                 <div class="fav-star" aria-label="Favorite">★</div>
-                <div class="cover-bar"><i style="width: 65%"></i></div>
               </button>
               <div class="book-meta-row">
                 <div class="book-text-info">
                   <h3 class="book-info-title">Nature and Life</h3>
                   <p class="book-info-author">Nguyen Van A</p>
-                  <div class="chip-row"><span class="book-chip">65%</span></div>
+                  <p class="book-last-read">Last at · Ch. 3 · Forests</p>
                 </div>
                 <button class="book-more-btn" type="button" onclick="toggleBookMenu(event)" aria-label="Context options">
                   <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.2" stroke="currentColor">
@@ -2191,17 +2168,16 @@
             </article>
 
             <!-- Book 2 -->
-            <article class="book-card" role="listitem" data-title="Practical System Design" data-author="Tran Van B" data-file="system-design.pdf" data-format="pdf" data-progress="12" data-favorite="false">
+            <article class="book-card" role="listitem" data-title="Practical System Design" data-author="Tran Van B" data-file="system-design.pdf" data-format="pdf" data-status="reading" data-last-read="p. 42" data-favorite="false">
               <button class="book-cover-button" type="button" onclick="launchReader('system-design.pdf')">
                 <span class="format-badge">PDF</span>
                 <div class="cover-face" style="background: var(--cover-grad-2);"><span>Practical System Design</span></div>
-                <div class="cover-bar"><i style="width: 12%"></i></div>
               </button>
               <div class="book-meta-row">
                 <div class="book-text-info">
                   <h3 class="book-info-title">Practical System Design</h3>
                   <p class="book-info-author">Tran Van B</p>
-                  <div class="chip-row"><span class="book-chip">12%</span></div>
+                  <p class="book-last-read">Last at · p. 42</p>
                 </div>
                 <button class="book-more-btn" type="button" onclick="toggleBookMenu(event)" aria-label="Context options">
                   <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.2" stroke="currentColor">
@@ -2216,17 +2192,16 @@
             </article>
 
             <!-- Book 3 -->
-            <article class="book-card" role="listitem" data-title="Architecture Notes" data-author="Personal notes" data-file="architecture-notes.md" data-format="md" data-progress="41" data-favorite="false">
+            <article class="book-card" role="listitem" data-title="Architecture Notes" data-author="Personal notes" data-file="architecture-notes.md" data-format="md" data-status="reading" data-last-read="§ Caching notes" data-favorite="false">
               <button class="book-cover-button" type="button" onclick="launchReader('architecture-notes.md')">
                 <span class="format-badge">MD</span>
                 <div class="cover-face" style="background: var(--cover-grad-4);"><span>Architecture Notes</span></div>
-                <div class="cover-bar"><i style="width: 41%"></i></div>
               </button>
               <div class="book-meta-row">
                 <div class="book-text-info">
                   <h3 class="book-info-title">Architecture Notes</h3>
                   <p class="book-info-author">Personal notes</p>
-                  <div class="chip-row"><span class="book-chip">41%</span></div>
+                  <p class="book-last-read">Last at · § Caching notes</p>
                 </div>
                 <button class="book-more-btn" type="button" onclick="toggleBookMenu(event)" aria-label="Context options">
                   <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.2" stroke="currentColor">
@@ -2241,18 +2216,17 @@
             </article>
 
             <!-- Book 4 -->
-            <article class="book-card" role="listitem" data-title="Domain-Driven Design" data-author="Eric Evans" data-file="ddd-evans.epub" data-format="epub" data-progress="28" data-favorite="true">
+            <article class="book-card" role="listitem" data-title="Domain-Driven Design" data-author="Eric Evans" data-file="ddd-evans.epub" data-format="epub" data-status="reading" data-last-read="Ch. 2 · Model Integrity" data-favorite="true">
               <button class="book-cover-button" type="button" onclick="launchReader('ddd-evans.epub')">
                 <span class="format-badge">EPUB</span>
                 <div class="cover-face" style="background: var(--cover-grad-5);"><span>Domain-Driven Design</span></div>
                 <div class="fav-star" aria-label="Favorite">★</div>
-                <div class="cover-bar"><i style="width: 28%"></i></div>
               </button>
               <div class="book-meta-row">
                 <div class="book-text-info">
                   <h3 class="book-info-title">Domain-Driven Design</h3>
                   <p class="book-info-author">Eric Evans</p>
-                  <div class="chip-row"><span class="book-chip">28%</span></div>
+                  <p class="book-last-read">Last at · Ch. 2 · Model Integrity</p>
                 </div>
                 <button class="book-more-btn" type="button" onclick="toggleBookMenu(event)" aria-label="Context options">
                   <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.2" stroke="currentColor">
@@ -2289,12 +2263,11 @@
             </div>
           </div>
           <div class="shelf-rail" role="list">
-            <article class="book-card" role="listitem" data-title="Clean Architecture" data-author="Robert C. Martin" data-file="clean-architecture.epub" data-format="epub" data-progress="100" data-favorite="true">
+            <article class="book-card" role="listitem" data-title="Clean Architecture" data-author="Robert C. Martin" data-file="clean-architecture.epub" data-format="epub" data-status="completed" data-last-read="" data-favorite="true">
               <button class="book-cover-button" type="button" onclick="launchReader('clean-architecture.epub')">
                 <span class="format-badge">EPUB</span>
                 <div class="cover-face" style="background: var(--cover-grad-3);"><span>Clean Architecture</span></div>
                 <div class="fav-star" aria-label="Favorite">★</div>
-                <div class="cover-bar"><i style="width: 100%"></i></div>
               </button>
               <div class="book-meta-row">
                 <div class="book-text-info">
@@ -2314,11 +2287,10 @@
               </div>
             </article>
 
-            <article class="book-card" role="listitem" data-title="Internal Spec Document" data-author="Team docs" data-file="spec-v1.txt" data-format="txt" data-progress="100" data-favorite="false">
+            <article class="book-card" role="listitem" data-title="Internal Spec Document" data-author="Team docs" data-file="spec-v1.txt" data-format="txt" data-status="completed" data-last-read="" data-favorite="false">
               <button class="book-cover-button" type="button" onclick="launchReader('spec-v1.txt')">
                 <span class="format-badge">TXT</span>
                 <div class="cover-face" style="background: var(--cover-grad-1);"><span>Internal Spec Document</span></div>
-                <div class="cover-bar"><i style="width: 100%"></i></div>
               </button>
               <div class="book-meta-row">
                 <div class="book-text-info">
@@ -2338,12 +2310,11 @@
               </div>
             </article>
 
-            <article class="book-card" role="listitem" data-title="Refactoring" data-author="Martin Fowler" data-file="refactoring.pdf" data-format="pdf" data-progress="100" data-favorite="true">
+            <article class="book-card" role="listitem" data-title="Refactoring" data-author="Martin Fowler" data-file="refactoring.pdf" data-format="pdf" data-status="completed" data-last-read="" data-favorite="true">
               <button class="book-cover-button" type="button" onclick="launchReader('refactoring.pdf')">
                 <span class="format-badge">PDF</span>
                 <div class="cover-face" style="background: var(--cover-grad-2);"><span>Refactoring</span></div>
                 <div class="fav-star" aria-label="Favorite">★</div>
-                <div class="cover-bar"><i style="width: 100%"></i></div>
               </button>
               <div class="book-meta-row">
                 <div class="book-text-info">
@@ -2386,11 +2357,10 @@
             </div>
           </div>
           <div class="shelf-rail" role="list">
-            <article class="book-card" role="listitem" data-title="Machine Learning Basics" data-author="Pham Minh C" data-file="ml-basics.pdf" data-format="pdf" data-progress="0" data-favorite="false">
+            <article class="book-card" role="listitem" data-title="Machine Learning Basics" data-author="Pham Minh C" data-file="ml-basics.pdf" data-format="pdf" data-status="not-started" data-last-read="" data-favorite="false">
               <button class="book-cover-button" type="button" onclick="launchReader('ml-basics.pdf')">
                 <span class="format-badge">PDF</span>
                 <div class="cover-face" style="background: var(--cover-grad-4);"><span>Machine Learning Basics</span></div>
-                <div class="cover-bar"><i style="width: 0%"></i></div>
               </button>
               <div class="book-meta-row">
                 <div class="book-text-info">
@@ -2410,11 +2380,10 @@
               </div>
             </article>
 
-            <article class="book-card" role="listitem" data-title="Project README" data-author="Local file" data-file="README.txt" data-format="txt" data-progress="0" data-favorite="false">
+            <article class="book-card" role="listitem" data-title="Project README" data-author="Local file" data-file="README.txt" data-format="txt" data-status="not-started" data-last-read="" data-favorite="false">
               <button class="book-cover-button" type="button" onclick="launchReader('README.txt')">
                 <span class="format-badge">TXT</span>
                 <div class="cover-face" style="background: var(--cover-grad-2);"><span>Project README</span></div>
-                <div class="cover-bar"><i style="width: 0%"></i></div>
               </button>
               <div class="book-meta-row">
                 <div class="book-text-info">
@@ -2434,11 +2403,10 @@
               </div>
             </article>
 
-            <article class="book-card" role="listitem" data-title="Internal Handbook" data-author="—" data-file="internal-handbook.md" data-format="md" data-progress="0" data-favorite="false">
+            <article class="book-card" role="listitem" data-title="Internal Handbook" data-author="—" data-file="internal-handbook.md" data-format="md" data-status="not-started" data-last-read="" data-favorite="false">
               <button class="book-cover-button" type="button" onclick="launchReader('internal-handbook.md')">
                 <span class="format-badge">MD</span>
                 <div class="cover-face" style="background: var(--cover-grad-5);"><span>Internal Handbook</span></div>
-                <div class="cover-bar"><i style="width: 0%"></i></div>
               </button>
               <div class="book-meta-row">
                 <div class="book-text-info">
@@ -2458,11 +2426,10 @@
               </div>
             </article>
 
-            <article class="book-card" role="listitem" data-title="Thinking in Systems" data-author="Donella Meadows" data-file="thinking-in-systems.epub" data-format="epub" data-progress="0" data-favorite="false">
+            <article class="book-card" role="listitem" data-title="Thinking in Systems" data-author="Donella Meadows" data-file="thinking-in-systems.epub" data-format="epub" data-status="not-started" data-last-read="" data-favorite="false">
               <button class="book-cover-button" type="button" onclick="launchReader('thinking-in-systems.epub')">
                 <span class="format-badge">EPUB</span>
                 <div class="cover-face" style="background: var(--cover-grad-3);"><span>Thinking in Systems</span></div>
-                <div class="cover-bar"><i style="width: 0%"></i></div>
               </button>
               <div class="book-meta-row">
                 <div class="book-text-info">
@@ -2680,6 +2647,8 @@
             <span class="format-tag">PDF</span>
             <span class="format-tag">TXT</span>
             <span class="format-tag">MD</span>
+            <span class="format-tag">DOCX</span>
+            <span class="format-tag">DOC</span>
           </div>
         </div>
         <div class="dialog-actions" style="display:flex; gap:10px; justify-content:flex-end;">
@@ -2742,14 +2711,14 @@
       },
       completed: {
         title: 'Completed',
-        empty: 'No completed books yet. Finish a book to see it here.',
-        match: function (card) { return parseInt(card.dataset.progress || '0', 10) >= 100; },
+        empty: 'No completed books yet. Mark a book completed to see it here.',
+        match: function (card) { return card.dataset.status === 'completed'; },
         showStar: false
       },
       'to-read': {
         title: 'To read',
         empty: 'Nothing queued yet. Books you have not started appear here.',
-        match: function (card) { return parseInt(card.dataset.progress || '0', 10) <= 0; },
+        match: function (card) { return card.dataset.status === 'not-started'; },
         showStar: false
       }
     };
@@ -2806,13 +2775,19 @@
         const author = card.dataset.author || '';
         const file = card.dataset.file || '';
         const format = (card.dataset.format || '').toUpperCase();
-        const progress = parseInt(card.dataset.progress || '0', 10);
+        const status = card.dataset.status || 'not-started';
+        const lastRead = card.dataset.lastRead || '';
         const isFav = card.dataset.favorite === 'true';
         const grad = (index % 5) + 1;
         const chip = card.querySelector('.book-chip');
-        const chipText = chip ? chip.textContent.trim() : (progress + '%');
-        const chipDone = progress >= 100;
+        const lastEl = card.querySelector('.book-last-read');
+        const chipText = chip ? chip.textContent.trim() : '';
+        const metaLine = lastEl
+          ? lastEl.textContent.trim()
+          : (lastRead ? ('Last at · ' + lastRead) : chipText);
+        const chipDone = status === 'completed';
         const showStar = config.showStar || isFav;
+        const useChip = status === 'completed' || status === 'not-started';
 
         const li = document.createElement('li');
         li.innerHTML =
@@ -2821,13 +2796,14 @@
               (format ? '<span class="format-badge">' + format + '</span>' : '') +
               '<div class="cover-face"><span></span></div>' +
               (showStar ? '<div class="fav-star">★</div>' : '') +
-              '<div class="cover-bar"><i style="width:' + progress + '%"></i></div>' +
             '</div>' +
             '<div class="vert-info">' +
               '<h3 class="book-info-title"></h3>' +
               '<p class="book-info-author"></p>' +
               '<p class="file-name" style="font-size:11px; color:var(--faint); font-family:monospace;"></p>' +
-              '<div class="chip-row"><span class="book-chip' + (chipDone ? ' done' : '') + '"></span></div>' +
+              (useChip
+                ? '<div class="chip-row"><span class="book-chip' + (chipDone ? ' done' : '') + '"></span></div>'
+                : '<p class="book-last-read"></p>') +
             '</div>' +
             '<span class="vert-chevron" aria-hidden="true">' +
               '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" /></svg>' +
@@ -2838,7 +2814,10 @@
         li.querySelector('.book-info-title').textContent = titleText;
         li.querySelector('.book-info-author').textContent = author;
         li.querySelector('.file-name').textContent = file;
-        li.querySelector('.book-chip').textContent = chipText;
+        const chipNode = li.querySelector('.book-chip');
+        const lastNode = li.querySelector('.book-last-read');
+        if (chipNode) chipNode.textContent = chipText || (chipDone ? 'Completed' : 'Not started');
+        if (lastNode) lastNode.textContent = metaLine;
         li.querySelector('.vert-item').addEventListener('click', function () {
           launchReader(file);
         });
@@ -3039,20 +3018,20 @@
       card.dataset.author = 'Local Document';
       card.dataset.file = filename;
       card.dataset.format = format.toLowerCase();
-      card.dataset.progress = '0';
+      card.dataset.status = 'not-started';
+      card.dataset.lastRead = '';
       card.dataset.favorite = 'false';
 
       card.innerHTML = `
         <button class="book-cover-button" type="button" onclick="launchReader('${filename}')">
           <span class="format-badge">${format}</span>
           <div class="cover-face" style="background: var(--cover-grad-${gradIndex});"><span>${capitalizedTitle}</span></div>
-          <div class="cover-bar"><i style="width: 0%"></i></div>
         </button>
         <div class="book-meta-row">
           <div class="book-text-info">
             <h3 class="book-info-title">${capitalizedTitle}</h3>
             <p class="book-info-author">Local Document</p>
-            <div class="chip-row"><span class="book-chip">0%</span></div>
+            <div class="chip-row"><span class="book-chip">Not started</span></div>
           </div>
           <button class="book-more-btn" type="button" onclick="toggleBookMenu(event)" aria-label="Book choices">
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.2" stroke="currentColor">
@@ -3165,13 +3144,19 @@
       const detailBack = document.getElementById('detailBack');
       if (!libraryView || !detailView) return;
 
-      function progressLabel(card) {
+      function statusMeta(card) {
+        const status = card.dataset.status || 'not-started';
+        const lastRead = card.dataset.lastRead || '';
         const chip = card.querySelector('.book-chip');
-        if (chip) return chip.textContent.trim();
-        const p = parseInt(card.dataset.progress || '0', 10);
-        if (p >= 100) return 'Completed';
-        if (p <= 0) return 'Not started';
-        return p + '%';
+        const lastEl = card.querySelector('.book-last-read');
+        if (status === 'reading') {
+          if (lastEl) return { kind: 'last', text: lastEl.textContent.trim() };
+          if (lastRead) return { kind: 'last', text: 'Last at · ' + lastRead };
+        }
+        if (chip) return { kind: 'chip', text: chip.textContent.trim(), done: status === 'completed' };
+        if (status === 'completed') return { kind: 'chip', text: 'Completed', done: true };
+        return { kind: 'chip', text: 'Not started', done: false };
+
       }
 
       function openShelf(shelf) {
@@ -3187,11 +3172,12 @@
           const author = card.dataset.author || '';
           const file = card.dataset.file || '';
           const format = (card.dataset.format || '').toUpperCase();
-          const progress = parseInt(card.dataset.progress || '0', 10);
           const isFav = card.dataset.favorite === 'true';
-          const chipText = progressLabel(card);
-          const chipDone = progress >= 100;
+          const meta = statusMeta(card);
           const randomGrad = Math.floor(Math.random() * 5) + 1; // Elegant Cover Gradient (Lỗi 4 fix)
+          const metaHtml = meta.kind === 'last'
+            ? '<p class="book-last-read"></p>'
+            : '<div class="chip-row"><span class="book-chip' + (meta.done ? ' done' : '') + '"></span></div>';
 
           const li = document.createElement('li');
           li.innerHTML =
@@ -3200,13 +3186,12 @@
                 (format ? '<span class="format-badge">' + format + '</span>' : '') +
                 '<div class="cover-face"><span></span></div>' +
                 (isFav ? '<div class="fav-star">★</div>' : '') +
-                '<div class="cover-bar"><i style="width:' + progress + '%"></i></div>' +
               '</div>' +
               '<div class="vert-info">' +
                 '<h3 class="book-info-title"></h3>' +
                 '<p class="book-info-author"></p>' +
                 '<p class="file-name" style="font-size:11px; color:var(--faint); font-family:monospace;"></p>' +
-                '<div class="chip-row"><span class="book-chip' + (chipDone ? ' done' : '') + '"></span></div>' +
+                metaHtml +
               '</div>' +
               '<span class="vert-chevron" aria-hidden="true">' +
                 '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" /></svg>' +
@@ -3217,7 +3202,10 @@
           li.querySelector('.book-info-title').textContent = titleText;
           li.querySelector('.book-info-author').textContent = author;
           li.querySelector('.file-name').textContent = file;
-          li.querySelector('.book-chip').textContent = chipText;
+          const chipNode = li.querySelector('.book-chip');
+          const lastNode = li.querySelector('.book-last-read');
+          if (chipNode) chipNode.textContent = meta.text;
+          if (lastNode) lastNode.textContent = meta.text;
 
           li.querySelector('.vert-item').addEventListener('click', () => {
             launchReader(file);

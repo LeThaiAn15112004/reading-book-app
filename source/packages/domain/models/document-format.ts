@@ -5,6 +5,7 @@ export enum DocumentFormat {
   Txt = 'txt',
   Md = 'md',
   Docx = 'docx',
+  Doc = 'doc',
 }
 
 const ALL_FORMATS: readonly DocumentFormat[] = [
@@ -13,6 +14,7 @@ const ALL_FORMATS: readonly DocumentFormat[] = [
   DocumentFormat.Txt,
   DocumentFormat.Md,
   DocumentFormat.Docx,
+  DocumentFormat.Doc,
 ];
 
 export function isDocumentFormat(value: string): value is DocumentFormat {

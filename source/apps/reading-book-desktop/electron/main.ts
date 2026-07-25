@@ -1,11 +1,24 @@
-import { app, BrowserWindow } from 'electron'
+import { app, BrowserWindow, Menu } from 'electron'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
+import {
+  registerCoverProtocol,
+  registerCoverSchemePrivileged,
+} from './files/cover-protocol'
 import { ensureBooksSandbox } from './files/sandbox'
 import { registerAllIpcHandlers } from './ipc'
 import { closeDatabase, openDatabase } from './persistence/db'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
+
+/** Match Library chrome `--color-lib-bg-deep` / mockup `--bg-deep`. */
+const CHROME_BG = '#0f172a'
+const CHROME_SYMBOL = '#e2e8f0'
+/** Match `.app-window-titlebar` height (near Windows default caption size). */
+const TITLE_BAR_OVERLAY_HEIGHT = 36
+
+// Custom schemes must be registered before app is ready.
+registerCoverSchemePrivileged()
 
 // The built directory structure
 //
@@ -27,15 +40,68 @@ process.env.VITE_PUBLIC = VITE_DEV_SERVER_URL ? path.join(process.env.APP_ROOT, 
 
 let win: BrowserWindow | null
 
+/** Drop File/Edit/View chrome; keep a minimal macOS menu for Quit / edit shortcuts. */
+function installApplicationMenu(): void {
+  if (process.platform === 'darwin') {
+    Menu.setApplicationMenu(
+      Menu.buildFromTemplate([
+        {
+          label: app.name,
+          submenu: [
+            { role: 'about' },
+            { type: 'separator' },
+            { role: 'services' },
+            { type: 'separator' },
+            { role: 'hide' },
+            { role: 'hideOthers' },
+            { role: 'unhide' },
+            { type: 'separator' },
+            { role: 'quit' },
+          ],
+        },
+        { role: 'editMenu' },
+        { role: 'windowMenu' },
+      ]),
+    )
+    return
+  }
+
+  Menu.setApplicationMenu(null)
+}
+
 function createWindow() {
+  const isMac = process.platform === 'darwin'
+
   win = new BrowserWindow({
     icon: path.join(process.env.VITE_PUBLIC, 'electron-vite.svg'),
+    width: 1280,
+    height: 800,
+    minWidth: 900,
+    minHeight: 600,
+    show: false,
+    backgroundColor: CHROME_BG,
+    autoHideMenuBar: true,
+    // Custom chrome: remove OS gray title strip; keep native window controls.
+    titleBarStyle: 'hidden',
+    ...(isMac
+      ? { trafficLightPosition: { x: 14, y: 10 } }
+      : {
+          titleBarOverlay: {
+            color: CHROME_BG,
+            symbolColor: CHROME_SYMBOL,
+            height: TITLE_BAR_OVERLAY_HEIGHT,
+          },
+        }),
     webPreferences: {
       preload: path.join(__dirname, 'preload.mjs'),
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
     },
+  })
+
+  win.once('ready-to-show', () => {
+    win?.show()
   })
 
   if (VITE_DEV_SERVER_URL) {
@@ -69,8 +135,10 @@ app.on('before-quit', () => {
 })
 
 app.whenReady().then(() => {
+  installApplicationMenu()
   ensureBooksSandbox()
   openDatabase()
+  registerCoverProtocol()
   registerAllIpcHandlers()
   createWindow()
 })

@@ -40,6 +40,12 @@ export const SUPPORTED_FORMATS: readonly FormatDescriptor[] = [
     ],
     displayName: 'Word Document',
   },
+  {
+    format: DocumentFormat.Doc,
+    extensions: ['.doc'],
+    mimeTypes: ['application/msword'],
+    displayName: 'Word Document (legacy)',
+  },
 ] as const;
 
 export const SUPPORTED_EXTENSIONS: readonly string[] = SUPPORTED_FORMATS.flatMap(

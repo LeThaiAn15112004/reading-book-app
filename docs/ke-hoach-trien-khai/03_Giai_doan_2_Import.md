@@ -25,11 +25,11 @@
 | T2.2 | Modal (desktop) / bottom sheet (mobile sau): nhập URL | FR-13 |
 | T2.3 | Main: OS file picker + copy vào sandbox | FR-01 |
 | T2.4 | Main: download URL (https, timeout, size limit, scheme allowlist) | FR-13 |
-| T2.5 | Validate extension: epub / pdf / txt / md — từ chối format khác rõ ràng | FR-01 |
+| T2.5 | Validate extension: epub / pdf / txt / md / docx / doc — từ chối format khác rõ ràng | FR-01 |
 | T2.6 | Metadata tối thiểu (title, author nếu có, format, filename, cover nếu extract được) | FR-01 |
 | T2.7 | SHA-256 dedup (**BR-03**) + dialog conflict | FR-01, FR-13 |
 | T2.8 | Ghi `books` + path sandbox; optional `source_url` | FR-13 |
-| T2.9 | Adapter EPUB trước (metadata); stub PDF/TXT/MD nếu chưa render | — |
+| T2.9 | Adapter EPUB trước (metadata); stub PDF/TXT/MD/DOCX/DOC nếu chưa render | — |
 | T2.10 | Progress UI khi copy/download; dọn temp khi lỗi | FR-13 |
 | T2.11 | Library refresh + toast thành công | FR-08 |
 
@@ -46,15 +46,16 @@ T2.3 → T2.5 → T2.6 → T2.7 → T2.8
 
 ## 4. Nghiệm thu
 
-- [ ] Import EPUB từ máy → card hiện Library
-- [ ] File gốc không bị sửa (copy sandbox)
-- [ ] Import trùng → thông báo, không 2 bản ghi
-- [ ] URL hợp lệ → offline đọc được (sau G3); không re-download mỗi lần mở
-- [ ] URL lỗi / format sai → message rõ; không bản ghi rỗng
-- [ ] Không có UI bookstore / catalog
+- [x] Import EPUB từ máy → card hiện Library
+- [x] File gốc không bị sửa (copy sandbox)
+- [x] Import trùng → thông báo, không 2 bản ghi
+- [x] URL hợp lệ → file nằm sandbox local (đọc nội dung → **G3**); không re-download mỗi lần mở
+- [x] URL lỗi / format sai → message rõ; không bản ghi rỗng
+- [x] Không có UI bookstore / catalog
 
 ## 5. Nợ được chấp nhận
 
 - Cover đẹp / extract đầy đủ cho PDF có thể làm G6
 - FTS5 index đầy đủ text có thể làm sau khi có extract (G3/G6)
 - Gắn sách vào Collection ngay lúc import — không bắt buộc G2 (làm từ Library / Collections hub theo FR-14)
+- Detect chữ ký số → ghi `is_signed` / `book_signatures` — schema sẵn (SDS 1.15); wire lúc import / PDF → **G6**

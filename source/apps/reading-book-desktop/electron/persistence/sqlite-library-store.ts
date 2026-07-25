@@ -19,6 +19,7 @@ interface BookRow {
   sha256: string
   file_size_bytes: number | null
   is_favorite: number
+  is_signed: number
   source_url: string | null
   added_at: string
   updated_at: string
@@ -32,7 +33,7 @@ export type BookListItem = {
 
 const BOOK_COLUMNS = `
   id, title, file_path, normalized_path, file_format, cover_path,
-  sha256, file_size_bytes, is_favorite, source_url, added_at, updated_at
+  sha256, file_size_bytes, is_favorite, is_signed, source_url, added_at, updated_at
 `
 
 function rowToBook(row: BookRow): Book {
@@ -46,6 +47,7 @@ function rowToBook(row: BookRow): Book {
     sha256: row.sha256,
     fileSizeBytes: row.file_size_bytes ?? undefined,
     isFavorite: row.is_favorite === 1,
+    isSigned: row.is_signed === 1,
     sourceUrl: row.source_url ?? undefined,
     addedAt: row.added_at,
     updatedAt: row.updated_at,
@@ -81,10 +83,10 @@ export class SqliteLibraryStore implements LibraryStore {
       .prepare(
         `INSERT INTO books (
           id, title, file_path, normalized_path, file_format, cover_path,
-          sha256, file_size_bytes, is_favorite, source_url, added_at, updated_at
+          sha256, file_size_bytes, is_favorite, is_signed, source_url, added_at, updated_at
         ) VALUES (
           @id, @title, @file_path, @normalized_path, @file_format, @cover_path,
-          @sha256, @file_size_bytes, @is_favorite, @source_url, @added_at, @updated_at
+          @sha256, @file_size_bytes, @is_favorite, @is_signed, @source_url, @added_at, @updated_at
         )`,
       )
       .run({
@@ -97,6 +99,7 @@ export class SqliteLibraryStore implements LibraryStore {
         sha256: book.sha256,
         file_size_bytes: book.fileSizeBytes ?? null,
         is_favorite: book.isFavorite ? 1 : 0,
+        is_signed: book.isSigned ? 1 : 0,
         source_url: book.sourceUrl ?? null,
         added_at: book.addedAt,
         updated_at: book.updatedAt,
@@ -190,10 +193,10 @@ export class SqliteLibraryStore implements LibraryStore {
         .prepare(
           `INSERT INTO books (
             id, title, file_path, normalized_path, file_format, cover_path,
-            sha256, file_size_bytes, is_favorite, source_url, added_at, updated_at
+            sha256, file_size_bytes, is_favorite, is_signed, source_url, added_at, updated_at
           ) VALUES (
             @id, @title, @file_path, @normalized_path, @file_format, @cover_path,
-            @sha256, @file_size_bytes, @is_favorite, @source_url, @added_at, @updated_at
+            @sha256, @file_size_bytes, @is_favorite, @is_signed, @source_url, @added_at, @updated_at
           )`,
         )
         .run({
@@ -206,6 +209,7 @@ export class SqliteLibraryStore implements LibraryStore {
           sha256: book.sha256,
           file_size_bytes: book.fileSizeBytes ?? null,
           is_favorite: book.isFavorite ? 1 : 0,
+          is_signed: book.isSigned ? 1 : 0,
           source_url: book.sourceUrl ?? null,
           added_at: book.addedAt,
           updated_at: book.updatedAt,

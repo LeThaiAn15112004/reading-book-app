@@ -35,7 +35,7 @@ export function LibraryTopBar({
   onFromUrl,
 }: LibraryTopBarProps) {
   return (
-    <header className="relative z-[35] flex h-16 shrink-0 items-center gap-2 border-b border-lib-border-soft bg-lib-topbar px-4 backdrop-blur-sm sm:gap-3 sm:px-7">
+    <header className="app-titlebar relative z-[35] flex h-16 shrink-0 items-center gap-2 border-b border-lib-border-soft bg-lib-topbar px-4 backdrop-blur-sm sm:gap-3 sm:pl-7">
       <div className="relative min-w-0 max-w-80 flex-1">
         <SearchIcon className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-lib-faint" />
         <input

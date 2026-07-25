@@ -60,7 +60,7 @@ Sử dụng bảng màu trung tính để tránh mỏi mắt.
 *   **Điều hướng:**
     *   Chạm 2 bên màn hình để lật trang.
     *   Nhấn giữ để gọi menu ngữ cảnh (AI Chat, Note, Highlight).
-*   **Đồng bộ:** Luôn hiển thị vị trí đọc (Progress bar mỏng) ở cạnh dưới màn hình một cách tinh tế.
+*   **Đồng bộ:** Luôn cho biết vị trí đọc gần nhất (nhãn chương/trang + scrubber mỏng ở cạnh dưới khi chrome hiện) — tinh tế, không dùng % “đã đọc xong”.
 
 ---
 

@@ -28,9 +28,9 @@ Bám cây `source/packages/{domain,shared,config}` trong SDS §2.11. Domain **kh
 
 | Task | Chi tiết | Vị trí |
 | :--- | :--- | :--- |
-| T0.1 | Domain models (SDS §3): `Book`, `Author`, `BookAuthor`, `Collection`, `CollectionBook`, `ReadingSessionState`, `Highlight`, `Note`, `Bookmark`, `BookChunk`, `Location` (CFI / page-rect / text-offset), `DocumentFormat` (`epub` \| `pdf` \| `txt` \| `md`), `Preferences` (app-level) | `packages/domain` — file: `book.ts`, `author.ts`, `collection.ts`, `location.ts`, `reading-session-state.ts`, `highlight.ts`, `note.ts`, `bookmark.ts`, `book-chunk.ts`, `document-format.ts`, `preferences.ts`, `index.ts` |
+| T0.1 | Domain models (SDS §3): `Book` (+ `isSigned`), `Author`, `BookAuthor`, `BookSignature`, `Collection`, `CollectionBook`, `ReadingSessionState`, `Highlight`, `Note`, `Comment`, `Bookmark`, `BookChunk`, `Location` (CFI / page-rect / text-offset), `DocumentFormat` (`epub` \| `pdf` \| `txt` \| `md` \| `docx` \| `doc`), `Preferences` (app-level) | `packages/domain` — gồm `book-signature.ts`, `comment.ts`, … |
 | T0.2 | Port stubs (SDS §2.6): `DocumentImporter`, `UrlDocumentFetcher`, `DocumentNormalizer` (stub OK), `DocumentRenderer`, `OverlayPainter`, `LocationCodec`, `LibraryStore`, `CollectionStore`, `OverlayStore`, `AiProvider` (**NoOp**), `ExternalLibraryConnector` (**NoOp**; không Auth/account) | `packages/domain/ports` |
-| T0.3 | Config: `formats` (epub/pdf/txt/md), theme tokens stub, feature flags `aiEnabled=false`, `externalLibrariesEnabled=false` (không tài khoản app) | `packages/config` — `formats.ts`, `theme.ts`, `features.ts` |
+| T0.3 | Config: `formats` (epub/pdf/txt/md/docx/doc), theme tokens stub, feature flags `aiEnabled=false`, `externalLibrariesEnabled=false` (không tài khoản app) | `packages/config` — `formats.ts`, `theme.ts`, `features.ts` |
 | T0.4 | Use case skeleton (SDS §2.11 `shared/services`): `importBook`, `openReader`, `saveReadingSessionState`, `addHighlight`, `addNote`, `listAnnotations`, `createCollection`, `manageCollectionBooks` — impl nhẹ / empty OK | `packages/shared/services` (+ folder `models`, `repositories`, `readers`, `storage`, `utils` theo SDS) |
 
 ### 2.2. Electron Infrastructure
@@ -38,7 +38,7 @@ Bám cây `source/packages/{domain,shared,config}` trong SDS §2.11. Domain **kh
 | Task | Chi tiết | Vị trí |
 | :--- | :--- | :--- |
 | T0.5 | Cấu trúc folder theo SDS §2.11: `electron/ipc`, `persistence`, `files`, `adapters` | desktop |
-| T0.6 | SQLite + migration v1 theo SDS §3: `books`, `authors`, `book_authors`, `collections`, `collection_books`, `reading_session_states`, `highlights`, `notes`, `bookmarks`, `book_chunks` (embedding nullable), `app_settings` | `electron/persistence` |
+| T0.6 | SQLite + migrations theo SDS §3 (overlay sách): `books` (+ `is_signed`), `book_signatures`, `authors`, `book_authors`, `collections`, `collection_books`, `reading_session_states`, `highlights`, `notes`, `comments`, `bookmarks`, `book_chunks` — files `001`…`005` (**không** `app_settings`; app prefs → electron-store / MMKV) | `electron/persistence` |
 | T0.7 | Sandbox path: thư mục books trong userData; allowlist path | `electron/files/sandbox.ts` |
 | T0.8 | Preload `contextBridge` — API hẹp typed | `electron/preload.ts` |
 | T0.9 | IPC channels: `library:*`, `import:*`, `overlay:*` (handler stub OK) | `electron/ipc` |
@@ -61,13 +61,15 @@ T0.1 → T0.2 → T0.3
 
 ## 4. Nghiệm thu
 
-- [ ] `npm run dev` không lỗi
-- [ ] DB file tạo được sau lần chạy đầu
-- [ ] Renderer gọi IPC thành công (không `require('fs')` từ renderer)
-- [ ] `packages/domain` có đủ domain models SDS §3 (gồm `Author` / `BookAuthor` / `Collection` / `CollectionBook` / `BookChunk` / `Location`)
-- [ ] `packages/domain/ports` có đủ port SDS §2.6 (gồm `CollectionStore`); `AiProvider` / `ExternalLibraryConnector` = NoOp; **không** port Auth/login
-- [ ] `packages/domain` / `packages/shared` không import Electron / SQLite
-- [ ] Feature flag AI/Sync = off
+- [x] `npm run dev` không lỗi
+- [x] DB file tạo được sau lần chạy đầu
+- [x] Renderer gọi IPC thành công (không `require('fs')` từ renderer)
+- [x] `packages/domain` có đủ domain models SDS §3 (gồm `Author` / `BookAuthor` / `BookSignature` / `Collection` / `CollectionBook` / `Comment` / `BookChunk` / `Location`)
+- [x] `packages/domain/ports` có đủ port SDS §2.6 (gồm `CollectionStore`); `AiProvider` / `ExternalLibraryConnector` = NoOp; **không** port Auth/login
+- [x] `packages/domain` / `packages/shared` không import Electron / SQLite
+- [x] Feature flag AI/Sync = off
+
+**Nợ chấp nhận:** use case `packages/shared/services` còn skeleton — logic import đang ở Electron Main/IPC (không chặn G1–G2).
 
 ## 5. Tham chiếu
 

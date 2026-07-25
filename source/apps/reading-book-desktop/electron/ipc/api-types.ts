@@ -16,7 +16,8 @@ export interface BookSummaryDto {
   id: string
   title: string
   format: DocumentFormatDto
-  coverPath?: string
+  /** Renderer-safe cover URL (`rb-cover://…`); never an absolute filesystem path. */
+  coverUrl?: string
   addedAt: string
   updatedAt: string
   /** Display author(s); optional until import metadata lands (G2). */
