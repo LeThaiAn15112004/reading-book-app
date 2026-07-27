@@ -51,8 +51,16 @@ T5.1 → T5.2 → T5.3
 - [ ] Jump từ sidebar đúng đoạn
 - [ ] Không có màn Notes toàn cục trong nav
 
-## 5. Nợ được chấp nhận
+## 5. Nợ được chấp nhận (G5) + backlog từ note.txt
 
-- Overlay Canvas cho PDF → G6 (cùng lúc làm PDF renderer)
-- Export notes / quote cards → G8+
-- Comment trên EPUB có thể map `page_number`/spine index tạm — chuẩn hóa location chung nếu cần sau G3
+Nguồn map: [11_Backlog_tu_note_san_pham.md](./11_Backlog_tu_note_san_pham.md).
+
+| ID | Nợ (ý note.txt) | Trả ở |
+| :--- | :--- | :--- |
+| — | Overlay Canvas PDF | **G6** |
+| — | Export notes / quote cards | **G8+** |
+| — | Chuẩn hóa location Comment EPUB | sau G3 nếu cần |
+| **NOTE-R5** | **Đánh dấu trang** (bookmark) persist + jump | **G5** |
+| **NOTE-R7** | **Note văn bản** persist + sidebar | **G5** |
+| — | Highlight màu (SDS; hỗ trợ note/selection) | **G5** |
+| — | Comment / đáp án theo đoạn | **G5** |

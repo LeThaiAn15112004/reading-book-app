@@ -1,21 +1,15 @@
-import { Link } from 'react-router-dom'
 import type { AnnotateTool } from '../readerSession'
-import { TOOL_LABELS } from '../readerSession'
 import { MoreMenu } from './MoreMenu'
-import { ToolsMenu } from './ToolsMenu'
+import { ToolsStrip } from './ToolsMenu'
 
 type ReaderTopbarProps = {
-  chapterLabel: string
   chromeHidden: boolean
-  toolsOpen: boolean
   moreOpen: boolean
   settingsOpen: boolean
   activeTool: AnnotateTool
-  onToggleTools: () => void
   onToggleMore: () => void
   onToggleSettings: () => void
   onSelectTool: (tool: Exclude<AnnotateTool, null>) => void
-  onClearTool: () => void
   onOpenSign: () => void
   onShare: () => void
   onFavorites: () => void
@@ -23,21 +17,17 @@ type ReaderTopbarProps = {
   onTrash: () => void
 }
 
-const toolBtn =
-  'inline-flex h-10 shrink-0 cursor-pointer items-center justify-center gap-2 rounded-lg border border-slate-600/45 bg-slate-800/50 px-0 text-slate-400 transition-colors hover:border-amber-500 hover:bg-amber-500/10 hover:text-slate-100 sm:w-auto sm:px-3.5 sm:text-[13px] sm:font-semibold w-10'
+const chromeBtn =
+  'inline-flex h-10 w-10 shrink-0 cursor-pointer items-center justify-center gap-2 rounded-lg border border-lib-border bg-lib-bg-mid/50 px-0 text-lib-muted transition-colors hover:border-lib-accent hover:bg-lib-accent-soft hover:text-lib-text-strong sm:w-auto sm:px-3.5 sm:text-[13px] sm:font-semibold'
 
 export function ReaderTopbar({
-  chapterLabel,
   chromeHidden,
-  toolsOpen,
   moreOpen,
   settingsOpen,
   activeTool,
-  onToggleTools,
   onToggleMore,
   onToggleSettings,
   onSelectTool,
-  onClearTool,
   onOpenSign,
   onShare,
   onFavorites,
@@ -46,101 +36,22 @@ export function ReaderTopbar({
 }: ReaderTopbarProps) {
   return (
     <header
-      className={`relative z-50 flex h-14 shrink-0 items-center justify-between gap-3 border-b border-slate-600/30 bg-slate-900/95 px-4 backdrop-blur-md transition-all duration-300 sm:h-16 sm:px-6 ${
+      className={`relative z-50 flex h-14 shrink-0 items-center gap-2 border-b border-lib-border-soft bg-lib-surface-strong px-3 backdrop-blur-md transition-all duration-300 sm:h-16 sm:gap-3 sm:px-5 ${
         chromeHidden
           ? 'pointer-events-none -translate-y-full opacity-0'
           : 'translate-y-0 opacity-100'
       }`}
       onClick={(e) => e.stopPropagation()}
     >
-      <div className="flex min-w-0 flex-1 items-center gap-3">
-        <Link
-          to="/library"
-          className="inline-flex size-10 shrink-0 items-center justify-center rounded-lg text-slate-300 transition-colors hover:bg-white/5 hover:text-amber-400"
-          title="Back to library"
-          aria-label="Back to library"
-        >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            fill="none"
-            viewBox="0 0 24 24"
-            strokeWidth={2.2}
-            stroke="currentColor"
-            className="size-[22px]"
-            aria-hidden
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M15.75 19.5 8.25 12l7.5-7.5"
-            />
-          </svg>
-        </Link>
-        <p className="m-0 max-w-[min(50vw,360px)] truncate text-[13px] font-semibold tracking-wide text-slate-100 uppercase">
-          {chapterLabel}
-        </p>
-      </div>
+      <ToolsStrip
+        activeTool={activeTool}
+        onSelectTool={onSelectTool}
+        onOpenSign={onOpenSign}
+      />
 
       <div className="relative flex shrink-0 items-center gap-1.5 sm:gap-2">
-        {activeTool ? (
-          <button
-            className="inline-flex h-9 max-w-[140px] min-w-0 cursor-pointer items-center gap-1.5 rounded-full border border-amber-500/45 bg-amber-500/10 px-3 text-xs font-bold text-amber-400"
-            type="button"
-            title="Clear tool"
-            aria-label={`Clear ${TOOL_LABELS[activeTool]} tool`}
-            onClick={(e) => {
-              e.stopPropagation()
-              onClearTool()
-            }}
-          >
-            <span className="truncate">{TOOL_LABELS[activeTool]}</span>
-            <span
-              className="inline-flex size-[18px] shrink-0 items-center justify-center rounded-full bg-amber-500/20 text-[11px]"
-              aria-hidden
-            >
-              ✕
-            </span>
-          </button>
-        ) : null}
-
         <button
-          className={`${toolBtn}${toolsOpen ? ' border-amber-500 bg-amber-500/10 text-slate-100' : ''}`}
-          type="button"
-          title="Tools"
-          aria-label="Annotation tools"
-          aria-haspopup="true"
-          aria-expanded={toolsOpen}
-          onClick={(e) => {
-            e.stopPropagation()
-            onToggleTools()
-          }}
-        >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            fill="none"
-            viewBox="0 0 24 24"
-            strokeWidth={1.8}
-            stroke="currentColor"
-            className="size-5"
-            aria-hidden
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M11.42 15.17 17.25 21A2.652 2.652 0 0 0 21 17.25l-5.877-5.877M11.42 15.17l2.496-3.03c.317-.384.74-.626 1.208-.766M11.42 15.17l-4.655 5.653a2.548 2.548 0 1 1-3.586-3.586l6.837-5.63m5.108-.233c.55-.05 1.023-.288 1.415-.68l3.97-3.97a.75.75 0 0 0-1.06-1.06l-3.97 3.97c-.392.391-.63.864-.68 1.415m-5.108.233c-.55.05-1.023.288-1.415.68l-3.97 3.97a.75.75 0 1 0 1.06 1.06l3.97-3.97c.392-.391.63-.864.68-1.415"
-            />
-          </svg>
-          <span className="hidden sm:inline">Tools</span>
-        </button>
-        <ToolsMenu
-          open={toolsOpen}
-          activeTool={activeTool}
-          onSelectTool={onSelectTool}
-          onOpenSign={onOpenSign}
-        />
-
-        <button
-          className={`${toolBtn}${settingsOpen ? ' border-amber-500 bg-amber-500/10 text-slate-100' : ''}`}
+          className={`${chromeBtn}${settingsOpen ? ' border-lib-accent bg-lib-accent-soft text-lib-text-strong' : ''}`}
           type="button"
           title="Reading settings"
           aria-label="Reading settings"
@@ -174,7 +85,7 @@ export function ReaderTopbar({
         </button>
 
         <button
-          className={`${toolBtn}${moreOpen ? ' border-amber-500 bg-amber-500/10 text-slate-100' : ''}`}
+          className={`${chromeBtn}${moreOpen ? ' border-lib-accent bg-lib-accent-soft text-lib-text-strong' : ''}`}
           type="button"
           title="More"
           aria-label="More options"

@@ -1,4 +1,4 @@
-/** SCR-06 App Settings title (placeholder; not Reading Settings SCR-05). */
+/** SCR-06 App Settings title. */
 export function SettingsHeader() {
   return (
     <div className="min-w-0">
@@ -6,7 +6,7 @@ export function SettingsHeader() {
         Settings
       </h1>
       <p className="m-0 mt-0.5 text-xs text-lib-faint">
-        SCR-06 App Settings · stub
+        App-wide preferences
       </p>
     </div>
   )

@@ -8,6 +8,7 @@
   "exports": {
     ".": "./index.ts",
     "./hooks": "./hooks/index.ts",
+    "./hooks/app": "./hooks/app/index.ts",
     "./hooks/library": "./hooks/library/index.ts",
     "./models": "./models/index.ts",
     "./services": "./services/index.ts"

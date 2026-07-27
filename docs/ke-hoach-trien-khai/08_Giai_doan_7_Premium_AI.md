@@ -55,3 +55,14 @@ Provider + chunk/embed một sách
 - Linked libraries Drive / Books / Apple Books (G8)
 - Knowledge graph đa sách (G8)
 - Social feed đầy đủ
+
+## 7. Backlog từ note.txt thuộc G7
+
+Nguồn map: [11_Backlog_tu_note_san_pham.md](./11_Backlog_tu_note_san_pham.md).
+
+| ID | Ý note.txt | Ghi chú |
+| :--- | :--- | :--- |
+| **NOTE-AI1** | AI **tóm tắt** nội dung sách dài | Opt-in; không phá flow đọc |
+| **NOTE-AI2** | AI phân tích / gợi ý thêm field metadata | Opt-in; **không** auto khi import |
+| **NOTE-R6** (phần AI) | Semantic search trong sách | Sau find-in-book cơ bản |
+| **NOTE-TTS1** | Đọc **audio** (TTS) | Chưa cam kết MVP — quyết định trong/sau G7 |

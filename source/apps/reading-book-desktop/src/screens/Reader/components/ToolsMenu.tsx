@@ -1,8 +1,7 @@
 import type { AnnotateTool } from '../readerSession'
 import { TOOL_LABELS } from '../readerSession'
 
-type ToolsMenuProps = {
-  open: boolean
+type ToolsStripProps = {
   activeTool: AnnotateTool
   onSelectTool: (tool: Exclude<AnnotateTool, null>) => void
   onOpenSign: () => void
@@ -16,8 +15,8 @@ const MODE_TOOLS: Exclude<AnnotateTool, null>[] = [
   'esign',
 ]
 
-const itemClass =
-  'flex min-h-11 w-full cursor-pointer items-center gap-2.5 rounded-lg border-none bg-transparent px-3 py-3 text-left text-sm font-medium text-slate-300 hover:bg-white/5 hover:text-slate-100'
+const stripBtn =
+  'inline-flex h-9 shrink-0 cursor-pointer items-center justify-center gap-1.5 rounded-lg border border-transparent px-2 text-lib-muted transition-colors hover:border-lib-accent-ring hover:bg-lib-accent-soft hover:text-lib-text-strong sm:h-10 sm:gap-2 sm:px-2.5'
 
 function ToolIcon({ tool }: { tool: string }) {
   const cls = 'size-[18px] shrink-0'
@@ -61,42 +60,50 @@ function ToolIcon({ tool }: { tool: string }) {
   }
 }
 
-export function ToolsMenu({
-  open,
+/** Horizontal annotate tools on the Reader chrome bar (1 tap to select). */
+export function ToolsStrip({
   activeTool,
   onSelectTool,
   onOpenSign,
-}: ToolsMenuProps) {
-  if (!open) return null
-
+}: ToolsStripProps) {
   return (
     <div
-      className="absolute top-[calc(100%+8px)] right-0 z-[120] flex min-w-[min(260px,calc(100vw-24px))] flex-col gap-0.5 rounded-xl border border-slate-600/45 bg-slate-900/95 p-1.5 shadow-xl backdrop-blur-md"
-      role="menu"
+      className="flex min-w-0 flex-1 items-center gap-0.5 overflow-x-auto overscroll-x-contain sm:gap-1"
+      role="toolbar"
+      aria-label="Annotation tools"
       onClick={(e) => e.stopPropagation()}
     >
-      {MODE_TOOLS.map((tool) => (
-        <button
-          key={tool}
-          className={`${itemClass}${activeTool === tool ? ' bg-amber-500/10 text-amber-400' : ''}`}
-          type="button"
-          role="menuitem"
-          aria-checked={activeTool === tool}
-          onClick={() => onSelectTool(tool)}
-        >
-          <ToolIcon tool={tool} />
-          {TOOL_LABELS[tool]}
-        </button>
-      ))}
-      <div className="mx-1.5 my-1 h-px bg-slate-600/30" />
+      {MODE_TOOLS.map((tool) => {
+        const active = activeTool === tool
+        return (
+          <button
+            key={tool}
+            className={`${stripBtn}${active ? ' border-lib-accent bg-lib-accent-soft text-lib-accent' : ''}`}
+            type="button"
+            title={TOOL_LABELS[tool]}
+            aria-label={TOOL_LABELS[tool]}
+            aria-pressed={active}
+            onClick={() => onSelectTool(tool)}
+          >
+            <ToolIcon tool={tool} />
+            <span className="hidden text-[12px] font-semibold whitespace-nowrap lg:inline">
+              {TOOL_LABELS[tool]}
+            </span>
+          </button>
+        )
+      })}
+      <span className="mx-0.5 hidden h-5 w-px shrink-0 bg-lib-border sm:mx-1 sm:block" aria-hidden />
       <button
-        className={itemClass}
+        className={stripBtn}
         type="button"
-        role="menuitem"
+        title="Sign"
+        aria-label="Sign"
         onClick={onOpenSign}
       >
         <ToolIcon tool="sign" />
-        Sign
+        <span className="hidden text-[12px] font-semibold whitespace-nowrap lg:inline">
+          Sign
+        </span>
       </button>
     </div>
   )

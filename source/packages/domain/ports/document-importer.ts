@@ -13,6 +13,12 @@ export interface ImportResult {
   fileSizeBytes?: number;
   coverPath?: string;
   authorNames?: string[];
+  /** Short description / blurb when extractable. */
+  description?: string;
+  /** Genre / subject names (linked via book_genres). */
+  genreNames?: string[];
+  /** Page or spine-section count when known. */
+  pageCount?: number;
   /** Original source path before sandbox copy (optional). */
   sourcePath?: string;
 }

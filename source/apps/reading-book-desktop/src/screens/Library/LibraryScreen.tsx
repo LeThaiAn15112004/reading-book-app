@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import {
   useCollections,
@@ -13,7 +13,7 @@ import {
   ImportUrlDialog,
 } from '../../components/import'
 import { importApi, libraryApi } from '../../bridge'
-import { AppSidebar } from '../../utils'
+import { useAppNav, useOpenReading, type AppStubNavId } from '../../chrome'
 import type { BootLocationState } from '../boot'
 import {
   BootErrorBanner,
@@ -21,6 +21,7 @@ import {
   ContinueReading,
   FilteredListView,
   LIBRARY_SHELVES,
+  LibraryBookInfoDialog,
   LibraryEmptyState,
   LibraryHint,
   LibraryShelves,
@@ -40,25 +41,44 @@ import {
   type LibraryBook,
 } from './libraryModel'
 
-/** SCR-01 — Library hub shell (sidebar + top bar + format hint). */
+type LibraryLocationState = BootLocationState & {
+  openNav?: AppStubNavId
+}
+
+/** SCR-01 — Library hub shell (menubar + top bar + format hint). */
 export function LibraryScreen() {
   const navigate = useNavigate()
   const location = useLocation()
-  const bootError = (location.state as BootLocationState | null)?.bootError
+  const { registerLibraryNav } = useAppNav()
+  const { openBook } = useOpenReading()
+  const locState = location.state as LibraryLocationState | null
+  const bootError = locState?.bootError
   const [searchQuery, setSearchQuery] = useState('')
+
+  const [bookInfoId, setBookInfoId] = useState<string | null>(null)
 
   const { books, refreshLibrary } = useLibraryBooks({
     client: libraryApi,
   })
 
   function openReader(bookId: string) {
-    navigate(`/reader/${bookId}`)
+    const title = books?.find((b) => b.id === bookId)?.title
+    openBook(bookId, title)
   }
 
   function handleOpenNotes(bookId: string) {
     // Notes tab wiring lands with Reader chrome (G5); open book for now.
     openReader(bookId)
   }
+
+  function handleBookInfo(bookId: string) {
+    setBookInfoId(bookId)
+  }
+
+  const bookInfoBook =
+    bookInfoId != null
+      ? (books?.find((b) => b.id === bookInfoId) ?? null)
+      : null
 
   const {
     toast,
@@ -91,6 +111,36 @@ export function LibraryScreen() {
   } = useLibraryView({
     onComingSoon: () => showToast('Coming soon.', 'info'),
   })
+
+  const libraryNavRef = useRef({
+    activeId: sidebarActive,
+    onStubNav: handleStubNav,
+    onLibraryNav: goHub,
+  })
+  libraryNavRef.current = {
+    activeId: sidebarActive,
+    onStubNav: handleStubNav,
+    onLibraryNav: goHub,
+  }
+
+  useEffect(() => {
+    registerLibraryNav({
+      activeId: sidebarActive,
+      onStubNav: (id) => libraryNavRef.current.onStubNav(id),
+      onLibraryNav: () => libraryNavRef.current.onLibraryNav(),
+    })
+    return () => registerLibraryNav(null)
+  }, [sidebarActive, registerLibraryNav])
+
+  useEffect(() => {
+    const openNav = locState?.openNav
+    if (!openNav) return
+    libraryNavRef.current.onStubNav(openNav)
+    navigate('/library', {
+      replace: true,
+      state: bootError ? { bootError } : null,
+    })
+  }, [locState?.openNav, navigate, bootError])
 
   const {
     collections,
@@ -163,13 +213,7 @@ export function LibraryScreen() {
     : []
 
   return (
-    <div className="lib-chrome relative flex h-full w-full select-none overflow-hidden bg-[radial-gradient(ellipse_80%_50%_at_20%_-10%,rgba(245,158,11,0.08),transparent_55%),radial-gradient(circle_at_80%_100%,rgba(30,58,138,0.18),transparent_45%),radial-gradient(circle,#1e293b_0%,#0f172a_100%)] font-[system-ui,'Segoe_UI',sans-serif] text-lib-text antialiased">
-      <AppSidebar
-        activeId={sidebarActive}
-        onStubNav={handleStubNav}
-        onLibraryNav={goHub}
-      />
-
+    <div className="lib-chrome relative flex h-full w-full select-none overflow-hidden font-[system-ui,'Segoe_UI',sans-serif] text-lib-text antialiased">
       <main className="flex min-w-0 flex-1 flex-col overflow-hidden">
         {activeShelf ? (
           <ShelfDetailView
@@ -177,6 +221,7 @@ export function LibraryScreen() {
             items={shelfItems}
             onBack={handleCloseShelf}
             onOpenItem={openReader}
+            onBookInfo={handleBookInfo}
           />
         ) : view.kind === 'filter' && filterConfig ? (
           <FilteredListView
@@ -184,6 +229,7 @@ export function LibraryScreen() {
             emptyMessage={filterConfig.empty}
             items={filterItems}
             onOpenItem={openReader}
+            onBookInfo={handleBookInfo}
           />
         ) : view.kind === 'collections' ? (
           <CollectionsHub
@@ -197,6 +243,7 @@ export function LibraryScreen() {
             items={collectionItems}
             onBack={goCollections}
             onOpenItem={openReader}
+            onBookInfo={handleBookInfo}
             countLabel={
               collectionItems.length === 1
                 ? '1 book'
@@ -295,6 +342,28 @@ export function LibraryScreen() {
         message={conflict?.message}
         onDiscard={handleConflictDiscard}
         onOpenExisting={handleConflictOpenExisting}
+      />
+
+      <LibraryBookInfoDialog
+        open={bookInfoId !== null}
+        book={
+          bookInfoBook
+            ? {
+                id: bookInfoBook.id,
+                title: bookInfoBook.title,
+                author: bookInfoBook.author,
+                fileName: bookInfoBook.fileName,
+                format: bookInfoBook.format,
+                coverUrl: bookInfoBook.coverUrl,
+                genre: bookInfoBook.genre,
+                genres: bookInfoBook.genres,
+                fileSizeBytes: bookInfoBook.fileSizeBytes,
+                pageCount: bookInfoBook.pageCount,
+                description: bookInfoBook.description,
+              }
+            : null
+        }
+        onClose={() => setBookInfoId(null)}
       />
     </div>
   )

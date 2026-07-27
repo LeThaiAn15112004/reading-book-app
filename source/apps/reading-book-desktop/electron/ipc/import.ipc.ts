@@ -112,11 +112,17 @@ function persistImportedBook(
     coverPath: meta.coverPath,
     sha256: meta.sha256,
     fileSizeBytes: meta.fileSizeBytes,
+    description: meta.description,
+    pageCount: meta.pageCount,
     sourceUrl: options.sourceUrl,
     addedAt: now,
     updatedAt: now,
   })
-  getLibraryStore().persistImportedBook(book, meta.authorNames ?? [])
+  getLibraryStore().persistImportedBook(
+    book,
+    meta.authorNames ?? [],
+    meta.genreNames ?? [],
+  )
   return book.id
 }
 

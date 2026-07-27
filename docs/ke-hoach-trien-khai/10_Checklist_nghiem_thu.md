@@ -2,7 +2,7 @@
 
 Dùng file này để đánh dấu tiến độ. Chỉ sang giai đoạn sau khi mục hiện tại đủ (hoặc ghi rõ nợ được chấp nhận).
 
-**Cập nhật tiến độ:** 2026-07-25 — G0–G2 đạt outcome chính; schema SDS 1.16 (`is_signed`, `book_signatures`, `comments`); tiếp theo **G3 Reader EPUB**.
+**Cập nhật tiến độ:** 2026-07-27 — G0–G2 đạt outcome; **G3: T3.0 + T3.1 + T3.4 + T3.3 + T3.2 + T3.5 đạt** (nav page/section/scroll + footer scrub spine); tiếp **T3.6** tap-center / **T3.7** TOC. Nợ G1/G2 + [11_Backlog](./11_Backlog_tu_note_san_pham.md) giữ nguyên.
 
 ---
 
@@ -23,6 +23,7 @@ Dùng file này để đánh dấu tiến độ. Chỉ sang giai đoạn sau khi
 - [x] SCR-01a shelf detail + Back (T1.6)
 - [x] Collections nav + hub (list tập; stub tạo được chấp nhận ở G1)
 - [x] Không UI bookstore
+- [x] Nợ G1 ghi rõ → xem §5 [`02_Giai_doan_1_Splash_Library.md`](./02_Giai_doan_1_Splash_Library.md) + bảng dưới
 
 ## G2 — Import
 
@@ -31,14 +32,21 @@ Dùng file này để đánh dấu tiến độ. Chỉ sang giai đoạn sau khi
 - [x] Import URL direct file → sandbox local
 - [x] Overlay đóng + toast; không màn Import riêng
 - [x] Format không hỗ trợ bị từ chối rõ
+- [x] Nợ G2 ghi rõ → xem §5 [`03_Giai_doan_2_Import.md`](./03_Giai_doan_2_Import.md) + bảng dưới
 
 ## G3 — Reader EPUB
 
 - [x] **T3.0** UI SCR-03 theo mockup + nội dung fake; tap sách nào cũng vào đọc ngay
-- [ ] Mở EPUB đọc được (thay fake)
-- [ ] Invisible UI (chrome ẩn mặc định)
-- [ ] TOC / điều hướng cơ bản
-- [ ] File gốc không bị ghi đè
+- [x] **T3.1** Spike chọn EPUB engine — chốt `epubjs` ^0.3.93 (SDS §2.10.1; harness `#/spike/epub`)
+- [x] **T3.4** Mở sách qua IPC: `library:openBookContent` → bytes + sandbox allowlist (không path FS cho Renderer)
+- [x] **T3.3** `EpubRenderer` — mở EPUB thật thay fake khi `format === epub`
+- [x] **T3.2** `ReaderShell` chung: vùng nội dung + chrome ẩn mặc định (reveal chevron)
+- [x] Invisible UI (chrome ẩn mặc định) — tap center còn **T3.6**
+- [x] **T3.5** Nav EPUB: page (Arrow + click cạnh), section (Ctrl/Cmd+Arrow / `[` `]`), scroll mode
+- [x] **T3.5** Footer scrub theo spine index (EPUB); fake chapter keys khi non-EPUB
+- [ ] Mở EPUB: TOC đầy đủ từ `nav.toc` — **T3.7**
+- [x] Điều hướng cơ bản (page / section / scrub) — T3.5
+- [x] File gốc không bị ghi đè
 
 ## G4 — Tiến độ & Reading Settings
 
@@ -100,11 +108,44 @@ Dùng file này để đánh dấu tiến độ. Chỉ sang giai đoạn sau khi
 
 ## Ghi chú nợ kỹ thuật
 
-| Ngày | Giai đoạn | Nợ | Ai chấp nhận | Dự kiến trả |
-| :--- | :--- | :--- | :--- | :--- |
-| 2026-07-22 | G1 / T1.5 | Drag reorder shelf bằng `=` (handle chrome-only) | Phase doc §5 | Cuối G1 hoặc G6 polish |
-| 2026-07-25 | G1 / T1.7–T1.9 | Continue Reading / shelf Reading·Completed / Favorites thiếu data thật (`listBooks` chưa trả last-read / status / favorite) | Nghiệm thu G1–G2 | G4 (+ UI star) |
-| 2026-07-25 | G1 / T1.9a | Collections hub chỉ session stub — chưa SQLite `collections` | FR-14 stub G1 | G6 |
-| 2026-07-25 | G0 / shared | Use cases `packages/shared/services` còn skeleton; import thật đang ở Electron IPC | SDS layered | Khi refactor ImportBookService |
-| 2026-07-25 | Schema | `is_signed` / `book_signatures` / `comments` đã migrate + domain; chưa wire import detect chữ ký / UI Comment Reader | SDS 1.15–1.16 | G5 (Comment) · G6 (signature detect) |
-| 2026-07-25 | G0 / G6 | Bỏ `app_settings` khỏi SQLite; SCR-06 dùng electron-store (desktop) / MMKV (mobile) — chưa wire store | SDS 1.17 | G6 T6.8 |
+**Map đầy đủ từ [`docs/note/note.txt`](../note/note.txt):** [11_Backlog_tu_note_san_pham.md](./11_Backlog_tu_note_san_pham.md)
+
+Chi tiết theo giai đoạn: [G1 §5](./02_Giai_doan_1_Splash_Library.md) · [G2 §5](./03_Giai_doan_2_Import.md) · [G3 §5](./04_Giai_doan_3_Reader_EPUB.md) · [G4 §5](./05_Giai_doan_4_Tien_do_va_Reading_Settings.md) · [G5 §5](./06_Giai_doan_5_Highlight_Note_Bookmark.md) · [G6 §6](./07_Giai_doan_6_PDF_TXT_MD_va_App_Settings.md) · [G7 §7](./08_Giai_doan_7_Premium_AI.md) · [G8 §5](./09_Giai_doan_8_Special_Sync_Mobile.md).
+
+| Ngày | ID / Giai đoạn | Nợ | Dự kiến trả |
+| :--- | :--- | :--- | :--- |
+| 2026-07-27 | **G1-N1** | Continue Reading / last-read chưa từ `reading_session_states` (`listBooks`) | G4 |
+| 2026-07-27 | **G1-N2** | Shelf Reading / Completed / Not started thiếu status thật | G4 |
+| 2026-07-27 | **G1-N3** | Favorites (note.txt): có cột DB, chưa IPC/UI toggle + filter | G4 |
+| 2026-07-27 | **G1-N4** | Collections hub session stub — chưa SQLite | G6 FR-14 |
+| 2026-07-27 | **G1-N5** | Drag reorder shelf (`=`) chrome-only | G6 polish |
+| 2026-07-27 | **G1-N6** | SCR-06 stub (chưa electron-store) | G6 |
+| 2026-07-27 | **G1-N7** | Card: thể loại / MB / trang / mô tả ngắn (note.txt) | Schema+UI list kéo sớm; backfill EPUB khi boot; còn PDF pages → G6 |
+| 2026-07-27 | **G1-N8** | UI bìa + bìa default + title (note.txt) | G6 polish |
+| 2026-07-27 | **G2-N1** | Adapter metadata/cover ngoài EPUB = stub | G6 |
+| 2026-07-27 | **G2-N2** | Detect chữ ký → `is_signed` / `book_signatures` | G6 |
+| 2026-07-27 | **G2-N3** | FTS / `book_chunks` chưa fill khi import | G3/G6 |
+| 2026-07-27 | **G2-N4** | Gắn collection lúc import | G6 |
+| 2026-07-27 | **G2-N5** | Form enrich import (title/mô tả/thể loại/bìa tay) — note.txt | G6 polish |
+| 2026-07-27 | **G2-N6** | `deleteBook` cascade stub | G6 FR-12 |
+| 2026-07-27 | **G2-N7** | Cover UX đa format / fallback default+title — note.txt | G6 polish |
+| 2026-07-27 | **NOTE-R1** | Đổi màu nền đọc (giảm mỏi mắt) — persist | G4 |
+| 2026-07-27 | **NOTE-R2** | Màu chữ tương phản theme | G4 |
+| 2026-07-27 | **NOTE-R3** | Xoay / landscape + dual-page | G4 |
+| 2026-07-27 | **NOTE-R4** | Next trang nhanh (EPUB thật) | G3 / G4 |
+| 2026-07-27 | **NOTE-R5** | Đánh dấu trang (bookmark) persist | G5 |
+| 2026-07-27 | **NOTE-R6** | Search trong sách (find-in-book; titlebar stub) | G3/G4 · semantic G7 |
+| 2026-07-27 | **NOTE-R7** | Note văn bản persist | G5 |
+| 2026-07-27 | **NOTE-R8** | 1 trang căn giữa / 2 trang + khung | G4 |
+| 2026-07-27 | **NOTE-R9** | Chọn kiểu đọc scroll vs lật trang | G4 |
+| 2026-07-27 | **NOTE-R10** | Zoom (MVP font A±; PDF pinch) | G4 · G6 |
+| 2026-07-27 | **NOTE-R11** | Độ sáng + chế độ ngoài trời | G4 theme · G6 brightness |
+| 2026-07-27 | **NOTE-AI1** | AI tóm tắt sách dài | G7 opt-in |
+| 2026-07-27 | **NOTE-AI2** | AI gợi ý metadata (không auto import) | G7 opt-in |
+| 2026-07-27 | **NOTE-TTS1** | Đọc audio (TTS) — chưa cam kết MVP | Sau G7 / quyết định |
+| 2026-07-27 | **NOTE-L1** | Linked libs only, không account user | G8 |
+| 2026-07-27 | — | Check bản quyền / DRM (note.txt) | **Ngoài phạm vi** |
+| 2026-07-22 | G1 / T1.5 | (cũ) Drag reorder — gộp **G1-N5** | G6 |
+| 2026-07-25 | G0 / shared | Use cases `packages/shared/services` skeleton; import ở Electron IPC | Refactor sau |
+| 2026-07-25 | Schema | `comments` / signatures migrate; UI Comment Reader + detect lúc import còn lại | G5 · G6 |
+| 2026-07-25 | G0 / G6 | Bỏ `app_settings`; prefs platform store chưa wire | G6 T6.8 |

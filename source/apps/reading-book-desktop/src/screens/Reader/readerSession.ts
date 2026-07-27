@@ -1,94 +1,30 @@
-/** In-memory Reader session + overlays (UI shell). Persistence lands later. */
+/**
+ * Desktop re-exports of platform-agnostic reader session types/helpers.
+ * Demo signatures stay here (UI shell until book_signatures IPC).
+ */
+export {
+  TOOL_LABELS,
+  nextId,
+  nextReaderOverlayId,
+  type AnnotateTool,
+  type ESignStamp,
+  type HighlightColor,
+  type PageLayout,
+  type PageMode,
+  type PendingSelection,
+  type ReaderBookmark,
+  type ReaderComment,
+  type ReaderHighlight,
+  type ReaderNote,
+  type ReaderSignature,
+  type TypewriterMark,
+} from '@reading-book/shared/models'
 
-export type AnnotateTool =
-  | 'note'
-  | 'highlight'
-  | 'comment'
-  | 'typewriter'
-  | 'esign'
-  | null
+export type { TextAlign } from '@reading-book/shared/models'
 
-export type HighlightColor = 'yellow' | 'green' | 'pink'
+import type { ReaderSignature } from '@reading-book/shared/models'
 
-export type PageLayout = 'single' | 'dual'
-export type PageMode = 'scroll' | 'paginated'
-export type TextAlign = 'left' | 'justify' | 'center'
-
-export type ReaderHighlight = {
-  id: string
-  chapterIndex: number
-  paragraphIndex: number
-  selectedText: string
-  color: HighlightColor
-}
-
-export type ReaderNote = {
-  id: string
-  chapterIndex: number
-  paragraphIndex: number
-  selectedText: string
-  content: string
-}
-
-export type ReaderBookmark = {
-  id: string
-  chapterIndex: number
-  label: string
-}
-
-export type ReaderComment = {
-  id: string
-  chapterIndex: number
-  paragraphIndex: number
-  content: string
-  authorName: string
-  createdAt: string
-}
-
-export type TypewriterMark = {
-  id: string
-  chapterIndex: number
-  xPct: number
-  yPct: number
-  text: string
-}
-
-export type ESignStamp = {
-  id: string
-  chapterIndex: number
-  xPct: number
-  yPct: number
-  label: string
-}
-
-export type ReaderSignature = {
-  id: string
-  signerName: string
-  signatureStatus: 'valid' | 'invalid' | 'expired' | 'unknown'
-  signedAt?: string
-}
-
-export type PendingSelection = {
-  chapterIndex: number
-  paragraphIndex: number
-  selectedText: string
-  rect: { top: number; left: number; width: number; height: number }
-}
-
-let seq = 0
-export function nextId(prefix: string): string {
-  seq += 1
-  return `${prefix}-${Date.now().toString(36)}-${seq}`
-}
-
-export const TOOL_LABELS: Record<Exclude<AnnotateTool, null>, string> = {
-  note: 'Note',
-  highlight: 'Highlight',
-  comment: 'Comment',
-  typewriter: 'Typewriter',
-  esign: 'eSign',
-}
-
+/** Demo signatures for UI shell until detect/import fills `book_signatures`. */
 export const FAKE_SIGNATURES: ReaderSignature[] = [
   {
     id: 'sig-demo-1',

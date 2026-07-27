@@ -1,7 +1,18 @@
-/** Matches `AppTheme` in `@reading-book/domain` (day | sepia | night). */
-export type AppThemeId = 'day' | 'sepia' | 'night'
+import {
+  toAppThemeAttr,
+  type ReaderTheme,
+} from '@reading-book/shared/models'
+import { appApi } from '../bridge/app'
+
+/** App chrome theme ids (Night / Sepia / Paper). */
+export type AppThemeId = ReaderTheme
 
 /** Sets shell theme via CSS variables on `<html data-theme>` (NFR-03). */
-export function applyTheme(theme: AppThemeId): void {
-  document.documentElement.dataset.theme = theme
+export function applyTheme(theme: string): void {
+  const id = toAppThemeAttr(theme)
+  document.documentElement.dataset.theme = id
+  // Native minimize / maximize / close (Electron titleBarOverlay).
+  void appApi.setChromeTheme(id).catch(() => {
+    // Not in Electron (or preload not ready yet).
+  })
 }

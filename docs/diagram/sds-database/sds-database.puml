@@ -17,11 +17,25 @@ entity "books" as books {
   cover_path : TEXT NULL
   * sha256 : TEXT NOT NULL <<UNIQUE>>
   file_size_bytes : INTEGER NULL
+  description : TEXT NULL
+  page_count : INTEGER NULL
   is_favorite : INTEGER NOT NULL DEFAULT 0
   is_signed : INTEGER NOT NULL DEFAULT 0
   source_url : TEXT NULL
   added_at : TEXT NOT NULL
   updated_at : TEXT NOT NULL
+}
+
+entity "genres" as genres {
+  * id : TEXT <<PK>>
+  --
+  * name : TEXT NOT NULL <<UNIQUE>>
+  created_at : TEXT NOT NULL
+}
+
+entity "book_genres" as book_genres {
+  * book_id : TEXT <<PK,FK>>
+  * genre_id : TEXT <<PK,FK>>
 }
 
 entity "book_signatures" as book_signatures {
@@ -138,6 +152,9 @@ entity "collection_books" as collection_books {
 
 books ||--o{ book_authors : "1 - n\nON DELETE CASCADE"
 authors ||--o{ book_authors : "1 - n\nON DELETE RESTRICT"
+
+books ||--o{ book_genres : "1 - n\nON DELETE CASCADE"
+genres ||--o{ book_genres : "1 - n\nON DELETE CASCADE"
 
 books ||--o{ book_signatures : "1 - n\nON DELETE CASCADE"
 books ||--|| session : "1 - 1\nON DELETE CASCADE"

@@ -1,14 +1,19 @@
-import { useEffect, useMemo, useState, type CSSProperties } from 'react'
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { libraryApi } from '../../bridge'
-import { useAppTitle } from '../../chrome'
+import { useAppTitle, useGlobalReadingPrefs, useOpenReading, fontFamilyCss } from '../../chrome'
+import { ReaderShell } from '../../reader'
+import {
+  EpubRenderer,
+  type EpubNavState,
+  type EpubRendererApi,
+} from '../../reader/renderers/epub'
+import { toArrayBuffer } from '../../reader/renderers/epub/openEpubjs'
 import {
   AaSettingsPanel,
   BookInfoDialog,
   BookmarkEdgeButton,
-  ChromeRevealButton,
   CommentsDrawer,
-  fontFamilyCss,
   NoteModal,
   ReaderFooter,
   ReaderTopbar,
@@ -40,19 +45,24 @@ import {
 } from './readerSession'
 
 const DEFAULT_PREFS: ReadingPrefs = {
-  theme: 'dark',
   fontSize: 18,
-  fontFamily: 'serif',
-  fontWeight: 400,
   lineHeight: 1.65,
   margin: 'normal',
   marginEnabled: true,
   layout: 'single',
-  pageMode: 'scroll',
-  textAlign: 'justify',
+  pageMode: 'paginated',
 }
 
-/** SCR-03 — full Reader UI shell (in-memory overlays; real EPUB later). */
+const FONT_SIZE_MIN = 12
+const FONT_SIZE_MAX = 32
+const FONT_SIZE_STEP = 2
+const FONT_SIZE_DEFAULT = DEFAULT_PREFS.fontSize
+
+function clampFontSize(px: number): number {
+  return Math.min(FONT_SIZE_MAX, Math.max(FONT_SIZE_MIN, px))
+}
+
+/** SCR-03 — session wiring; layout/chrome live in ReaderShell (T3.2). */
 export function ReaderScreen() {
   const { bookId } = useParams<{ bookId: string }>()
   const navigate = useNavigate()
@@ -61,14 +71,23 @@ export function ReaderScreen() {
     readerSearchQuery,
     readerSearchRequestId,
   } = useAppTitle()
+  const { ensureTab, updateBookTitle } = useOpenReading()
+  const { prefs: globalPrefs } = useGlobalReadingPrefs()
 
   const [bookTitle, setBookTitle] = useState('Untitled')
+  const [coverUrl, setCoverUrl] = useState<string | undefined>()
+  const [contentStatus, setContentStatus] = useState<
+    'idle' | 'loading' | 'ready' | 'error'
+  >('idle')
+  const [bookBytes, setBookBytes] = useState<ArrayBuffer | null>(null)
+  const [bookFormat, setBookFormat] = useState<string | null>(null)
   const [chapterIndex, setChapterIndex] = useState(0)
+  const [epubNav, setEpubNav] = useState<EpubNavState | null>(null)
+  const epubApiRef = useRef<EpubRendererApi | null>(null)
   const [chromeHidden, setChromeHidden] = useState(true)
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [sidebarTab, setSidebarTab] = useState<SidebarTab>('chapters')
   const [settingsOpen, setSettingsOpen] = useState(false)
-  const [toolsOpen, setToolsOpen] = useState(false)
   const [moreOpen, setMoreOpen] = useState(false)
   const [prefs, setPrefs] = useState<ReadingPrefs>(DEFAULT_PREFS)
   const [toast, setToast] = useState<string | null>(null)
@@ -94,6 +113,8 @@ export function ReaderScreen() {
   // Reset in-memory overlays when switching books.
   useEffect(() => {
     setChapterIndex(0)
+    setEpubNav(null)
+    epubApiRef.current = null
     setHighlights([])
     setNotes([])
     setBookmarks([])
@@ -104,27 +125,78 @@ export function ReaderScreen() {
     setPendingSelection(null)
     setCommentTarget(null)
     setChromeHidden(true)
+    setBookBytes(null)
+    setBookFormat(null)
+    setCoverUrl(undefined)
+    setContentStatus('idle')
   }, [bookId])
+
+  useEffect(() => {
+    if (!bookId) return
+    ensureTab(bookId)
+  }, [bookId, ensureTab])
 
   useEffect(() => {
     if (!bookId) {
       setBookTitle('Untitled')
+      setCoverUrl(undefined)
+      setBookBytes(null)
+      setBookFormat(null)
+      setContentStatus('idle')
       return
     }
     let cancelled = false
+    setContentStatus('loading')
+    setBookBytes(null)
+    setBookFormat(null)
+    setCoverUrl(undefined)
     libraryApi
       .getBook(bookId)
       .then((book) => {
         if (cancelled) return
-        setBookTitle(book?.title?.trim() || 'Untitled')
+        const title = book?.title?.trim() || 'Untitled'
+        setBookTitle(title)
+        setCoverUrl(book?.coverUrl)
+        updateBookTitle(bookId, title)
       })
       .catch(() => {
-        if (!cancelled) setBookTitle('Untitled')
+        if (!cancelled) {
+          setBookTitle('Untitled')
+          setCoverUrl(undefined)
+        }
       })
+
+    // T3.4: open sandboxed bytes via Main allowlist (no FS path in renderer).
+    libraryApi
+      .openBookContent(bookId)
+      .then((result) => {
+        if (cancelled) return
+        if (result.ok && result.data) {
+          // Normalize IPC payload (ArrayBuffer or typed array) into a fresh buffer.
+          setBookBytes(toArrayBuffer(result.data))
+          setBookFormat(result.format ?? null)
+          setContentStatus('ready')
+          // Library Reading shelf — default status when user opens a book.
+          void libraryApi.markAsReading(bookId).catch(() => {})
+          return
+        }
+        setBookBytes(null)
+        setBookFormat(null)
+        setContentStatus('error')
+        setToast(result.errorMessage ?? 'Could not open this book file.')
+      })
+      .catch(() => {
+        if (cancelled) return
+        setBookBytes(null)
+        setBookFormat(null)
+        setContentStatus('error')
+        setToast('Could not open this book file.')
+      })
+
     return () => {
       cancelled = true
     }
-  }, [bookId])
+  }, [bookId, updateBookTitle])
 
   useEffect(() => {
     setDocumentSubtitle(bookTitle)
@@ -146,13 +218,41 @@ export function ReaderScreen() {
     return () => window.clearTimeout(t)
   }, [toast])
 
+  const isEpubSurface =
+    contentStatus === 'ready' && bookFormat === 'epub' && !!bookBytes
+
   const chapter = FAKE_CHAPTERS[chapterIndex] ?? FAKE_CHAPTERS[0]
-  const chapterLabel = `${chapter.num}: ${chapter.title}`
-  const locationLabel = chapterLocationLabel(chapterIndex)
+  const chapterLabel = chapter.title
+  const locationLabel =
+    isEpubSurface && epubNav
+      ? epubNav.label
+      : chapterLocationLabel(chapterIndex)
+  const pageCurrent = isEpubSurface
+    ? (epubNav?.pageCurrent ?? 0)
+    : chapterIndex + 1
+  const pageTotal = isEpubSurface
+    ? (epubNav?.pageTotal ?? 0)
+    : FAKE_CHAPTERS.length
   const progress =
-    FAKE_CHAPTERS.length <= 1
-      ? 0
-      : chapterIndex / (FAKE_CHAPTERS.length - 1)
+    isEpubSurface && epubNav
+      ? epubNav.progress
+      : FAKE_CHAPTERS.length <= 1
+        ? 0
+        : chapterIndex / (FAKE_CHAPTERS.length - 1)
+  const zoomPercent = Math.round(
+    (prefs.fontSize / FONT_SIZE_DEFAULT) * 100,
+  )
+
+  function bumpFontSize(delta: number) {
+    setPrefs((p) => ({
+      ...p,
+      fontSize: clampFontSize(p.fontSize + delta),
+    }))
+  }
+
+  function resetFontSize() {
+    setPrefs((p) => ({ ...p, fontSize: FONT_SIZE_DEFAULT }))
+  }
 
   const effectiveMargin = prefs.marginEnabled ? prefs.margin : 'off'
   const chapterBookmarked = bookmarks.some(
@@ -165,21 +265,20 @@ export function ReaderScreen() {
       ({
         '--reader-reading-size': `${prefs.fontSize}px`,
         '--reader-reading-line-height': String(prefs.lineHeight),
-        '--reader-reading-weight': String(prefs.fontWeight),
-        '--reader-font-reading': fontFamilyCss(prefs.fontFamily),
-        '--reader-reading-align': prefs.textAlign,
+        '--reader-reading-weight': String(globalPrefs.fontWeight),
+        '--reader-font-reading': fontFamilyCss(globalPrefs.fontFamily),
+        '--reader-reading-align': globalPrefs.textAlign,
       }) as CSSProperties,
     [
       prefs.fontSize,
       prefs.lineHeight,
-      prefs.fontWeight,
-      prefs.fontFamily,
-      prefs.textAlign,
+      globalPrefs.fontWeight,
+      globalPrefs.fontFamily,
+      globalPrefs.textAlign,
     ],
   )
 
   function closeFloating() {
-    setToolsOpen(false)
     setMoreOpen(false)
     setSettingsOpen(false)
   }
@@ -210,21 +309,88 @@ export function ReaderScreen() {
   }
 
   function handleScrub(ratio: number) {
+    if (isEpubSurface) {
+      const api = epubApiRef.current
+      const n = epubNav?.spineLength ?? api?.getSpineLength() ?? 0
+      if (!api || n <= 0) return
+      const idx = Math.round(ratio * Math.max(n - 1, 0))
+      void api.goToSpineIndex(idx)
+      return
+    }
     const idx = Math.round(ratio * (FAKE_CHAPTERS.length - 1))
     goChapter(idx)
   }
 
+  // Fake / non-EPUB: ArrowLeft/Right = chapter (EPUB binds its own keys).
+  useEffect(() => {
+    if (isEpubSurface) return
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return
+      if (e.ctrlKey || e.metaKey || e.altKey) return
+      const tag = (e.target as HTMLElement | null)?.tagName
+      if (
+        tag === 'INPUT' ||
+        tag === 'TEXTAREA' ||
+        (e.target as HTMLElement)?.isContentEditable
+      ) {
+        return
+      }
+      e.preventDefault()
+      setChapterIndex((i) => {
+        const next =
+          e.key === 'ArrowRight'
+            ? Math.min(i + 1, FAKE_CHAPTERS.length - 1)
+            : Math.max(i - 1, 0)
+        return next
+      })
+      setPendingSelection(null)
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [isEpubSurface])
+
+  // Zoom: Ctrl/Cmd + / − / 0 (works for EPUB + fake canvas).
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      if (!(e.ctrlKey || e.metaKey) || e.altKey) return
+      const tag = (e.target as HTMLElement | null)?.tagName
+      if (
+        tag === 'INPUT' ||
+        tag === 'TEXTAREA' ||
+        (e.target as HTMLElement)?.isContentEditable
+      ) {
+        return
+      }
+      if (e.key === '=' || e.key === '+') {
+        e.preventDefault()
+        setPrefs((p) => ({
+          ...p,
+          fontSize: clampFontSize(p.fontSize + FONT_SIZE_STEP),
+        }))
+        return
+      }
+      if (e.key === '-' || e.key === '_') {
+        e.preventDefault()
+        setPrefs((p) => ({
+          ...p,
+          fontSize: clampFontSize(p.fontSize - FONT_SIZE_STEP),
+        }))
+        return
+      }
+      if (e.key === '0') {
+        e.preventDefault()
+        setPrefs((p) => ({ ...p, fontSize: FONT_SIZE_DEFAULT }))
+      }
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [])
+
   function selectTool(tool: Exclude<AnnotateTool, null>) {
     closeFloating()
-    setToolsOpen(false)
     setActiveTool((prev) => (prev === tool ? null : tool))
     setPendingSelection(null)
     if (tool !== 'comment') setCommentTarget(null)
-  }
-
-  function clearTool() {
-    setActiveTool(null)
-    setPendingSelection(null)
   }
 
   function handleTextSelected(
@@ -341,7 +507,7 @@ export function ReaderScreen() {
       {
         id: nextId('bm'),
         chapterIndex,
-        label: `${chapter.num}: ${chapter.title}`,
+        label: chapter.title,
       },
     ])
     setToast('Bookmark added.')
@@ -387,203 +553,220 @@ export function ReaderScreen() {
       ? (chapter.paragraphs[commentTarget.paragraphIndex] ?? '')
       : ''
 
-  const themeShell =
-    prefs.theme === 'sepia'
-      ? 'bg-[#16120e] text-[#e1cfb3] [--reader-text:#e1cfb3]'
-      : prefs.theme === 'paper'
-        ? 'bg-slate-100 text-slate-700 [--reader-text:#334155]'
-        : 'bg-[#0f172a] text-slate-300 [--reader-text:#cbd5e1]'
+  const themeShell = 'bg-lib-bg-deep text-lib-text [--reader-text:var(--lib-text)]'
 
   return (
-    <div
-      className={`relative flex h-full w-full flex-col overflow-hidden font-[system-ui,'Segoe_UI',sans-serif] antialiased select-none ${themeShell}`}
+    <ReaderShell
+      themeClassName={themeShell}
       style={readingStyle}
+      chromeHidden={chromeHidden}
+      onToggleChrome={toggleChrome}
+      dataAttrs={{
+        'data-content-status': contentStatus,
+        'data-content-format': bookFormat ?? '',
+        'data-content-bytes': bookBytes ? String(bookBytes.byteLength) : '0',
+      }}
+      edges={
+        <>
+          <TocEdgeButton
+            onOpen={() => {
+              closeFloating()
+              setSidebarOpen(true)
+              setSidebarTab('chapters')
+            }}
+          />
+          <BookmarkEdgeButton
+            active={chapterBookmarked}
+            onToggle={() => {
+              closeFloating()
+              toggleBookmark()
+            }}
+          />
+        </>
+      }
+      topbar={
+        <ReaderTopbar
+          chromeHidden={chromeHidden}
+          moreOpen={moreOpen}
+          settingsOpen={settingsOpen}
+          activeTool={activeTool}
+          onToggleMore={() => {
+            setSettingsOpen(false)
+            setMoreOpen((v) => !v)
+          }}
+          onToggleSettings={() => {
+            setMoreOpen(false)
+            setSettingsOpen((v) => !v)
+          }}
+          onSelectTool={selectTool}
+          onOpenSign={() => {
+            setSignOpen(true)
+          }}
+          onShare={() => {
+            closeFloating()
+            setToast('Share — not available yet.')
+          }}
+          onFavorites={() => {
+            closeFloating()
+            setToast('Added to Favorites (local stub).')
+          }}
+          onBookInfo={() => {
+            closeFloating()
+            setBookInfoOpen(true)
+          }}
+          onTrash={() => {
+            closeFloating()
+            setTrashOpen(true)
+          }}
+        />
+      }
+      footer={
+        <ReaderFooter
+          chromeHidden={chromeHidden}
+          locationLabel={locationLabel}
+          pageCurrent={pageCurrent}
+          pageTotal={pageTotal}
+          progress={progress}
+          onScrub={handleScrub}
+          zoomPercent={zoomPercent}
+          onZoomOut={() => bumpFontSize(-FONT_SIZE_STEP)}
+          onZoomIn={() => bumpFontSize(FONT_SIZE_STEP)}
+          onZoomReset={resetFontSize}
+        />
+      }
+      overlays={
+        <>
+          <TocSidebar
+            open={sidebarOpen}
+            tab={sidebarTab}
+            chapters={FAKE_CHAPTERS}
+            chapterIndex={chapterIndex}
+            bookmarks={bookmarks}
+            notes={notes}
+            highlights={highlights}
+            comments={comments}
+            onClose={() => setSidebarOpen(false)}
+            onTabChange={setSidebarTab}
+            onSelectChapter={goChapter}
+            onJumpBookmark={goChapter}
+            onDeleteBookmark={(id) =>
+              setBookmarks((list) => list.filter((b) => b.id !== id))
+            }
+            onAddBookmark={() => {
+              toggleBookmark()
+              setSidebarTab('bookmarks')
+            }}
+            onJumpNote={goChapter}
+            onJumpComment={(ch, para) => {
+              goChapter(ch)
+              setCommentTarget({ paragraphIndex: para })
+            }}
+          />
+
+          <AaSettingsPanel
+            open={settingsOpen}
+            prefs={prefs}
+            onClose={() => setSettingsOpen(false)}
+            onChange={(patch) => setPrefs((p) => ({ ...p, ...patch }))}
+          />
+
+          <SelectionTooltip
+            selection={pendingSelection}
+            onHighlight={applyHighlight}
+            onNote={openNoteFromSelection}
+            onCopy={copySelection}
+          />
+
+          <NoteModal
+            open={noteModalOpen}
+            quote={pendingSelection?.selectedText ?? ''}
+            onClose={() => setNoteModalOpen(false)}
+            onSave={saveNote}
+          />
+
+          <CommentsDrawer
+            open={commentTarget !== null}
+            chapterLabel={chapterLabel}
+            paragraphPreview={paragraphPreview}
+            comments={drawerComments}
+            onClose={() => setCommentTarget(null)}
+            onSubmit={submitComment}
+          />
+
+          <SignInfoPanel
+            open={signOpen}
+            isSigned={isSigned}
+            signatures={FAKE_SIGNATURES}
+            onClose={() => setSignOpen(false)}
+          />
+
+          <BookInfoDialog
+            open={bookInfoOpen}
+            bookId={bookId ?? 'unknown'}
+            title={bookTitle}
+            chapterLabel={chapterLabel}
+            formatLabel={bookFormat?.toUpperCase() || 'EPUB'}
+            coverUrl={coverUrl}
+            isSigned={isSigned}
+            onClose={() => setBookInfoOpen(false)}
+          />
+
+          <TrashConfirmDialog
+            open={trashOpen}
+            bookTitle={bookTitle}
+            onCancel={() => setTrashOpen(false)}
+            onConfirm={() => {
+              setTrashOpen(false)
+              setToast('Trash confirm — delete wiring comes later.')
+              navigate('/library')
+            }}
+          />
+
+          {toast ? (
+            <div className="pointer-events-none fixed top-6 left-1/2 z-[999] -translate-x-1/2 rounded-full border border-lib-border bg-lib-surface-strong px-[18px] py-2.5 text-[13px] font-semibold text-lib-text-strong shadow-xl">
+              {toast}
+            </div>
+          ) : null}
+        </>
+      }
     >
-      <ChromeRevealButton
-        expanded={!chromeHidden}
-        onToggle={toggleChrome}
-      />
-
-      <TocEdgeButton
-        onOpen={() => {
-          closeFloating()
-          setSidebarOpen(true)
-          setSidebarTab('chapters')
-        }}
-      />
-
-      <BookmarkEdgeButton
-        active={chapterBookmarked}
-        onToggle={() => {
-          closeFloating()
-          toggleBookmark()
-        }}
-      />
-
-      <ReaderTopbar
-        chapterLabel={chapterLabel}
-        chromeHidden={chromeHidden}
-        toolsOpen={toolsOpen}
-        moreOpen={moreOpen}
-        settingsOpen={settingsOpen}
-        activeTool={activeTool}
-        onToggleTools={() => {
-          setMoreOpen(false)
-          setSettingsOpen(false)
-          setToolsOpen((v) => !v)
-        }}
-        onToggleMore={() => {
-          setToolsOpen(false)
-          setSettingsOpen(false)
-          setMoreOpen((v) => !v)
-        }}
-        onToggleSettings={() => {
-          setToolsOpen(false)
-          setMoreOpen(false)
-          setSettingsOpen((v) => !v)
-        }}
-        onSelectTool={selectTool}
-        onClearTool={clearTool}
-        onOpenSign={() => {
-          setToolsOpen(false)
-          setSignOpen(true)
-        }}
-        onShare={() => {
-          closeFloating()
-          setToast('Share — not available yet.')
-        }}
-        onFavorites={() => {
-          closeFloating()
-          setToast('Added to Favorites (local stub).')
-        }}
-        onBookInfo={() => {
-          closeFloating()
-          setBookInfoOpen(true)
-        }}
-        onTrash={() => {
-          closeFloating()
-          setTrashOpen(true)
-        }}
-      />
-
-      <ReadingCanvas
-        chapter={chapter}
-        chapterIndex={chapterIndex}
-        margin={effectiveMargin}
-        pageMode={prefs.pageMode}
-        layout={prefs.layout}
-        activeTool={activeTool}
-        highlights={highlights}
-        comments={comments}
-        typewriterMarks={typewriterMarks}
-        eSignStamps={eSignStamps}
-        onCanvasBackgroundClick={handleCanvasClick}
-        onParagraphClick={openCommentOnParagraph}
-        onTextSelected={handleTextSelected}
-        onPlaceTypewriter={placeTypewriter}
-        onPlaceESign={placeESign}
-        onTypewriterChange={(id, text) =>
-          setTypewriterMarks((list) =>
-            list.map((m) => (m.id === id ? { ...m, text } : m)),
-          )
-        }
-      />
-
-      <ReaderFooter
-        chromeHidden={chromeHidden}
-        locationLabel={locationLabel}
-        progress={progress}
-        onScrub={handleScrub}
-      />
-
-      <TocSidebar
-        open={sidebarOpen}
-        tab={sidebarTab}
-        chapters={FAKE_CHAPTERS}
-        chapterIndex={chapterIndex}
-        bookmarks={bookmarks}
-        notes={notes}
-        highlights={highlights}
-        comments={comments}
-        onClose={() => setSidebarOpen(false)}
-        onTabChange={setSidebarTab}
-        onSelectChapter={goChapter}
-        onJumpBookmark={goChapter}
-        onDeleteBookmark={(id) =>
-          setBookmarks((list) => list.filter((b) => b.id !== id))
-        }
-        onAddBookmark={() => {
-          toggleBookmark()
-          setSidebarTab('bookmarks')
-        }}
-        onJumpNote={goChapter}
-        onJumpComment={(ch, para) => {
-          goChapter(ch)
-          setCommentTarget({ paragraphIndex: para })
-        }}
-      />
-
-      <AaSettingsPanel
-        open={settingsOpen}
-        prefs={prefs}
-        onClose={() => setSettingsOpen(false)}
-        onChange={(patch) => setPrefs((p) => ({ ...p, ...patch }))}
-      />
-
-      <SelectionTooltip
-        selection={pendingSelection}
-        onHighlight={applyHighlight}
-        onNote={openNoteFromSelection}
-        onCopy={copySelection}
-      />
-
-      <NoteModal
-        open={noteModalOpen}
-        quote={pendingSelection?.selectedText ?? ''}
-        onClose={() => setNoteModalOpen(false)}
-        onSave={saveNote}
-      />
-
-      <CommentsDrawer
-        open={commentTarget !== null}
-        chapterLabel={chapterLabel}
-        paragraphPreview={paragraphPreview}
-        comments={drawerComments}
-        onClose={() => setCommentTarget(null)}
-        onSubmit={submitComment}
-      />
-
-      <SignInfoPanel
-        open={signOpen}
-        isSigned={isSigned}
-        signatures={FAKE_SIGNATURES}
-        onClose={() => setSignOpen(false)}
-      />
-
-      <BookInfoDialog
-        open={bookInfoOpen}
-        title={bookTitle}
-        chapterLabel={chapterLabel}
-        isSigned={isSigned}
-        onClose={() => setBookInfoOpen(false)}
-      />
-
-      <TrashConfirmDialog
-        open={trashOpen}
-        bookTitle={bookTitle}
-        onCancel={() => setTrashOpen(false)}
-        onConfirm={() => {
-          setTrashOpen(false)
-          setToast('Trash confirm — delete wiring comes later.')
-          navigate('/library')
-        }}
-      />
-
-      {toast ? (
-        <div className="pointer-events-none fixed top-6 left-1/2 z-[999] -translate-x-1/2 rounded-full border border-slate-600/45 bg-slate-900/95 px-[18px] py-2.5 text-[13px] font-semibold text-slate-100 shadow-xl">
-          {toast}
-        </div>
-      ) : null}
-    </div>
+      {contentStatus === 'ready' && bookFormat === 'epub' && bookBytes ? (
+        <EpubRenderer
+          data={bookBytes}
+          theme={globalPrefs.theme}
+          layout={prefs.layout}
+          pageMode={prefs.pageMode}
+          fontSize={prefs.fontSize}
+          pageTurnEnabled={
+            activeTool !== 'typewriter' && activeTool !== 'esign'
+          }
+          apiRef={epubApiRef}
+          onNavState={setEpubNav}
+        />
+      ) : (
+        <ReadingCanvas
+          chapter={chapter}
+          chapterIndex={chapterIndex}
+          margin={effectiveMargin}
+          pageMode={prefs.pageMode}
+          layout={prefs.layout}
+          activeTool={activeTool}
+          highlights={highlights}
+          comments={comments}
+          typewriterMarks={typewriterMarks}
+          eSignStamps={eSignStamps}
+          onCanvasBackgroundClick={handleCanvasClick}
+          onParagraphClick={openCommentOnParagraph}
+          onTextSelected={handleTextSelected}
+          onPlaceTypewriter={placeTypewriter}
+          onPlaceESign={placeESign}
+          onTypewriterChange={(id, text) =>
+            setTypewriterMarks((list) =>
+              list.map((m) => (m.id === id ? { ...m, text } : m)),
+            )
+          }
+        />
+      )}
+    </ReaderShell>
   )
 }

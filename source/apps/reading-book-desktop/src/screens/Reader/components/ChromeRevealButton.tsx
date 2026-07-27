@@ -11,7 +11,7 @@ export function ChromeRevealButton({
   return (
     <button
       type="button"
-      className={`absolute left-1/2 z-[60] flex h-7 w-10 -translate-x-1/2 cursor-pointer items-center justify-center rounded-b-lg border border-t-0 border-slate-600/50 bg-slate-900/90 text-slate-400 shadow-md backdrop-blur-md transition-[top,color,border-color] hover:border-amber-500/40 hover:text-amber-400 ${
+      className={`absolute left-1/2 z-[60] flex h-7 w-10 -translate-x-1/2 cursor-pointer items-center justify-center rounded-b-lg border border-t-0 border-lib-border bg-lib-surface-strong text-lib-muted shadow-md backdrop-blur-md transition-[top,color,border-color] hover:border-lib-accent-ring hover:text-lib-accent ${
         expanded ? 'top-14 sm:top-16' : 'top-0'
       }`}
       title={expanded ? 'Hide tools' : 'Show tools'}

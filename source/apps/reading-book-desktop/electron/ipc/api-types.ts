@@ -24,6 +24,14 @@ export interface BookSummaryDto {
   author?: string
   /** Original filename for Library search (FR-08). */
   fileName?: string
+  /** File size in bytes (Library card MB). */
+  fileSizeBytes?: number
+  /** Short blurb for Library list / Book info. */
+  description?: string
+  /** Genre / subject names (from book_genres). */
+  genres?: string[]
+  /** Page or spine-section count when known. */
+  pageCount?: number
   isFavorite?: boolean
   readingStatus?: ReadingStatusDto
   /** Human-readable last-read location; when set, enables Continue Reading. */
@@ -34,6 +42,29 @@ export interface BookSummaryDto {
 
 export interface OkResult {
   ok: boolean
+}
+
+/** Stable codes for library.openBookContent failures (T3.4). */
+export type OpenBookErrorCode =
+  | 'not_found'
+  | 'missing_file'
+  | 'path_denied'
+  | 'read_failed'
+
+/**
+ * Book file bytes for the renderer. Never includes a filesystem path —
+ * Main resolves `books.file_path` under the sandbox allowlist.
+ */
+export interface OpenBookContentResult {
+  ok: boolean
+  bookId: string
+  format?: DocumentFormatDto
+  /** Binary payload for engines (e.g. epubjs ArrayBuffer open). */
+  data?: ArrayBuffer
+  byteLength?: number
+  errorCode?: OpenBookErrorCode
+  /** Short user-facing message when ok is false. */
+  errorMessage?: string
 }
 
 /** Stable codes for import failures (URL download / copy / format / dedup). */
@@ -95,9 +126,14 @@ export interface AddNoteInput {
 export interface DesktopApi {
   ping(): Promise<'pong'>
   getAppInfo(): Promise<AppInfo>
+  /** Update Windows/Linux caption button colors to match app theme. */
+  setChromeTheme(theme: 'night' | 'sepia' | 'paper' | string): Promise<OkResult>
   library: {
     listBooks(): Promise<BookSummaryDto[]>
     getBook(id: string): Promise<BookSummaryDto | null>
+    openBookContent(id: string): Promise<OpenBookContentResult>
+    /** After user opens Reader — book appears on Reading shelf. */
+    markAsReading(id: string): Promise<OkResult>
     deleteBook(id: string): Promise<OkResult>
   }
   import: {

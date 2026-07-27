@@ -1,10 +1,5 @@
-export { AaSettingsPanel, fontFamilyCss } from './AaSettingsPanel'
-export type {
-  FontFamily,
-  MarginMode,
-  ReaderTheme,
-  ReadingPrefs,
-} from './AaSettingsPanel'
+export { AaSettingsPanel } from './AaSettingsPanel'
+export type { MarginMode, ReadingPrefs } from './AaSettingsPanel'
 export { BookInfoDialog } from './BookInfoDialog'
 export { BookmarkEdgeButton } from './BookmarkEdgeButton'
 export { ChromeRevealButton } from './ChromeRevealButton'
@@ -19,5 +14,5 @@ export { SignInfoPanel } from './SignInfoPanel'
 export { TocEdgeButton } from './TocEdgeButton'
 export { TocSidebar } from './TocSidebar'
 export type { SidebarTab } from './TocSidebar'
-export { ToolsMenu } from './ToolsMenu'
+export { ToolsStrip } from './ToolsMenu'
 export { TrashConfirmDialog } from './TrashConfirmDialog'

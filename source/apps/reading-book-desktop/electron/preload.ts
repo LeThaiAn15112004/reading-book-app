@@ -10,9 +10,13 @@ import {
 const api: DesktopApi = {
   ping: () => ipcRenderer.invoke(AppChannels.ping),
   getAppInfo: () => ipcRenderer.invoke(AppChannels.getAppInfo),
+  setChromeTheme: (theme) =>
+    ipcRenderer.invoke(AppChannels.setChromeTheme, theme),
   library: {
     listBooks: () => ipcRenderer.invoke(LibraryChannels.listBooks),
     getBook: (id) => ipcRenderer.invoke(LibraryChannels.getBook, id),
+    openBookContent: (id) => ipcRenderer.invoke(LibraryChannels.openBookContent, id),
+    markAsReading: (id) => ipcRenderer.invoke(LibraryChannels.markAsReading, id),
     deleteBook: (id) => ipcRenderer.invoke(LibraryChannels.deleteBook, id),
   },
   import: {

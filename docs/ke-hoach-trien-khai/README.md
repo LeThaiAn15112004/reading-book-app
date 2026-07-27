@@ -48,24 +48,26 @@ Khác với [`docs/plan/`](../plan/) (tầm nhìn sản phẩm, map research →
 | 8 | [08_Giai_doan_7_Premium_AI.md](./08_Giai_doan_7_Premium_AI.md) | Phase 2 — AI không xâm lấn |
 | 9 | [09_Giai_doan_8_Special_Sync_Mobile.md](./09_Giai_doan_8_Special_Sync_Mobile.md) | Phase 3 — linked libraries + mobile |
 | — | [10_Checklist_nghiem_thu.md](./10_Checklist_nghiem_thu.md) | Checklist DoD từng giai đoạn |
+| — | [11_Backlog_tu_note_san_pham.md](./11_Backlog_tu_note_san_pham.md) | Map đầy đủ nợ từ [`docs/note/note.txt`](../note/note.txt) |
 
 **Quy tắc:** Chỉ sang giai đoạn tiếp theo khi checklist của giai đoạn hiện tại đã tick đủ (hoặc ghi rõ nợ kỹ thuật được chấp nhận).
 
 ---
 
-## Tiến độ hiện tại (2026-07-25)
+## Tiến độ hiện tại (2026-07-27)
 
 | Giai đoạn | Trạng thái | Ghi chú ngắn |
 | :--- | :--- | :--- |
-| **G0** Nền tảng | **Xong** | Electron, SQLite migrations `001`–`004`, IPC, domain/ports, feature flags off |
-| **G1** Splash + Library | **Xong** (nợ data) | UI hub/shelves/filters/collections stub; Continue Reading / status shelf chờ G4 |
-| **G2** Import | **Xong** | File + URL, sandbox, SHA-256 dedup, toast overlay; EPUB metadata thật, format khác stub |
-| **G3** Reader EPUB | **T3.0 xong** | UI theo `reading.html` + fake; tap sách → đọc ngay. Tiếp: EPUB thật (T3.1+) |
+| **G0** Nền tảng | **Xong** | Electron, SQLite migrations `001`–`007`, IPC, domain/ports, feature flags off |
+| **G1** Splash + Library | **Xong** | Outcome đạt; **nợ G1-N1…N8** → [§5](./02_Giai_doan_1_Splash_Library.md) (last-read/favorite → G4; collections/settings → G6; **G1-N7** schema+list UI đã kéo sớm — còn backfill page/genre sách cũ + PDF page count → G6) |
+| **G2** Import | **Xong** | Outcome đạt; **nợ G2-N1…N7** → [§5](./03_Giai_doan_2_Import.md) (metadata đa format, signature, delete → G6) |
+| **G3** Reader EPUB | **T3.0–T3.5 xong** (thiếu T3.6–T3.9) | Nav page/section/scroll + scrub spine; tiếp T3.6 tap-center / T3.7 TOC |
 | G4…G8 | Chưa | Theo thứ tự checklist |
 
-**Schema gần đây (SDS 1.15–1.17):** `books.is_signed`, `book_signatures`, `comments`; **đã bỏ `app_settings`** — app prefs theo platform (`electron-store` / MMKV). UI Comment / signature detect còn ở G5/G6.
+**Schema (SDS 1.18):** `description` / `page_count` trên `books`; `genres` + `book_genres` (n–n); `is_signed`, `book_signatures`, `comments`; **không** `app_settings`. Migrations `001`–`007`.
 
-**Chi tiết tick:** [10_Checklist_nghiem_thu.md](./10_Checklist_nghiem_thu.md)
+**Chi tiết tick + bảng nợ:** [10_Checklist_nghiem_thu.md](./10_Checklist_nghiem_thu.md)  
+**Map note sản phẩm → giai đoạn:** [11_Backlog_tu_note_san_pham.md](./11_Backlog_tu_note_san_pham.md)
 
 ---
 

@@ -2,7 +2,7 @@
 export function SplashSpinner() {
   return (
     <div
-      className="absolute bottom-12 h-6 w-6 animate-spin rounded-full border-2 border-[#334155] border-t-[#f59e0b]"
+      className="absolute bottom-12 h-6 w-6 animate-spin rounded-full border-2 border-lib-border border-t-lib-accent"
       role="status"
       aria-label="Loading"
     />

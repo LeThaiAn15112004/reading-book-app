@@ -77,7 +77,7 @@ export function SplashScreen() {
   }, [navigate])
 
   return (
-    <main className="app-drag flex h-full w-full select-none flex-col items-center justify-center overflow-hidden bg-[radial-gradient(circle,#1e293b_0%,#0f172a_100%)]">
+    <main className="lib-chrome app-drag flex h-full w-full select-none flex-col items-center justify-center overflow-hidden">
       <SplashBrand />
       <SplashSpinner />
     </main>

@@ -88,17 +88,17 @@ Mỗi giai đoạn đạt khi:
 - [ ] Không còn hack “tạm” chặn giai đoạn sau (hoặc đã ghi nợ rõ trong PR/note)
 - [ ] Checklist ở [10_Checklist_nghiem_thu.md](./10_Checklist_nghiem_thu.md) đã cập nhật
 
-### 5.1. Snapshot tiến độ (2026-07-25)
+### 5.1. Snapshot tiến độ (2026-07-27)
 
 | Giai đoạn | Outcome | Trạng thái |
 | :--- | :--- | :--- |
 | G0 | App + DB + IPC | **Đạt** |
-| G1 | Splash → Library | **Đạt** (nợ: last-read / favorite data; collections persist) |
-| G2 | Import file/URL + dedup | **Đạt** |
-| G3 | Đọc EPUB | **T3.0 đạt** (UI + fake); EPUB thật còn lại |
+| G1 | Splash → Library | **Đạt** — nợ **G1-N1…N8** (last-read/favorite → G4; collections/settings/card polish → G6). Chi tiết [02 §5](./02_Giai_doan_1_Splash_Library.md) |
+| G2 | Import file/URL + dedup | **Đạt** — nợ **G2-N1…N7** (adapter đa format, signature, delete, enrich form → G6). Chi tiết [03 §5](./03_Giai_doan_2_Import.md) |
+| G3 | Đọc EPUB | **T3.0 đạt** (UI + fake); EPUB thật còn lại — **không** bị chặn bởi nợ G1/G2 polish |
 | Schema | `is_signed`, `book_signatures`, `comments`; **không** `app_settings` | Overlay SQLite; app prefs = electron-store / MMKV |
 
-Chi tiết: [10_Checklist_nghiem_thu.md](./10_Checklist_nghiem_thu.md) · [README](./README.md).
+Chi tiết: [10_Checklist_nghiem_thu.md](./10_Checklist_nghiem_thu.md) · [11_Backlog_tu_note_san_pham.md](./11_Backlog_tu_note_san_pham.md) · [README](./README.md).
 
 
 

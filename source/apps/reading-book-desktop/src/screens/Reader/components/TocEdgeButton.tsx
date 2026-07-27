@@ -5,7 +5,7 @@ type TocEdgeButtonProps = {
 export function TocEdgeButton({ onOpen }: TocEdgeButtonProps) {
   return (
     <button
-      className="group fixed top-0 bottom-0 left-0 z-[80] flex h-full w-7 cursor-pointer items-center justify-center border-none bg-transparent text-slate-400 transition-[width] hover:w-[34px] hover:bg-gradient-to-r hover:from-slate-950/55 hover:to-transparent hover:text-amber-400"
+      className="group fixed top-0 bottom-0 left-0 z-[80] flex h-full w-7 cursor-pointer items-center justify-center border-none bg-transparent text-lib-muted transition-[width] hover:w-[34px] hover:bg-gradient-to-r hover:from-lib-bg-deep/55 hover:to-transparent hover:text-lib-accent"
       type="button"
       title="Open table of contents"
       aria-label="Open table of contents"
@@ -14,7 +14,7 @@ export function TocEdgeButton({ onOpen }: TocEdgeButtonProps) {
         onOpen()
       }}
     >
-      <span className="absolute top-0 bottom-0 left-0 w-[3px] bg-transparent group-hover:bg-amber-500" />
+      <span className="absolute top-0 bottom-0 left-0 w-[3px] bg-transparent group-hover:bg-lib-accent" />
       <svg
         xmlns="http://www.w3.org/2000/svg"
         fill="none"

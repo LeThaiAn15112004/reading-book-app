@@ -8,27 +8,29 @@
   --color-accent: var(--accent);
 
   /*
-   * SCR-01 Library chrome — concrete values from docs/mockups/library.html
-   * (not dependent on scoped CSS vars, so utilities always resolve).
+   * Library / Settings chrome — values come from [data-theme] in theme.css
+   * (Night / Sepia / Paper).
    */
-  --color-lib-bg-deep: #0f172a;
-  --color-lib-bg-mid: #1e293b;
-  --color-lib-surface: rgb(30 41 59 / 0.45);
-  --color-lib-surface-strong: rgb(15 23 42 / 0.85);
-  --color-lib-border: rgb(51 65 85 / 0.45);
-  --color-lib-border-soft: rgb(51 65 85 / 0.28);
-  --color-lib-text: #e2e8f0;
-  --color-lib-text-strong: #f1f5f9;
-  --color-lib-muted: #94a3b8;
-  --color-lib-faint: #64748b;
-  --color-lib-accent: #f59e0b;
-  --color-lib-accent-hover: #d97706;
-  --color-lib-accent-soft: rgb(245 158 11 / 0.14);
-  --color-lib-accent-ring: rgb(245 158 11 / 0.28);
-  --color-lib-input: rgb(15 23 42 / 0.45);
-  --color-lib-topbar: rgb(15 23 42 / 0.35);
-  --color-lib-hint: rgb(15 23 42 / 0.28);
-  --color-lib-chip: rgb(51 65 85 / 0.35);
+  --color-lib-bg-deep: var(--lib-bg-deep);
+  --color-lib-bg-mid: var(--lib-bg-mid);
+  --color-lib-surface: var(--lib-surface);
+  --color-lib-surface-strong: var(--lib-surface-strong);
+  --color-lib-surface-hover: var(--lib-surface-hover);
+  --color-lib-border: var(--lib-border);
+  --color-lib-border-soft: var(--lib-border-soft);
+  --color-lib-text: var(--lib-text);
+  --color-lib-text-strong: var(--lib-text-strong);
+  --color-lib-muted: var(--lib-muted);
+  --color-lib-faint: var(--lib-faint);
+  --color-lib-accent: var(--lib-accent);
+  --color-lib-accent-hover: var(--lib-accent-hover);
+  --color-lib-accent-soft: var(--lib-accent-soft);
+  --color-lib-accent-ring: var(--lib-accent-ring);
+  --color-lib-on-accent: var(--lib-on-accent);
+  --color-lib-input: var(--lib-input);
+  --color-lib-topbar: var(--lib-topbar);
+  --color-lib-hint: var(--lib-hint);
+  --color-lib-chip: var(--lib-chip);
 
   /* SCR-00 Splash brand motion */
   --animate-splash-pulse: splash-pulse 2.5s ease-in-out infinite;
@@ -39,11 +41,15 @@
     0%,
     100% {
       transform: scale(1);
-      filter: drop-shadow(0 0 15px rgba(245, 158, 11, 0.2));
+      filter: drop-shadow(
+        0 0 15px color-mix(in srgb, var(--lib-accent) 25%, transparent)
+      );
     }
     50% {
       transform: scale(1.03);
-      filter: drop-shadow(0 0 25px rgba(245, 158, 11, 0.4));
+      filter: drop-shadow(
+        0 0 25px color-mix(in srgb, var(--lib-accent) 45%, transparent)
+      );
     }
   }
 
@@ -116,6 +122,11 @@
     color: var(--accent);
   }
 
+  /* Library / Settings shell background follows app theme */
+  .lib-chrome {
+    background: var(--lib-chrome-bg);
+  }
+
   /* Library chrome: do not inherit Reader/app accent link color */
   .lib-chrome a {
     color: inherit;
@@ -158,9 +169,9 @@
   flex-shrink: 0;
   align-items: center;
   overflow: hidden;
-  border-bottom: 1px solid rgb(51 65 85 / 0.35);
-  background: #0f172a;
-  color: #e2e8f0;
+  border-bottom: 1px solid var(--lib-titlebar-border);
+  background: var(--lib-titlebar-bg);
+  color: var(--lib-titlebar-fg);
   -webkit-app-region: drag;
   user-select: none;
   padding-left: max(12px, env(titlebar-area-x, 0px));
@@ -180,7 +191,7 @@
   font-size: 12px;
   font-weight: 500;
   letter-spacing: 0.01em;
-  color: #cbd5e1;
+  color: var(--lib-titlebar-muted);
   pointer-events: none;
 }
 
@@ -240,6 +251,25 @@
   box-shadow: 0 0 0 2px rgb(245 158 11 / 0.18);
 }
 
+/* Shared app menubar (below window titlebar; text-only nav). */
+.app-menubar-stack {
+  -webkit-app-region: no-drag;
+}
+
+.app-menubar {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(100 116 139 / 0.45) transparent;
+}
+
+.app-menubar::-webkit-scrollbar {
+  height: 4px;
+}
+
+.app-menubar::-webkit-scrollbar-thumb {
+  background: rgb(100 116 139 / 0.45);
+  border-radius: 999px;
+}
+
 /* Content headers below the window titlebar (drag chrome only). */
 .app-titlebar {
   -webkit-app-region: drag;
@@ -257,55 +287,38 @@
   -webkit-app-region: no-drag;
 }
 
-/* macOS traffic lights overlay the left edge of the sidebar header. */
-.app-sidebar-titlebar {
-  -webkit-app-region: drag;
-  padding-left: max(0.5rem, env(titlebar-area-x, 0px));
-}
-
-.app-sidebar-titlebar button {
-  -webkit-app-region: no-drag;
-}
-
 /*
  * Themed thin scrollbar (Electron/Windows). Pseudo-elements cannot be expressed
  * as Tailwind utilities alone — apply via className `app-scroll`.
  */
-.app-scroll,
-.lib-sidebar-scroll {
+.app-scroll {
   scrollbar-width: thin;
   scrollbar-color: rgb(100 116 139 / 0.45) transparent;
 }
 
-.app-scroll::-webkit-scrollbar,
-.lib-sidebar-scroll::-webkit-scrollbar {
+.app-scroll::-webkit-scrollbar {
   width: 6px;
 }
 
-.app-scroll::-webkit-scrollbar-track,
-.lib-sidebar-scroll::-webkit-scrollbar-track {
+.app-scroll::-webkit-scrollbar-track {
   background: transparent;
 }
 
-.app-scroll::-webkit-scrollbar-thumb,
-.lib-sidebar-scroll::-webkit-scrollbar-thumb {
+.app-scroll::-webkit-scrollbar-thumb {
   background: rgb(100 116 139 / 0.45);
   border-radius: 999px;
 }
 
-.app-scroll::-webkit-scrollbar-thumb:hover,
-.lib-sidebar-scroll::-webkit-scrollbar-thumb:hover {
+.app-scroll::-webkit-scrollbar-thumb:hover {
   background: rgb(148 163 184 / 0.55);
 }
 
-.app-scroll::-webkit-scrollbar-button,
-.lib-sidebar-scroll::-webkit-scrollbar-button {
+.app-scroll::-webkit-scrollbar-button {
   display: none;
   width: 0;
   height: 0;
 }
 
-.app-scroll::-webkit-scrollbar-corner,
-.lib-sidebar-scroll::-webkit-scrollbar-corner {
+.app-scroll::-webkit-scrollbar-corner {
   background: transparent;
 }

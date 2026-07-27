@@ -1,2 +1,2 @@
-export { AppSidebar } from './AppSidebar'
-export type { AppNavId, AppSidebarProps } from './AppSidebar'
+/** Shared UI helpers (sidebar replaced by chrome/AppMenubar). */
+export {}

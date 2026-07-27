@@ -1,8 +1,8 @@
 # Software Design Specification (SDS)
 
 **Sản phẩm:** Reading Book App — Trình đọc sách / tài liệu thông minh (Trợ lý tri thức cá nhân)  
-**Phiên bản tài liệu:** 1.17  
-**Ngày:** 2026-07-25  
+**Phiên bản tài liệu:** 1.18  
+**Ngày:** 2026-07-27  
 **Trạng thái:** Draft — căn cứ SRS + Design Plan (MVP Free Core) + mockups  
 **Tài liệu liên quan:** [SRS.md](./SRS.md), [docs/mockups/](../mockups/)  
 **Changelog 1.2:** Import từ URL (direct file → sandbox) đưa vào MVP — SDS §1.2, §2.6–2.8, §3.5–3.7; SRS FR-13 / UC-01 / WF-02.  
@@ -20,7 +20,8 @@
 **Changelog 1.14:** Thêm **§3.10 Catalog bảng & thuộc tính** (SQLite vật lý: từng cột / kiểu / ràng buộc) — khớp migration `001_initial.sql`; desktop & mobile dùng cùng schema logic.  
 **Changelog 1.15:** Thêm **`BOOK.is_signed`** + bảng **`BOOK_SIGNATURE` / `book_signatures`** (chi tiết chữ ký số; cascade khi xóa sách) — migration `003_book_signatures.sql`.  
 **Changelog 1.16:** Thêm bảng **`COMMENT` / `comments`** (overlay comment theo trang + `position_data`; cascade khi xóa sách) — migration `004_comments.sql`; SCR-03 tab Comment.  
-**Changelog 1.17:** **Bỏ bảng `app_settings`** khỏi SQLite overlay — app preferences theo platform (desktop: `electron-store`; mobile: MMKV / AsyncStorage); model `AppPreferences` vẫn dùng chung; migration `005_drop_app_settings.sql`.
+**Changelog 1.17:** **Bỏ bảng `app_settings`** khỏi SQLite overlay — app preferences theo platform (desktop: `electron-store`; mobile: MMKV / AsyncStorage); model `AppPreferences` vẫn dùng chung; migration `005_drop_app_settings.sql`.  
+**Changelog 1.18:** Library metadata — `books.description`, `books.page_count` (006); thể loại **n–n** qua **`GENRE` / `BOOK_GENRE`** (`genres`, `book_genres`) thay cột `books.genre` (007). **Không** khôi phục `app_settings`.
 
 ---
 
@@ -42,6 +43,7 @@
   - [2.8. Luồng tiêu biểu (minh họa layered)](#28-luồng-tiêu-biểu-minh-họa-layered)
   - [2.9. Điểm mở rộng phase sau (không phá layered)](#29-điểm-mở-rộng-phase-sau-không-phá-layered)
   - [2.10. Quyết định đã chốt (architecture)](#210-quyết-định-đã-chốt-architecture)
+  - [2.10.1. EPUB engine (T3.1 spike)](#2101-epub-engine-t31-spike)
   - [2.11. Cấu trúc folder dự án (source/)](#211-cấu-trúc-folder-dự-án-source)
 - [3. Data Model & ERD](#3-data-model--erd)
   - [3.1. Nguyên tắc mô hình dữ liệu](#31-nguyên-tắc-mô-hình-dữ-liệu)
@@ -348,12 +350,26 @@ MVP giữ port trống (`NoOp*`) để UI/feature flag không phải đập lạ
 | Desktop process        | Electron Main / Preload / Renderer                     |
 | Chia sẻ desktop–mobile | Domain + Application trong `packages/`                 |
 | Đa định dạng           | Pluggable Document Adapter / Renderer / OverlayPainter |
+| **EPUB engine (desktop)** | **`epubjs` (epub.js) ^0.3.93** — spike T3.1 xác nhận 2026-07-27 (xem §2.10.1) |
 | Persistence MVP        | SQLite (+ FTS5) overlay sách phía Main; **app prefs** = electron-store (desktop) / MMKV (mobile) |
 | AI / Sync MVP          | Interface + NoOp; chưa implement                       |
 | Identity               | **Không** tài khoản app (SRS NFR-11 / BR-08)           |
 | Phase 3 catalog sync   | Folder / library path connectors — không OAuth2 login app |
 
 
+### 2.10.1. EPUB engine (T3.1 spike)
+
+**Đã chốt (2026-07-27):** npm package **`epubjs`** (upstream [epub.js](https://github.com/futurepress/epub.js)) **^0.3.93**, license BSD-2-Clause.
+
+| | |
+| :--- | :--- |
+| **Lý do** | Mở EPUB từ `ArrayBuffer` / binary; TOC + spine; CFI (`cfiBase` / `currentLocation` / `EpubCFI`); `rendition.themes` inject CSS runtime (không ghi đè file); selection API; Vite/Electron ổn; khớp mặc định design (`docs/plan/02_Design.md`). |
+| **Loại — foliate-js** | Đủ năng lực (kể cả `search.js`) nhưng README cảnh báo API chưa ổn định / không semver — rủi ro MVP cao hơn. |
+| **Loại — baseline JSZip+iframe** | Không có CFI → chặn T4.1 resume và G5 highlight. |
+| **Biên tích hợp** | Chỉ Infrastructure UI: `apps/reading-book-desktop/src/reader/renderers/epub/` (theo §2.11). Domain chỉ thấy `DocumentRenderer` + `Location` CFI — **không** import `epubjs`. |
+| **Electron** | Renderer nhận bytes/Blob qua Main IPC allowlist — kênh **`library:openBookContent`** (T3.4); không đọc path tùy ý. Spike harness: `#/spike/epub` + `spikes/epub-engine/MATRIX.md` (không gắn Library → Reader). |
+
+Chi tiết ma trận Pass/Fail: [`source/apps/reading-book-desktop/spikes/epub-engine/MATRIX.md`](../../source/apps/reading-book-desktop/spikes/epub-engine/MATRIX.md).
 
 
 ### 2.11. Cấu trúc folder dự án (`source/`)
@@ -540,9 +556,11 @@ Bảng đối chiếu khi implement: mỗi entity dùng để làm gì, gắn v�
 
 | Thực thể           | Tác dụng thực tế trong ứng dụng                                                                                                                                                                                          | Giải quyết nỗi đau / hành vi nào?                                                                                                 | Ví dụ thực tế (User Story)                                                                                                                                       |
 | ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `BOOK`             | Lưu metadata cuốn sách/tài liệu; quản lý đường dẫn file vật lý trong sandbox; định danh bằng SHA-256 để tránh import trùng; gắn `file_format` và (nếu có) `normalized_path`; cờ `is_signed` khi có chữ ký số. Tác giả qua quan hệ **n - n** với `AUTHOR`. | Tránh thất lạc và trùng lặp sách — thư viện ngăn nắp, biết chính xác file nằm đâu để mở đọc; biết tài liệu đã ký hay chưa. | Bạn import `De-men-phieu-luu-ky.epub`. Hệ thống tính SHA-256, lưu `file_path`, liên kết tác giả (có thể nhiều người), hiện title + danh sách author lên Library. |
+| `BOOK`             | Lưu metadata cuốn sách/tài liệu; quản lý đường dẫn file vật lý trong sandbox; định danh bằng SHA-256 để tránh import trùng; gắn `file_format` và (nếu có) `normalized_path`; cờ `is_signed` khi có chữ ký số; `description` / `page_count` cho Library card. Tác giả qua quan hệ **n - n** với `AUTHOR`; thể loại qua **n - n** với `GENRE`. | Tránh thất lạc và trùng lặp sách — thư viện ngăn nắp, biết chính xác file nằm đâu để mở đọc; biết tài liệu đã ký hay chưa; xem nhanh mô tả / dung lượng / số trang / thể loại trên list. | Bạn import `De-men-phieu-luu-ky.epub`. Hệ thống tính SHA-256, lưu `file_path`, liên kết tác giả + thể loại (có thể nhiều), hiện title + author + genre lên Library. |
 | `AUTHOR`           | Lưu hồ sơ tác giả dùng chung (`name`, `sort_name`). Một tác giả gắn được nhiều sách.                                                                                                                                     | Tìm / lọc theo tác giả; không nhân đôi chuỗi author trên từng sách; hỗ trợ sách nhiều đồng tác giả.                               | Import sách có 2 đồng tác giả → tạo/reuse 2 `AUTHOR`, gắn qua `BOOK_AUTHOR`. Sách khác cùng 1 tác giả tái sử dụng bản ghi author đó.                             |
 | `BOOK_AUTHOR`      | Bảng liên kết **n - n** giữa `BOOK` và `AUTHOR`; có `sort_order` để hiển thị thứ tự tên trên bìa/Library.                                                                                                                | Cho phép 1 sách nhiều tác giả và 1 tác giả nhiều sách.                                                                            | Sách A: author X (order 0), Y (order 1). Sách B cũng gắn author X.                                                                                               |
+| `GENRE`            | Thể loại / subject dùng chung (`name` unique). Một thể loại gắn được nhiều sách.                                                                                                                                         | Phân loại Library; lọc / search theo thể loại; tái sử dụng nhãn từ OPF `dc:subject`.                                              | Import EPUB có subject “Fiction”, “Adventure” → 2 `GENRE`, gắn qua `BOOK_GENRE`.                                                                                 |
+| `BOOK_GENRE`       | Bảng liên kết **n - n** giữa `BOOK` và `GENRE`.                                                                                                                                                                          | 1 sách nhiều thể loại; 1 thể loại nhiều sách.                                                                                    | Sách A: Fiction + Adventure. Sách B cũng Fiction.                                                                                                                |
 | `BOOK_SIGNATURE`   | Chi tiết chữ ký số trên tài liệu (`signer_name`, `signature_status`, `signed_at`). Quan hệ **1 - n** với `BOOK`. Cờ `BOOK.is_signed` = denormalized khi có ≥ 1 dòng chữ ký.                                              | Xác thực nguồn / tính toàn vẹn tài liệu đã ký (PDF signed, v.v.); lọc sách đã ký trong Library.                                   | Import PDF có chữ ký của “Acme Corp” → `is_signed = 1` + một dòng `BOOK_SIGNATURE` status `valid`.                                                              |
 | `READING_SESSION_STATE` | Lưu vị trí đọc cuối (`last_read_location`); lưu cấu hình đọc per-book (màu nền, màu chữ, font, landscape…). Quan hệ **1 - 1** với `BOOK`. Không hàm ý đã đọc hết hay đọc tuần tự. | “Mở xong đóng, mở lại đúng chỗ” — không mất đoạn đang đọc; không phải chỉnh lại theme chống mỏi mắt mỗi lần mở. | Bạn đọc tới Chương 3 (hoặc nhảy cóc sang đoạn khác), bật Sepia rồi tắt app. Hôm sau mở lại: nền Sepia + nhảy đúng vị trí lần trước. |
 | `HIGHLIGHT`        | Lưu đoạn bôi màu (`location_start`/`end`, `selected_text`, `color_hex`) như Overlay đè lên nội dung gốc (không sửa file).                                                                                                | Ghi nhớ thông tin cốt lõi — xem lại nhanh trích dẫn / kiến thức đã đánh dấu, không lật lại từng trang.                            | Bôi câu *“Đi một ngày đàng, học một sàng khôn”*, chọn màu Vàng → hiện trong danh sách Highlight và jump lại đúng chỗ.                                            |
@@ -564,6 +582,9 @@ Bảng đối chiếu khi implement: mỗi entity dùng để làm gì, gắn v�
 | `BOOK` ↔ `AUTHOR`           | **n - n**   | Qua bảng liên kết `BOOK_AUTHOR` (`sort_order`). 1 sách nhiều tác giả; 1 tác giả nhiều sách. |
 | `BOOK` → `BOOK_AUTHOR`      | **1 - n**   | Cascade khi xóa sách.                                                                       |
 | `AUTHOR` → `BOOK_AUTHOR`    | **1 - n**   | Xóa author: RESTRICT nếu còn sách gắn (hoặc cascade unlink tùy policy).                     |
+| `BOOK` ↔ `GENRE`            | **n - n**   | Qua bảng liên kết `BOOK_GENRE`. 1 sách nhiều thể loại; 1 thể loại nhiều sách.               |
+| `BOOK` → `BOOK_GENRE`       | **1 - n**   | Cascade khi xóa sách.                                                                       |
+| `GENRE` → `BOOK_GENRE`      | **1 - n**   | Cascade khi xóa genre (gỡ membership).                                                      |
 | `BOOK` → `BOOK_SIGNATURE`   | **1 - n**   | Chi tiết chữ ký số; cascade khi xóa sách. Cờ `is_signed` trên `BOOK` đồng bộ khi có/không còn signature. |
 | `BOOK` → `READING_SESSION_STATE` | **1 - 1**   | Mỗi sách một bản ghi resume + setting đọc gần nhất. Tạo khi import hoặc lần mở đầu. |
 | `BOOK` → `HIGHLIGHT`        | **1 - n**   | Overlay; cascade khi xóa sách.                                                              |
@@ -630,14 +651,17 @@ Bảng đối chiếu khi implement: mỗi entity dùng để làm gì, gắn v�
 | ---------------- | ------------------------------------------------------------------ |
 | PK sách          | UUID (string)                                                      |
 | Book ↔ Author    | **n - n** qua `BOOK_AUTHOR` / `book_authors` (+ `sort_order`)      |
+| Book ↔ Genre     | **n - n** qua `BOOK_GENRE` / `book_genres` (migration `007`)       |
 | Resume / session | 1 - 1 với BOOK qua `READING_SESSION_STATE`; gộp cả setting đọc per-book (màu, font, landscape) |
 | Favorite         | Cột `BOOK.is_favorite`                                             |
+| Library blurb    | `BOOK.description` + `BOOK.page_count` + `file_size_bytes` (card G1-N7) |
+| App preferences  | **Không** SQLite `app_settings` — platform store (1.17)            |
 | Digital signature | Cột `BOOK.is_signed` + bảng `BOOK_SIGNATURE` / `book_signatures` (1–n) |
 | Bookmark         | Bảng riêng `BOOKMARK` (không gộp vào highlight)                    |
 | Comment          | Bảng riêng `COMMENT` / `comments` (page + position_data; khác NOTE) |
 | Note ↔ Highlight | Optional FK `highlight_id`                                         |
 | Chunk            | Có trong schema sớm; embedding nullable đến Phase 2                |
-| Cascade xóa sách | book_authors + collection_books + book_signatures + ReadingSessionState + Highlight + Note + Comment + Bookmark + Chunk |
+| Cascade xóa sách | book_authors + book_genres + collection_books + book_signatures + ReadingSessionState + Highlight + Note + Comment + Bookmark + Chunk |
 | Collections      | `COLLECTION` + `COLLECTION_BOOK` (n–n); xóa collection cascade membership, **không** xóa sách |
 | Nguồn import     | File máy **và** URL direct file; optional cột `books.source_url`   |
 
@@ -701,6 +725,8 @@ Catalog vật lý khớp migration desktop [`001_initial.sql`](../../source/apps
 | `cover_path` | TEXT | NULL | Path cover đã extract (nếu có) |
 | `sha256` | TEXT | NOT NULL, **UNIQUE** | Hash nội dung — dedup import (**BR-03**) |
 | `file_size_bytes` | INTEGER | NULL | Kích thước file (byte) |
+| `description` | TEXT | NULL | Mô tả ngắn / OPF description (Library card · G1-N7) |
+| `page_count` | INTEGER | NULL | Tổng trang (PDF) hoặc số spine/section (EPUB) khi biết |
 | `is_favorite` | INTEGER | NOT NULL, DEFAULT `0` | Favorite (0/1) |
 | `is_signed` | INTEGER | NOT NULL, DEFAULT `0` | Có chữ ký số (0 = chưa ký, 1 = đã ký); chi tiết ở `book_signatures` |
 | `source_url` | TEXT | NULL | URL gốc nếu import từ mạng; null nếu từ máy |
@@ -708,6 +734,27 @@ Catalog vật lý khớp migration desktop [`001_initial.sql`](../../source/apps
 | `updated_at` | TEXT | NOT NULL | Lần cập nhật metadata gần nhất |
 
 **Index:** `UNIQUE(sha256)`; `INDEX(is_favorite)`; `INDEX(is_signed)`; `INDEX(updated_at)`.
+
+> Thể loại **không** lưu cột trên `books` — dùng `genres` + `book_genres` (migration `007_genres_nn.sql`).
+
+#### `genres` — thể loại / subject dùng chung
+
+| Cột | Kiểu | Ràng buộc | Mô tả |
+| :--- | :--- | :--- | :--- |
+| `id` | TEXT | PK, NOT NULL | UUID genre |
+| `name` | TEXT | NOT NULL, **UNIQUE** | Tên thể loại (vd. Fiction) |
+| `created_at` | TEXT | NOT NULL | Thời điểm tạo |
+
+**Index:** `INDEX(name)` (unique đã cover lookup).
+
+#### `book_genres` — liên kết n–n sách ↔ thể loại
+
+| Cột | Kiểu | Ràng buộc | Mô tả |
+| :--- | :--- | :--- | :--- |
+| `book_id` | TEXT | PK composite, FK → `books.id` **ON DELETE CASCADE** | Sách |
+| `genre_id` | TEXT | PK composite, FK → `genres.id` **ON DELETE CASCADE** | Thể loại |
+
+**Index:** `INDEX(genre_id)`.
 
 #### `book_signatures` — chi tiết chữ ký số trên tài liệu
 

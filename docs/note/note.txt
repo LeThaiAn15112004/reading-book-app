@@ -1,3 +1,5 @@
+# Map nợ kỹ thuật đầy đủ → docs/ke-hoach-trien-khai/11_Backlog_tu_note_san_pham.md
+
 cho import sách từ file hệ thống + link mạng
 chuyển màu bg khi đọc để tối ưu trải nghiệm (tránh mỏi mắt)
 có thể chỉnh cả màu text tương phản với màn để tránh đau mắt
@@ -13,3 +15,12 @@ có thêm đọc audio cho ai lười nhìn
 đọc sách ít khi để 2 trang khi ngang màn, 1 căn giữa, có khung chia phân 2 trang
 cho chọn kiểu đọc
 bỏ quản lý user, chỉ cần super app (gg books, icloud books), khi đồng bộ là load list sách lên, ở app cũng cho đồng bộ
+
+nhìn vào mấy quyển sách kia hiện đang chưa biết nó thuộc thể loại nào, file nặng bao nhiêu mb, tổng số trang, mô tả ngắn..
+UI bìa sách hiển thị cũng chưa đẹp
+lục import file vào thì thêm mục add bìa sách nữa, nếu k app thì sẽ có bìa default và hiện title của file sách đó lên bìa
+Màn import sách thì e phải thêm mục Title sách, mô tả ngắn, thể loại, tác giả, ảnh bìa, link file...
+Bảo AI nó phân tích rồi xem có thêm mục nào nữa k?
+Sách đúng ra là phải có check bản quyền các thứ nữa
+zoom in zoom out
+phải chỉnh được cả độ sáng tôi màn hình, chỉnh chế độ đọc sách ban ngày, ban đêm, ngoài trời

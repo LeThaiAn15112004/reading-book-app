@@ -23,14 +23,14 @@ export function SelectionTooltip({
 
   return (
     <div
-      className="fixed z-[200] flex max-w-[calc(100vw-24px)] items-center gap-2.5 rounded-3xl border border-slate-600/45 bg-slate-900/95 px-3 py-1.5 shadow-xl backdrop-blur-md"
+      className="fixed z-[200] flex max-w-[calc(100vw-24px)] items-center gap-2.5 rounded-3xl border border-lib-border bg-lib-surface-strong px-3 py-1.5 shadow-xl backdrop-blur-md"
       style={{ top, left }}
       onClick={(e) => e.stopPropagation()}
       role="toolbar"
       aria-label="Selection actions"
     >
       <button
-        className="size-6 cursor-pointer rounded-full border border-amber-500 bg-amber-500/45 p-0 transition-transform hover:scale-110"
+        className="size-6 cursor-pointer rounded-full border border-lib-accent bg-lib-accent/45 p-0 transition-transform hover:scale-110"
         type="button"
         title="Highlight yellow"
         aria-label="Highlight yellow"
@@ -50,16 +50,16 @@ export function SelectionTooltip({
         aria-label="Highlight pink"
         onClick={() => onHighlight('pink')}
       />
-      <div className="h-[18px] w-px bg-slate-600/40" />
+      <div className="h-[18px] w-px bg-lib-border" />
       <button
-        className="cursor-pointer border-none bg-transparent px-1 py-1.5 text-[13px] font-semibold text-slate-100"
+        className="cursor-pointer border-none bg-transparent px-1 py-1.5 text-[13px] font-semibold text-lib-text-strong"
         type="button"
         onClick={onNote}
       >
         Note
       </button>
       <button
-        className="cursor-pointer border-none bg-transparent px-1 py-1.5 text-[13px] font-semibold text-slate-100"
+        className="cursor-pointer border-none bg-transparent px-1 py-1.5 text-[13px] font-semibold text-lib-text-strong"
         type="button"
         onClick={onCopy}
       >

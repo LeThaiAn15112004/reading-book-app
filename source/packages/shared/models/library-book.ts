@@ -19,6 +19,16 @@ export type LibraryBook = {
   lastReadLocation?: string
   lastReadAt?: string
   noteCount: number
+  /** File size in bytes for Library MB display. */
+  fileSizeBytes?: number
+  /** Short blurb (OPF description / enrich). */
+  description?: string
+  /** Genre / subject names (from book_genres). */
+  genres?: string[]
+  /** Joined genre label for list / search display. */
+  genre?: string
+  /** Page or spine-section count when known. */
+  pageCount?: number
 }
 
 export type NavFilterId = 'favorites' | 'completed' | 'to-read'
@@ -35,6 +45,12 @@ export type BookSummaryInput = {
   fileName?: string
   /** Renderer-safe cover URL (`rb-cover://…`); optional. */
   coverUrl?: string
+  fileSizeBytes?: number
+  description?: string
+  genres?: string[]
+  /** @deprecated Prefer genres[]; kept for older IPC shapes. */
+  genre?: string
+  pageCount?: number
   isFavorite?: boolean
   readingStatus?: LibraryReadingStatus
   lastReadLocation?: string
@@ -73,6 +89,29 @@ export function mapBookSummary(dto: BookSummaryInput): LibraryBook {
     dto.readingStatus ?? (lastReadLocation ? 'reading' : 'not-started')
 
   const coverUrl = dto.coverUrl?.trim() || undefined
+  const description = dto.description?.trim() || undefined
+  const genres = [
+    ...new Set(
+      (dto.genres ?? [])
+        .map((g) => g.trim())
+        .filter((g) => g.length > 0),
+    ),
+  ]
+  if (genres.length === 0 && dto.genre?.trim()) {
+    for (const part of dto.genre.split(',')) {
+      const t = part.trim()
+      if (t) genres.push(t)
+    }
+  }
+  const genre = genres.length > 0 ? genres.join(', ') : undefined
+  const pageCount =
+    dto.pageCount != null && dto.pageCount > 0
+      ? Math.floor(dto.pageCount)
+      : undefined
+  const fileSizeBytes =
+    dto.fileSizeBytes != null && dto.fileSizeBytes >= 0
+      ? dto.fileSizeBytes
+      : undefined
 
   return {
     id: dto.id,
@@ -86,6 +125,11 @@ export function mapBookSummary(dto: BookSummaryInput): LibraryBook {
     lastReadLocation,
     lastReadAt: dto.lastReadAt,
     noteCount: dto.noteCount ?? 0,
+    fileSizeBytes,
+    description,
+    genres: genres.length > 0 ? genres : undefined,
+    genre,
+    pageCount,
   }
 }
 
@@ -108,7 +152,10 @@ export function matchesSearch(book: LibraryBook, query: string): boolean {
     book.title.toLowerCase().includes(q) ||
     book.author.toLowerCase().includes(q) ||
     book.fileName.toLowerCase().includes(q) ||
-    book.format.toLowerCase().includes(q)
+    book.format.toLowerCase().includes(q) ||
+    (book.genre?.toLowerCase().includes(q) ?? false) ||
+    (book.genres?.some((g) => g.toLowerCase().includes(q)) ?? false) ||
+    (book.description?.toLowerCase().includes(q) ?? false)
   )
 }
 
@@ -146,4 +193,15 @@ export function formatRelativeLastRead(iso?: string): string | undefined {
   if (hours < 48) return `${hours} hour${hours === 1 ? '' : 's'} ago`
   const days = Math.floor(hours / 24)
   return `${days} day${days === 1 ? '' : 's'} ago`
+}
+
+/** Human-readable file size for Library cards (G1-N7). */
+export function formatFileSizeMb(bytes?: number): string | undefined {
+  if (bytes == null || bytes < 0 || !Number.isFinite(bytes)) return undefined
+  if (bytes < 1024) return `${bytes} B`
+  const kb = bytes / 1024
+  if (kb < 1024) return `${kb < 10 ? kb.toFixed(1) : Math.round(kb)} KB`
+  const mb = kb / 1024
+  if (mb < 10) return `${mb.toFixed(1)} MB`
+  return `${Math.round(mb)} MB`
 }

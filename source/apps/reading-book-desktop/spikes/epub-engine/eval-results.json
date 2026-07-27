@@ -1,0 +1,147 @@
+{
+  "date": "2026-07-27",
+  "fixture": "spikes/epub-engine/fixtures/spike-sample.epub",
+  "candidates": {
+    "baseline": [
+      {
+        "id": "open_arraybuffer",
+        "verdict": "Pass",
+        "note": "JSZip.loadAsync(ArrayBuffer)"
+      },
+      {
+        "id": "toc",
+        "verdict": "Pass",
+        "note": "spine=2; tocLabels=Chapter One | Chapter Two"
+      },
+      {
+        "id": "nav_scroll",
+        "verdict": "Partial",
+        "note": "Chapter index nav OK; page-turn/scroll must be hand-rolled in iframe"
+      },
+      {
+        "id": "cfi",
+        "verdict": "Fail",
+        "note": "No CFI codec — would need custom LocationCodec; resume/highlight unstable"
+      },
+      {
+        "id": "theme_css",
+        "verdict": "Partial",
+        "note": "Can inject CSS into iframe/srcdoc; no engine API"
+      },
+      {
+        "id": "selection",
+        "verdict": "Partial",
+        "note": "Native DOM selection in iframe possible; no selection→CFI mapping"
+      },
+      {
+        "id": "search",
+        "verdict": "Partial",
+        "note": "Full-text scan of unpacked XHTML possible; no engine search API"
+      },
+      {
+        "id": "electron_vite",
+        "verdict": "Pass",
+        "note": "Uses existing jszip + fast-xml-parser; no new CSP concerns beyond iframe"
+      },
+      {
+        "id": "maintenance",
+        "verdict": "Fail",
+        "note": "Re-implements CFI, pagination, asset URL rewriting — high long-term cost"
+      }
+    ],
+    "epubjs": [
+      {
+        "id": "open_arraybuffer",
+        "verdict": "Pass",
+        "note": "ePub(ArrayBuffer, { openAs: \"binary\" })"
+      },
+      {
+        "id": "toc",
+        "verdict": "Pass",
+        "note": "toc entries=2; first=\"Chapter One\""
+      },
+      {
+        "id": "nav_scroll",
+        "verdict": "Pass",
+        "note": "spine length=2; Rendition supports paginated + scrolled (UI harness)"
+      },
+      {
+        "id": "cfi",
+        "verdict": "Pass",
+        "note": "section cfiBase=/6/2; display()/currentLocation in UI harness"
+      },
+      {
+        "id": "theme_css",
+        "verdict": "Pass",
+        "note": "rendition.themes.default / register / fontSize (API; UI harness)"
+      },
+      {
+        "id": "selection",
+        "verdict": "Pass",
+        "note": "rendition.on(\"selected\") + getRange (API; UI harness)"
+      },
+      {
+        "id": "search",
+        "verdict": "Partial",
+        "note": "No first-class find API; DIY via section text in Chromium (Node section.load flaky)"
+      },
+      {
+        "id": "electron_vite",
+        "verdict": "Pass",
+        "note": "BSD-2-Clause; npm epubjs@0.3.93; iframe rendition in Chromium/Electron"
+      },
+      {
+        "id": "maintenance",
+        "verdict": "Partial",
+        "note": "Mature API + types; upstream slower; default in design docs"
+      }
+    ],
+    "foliate": [
+      {
+        "id": "open_arraybuffer",
+        "verdict": "Pass",
+        "note": "makeBook(File/Blob) documented; zip loader from ArrayBuffer OK; render in #/spike/epub"
+      },
+      {
+        "id": "toc",
+        "verdict": "Pass",
+        "note": "EPUB.toc / nav parse in foliate-js/epub.js (Chromium harness)"
+      },
+      {
+        "id": "nav_scroll",
+        "verdict": "Pass",
+        "note": "foliate-view + paginator.js (goTo/next/prev/scroll)"
+      },
+      {
+        "id": "cfi",
+        "verdict": "Pass",
+        "note": "epubcfi.js module resolved; section.cfi + resolveCFI in book API"
+      },
+      {
+        "id": "theme_css",
+        "verdict": "Pass",
+        "note": "renderer.setStyles / transformTarget runtime CSS"
+      },
+      {
+        "id": "selection",
+        "verdict": "Pass",
+        "note": "selection + overlayer.js annotation support"
+      },
+      {
+        "id": "search",
+        "verdict": "Pass",
+        "note": "foliate-js/search.js module present"
+      },
+      {
+        "id": "electron_vite",
+        "verdict": "Partial",
+        "note": "MIT; ESM deep imports; Vite care; README: API not semver-stable"
+      },
+      {
+        "id": "maintenance",
+        "verdict": "Partial",
+        "note": "Strong Foliate app; library warns breaking changes — higher risk vs epubjs types"
+      }
+    ]
+  }
+}

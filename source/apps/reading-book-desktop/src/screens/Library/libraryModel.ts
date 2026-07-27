@@ -1,5 +1,8 @@
 import type { ShelfDetailItemData } from './components/ShelfDetailItem'
-import type { LibraryBook } from '@reading-book/shared/models'
+import {
+  shelfProgressForBook,
+  type LibraryBook,
+} from '@reading-book/shared/models'
 
 export type {
   BookSummaryInput,
@@ -14,6 +17,7 @@ export {
   NAV_FILTERS,
   filterByNav,
   filterByShelf,
+  formatFileSizeMb,
   formatRelativeLastRead,
   mapBookSummary,
   matchesSearch,
@@ -26,7 +30,7 @@ export function toShelfDetailItem(
   opts?: { forceFavoriteStar?: boolean },
 ): ShelfDetailItemData {
   const showStar = opts?.forceFavoriteStar || book.isFavorite
-  const useChip = book.status === 'completed' || book.status === 'not-started'
+  const progress = shelfProgressForBook(book)
   return {
     id: book.id,
     title: book.title,
@@ -34,15 +38,12 @@ export function toShelfDetailItem(
     fileName: book.fileName,
     format: book.format,
     coverUrl: book.coverUrl,
+    fileSizeBytes: book.fileSizeBytes,
+    description: book.description,
+    genre: book.genre,
+    genres: book.genres,
+    pageCount: book.pageCount,
     isFavorite: showStar,
-    progressKind: useChip ? 'chip' : book.lastReadLocation ? 'last' : undefined,
-    progressLabel: useChip
-      ? book.status === 'completed'
-        ? 'Completed'
-        : 'Not started'
-      : book.lastReadLocation
-        ? `Last at · ${book.lastReadLocation}`
-        : undefined,
-    progressDone: book.status === 'completed',
+    ...progress,
   }
 }

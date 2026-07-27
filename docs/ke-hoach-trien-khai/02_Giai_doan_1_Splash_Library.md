@@ -59,12 +59,24 @@ T1.1 → T1.2 → T1.3 → T1.4
 
 
 
-## 5. Nợ được chấp nhận
+## 5. Nợ kỹ thuật được chấp nhận (G1)
 
-- ~~Add file chưa import thật~~ → **đã làm ở G2**
-- Card sách / last-read location thật → **G4** (`listBooks` chưa expose session)
-- Shelves Reading / Completed / Favorites thiếu data thật → **G4** (+ UI favorite)
-- Collections hub = session stub (`useCollections` shared) → persist SQLite **G6**
-- Drag reorder shelf (`=`) → cuối G1 hoặc G6 polish
-- Library hooks dùng chung desktop/mobile: `@reading-book/shared/hooks/library` (inject bridge client)
+G1 **đạt outcome** (Splash → Library, shelves/empty/search/filters UI). Các mục dưới **không chặn** sang G2/G3; trả đúng giai đoạn ghi.
+
+Nguồn ý sản phẩm: [`docs/note/note.txt`](../note/note.txt) — map đầy đủ tại [11_Backlog_tu_note_san_pham.md](./11_Backlog_tu_note_san_pham.md).
+
+| ID | Nợ (gồm ý từ note.txt) | Hiện trạng (code) | Trả ở |
+| :--- | :--- | :--- | :--- |
+| **G1-N1** | Continue Reading / last-read thật | UI ẩn khi không có `last_read`; `listBooks` chưa trả session | **G4** |
+| **G1-N2** | Shelf Reading / Completed / Not started theo status thật | Đếm/filter DTO stub | **G4** |
+| **G1-N3** | **Lưu yêu thích** (note.txt) — star + filter Favorites | Cột `is_favorite` có; chưa IPC/UI toggle | **G4** |
+| **G1-N4** | Collections persist | Session stub `useCollections` | **G6** FR-14 |
+| **G1-N5** | Drag reorder shelf (`=`) | Chrome-only | **G6** polish |
+| **G1-N6** | SCR-06 App Settings | Route stub | **G6** |
+| **G1-N7** | Card: **thể loại, dung lượng MB, tổng trang, mô tả ngắn** (note.txt) | Schema: `description`/`page_count` + `genres`/`book_genres`; list + ⋮ Book info **đã có**. Còn: backfill metadata sách cũ; PDF page count thật | **G6** polish (backfill / đa format) |
+| **G1-N8** | **UI bìa** + bìa default hiện title khi thiếu cover (note.txt) | EPUB cover khi extract; fallback/UX mỏng | **G6** polish |
+
+**Đã đóng:** ~~Import file/URL~~ → G2; library hooks shared đã có.
+
+**Nguyên tắc:** Không chặn G3 vì card/metadata polish.
 

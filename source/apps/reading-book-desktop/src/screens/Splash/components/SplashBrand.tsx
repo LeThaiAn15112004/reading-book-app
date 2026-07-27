@@ -1,6 +1,6 @@
 function SplashBookIcon() {
   return (
-    <div className="mb-6 h-20 w-20 animate-splash-pulse text-[#f59e0b] drop-shadow-[0_0_15px_rgba(245,158,11,0.3)]">
+    <div className="mb-6 h-20 w-20 animate-splash-pulse text-lib-accent drop-shadow-[0_0_15px_color-mix(in_srgb,var(--lib-accent)_35%,transparent)]">
       <svg
         xmlns="http://www.w3.org/2000/svg"
         fill="none"
@@ -25,10 +25,10 @@ export function SplashBrand() {
   return (
     <div className="flex flex-col items-center text-center">
       <SplashBookIcon />
-      <h1 className="animate-splash-fade-in-up translate-y-2.5 text-2xl font-light uppercase tracking-[0.3em] text-[#e2e8f0] opacity-0 delay-500">
+      <h1 className="animate-splash-fade-in-up translate-y-2.5 text-2xl font-light uppercase tracking-[0.3em] text-lib-text-strong opacity-0 delay-500">
         Readmate
       </h1>
-      <p className="animate-splash-fade-in-up mt-2 translate-y-2.5 text-[11px] font-light uppercase tracking-[0.45em] text-[#64748b] opacity-0 delay-[800ms]">
+      <p className="animate-splash-fade-in-up mt-2 translate-y-2.5 text-[11px] font-light uppercase tracking-[0.45em] text-lib-faint opacity-0 delay-[800ms]">
         Reader
       </p>
     </div>

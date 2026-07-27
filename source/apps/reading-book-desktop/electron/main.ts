@@ -8,14 +8,15 @@ import {
 import { ensureBooksSandbox } from './files/sandbox'
 import { registerAllIpcHandlers } from './ipc'
 import { closeDatabase, openDatabase } from './persistence/db'
+import { backfillLibraryMetadataFromFiles } from './persistence/backfill-library-metadata'
+import {
+  TITLE_BAR_OVERLAY_HEIGHT,
+  titleBarOverlayOptions,
+} from './theme/titlebar-overlay'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
-/** Match Library chrome `--color-lib-bg-deep` / mockup `--bg-deep`. */
-const CHROME_BG = '#0f172a'
-const CHROME_SYMBOL = '#e2e8f0'
-/** Match `.app-window-titlebar` height (near Windows default caption size). */
-const TITLE_BAR_OVERLAY_HEIGHT = 36
+const DEFAULT_OVERLAY = titleBarOverlayOptions('night')
 
 // Custom schemes must be registered before app is ready.
 registerCoverSchemePrivileged()
@@ -79,7 +80,7 @@ function createWindow() {
     minWidth: 900,
     minHeight: 600,
     show: false,
-    backgroundColor: CHROME_BG,
+    backgroundColor: DEFAULT_OVERLAY.color,
     autoHideMenuBar: true,
     // Custom chrome: remove OS gray title strip; keep native window controls.
     titleBarStyle: 'hidden',
@@ -87,8 +88,8 @@ function createWindow() {
       ? { trafficLightPosition: { x: 14, y: 10 } }
       : {
           titleBarOverlay: {
-            color: CHROME_BG,
-            symbolColor: CHROME_SYMBOL,
+            color: DEFAULT_OVERLAY.color,
+            symbolColor: DEFAULT_OVERLAY.symbolColor,
             height: TITLE_BAR_OVERLAY_HEIGHT,
           },
         }),
@@ -134,10 +135,15 @@ app.on('before-quit', () => {
   closeDatabase()
 })
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
   installApplicationMenu()
   ensureBooksSandbox()
   openDatabase()
+  try {
+    await backfillLibraryMetadataFromFiles()
+  } catch (err) {
+    console.error('Library metadata backfill failed:', err)
+  }
   registerCoverProtocol()
   registerAllIpcHandlers()
   createWindow()

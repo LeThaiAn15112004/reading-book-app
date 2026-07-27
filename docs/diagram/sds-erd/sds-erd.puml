@@ -16,6 +16,8 @@ entity "BOOK" as BOOK {
   cover_path : string
   sha256 : string
   file_size_bytes : int
+  description : string
+  page_count : int
   is_favorite : boolean
   is_signed : boolean
   added_at : datetime
@@ -44,6 +46,18 @@ entity "BOOK_AUTHOR" as BA {
   * author_id : string <<PK,FK>>
   --
   sort_order : int
+}
+
+entity "GENRE" as GENRE {
+  * id : string <<PK>>
+  --
+  name : string
+  created_at : datetime
+}
+
+entity "BOOK_GENRE" as BG {
+  * book_id : string <<PK,FK>>
+  * genre_id : string <<PK,FK>>
 }
 
 entity "READING_SESSION_STATE" as SESSION {
@@ -137,6 +151,9 @@ entity "COLLECTION_BOOK" as CB {
 BOOK ||--o{ BA : "1 - n"
 AUTHOR ||--o{ BA : "1 - n"
 
+BOOK ||--o{ BG : "1 - n"
+GENRE ||--o{ BG : "1 - n"
+
 BOOK ||--o{ BSIG : "1 - n"
 BOOK ||--|| SESSION : "1 - 1"
 BOOK ||--o{ HL : "1 - n"
@@ -152,6 +169,11 @@ BOOK ||--o{ CB : "1 - n"
 note bottom of BA
   BOOK <-> AUTHOR = **n - n**
   (qua bang lien ket BOOK_AUTHOR)
+end note
+
+note bottom of BG
+  BOOK <-> GENRE = **n - n**
+  (qua bang lien ket BOOK_GENRE)
 end note
 
 note bottom of CB

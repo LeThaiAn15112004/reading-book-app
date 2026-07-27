@@ -20,6 +20,9 @@ export type {
 export { Author, BookAuthor } from './author.js';
 export type { AuthorProps, BookAuthorProps } from './author.js';
 
+export { Genre, BookGenre } from './genre.js';
+export type { GenreProps, BookGenreProps } from './genre.js';
+
 export { Book } from './book.js';
 export type { BookProps } from './book.js';
 

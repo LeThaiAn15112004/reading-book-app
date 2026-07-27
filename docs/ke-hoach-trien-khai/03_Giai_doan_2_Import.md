@@ -53,9 +53,27 @@ T2.3 → T2.5 → T2.6 → T2.7 → T2.8
 - [x] URL lỗi / format sai → message rõ; không bản ghi rỗng
 - [x] Không có UI bookstore / catalog
 
-## 5. Nợ được chấp nhận
+## 5. Nợ kỹ thuật được chấp nhận (G2)
 
-- Cover đẹp / extract đầy đủ cho PDF có thể làm G6
-- FTS5 index đầy đủ text có thể làm sau khi có extract (G3/G6)
-- Gắn sách vào Collection ngay lúc import — không bắt buộc G2 (làm từ Library / Collections hub theo FR-14)
-- Detect chữ ký số → ghi `is_signed` / `book_signatures` — schema sẵn (SDS 1.15); wire lúc import / PDF → **G6**
+G2 **đạt outcome** (import máy + URL — khớp note.txt dòng 1–2). Các mục dưới **không chặn** G3.
+
+Nguồn ý sản phẩm: [`docs/note/note.txt`](../note/note.txt) — map đầy đủ tại [11_Backlog_tu_note_san_pham.md](./11_Backlog_tu_note_san_pham.md).
+
+| ID | Nợ (gồm ý từ note.txt) | Hiện trạng (code) | Trả ở |
+| :--- | :--- | :--- | :--- |
+| **G2-N1** | Metadata / cover PDF · TXT · MD · DOCX · DOC | Ngoài EPUB = filename fallback | **G6** |
+| **G2-N2** | Detect chữ ký số → `is_signed` / `book_signatures` | Schema sẵn; chưa detect lúc import | **G6** |
+| **G2-N3** | FTS / `book_chunks` | Bảng có; chưa fill | **G3/G6** |
+| **G2-N4** | Gắn Collection lúc import | Không bắt buộc G2 | **G6** |
+| **G2-N5** | **Form enrich import:** Title, mô tả ngắn, thể loại, tác giả, **ảnh bìa thủ công**, link file (note.txt) | Chỉ metadata file/filename; chưa form sau pick | **G6** polish |
+| **G2-N6** | `library.deleteBook` cascade | IPC stub | **G6** FR-12 |
+| **G2-N7** | **Bìa default + title** khi không có cover; UI bìa đẹp hơn (note.txt) | EPUB cover khi có; fallback mỏng | **G6** polish |
+
+**Ngoài phạm vi G2 (ghi rõ theo note.txt):**
+
+| Ý note.txt | Xử lý |
+| :--- | :--- |
+| Check bản quyền / DRM | **Ngoài sản phẩm** (SDS) |
+| AI phân tích thêm field metadata lúc import | **G7** opt-in (**NOTE-AI2**); **không** auto khi import (NFR) |
+
+**Đã đóng:** Import từ máy + URL.

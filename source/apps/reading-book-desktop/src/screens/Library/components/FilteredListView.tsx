@@ -8,6 +8,7 @@ export type FilteredListViewProps = {
   emptyMessage: string
   items: ShelfDetailItemData[]
   onOpenItem: (id: string) => void
+  onBookInfo?: (id: string) => void
 }
 
 /** SCR-01 nav filter list — Favorites / Completed / To read (no Back; switch via sidebar). */
@@ -16,6 +17,7 @@ export function FilteredListView({
   emptyMessage,
   items,
   onOpenItem,
+  onBookInfo,
 }: FilteredListViewProps) {
   const sub =
     items.length === 1 ? '1 book' : `${items.length} books`
@@ -42,7 +44,12 @@ export function FilteredListView({
             role="list"
           >
             {items.map((item) => (
-              <ShelfDetailItem key={item.id} item={item} onOpen={onOpenItem} />
+              <ShelfDetailItem
+                key={item.id}
+                item={item}
+                onOpen={onOpenItem}
+                onBookInfo={onBookInfo}
+              />
             ))}
           </ul>
         ) : (

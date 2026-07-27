@@ -7,7 +7,7 @@ type MoreMenuProps = {
 }
 
 const itemClass =
-  'flex min-h-11 w-full cursor-pointer items-center gap-2.5 rounded-lg border-none bg-transparent px-3 py-3 text-left text-sm font-medium text-slate-300 hover:bg-white/5 hover:text-slate-100'
+  'flex min-h-11 w-full cursor-pointer items-center gap-2.5 rounded-lg border-none bg-transparent px-3 py-3 text-left text-sm font-medium text-lib-text hover:bg-lib-surface-hover hover:text-lib-text-strong'
 
 export function MoreMenu({
   open,
@@ -20,7 +20,7 @@ export function MoreMenu({
 
   return (
     <div
-      className="absolute top-[calc(100%+8px)] right-0 z-[120] flex min-w-[min(220px,calc(100vw-24px))] flex-col gap-0.5 rounded-xl border border-slate-600/45 bg-slate-900/95 p-1.5 shadow-xl backdrop-blur-md"
+      className="absolute top-[calc(100%+8px)] right-0 z-[120] flex min-w-[min(220px,calc(100vw-24px))] flex-col gap-0.5 rounded-xl border border-lib-border bg-lib-surface-strong p-1.5 shadow-xl backdrop-blur-md"
       role="menu"
       onClick={(e) => e.stopPropagation()}
     >
@@ -43,7 +43,7 @@ export function MoreMenu({
       >
         Book info
       </button>
-      <div className="mx-1.5 my-1 h-px bg-slate-600/30" />
+      <div className="mx-1.5 my-1 h-px bg-lib-border-soft" />
       <button
         className={`${itemClass} text-red-400 hover:text-red-300`}
         type="button"

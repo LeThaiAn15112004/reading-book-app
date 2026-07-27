@@ -23,7 +23,16 @@ const xmlParser = new XMLParser({
   attributeNamePrefix: '@_',
   removeNSPrefix: true,
   isArray: (name) =>
-    ['item', 'itemref', 'meta', 'title', 'creator', 'rootfile'].includes(name),
+    [
+      'item',
+      'itemref',
+      'meta',
+      'title',
+      'creator',
+      'subject',
+      'description',
+      'rootfile',
+    ].includes(name),
 })
 
 function asRecord(value: unknown): Record<string, unknown> | undefined {
@@ -70,6 +79,9 @@ function resolveZipRelative(baseDir: string, href: string): string {
 interface ParsedOpf {
   title?: string
   authors: string[]
+  description?: string
+  genreNames: string[]
+  pageCount?: number
   coverHref?: string
 }
 
@@ -99,6 +111,19 @@ function findMetaNodes(opf: Record<string, unknown>): Record<string, unknown>[] 
   return one ? [one] : []
 }
 
+function findSpineItemrefs(opf: Record<string, unknown>): Record<string, unknown>[] {
+  const packageNode = asRecord(opf.package) ?? opf
+  const spine = asRecord(packageNode.spine)
+  if (!spine) return []
+  const refs = spine.itemref
+  if (!refs) return []
+  if (Array.isArray(refs)) {
+    return refs.map(asRecord).filter((x): x is Record<string, unknown> => !!x)
+  }
+  const one = asRecord(refs)
+  return one ? [one] : []
+}
+
 function parseOpf(opfXml: string): ParsedOpf {
   const root = asRecord(xmlParser.parse(opfXml)) ?? {}
   const packageNode = asRecord(root.package) ?? root
@@ -106,6 +131,12 @@ function parseOpf(opfXml: string): ParsedOpf {
 
   const titles = collectTexts(metadata.title)
   const authors = collectTexts(metadata.creator)
+  const descriptions = collectTexts(metadata.description)
+  const subjects = collectTexts(metadata.subject)
+  const genreNames = [
+    ...new Set(subjects.map((s) => s.trim()).filter(Boolean)),
+  ].slice(0, 8)
+  const spineCount = findSpineItemrefs(root).length
 
   const items = findManifestItems(root)
   const byId = new Map<string, Record<string, unknown>>()
@@ -164,6 +195,9 @@ function parseOpf(opfXml: string): ParsedOpf {
   return {
     title: titles[0],
     authors,
+    description: descriptions[0],
+    genreNames,
+    pageCount: spineCount > 0 ? spineCount : undefined,
     coverHref,
   }
 }
@@ -214,6 +248,9 @@ async function extractCoverToSandbox(
 async function extractEpubMetadata(filePath: string): Promise<{
   title?: string
   authors: string[]
+  description?: string
+  genreNames: string[]
+  pageCount?: number
   coverPath?: string
 }> {
   const buf = await fsp.readFile(filePath)
@@ -221,18 +258,18 @@ async function extractEpubMetadata(filePath: string): Promise<{
 
   const containerEntry = zip.file('META-INF/container.xml')
   if (!containerEntry) {
-    return { authors: [] }
+    return { authors: [], genreNames: [] }
   }
 
   const containerXml = await containerEntry.async('string')
   const opfPath = parseContainerRootfile(containerXml)
   if (!opfPath) {
-    return { authors: [] }
+    return { authors: [], genreNames: [] }
   }
 
   const opfEntry = zip.file(opfPath)
   if (!opfEntry) {
-    return { authors: [] }
+    return { authors: [], genreNames: [] }
   }
 
   const opfXml = await opfEntry.async('string')
@@ -250,7 +287,28 @@ async function extractEpubMetadata(filePath: string): Promise<{
   return {
     title: parsed.title,
     authors: parsed.authors,
+    description: parsed.description,
+    genreNames: parsed.genreNames,
+    pageCount: parsed.pageCount,
     coverPath,
+  }
+}
+
+/** Read OPF fields for Library backfill (no import / no hash). */
+export async function readEpubLibraryMetadata(filePath: string): Promise<{
+  title?: string
+  authors: string[]
+  description?: string
+  genreNames: string[]
+  pageCount?: number
+}> {
+  const meta = await extractEpubMetadata(filePath)
+  return {
+    title: meta.title,
+    authors: meta.authors,
+    description: meta.description,
+    genreNames: meta.genreNames,
+    pageCount: meta.pageCount,
   }
 }
 
@@ -265,12 +323,18 @@ export const epubAdapter: DocumentImporter = {
     let title: string | undefined
     let authorNames: string[] | undefined
     let coverPath: string | undefined
+    let description: string | undefined
+    let genreNames: string[] | undefined
+    let pageCount: number | undefined
 
     try {
       const meta = await extractEpubMetadata(filePath)
       title = meta.title
       authorNames = meta.authors.length > 0 ? meta.authors : undefined
       coverPath = meta.coverPath
+      description = meta.description
+      genreNames = meta.genreNames.length > 0 ? meta.genreNames : undefined
+      pageCount = meta.pageCount
     } catch {
       // Corrupt / unreadable EPUB metadata → filename fallback; do not fail import.
     }
@@ -279,6 +343,9 @@ export const epubAdapter: DocumentImporter = {
       title,
       authorNames,
       coverPath,
+      description,
+      genreNames,
+      pageCount,
     })
   },
 }

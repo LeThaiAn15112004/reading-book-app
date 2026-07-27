@@ -28,7 +28,7 @@ type TocSidebarProps = {
 }
 
 const TABS: { id: SidebarTab; label: string }[] = [
-  { id: 'chapters', label: 'Chapters' },
+  { id: 'chapters', label: 'Contents' },
   { id: 'bookmarks', label: 'Bookmarks' },
   { id: 'notes', label: 'Notes' },
   { id: 'comments', label: 'Comments' },
@@ -79,7 +79,7 @@ export function TocSidebar({
   return (
     <>
       <div
-        className={`fixed inset-0 z-[150] bg-slate-950/40 backdrop-blur-sm transition-opacity ${
+        className={`fixed inset-0 z-[150] bg-lib-bg-deep/45 backdrop-blur-sm transition-opacity ${
           open
             ? 'pointer-events-auto opacity-100'
             : 'pointer-events-none opacity-0'
@@ -88,15 +88,17 @@ export function TocSidebar({
         aria-hidden={!open}
       />
       <aside
-        className={`fixed top-[var(--app-titlebar-h,36px)] bottom-0 left-0 z-[160] flex w-[min(100%,340px)] max-w-[86vw] flex-col border-r border-slate-600/45 bg-slate-900/95 shadow-xl backdrop-blur-xl transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${
+        className={`fixed top-[var(--app-titlebar-h,36px)] bottom-0 left-0 z-[160] flex w-[min(100%,340px)] max-w-[86vw] flex-col border-r border-lib-border bg-lib-surface-strong shadow-xl backdrop-blur-xl transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${
           open ? 'translate-x-0' : '-translate-x-full'
         }`}
         aria-hidden={!open}
       >
-        <div className="flex items-center justify-between border-b border-slate-600/30 px-4 py-3">
-          <h2 className="m-0 text-lg font-semibold text-slate-100">Contents</h2>
+        <div className="flex items-center justify-between border-b border-lib-border-soft px-4 py-3">
+          <h2 className="m-0 text-lg font-semibold text-lib-text-strong">
+            Contents
+          </h2>
           <button
-            className="inline-flex size-9 cursor-pointer items-center justify-center border-none bg-transparent text-lg text-slate-400 hover:text-slate-100"
+            className="inline-flex size-9 cursor-pointer items-center justify-center border-none bg-transparent text-lg text-lib-muted hover:text-lib-text-strong"
             type="button"
             aria-label="Close"
             onClick={onClose}
@@ -105,14 +107,14 @@ export function TocSidebar({
           </button>
         </div>
 
-        <div className="flex gap-0.5 border-b border-slate-600/30 bg-slate-950/30 p-2">
+        <div className="flex gap-0.5 border-b border-lib-border-soft bg-lib-hint p-2">
           {TABS.map((t) => (
             <button
               key={t.id}
               className={`h-9 flex-1 cursor-pointer rounded-md border-none px-0.5 text-[11px] font-semibold whitespace-nowrap ${
                 tab === t.id
-                  ? 'bg-slate-800 text-amber-400'
-                  : 'bg-transparent text-slate-400 hover:text-slate-200'
+                  ? 'bg-lib-bg-mid text-lib-accent'
+                  : 'bg-transparent text-lib-muted hover:text-lib-text-strong'
               }`}
               type="button"
               onClick={() => onTabChange(t.id)}
@@ -132,17 +134,15 @@ export function TocSidebar({
                     <button
                       className={`flex w-full cursor-pointer items-center justify-between gap-2 rounded-lg border-none px-3 py-3 text-left text-sm font-medium ${
                         i === chapterIndex
-                          ? 'rounded-l-none border-l-[3px] border-amber-500 bg-white/5 pr-3 pl-[9px] text-slate-100'
-                          : 'bg-transparent text-slate-300 hover:bg-white/5'
+                          ? 'rounded-l-none border-l-[3px] border-lib-accent bg-lib-accent-soft pr-3 pl-[9px] text-lib-text-strong'
+                          : 'bg-transparent text-lib-text hover:bg-lib-surface-hover'
                       }`}
                       type="button"
                       onClick={() => onSelectChapter(i)}
                     >
-                      <span className="min-w-0">
-                        {ch.num}: {ch.title}
-                      </span>
+                      <span className="min-w-0">{ch.title}</span>
                       {badge > 0 ? (
-                        <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-amber-500/15 px-1.5 text-[11px] font-bold text-amber-400">
+                        <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-lib-accent-soft px-1.5 text-[11px] font-bold text-lib-accent">
                           {badge}
                         </span>
                       ) : null}
@@ -156,33 +156,33 @@ export function TocSidebar({
           {tab === 'bookmarks' ? (
             <div className="flex flex-col gap-2.5">
               <button
-                className="h-10 w-full cursor-pointer rounded-lg border border-slate-600/45 bg-amber-500/10 text-[13px] font-semibold text-amber-400"
+                className="h-10 w-full cursor-pointer rounded-lg border border-lib-border bg-lib-accent-soft text-[13px] font-semibold text-lib-accent"
                 type="button"
                 onClick={onAddBookmark}
               >
                 {bookmarks.some((b) => b.chapterIndex === chapterIndex)
-                  ? 'Remove bookmark for this chapter'
-                  : 'Bookmark this chapter'}
+                  ? 'Remove bookmark here'
+                  : 'Bookmark this place'}
               </button>
               {bookmarks.length === 0 ? (
-                <p className="m-0 px-4 py-6 text-center text-[13px] text-slate-500">
+                <p className="m-0 px-4 py-6 text-center text-[13px] text-lib-faint">
                   No bookmarks yet
                 </p>
               ) : (
                 bookmarks.map((b) => (
                   <div
                     key={b.id}
-                    className="flex items-start gap-2 rounded-lg border border-slate-600/30 bg-white/[0.03] p-3"
+                    className="flex items-start gap-2 rounded-lg border border-lib-border-soft bg-lib-surface p-3"
                   >
                     <button
-                      className="min-w-0 flex-1 cursor-pointer border-none bg-transparent p-0 text-left text-sm text-slate-300"
+                      className="min-w-0 flex-1 cursor-pointer border-none bg-transparent p-0 text-left text-sm text-lib-text"
                       type="button"
                       onClick={() => onJumpBookmark(b.chapterIndex)}
                     >
                       {b.label}
                     </button>
                     <button
-                      className="cursor-pointer border-none bg-transparent px-1 text-xs text-slate-500 hover:text-red-400"
+                      className="cursor-pointer border-none bg-transparent px-1 text-xs text-lib-faint hover:text-red-400"
                       type="button"
                       aria-label="Delete bookmark"
                       onClick={() => onDeleteBookmark(b.id)}
@@ -197,7 +197,7 @@ export function TocSidebar({
 
           {tab === 'notes' ? (
             noteCards.length === 0 ? (
-              <p className="m-0 px-4 py-6 text-center text-[13px] text-slate-500">
+              <p className="m-0 px-4 py-6 text-center text-[13px] text-lib-faint">
                 No notes yet
               </p>
             ) : (
@@ -205,17 +205,17 @@ export function TocSidebar({
                 {noteCards.map((card) => (
                   <button
                     key={card.id}
-                    className="flex w-full cursor-pointer flex-col gap-1 rounded-lg border border-slate-600/30 bg-white/[0.03] p-3 text-left"
+                    className="flex w-full cursor-pointer flex-col gap-1 rounded-lg border border-lib-border-soft bg-lib-surface p-3 text-left"
                     type="button"
                     onClick={() => onJumpNote(card.chapterIndex)}
                   >
-                    <span className="text-[10px] font-bold tracking-wide text-amber-400 uppercase">
+                    <span className="text-[10px] font-bold tracking-wide text-lib-accent uppercase">
                       {card.kind}
                     </span>
-                    <span className="text-xs text-slate-400 italic">
+                    <span className="text-xs text-lib-muted italic">
                       “{card.excerpt}”
                     </span>
-                    <span className="text-[13px] leading-snug text-slate-300">
+                    <span className="text-[13px] leading-snug text-lib-text">
                       {card.body}
                     </span>
                   </button>
@@ -226,7 +226,7 @@ export function TocSidebar({
 
           {tab === 'comments' ? (
             comments.length === 0 ? (
-              <p className="m-0 px-4 py-6 text-center text-[13px] text-slate-500">
+              <p className="m-0 px-4 py-6 text-center text-[13px] text-lib-faint">
                 No comments yet
               </p>
             ) : (
@@ -234,16 +234,17 @@ export function TocSidebar({
                 {comments.map((c) => (
                   <button
                     key={c.id}
-                    className="flex w-full cursor-pointer flex-col gap-1 rounded-lg border border-slate-600/30 bg-white/[0.03] p-3 text-left"
+                    className="flex w-full cursor-pointer flex-col gap-1 rounded-lg border border-lib-border-soft bg-lib-surface p-3 text-left"
                     type="button"
                     onClick={() =>
                       onJumpComment(c.chapterIndex, c.paragraphIndex)
                     }
                   >
-                    <span className="text-[10px] font-bold tracking-wide text-amber-400 uppercase">
-                      Ch. {c.chapterIndex + 1} · ¶{c.paragraphIndex + 1}
+                    <span className="text-[10px] font-bold tracking-wide text-lib-accent uppercase">
+                      {chapters[c.chapterIndex]?.title ?? `§${c.chapterIndex + 1}`}
+                      {' · '}¶{c.paragraphIndex + 1}
                     </span>
-                    <span className="text-[13px] leading-snug text-slate-300">
+                    <span className="text-[13px] leading-snug text-lib-text">
                       {c.content}
                     </span>
                   </button>

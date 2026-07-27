@@ -81,3 +81,16 @@ T6.6 → T6.4 → T6.5 → T6.5a → T6.5b   # text / Word formats
 ## 5. Sau giai đoạn này
 
 MVP Free Core **desktop** coi là xong → mới mở **G7 Premium AI**.
+
+## 6. Nợ / polish bắt buộc gom từ note.txt (trả trong G6 nếu chưa xong sớm hơn)
+
+Nguồn map: [11_Backlog_tu_note_san_pham.md](./11_Backlog_tu_note_san_pham.md).
+
+| ID | Ý note.txt | Việc G6 |
+| :--- | :--- | :--- |
+| **G1-N7** | Thể loại, MB, tổng trang, mô tả ngắn trên card | Schema n–n genres + list UI đã kéo sớm; G6: backfill sách cũ, PDF page count, enrich form (**G2-N5**) |
+| **G1-N8** / **G2-N7** | UI bìa đẹp; bìa default + title | Cover UX |
+| **G2-N5** | Form import: title, mô tả, thể loại, tác giả, ảnh bìa, link | Enrich overlay sau pick file/URL |
+| **NOTE-R11** | Độ sáng màn; chế độ **ngoài trời** | SCR-06 Appearance |
+| **NOTE-R10** | Zoom trang (PDF) | PDF renderer |
+| **G2-N1/N2/N6** | Adapter đa format, signature detect, delete cascade | Task G6 sẵn có |

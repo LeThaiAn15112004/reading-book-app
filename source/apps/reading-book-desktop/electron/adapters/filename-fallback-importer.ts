@@ -8,6 +8,9 @@ export interface MetadataExtras {
   title?: string
   authorNames?: string[]
   coverPath?: string
+  description?: string
+  genreNames?: string[]
+  pageCount?: number
 }
 
 /**
@@ -24,6 +27,18 @@ export async function buildImportResult(
   const authorNames = extras.authorNames
     ?.map((n) => n.trim())
     .filter((n) => n.length > 0)
+  const description = extras.description?.trim() || undefined
+  const genreNames = [
+    ...new Set(
+      (extras.genreNames ?? [])
+        .map((n) => n.trim())
+        .filter((n) => n.length > 0),
+    ),
+  ]
+  const pageCount =
+    extras.pageCount != null && extras.pageCount > 0
+      ? Math.floor(extras.pageCount)
+      : undefined
 
   const result: ImportResult = {
     title,
@@ -39,6 +54,9 @@ export async function buildImportResult(
   if (extras.coverPath) {
     result.coverPath = extras.coverPath
   }
+  if (description) result.description = description
+  if (genreNames.length > 0) result.genreNames = genreNames
+  if (pageCount != null) result.pageCount = pageCount
 
   return result
 }

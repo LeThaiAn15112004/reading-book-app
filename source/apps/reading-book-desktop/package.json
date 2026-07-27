@@ -9,11 +9,15 @@
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview",
     "postinstall": "electron-builder install-app-deps",
-    "rebuild:native": "electron-builder install-app-deps"
+    "rebuild:native": "electron-builder install-app-deps",
+    "spike:epub:fixture": "node spikes/epub-engine/build-fixture.mjs",
+    "spike:epub:eval": "node spikes/epub-engine/build-fixture.mjs && node spikes/epub-engine/run-node-evals.mjs"
   },
   "dependencies": {
     "better-sqlite3": "^12.11.1",
+    "epubjs": "^0.3.93",
     "fast-xml-parser": "^5.10.1",
+    "foliate-js": "^1.0.1",
     "jszip": "^3.10.1",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
@@ -29,6 +33,7 @@
     "@typescript-eslint/eslint-plugin": "^7.1.1",
     "@typescript-eslint/parser": "^7.1.1",
     "@vitejs/plugin-react": "^5.2.0",
+    "@xmldom/xmldom": "^0.9.10",
     "electron": "^39.8.10",
     "electron-builder": "^26.15.3",
     "eslint": "^8.57.0",

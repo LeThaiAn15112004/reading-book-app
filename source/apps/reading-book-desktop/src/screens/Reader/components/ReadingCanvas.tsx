@@ -111,9 +111,6 @@ export function ReadingCanvas({
         }}
       >
         <div className="mb-9 border-b border-dashed border-current/15 pb-6 text-center">
-          <p className="m-0 mb-2 text-[11px] font-bold tracking-[0.2em] text-amber-500 uppercase">
-            {chapter.num}
-          </p>
           <h2 className="m-0 px-2 font-['Playfair_Display',Georgia,serif] text-[clamp(24px,6vw,32px)] leading-tight font-semibold text-current">
             {chapter.title}
           </h2>

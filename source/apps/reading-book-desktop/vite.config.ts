@@ -13,6 +13,10 @@ export default defineConfig({
       '@reading-book/domain': path.resolve(__dirname, '../../packages/domain'),
     },
   },
+  optimizeDeps: {
+    include: ['epubjs', 'jszip'],
+    exclude: ['foliate-js'],
+  },
   plugins: [
     tailwindcss(),
     react(),

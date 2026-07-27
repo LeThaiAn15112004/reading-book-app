@@ -72,9 +72,17 @@ T8.7–T8.9 (mobile parity tối thiểu song song được nếu domain đóng 
 - [ ] Mobile: import → đọc → highlight → resume được với ít nhất EPUB (hoặc format đã chọn spike)
 - [ ] Special user: không ads mọi màn
 
-## 5. Phạm vi để sau G8
+## 5. Backlog từ note.txt thuộc G8
+
+Nguồn map: [11_Backlog_tu_note_san_pham.md](./11_Backlog_tu_note_san_pham.md).
+
+| ID | Ý note.txt | Ghi chú |
+| :--- | :--- | :--- |
+| **NOTE-L1** | **Bỏ quản lý user**; chỉ linked libs (GG Books, iCloud Books, Drive…); đồng bộ → load list sách + sync trong app | Khớp BR-08 / không account app; connector E2E trong G8 |
+
+## 6. Phạm vi để sau G8
 
 - Sync progress/note đa thiết bị qua server app (đã loại — không account)
 - Mạng xã hội realtime / feed cộng đồng đầy đủ
-- Marketplace sách
+- Marketplace sách / **check bản quyền DRM** (note.txt — ngoài sản phẩm)
 - OCR hàng loạt PDF scan

@@ -181,7 +181,7 @@ flowchart LR
 
 | Chủ đề | Đề xuất mặc định |
 | :--- | :--- |
-| EPUB engine (web/desktop) | epub.js hoặc tương đương trên Chromium |
+| EPUB engine (web/desktop) | **Đã chốt:** `epubjs` ^0.3.93 (T3.1 / SDS §2.10.1, 2026-07-27) |
 | Local DB | SQLite qua better-sqlite3 (main) hoặc sql.js |
 | State UI | Zustand hoặc React context tối giản |
 | Highlight storage | Offset / CFI (EPUB) trong DB |

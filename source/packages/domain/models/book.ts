@@ -10,6 +10,10 @@ export interface BookProps {
   coverPath?: string;
   sha256: string;
   fileSizeBytes?: number;
+  /** Short blurb / OPF description for Library cards. */
+  description?: string;
+  /** Page or spine-section count when known. */
+  pageCount?: number;
   isFavorite?: boolean;
   /** Denormalized flag: book has ≥ 1 digital signature row. */
   isSigned?: boolean;
@@ -22,6 +26,7 @@ export interface BookProps {
 /**
  * Book / document metadata (SDS §3 — BOOK).
  * Binary file lives on disk; this model only stores paths + metadata.
+ * Genres are linked via BOOK_GENRE (n–n), not a column on Book.
  */
 export class Book {
   readonly id: string;
@@ -32,6 +37,8 @@ export class Book {
   coverPath?: string;
   readonly sha256: string;
   fileSizeBytes?: number;
+  description?: string;
+  pageCount?: number;
   isFavorite: boolean;
   isSigned: boolean;
   sourceUrl?: string;
@@ -53,6 +60,11 @@ export class Book {
     this.coverPath = props.coverPath;
     this.sha256 = props.sha256;
     this.fileSizeBytes = props.fileSizeBytes;
+    this.description = props.description?.trim() || undefined;
+    this.pageCount =
+      props.pageCount != null && props.pageCount > 0
+        ? Math.floor(props.pageCount)
+        : undefined;
     this.isFavorite = props.isFavorite ?? false;
     this.isSigned = props.isSigned ?? false;
     this.sourceUrl = props.sourceUrl;

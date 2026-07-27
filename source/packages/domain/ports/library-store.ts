@@ -1,5 +1,6 @@
 import type { Book } from '../models/book.js';
 import type { BookAuthor } from '../models/author.js';
+import type { BookGenre } from '../models/genre.js';
 
 /**
  * Persistence port for books and author links (SDS §2.6 / class diagram).
@@ -11,5 +12,6 @@ export interface LibraryStore {
   findByAuthor(authorId: string): Promise<Book[]>;
   save(book: Book): Promise<void>;
   linkAuthors(bookId: string, authors: BookAuthor[]): Promise<void>;
+  linkGenres(bookId: string, genres: BookGenre[]): Promise<void>;
   deleteCascade(bookId: string): Promise<void>;
 }

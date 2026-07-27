@@ -4,6 +4,8 @@ import migration002 from './migrations/002_expand_file_formats.sql?raw'
 import migration003 from './migrations/003_book_signatures.sql?raw'
 import migration004 from './migrations/004_comments.sql?raw'
 import migration005 from './migrations/005_drop_app_settings.sql?raw'
+import migration006 from './migrations/006_book_library_metadata.sql?raw'
+import migration007 from './migrations/007_genres_nn.sql?raw'
 
 interface Migration {
   name: string
@@ -16,10 +18,16 @@ const MIGRATIONS: Migration[] = [
   { name: '003_book_signatures.sql', sql: migration003 },
   { name: '004_comments.sql', sql: migration004 },
   { name: '005_drop_app_settings.sql', sql: migration005 },
+  { name: '006_book_library_metadata.sql', sql: migration006 },
+  { name: '007_genres_nn.sql', sql: migration007 },
 ]
 
 /**
  * Apply pending SQL migrations in order. Idempotent via schema_migrations.
+ *
+ * Important: `PRAGMA foreign_keys` is a **no-op inside a transaction**. Migrations that
+ * rebuild `books` (DROP + rename) must run with FK disabled at the connection level,
+ * otherwise ON DELETE CASCADE wipes `book_authors` / sessions / overlays.
  */
 export function migrate(db: Database): void {
   db.exec(`
@@ -40,13 +48,18 @@ export function migrate(db: Database): void {
     'INSERT INTO schema_migrations (name, applied_at) VALUES (?, ?)',
   )
 
-  const runPending = db.transaction(() => {
-    for (const migration of MIGRATIONS) {
-      if (applied.has(migration.name)) continue
-      db.exec(migration.sql)
-      insert.run(migration.name, new Date().toISOString())
-    }
-  })
+  for (const migration of MIGRATIONS) {
+    if (applied.has(migration.name)) continue
 
-  runPending()
+    db.pragma('foreign_keys = OFF')
+    try {
+      const applyOne = db.transaction(() => {
+        db.exec(migration.sql)
+        insert.run(migration.name, new Date().toISOString())
+      })
+      applyOne()
+    } finally {
+      db.pragma('foreign_keys = ON')
+    }
+  }
 }

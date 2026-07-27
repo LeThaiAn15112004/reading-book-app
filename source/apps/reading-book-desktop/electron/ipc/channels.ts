@@ -3,11 +3,17 @@
 export const AppChannels = {
   ping: 'app:ping',
   getAppInfo: 'app:getAppInfo',
+  /** Sync native titleBarOverlay caption buttons to Night/Sepia/Paper. */
+  setChromeTheme: 'app:setChromeTheme',
 } as const
 
 export const LibraryChannels = {
   listBooks: 'library:listBooks',
   getBook: 'library:getBook',
+  /** Open sandboxed book bytes by id (T3.4); never exposes filesystem paths. */
+  openBookContent: 'library:openBookContent',
+  /** Mark book as in-progress → Library Reading shelf. */
+  markAsReading: 'library:markAsReading',
   deleteBook: 'library:deleteBook',
 } as const
 

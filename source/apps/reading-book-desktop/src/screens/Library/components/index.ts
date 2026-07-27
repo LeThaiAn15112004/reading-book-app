@@ -9,6 +9,11 @@ export { FilteredListView } from './FilteredListView'
 export type { FilteredListViewProps } from './FilteredListView'
 export { LibraryEmptyState } from './LibraryEmptyState'
 export { LibraryHint } from './LibraryHint'
+export { LibraryBookInfoDialog } from './LibraryBookInfoDialog'
+export type {
+  LibraryBookInfoDialogProps,
+  LibraryBookInfoFields,
+} from './LibraryBookInfoDialog'
 export {
   LIBRARY_SHELVES,
   LibraryShelves,

@@ -28,6 +28,7 @@ export type ShelfDetailViewProps = {
   items: ShelfDetailItemData[]
   onBack: () => void
   onOpenItem: (id: string) => void
+  onBookInfo?: (id: string) => void
   /** Override subtitle (default: “N files”). */
   countLabel?: string
   emptyMessage?: string
@@ -40,6 +41,7 @@ export function ShelfDetailView({
   items,
   onBack,
   onOpenItem,
+  onBookInfo,
   countLabel,
   emptyMessage = 'No files in this section.',
   backAriaLabel = 'Back to library',
@@ -79,7 +81,12 @@ export function ShelfDetailView({
             role="list"
           >
             {items.map((item) => (
-              <ShelfDetailItem key={item.id} item={item} onOpen={onOpenItem} />
+              <ShelfDetailItem
+                key={item.id}
+                item={item}
+                onOpen={onOpenItem}
+                onBookInfo={onBookInfo}
+              />
             ))}
           </ul>
         ) : (
