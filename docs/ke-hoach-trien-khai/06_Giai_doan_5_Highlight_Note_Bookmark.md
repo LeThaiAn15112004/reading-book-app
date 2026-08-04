@@ -2,65 +2,101 @@
 
 **Mục tiêu:** Đánh dấu tri thức trong lúc đọc; xem lại và nhảy về đúng đoạn — **trong Reader theo từng sách**.
 
-**Mockup:** sidebar Note · Comment · Bookmark trong [`reading.html`](../mockups/reading.html)  
+**Mockup:** sidebar Note · Comment · Bookmark trong `[reading.html](../mockups/reading.html)`  
 **SRS:** FR-06, FR-07, FR-09, FR-11 · **UC-03–06** · **WF-04** · **BR-01, BR-02**  
-**SDS:** không còn SCR-04 toàn cục
+**SDS:** không còn SCR-04 toàn cục · **schema highlights v2** (migration `009`)
 
 **Điều kiện vào:** G4 có LocationCodec + persist ổn.
 
 ---
 
+## 0. Schema overlay (G5 — migration `009`)
+
+G5 dùng model **highlight-centric**:
+
+
+| Thay đổi                  | Chi tiết                                                                                   |
+| ------------------------- | ------------------------------------------------------------------------------------------ |
+| `highlights` v2           | Một cột `location` (pack `start|end`); inline `note`, `status`, `is_checked`, `updated_at` |
+| Bỏ `notes`                | Ghi chú nằm trên `highlights.note` — không bảng riêng                                      |
+| `tags` + `highlight_tags` | N–N optional — UI tag **nợ G5+** (chỉ schema sẵn)                                          |
+| **Không** `app_settings`  | App prefs vẫn electron-store / MMKV (SDS 1.17)                                             |
+
+
+Domain: `Highlight` (+ `Tag`); port `OverlayStore.saveHighlight` — **đã wire** SQLite + IPC (T5.2).  
+Overlay paint EPUB: `DomCssOverlay` implements `OverlayPainter` (T5.3).
+
+---
+
+
+
 ## 1. Outcome
 
 1. Bôi chọn text → Highlight trong **≤ 2 thao tác**.
-2. Thêm / sửa / xóa note gắn đoạn; note rỗng không tạo mới.
+2. Thêm / sửa ghi chú **inline** trên highlight (`highlights.note`); note rỗng không tạo mới.
 3. Bookmark vị trí để quay lại nhanh.
 4. Mở lại sách → highlight vẽ lại đúng chỗ.
 5. Sidebar list Note / Comment / Bookmark → Jump đúng location.
-6. Từ Library “Notes (n)” → mở Reader + tab Note của sách đó.
+6. Từ Library “Notes (n)” → mở Reader + tab Note của sách đó (đếm highlight có `note`).
+
+
 
 ## 2. Việc cần làm
 
-| Task | Chi tiết | FR |
-| :--- | :--- | :--- |
-| T5.1 | Selection → context action Highlight | FR-06 |
-| T5.2 | Lưu highlight + location + màu (nếu có) vào SQLite Overlay | FR-06 |
-| T5.3 | `DomCssOverlay` vẽ lại khi mở / sau khi thêm | FR-06 |
-| T5.4 | Note CRUD gắn selection / location | FR-07 |
-| T5.5 | Bookmark add / list / jump / xóa | FR-11 |
-| T5.6 | Comment theo trang: IPC + UI drawer/sidebar trên bảng `comments` (`page_number`, `position_data`) — **schema + domain `Comment` đã có** (migration `004`) | SDS SCR-03 |
-| T5.7 | Sidebar tabs: Note · Comment · Bookmark — filter theo `bookId` | FR-09 |
-| T5.8 | Jump từ list → scroll/navigate đúng CFI | FR-09 |
-| T5.9 | Đếm notes trên Continue Reading → mở tab Note | FR-09 |
-| T5.10 | Xóa highlight/note đồng bộ overlay + DB | FR-07 |
+
+| Task  | Chi tiết                                                                                                                     | FR         |
+| ----- | ---------------------------------------------------------------------------------------------------------------------------- | ---------- |
+| T5.0  | Migration `009_highlights_v2.sql` + domain `Highlight` / `Tag`; bỏ entity `Note`                                             | SDS §3     |
+| T5.1  | Selection → context action Highlight                                                                                         | FR-06      |
+| T5.2  | Lưu highlight (`location`, màu) vào SQLite Overlay                                                                           | FR-06      |
+| T5.3  | `DomCssOverlay` vẽ lại khi mở / sau khi thêm                                                                                 | FR-06      |
+| T5.4  | Sửa `highlights.note` trên highlight đã có (selection hoặc sidebar)                                                          | FR-07      |
+| T5.5  | Bookmark add / list / jump / xóa                                                                                             | FR-11      |
+| T5.6  | Comment theo trang: IPC + UI drawer/sidebar trên bảng `comments` — **schema + domain** `Comment` **đã có** (migration `004`) | SDS SCR-03 |
+| T5.7  | Sidebar tabs: Note · Comment · Bookmark — filter theo `bookId`                                                               | FR-09      |
+| T5.8  | Jump từ list → scroll/navigate đúng CFI                                                                                      | FR-09      |
+| T5.9  | Đếm highlight có note trên Continue Reading → mở tab Note                                                                    | FR-09      |
+| T5.10 | Xóa highlight đồng bộ overlay + DB                                                                                           | FR-07      |
+
+
+**Nợ G5 (chấp nhận):** `status` / `is_checked` / **tags** — schema sẵn, UI sau; tag auto (Phase 3).
 
 ## 3. Thứ tự khuyến nghị
 
 ```text
-T5.1 → T5.2 → T5.3
+T5.0 (schema + domain)
+  → T5.1 → T5.2 → T5.3
   → T5.4 → T5.10
   → T5.5 → T5.7 → T5.8
   → T5.9 → T5.6
 ```
 
+
+
 ## 4. Nghiệm thu
 
-- [ ] ≥ 3 highlight + ≥ 1 note; restart app vẫn còn
+- [ ] Migration `009` chạy trên DB dev
+- [ ] ≥ 3 highlight + ≥ 1 highlight có `note`; restart app vẫn còn
 - [ ] File EPUB không đổi trên đĩa
 - [ ] Highlight từ selection ≤ 2 thao tác chính
 - [ ] Jump từ sidebar đúng đoạn
 - [ ] Không có màn Notes toàn cục trong nav
 
+
+
 ## 5. Nợ được chấp nhận (G5) + backlog từ note.txt
 
 Nguồn map: [11_Backlog_tu_note_san_pham.md](./11_Backlog_tu_note_san_pham.md).
 
-| ID | Nợ (ý note.txt) | Trả ở |
-| :--- | :--- | :--- |
-| — | Overlay Canvas PDF | **G6** |
-| — | Export notes / quote cards | **G8+** |
-| — | Chuẩn hóa location Comment EPUB | sau G3 nếu cần |
-| **NOTE-R5** | **Đánh dấu trang** (bookmark) persist + jump | **G5** |
-| **NOTE-R7** | **Note văn bản** persist + sidebar | **G5** |
-| — | Highlight màu (SDS; hỗ trợ note/selection) | **G5** |
-| — | Comment / đáp án theo đoạn | **G5** |
+
+| ID          | Nợ (ý note.txt)                                  | Trả ở             |
+| ----------- | ------------------------------------------------ | ----------------- |
+| —           | Overlay Canvas PDF                               | **G6**            |
+| —           | Export notes / quote cards                       | **G8+**           |
+| —           | Chuẩn hóa location Comment EPUB                  | sau G3 nếu cần    |
+| **NOTE-R5** | **Đánh dấu trang** (bookmark) persist + jump     | **G5**            |
+| **NOTE-R7** | **Note văn bản** inline trên highlight + sidebar | **G5**            |
+| —           | Highlight màu + status / tags UI                 | **G5+** / Phase 3 |
+| —           | Comment / đáp án theo đoạn                       | **G5**            |
+
+

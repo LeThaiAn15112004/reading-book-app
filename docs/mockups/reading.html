@@ -1,194 +1,421 @@
 <!DOCTYPE html>
-<html lang="vi">
+<html lang="vi" data-theme="night">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="theme-color" content="#0f172a">
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="mobile-web-app-capable" content="yes">
-  <title>Readmate — Premium Interactive Reader</title>
-  
-  <!-- Phục vụ kết nối Google Fonts cho kiểu chữ văn học chân thực -->
+  <title>Readmate — Reader (mockup · SCR-03)</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Literata:opsz,wght@7..72,300;7..72,400;7..72,500;7..72,600;7..72,700&family=Source+Sans+3:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,600;1,600&display=swap" rel="stylesheet">
-  
+  <link href="https://fonts.googleapis.com/css2?family=Literata:opsz,wght@7..72,400;7..72,600;7..72,700&family=Source+Sans+3:wght@400;500;600;700&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
   <style>
-    :root {
-      /* Theme mặc định: Night Mode - Chống ánh sáng xanh tối ưu */
-      --bg-deep: #0f172a;
-      --bg-mid: #1e293b;
-      --surface: rgba(30, 41, 59, 0.45);
-      --surface-strong: rgba(15, 23, 42, 0.95);
-      --border: rgba(51, 65, 85, 0.45);
-      --border-soft: rgba(51, 65, 85, 0.22);
-      --text: #cbd5e1;
-      --text-strong: #f1f5f9;
-      --muted: #94a3b8;
-      --faint: #64748b;
-      --accent: #f59e0b;
-      --accent-hover: #d97706;
-      --accent-soft: rgba(245, 158, 11, 0.14);
-      --shadow: 0 12px 32px rgba(0, 0, 0, 0.4);
-      --radius: 12px;
-      --font-ui: "Source Sans 3", sans-serif;
-      --font-reading: "Literata", Georgia, serif;
-      --reading-size: 18px;
-      --reading-line-height: 1.65;
-      --reading-weight: 400;
-      --reading-align: justify;
-      --safe-top: env(safe-area-inset-top, 0px);
-      --safe-bottom: env(safe-area-inset-bottom, 0px);
-      --safe-left: env(safe-area-inset-left, 0px);
-      --safe-right: env(safe-area-inset-right, 0px);
+    /* ── Tokens (aligned with theme.css lib-*) ── */
+    :root,
+    [data-theme='night'] {
+      --lib-bg-deep: #0f172a;
+      --lib-bg-mid: #1e293b;
+      --lib-surface: rgb(30 41 59 / 0.45);
+      --lib-surface-strong: rgb(15 23 42 / 0.85);
+      --lib-surface-hover: rgb(30 41 59 / 0.55);
+      --lib-border: rgb(51 65 85 / 0.45);
+      --lib-border-soft: rgb(51 65 85 / 0.28);
+      --lib-text: #cbd5e1;
+      --lib-text-strong: #f1f5f9;
+      --lib-muted: #94a3b8;
+      --lib-faint: #64748b;
+      --lib-accent: #f59e0b;
+      --lib-accent-hover: #d97706;
+      --lib-accent-soft: rgb(245 158 11 / 0.14);
+      --lib-accent-ring: rgb(245 158 11 / 0.28);
+      --lib-on-accent: #0f172a;
+      --lib-hint: rgb(15 23 42 / 0.28);
+      --lib-chip: rgb(51 65 85 / 0.35);
+      --lib-overlay-shadow: 0 12px 32px rgba(0, 0, 0, 0.35);
+      --app-titlebar-h: 36px;
+      --reader-font-reading: "Literata", Georgia, serif;
+      --reader-reading-size: 18px;
+      --reader-reading-line-height: 1.65;
+      --reader-reading-weight: 400;
+      --reader-reading-align: justify;
+      --reader-max-width: 680px;
       --topbar-h: 56px;
       --footer-h: 56px;
-
-      /* Book Layout Widths */
-      --reader-max-width: 680px;
     }
 
-    /* Theme: Giấy Sepia ấm cúng cổ điển */
-    body.theme-sepia {
-      --bg-deep: #16120e;
-      --bg-mid: #251f19;
-      --surface: rgba(45, 38, 31, 0.45);
-      --surface-strong: rgba(22, 18, 14, 0.95);
-      --border: rgba(94, 80, 63, 0.4);
-      --border-soft: rgba(94, 80, 63, 0.2);
-      --text: #e1cfb3;
-      --text-strong: #f4edd4;
-      --muted: #a69175;
-      --faint: #7a6a54;
-      --accent: #d97706;
-      --accent-soft: rgba(217, 119, 6, 0.15);
-      --shadow: 0 12px 32px rgba(22, 18, 14, 0.5);
+    [data-theme='sepia'] {
+      --lib-bg-deep: #16120e;
+      --lib-bg-mid: #251f19;
+      --lib-surface-strong: rgb(22 18 14 / 0.9);
+      --lib-border: rgb(90 70 45 / 0.4);
+      --lib-border-soft: rgb(90 70 45 / 0.28);
+      --lib-text: #e1cfb3;
+      --lib-text-strong: #f3e6d0;
+      --lib-muted: #b8a48a;
+      --lib-faint: #8a7660;
+      --lib-hint: rgb(37 31 25 / 0.4);
+      --lib-chip: rgb(90 70 45 / 0.35);
     }
 
-    /* Theme: Giấy trắng mịn ban ngày */
-    body.theme-paper {
-      --bg-deep: #f1f5f9;
-      --bg-mid: #ffffff;
-      --surface: rgba(226, 232, 240, 0.5);
-      --surface-strong: rgba(255, 255, 255, 0.98);
-      --border: rgba(148, 163, 184, 0.35);
-      --border-soft: rgba(148, 163, 184, 0.2);
-      --text: #334155;
-      --text-strong: #0f172a;
-      --muted: #475569;
-      --faint: #94a3b8;
-      --accent: #d97706;
-      --accent-soft: rgba(217, 119, 6, 0.08);
-      --shadow: 0 12px 32px rgba(15, 23, 42, 0.06);
+    [data-theme='paper'] {
+      --lib-bg-deep: #f8fafc;
+      --lib-bg-mid: #e2e8f0;
+      --lib-surface-strong: rgb(255 255 255 / 0.92);
+      --lib-border: rgb(148 163 184 / 0.45);
+      --lib-border-soft: rgb(148 163 184 / 0.3);
+      --lib-text: #334155;
+      --lib-text-strong: #0f172a;
+      --lib-muted: #64748b;
+      --lib-faint: #94a3b8;
+      --lib-accent: #d97706;
+      --lib-accent-soft: rgb(217 119 6 / 0.12);
+      --lib-accent-ring: rgb(217 119 6 / 0.28);
+      --lib-hint: rgb(241 245 249 / 0.8);
+      --lib-chip: rgb(148 163 184 / 0.35);
     }
 
-    * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-      -webkit-tap-highlight-color: transparent;
-    }
-
-    html, body {
-      width: 100%;
-      height: 100dvh;
-      overflow: hidden;
-    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { width: 100%; height: 100%; overflow: hidden; }
 
     body {
-      background-color: var(--bg-deep);
-      color: var(--text);
-      font-family: var(--font-ui);
+      font-family: "Source Sans 3", system-ui, sans-serif;
+      background:
+        radial-gradient(ellipse 80% 50% at 20% -10%, rgba(245, 158, 11, 0.08), transparent 55%),
+        radial-gradient(circle at 80% 100%, rgba(30, 58, 138, 0.18), transparent 45%),
+        radial-gradient(circle, var(--lib-bg-mid) 0%, var(--lib-bg-deep) 100%);
+      color: var(--lib-text);
       -webkit-font-smoothing: antialiased;
-      transition: background-color 0.3s ease, color 0.3s ease;
-      user-select: none;
-      overscroll-behavior: none;
     }
 
-    .reader-app {
-      position: relative;
-      width: 100%;
-      height: 100dvh;
-      display: flex;
-      flex-direction: column;
-      z-index: 10;
-      padding-left: var(--safe-left);
-      padding-right: var(--safe-right);
-    }
+    button, input, textarea { font-family: inherit; }
 
-    .topbar {
-      height: calc(var(--topbar-h) + var(--safe-top));
-      padding: var(--safe-top) 16px 0 16px;
+    /* ── Electron titlebar (desktop shell) ── */
+    .titlebar {
+      height: var(--app-titlebar-h);
       display: flex;
       align-items: center;
       justify-content: space-between;
-      gap: 12px;
-      border-bottom: 1px solid var(--border-soft);
-      background: var(--surface-strong);
-      backdrop-filter: blur(16px);
-      -webkit-backdrop-filter: blur(16px);
-      z-index: 50;
-      transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.3s;
+      padding: 0 12px 0 14px;
+      background: var(--lib-bg-deep);
+      border-bottom: 1px solid var(--lib-border-soft);
+      color: var(--lib-muted);
+      font-size: 12px;
+      user-select: none;
       flex-shrink: 0;
     }
+    .titlebar-tabs {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      min-width: 0;
+    }
+    .titlebar-tab {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      max-width: 200px;
+      padding: 4px 10px;
+      border-radius: 6px;
+      background: var(--lib-hint);
+      color: var(--lib-text-strong);
+      font-weight: 600;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .titlebar-tab-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--lib-accent); flex-shrink: 0; }
+    .titlebar-controls { display: flex; gap: 8px; opacity: 0.5; }
+    .titlebar-dot { width: 12px; height: 12px; border-radius: 50%; background: var(--lib-border); }
 
-    .topbar.hide {
+    /* ── Reader shell ── */
+    .reader-shell {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      height: calc(100% - var(--app-titlebar-h));
+      overflow: hidden;
+      background: var(--lib-bg-deep);
+      color: var(--lib-text);
+    }
+
+    .reader-main {
+      position: relative;
+      flex: 1;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── Reading surface ── */
+    .reading-scroll {
+      flex: 1;
+      min-height: 0;
+      overflow-x: hidden;
+      overflow-y: auto;
+      padding: 32px 24px calc(var(--footer-h) + 32px) 32px;
+      cursor: grab;
+    }
+    .reading-scroll.mode-select { cursor: text; user-select: text; }
+    .reading-scroll.mode-hand { user-select: none; }
+
+    .reading-area {
+      width: 100%;
+      max-width: var(--reader-max-width);
+      margin: 0 auto;
+      transition: max-width 0.3s ease;
+    }
+    .reading-area.layout-dual {
+      max-width: min(1200px, 95vw);
+      columns: 2;
+      column-gap: 64px;
+      column-rule: 1px dashed var(--lib-border-soft);
+    }
+    @media (max-width: 899px) {
+      .reading-area.layout-dual { columns: 1; column-rule: none; max-width: var(--reader-max-width); }
+    }
+    .reading-area.margin-narrow { max-width: 580px; }
+    .reading-area.margin-wide { max-width: 780px; }
+
+    .chapter-header {
+      text-align: center;
+      margin-bottom: 36px;
+      padding-bottom: 24px;
+      border-bottom: 1px dashed var(--lib-border-soft);
+      break-inside: avoid;
+    }
+    .chapter-title {
+      font-family: "Playfair Display", Georgia, serif;
+      font-size: clamp(24px, 5vw, 32px);
+      font-weight: 600;
+      color: var(--lib-text-strong);
+      line-height: 1.25;
+    }
+
+    .chapter-body {
+      font-family: var(--reader-font-reading);
+      font-size: var(--reader-reading-size);
+      font-weight: var(--reader-reading-weight);
+      line-height: var(--reader-reading-line-height);
+      text-align: var(--reader-reading-align);
+      color: var(--lib-text);
+    }
+    .chapter-body p {
+      margin: 0 0 1.5em;
+      text-indent: 1.5em;
+    }
+    .chapter-body p:first-of-type {
+      text-indent: 0;
+    }
+    .chapter-body p:first-of-type::first-letter {
+      font-family: "Playfair Display", Georgia, serif;
+      font-size: clamp(2.2em, 8vw, 3.2em);
+      float: left;
+      line-height: 0.85;
+      padding-right: 10px;
+      margin-top: 4px;
+      color: var(--lib-accent);
+      font-weight: 700;
+    }
+
+    .hl-mark {
+      background: rgb(245 158 11 / 0.25);
+      box-shadow: inset 0 -2px 0 var(--lib-accent);
+      border-radius: 2px;
+    }
+
+    ::selection {
+      background: rgb(245 158 11 / 0.35);
+      color: var(--lib-text-strong);
+    }
+
+    /* ── Topbar (ReaderTopbar) ── */
+    .topbar {
+      position: absolute;
+      inset: 0 0 auto 0;
+      z-index: 50;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      height: var(--topbar-h);
+      padding: 0 12px 0 16px;
+      border-bottom: 1px solid var(--lib-border-soft);
+      background: var(--lib-surface-strong);
+      backdrop-filter: blur(12px);
+      transition: transform 0.3s ease, opacity 0.3s ease;
+    }
+    .topbar.hidden {
       transform: translateY(-100%);
       opacity: 0;
       pointer-events: none;
     }
 
-    .topbar-left {
+    .tools-strip {
       display: flex;
-      align-items: center;
-      gap: 12px;
-      min-width: 0;
       flex: 1;
+      min-width: 0;
+      align-items: center;
+      gap: 4px;
+      overflow-x: auto;
     }
-
-    .back-btn {
-      width: 40px;
-      height: 40px;
-      border: none;
+    .tool-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      height: 36px;
+      padding: 0 8px;
+      border: 1px solid transparent;
       border-radius: 8px;
       background: transparent;
-      color: var(--muted);
+      color: var(--lib-muted);
+      font-size: 12px;
+      font-weight: 600;
       cursor: pointer;
+      white-space: nowrap;
+      flex-shrink: 0;
+      transition: all 0.15s ease;
+    }
+    .tool-btn:hover {
+      border-color: var(--lib-accent-ring);
+      background: var(--lib-accent-soft);
+      color: var(--lib-text-strong);
+    }
+    .tool-btn.active {
+      border-color: var(--lib-accent);
+      background: var(--lib-accent-soft);
+      color: var(--lib-accent);
+    }
+    .tool-btn.active-highlight {
+      border-color: var(--lib-accent);
+      background: var(--lib-accent);
+      color: var(--lib-on-accent);
+    }
+    .tool-btn svg { width: 18px; height: 18px; flex-shrink: 0; }
+    .tool-btn .label { display: none; }
+    @media (min-width: 1024px) { .tool-btn .label { display: inline; } }
+
+    .tools-divider {
+      width: 1px;
+      height: 20px;
+      background: var(--lib-border);
+      margin: 0 4px;
+      flex-shrink: 0;
+    }
+
+    .topbar-actions {
+      position: relative;
       display: flex;
+      shrink: 0;
+      align-items: center;
+      gap: 6px;
+    }
+    .chrome-btn {
+      display: inline-flex;
       align-items: center;
       justify-content: center;
+      gap: 8px;
+      height: 40px;
+      width: 40px;
+      border: 1px solid var(--lib-border);
+      border-radius: 8px;
+      background: rgb(30 41 59 / 0.5);
+      color: var(--lib-muted);
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .chrome-btn:hover, .chrome-btn.active {
+      border-color: var(--lib-accent);
+      background: var(--lib-accent-soft);
+      color: var(--lib-text-strong);
+    }
+    .chrome-btn span { display: none; }
+    @media (min-width: 640px) {
+      .chrome-btn { width: auto; padding: 0 14px; font-size: 13px; font-weight: 600; }
+      .chrome-btn span { display: inline; }
+    }
+    .chrome-btn svg { width: 20px; height: 20px; }
+
+    /* ── Footer (ReaderFooter) ── */
+    .footer {
+      position: absolute;
+      inset: auto 0 0 0;
+      z-index: 90;
+      display: flex;
+      align-items: center;
+      height: var(--footer-h);
+      padding: 0 16px 0 48px;
+      border-top: 1px solid var(--lib-border-soft);
+      background: var(--lib-surface-strong);
+      backdrop-filter: blur(12px);
+      transition: transform 0.3s ease, opacity 0.3s ease;
+    }
+    .footer.hidden {
+      transform: translateY(100%);
+      opacity: 0;
+      pointer-events: none;
+    }
+    .footer-label {
+      max-width: 42%;
       flex-shrink: 0;
-      transition: color 0.15s, background 0.15s;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--lib-text-strong);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .scrubber {
+      position: relative;
+      flex: 1;
+      height: 28px;
+      margin-left: 12px;
+      cursor: pointer;
+    }
+    .scrubber-track {
+      position: absolute;
+      top: 50%;
+      left: 0;
+      right: 0;
+      height: 4px;
+      transform: translateY(-50%);
+      border-radius: 999px;
+      background: var(--lib-chip);
+    }
+    .scrubber-fill {
+      height: 100%;
+      border-radius: inherit;
+      background: rgb(245 158 11 / 0.55);
+      width: 34%;
+    }
+    .scrubber-thumb {
+      position: absolute;
+      top: 50%;
+      left: 34%;
+      width: 12px;
+      height: 12px;
+      transform: translate(-50%, -50%);
+      border-radius: 50%;
+      border: 2px solid var(--lib-accent);
+      background: var(--lib-text-strong);
     }
 
-    .back-btn:hover {
-      color: var(--text-strong);
-      background: rgba(255, 255, 255, 0.05);
-    }
-
-    /* Edge Interactive Actions (Mục lục, Ribbon Bookmark) */
-    .toc-edge-btn {
+    /* ── Edge controls ── */
+    .toc-edge {
       position: fixed;
-      left: var(--safe-left);
-      top: 0;
-      bottom: 0;
+      top: var(--app-titlebar-h);
+      bottom: var(--footer-h);
+      left: 0;
       z-index: 80;
       width: 28px;
-      height: 100dvh;
-      padding: 0;
-      margin: 0;
       border: none;
       background: transparent;
-      color: var(--muted);
+      color: var(--lib-muted);
       cursor: pointer;
       display: flex;
       align-items: center;
       justify-content: center;
-      transition: color 0.15s, background 0.15s, width 0.15s, opacity 0.2s;
-      touch-action: manipulation;
+      transition: width 0.15s, color 0.15s;
     }
-
-    .toc-edge-btn::before {
+    .toc-edge::before {
       content: "";
       position: absolute;
       left: 0;
@@ -196,2469 +423,1041 @@
       bottom: 0;
       width: 3px;
       background: transparent;
-      transition: background 0.15s, width 0.15s;
+      transition: background 0.15s;
     }
+    .toc-edge:hover { width: 34px; color: var(--lib-accent); }
+    .toc-edge:hover::before { background: var(--lib-accent); }
+    .toc-edge svg { width: 16px; height: 16px; opacity: 0.55; }
+    .toc-edge:hover svg { opacity: 1; }
 
-    .toc-edge-btn svg {
-      width: 16px;
-      height: 16px;
-      opacity: 0.55;
-      transition: opacity 0.15s, color 0.15s;
-      pointer-events: none;
-    }
-
-    .toc-edge-btn:hover,
-    .toc-edge-btn:focus-visible {
-      width: 34px;
-      color: var(--accent);
-      background: linear-gradient(90deg, rgba(15, 23, 42, 0.55), transparent);
-      outline: none;
-    }
-
-    .toc-edge-btn:hover::before,
-    .toc-edge-btn:focus-visible::before {
-      width: 3px;
-      background: var(--accent);
-    }
-
-    .toc-edge-btn:hover svg,
-    .toc-edge-btn:focus-visible svg {
-      opacity: 1;
-    }
-
-    .toc-edge-btn.is-hidden {
-      opacity: 0;
-      pointer-events: none;
-    }
-
-    .bookmark-edge-btn {
+    .bookmark-edge {
       position: fixed;
-      left: var(--safe-left);
-      top: calc(var(--topbar-h) + var(--safe-top) + 8px);
+      top: calc(var(--app-titlebar-h) + 56px);
+      left: 0;
       z-index: 81;
       width: 36px;
       height: 48px;
-      padding: 0 0 0 4px;
-      border: none;
-      border-radius: 0 8px 8px 0;
-      background: rgba(15, 23, 42, 0.75);
-      border: 1px solid var(--border-soft);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: 1px solid var(--lib-border-soft);
       border-left: none;
-      color: var(--muted);
+      border-radius: 0 8px 8px 0;
+      background: rgb(15 23 42 / 0.75);
+      color: var(--lib-muted);
       cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      box-shadow: 2px 2px 10px rgba(0, 0, 0, 0.25);
-      transition: color 0.15s, background 0.15s, width 0.15s, opacity 0.2s;
+      box-shadow: 2px 2px 10px rgba(0,0,0,0.25);
+      transition: width 0.15s, color 0.15s, background 0.15s;
     }
-
-    .bookmark-edge-btn svg {
-      width: 20px;
-      height: 20px;
+    .bookmark-edge:hover { width: 42px; color: var(--lib-accent); }
+    .bookmark-edge.active {
+      color: var(--lib-accent);
+      background: var(--lib-accent-soft);
+      border-color: var(--lib-accent-ring);
     }
+    .bookmark-edge svg { width: 20px; height: 20px; }
 
-    .bookmark-edge-btn:hover {
-      width: 42px;
-      color: var(--accent);
-      background: rgba(15, 23, 42, 0.95);
-    }
-
-    .bookmark-edge-btn.is-active {
-      color: var(--accent);
-      background: rgba(245, 158, 11, 0.18);
-      border-color: rgba(245, 158, 11, 0.35);
-    }
-
-    .bookmark-edge-btn.is-hidden {
-      opacity: 0;
-      pointer-events: none;
-    }
-
-    .book-meta {
-      min-width: 0;
-      flex: 1;
-    }
-
-    .book-title {
-      font-size: 15px;
-      font-weight: 600;
-      color: var(--text-strong);
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      max-width: min(45vw, 240px);
-    }
-
-    .chapter-indicator {
-      font-size: 11px;
-      color: var(--faint);
-      margin-top: 2px;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      max-width: min(45vw, 240px);
-    }
-
-    .topbar-right {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      flex-shrink: 0;
-    }
-
-    .topbar-actions {
-      position: relative;
-      display: flex;
-      align-items: center;
-      gap: 6px;
-    }
-
-    .tool-btn {
-      height: 40px;
+    .chrome-reveal {
+      position: absolute;
+      left: 50%;
+      z-index: 60;
+      transform: translateX(-50%);
       width: 40px;
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      background: var(--surface);
-      color: var(--muted);
-      cursor: pointer;
+      height: 28px;
       display: flex;
       align-items: center;
       justify-content: center;
-      gap: 8px;
-      font-family: inherit;
-      touch-action: manipulation;
-      flex-shrink: 0;
-      transition: all 0.2s ease;
+      border: 1px solid var(--lib-border);
+      border-top: none;
+      border-radius: 0 0 8px 8px;
+      background: var(--lib-surface-strong);
+      color: var(--lib-muted);
+      cursor: pointer;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+      transition: top 0.3s ease, color 0.15s;
     }
+    .chrome-reveal:hover { color: var(--lib-accent); border-color: var(--lib-accent-ring); }
+    .chrome-reveal svg { width: 16px; height: 16px; transition: transform 0.3s; }
+    .chrome-reveal.expanded { top: var(--topbar-h); }
+    .chrome-reveal.collapsed { top: 0; }
+    .chrome-reveal.expanded svg { transform: rotate(180deg); }
 
-    .tool-btn:hover {
-      color: var(--text-strong);
-      border-color: var(--muted);
-    }
-
-    .tool-btn:active, .tool-btn.active {
-      border-color: var(--accent);
-      color: var(--text-strong);
-      background: var(--accent-soft);
-    }
-
-    .tool-btn span {
-      display: none;
-    }
-
-    .reader-scroll-container {
-      flex: 1;
-      overflow-x: hidden;
-      overflow-y: auto;
-      padding: 32px 24px calc(var(--footer-h) + var(--safe-bottom) + 32px) 32px;
-      position: relative;
-      scroll-behavior: smooth;
-      -webkit-overflow-scrolling: touch;
-      overscroll-behavior-y: contain;
-    }
-
-    .reading-area {
-      width: 100%;
-      max-width: var(--reader-max-width);
-      margin: 0 auto;
-      transition: max-width 0.3s cubic-bezier(0.25, 1, 0.5, 1);
-    }
-
-    /* CHẾ ĐỘ 1 TRANG CĂN GIỮA (Mặc định cho trải nghiệm tối giản) */
-    .reader-app.mode-single-page .reading-area {
-      max-width: var(--reader-max-width);
-      columns: 1 !important;
-      column-rule: none !important;
-    }
-
-    /* CHẾ ĐỘ 2 TRANG SONG SONG (Chỉ kích hoạt khi được chọn và màn hình đủ rộng) */
-    .reader-app.mode-dual-page .reading-area {
-      max-width: min(1200px, 95vw);
-      columns: 2;
-      column-gap: 64px;
-      /* Khung phân tách 2 trang sách (Spine line) chân thực */
-      column-rule: 1px dashed var(--border);
-      column-fill: auto;
-      text-align: justify;
-    }
-
-    /* Fallback cho màn hình hẹp: Dù chọn 2 trang vẫn trả về 1 trang để chống tràn chữ */
-    @media (max-width: 899px) {
-      .reader-app.mode-dual-page .reading-area {
-        columns: 1 !important;
-        column-rule: none !important;
-        max-width: var(--reader-max-width);
-      }
-    }
-
-    /* Custom các thuộc tính lề trang linh hoạt */
-    .reading-area.margin-narrow { max-width: 580px; }
-    .reading-area.margin-wide { max-width: 780px; }
-    .reading-area.margin-off {
-      max-width: 100% !important;
-      padding-left: 12px;
-      padding-right: 12px;
-    }
-
-    .chapter-content {
-      font-family: var(--font-reading);
-      font-size: var(--reading-size);
-      font-weight: var(--reading-weight);
-      line-height: var(--reading-line-height);
-      color: var(--text);
-      text-align: var(--reading-align);
-      user-select: text;
-    }
-
-    /* Khung chứa đoạn văn phục vụ comment tương tác */
-    .paragraph-wrapper {
-      position: relative;
-      margin-bottom: 1.5em;
-      padding-right: 44px;
-      break-inside: avoid-column;
-    }
-
-    .chapter-content p {
-      margin-bottom: 0;
-      text-indent: 1.5em;
-      display: inline;
-    }
-
-    .paragraph-wrapper.first-p p {
-      text-indent: 0;
-    }
-
-    .paragraph-wrapper.first-p p::first-letter {
-      font-family: "Playfair Display", Georgia, serif;
-      font-size: clamp(2.2em, 8vw, 3.2em);
-      float: left;
-      line-height: 0.85;
-      padding-right: 10px;
-      margin-top: 4px;
-      color: var(--accent);
-      font-weight: bold;
-    }
-
-    .dropdown-overlay {
+    /* ── Overlays ── */
+    .overlay-backdrop {
       position: fixed;
       inset: 0;
-      background: rgba(15, 23, 42, 0.6);
+      z-index: 150;
+      background: rgb(15 23 42 / 0.45);
       backdrop-filter: blur(4px);
-      z-index: 90;
-      display: none;
       opacity: 0;
+      pointer-events: none;
       transition: opacity 0.25s ease;
     }
+    .overlay-backdrop.show { opacity: 1; pointer-events: auto; }
 
-    .dropdown-overlay.show {
-      display: block;
-      opacity: 1;
-    }
-
-    .dropdown-menu {
+    /* Sidebar */
+    .sidebar {
       position: fixed;
+      top: var(--app-titlebar-h);
       bottom: 0;
       left: 0;
-      right: 0;
-      max-height: min(88dvh, 740px);
-      overflow-y: auto;
-      background: var(--surface-strong);
-      border-top: 1px solid var(--border);
-      border-radius: 16px 16px 0 0;
-      padding: 24px 16px calc(24px + var(--safe-bottom));
+      z-index: 160;
+      width: min(340px, 86vw);
       display: flex;
       flex-direction: column;
-      gap: 20px;
-      z-index: 100;
-      transform: translateY(100%);
+      border-right: 1px solid var(--lib-border);
+      background: var(--lib-surface-strong);
+      box-shadow: var(--lib-overlay-shadow);
+      backdrop-filter: blur(20px);
+      transform: translateX(-100%);
       transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-      -webkit-overflow-scrolling: touch;
-      overscroll-behavior: contain;
     }
-
-    .dropdown-menu.show {
-      transform: translateY(0);
-    }
-
-    .dropdown-pull-bar {
-      width: 36px;
-      height: 4px;
-      background: var(--border-soft);
-      border-radius: 2px;
-      margin: -12px auto 12px;
-    }
-
-    .dropdown-menu-header {
+    .sidebar.show { transform: translateX(0); }
+    .sidebar-header {
       display: flex;
       align-items: center;
       justify-content: space-between;
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--lib-border-soft);
     }
-
-    .dropdown-menu-header h2 {
-      font-size: 16px;
-      font-weight: 700;
-      color: var(--text-strong);
-    }
-
-    .settings-close-btn {
-      width: 32px;
-      height: 32px;
-      border: none;
-      border-radius: 8px;
-      background: transparent;
-      color: var(--muted);
-      cursor: pointer;
-      font-size: 18px;
-    }
-
-    .dropdown-section-title {
-      font-size: 11px;
-      font-weight: 700;
-      color: var(--faint);
-      text-transform: uppercase;
-      letter-spacing: 0.1em;
-      margin-bottom: 10px;
-    }
-
-    .toggle-group {
+    .sidebar-header h2 { font-size: 18px; font-weight: 600; color: var(--lib-text-strong); }
+    .sidebar-tabs {
       display: flex;
-      gap: 6px;
-      background: rgba(15, 23, 42, 0.45);
-      padding: 4px;
-      border: 1px solid var(--border-soft);
-      border-radius: 8px;
+      gap: 2px;
+      padding: 8px;
+      background: var(--lib-hint);
+      border-bottom: 1px solid var(--lib-border-soft);
     }
-
-    .toggle-item {
+    .sidebar-tab {
       flex: 1;
-      height: 38px;
+      height: 36px;
       border: none;
-      background: transparent;
-      color: var(--muted);
-      font-size: 12px;
-      font-weight: 600;
       border-radius: 6px;
+      background: transparent;
+      color: var(--lib-muted);
+      font-size: 11px;
+      font-weight: 600;
       cursor: pointer;
-      padding: 0 4px;
-      white-space: nowrap;
-      transition: all 0.15s ease;
-    }
-
-    .toggle-item.active {
-      background: var(--bg-deep);
-      color: var(--accent);
-      box-shadow: 0 2px 8px rgba(0,0,0,0.2);
-    }
-
-    .custom-dialog-overlay {
-      position: fixed;
-      inset: 0;
-      background: rgba(15, 23, 42, 0.75);
-      backdrop-filter: blur(4px);
-      z-index: 300;
-      display: none;
+      display: flex;
       align-items: center;
       justify-content: center;
-      padding: 20px;
-      opacity: 0;
-      transition: opacity 0.2s ease;
-    }
-
-    .custom-dialog-overlay.show {
-      display: flex;
-      opacity: 1;
-    }
-
-    .custom-dialog {
-      background: var(--surface-strong);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      width: 100%;
-      max-width: 400px;
-      padding: 24px;
-      box-shadow: var(--shadow);
-      transform: scale(0.9);
-      transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
-    }
-
-    .custom-dialog-overlay.show .custom-dialog {
-      transform: scale(1);
-    }
-
-    .custom-dialog-title {
-      font-size: 16px;
-      font-weight: 700;
-      color: var(--text-strong);
-      margin-bottom: 12px;
-    }
-
-    .custom-dialog-desc {
-      font-size: 14px;
-      color: var(--text);
-      line-height: 1.5;
-      margin-bottom: 24px;
-    }
-
-    .custom-dialog-actions {
-      display: flex;
-      justify-content: flex-end;
-      gap: 12px;
-    }
-
-    .dialog-btn {
-      padding: 10px 18px;
-      font-size: 13px;
-      font-weight: 600;
-      border-radius: 8px;
-      cursor: pointer;
-      font-family: inherit;
-      border: 1px solid var(--border);
-      background: transparent;
-      color: var(--text);
-      transition: all 0.15s ease;
-    }
-
-    .dialog-btn.confirm-danger {
-      background: #ef4444;
-      border-color: #ef4444;
-      color: #ffffff;
-    }
-
-    .dialog-btn.confirm-danger:hover {
-      background: #dc2626;
-      border-color: #dc2626;
-    }
-
-    .dialog-btn:hover {
-      background: var(--surface);
-    }
-
-    .comment-trigger-btn {
-      position: absolute;
-      right: 0;
-      top: 2px;
-      background: var(--surface);
-      border: 1px solid var(--border-soft);
-      border-radius: 10px;
-      color: var(--muted);
-      font-size: 10px;
-      font-weight: 700;
-      padding: 4px 8px;
-      min-height: 26px;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
       gap: 4px;
-      z-index: 5;
-      transition: all 0.2s;
-      opacity: 0.7;
-      touch-action: manipulation;
     }
-
-    .comment-trigger-btn.has-comments,
-    .paragraph-wrapper:hover .comment-trigger-btn,
-    .reader-app.comment-mode .comment-trigger-btn {
-      opacity: 1;
+    .sidebar-tab.active { background: var(--lib-bg-mid); color: var(--lib-accent); }
+    .sidebar-scroll { flex: 1; overflow-y: auto; padding: 12px; }
+    .toc-item {
+      width: 100%;
+      padding: 10px 12px;
+      border: none;
+      border-radius: 8px;
+      background: transparent;
+      color: var(--lib-text);
+      font-size: 14px;
+      font-weight: 500;
+      text-align: left;
+      cursor: pointer;
+      margin-bottom: 4px;
     }
-
-    .comment-trigger-btn.has-comments {
-      color: var(--accent);
-      border-color: rgba(245, 158, 11, 0.45);
-      background: var(--accent-soft);
+    .toc-item:hover { background: var(--lib-surface-hover); }
+    .toc-item.active {
+      border-left: 3px solid var(--lib-accent);
+      border-radius: 0 8px 8px 0;
+      padding-left: 9px;
+      background: var(--lib-accent-soft);
+      color: var(--lib-text-strong);
     }
-
-    .comment-trigger-btn:hover {
-      color: var(--accent);
-      border-color: var(--accent);
-      transform: scale(1.05);
-      opacity: 1;
-    }
-
-    .paragraph-wrapper.has-comments {
-      border-left: 2px solid rgba(245, 158, 11, 0.45);
-      padding-left: 12px;
-      margin-left: -14px;
-    }
-
-    .reader-app.comment-mode .paragraph-wrapper {
+    .sidebar-card {
+      padding: 12px;
+      border: 1px solid var(--lib-border-soft);
+      border-radius: 8px;
+      background: rgb(15 23 42 / 0.35);
+      margin-bottom: 8px;
       cursor: pointer;
     }
+    .sidebar-card:hover { border-color: var(--lib-accent-ring); }
+    .sidebar-card-title { font-size: 13px; font-weight: 600; color: var(--lib-text-strong); }
+    .sidebar-card-meta { font-size: 11px; color: var(--lib-faint); margin-top: 4px; }
+    .sidebar-empty { padding: 24px; text-align: center; font-size: 13px; color: var(--lib-faint); }
 
-    .reader-app.comment-mode .paragraph-wrapper:hover {
-      background: rgba(245, 158, 11, 0.06);
-      border-radius: 6px;
+    /* Settings panel */
+    .settings-panel {
+      position: fixed;
+      z-index: 95;
+      right: 0;
+      bottom: 0;
+      left: 0;
+      max-height: min(88dvh, 740px);
+      overflow-y: auto;
+      padding: 12px 20px 24px;
+      border-top: 1px solid var(--lib-border);
+      background: var(--lib-surface-strong);
+      box-shadow: var(--lib-overlay-shadow);
+      transform: translateY(100%);
+      opacity: 0;
+      pointer-events: none;
+      transition: all 0.3s ease;
     }
-
-    /* Trình chiếu các cấu trúc bổ sung */
-    .chapter-header-decor {
-      text-align: center;
-      margin-bottom: 36px;
-      padding-bottom: 24px;
-      border-bottom: 1px dashed var(--border-soft);
-      break-inside: avoid-column;
+    @media (min-width: 640px) {
+      .settings-panel {
+        top: calc(var(--app-titlebar-h) + 72px);
+        right: 16px;
+        bottom: auto;
+        left: auto;
+        width: 380px;
+        max-height: min(78vh, 660px);
+        border: 1px solid var(--lib-border);
+        border-radius: 12px;
+        transform: translateY(10px);
+      }
     }
-
-    .chapter-num {
+    .settings-panel.show {
+      transform: translateY(0);
+      opacity: 1;
+      pointer-events: auto;
+    }
+    @media (min-width: 640px) {
+      .settings-panel:not(.show) { transform: translateY(10px); }
+    }
+    .settings-pull { width: 36px; height: 4px; border-radius: 2px; background: var(--lib-border-soft); margin: 0 auto 12px; }
+    @media (min-width: 640px) { .settings-pull { display: none; } }
+    .section-title {
       font-size: 11px;
       font-weight: 700;
-      color: var(--accent);
+      letter-spacing: 0.05em;
       text-transform: uppercase;
-      letter-spacing: 0.2em;
+      color: var(--lib-faint);
       margin-bottom: 8px;
     }
-
-    .chapter-title {
-      font-family: "Playfair Display", Georgia, serif;
-      font-size: clamp(24px, 6vw, 32px);
-      font-weight: 600;
-      color: var(--text-strong);
-      line-height: 1.25;
-      padding: 0 8px;
+    .toggle-group {
+      display: flex;
+      gap: 4px;
+      padding: 4px;
+      border-radius: 8px;
+      background: var(--lib-hint);
     }
-
-    .highlight-tooltip {
-      position: absolute;
-      background: var(--surface-strong);
-      border: 1px solid var(--border);
-      border-radius: 24px;
-      padding: 6px 12px;
-      display: none;
-      align-items: center;
-      gap: 10px;
-      box-shadow: var(--shadow);
-      z-index: 200;
-      max-width: calc(100vw - 24px);
-    }
-
-    .hl-color-btn {
-      width: 24px;
-      height: 24px;
-      border-radius: 50%;
-      border: 1px solid rgba(255,255,255,0.2);
-      cursor: pointer;
-      transition: transform 0.15s ease;
-    }
-
-    .hl-color-btn:hover {
-      transform: scale(1.12);
-    }
-
-    .hl-yellow { background: rgba(245, 158, 11, 0.45); border-color: #f59e0b; }
-    .hl-green { background: rgba(16, 185, 129, 0.45); border-color: #10b981; }
-    .hl-pink { background: rgba(236, 72, 153, 0.45); border-color: #ec4899; }
-    
-    .hl-text-marker-yellow { background-color: rgba(245, 158, 11, 0.25); border-bottom: 2px solid #f59e0b; }
-    .hl-text-marker-green { background-color: rgba(16, 185, 129, 0.25); border-bottom: 2px solid #10b981; }
-    .hl-text-marker-pink { background-color: rgba(236, 72, 153, 0.25); border-bottom: 2px solid #ec4899; }
-
-    .tooltip-divider {
-      width: 1px;
-      height: 18px;
-      background: var(--border-soft);
-    }
-
-    .tooltip-btn {
-      background: transparent;
+    .toggle-item {
+      flex: 1;
+      height: 36px;
       border: none;
-      color: var(--text-strong);
+      border-radius: 6px;
+      background: transparent;
+      color: var(--lib-muted);
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .toggle-item.active { background: var(--lib-bg-mid); color: var(--lib-accent); }
+    .settings-section { margin-bottom: 20px; }
+    .theme-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+    .theme-swatch {
+      height: 42px;
+      border-radius: 8px;
+      border: 1px solid var(--lib-border-soft);
       font-size: 13px;
       font-weight: 600;
-      padding: 6px 4px;
       cursor: pointer;
+    }
+    .theme-swatch.active { outline: 2px solid var(--lib-accent); outline-offset: 1px; }
+
+    /* More menu */
+    .more-menu {
+      position: absolute;
+      top: calc(100% + 8px);
+      right: 0;
+      z-index: 120;
+      min-width: 220px;
+      padding: 6px;
+      border: 1px solid var(--lib-border);
+      border-radius: 12px;
+      background: var(--lib-surface-strong);
+      box-shadow: var(--lib-overlay-shadow);
+      display: none;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .more-menu.show { display: flex; }
+    .menu-item {
       display: flex;
       align-items: center;
-      gap: 4px;
+      width: 100%;
+      min-height: 44px;
+      padding: 10px 12px;
+      border: none;
+      border-radius: 8px;
+      background: transparent;
+      color: var(--lib-text);
+      font-size: 14px;
+      font-weight: 500;
+      text-align: left;
+      cursor: pointer;
     }
+    .menu-item:hover { background: var(--lib-surface-hover); color: var(--lib-text-strong); }
+    .menu-item.danger { color: #f87171; }
+    .menu-divider { height: 1px; background: var(--lib-border-soft); margin: 4px 6px; }
 
-    .tooltip-btn svg {
-      width: 16px;
-      height: 16px;
-    }
-
-    /* Modal Ghi chú & Đánh dấu */
-    .modal-overlay {
+    /* Selection context menu (right-click only) */
+    .selection-menu-backdrop {
       position: fixed;
       inset: 0;
-      background: rgba(15, 23, 42, 0.6);
-      backdrop-filter: blur(4px);
+      z-index: 199;
+      display: none;
+    }
+    .selection-menu-backdrop.show { display: block; }
+    .selection-menu {
+      position: fixed;
+      z-index: 200;
+      width: min(240px, calc(100vw - 24px));
+      padding: 6px 0;
+      border: 1px solid var(--lib-border);
+      border-radius: 12px;
+      background: var(--lib-surface-strong);
+      box-shadow: var(--lib-overlay-shadow);
+      backdrop-filter: blur(12px);
+      display: none;
+    }
+    .selection-menu.show { display: block; }
+    .selection-menu-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      width: 100%;
+      padding: 8px 12px;
+      border: none;
+      background: transparent;
+      color: var(--lib-text-strong);
+      font-size: 13px;
+      font-weight: 500;
+      text-align: left;
+      cursor: pointer;
+    }
+    .selection-menu-item:hover { background: rgb(15 23 42 / 0.4); }
+    .selection-menu-item.destructive { color: #f87171; }
+    .selection-menu-divider { height: 1px; background: var(--lib-border); margin: 4px 12px; }
+    .selection-menu-icon { width: 20px; text-align: center; flex-shrink: 0; }
+
+    /* Highlight color edit (Highlight tool) */
+    .highlight-edit {
+      position: fixed;
+      z-index: 200;
+      display: none;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 8px;
+      border: 1px solid var(--lib-border);
+      border-radius: 12px;
+      background: var(--lib-surface-strong);
+      box-shadow: var(--lib-overlay-shadow);
+    }
+    .highlight-edit.show { display: flex; }
+    .color-swatch-btn {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      border: 2px solid var(--lib-border);
+      background: #eab308;
+      cursor: pointer;
+    }
+
+    /* Note modal */
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
       z-index: 250;
       display: none;
       align-items: center;
       justify-content: center;
       padding: 16px;
+      background: rgb(15 23 42 / 0.6);
+      backdrop-filter: blur(4px);
     }
-
-    .modal-overlay.show {
-      display: flex;
-    }
-
+    .modal-backdrop.show { display: flex; }
     .note-modal {
-      background: var(--surface-strong);
-      border: 1px solid var(--border);
-      border-radius: 12px;
       width: 100%;
       max-width: 450px;
-      box-shadow: var(--shadow);
       padding: 20px;
+      border: 1px solid var(--lib-border);
+      border-radius: 12px;
+      background: var(--lib-surface-strong);
+      box-shadow: var(--lib-overlay-shadow);
       display: flex;
       flex-direction: column;
       gap: 16px;
     }
-
-    .modal-title {
-      font-size: 16px;
-      font-weight: 600;
-      color: var(--text-strong);
-    }
-
+    .note-modal h3 { font-size: 16px; font-weight: 600; color: var(--lib-text-strong); }
     .quote-preview {
-      font-family: var(--font-reading);
+      font-family: var(--reader-font-reading);
       font-size: 14px;
       font-style: italic;
-      color: var(--muted);
-      border-left: 3px solid var(--accent);
+      color: var(--lib-muted);
+      border-left: 3px solid var(--lib-accent);
       padding-left: 10px;
       line-height: 1.4;
     }
-
     .note-textarea {
       width: 100%;
       height: 100px;
-      background: var(--bg-deep);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      color: var(--text-strong);
-      font-family: var(--font-ui);
-      font-size: 16px;
       padding: 10px;
+      border: 1px solid var(--lib-border);
+      border-radius: 8px;
+      background: var(--lib-bg-deep);
+      color: var(--lib-text-strong);
+      font-size: 15px;
       resize: none;
       outline: none;
     }
-
-    .note-textarea:focus {
-      border-color: var(--accent);
-    }
-
-    .modal-actions {
-      display: flex;
-      justify-content: flex-end;
-      gap: 10px;
-    }
-
+    .modal-actions { display: flex; justify-content: flex-end; gap: 10px; }
     .modal-btn {
       padding: 8px 16px;
+      border: 1px solid var(--lib-border);
+      border-radius: 6px;
+      background: transparent;
+      color: var(--lib-muted);
       font-size: 13px;
       font-weight: 600;
-      border-radius: 6px;
       cursor: pointer;
-      border: 1px solid var(--border);
-      background: transparent;
-      color: var(--muted);
     }
-
     .modal-btn.primary {
-      background: var(--accent);
-      border-color: var(--accent);
-      color: #000;
+      background: var(--lib-accent);
+      border-color: var(--lib-accent);
+      color: var(--lib-on-accent);
     }
 
-    .sidebar-overlay {
+    /* Toast */
+    #toast {
       position: fixed;
-      inset: 0;
-      background: rgba(15, 23, 42, 0.4);
-      backdrop-filter: blur(4px);
-      z-index: 150;
-      display: none;
-      opacity: 0;
-      transition: opacity 0.25s ease;
-    }
-
-    .sidebar-overlay.show {
-      display: block;
-      opacity: 1;
-    }
-
-    .toc-sidebar {
-      position: fixed;
-      top: 0;
-      left: 0;
-      bottom: 0;
-      width: min(100%, 340px);
-      max-width: 86vw;
-      padding-top: var(--safe-top);
-      padding-bottom: var(--safe-bottom);
-      background: var(--surface-strong);
-      border-right: 1px solid var(--border);
-      z-index: 160;
-      box-shadow: var(--shadow);
-      backdrop-filter: blur(20px);
-      -webkit-backdrop-filter: blur(20px);
-      transform: translateX(-100%);
-      transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-      display: flex;
-      flex-direction: column;
-    }
-
-    .toc-sidebar.show {
-      transform: translateX(0);
-    }
-
-    .toc-header {
-      padding: 16px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      border-bottom: 1px solid var(--border-soft);
-    }
-
-    .toc-title {
-      font-size: 18px;
-      font-weight: 600;
-      color: var(--text-strong);
-    }
-
-    .dialog-close {
-      width: 36px;
-      height: 36px;
-      border: none;
-      background: transparent;
-      color: var(--muted);
-      font-size: 18px;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-
-    .toc-tabs {
-      display: flex;
-      padding: 8px 8px;
-      background: rgba(15, 23, 42, 0.3);
-      border-bottom: 1px solid var(--border-soft);
-      gap: 2px;
-    }
-
-    .toc-tab {
-      flex: 1;
-      height: 36px;
-      border: none;
-      background: transparent;
-      color: var(--muted);
-      font-size: 11px;
-      font-weight: 600;
-      border-radius: 6px;
-      cursor: pointer;
-      padding: 0 2px;
-      white-space: nowrap;
-    }
-
-    .toc-tab.active {
-      background: var(--surface);
-      color: var(--accent);
-    }
-
-    .toc-scroll {
-      flex: 1;
-      overflow-y: auto;
-      padding: 12px;
-    }
-
-    .toc-list {
-      list-style: none;
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-    }
-
-    .toc-item {
-      width: 100%;
-      padding: 12px;
-      border: none;
-      border-radius: 8px;
-      background: transparent;
-      color: var(--text);
-      font-size: 14px;
-      font-weight: 500;
-      text-align: left;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 8px;
-    }
-
-    .toc-item-label {
-      min-width: 0;
-      flex: 1;
-      line-height: 1.35;
-    }
-
-    .toc-comment-badge {
-      flex-shrink: 0;
-      min-width: 22px;
-      height: 22px;
-      padding: 0 6px;
-      border-radius: 999px;
-      background: var(--accent-soft);
-      color: var(--accent);
-      border: 1px solid rgba(245, 158, 11, 0.35);
-      font-size: 11px;
-      font-weight: 700;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-    }
-
-    .toc-item.active {
-      background: rgba(255,255,255,0.05);
-      color: var(--text-strong);
-      border-left: 3px solid var(--accent);
-      border-radius: 0 8px 8px 0;
-      padding-left: 9px;
-    }
-
-    .bookmarks-list {
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-    }
-
-    .bookmark-card {
-      width: 100%;
-      text-align: left;
-      border: 1px solid var(--border-soft);
-      border-radius: 8px;
-      background: rgba(15, 23, 42, 0.35);
-      color: inherit;
-      padding: 12px;
-      cursor: pointer;
-      font-family: inherit;
-      display: flex;
-      flex-direction: column;
-      gap: 4px;
-      transition: border-color 0.15s, background 0.15s;
-    }
-
-    .bookmark-card:hover {
-      border-color: rgba(245, 158, 11, 0.28);
-      background: rgba(30, 41, 59, 0.55);
-    }
-
-    .bookmark-card-title {
-      font-size: 13px;
-      font-weight: 600;
-      color: var(--text-strong);
-    }
-
-    .bookmark-card-meta {
-      font-size: 11px;
-      color: var(--faint);
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      gap: 8px;
-    }
-
-    .bookmark-card-del {
-      border: none;
-      background: transparent;
-      color: var(--faint);
-      cursor: pointer;
-      font-size: 12px;
-      padding: 2px 4px;
-    }
-
-    .bookmark-card-del:hover {
-      color: #f87171;
-    }
-
-    .comments-drawer {
-      position: fixed;
-      bottom: 0;
-      left: 0;
-      right: 0;
-      height: min(78%, 560px);
-      max-height: calc(100dvh - var(--safe-top) - 48px);
-      background: var(--surface-strong);
-      border-top: 1px solid var(--border);
-      border-radius: 16px 16px 0 0;
-      box-shadow: var(--shadow);
-      backdrop-filter: blur(20px);
-      -webkit-backdrop-filter: blur(20px);
-      z-index: 180;
-      transform: translateY(100%);
-      transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
-      display: flex;
-      flex-direction: column;
-      padding-bottom: var(--safe-bottom);
-    }
-
-    .comments-drawer.show {
-      transform: translateY(0);
-    }
-
-    .drawer-header {
-      padding: 16px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      border-bottom: 1px solid var(--border-soft);
-    }
-
-    .drawer-title {
-      font-size: 15px;
-      font-weight: 600;
-      color: var(--text-strong);
-    }
-
-    .comments-scroll {
-      flex: 1;
-      overflow-y: auto;
-      padding: 16px;
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-    }
-
-    .comment-item {
-      background: rgba(15, 23, 42, 0.3);
-      border: 1px solid var(--border-soft);
-      border-radius: 8px;
-      padding: 12px;
-    }
-
-    .comment-meta {
-      display: flex;
-      justify-content: space-between;
-      font-size: 11px;
-      color: var(--faint);
-      margin-bottom: 6px;
-    }
-
-    .comment-user {
-      font-weight: 600;
-      color: var(--accent);
-    }
-
-    .comment-text {
-      font-size: 13px;
-      color: var(--text);
-      line-height: 1.4;
-    }
-
-    .comment-input-area {
-      padding: 12px 16px 16px;
-      border-top: 1px solid var(--border-soft);
-      display: flex;
-      gap: 8px;
-      background: var(--surface-strong);
-    }
-
-    .comment-input {
-      flex: 1;
-      height: 44px;
-      background: var(--bg-deep);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      color: var(--text-strong);
-      padding: 0 12px;
-      font-family: var(--font-ui);
-      font-size: 15px;
-      outline: none;
-    }
-
-    .comment-send-btn {
-      height: 44px;
-      padding: 0 16px;
-      background: var(--accent);
-      border: none;
-      border-radius: 8px;
-      color: #000;
-      font-weight: 600;
-      font-size: 13px;
-      cursor: pointer;
-      touch-action: manipulation;
-      flex-shrink: 0;
-    }
-
-    /* Trình đơn Thêm tùy chọn (Dropdown) */
-    .more-menu {
-      position: absolute;
-      top: calc(100% + 8px);
-      right: 0;
-      min-width: min(220px, calc(100vw - 24px));
-      max-width: calc(100vw - 16px);
-      padding: 6px;
-      border-radius: 12px;
-      border: 1px solid var(--border);
-      background: var(--surface-strong);
-      box-shadow: var(--shadow);
-      display: none;
-      z-index: 120;
-      flex-direction: column;
-      gap: 2px;
-    }
-
-    .more-menu.show {
-      display: flex;
-    }
-
-    .more-menu-item {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      width: 100%;
-      padding: 12px;
-      min-height: 40px;
-      border: none;
-      border-radius: 8px;
-      background: transparent;
-      color: var(--text);
-      font-family: inherit;
-      font-size: 14px;
-      font-weight: 500;
-      cursor: pointer;
-      text-align: left;
-      touch-action: manipulation;
-    }
-
-    .more-menu-item:hover {
-      background: rgba(255, 255, 255, 0.06);
-      color: var(--text-strong);
-    }
-
-    .more-menu-item.danger {
-      color: #f87171;
-    }
-
-    .more-menu-divider {
-      height: 1px;
-      background: var(--border-soft);
-      margin: 4px 6px;
-    }
-
-    .more-menu-item svg {
-      width: 18px;
-      height: 18px;
-      flex-shrink: 0;
-    }
-
-    .tools-menu {
-      position: absolute;
-      top: calc(100% + 8px);
-      right: 0;
-      min-width: min(220px, calc(100vw - 24px));
-      max-width: calc(100vw - 16px);
-      padding: 6px;
-      border-radius: 12px;
-      border: 1px solid var(--border);
-      background: var(--surface-strong);
-      box-shadow: var(--shadow);
-      display: none;
-      z-index: 120;
-      flex-direction: column;
-      gap: 2px;
-    }
-
-    .tools-menu.show {
-      display: flex;
-    }
-
-    .tools-menu-item {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      width: 100%;
-      padding: 12px;
-      min-height: 44px;
-      border: none;
-      border-radius: 8px;
-      background: transparent;
-      color: var(--text);
-      font-family: inherit;
-      font-size: 14px;
-      font-weight: 500;
-      cursor: pointer;
-      text-align: left;
-      touch-action: manipulation;
-    }
-
-    .tools-menu-item:hover {
-      background: rgba(255, 255, 255, 0.06);
-      color: var(--text-strong);
-    }
-
-    .tools-menu-item.active {
-      color: var(--accent);
-      background: var(--accent-soft);
-    }
-
-    .tools-menu-item svg {
-      width: 18px;
-      height: 18px;
-      flex-shrink: 0;
-    }
-
-    .active-tool-chip {
-      display: none;
-      align-items: center;
-      gap: 6px;
-      height: 36px;
-      max-width: min(42vw, 140px);
-      padding: 0 10px 0 12px;
-      border: 1px solid rgba(245, 158, 11, 0.45);
-      border-radius: 999px;
-      background: var(--accent-soft);
-      color: var(--accent);
-      font-family: inherit;
-      font-size: 12px;
-      font-weight: 700;
-      cursor: pointer;
-      touch-action: manipulation;
-      flex-shrink: 1;
-      min-width: 0;
-    }
-
-    .active-tool-chip.show {
-      display: inline-flex;
-    }
-
-    .active-tool-chip-label {
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-
-    .active-tool-chip-x {
-      flex-shrink: 0;
-      width: 18px;
-      height: 18px;
-      border-radius: 50%;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 11px;
-      line-height: 1;
-      background: rgba(245, 158, 11, 0.2);
-    }
-
-    /* FOOTER BAR (Thanh tiến trình) */
-    .footer-bar {
-      height: calc(var(--footer-h) + var(--safe-bottom));
-      padding: 0 16px var(--safe-bottom);
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      border-top: 1px solid var(--border-soft);
-      background: var(--surface-strong);
-      backdrop-filter: blur(16px);
-      -webkit-backdrop-filter: blur(16px);
-      z-index: 50;
-      transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.3s;
-      flex-shrink: 0;
-    }
-
-    .footer-bar.hide {
-      transform: translateY(100%);
-      opacity: 0;
-      pointer-events: none;
-    }
-
-    .progress-slider-container {
-      flex: 1;
-      width: 100%;
-      display: flex;
-      align-items: center;
-      gap: 12px;
-    }
-
-    .progress-slider {
-      flex: 1;
-      height: 20px;
-      display: flex;
-      align-items: center;
-      position: relative;
-      cursor: pointer;
-    }
-
-    .progress-slider-track {
-      width: 100%;
-      height: 4px;
-      background: var(--border-soft);
-      border-radius: 2px;
-      position: relative;
-    }
-
-    .progress-slider-fill {
-      height: 100%;
-      background: var(--accent);
-      border-radius: 2px;
-      width: 0%;
-    }
-
-    .progress-slider-handle {
-      position: absolute;
-      top: 50%;
-      transform: translate(-50%, -50%);
-      width: 16px;
-      height: 16px;
-      border-radius: 50%;
-      background: #ffffff;
-      border: 3px solid var(--accent);
-      left: 0%;
-    }
-
-    .progress-location-label {
-      font-size: 11px;
-      font-weight: 600;
-      color: var(--muted);
-      max-width: 140px;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      flex-shrink: 0;
-    }
-
-    /* Toast Notifications */
-    #toastContainer {
-      position: fixed;
-      top: 24px;
+      top: calc(var(--app-titlebar-h) + 16px);
       left: 50%;
-      transform: translateX(-50%);
+      transform: translateX(-50%) translateY(-12px);
       z-index: 999;
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-      pointer-events: none;
-    }
-
-    .toast {
-      background: var(--surface-strong);
-      border: 1px solid var(--border);
-      color: var(--text-strong);
       padding: 10px 18px;
-      border-radius: 30px;
+      border: 1px solid var(--lib-border);
+      border-radius: 999px;
+      background: var(--lib-surface-strong);
+      color: var(--lib-text-strong);
       font-size: 13px;
       font-weight: 600;
-      box-shadow: var(--shadow);
+      box-shadow: var(--lib-overlay-shadow);
+      opacity: 0;
+      pointer-events: none;
+      transition: all 0.25s ease;
+    }
+    #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+    /* ── Mockup sketch panel (for ideation) ── */
+    .sketch-panel {
+      position: fixed;
+      right: 12px;
+      bottom: calc(var(--footer-h) + 12px);
+      z-index: 500;
+      width: min(300px, calc(100vw - 24px));
+      max-height: min(420px, 50vh);
+      display: flex;
+      flex-direction: column;
+      border: 1px dashed var(--lib-accent-ring);
+      border-radius: 12px;
+      background: rgb(15 23 42 / 0.92);
+      box-shadow: var(--lib-overlay-shadow);
+      backdrop-filter: blur(12px);
+      overflow: hidden;
+      transition: transform 0.25s ease, opacity 0.25s ease;
+    }
+    .sketch-panel.collapsed {
+      width: auto;
+      max-height: none;
+    }
+    .sketch-panel.collapsed .sketch-body { display: none; }
+    .sketch-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 12px;
+      background: var(--lib-accent-soft);
+      border-bottom: 1px solid var(--lib-accent-ring);
+      cursor: pointer;
+      user-select: none;
+    }
+    .sketch-header h3 {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--lib-accent);
+    }
+    .sketch-body {
+      padding: 10px 12px 12px;
+      overflow-y: auto;
+      font-size: 11px;
+      line-height: 1.45;
+      color: var(--lib-muted);
+    }
+    .sketch-body label {
       display: flex;
       align-items: center;
       gap: 8px;
-      opacity: 0;
-      transform: translateY(-20px);
-      transition: opacity 0.3s, transform 0.3s;
+      margin-bottom: 6px;
+      cursor: pointer;
+      color: var(--lib-text);
     }
-
-    .toast.show {
-      opacity: 1;
-      transform: translateY(0);
+    .sketch-body textarea {
+      width: 100%;
+      min-height: 72px;
+      margin-top: 8px;
+      padding: 8px;
+      border: 1px solid var(--lib-border-soft);
+      border-radius: 6px;
+      background: var(--lib-bg-deep);
+      color: var(--lib-text);
+      font-size: 11px;
+      resize: vertical;
     }
-
-    @media (min-width: 768px) {
-      :root {
-        --topbar-h: 64px;
-        --footer-h: 64px;
-      }
-
-      .topbar {
-        padding: var(--safe-top) 24px 0;
-      }
-
-      .tool-btn {
-        width: auto;
-        height: 40px;
-        padding: 0 14px;
-        gap: 8px;
-        font-size: 13px;
-        font-weight: 600;
-      }
-
-      .tool-btn span {
-        display: inline;
-      }
-
-      .dropdown-menu {
-        position: fixed;
-        top: calc(var(--topbar-h) + var(--safe-top) + 8px);
-        right: 16px;
-        left: auto;
-        bottom: auto;
-        width: 380px;
-        max-height: min(78vh, 660px);
-        border-radius: var(--radius);
-        border: 1px solid var(--border);
-        padding: 20px 20px 24px;
-        transform: translateY(10px);
-        opacity: 0;
-        display: none;
-        pointer-events: none;
-        box-shadow: var(--shadow);
-      }
-
-      .dropdown-menu.show {
-        display: flex;
-        transform: translateY(0);
-        opacity: 1;
-        pointer-events: auto;
-      }
-
-      .dropdown-overlay {
-        display: none !important;
-      }
-
-      .dropdown-pull-bar {
-        display: none;
-      }
-
-      .reader-scroll-container {
-        padding: 40px 32px 80px;
-      }
-
-      .comments-drawer {
-        top: 0;
-        bottom: 0;
-        right: 0;
-        left: auto;
-        width: min(360px, 90vw);
-        height: 100%;
-        max-height: none;
-        border-left: 1px solid var(--border);
-        border-top: none;
-        border-radius: 0;
-        transform: translateX(100%);
-        padding-bottom: 0;
-      }
-
-      .comments-drawer.show {
-        transform: translateX(0);
-      }
+    .sketch-note {
+      margin-top: 10px;
+      padding-top: 10px;
+      border-top: 1px solid var(--lib-border-soft);
+      color: var(--lib-faint);
     }
+    .sketch-note strong { color: var(--lib-muted); display: block; margin-bottom: 4px; }
   </style>
 </head>
-<body class="theme-dark">
+<body>
 
-  <div class="reader-app mode-single-page" id="readerApp">
+  <!-- Desktop shell: tab + window controls -->
+  <header class="titlebar" aria-hidden="true">
+    <div class="titlebar-tabs">
+      <div class="titlebar-tab">
+        <span class="titlebar-tab-dot"></span>
+        <span>Thinking in Systems</span>
+      </div>
+    </div>
+    <div class="titlebar-controls" aria-hidden="true">
+      <span class="titlebar-dot"></span>
+      <span class="titlebar-dot"></span>
+      <span class="titlebar-dot"></span>
+    </div>
+  </header>
 
-    <button
-      class="toc-edge-btn"
-      id="tocEdgeBtn"
-      type="button"
-      onclick="event.stopPropagation(); toggleToCSidebar(true)"
-      title="Mở mục lục — bấm vào dải cạnh trái"
-      aria-label="Mở mục lục"
-      aria-expanded="false"
-    >
+  <div class="reader-shell" id="readerShell">
+
+    <!-- Chrome reveal chevron -->
+    <button class="chrome-reveal collapsed" id="chromeReveal" type="button" title="Show tools" aria-expanded="false">
       <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.4" stroke="currentColor" aria-hidden="true">
-        <path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
+        <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5"/>
       </svg>
     </button>
 
-    <!-- Bookmark Edge Ribbon -->
-    <button
-      class="bookmark-edge-btn"
-      id="bookmarkEdgeBtn"
-      type="button"
-      onclick="event.stopPropagation(); onBookmarkEdgeClick()"
-      title="Đánh dấu chương hiện tại"
-      aria-label="Bookmark"
-      aria-pressed="false"
-    >
+    <!-- Left edge: TOC -->
+    <button class="toc-edge" id="tocEdge" type="button" title="Open table of contents" aria-label="Open table of contents">
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.4" stroke="currentColor" aria-hidden="true">
+        <path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5"/>
+      </svg>
+    </button>
+
+    <!-- Left edge: Bookmark ribbon -->
+    <button class="bookmark-edge" id="bookmarkEdge" type="button" title="Bookmark this place" aria-pressed="false">
       <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" aria-hidden="true">
-        <path stroke-linecap="round" stroke-linejoin="round" d="M17.593 3.322c1.1.128 1.907 1.077 1.907 2.185V21L12 17.25 4.5 21V5.507c0-1.108.806-2.057 1.907-2.185a48.507 48.507 0 0 1 11.186 0Z" />
+        <path stroke-linecap="round" stroke-linejoin="round" d="M17.593 3.322c1.1.128 1.907 1.077 1.907 2.185V21L12 17.25 4.5 21V5.507c0-1.108.806-2.057 1.907-2.185a48.507 48.507 0 0 1 11.186 0Z"/>
       </svg>
     </button>
-    
-    <!-- TOPBAR -->
-    <header class="topbar" id="topbar" onclick="event.stopPropagation()">
-      <div class="topbar-left">
-        <button class="back-btn" type="button" onclick="goBackToLibrary()" title="Quay lại thư viện" aria-label="Quay lại thư viện">
-          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.2" stroke="currentColor" style="width:22px; height:22px;">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" />
-          </svg>
-        </button>
-        <div class="book-meta">
-          <h1 class="book-title" id="bookTitle">Thinking in Systems</h1>
-          <p class="chapter-indicator" id="chapterIndicator">Chương 1</p>
-        </div>
-      </div>
 
-      <div class="topbar-right">
+    <div class="reader-main">
+      <!-- Reading content (EPUB / fake canvas) -->
+      <main class="reading-scroll mode-hand" id="readingScroll">
+        <div class="reading-area" id="readingArea">
+          <header class="chapter-header">
+            <h1 class="chapter-title">The Basics</h1>
+          </header>
+          <div class="chapter-body" id="chapterBody">
+            <p>A system is an interconnected set of elements that is coherently organized in a way that achieves something. If you look at that definition closely for a minute, you can see that a system must consist of three kinds of things: elements, interconnections, and a function or purpose.</p>
+            <p>For example, the elements of your digestive system include teeth, enzymes, stomach, and intestines. They are interrelated through the physical flow of food, and through an exquisite set of regulating signals. The function of this system is to break down food into its basic nutrients and to transfer those nutrients into the bloodstream, while discarding unusable wastes.</p>
+            <p>A system <span class="hl-mark">is more than the sum of its parts</span>. It may exhibit adaptive, dynamic, goal-seeking, self-preserving, and sometimes evolutionary behavior. You can see this in a football team, a city, an ecosystem, or a national economy.</p>
+            <p>Many of the interconnections in systems operate through the flow of information. Information holds systems together and plays a great role in determining how they operate. Without information, no system can be understood or managed.</p>
+          </div>
+        </div>
+      </main>
+
+      <!-- Topbar: tools strip + Settings + More (chrome hidden by default in app) -->
+      <header class="topbar hidden" id="topbar">
+        <div class="tools-strip" role="toolbar" aria-label="Reading tools">
+          <button class="tool-btn active" data-tool="hand" type="button" title="Hand">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" aria-hidden="true">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M7.5 11.5V7.25a1.25 1.25 0 0 1 2.5 0V11.5m0-3.25a1.25 1.25 0 0 1 2.5 0V11.5m0-2a1.25 1.25 0 0 1 2.5 0v3.25m0-1a1.25 1.25 0 0 1 2.5 0v4.5a5.25 5.25 0 0 1-5.25 5.25h-.5A5.75 5.75 0 0 1 6 15.5v-2.25a1.75 1.75 0 0 1 1.5-1.75Z"/>
+            </svg>
+            <span class="label">Hand</span>
+          </button>
+          <button class="tool-btn" data-tool="select" type="button" title="Text Select">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" aria-hidden="true">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M8 4h8M12 4v16M9.5 20h5"/>
+            </svg>
+            <span class="label">Text Select</span>
+          </button>
+          <button class="tool-btn" data-tool="highlight" type="button" title="Highlight">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" aria-hidden="true">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M9.53 16.122a3 3 0 0 0-5.78 1.128 2.25 2.25 0 0 1-2.4 2.245 4.5 4.5 0 0 0 8.4-2.245c0-.399-.078-.78-.22-1.128Zm0 0a15.998 15.998 0 0 0 3.388-1.62m-5.043-.025a15.994 15.994 0 0 1 1.622-3.395m3.42 3.42a15.995 15.995 0 0 0 4.764-4.648l3.876-5.814a1.151 1.151 0 0 0-1.597-1.597L14.146 6.32a15.996 15.996 0 0 0-4.649 4.763m3.42 3.42a6.776 6.776 0 0 0-3.42-3.42"/>
+            </svg>
+            <span class="label">Highlight</span>
+          </button>
+          <span class="tools-divider" aria-hidden="true"></span>
+          <button class="tool-btn" data-tool="sign" type="button" title="Sign">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" aria-hidden="true">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487 19.5 7.125M7.5 16.5l2.25.75L16.5 10.5a1.5 1.5 0 0 0-2.121-2.121L7.629 15.129 7.5 16.5Zm-3.75 3h15"/>
+            </svg>
+            <span class="label">Sign</span>
+          </button>
+        </div>
+
         <div class="topbar-actions">
-          <button class="active-tool-chip" id="activeToolChip" type="button" onclick="clearAnnotateTool(event)" title="Tắt công cụ" aria-label="Tắt công cụ đang dùng" hidden>
-            <span class="active-tool-chip-label" id="activeToolChipLabel">Highlight</span>
-            <span class="active-tool-chip-x" aria-hidden="true">✕</span>
-          </button>
-
-          <!-- Annotate Tools -->
-          <button class="tool-btn" id="toolsBtn" type="button" onclick="toggleToolsMenu(event)" title="Công cụ tương tác" aria-label="Công cụ chú thích" aria-haspopup="true" aria-expanded="false">
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" style="width:20px; height:20px;" aria-hidden="true">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M11.42 15.17 17.25 21A2.652 2.652 0 0 0 21 17.25l-5.877-5.877M11.42 15.17l2.496-3.03c.317-.384.74-.626 1.208-.766M11.42 15.17l-4.655 5.653a2.548 2.548 0 1 1-3.586-3.586l6.837-5.63m5.108-.233c.55-.05 1.023-.288 1.415-.68l3.97-3.97a.75.75 0 0 0-1.06-1.06l-3.97 3.97c-.392.391-.63.864-.68 1.415m-5.108.233c-.55.05-1.023.288-1.415.68l-3.97 3.97a.75.75 0 1 0 1.06 1.06l3.97-3.97c.392-.391.63-.864.68-1.415" />
+          <button class="chrome-btn" id="settingsBtn" type="button" title="Reading settings" aria-expanded="false">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" aria-hidden="true">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.325.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 0 1 1.37.49l1.296 2.247a1.125 1.125 0 0 1-.26 1.431l-1.003.827c-.293.241-.438.613-.43.992a7.723 7.723 0 0 1 0 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.955.26 1.43l-1.298 2.247a1.125 1.125 0 0 1-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.47 6.47 0 0 1-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.94-1.11.94h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 0 1-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 0 1-1.369-.49l-1.297-2.247a1.125 1.125 0 0 1 .26-1.431l1.004-.827c.292-.24.437-.613.43-.991a6.932 6.932 0 0 1 0-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 0 1-.26-1.43l1.297-2.247a1.125 1.125 0 0 1 1.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.087.22-.128.332-.183.582-.495.644-.869l.214-1.28Z"/>
+              <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"/>
             </svg>
-            <span>Công cụ</span>
+            <span>Settings</span>
           </button>
-
-          <div class="tools-menu" id="toolsMenu" role="menu" onclick="event.stopPropagation()">
-            <button class="tools-menu-item" type="button" role="menuitem" data-tool="note" onclick="selectAnnotateTool('note')">
-              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" aria-hidden="true">
-                <path stroke-linecap="round" stroke-linejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10" />
-              </svg>
-              Ghi chú
-            </button>
-            <button class="tools-menu-item" type="button" role="menuitem" data-tool="highlight" onclick="selectAnnotateTool('highlight')">
-              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" aria-hidden="true">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M9.53 16.122a3 3 0 0 0-5.78 1.128 2.25 2.25 0 0 1-2.4 2.245 4.5 4.5 0 0 0 8.4-2.245c0-.399-.078-.78-.22-1.128Zm0 0a15.998 15.998 0 0 0 3.388-1.62m-5.043-.025a15.994 15.994 0 0 1 1.622-3.395m3.42 3.42a15.995 15.995 0 0 0 4.764-4.648l3.876-5.814a1.151 1.151 0 0 0-1.597-1.597L14.146 6.32a15.996 15.996 0 0 0-4.649 4.763m3.42 3.42a6.776 6.776 0 0 0-3.42-3.42" />
-              </svg>
-              Tô sáng
-            </button>
-            <button class="tools-menu-item" type="button" role="menuitem" data-tool="comment" onclick="selectAnnotateTool('comment')">
-              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" aria-hidden="true">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M7.5 8.25h9m-9 3H12m-9.75 1.51c0 1.6 1.123 2.994 2.707 3.227 1.129.166 2.27.293 3.423.379.35.026.67.21.865.501L12 21l2.755-4.133a1.14 1.14 0 0 1 .865-.501 48.172 48.172 0 0 0 3.423-.379c1.584-.233 2.707-1.626 2.707-3.228V6.741c0-1.602-1.123-2.995-2.707-3.228A48.394 48.394 0 0 0 12 3c-2.392 0-4.744.175-7.043.513C3.373 3.746 2.25 5.14 2.25 6.741v6.018Z" />
-              </svg>
-              Bình luận (Điền đáp án)
-            </button>
-          </div>
-
-          <!-- Format settings -->
-          <button class="tool-btn" id="aaBtn" type="button" onclick="toggleDropdown(event)" title="Cài đặt hiển thị" aria-label="Cấu hình định dạng">
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" style="width:20px; height:20px;" aria-hidden="true">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.325.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 0 1 1.37.49l1.296 2.247a1.125 1.125 0 0 1-.26 1.431l-1.003.827c-.293.241-.438.613-.43.992a7.723 7.723 0 0 1 0 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.955.26 1.43l-1.298 2.247a1.125 1.125 0 0 1-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.47 6.47 0 0 1-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.94-1.11.94h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 0 1-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 0 1-1.369-.49l-1.297-2.247a1.125 1.125 0 0 1 .26-1.431l1.004-.827c.292-.24.437-.613.43-.991a6.932 6.932 0 0 1 0-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 0 1-.26-1.43l1.297-2.247a1.125 1.125 0 0 1 1.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.087.22-.128.332-.183.582-.495.644-.869l.214-1.28Z" />
-              <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
-            </svg>
-            <span>Cài đặt</span>
-          </button>
-
-          <!-- More options -->
-          <button class="tool-btn" id="moreBtn" type="button" onclick="toggleMoreMenu(event)" title="Tùy chọn khác" aria-label="Thêm tùy chọn" aria-haspopup="true" aria-expanded="false">
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" style="width:20px; height:20px;" aria-hidden="true">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M12 6.75a.75.75 0 1 1 0-1.5.75.75 0 0 1 0 1.5ZM12 12.75a.75.75 0 1 1 0-1.5.75.75 0 0 1 0 1.5ZM12 18.75a.75.75 0 1 1 0-1.5.75.75 0 0 1 0 1.5Z" />
+          <button class="chrome-btn" id="moreBtn" type="button" title="More options" aria-haspopup="true" aria-expanded="false">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" aria-hidden="true">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M12 6.75a.75.75 0 1 1 0-1.5.75.75 0 0 1 0 1.5ZM12 12.75a.75.75 0 1 1 0-1.5.75.75 0 0 1 0 1.5ZM12 18.75a.75.75 0 1 1 0-1.5.75.75 0 0 1 0 1.5Z"/>
             </svg>
           </button>
-
-          <div class="more-menu" id="moreMenu" role="menu" onclick="event.stopPropagation()">
-            <button class="more-menu-item" type="button" role="menuitem" onclick="shareDocument()">
-              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" aria-hidden="true">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M9 8.25H7.5a2.25 2.25 0 0 0-2.25 2.25v9a2.25 2.25 0 0 0 2.25 2.25h9a2.25 2.25 0 0 0 2.25-2.25v-9a2.25 2.25 0 0 0-2.25-2.25H15m0-3-3-3m0 0-3 3m3-3V15" />
-              </svg>
-              Chia sẻ tài liệu
-            </button>
-            <button class="more-menu-item" type="button" role="menuitem" onclick="addToFavorites()">
-              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" aria-hidden="true">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M11.48 3.499a.562.562 0 0 1 1.04 0l2.125 5.111a.563.563 0 0 0 .475.345l5.518.442c.499.04.701.663.321.988l-4.204 3.602a.563.563 0 0 0-.182.557l1.285 5.385a.562.562 0 0 1-.84.61l-4.725-2.885a.562.562 0 0 0-.586 0L6.982 20.54a.562.562 0 0 1-.84-.61l1.285-5.386a.562.562 0 0 0-.182-.557l-4.204-3.602a.562.562 0 0 1 .321-.988l5.518-.442a.563.563 0 0 0 .475-.345L11.48 3.5Z" />
-              </svg>
-              Thêm vào Favorites
-            </button>
-            <button class="more-menu-item" type="button" role="menuitem" onclick="showBookInfo()">
-              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" aria-hidden="true">
-                <path stroke-linecap="round" stroke-linejoin="round" d="m11.25 11.25.041-.02a.75.75 0 0 1 1.063.852l-.708 2.836a.75.75 0 0 0 1.063.853l.041-.021M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9-3.75h.008v.008H12V8.25Z" />
-              </svg>
-              Thông tin sách
-            </button>
-            <div class="more-menu-divider"></div>
-            <button class="more-menu-item danger" type="button" role="menuitem" onclick="triggerTrashConfirmation()">
-              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" aria-hidden="true">
-                <path stroke-linecap="round" stroke-linejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
-              </svg>
-              Xóa vào thùng rác
-            </button>
+          <div class="more-menu" id="moreMenu" role="menu">
+            <button class="menu-item" type="button" role="menuitem">Share document</button>
+            <button class="menu-item" type="button" role="menuitem">Add to Favorites</button>
+            <button class="menu-item" type="button" role="menuitem">Book info</button>
+            <div class="menu-divider"></div>
+            <button class="menu-item danger" type="button" role="menuitem">Move to trash</button>
           </div>
         </div>
-      </div>
-    </header>
+      </header>
 
-    <div class="dropdown-overlay" id="aaOverlay" onclick="closeDropdown()"></div>
-    <div class="dropdown-menu" id="aaDropdown" onclick="event.stopPropagation()">
-      <div class="dropdown-pull-bar"></div>
-
-      <div class="dropdown-menu-header">
-        <h2>Cấu hình trang đọc</h2>
-        <button class="settings-close-btn" type="button" onclick="closeDropdown()" aria-label="Đóng">✕</button>
-      </div>
-
-      <!-- LỰA CHỌN KIỂU ĐỌC: 1 TRANG VS 2 TRANG SỐNG SÁCH -->
-      <div class="dropdown-section">
-        <div class="dropdown-section-title">Bố cục dàn trang (Layout)</div>
-        <div class="toggle-group">
-          <button class="toggle-item active" id="layoutSingleBtn" type="button" onclick="changeReadingLayout('single')">1 Trang căn giữa</button>
-          <button class="toggle-item" id="layoutDualBtn" type="button" onclick="changeReadingLayout('dual')">2 Trang song song</button>
+      <!-- Footer: location scrubber -->
+      <footer class="footer hidden" id="footer">
+        <span class="footer-label" title="Current location">The Basics · 12/48</span>
+        <div class="scrubber" role="slider" aria-label="Jump to location in document" aria-valuenow="12" aria-valuemin="1" aria-valuemax="48">
+          <div class="scrubber-track">
+            <div class="scrubber-fill"></div>
+            <div class="scrubber-thumb"></div>
+          </div>
         </div>
-        <p style="margin: 8px 0 0; font-size: 11px; color: var(--muted); line-height: 1.45;">Bố cục 2 trang tự động bật vạch sống sách mô phỏng chân thực khi hiển thị ngang màn hình lớn.</p>
-      </div>
+      </footer>
+    </div>
 
-      <div class="dropdown-section">
-        <div class="dropdown-section-title">Màu nền</div>
+    <!-- Sidebar -->
+    <div class="overlay-backdrop" id="sidebarBackdrop"></div>
+    <aside class="sidebar" id="sidebar" aria-hidden="true">
+      <div class="sidebar-header">
+        <h2>Contents</h2>
+        <button class="chrome-btn" type="button" id="sidebarClose" aria-label="Close" style="width:36px;height:36px;border:none;background:transparent;">✕</button>
+      </div>
+      <div class="sidebar-tabs">
+        <button class="sidebar-tab active" data-tab="chapters" type="button"><span>📑</span> Contents</button>
+        <button class="sidebar-tab" data-tab="bookmarks" type="button"><span>🔖</span> Bookmarks</button>
+        <button class="sidebar-tab" data-tab="highlights" type="button"><span>🖍</span> Highlight</button>
+        <button class="sidebar-tab" data-tab="comments" type="button"><span>💬</span> Comments</button>
+      </div>
+      <div class="sidebar-scroll" id="sidebarContent">
+        <button class="toc-item active" type="button">Introduction</button>
+        <button class="toc-item" type="button">The Basics</button>
+        <button class="toc-item" type="button">A Brief Visit to the Systems Zoo</button>
+        <button class="toc-item" type="button">Why Systems Work So Well</button>
+      </div>
+    </aside>
+
+    <!-- Settings panel -->
+    <div class="overlay-backdrop" id="settingsBackdrop"></div>
+    <div class="settings-panel" id="settingsPanel">
+      <div class="settings-pull"></div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+        <h2 style="font-size:16px;font-weight:600;color:var(--lib-text-strong);">Reading settings</h2>
+        <button class="chrome-btn" id="settingsClose" type="button" aria-label="Close" style="width:36px;height:36px;border:none;background:transparent;">✕</button>
+      </div>
+      <div class="settings-section">
+        <div class="section-title">Theme</div>
         <div class="theme-grid">
-          <button class="theme-swatch active" type="button" style="background: #0f172a; color: #cbd5e1; border-color: rgba(51, 65, 85, 0.45); height: 42px; border-radius: 8px; font-family: inherit; font-size: 13px; font-weight: 600; cursor: pointer;" onclick="setTheme('dark', this)">Đêm</button>
-          <button class="theme-swatch" type="button" style="background: #251f19; color: #e1cfb3; border-color: #5e503f; height: 42px; border-radius: 8px; font-family: inherit; font-size: 13px; font-weight: 600; cursor: pointer;" onclick="setTheme('sepia', this)">Sepia</button>
-          <button class="theme-swatch" type="button" style="background: #ffffff; color: #334155; border-color: #cbd5e1; height: 42px; border-radius: 8px; font-family: inherit; font-size: 13px; font-weight: 600; cursor: pointer;" onclick="setTheme('paper', this)">Giấy</button>
+          <button class="theme-swatch active" data-theme="night" type="button" style="background:#0f172a;color:#cbd5e1;">Night</button>
+          <button class="theme-swatch" data-theme="sepia" type="button" style="background:#251f19;color:#e1cfb3;">Sepia</button>
+          <button class="theme-swatch" data-theme="paper" type="button" style="background:#fff;color:#334155;">Paper</button>
         </div>
       </div>
-
-      <div class="dropdown-section">
-        <div class="dropdown-section-title">Cỡ chữ</div>
-        <div class="font-size-control" style="display: flex; align-items: center; gap: 8px;">
-          <button class="font-size-btn" type="button" style="flex: 1; height: 40px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface); color: var(--text-strong); font-size: 14px; font-weight: bold; cursor: pointer;" onclick="adjustFontSize(-1)">A-</button>
-          <div class="font-size-indicator" id="fontSizeLabel" style="width: 60px; text-align: center; font-weight: 700;">18px</div>
-          <button class="font-size-btn" type="button" style="flex: 1; height: 40px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface); color: var(--text-strong); font-size: 14px; font-weight: bold; cursor: pointer;" onclick="adjustFontSize(1)">A+</button>
-        </div>
-      </div>
-
-      <div class="dropdown-section">
-        <div class="dropdown-section-title">Font chữ</div>
+      <div class="settings-section">
+        <div class="section-title">Layout</div>
         <div class="toggle-group">
-          <button class="toggle-item active" id="fontSerif" type="button" onclick="setFontFamily('serif')">Serif</button>
-          <button class="toggle-item" id="fontSans" type="button" onclick="setFontFamily('sans')">Sans-serif</button>
-          <button class="toggle-item" id="fontMono" type="button" onclick="setFontFamily('mono')">Mono</button>
+          <button class="toggle-item active" data-layout="single" type="button">1 page</button>
+          <button class="toggle-item" data-layout="dual" type="button">2 pages</button>
         </div>
       </div>
-
-      <div class="dropdown-section">
-        <div class="dropdown-section-title">Độ đậm</div>
+      <div class="settings-section">
+        <div class="section-title">Font family</div>
         <div class="toggle-group">
-          <button class="toggle-item" id="weightLight" type="button" onclick="setFontWeight(300)">Mỏng</button>
-          <button class="toggle-item active" id="weightNormal" type="button" onclick="setFontWeight(400)">Vừa</button>
-          <button class="toggle-item" id="weightBold" type="button" onclick="setFontWeight(600)">Đậm</button>
+          <button class="toggle-item active" type="button">Serif</button>
+          <button class="toggle-item" type="button">Sans</button>
+          <button class="toggle-item" type="button">Mono</button>
         </div>
       </div>
-
-      <div class="dropdown-section">
-        <div class="dropdown-section-title">Lề trang</div>
-        <div class="toggle-group" style="margin-bottom: 10px;">
-          <button class="toggle-item active" id="marginOn" type="button" onclick="setMarginEnabled(true)">Bật lề</button>
-          <button class="toggle-item" id="marginOff" type="button" onclick="setMarginEnabled(false)">Tắt lề</button>
-        </div>
-        <div class="toggle-group" id="marginSizeGroup">
-          <button class="toggle-item" id="marginNarrow" type="button" onclick="setMargin('narrow')">Hẹp</button>
-          <button class="toggle-item active" id="marginNormal" type="button" onclick="setMargin('normal')">Vừa</button>
-          <button class="toggle-item" id="marginWide" type="button" onclick="setMargin('wide')">Rộng</button>
-        </div>
-      </div>
-
-      <div class="dropdown-section">
-        <div class="dropdown-section-title">Khoảng cách dòng</div>
-        <div class="slider-row" style="display: flex; align-items: center; gap: 12px;">
-          <input type="range" id="lineHeightSlider" min="1.3" max="2.3" step="0.05" value="1.65" style="flex:1; accent-color: var(--accent);" oninput="setLineHeight(this.value)">
-          <span class="slider-value" id="lineHeightLabel" style="font-weight: 700; font-size:12px; min-width:32px; text-align:right;">1.65</span>
-        </div>
-      </div>
-
-      <div class="dropdown-section">
-        <div class="dropdown-section-title">Cách lật trang</div>
+      <div class="settings-section">
+        <div class="section-title">Page turn</div>
         <div class="toggle-group">
-          <button class="toggle-item active" id="pageModeScroll" type="button" onclick="setPageMode('scroll')">Cuộn dọc</button>
-          <button class="toggle-item" id="pageModePaginated" type="button" onclick="setPageMode('paginated')">Lật trang</button>
+          <button class="toggle-item active" type="button">Scroll</button>
+          <button class="toggle-item" type="button">Paginated</button>
         </div>
       </div>
     </div>
 
-    <main class="reader-scroll-container" id="readerScroll" onclick="onReaderBackgroundClicked()">
-      <div class="reading-area" id="readingArea">
-        <div class="chapter-header-decor">
-          <p class="chapter-num" id="chapterNumDisplay">CHƯƠNG I</p>
-          <h2 class="chapter-title" id="chapterTitleDisplay">Các Hệ Thống Động</h2>
-        </div>
-        
-        <div class="chapter-content" id="chapterContent">
-          <!-- Phục vụ kết cấu render động thông qua Javascript -->
-        </div>
-      </div>
-    </main>
-
-    <!-- FLOATING HIGHLIGHT & NOTE TOOLTIP -->
-    <div class="highlight-tooltip" id="highlightTooltip">
-      <button class="hl-color-btn hl-yellow" onclick="applyHighlight('yellow')" title="Tô sáng màu vàng"></button>
-      <button class="hl-color-btn hl-green" onclick="applyHighlight('green')" title="Tô sáng màu xanh lá"></button>
-      <button class="hl-color-btn hl-pink" onclick="applyHighlight('pink')" title="Tô sáng màu hồng"></button>
-      <div class="tooltip-divider"></div>
-      
-      <button class="tooltip-btn" onclick="openNoteModal()">
-        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
-          <path stroke-linecap="round" stroke-linejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10" />
-        </svg>
-        Ghi chú
-      </button>
-
-      <button class="tooltip-btn" onclick="copySelectedText()">
-        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
-          <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 17.25v3.375c0 .621-.504 1.125-1.125 1.125h-9.75a1.125 1.125 0 01-1.125-1.125V7.875c0-.621.504-1.125 1.125-1.125H5.4M7.5 16.5h.008v.008H7.5V16.5zm0-3h.008v.008H7.5v-.008zm0-3h.008v.008H7.5V10.5zm1.125-6H21m-1.125 13.5H9.75M9.75 18V6H21v12H9.75z" />
-        </svg>
-        Sao chép
-      </button>
+    <!-- Right-click selection menu (NOT auto on mouseup) -->
+    <div class="selection-menu-backdrop" id="selectionBackdrop"></div>
+    <div class="selection-menu" id="selectionMenu" role="menu" aria-label="Selection actions">
+      <button class="selection-menu-item" type="button" role="menuitem"><span class="selection-menu-icon">🖍</span> Highlight</button>
+      <button class="selection-menu-item" type="button" role="menuitem"><span class="selection-menu-icon">📝</span> Note</button>
+      <button class="selection-menu-item" type="button" role="menuitem"><span class="selection-menu-icon">📋</span> Copy</button>
+      <div class="selection-menu-divider"></div>
+      <button class="selection-menu-item" type="button" role="menuitem"><span class="selection-menu-icon">🔍</span> Search / Lookup</button>
+      <button class="selection-menu-item" type="button" role="menuitem"><span class="selection-menu-icon">🤖</span> Ask AI / Explain</button>
+      <button class="selection-menu-item" type="button" role="menuitem"><span class="selection-menu-icon">🔗</span> Share / Export Snippet</button>
+      <div class="selection-menu-divider"></div>
+      <button class="selection-menu-item destructive" type="button" role="menuitem"><span class="selection-menu-icon">🗑️</span> Remove Highlight</button>
     </div>
 
-    <!-- MODAL ĐÍNH KÈM GHI CHÚ -->
-    <div class="modal-overlay" id="noteModalOverlay" onclick="closeNoteModal()">
+    <!-- Highlight tool: compact color panel -->
+    <div class="highlight-edit" id="highlightEdit" role="dialog" aria-label="Highlight color">
+      <button class="color-swatch-btn" type="button" title="Pick color"></button>
+      <span style="width:1px;height:20px;background:var(--lib-border);"></span>
+      <button class="chrome-btn" type="button" style="width:28px;height:28px;border:none;background:transparent;" title="Note">📝</button>
+    </div>
+
+    <!-- Note modal -->
+    <div class="modal-backdrop" id="noteModal">
       <div class="note-modal" onclick="event.stopPropagation()">
-        <div class="modal-title">Đính kèm Ghi chú</div>
-        <div class="quote-preview" id="noteQuotePreview">Đoạn trích đang chọn...</div>
-        <textarea class="note-textarea" id="noteInput" placeholder="Nội dung thảo luận hoặc phân tích của riêng bạn..."></textarea>
+        <h3>Edit note</h3>
+        <div class="quote-preview">"is more than the sum of its parts"</div>
+        <textarea class="note-textarea" placeholder="Your note…"></textarea>
         <div class="modal-actions">
-          <button class="modal-btn" onclick="closeNoteModal()">Hủy</button>
-          <button class="modal-btn primary" onclick="saveNote()">Lưu Ghi Chú</button>
+          <button class="modal-btn" type="button" id="noteCancel">Cancel</button>
+          <button class="modal-btn primary" type="button">Save</button>
         </div>
       </div>
     </div>
 
-    <!-- KHAY ĐÁP ÁN / COMMENTS THEO TỪNG ĐOẠN -->
-    <div class="comments-drawer" id="commentsDrawer">
-      <div class="drawer-header">
-        <h3 class="drawer-title" id="drawerParaTitle">Comment & Ghi đáp án</h3>
-        <button class="dialog-close" onclick="toggleCommentsDrawer(false)">✕</button>
-      </div>
-      
-      <div class="comments-scroll" id="commentsList"></div>
-
-      <div class="comment-input-area" onclick="event.stopPropagation()">
-        <input type="text" class="comment-input" id="commentInput" placeholder="Viết phản hồi hoặc điền câu trả lời...">
-        <button class="comment-send-btn" onclick="submitComment()">Lưu</button>
-      </div>
-    </div>
-
-    <div class="sidebar-overlay" id="sidebarOverlay" onclick="toggleToCSidebar(false)"></div>
-    <div class="toc-sidebar" id="tocSidebar">
-      <div class="toc-header">
-        <h2 class="toc-title">Thư viện & Tiện ích</h2>
-        <button class="dialog-close" onclick="toggleToCSidebar(false)">✕</button>
-      </div>
-      <div class="toc-tabs">
-        <button class="toc-tab active" id="tabChaptersBtn" onclick="switchSidebarTab('chapters')">Chương</button>
-        <button class="toc-tab" id="tabBookmarksBtn" onclick="switchSidebarTab('bookmarks')">Bookmarks</button>
-        <button class="toc-tab" id="tabHighlightsBtn" onclick="switchSidebarTab('highlights')">Notes</button>
-        <button class="toc-tab" id="tabCommentsBtn" onclick="switchSidebarTab('comments')">Comments</button>
-      </div>
-
-      <div class="toc-scroll">
-        <!-- Tab Danh sách chương -->
-        <div id="tabChaptersContent">
-          <ul class="toc-list" id="tocList"></ul>
-        </div>
-
-        <!-- Tab Bookmarks -->
-        <div id="tabBookmarksContent" style="display: none;">
-          <div style="padding: 12px 12px 4px;">
-            <button class="bookmark-add-btn" type="button" style="width: 100%; height: 40px; border: 1px dashed var(--border); border-radius: 8px; background: transparent; color: var(--muted); font-family: inherit; font-size: 13px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px;" onclick="toggleBookmarkHere()">
-              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" style="width:18px;height:18px" aria-hidden="true">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M17.593 3.322c1.1.128 1.907 1.077 1.907 2.185V21L12 17.25 4.5 21V5.507c0-1.108.806-2.057 1.907-2.185a48.507 48.507 0 0 1 11.186 0Z" />
-              </svg>
-              <span id="bookmarkAddLabel">Đánh dấu trang hiện tại</span>
-            </button>
-          </div>
-          <div class="bookmarks-list" id="bookmarksList" style="padding: 12px 12px 24px;"></div>
-          <p id="bookmarksEmpty" style="padding: 24px 16px; text-align: center; font-size: 13px; color: var(--faint);">Chưa có bookmark nào được lưu.</p>
-        </div>
-
-        <!-- Tab Highlight & Notes -->
-        <div id="tabHighlightsContent" style="display: none;">
-          <div id="savedHighlightsList" style="display: flex; flex-direction: column; gap: 12px; padding: 12px;"></div>
-        </div>
-
-        <!-- Tab Comments -->
-        <div id="tabCommentsContent" style="display: none;">
-          <p style="font-size: 11px; line-height:1.45; color: var(--muted); padding: 8px 12px; background: rgba(245, 158, 11, 0.08); border-radius:8px; border: 1px solid rgba(245, 158, 11, 0.15); margin: 0 12px 12px;">Đóng góp bài làm, đáp án hoặc giải nghĩa cụ thể theo từng đoạn văn để lưu trữ đồng bộ.</p>
-          <div id="savedCommentsList" style="padding: 0 12px;"></div>
-          <p id="commentsEmpty" style="padding: 24px 16px; text-align: center; font-size: 13px; color: var(--faint);">Chưa có bình luận hoặc lời giải.</p>
-        </div>
-      </div>
-    </div>
-
-    <!-- LOCATION SCRUBBER (bản đồ vị trí tài liệu — không phải % hoàn thành) -->
-    <footer class="footer-bar" id="footerBar">
-      <div class="progress-slider-container">
-        <span class="progress-location-label" id="progressLocationLabel" title="Current location">Ch. 1</span>
-        <div class="progress-slider" id="progressSlider" onclick="handleProgressBarClick(event)" aria-label="Jump to location in document">
-          <div class="progress-slider-track">
-            <div class="progress-slider-fill" id="progressFill"></div>
-            <div class="progress-slider-handle" id="progressHandle"></div>
-          </div>
-        </div>
-      </div>
-    </footer>
-
-    <div class="custom-dialog-overlay" id="confirmDialog">
-      <div class="custom-dialog">
-        <div class="custom-dialog-title" id="confirmDialogTitle">Xác nhận tác vụ</div>
-        <div class="custom-dialog-desc" id="confirmDialogDesc">Nội dung yêu cầu xác thực...</div>
-        <div class="custom-dialog-actions">
-          <button class="dialog-btn" id="confirmCancelBtn" onclick="closeCustomConfirm(false)">Hủy</button>
-          <button class="dialog-btn confirm-danger" id="confirmOkBtn" onclick="closeCustomConfirm(true)">Xác nhận</button>
-        </div>
-      </div>
-    </div>
-
-    <!-- Container chứa các thông báo nổi Toast -->
-    <div id="toastContainer"></div>
-
+    <div id="toast" role="status" aria-live="polite"></div>
   </div>
 
+  <!-- Mockup sketch / state toggles -->
+  <aside class="sketch-panel" id="sketchPanel">
+    <div class="sketch-header" id="sketchToggle">
+      <h3>Mockup · SCR-03</h3>
+      <span style="font-size:10px;color:var(--lib-faint);">▼</span>
+    </div>
+    <div class="sketch-body">
+      <label><input type="checkbox" id="chkChrome"> Chrome visible (topbar + footer)</label>
+      <label><input type="checkbox" id="chkSidebar"> Sidebar open</label>
+      <label><input type="checkbox" id="chkSettings"> Settings panel</label>
+      <label><input type="checkbox" id="chkSelectionMenu"> Selection menu (right-click)</label>
+      <label><input type="checkbox" id="chkHighlightEdit"> Highlight color panel</label>
+      <label><input type="checkbox" id="chkNoteModal"> Note modal</label>
+      <label><input type="checkbox" id="chkBookmark"> Bookmark active</label>
+      <label><input type="checkbox" id="chkDualLayout"> 2-page layout</label>
+      <textarea id="sketchNotes" placeholder="Ghi chú ý tưởng mới tại đây…"></textarea>
+      <div class="sketch-note">
+        <strong>Hành vi hiện tại (app thật)</strong>
+        Hand mặc định · click text → Text Select tạm · margin → Hand.<br>
+        Toolbar Text Select → khóa cho đến khi đổi tool.<br>
+        Chọn text xong <em>không</em> auto popup — chỉ <strong>chuột phải</strong> trên vùng chọn.<br>
+        Highlight tool → tô ngay khi thả chuột · click mark → panel màu.
+      </div>
+    </div>
+  </aside>
+
   <script>
-    // Cơ sở dữ liệu Mock gốc của tác phẩm văn học / học tập
-    const bookData = {
-      title: "Thinking in Systems",
-      author: "Donella H. Meadows",
-      chapters: [
-        {
-          num: "CHƯƠNG I",
-          title: "Các Hệ Thống Động",
-          paragraphs: [
-            "Hệ thống (system) xuất hiện ở khắp mọi nơi xung quanh chúng ta. Từ cơ thể sống của một con sinh vật nhỏ bé cho đến guồng quay phức tạp của các siêu đô thị hay mạng lưới khí hậu toàn cầu. Một hệ thống không chỉ đơn thuần là tập hợp ngẫu nhiên của các thành phần, mà nó là một thể thống nhất được thiết kế có tổ chức, nhằm đạt được một chức năng hay mục tiêu nhất định nào đó.",
-            "Hãy tưởng tượng một chiếc bồn tắm có vòi nước đang chảy và lỗ thoát nước đang mở. Đây chính là mô hình hệ thống động học cơ bản nhất mà bạn có thể tìm thấy. Lượng nước hiện có trong bồn đại diện cho Kho chứa (Stock). Dòng nước từ vòi chảy vào đại diện cho Dòng vào (Inflow). Dòng nước thoát ra đại diện cho Dòng ra (Outflow). Sự cân bằng của toàn bộ hệ thống này phụ thuộc vào tốc độ tương đối giữa hai dòng vào và ra đó.",
-            "Các kho chứa là nền móng của mọi hệ thống. Chúng thay đổi chậm chạp và thường đóng vai trò như một bộ giảm xóc hoặc chất đệm đối với các thay đổi đột ngột từ bên ngoài. Trái lại, các luồng dòng chảy luôn biến động liên tục dưới sự kiểm soát của hệ thống thông tin phản hồi."
-          ]
-        },
-        {
-          num: "CHƯƠNG II",
-          title: "Vòng Phản Hồi Âm & Dương",
-          paragraphs: [
-            "Vòng phản hồi (feedback loops) là cơ chế tự điều chỉnh cốt lõi của tất cả mọi hệ thống. Có hai loại phản hồi chính: Phản hồi cân bằng (Balancing) và Phản hồi gia tăng (Reinforcing).",
-            "Vòng phản hồi cân bằng hoạt động giống như một chiếc máy điều hòa nhiệt độ trong phòng. Khi nhiệt độ vượt quá ngưỡng cho phép, cảm biến kích hoạt hệ thống làm mát hoạt động mạnh để kéo nhiệt độ đi xuống. Cơ chế này luôn có xu hướng chống lại sự thay đổi, giữ cho hệ thống luôn ở trạng thái ổn định lý tưởng.",
-            "Vòng phản hồi gia tăng lại hoạt động theo chiều hướng ngược lại - nhân cấp lũy thừa. Nó giống như tài khoản tiết kiệm sinh lãi kép hoặc phản ứng dây chuyền. Sự gia tăng của kho chứa dẫn đến sự gia tăng của dòng vào, và dòng vào lại tiếp tục bồi đắp kho chứa lớn hơn nữa. Đây là gốc rễ của sự tăng trưởng vượt bậc hoặc sự sụp đổ dây chuyền."
-          ]
-        }
-      ]
+    const state = {
+      chromeHidden: true,
+      activeTool: 'hand',
+      sidebarOpen: false,
+      settingsOpen: false,
+      selectionMenuOpen: false,
+      highlightEditOpen: false,
+      noteModalOpen: false,
+      bookmarkActive: false,
+      dualLayout: false,
     };
 
-    // Database chứa Comments, lời giải đáp án
-    let commentsDatabase = {
-      "0-0": [
-        { user: "Đại học Sư Phạm", text: "Hệ thống bao gồm 3 yếu tố cốt lõi: các yếu tố, các mối quan hệ, và mục tiêu chung.", date: "10 phút trước" }
-      ],
-      "0-1": [
-        { user: "Học viên A", text: "Bài tập nộp: Kho chứa (Stock) là chỉ số lưu trữ, vòi chảy là Inflow.", date: "1 giờ trước" }
-      ]
+    const els = {
+      topbar: document.getElementById('topbar'),
+      footer: document.getElementById('footer'),
+      chromeReveal: document.getElementById('chromeReveal'),
+      readingScroll: document.getElementById('readingScroll'),
+      readingArea: document.getElementById('readingArea'),
+      sidebar: document.getElementById('sidebar'),
+      sidebarBackdrop: document.getElementById('sidebarBackdrop'),
+      settingsPanel: document.getElementById('settingsPanel'),
+      settingsBackdrop: document.getElementById('settingsBackdrop'),
+      selectionMenu: document.getElementById('selectionMenu'),
+      selectionBackdrop: document.getElementById('selectionBackdrop'),
+      highlightEdit: document.getElementById('highlightEdit'),
+      noteModal: document.getElementById('noteModal'),
+      bookmarkEdge: document.getElementById('bookmarkEdge'),
+      moreMenu: document.getElementById('moreMenu'),
+      toast: document.getElementById('toast'),
     };
 
-    // State của ứng dụng đọc sách
-    let currentChapterIndex = 0;
-    let isUiHidden = false;
-    let savedHighlights = [];
-    let savedBookmarks = [];
-    let bookmarkIdSeq = 1;
-    let selectedTextRange = null;
-    let selectedTextString = "";
-    let activeCommentTargetKey = null;
-    let activeAnnotateTool = null;
-    let currentReadingLayout = "single"; // Mặc định là 1 trang căn giữa (Single Column Centered)
-
-    // Biến xử lý Callback cho Custom Confirm dialog
-    let confirmDialogCallback = null;
-
-    window.onload = function() {
-      loadChapter(0);
-      buildToC();
-      
-      // Khởi tạo layout mặc định: 1 trang căn giữa (Single)
-      changeReadingLayout('single');
-      setPageMode('scroll');
-
-      window.addEventListener('resize', syncDualPageRule);
-      window.addEventListener('orientationchange', syncDualPageRule);
-      
-      document.addEventListener('click', () => {
-        closeMoreMenu();
-        closeToolsMenu();
-      });
-    };
-
-    function changeReadingLayout(mode) {
-      currentReadingLayout = mode;
-      const app = document.getElementById('readerApp');
-      const singleBtn = document.getElementById('layoutSingleBtn');
-      const dualBtn = document.getElementById('layoutDualBtn');
-
-      if (mode === 'dual') {
-        app.classList.remove('mode-single-page');
-        app.classList.add('mode-dual-page');
-        if (singleBtn) singleBtn.classList.remove('active');
-        if (dualBtn) dualBtn.classList.add('active');
-      } else {
-        app.classList.remove('mode-dual-page');
-        app.classList.add('mode-single-page');
-        if (singleBtn) singleBtn.classList.add('active');
-        if (dualBtn) dualBtn.classList.remove('active');
-      }
-
-      syncDualPageRule();
+    function showToast(msg) {
+      els.toast.textContent = msg;
+      els.toast.classList.add('show');
+      clearTimeout(showToast._t);
+      showToast._t = setTimeout(() => els.toast.classList.remove('show'), 2500);
     }
 
-    // Điều hướng phân chia cột dựa vào hướng xoay màn hình khi ở chế độ 2 trang
-    function syncDualPageRule() {
-      // Logic xử lý nội bộ tự đồng bộ theo kích thước của CSS engine
+    function syncChrome() {
+      const hidden = state.chromeHidden;
+      els.topbar.classList.toggle('hidden', hidden);
+      els.footer.classList.toggle('hidden', hidden);
+      els.chromeReveal.classList.toggle('collapsed', hidden);
+      els.chromeReveal.classList.toggle('expanded', !hidden);
+      els.chromeReveal.title = hidden ? 'Show tools' : 'Hide tools';
+      els.chromeReveal.setAttribute('aria-expanded', String(!hidden));
+      document.getElementById('chkChrome').checked = !hidden;
     }
 
-    function loadChapter(index) {
-      currentChapterIndex = index;
-      const chapter = bookData.chapters[index];
-
-      document.getElementById('readerScroll').scrollTop = 0;
-      document.getElementById('chapterIndicator').textContent = `${chapter.num}: ${chapter.title}`;
-      document.getElementById('chapterNumDisplay').textContent = chapter.num;
-      document.getElementById('chapterTitleDisplay').textContent = chapter.title;
-
-      syncBookmarkEdgeState();
-
-      const contentEl = document.getElementById('chapterContent');
-      contentEl.innerHTML = '';
-
-      chapter.paragraphs.forEach((p, pIdx) => {
-        const wrapper = document.createElement('div');
-        wrapper.className = `paragraph-wrapper ${pIdx === 0 ? 'first-p' : ''}`;
-        wrapper.dataset.paraKey = `${index}-${pIdx}`;
-        wrapper.dataset.paraIdx = String(pIdx);
-        
-        const paragraphNode = document.createElement('p');
-        paragraphNode.textContent = p;
-        wrapper.appendChild(paragraphNode);
-
-        const key = `${index}-${pIdx}`;
-        const count = commentsDatabase[key] ? commentsDatabase[key].length : 0;
-        if (count > 0) wrapper.classList.add('has-comments');
-        
-        const commentBtn = document.createElement('button');
-        commentBtn.className = 'comment-trigger-btn' + (count > 0 ? ' has-comments' : '');
-        commentBtn.type = 'button';
-        commentBtn.title = count > 0 ? `${count} comment — xem đáp án` : 'Ghi đáp án / bình luận';
-        commentBtn.innerHTML = `
-          <svg viewBox="0 0 24 24" fill="currentColor" style="width:11px;height:11px;">
-            <path d="M12 2C6.477 2 2 6.119 2 11.2c0 2.894 1.455 5.485 3.738 7.11-.122.955-.541 2.502-1.341 3.513-.1.127-.035.314.126.35 1.95.434 4.056-.23 5.347-.94A10.155 10.155 0 0 0 12 20.4c5.523 0 10-4.119 10-9.2C22 6.119 17.523 2 12 2Z"/>
-          </svg>
-          <span>${count}</span>
-        `;
-        commentBtn.onclick = (e) => {
-          e.stopPropagation();
-          openCommentsDrawer(key, pIdx);
-        };
-        wrapper.appendChild(commentBtn);
-
-        // Kích hoạt khi công cụ Bình luận đang được chọn làm Active Tool
-        wrapper.addEventListener('click', (e) => {
-          if (activeAnnotateTool !== 'comment') return;
-          if (e.target.closest('.comment-trigger-btn')) return;
-          e.stopPropagation();
-          openCommentsDrawer(key, pIdx);
-        });
-
-        contentEl.appendChild(wrapper);
-      });
-
-      refreshTocCommentBadges();
-      document.querySelectorAll('.toc-item').forEach((item, i) => {
-        item.classList.toggle('active', i === index);
-      });
-
-      updateProgressBar((index / (bookData.chapters.length - 1)) * 100);
-    }
-
-    function showCustomConfirm(title, desc, callback) {
-      const dialog = document.getElementById('confirmDialog');
-      document.getElementById('confirmDialogTitle').textContent = title;
-      document.getElementById('confirmDialogDesc').textContent = desc;
-      confirmDialogCallback = callback;
-      
-      dialog.style.display = 'flex';
-      setTimeout(() => dialog.classList.add('show'), 50);
-    }
-
-    function closeCustomConfirm(status) {
-      const dialog = document.getElementById('confirmDialog');
-      dialog.classList.remove('show');
-      setTimeout(() => {
-        dialog.style.display = 'none';
-        if (confirmDialogCallback) {
-          confirmDialogCallback(status);
-          confirmDialogCallback = null;
+    function setTool(tool) {
+      state.activeTool = tool;
+      document.querySelectorAll('.tool-btn[data-tool]').forEach(btn => {
+        const t = btn.dataset.tool;
+        const active = t === tool;
+        btn.classList.remove('active', 'active-highlight');
+        if (active) {
+          btn.classList.add(tool === 'highlight' ? 'active-highlight' : 'active');
         }
-      }, 200);
+      });
+      els.readingScroll.classList.remove('mode-hand', 'mode-select');
+      if (tool === 'hand') els.readingScroll.classList.add('mode-hand');
+      else if (tool === 'select' || tool === 'highlight') els.readingScroll.classList.add('mode-select');
     }
 
-    function triggerTrashConfirmation() {
-      closeMoreMenu();
-      showCustomConfirm(
-        "Xác nhận xóa tài liệu",
-        "Bạn có chắc chắn muốn chuyển tài liệu này vào thùng rác? Bạn có thể khôi phục lại từ trình quản lý lưu trữ bất cứ lúc nào.",
-        function(isConfirmed) {
-          if (isConfirmed) {
-            showToast("Đã chuyển tài liệu vào thùng rác.", "info");
-          }
-        }
-      );
+    function openSelectionMenu(x, y) {
+      state.selectionMenuOpen = true;
+      els.selectionMenu.style.left = Math.min(window.innerWidth - 260, x + 4) + 'px';
+      els.selectionMenu.style.top = Math.min(window.innerHeight - 320, y + 4) + 'px';
+      els.selectionMenu.classList.add('show');
+      els.selectionBackdrop.classList.add('show');
+      document.getElementById('chkSelectionMenu').checked = true;
     }
 
-    function toggleDropdown(event) {
-      if (event) event.stopPropagation();
-      closeMoreMenu();
-      closeToolsMenu();
-      const dropdown = document.getElementById('aaDropdown');
-      const overlay = document.getElementById('aaOverlay');
-      const isVisible = dropdown.classList.contains('show');
-
-      if (!isVisible) {
-        dropdown.classList.add('show');
-        overlay.classList.add('show');
-        document.getElementById('aaBtn').classList.add('active');
-      } else {
-        closeDropdown();
-      }
+    function closeSelectionMenu() {
+      state.selectionMenuOpen = false;
+      els.selectionMenu.classList.remove('show');
+      els.selectionBackdrop.classList.remove('show');
+      document.getElementById('chkSelectionMenu').checked = false;
     }
 
-    function closeDropdown() {
-      document.getElementById('aaDropdown').classList.remove('show');
-      const overlay = document.getElementById('aaOverlay');
-      if (overlay) overlay.classList.remove('show');
-      document.getElementById('aaBtn').classList.remove('active');
+    function toggleSidebar(open) {
+      state.sidebarOpen = open;
+      els.sidebar.classList.toggle('show', open);
+      els.sidebarBackdrop.classList.toggle('show', open);
+      els.sidebar.setAttribute('aria-hidden', String(!open));
+      document.getElementById('chkSidebar').checked = open;
     }
 
-    function toggleToolsMenu(event) {
-      if (event) event.stopPropagation();
-      closeDropdown();
-      closeMoreMenu();
-      const menu = document.getElementById('toolsMenu');
-      const btn = document.getElementById('toolsBtn');
-      const willShow = !menu.classList.contains('show');
-      menu.classList.toggle('show', willShow);
-      btn.classList.toggle('active', willShow);
-      btn.setAttribute('aria-expanded', willShow ? 'true' : 'false');
+    function toggleSettings(open) {
+      state.settingsOpen = open;
+      els.settingsPanel.classList.toggle('show', open);
+      els.settingsBackdrop.classList.toggle('show', open);
+      document.getElementById('settingsBtn').classList.toggle('active', open);
+      document.getElementById('chkSettings').checked = open;
     }
 
-    function closeToolsMenu() {
-      const menu = document.getElementById('toolsMenu');
-      const btn = document.getElementById('toolsBtn');
-      if (!menu) return;
-      menu.classList.remove('show');
-      if (btn) {
-        btn.classList.remove('active');
-        btn.setAttribute('aria-expanded', 'false');
-        btn.classList.toggle('has-active-tool', !!activeAnnotateTool);
-      }
-    }
-
-    function toggleMoreMenu(event) {
-      if (event) event.stopPropagation();
-      closeDropdown();
-      closeToolsMenu();
-      const menu = document.getElementById('moreMenu');
-      const btn = document.getElementById('moreBtn');
-      const willShow = !menu.classList.contains('show');
-      menu.classList.toggle('show', willShow);
-      btn.classList.toggle('active', willShow);
-      btn.setAttribute('aria-expanded', willShow ? 'true' : 'false');
-    }
-
-    function closeMoreMenu() {
-      const menu = document.getElementById('moreMenu');
-      const btn = document.getElementById('moreBtn');
-      if (!menu) return;
-      menu.classList.remove('show');
-      if (btn) {
-        btn.classList.remove('active');
-        btn.setAttribute('aria-expanded', 'false');
-      }
-    }
-
-    document.addEventListener('selectionchange', () => {
-      const selection = window.getSelection();
-      if (!selection || selection.isCollapsed || selection.toString().trim() === "") {
-        document.getElementById('highlightTooltip').style.display = 'none';
-        return;
-      }
-
-      selectedTextString = selection.toString();
-      selectedTextRange = selection.getRangeAt(0);
-
-      const rect = selectedTextRange.getBoundingClientRect();
-      const tooltip = document.getElementById('highlightTooltip');
-      
-      tooltip.style.display = 'flex';
-      
-      const containerScroll = document.getElementById('readerScroll');
-      let leftOffset = rect.left + (rect.width / 2) - (tooltip.offsetWidth / 2);
-      let topOffset = rect.top - tooltip.offsetHeight - 12 + containerScroll.scrollTop;
-
-      if (leftOffset < 10) leftOffset = 10;
-      if (leftOffset + tooltip.offsetWidth > window.innerWidth - 10) {
-        leftOffset = window.innerWidth - tooltip.offsetWidth - 10;
-      }
-
-      tooltip.style.left = `${leftOffset}px`;
-      tooltip.style.top = `${topOffset}px`;
+    // Chrome reveal
+    els.chromeReveal.addEventListener('click', (e) => {
+      e.stopPropagation();
+      state.chromeHidden = !state.chromeHidden;
+      syncChrome();
     });
 
-    function applyHighlight(colorClass) {
-      if (!selectedTextRange) return;
+    // Center tap toggles chrome (immersive)
+    els.readingScroll.addEventListener('click', (e) => {
+      if (e.target.closest('.hl-mark')) return;
+      const rect = els.readingScroll.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      if (x < rect.width * 0.25 || x > rect.width * 0.75) return;
+      state.chromeHidden = !state.chromeHidden;
+      syncChrome();
+      closeSelectionMenu();
+      toggleSettings(false);
+      els.moreMenu.classList.remove('show');
+    });
 
-      const span = document.createElement('span');
-      span.className = `hl-text-marker-${colorClass}`;
-      selectedTextRange.surroundContents(span);
-
-      savedHighlights.push({
-        id: Date.now(),
-        text: selectedTextString,
-        color: colorClass,
-        note: "",
-        chapter: bookData.chapters[currentChapterIndex].title
+    // Tools
+    document.querySelectorAll('.tool-btn[data-tool]').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const tool = btn.dataset.tool;
+        if (tool === 'sign') { showToast('Sign panel (stub)'); return; }
+        if (state.activeTool === tool && tool === 'highlight') {
+          setTool('hand');
+          return;
+        }
+        setTool(tool);
+        if (tool === 'highlight') showToast('Highlight tool — drag to apply on release');
       });
+    });
 
-      window.getSelection().removeAllRanges();
-      document.getElementById('highlightTooltip').style.display = 'none';
-      showToast("Tô sáng đoạn trích thành công!");
-    }
+    // Settings / More
+    document.getElementById('settingsBtn').addEventListener('click', (e) => {
+      e.stopPropagation();
+      toggleSettings(!state.settingsOpen);
+      els.moreMenu.classList.remove('show');
+    });
+    document.getElementById('settingsClose').addEventListener('click', () => toggleSettings(false));
+    els.settingsBackdrop.addEventListener('click', () => toggleSettings(false));
 
-    function openNoteModal() {
-      if (!selectedTextString) return;
-      document.getElementById('noteQuotePreview').textContent = `"${selectedTextString}"`;
-      document.getElementById('noteInput').value = "";
-      document.getElementById('noteModalOverlay').classList.add('show');
-    }
+    document.getElementById('moreBtn').addEventListener('click', (e) => {
+      e.stopPropagation();
+      els.moreMenu.classList.toggle('show');
+      toggleSettings(false);
+    });
 
-    function closeNoteModal() {
-      document.getElementById('noteModalOverlay').classList.remove('show');
-    }
+    // Sidebar
+    document.getElementById('tocEdge').addEventListener('click', (e) => {
+      e.stopPropagation();
+      toggleSidebar(true);
+    });
+    document.getElementById('sidebarClose').addEventListener('click', () => toggleSidebar(false));
+    els.sidebarBackdrop.addEventListener('click', () => toggleSidebar(false));
 
-    function saveNote() {
-      const noteText = document.getElementById('noteInput').value.trim();
-      if (!noteText) {
-        showToast("Vui lòng điền nội dung ghi chú!", "info");
-        return;
-      }
-
-      const span = document.createElement('span');
-      span.className = 'hl-text-marker-yellow';
-      selectedTextRange.surroundContents(span);
-
-      savedHighlights.push({
-        id: Date.now(),
-        text: selectedTextString,
-        color: 'yellow',
-        note: noteText,
-        chapter: bookData.chapters[currentChapterIndex].title
+    document.querySelectorAll('.sidebar-tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        document.querySelectorAll('.sidebar-tab').forEach(t => t.classList.remove('active'));
+        tab.classList.add('active');
+        const id = tab.dataset.tab;
+        const content = document.getElementById('sidebarContent');
+        if (id === 'chapters') {
+          content.innerHTML = `
+            <button class="toc-item" type="button">Introduction</button>
+            <button class="toc-item active" type="button">The Basics</button>
+            <button class="toc-item" type="button">A Brief Visit to the Systems Zoo</button>`;
+        } else if (id === 'bookmarks') {
+          content.innerHTML = `
+            <div class="sidebar-card"><div class="sidebar-card-title">The Basics</div><div class="sidebar-card-meta">Today · 09:12</div></div>`;
+        } else if (id === 'highlights') {
+          content.innerHTML = `
+            <div class="sidebar-card"><div class="sidebar-card-title">"is more than the sum of its parts"</div><div class="sidebar-card-meta">Yellow · The Basics</div></div>`;
+        } else {
+          content.innerHTML = `<p class="sidebar-empty">No comments yet.</p>`;
+        }
       });
+    });
 
-      closeNoteModal();
-      window.getSelection().removeAllRanges();
-      document.getElementById('highlightTooltip').style.display = 'none';
-      showToast("Lưu ghi chú thành công!");
-    }
+    // Bookmark
+    els.bookmarkEdge.addEventListener('click', (e) => {
+      e.stopPropagation();
+      state.bookmarkActive = !state.bookmarkActive;
+      els.bookmarkEdge.classList.toggle('active', state.bookmarkActive);
+      els.bookmarkEdge.setAttribute('aria-pressed', String(state.bookmarkActive));
+      document.getElementById('chkBookmark').checked = state.bookmarkActive;
+      showToast(state.bookmarkActive ? 'Bookmark saved' : 'Bookmark removed');
+    });
 
-    function openCommentsDrawer(key, pIdx) {
-      activeCommentTargetKey = key;
-      const chapter = bookData.chapters[currentChapterIndex];
-      document.getElementById('drawerParaTitle').textContent =
-        `${chapter.num} · Đoạn ${pIdx + 1} — Bình luận`;
-      renderComments();
-      toggleCommentsDrawer(true);
-    }
+    // Right-click selection menu (on chapter body)
+    document.getElementById('chapterBody').addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+      const sel = window.getSelection();
+      if (!sel || sel.isCollapsed || !sel.toString().trim()) return;
+      openSelectionMenu(e.clientX, e.clientY);
+    });
+    els.selectionBackdrop.addEventListener('mousedown', closeSelectionMenu);
 
-    function toggleCommentsDrawer(show) {
-      const drawer = document.getElementById('commentsDrawer');
-      if (show) {
-        drawer.classList.add('show');
-      } else {
-        drawer.classList.remove('show');
-      }
-    }
+    document.querySelector('.selection-menu-item').addEventListener('click', () => {
+      closeSelectionMenu();
+      showToast('Highlight applied');
+    });
+    document.querySelectorAll('.selection-menu-item')[1].addEventListener('click', () => {
+      closeSelectionMenu();
+      state.noteModalOpen = true;
+      els.noteModal.classList.add('show');
+      document.getElementById('chkNoteModal').checked = true;
+    });
 
-    function renderComments() {
-      const container = document.getElementById('commentsList');
-      container.innerHTML = '';
-      
-      const list = commentsDatabase[activeCommentTargetKey] || [];
-      if (list.length === 0) {
-        container.innerHTML = `<p style="font-size: 13px; color: var(--faint); text-align: center; margin-top: 32px;">Chưa có bình luận hay đáp án. Hãy viết phản hồi đầu tiên bên dưới.</p>`;
-        return;
-      }
+    document.getElementById('noteCancel').addEventListener('click', () => {
+      els.noteModal.classList.remove('show');
+      document.getElementById('chkNoteModal').checked = false;
+    });
+    els.noteModal.addEventListener('click', () => {
+      els.noteModal.classList.remove('show');
+      document.getElementById('chkNoteModal').checked = false;
+    });
 
-      list.forEach(c => {
-        const div = document.createElement('div');
-        div.className = 'comment-item';
-        div.innerHTML = `
-          <div class="comment-meta">
-            <span class="comment-user">${c.user}</span>
-            <span>${c.date}</span>
-          </div>
-          <div class="comment-text">${c.text}</div>
-        `;
-        container.appendChild(div);
+    // Click existing highlight → color panel (Highlight tool)
+    document.querySelector('.hl-mark').addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (state.activeTool !== 'highlight') return;
+      const rect = e.target.getBoundingClientRect();
+      els.highlightEdit.style.left = (rect.left + rect.width / 2 - 70) + 'px';
+      els.highlightEdit.style.top = (rect.top - 48) + 'px';
+      els.highlightEdit.classList.add('show');
+      document.getElementById('chkHighlightEdit').checked = true;
+    });
+
+    // Theme
+    document.querySelectorAll('.theme-swatch').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.documentElement.dataset.theme = btn.dataset.theme;
+        document.querySelectorAll('.theme-swatch').forEach(s => s.classList.remove('active'));
+        btn.classList.add('active');
       });
-    }
+    });
 
-    function submitComment() {
-      const input = document.getElementById('commentInput');
-      const text = input.value.trim();
-      if (!text) return;
-
-      if (!commentsDatabase[activeCommentTargetKey]) {
-        commentsDatabase[activeCommentTargetKey] = [];
-      }
-
-      commentsDatabase[activeCommentTargetKey].push({
-        user: "Bạn",
-        text: text,
-        date: "Vừa xong"
+    // Layout toggle in settings
+    document.querySelectorAll('[data-layout]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('[data-layout]').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        state.dualLayout = btn.dataset.layout === 'dual';
+        els.readingArea.classList.toggle('layout-dual', state.dualLayout);
+        document.getElementById('chkDualLayout').checked = state.dualLayout;
       });
+    });
 
-      input.value = '';
-      renderComments();
-      loadChapter(currentChapterIndex);
-      renderSidebarComments();
-      refreshTocCommentBadges();
-      showToast("Đã gửi phản hồi của bạn!");
-    }
-
-    function findBookmarkForChapter(chapterIndex) {
-      return savedBookmarks.find(b => b.chapterIndex === chapterIndex);
-    }
-
-    function syncBookmarkEdgeState() {
-      const btn = document.getElementById('bookmarkEdgeBtn');
-      const label = document.getElementById('bookmarkAddLabel');
-      const existing = findBookmarkForChapter(currentChapterIndex);
-      if (btn) {
-        btn.classList.toggle('is-active', !!existing);
-        btn.setAttribute('aria-pressed', existing ? 'true' : 'false');
+    // Sketch panel checkboxes
+    document.getElementById('chkChrome').addEventListener('change', (e) => {
+      state.chromeHidden = !e.target.checked;
+      syncChrome();
+    });
+    document.getElementById('chkSidebar').addEventListener('change', (e) => toggleSidebar(e.target.checked));
+    document.getElementById('chkSettings').addEventListener('change', (e) => toggleSettings(e.target.checked));
+    document.getElementById('chkSelectionMenu').addEventListener('change', (e) => {
+      if (e.target.checked) openSelectionMenu(window.innerWidth / 2, window.innerHeight / 2);
+      else closeSelectionMenu();
+    });
+    document.getElementById('chkHighlightEdit').addEventListener('change', (e) => {
+      els.highlightEdit.classList.toggle('show', e.target.checked);
+      if (e.target.checked) {
+        els.highlightEdit.style.left = '50%';
+        els.highlightEdit.style.top = '40%';
+        els.highlightEdit.style.transform = 'translateX(-50%)';
       }
-      if (label) {
-        label.textContent = existing ? "Xóa Bookmark chương này" : "Đánh dấu vị trí chương này";
-      }
-    }
+    });
+    document.getElementById('chkNoteModal').addEventListener('change', (e) => {
+      els.noteModal.classList.toggle('show', e.target.checked);
+    });
+    document.getElementById('chkBookmark').addEventListener('change', (e) => {
+      state.bookmarkActive = e.target.checked;
+      els.bookmarkEdge.classList.toggle('active', state.bookmarkActive);
+    });
+    document.getElementById('chkDualLayout').addEventListener('change', (e) => {
+      state.dualLayout = e.target.checked;
+      els.readingArea.classList.toggle('layout-dual', state.dualLayout);
+    });
 
-    function toggleBookmarkHere() {
-      const existing = findBookmarkForChapter(currentChapterIndex);
-      if (existing) {
-        savedBookmarks = savedBookmarks.filter(b => b.id !== existing.id);
-        showToast('Đã gỡ bookmark', 'info');
-      } else {
-        const chapter = bookData.chapters[currentChapterIndex];
-        savedBookmarks.unshift({
-          id: bookmarkIdSeq++,
-          chapterIndex: currentChapterIndex,
-          label: chapter.num + ': ' + chapter.title,
-          createdAt: new Date().toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' })
-        });
-        showToast('Đã lưu bookmark thành công!');
-      }
-      syncBookmarkEdgeState();
-      renderBookmarks();
-    }
+    document.getElementById('sketchToggle').addEventListener('click', () => {
+      document.getElementById('sketchPanel').classList.toggle('collapsed');
+    });
 
-    function onBookmarkEdgeClick() {
-      toggleBookmarkHere();
-      toggleToCSidebar(true);
-      switchSidebarTab('bookmarks');
-    }
+    document.getElementById('sketchNotes').addEventListener('input', (e) => {
+      localStorage.setItem('reading-mockup-notes', e.target.value);
+    });
+    const saved = localStorage.getItem('reading-mockup-notes');
+    if (saved) document.getElementById('sketchNotes').value = saved;
 
-    function renderBookmarks() {
-      const list = document.getElementById('bookmarksList');
-      const empty = document.getElementById('bookmarksEmpty');
-      if (!list || !empty) return;
+    document.addEventListener('click', () => els.moreMenu.classList.remove('show'));
 
-      list.innerHTML = '';
-      empty.style.display = savedBookmarks.length > 0 ? 'none' : 'block';
-
-      savedBookmarks.forEach(bm => {
-        const btn = document.createElement('button');
-        btn.type = 'button';
-        btn.className = 'bookmark-card';
-        btn.onclick = () => { loadChapter(bm.chapterIndex); toggleToCSidebar(false); };
-        btn.innerHTML = `
-          <div class="bookmark-card-title">${bm.label}</div>
-          <div class="bookmark-card-meta">
-            <span>${bm.createdAt}</span>
-            <span class="bookmark-card-del" onclick="event.stopPropagation(); deleteBookmark(${bm.id})">✕ Xóa</span>
-          </div>
-        `;
-        list.appendChild(btn);
-      });
-    }
-
-    function deleteBookmark(id) {
-      savedBookmarks = savedBookmarks.filter(b => b.id !== id);
-      syncBookmarkEdgeState();
-      renderBookmarks();
-      showToast('Đã xóa bookmark.', 'info');
-    }
-
-    function adjustFontSize(dir) {
-      let currentSize = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--reading-size'), 10);
-      let newSize = currentSize + (dir * 2);
-      if (newSize < 12) newSize = 12;
-      if (newSize > 32) newSize = 32;
-      document.documentElement.style.setProperty('--reading-size', newSize + 'px');
-      document.getElementById('fontSizeLabel').textContent = newSize + 'px';
-    }
-
-    function setFontFamily(type) {
-      const fonts = {
-        serif: '"Literata", Georgia, serif',
-        sans: '"Source Sans 3", sans-serif',
-        mono: 'ui-monospace, "Cascadia Code", Consolas, monospace'
-      };
-      document.documentElement.style.setProperty('--font-reading', fonts[type] || fonts.serif);
-      document.getElementById('fontSerif').classList.toggle('active', type === 'serif');
-      document.getElementById('fontSans').classList.toggle('active', type === 'sans');
-      document.getElementById('fontMono').classList.toggle('active', type === 'mono');
-    }
-
-    function setFontWeight(weight) {
-      document.documentElement.style.setProperty('--reading-weight', String(weight));
-      document.getElementById('weightLight').classList.toggle('active', weight === 300);
-      document.getElementById('weightNormal').classList.toggle('active', weight === 400);
-      document.getElementById('weightBold').classList.toggle('active', weight === 600);
-    }
-
-    function setLineHeight(value) {
-      const v = Number(value);
-      document.documentElement.style.setProperty('--reading-line-height', String(v));
-      document.getElementById('lineHeightLabel').textContent = v.toFixed(2);
-    }
-
-    function setMarginEnabled(enabled) {
-      const area = document.getElementById('readingArea');
-      area.classList.toggle('margin-off', !enabled);
-      document.getElementById('marginOn').classList.toggle('active', enabled);
-      document.getElementById('marginOff').classList.toggle('active', !enabled);
-    }
-
-    function setMargin(marginType) {
-      const area = document.getElementById('readingArea');
-      area.classList.remove('margin-narrow', 'margin-wide');
-      if (marginType !== 'normal') {
-        area.classList.add(`margin-${marginType}`);
-      }
-      document.getElementById('marginNarrow').classList.toggle('active', marginType === 'narrow');
-      document.getElementById('marginNormal').classList.toggle('active', marginType === 'normal');
-      document.getElementById('marginWide').classList.toggle('active', marginType === 'wide');
-    }
-
-    function setPageMode(mode) {
-      const scroll = document.getElementById('readerScroll');
-      scroll.classList.toggle('mode-paginated', mode === 'paginated');
-      document.getElementById('pageModeScroll').classList.toggle('active', mode === 'scroll');
-      document.getElementById('pageModePaginated').classList.toggle('active', mode === 'paginated');
-    }
-
-    function setTheme(theme, el) {
-      document.body.className = '';
-      document.body.classList.add('theme-' + theme);
-      document.querySelectorAll('.theme-swatch').forEach(sw => sw.classList.remove('active'));
-      if (el) el.classList.add('active');
-    }
-
-    function selectAnnotateTool(tool) {
-      const labels = {
-        note: 'Note',
-        highlight: 'Highlight',
-        comment: 'Comment'
-      };
-
-      if (activeAnnotateTool === tool) {
-        clearAnnotateTool();
-        return;
-      }
-
-      activeAnnotateTool = tool;
-      document.getElementById('readerApp').classList.toggle('comment-mode', tool === 'comment');
-      document.querySelectorAll('.tools-menu-item').forEach(btn => {
-        btn.classList.toggle('active', btn.getAttribute('data-tool') === tool);
-      });
-      
-      syncActiveToolChip(labels[tool] || tool);
-      closeToolsMenu();
-    }
-
-    function clearAnnotateTool(event) {
-      if (event) event.stopPropagation();
-      activeAnnotateTool = null;
-      document.getElementById('readerApp').classList.remove('comment-mode');
-      document.querySelectorAll('.tools-menu-item').forEach(btn => btn.classList.remove('active'));
-      syncActiveToolChip(null);
-      closeToolsMenu();
-    }
-
-    function syncActiveToolChip(label) {
-      const chip = document.getElementById('activeToolChip');
-      const chipLabel = document.getElementById('activeToolChipLabel');
-      const toolsBtn = document.getElementById('toolsBtn');
-      if (!chip) return;
-
-      if (label && activeAnnotateTool) {
-        chipLabel.textContent = label;
-        chip.hidden = false;
-        chip.classList.add('show');
-      } else {
-        chip.hidden = true;
-        chip.classList.remove('show');
-      }
-      if (toolsBtn) {
-        toolsBtn.classList.toggle('has-active-tool', !!activeAnnotateTool);
-      }
-    }
-
-    function switchSidebarTab(tab) {
-      const tabs = ['chapters', 'bookmarks', 'highlights', 'comments'];
-      tabs.forEach(t => {
-        const btn = document.getElementById(`tab${t.charAt(0).toUpperCase() + t.slice(1)}Btn`);
-        const content = document.getElementById(`tab${t.charAt(0).toUpperCase() + t.slice(1)}Content`);
-        if (btn) btn.classList.toggle('active', t === tab);
-        if (content) content.style.display = t === tab ? 'block' : 'none';
-      });
-
-      if (tab === 'bookmarks') renderBookmarks();
-      if (tab === 'highlights') renderSavedHighlights();
-      if (tab === 'comments') renderSidebarComments();
-    }
-
-    function toggleToCSidebar(show) {
-      const sidebar = document.getElementById('tocSidebar');
-      const overlay = document.getElementById('sidebarOverlay');
-      sidebar.classList.toggle('show', show);
-      overlay.classList.toggle('show', show);
-    }
-
-    function buildToC() {
-      const tocList = document.getElementById('tocList');
-      tocList.innerHTML = '';
-      bookData.chapters.forEach((chapter, idx) => {
-        const li = document.createElement('li');
-        li.innerHTML = `
-          <button type="button" class="toc-item ${idx === 0 ? 'active' : ''}" data-chapter-index="${idx}" onclick="loadChapter(${idx}); toggleToCSidebar(false);">
-            <span class="toc-item-label">${chapter.num}: ${chapter.title}</span>
-          </button>
-        `;
-        tocList.appendChild(li);
-      });
-    }
-
-    function refreshTocCommentBadges() {
-      // Đếm bình luận hiển thị trên thanh mục lục
-    }
-
-    function renderSavedHighlights() {
-      const listContainer = document.getElementById('savedHighlightsList');
-      listContainer.innerHTML = '';
-      if (savedHighlights.length === 0) {
-        listContainer.innerHTML = `<p style="font-size: 13px; color: var(--faint); text-align: center; margin-top: 24px;">Chưa có trích dẫn hoặc ghi chú.</p>`;
-        return;
-      }
-      savedHighlights.forEach(hl => {
-        const div = document.createElement('div');
-        div.style.cssText = `background: rgba(15, 23, 42, 0.35); border: 1px solid var(--border-soft); border-radius: 8px; padding:12px; display:flex; flex-direction:column; gap:8px;`;
-        div.innerHTML = `
-          <div class="highlight-card-text hl-${hl.color}" style="font-family: var(--font-reading); font-size:13px; font-style:italic; padding-left:8px;">"${hl.text}"</div>
-          ${hl.note ? `<div style="font-size: 13px; background: rgba(0,0,0,0.2); padding: 8px; border-radius:6px; color: var(--text-strong);">Ghi chú: ${hl.note}</div>` : ''}
-          <div style="display:flex; justify-content:space-between; font-size:11px; color:var(--faint);">
-            <span>${hl.chapter}</span>
-            <span style="cursor:pointer;" onclick="deleteHighlight(${hl.id})">✕ Xóa</span>
-          </div>
-        `;
-        listContainer.appendChild(div);
-      });
-    }
-
-    function deleteHighlight(id) {
-      savedHighlights = savedHighlights.filter(hl => hl.id !== id);
-      renderSavedHighlights();
-      showToast("Đã xóa trích dẫn/ghi chú.", "info");
-    }
-
-    function renderSidebarComments() {
-      const container = document.getElementById('savedCommentsList');
-      const empty = document.getElementById('commentsEmpty');
-      container.innerHTML = '';
-      
-      let total = 0;
-      Object.keys(commentsDatabase).forEach(key => {
-        const comments = commentsDatabase[key] || [];
-        total += comments.length;
-
-        comments.forEach(c => {
-          const div = document.createElement('div');
-          div.className = 'bookmark-card';
-          div.style.marginBottom = '8px';
-          div.onclick = () => {
-            const parts = key.split('-');
-            loadChapter(parseInt(parts[0], 10));
-            toggleToCSidebar(false);
-          };
-          div.innerHTML = `
-            <div class="bookmark-card-title" style="color:var(--accent);">Đoạn văn ${parseInt(key.split('-')[1])+1}</div>
-            <div class="comment-text" style="font-size:13px; margin:4px 0;">${c.text}</div>
-            <div class="bookmark-card-meta"><span>${c.user}</span></div>
-          `;
-          container.appendChild(div);
-        });
-      });
-
-      empty.style.display = total > 0 ? 'none' : 'block';
-    }
-
-    function updateProgressBar(percentage) {
-      document.getElementById('progressFill').style.width = `${percentage}%`;
-      document.getElementById('progressHandle').style.left = `${percentage}%`;
-      const chapter = bookData.chapters[currentChapterIndex];
-      const label = document.getElementById('progressLocationLabel');
-      if (label && chapter) {
-        label.textContent = chapter.title || ('Ch. ' + (currentChapterIndex + 1));
-        label.title = 'Last / current location · ' + (chapter.title || '');
-      }
-    }
-
-    function handleProgressBarClick(event) {
-      const slider = document.getElementById('progressSlider');
-      const rect = slider.getBoundingClientRect();
-      const clickX = event.clientX - rect.left;
-      const percentage = Math.max(0, Math.min(100, (clickX / rect.width) * 100));
-      updateProgressBar(percentage);
-
-      const calculatedIndex = Math.round((percentage / 100) * (bookData.chapters.length - 1));
-      if (calculatedIndex !== currentChapterIndex) {
-        loadChapter(calculatedIndex);
-      }
-    }
-
-    function onReaderBackgroundClicked() {
-      // Đóng toàn bộ dropdown/drawer phụ trước khi chuyển UI Chrome
-      closeDropdown();
-      closeMoreMenu();
-      closeToolsMenu();
-      toggleCommentsDrawer(false);
-      
-      isUiHidden = !isUiHidden;
-      const topbar = document.getElementById('topbar');
-      const footerBar = document.getElementById('footerBar');
-      if (isUiHidden) {
-        topbar.classList.add('hide');
-        footerBar.classList.add('hide');
-      } else {
-        topbar.classList.remove('hide');
-        footerBar.classList.remove('hide');
-      }
-    }
-
-    function copySelectedText() {
-      if (!selectedTextString) return;
-      document.execCommand('copy');
-      showToast("Đã sao chép vào khay nhớ tạm!");
-      window.getSelection().removeAllRanges();
-      document.getElementById('highlightTooltip').style.display = 'none';
-    }
-
-    function showToast(message, type = 'success') {
-      const container = document.getElementById('toastContainer');
-      const toast = document.createElement('div');
-      toast.className = 'toast';
-      toast.innerHTML = `<span>${message}</span>`;
-      container.appendChild(toast);
-      setTimeout(() => toast.classList.add('show'), 50);
-      setTimeout(() => {
-        toast.classList.remove('show');
-        setTimeout(() => toast.remove(), 300);
-      }, 3000);
-    }
-
-    function goBackToLibrary() {
-      showToast("Đang quay lại tủ sách cá nhân...", "info");
-    }
+    // Initial: immersive (chrome hidden) like production
+    syncChrome();
+    setTool('hand');
   </script>
 </body>
 </html>

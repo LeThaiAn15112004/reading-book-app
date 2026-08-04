@@ -10,6 +10,11 @@ import {
 import type { Database as SqliteDatabase } from 'better-sqlite3'
 import { randomUUID } from 'node:crypto'
 import { getDatabase } from './db'
+import {
+  STARTED_LOCATION_LABEL,
+  displayLabelFromStoredLocation,
+  isPersistedLocationJson,
+} from './reading-session-location'
 
 interface BookRow {
   id: string
@@ -30,8 +35,9 @@ interface BookRow {
 }
 
 export type ReadingSessionSummary = {
-  /** Non-empty display / CFI location; empty DB values omitted. */
+  /** Human-readable last-read label for Library (never raw CFI JSON). */
   lastReadLocation?: string
+  /** Alias of reading_session_states.updated_at. */
   lastReadAt?: string
 }
 
@@ -43,9 +49,6 @@ export type BookListItem = {
   genreNames: string[]
   session?: ReadingSessionSummary
 }
-
-/** Placeholder until real CFI resume lands (G4). Marks shelf status = reading. */
-const STARTED_LOCATION_LABEL = 'Started'
 
 const BOOK_COLUMNS = `
   id, title, file_path, normalized_path, file_format, cover_path,
@@ -269,14 +272,14 @@ export class SqliteLibraryStore implements LibraryStore {
       | { last_read_location: string; updated_at: string }
       | undefined
     if (!row) return undefined
-    const loc = row.last_read_location?.trim()
-    if (!loc) return undefined
-    return { lastReadLocation: loc, lastReadAt: row.updated_at }
+    const label = displayLabelFromStoredLocation(row.last_read_location)
+    if (!label) return undefined
+    return { lastReadLocation: label, lastReadAt: row.updated_at }
   }
 
   /**
    * Mark book as in-progress (Library Reading shelf).
-   * Keeps existing non-empty location (CFI later); only fills empty with "Started".
+   * Does not overwrite a valid Location JSON (CFI); only fills empty with "Started".
    */
   markAsReading(bookId: string, now = new Date().toISOString()): void {
     const existing = this.db
@@ -293,6 +296,17 @@ export class SqliteLibraryStore implements LibraryStore {
           ) VALUES (?, ?, 0, 0, ?)`,
         )
         .run(bookId, STARTED_LOCATION_LABEL, now)
+      return
+    }
+
+    if (isPersistedLocationJson(existing.last_read_location)) {
+      this.db
+        .prepare(
+          `UPDATE reading_session_states
+           SET updated_at = ?
+           WHERE book_id = ?`,
+        )
+        .run(now, bookId)
       return
     }
 

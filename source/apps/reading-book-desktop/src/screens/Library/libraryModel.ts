@@ -1,4 +1,4 @@
-import type { ShelfDetailItemData } from './components/ShelfDetailItem'
+import type { ShelfDetailItemData } from './components/shelves/ShelfDetailItem'
 import {
   shelfProgressForBook,
   type LibraryBook,
@@ -18,6 +18,7 @@ export {
   filterByNav,
   filterByShelf,
   formatFileSizeMb,
+  formatLastReadLine,
   formatRelativeLastRead,
   mapBookSummary,
   matchesSearch,

@@ -6,6 +6,8 @@ import migration004 from './migrations/004_comments.sql?raw'
 import migration005 from './migrations/005_drop_app_settings.sql?raw'
 import migration006 from './migrations/006_book_library_metadata.sql?raw'
 import migration007 from './migrations/007_genres_nn.sql?raw'
+import migration008 from './migrations/008_reading_session_v2.sql?raw'
+import migration009 from './migrations/009_highlights_v2.sql?raw'
 
 interface Migration {
   name: string
@@ -20,6 +22,8 @@ const MIGRATIONS: Migration[] = [
   { name: '005_drop_app_settings.sql', sql: migration005 },
   { name: '006_book_library_metadata.sql', sql: migration006 },
   { name: '007_genres_nn.sql', sql: migration007 },
+  { name: '008_reading_session_v2.sql', sql: migration008 },
+  { name: '009_highlights_v2.sql', sql: migration009 },
 ]
 
 /**

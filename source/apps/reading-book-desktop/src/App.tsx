@@ -6,6 +6,8 @@ import {
   AppTitleProvider,
   GlobalReadingPrefsProvider,
   OpenReadingProvider,
+  ReaderChromeMenuProvider,
+  SessionFlushBridge,
 } from './chrome'
 import { LibraryScreen } from './screens/Library/LibraryScreen'
 import { ReaderScreen } from './screens/Reader/ReaderScreen'
@@ -20,24 +22,27 @@ function App() {
         <AppNavProvider>
           <GlobalReadingPrefsProvider>
             <OpenReadingProvider>
-              <div className="flex h-screen flex-col overflow-hidden">
-                <AppTitlebar />
-                <AppMenubar />
-                <div className="min-h-0 flex-1 overflow-hidden">
-                  <Routes>
-                    <Route path="/" element={<SplashScreen />} />
-                    <Route path="/library" element={<LibraryScreen />} />
-                    <Route path="/reader/:bookId" element={<ReaderScreen />} />
-                    <Route path="/settings" element={<SettingsScreen />} />
-                    {/* T3.1 spike harness — not linked from Library → Reader */}
-                    <Route path="/spike/epub" element={<SpikeEpubScreen />} />
-                    <Route
-                      path="*"
-                      element={<Navigate to="/library" replace />}
-                    />
-                  </Routes>
+              <ReaderChromeMenuProvider>
+                <SessionFlushBridge />
+                <div className="flex h-screen flex-col overflow-hidden">
+                  <AppTitlebar />
+                  <AppMenubar />
+                  <div className="min-h-0 flex-1 overflow-hidden">
+                    <Routes>
+                      <Route path="/" element={<SplashScreen />} />
+                      <Route path="/library" element={<LibraryScreen />} />
+                      <Route path="/reader/:bookId" element={<ReaderScreen />} />
+                      <Route path="/settings" element={<SettingsScreen />} />
+                      {/* T3.1 spike harness — not linked from Library → Reader */}
+                      <Route path="/spike/epub" element={<SpikeEpubScreen />} />
+                      <Route
+                        path="*"
+                        element={<Navigate to="/library" replace />}
+                      />
+                    </Routes>
+                  </div>
                 </div>
-              </div>
+              </ReaderChromeMenuProvider>
             </OpenReadingProvider>
           </GlobalReadingPrefsProvider>
         </AppNavProvider>

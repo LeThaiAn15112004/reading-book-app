@@ -1,0 +1,1 @@
+export { SplashBrand } from './SplashBrand'

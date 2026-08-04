@@ -1,8 +1,8 @@
 # Software Design Specification (SDS)
 
 **Sản phẩm:** Reading Book App — Trình đọc sách / tài liệu thông minh (Trợ lý tri thức cá nhân)  
-**Phiên bản tài liệu:** 1.18  
-**Ngày:** 2026-07-27  
+**Phiên bản tài liệu:** 1.19  
+**Ngày:** 2026-08-01  
 **Trạng thái:** Draft — căn cứ SRS + Design Plan (MVP Free Core) + mockups  
 **Tài liệu liên quan:** [SRS.md](./SRS.md), [docs/mockups/](../mockups/)  
 **Changelog 1.2:** Import từ URL (direct file → sandbox) đưa vào MVP — SDS §1.2, §2.6–2.8, §3.5–3.7; SRS FR-13 / UC-01 / WF-02.  
@@ -22,6 +22,7 @@
 **Changelog 1.16:** Thêm bảng **`COMMENT` / `comments`** (overlay comment theo trang + `position_data`; cascade khi xóa sách) — migration `004_comments.sql`; SCR-03 tab Comment.  
 **Changelog 1.17:** **Bỏ bảng `app_settings`** khỏi SQLite overlay — app preferences theo platform (desktop: `electron-store`; mobile: MMKV / AsyncStorage); model `AppPreferences` vẫn dùng chung; migration `005_drop_app_settings.sql`.  
 **Changelog 1.18:** Library metadata — `books.description`, `books.page_count` (006); thể loại **n–n** qua **`GENRE` / `BOOK_GENRE`** (`genres`, `book_genres`) thay cột `books.genre` (007). **Không** khôi phục `app_settings`.
+**Changelog 1.19:** **`highlights` v2** (009) — gộp ghi chú vào highlight (`note`, `status`, `is_checked`, `updated_at`); một cột `location` (pack `start|end`); **bỏ bảng `notes`**; thêm **`tags`** + **`highlight_tags`** (N–N). **`reading_session_states` v2** (008). **Không** khôi phục `app_settings`.
 
 ---
 
@@ -537,7 +538,7 @@ source/
 - File sách/tài liệu gốc **không** nằm trong DB — chỉ lưu `file_path` (và optional `normalized_path` nếu đã convert). Nội dung gốc Read-Only trên đĩa.
 - Highlight / Note / Comment / Bookmark / ReadingSessionState / Preferences-theo-sách là **Overlay** trong SQLite.
 - `BOOK_CHUNK` phục vụ tìm kiếm nhanh + RAG (Phase 2); MVP có thể tạo chunk text cho FTS5, embedding để sau.
-- Xóa `BOOK` → **cascade** xóa `BOOK_AUTHOR`, `COLLECTION_BOOK` (membership), `BOOK_SIGNATURE`, ReadingSessionState, Highlight, Note, Comment, Bookmark, Chunk (SRS BR-06). `AUTHOR` / `COLLECTION` giữ lại nếu còn liên kết khác.
+- Xóa `BOOK` → **cascade** xóa `BOOK_AUTHOR`, `COLLECTION_BOOK` (membership), `BOOK_SIGNATURE`, ReadingSessionState, Highlight, Comment, Bookmark, Chunk, highlight_tags (SRS BR-06). `AUTHOR` / `COLLECTION` / `TAG` giữ lại nếu còn liên kết khác.
 
 
 
@@ -563,8 +564,8 @@ Bảng đối chiếu khi implement: mỗi entity dùng để làm gì, gắn v�
 | `BOOK_GENRE`       | Bảng liên kết **n - n** giữa `BOOK` và `GENRE`.                                                                                                                                                                          | 1 sách nhiều thể loại; 1 thể loại nhiều sách.                                                                                    | Sách A: Fiction + Adventure. Sách B cũng Fiction.                                                                                                                |
 | `BOOK_SIGNATURE`   | Chi tiết chữ ký số trên tài liệu (`signer_name`, `signature_status`, `signed_at`). Quan hệ **1 - n** với `BOOK`. Cờ `BOOK.is_signed` = denormalized khi có ≥ 1 dòng chữ ký.                                              | Xác thực nguồn / tính toàn vẹn tài liệu đã ký (PDF signed, v.v.); lọc sách đã ký trong Library.                                   | Import PDF có chữ ký của “Acme Corp” → `is_signed = 1` + một dòng `BOOK_SIGNATURE` status `valid`.                                                              |
 | `READING_SESSION_STATE` | Lưu vị trí đọc cuối (`last_read_location`); lưu cấu hình đọc per-book (màu nền, màu chữ, font, landscape…). Quan hệ **1 - 1** với `BOOK`. Không hàm ý đã đọc hết hay đọc tuần tự. | “Mở xong đóng, mở lại đúng chỗ” — không mất đoạn đang đọc; không phải chỉnh lại theme chống mỏi mắt mỗi lần mở. | Bạn đọc tới Chương 3 (hoặc nhảy cóc sang đoạn khác), bật Sepia rồi tắt app. Hôm sau mở lại: nền Sepia + nhảy đúng vị trí lần trước. |
-| `HIGHLIGHT`        | Lưu đoạn bôi màu (`location_start`/`end`, `selected_text`, `color_hex`) như Overlay đè lên nội dung gốc (không sửa file).                                                                                                | Ghi nhớ thông tin cốt lõi — xem lại nhanh trích dẫn / kiến thức đã đánh dấu, không lật lại từng trang.                            | Bôi câu *“Đi một ngày đàng, học một sàng khôn”*, chọn màu Vàng → hiện trong danh sách Highlight và jump lại đúng chỗ.                                            |
-| `NOTE`             | Lưu suy nghĩ / phân tích cá nhân gắn vị trí sách; có thể gắn `highlight_id` (nullable).                                                                                                                                  | Active reading — ghi chép học tập / nghiên cứu “trên lề sách” như sách giấy.                                                      | Bôi thuật ngữ khó, ghi *“Cần tra thêm trên Wikipedia”* → icon note cạnh đoạn văn để mở lại.                                                                      |
+| `HIGHLIGHT`        | Lưu đoạn bôi màu (`location` pack start\|end, `selected_text`, `color_hex`) + ghi chú inline (`note`, `status`, `is_checked`) như Overlay đè lên nội dung gốc (không sửa file). Optional gắn **`TAG`** qua `highlight_tags`. | Ghi nhớ thông tin cốt lõi — xem lại nhanh trích dẫn / kiến thức đã đánh dấu và ghi chú kèm theo.                            | Bôi câu *“Đi một ngày đàng, học một sàng khôn”*, chọn màu Vàng, ghi *“Cần tra thêm”* → hiện trong sidebar Note và jump lại đúng chỗ.                                            |
+| `TAG`              | Thẻ user-defined (`name`, optional `color_hex`) gắn highlight qua N–N.                                                                                                                                                   | Phân loại / lọc highlight theo chủ đề (Phase 3 auto-tag opt-in).                                                                  | Gắn tag `#marketing` cho highlight về chiến lược nội dung.                                                                                                      |
 | `COMMENT`          | Overlay ghi chú / đáp án gắn **trang + vị trí trên trang** (`page_number`, `position_data`, `content`); local theo `bookId` — **không** phải mạng xã hội. Tab Comment trên SCR-03.                                      | Gắn đáp án / chú thích lên đúng chỗ trên tài liệu (vd. bài tập PDF được gửi); xem lại & jump từ sidebar.                          | Mở file bài tập → comment chữ đỏ “đáp án: B” tại trang 3 → badge Comment trên sidebar; tap → nhảy đúng chỗ.                                                      |
 | `BOOKMARK`         | Lưu điểm đánh dấu trang (`location_ref`, `label` tùy chọn) để quay lại nhanh.                                                                                                                                            | Đánh dấu chỗ cần đọc tiếp / chỗ quan trọng mà không cần bôi cả đoạn.                                                              | Đang giữa chương, chọn Bookmark “Ôn lại phần này” → sau mở từ danh sách bookmark và nhảy đúng vị trí.                                                            |
 | `BOOK_CHUNK`       | Chia nội dung extract thành đoạn (vd. ~1000–2000 từ) theo `chunk_index`; đầu vào FTS5, AI tóm tắt / RAG, và (khi cần) prefetch text theo đoạn.                                                                           | Hiệu năng & tìm trong sách — không phụ thuộc nạp cả file lớn một lần cho search/AI; lật/đọc mượt hơn khi kết hợp cache theo đoạn. | Sách dài: index chunk 0..n. User search hoặc AI chỉ lấy các chunk liên quan; khi đọc, có thể prefetch chunk kế tiếp thay vì load toàn bộ 1000 trang vào RAM.     |
@@ -587,12 +588,11 @@ Bảng đối chiếu khi implement: mỗi entity dùng để làm gì, gắn v�
 | `GENRE` → `BOOK_GENRE`      | **1 - n**   | Cascade khi xóa genre (gỡ membership).                                                      |
 | `BOOK` → `BOOK_SIGNATURE`   | **1 - n**   | Chi tiết chữ ký số; cascade khi xóa sách. Cờ `is_signed` trên `BOOK` đồng bộ khi có/không còn signature. |
 | `BOOK` → `READING_SESSION_STATE` | **1 - 1**   | Mỗi sách một bản ghi resume + setting đọc gần nhất. Tạo khi import hoặc lần mở đầu. |
-| `BOOK` → `HIGHLIGHT`        | **1 - n**   | Overlay; cascade khi xóa sách.                                                              |
-| `BOOK` → `NOTE`             | **1 - n**   | Note độc lập hoặc gắn highlight (`highlight_id` nullable).                                  |
+| `BOOK` → `HIGHLIGHT`        | **1 - n**   | Overlay; cascade khi xóa sách. Ghi chú inline trên `HIGHLIGHT.note` (không bảng NOTE riêng). |
 | `BOOK` → `COMMENT`          | **1 - n**   | Comment theo trang + vị trí; cascade khi xóa sách.                                          |
 | `BOOK` → `BOOKMARK`         | **1 - n**   | Đánh dấu trang (FR-11).                                                                     |
 | `BOOK` → `BOOK_CHUNK`       | **1 - n**   | Chunk text cho FTS / AI; rebuild khi re-index.                                              |
-| `HIGHLIGHT` → `NOTE`        | **1 - n**   | `NOTE.highlight_id` nullable; xóa highlight → **SET NULL** (giữ nội dung note).             |
+| `HIGHLIGHT` ↔ `TAG`         | **n - n**   | Qua `highlight_tags`; cascade khi xóa highlight hoặc tag.                                   |
 | `BOOK` ↔ `COLLECTION`       | **n - n**   | Qua `COLLECTION_BOOK` (`sort_order`, `added_at`). User-curated; khác shelf trạng thái.      |
 | `COLLECTION` → `COLLECTION_BOOK` | **1 - n** | Cascade khi xóa collection (không xóa sách).                                           |
 | `BOOK` → `COLLECTION_BOOK`  | **1 - n**   | Cascade khi xóa sách (chỉ gỡ membership).                                                   |
@@ -659,9 +659,9 @@ Bảng đối chiếu khi implement: mỗi entity dùng để làm gì, gắn v�
 | Digital signature | Cột `BOOK.is_signed` + bảng `BOOK_SIGNATURE` / `book_signatures` (1–n) |
 | Bookmark         | Bảng riêng `BOOKMARK` (không gộp vào highlight)                    |
 | Comment          | Bảng riêng `COMMENT` / `comments` (page + position_data; khác NOTE) |
-| Note ↔ Highlight | Optional FK `highlight_id`                                         |
+| Note ↔ Highlight | Ghi chú **inline** trên `highlights.note` (không bảng `notes` riêng); optional **`tags`** qua `highlight_tags` |
 | Chunk            | Có trong schema sớm; embedding nullable đến Phase 2                |
-| Cascade xóa sách | book_authors + book_genres + collection_books + book_signatures + ReadingSessionState + Highlight + Note + Comment + Bookmark + Chunk |
+| Cascade xóa sách | book_authors + book_genres + collection_books + book_signatures + ReadingSessionState + Highlight + Comment + Bookmark + Chunk + highlight_tags |
 | Collections      | `COLLECTION` + `COLLECTION_BOOK` (n–n); xóa collection cascade membership, **không** xóa sách |
 | Nguồn import     | File máy **và** URL direct file; optional cột `books.source_url`   |
 
@@ -680,7 +680,7 @@ Class Diagram — Domain + Application (MVP)
 - `Book` ↔ `Author` là **n - n** (association class `BookAuthor` kèm `sortOrder`).
 - `Book` ↔ `Collection` là **n - n** (association class `CollectionBook` kèm `sortOrder` / `addedAt`).
 - Application services điều phối use case; chỉ phụ thuộc **Ports** (`LibraryStore`, `CollectionStore`, `OverlayStore`, …), không phụ thuộc SQLite/Electron.
-- Cardinality khác: `Book` **1 - 1** `ReadingSessionState`; **1 - n** Highlight / Note / Comment / Bookmark / BookChunk / BookSignature; Highlight **1 - n** Note (optional qua `highlightId`).
+- Cardinality khác: `Book` **1 - 1** `ReadingSessionState`; **1 - n** Highlight / Comment / Bookmark / BookChunk / BookSignature; Highlight **n - n** Tag (optional qua `highlight_tags`).
 
 
 
@@ -695,13 +695,13 @@ Database Diagram — SQLite Overlay Schema (MVP)
 - Tên bảng snake_case (`books`, `authors`, `book_authors`, …); datetime lưu `TEXT` ISO-8601; boolean lưu `INTEGER` 0/1.
 - **Author không nằm trên** `books` — quan hệ **n - n** qua `book_authors` (PK `book_id` + `author_id`, `sort_order`).
 - File sách **không** trong DB — chỉ `file_path` / `normalized_path`.
-- Xóa `books` → **CASCADE** `book_authors`, `collection_books`, `book_signatures`, progress, highlights, notes, comments, bookmarks, book_chunks; xóa highlight → notes.`highlight_id` **SET NULL**.
+- Xóa `books` → **CASCADE** `book_authors`, `collection_books`, `book_signatures`, progress, highlights, comments, bookmarks, book_chunks, `highlight_tags`; xóa highlight → cascade `highlight_tags`.
 - Xóa `collections` → **CASCADE** `collection_books` (sách vẫn còn trong Library).
 - `sha256` **UNIQUE**; `book_chunks` **UNIQUE(book_id, chunk_index)**; FTS5 là virtual table riêng (không vẽ như entity nghiệp vụ).
 
 ### 3.10. Catalog bảng & thuộc tính (SQLite)
 
-Catalog vật lý khớp migration desktop [`001_initial.sql`](../../source/apps/reading-book-desktop/electron/persistence/migrations/001_initial.sql) (+ `002`…`005_drop_app_settings`). **Mobile dùng cùng schema overlay** (adapter Expo SQLite riêng; không dùng `better-sqlite3`). **App settings không nằm trong catalog này** — xem §3.6.
+Catalog vật lý khớp migration desktop [`001_initial.sql`](../../source/apps/reading-book-desktop/electron/persistence/migrations/001_initial.sql) (+ `002`…`009_highlights_v2`). **Mobile dùng cùng schema overlay** (adapter Expo SQLite riêng; không dùng `better-sqlite3`). **App settings không nằm trong catalog này** — xem §3.6.
 
 **Quy ước chung**
 
@@ -817,41 +817,53 @@ Catalog vật lý khớp migration desktop [`001_initial.sql`](../../source/apps
 | `book_id` | TEXT | PK, FK → `books.id` **ON DELETE CASCADE** | Một sách một session |
 | `last_read_location` | TEXT | NOT NULL | Vị trí ổn định theo format (CFI / page-rect / offset) |
 | `percent` | REAL | NOT NULL, DEFAULT `0` | Map vị trí scrubber (0–100); **không** dùng làm “% đã đọc xong” trên UI (FR-10) |
-| `bg_color` | TEXT | NULL | Màu nền đọc (per-book) |
-| `text_color` | TEXT | NULL | Màu chữ |
-| `font_size` | REAL | NULL | Cỡ chữ |
 | `font_family` | TEXT | NULL | Font |
+| `font_size` | REAL | NULL | Cỡ chữ |
+| `font_weight` | TEXT | NULL | Độ đậm chữ |
 | `line_height` | REAL | NULL | Giãn dòng |
-| `theme_preset` | TEXT | NULL | Preset theme (vd. night / sepia / day) |
+| `text_align` | TEXT | NULL | Căn chữ |
+| `layout_mode` | TEXT | NULL | Bố cục single / dual |
+| `page_turn_mode` | TEXT | NULL | Scroll / paginated |
+| `margins_enabled` | INTEGER | NULL | Bật lề (0/1) |
+| `margin_preset` | TEXT | NULL | Hẹp / vừa / rộng |
 | `is_landscape` | INTEGER | NOT NULL, DEFAULT `0` | Landscape (0/1) |
 | `updated_at` | TEXT | NOT NULL | Lần autosave gần nhất |
 
-#### `highlights` — overlay bôi chọn
+Theme Night / Sepia / Paper là preference toàn app ở localStorage và áp dụng bằng CSS preset; không lưu `bg_color`, `text_color` hoặc `theme_preset` trong bảng này.
+
+#### `highlights` — overlay bôi chọn + ghi chú inline
 
 | Cột | Kiểu | Ràng buộc | Mô tả |
 | :--- | :--- | :--- | :--- |
 | `id` | TEXT | PK, NOT NULL | UUID highlight |
 | `book_id` | TEXT | NOT NULL, FK → `books.id` **ON DELETE CASCADE** | Sách sở hữu |
-| `location_start` | TEXT | NOT NULL | Điểm đầu đoạn (theo format) |
-| `location_end` | TEXT | NOT NULL | Điểm cuối đoạn |
+| `location` | TEXT | NOT NULL | Phạm vi vị trí pack `start\|end` (Location.toString mỗi đầu) |
 | `selected_text` | TEXT | NOT NULL | Snapshot text đã chọn |
 | `color_hex` | TEXT | NOT NULL | Màu highlight (vd. `#F5D76E`) |
+| `note` | TEXT | NULL | Ghi chú inline (optional) |
+| `status` | TEXT | NOT NULL, DEFAULT `'None'`, CHECK | `None` \| `Accepted` \| `Rejected` \| `Cancelled` \| `Completed` \| `Deferred` \| `Future` |
+| `is_checked` | INTEGER | NOT NULL, DEFAULT `0` | Đánh dấu hoàn thành nhanh (0/1) |
 | `created_at` | TEXT | NOT NULL | Thời điểm tạo |
+| `updated_at` | TEXT | NOT NULL | Sửa ghi chú / trạng thái gần nhất |
 
-#### `notes` — ghi chú gắn vị trí (optional gắn highlight)
+**Index:** `INDEX(book_id)`; `INDEX(status)`.
+
+#### `tags` — thẻ gắn highlight (optional, G5+)
 
 | Cột | Kiểu | Ràng buộc | Mô tả |
 | :--- | :--- | :--- | :--- |
-| `id` | TEXT | PK, NOT NULL | UUID note |
-| `book_id` | TEXT | NOT NULL, FK → `books.id` **ON DELETE CASCADE** | Sách sở hữu |
-| `highlight_id` | TEXT | NULL, FK → `highlights.id` **ON DELETE SET NULL** | Optional; xóa highlight giữ note |
-| `location_ref` | TEXT | NOT NULL | Vị trí neo note |
-| `selected_text` | TEXT | NULL | Đoạn liên quan (nếu có) |
-| `content` | TEXT | NOT NULL | Nội dung note (không rỗng ở tầng use case) |
-| `created_at` | TEXT | NOT NULL | Tạo |
-| `updated_at` | TEXT | NOT NULL | Sửa gần nhất |
+| `id` | TEXT | PK, NOT NULL | UUID tag |
+| `name` | TEXT | NOT NULL, UNIQUE | Tên thẻ (vd. `#marketing`) |
+| `color_hex` | TEXT | NULL | Màu hiển thị UI |
 
-**Index:** `INDEX(book_id)`; `INDEX(highlight_id)`.
+#### `highlight_tags` — N–N highlight ↔ tag
+
+| Cột | Kiểu | Ràng buộc | Mô tả |
+| :--- | :--- | :--- | :--- |
+| `highlight_id` | TEXT | NOT NULL, FK → `highlights.id` **ON DELETE CASCADE** | Highlight |
+| `tag_id` | TEXT | NOT NULL, FK → `tags.id` **ON DELETE CASCADE** | Tag |
+
+**Index:** PK composite `(highlight_id, tag_id)`.
 
 #### `comments` — overlay comment theo trang (SCR-03)
 
@@ -1281,7 +1293,7 @@ Không gian đọc **content-first**: render tài liệu, lưu vị trí, highli
 | ----------- | ------------------------------------------------------------------------ |
 | Chapters    | Danh sách chương; **badge** số comment nếu chương đó có comment          |
 | Bookmark    | Thêm / bỏ bookmark tại chương hiện tại; list jump                        |
-| Note        | List highlight + note của **sách đang mở** (FR-09 / WF-04); tap → jump `location_start` |
+| Note        | List highlight có `note` của **sách đang mở** (FR-09 / WF-04); tap → jump `location` |
 | Comment     | List comment / đáp án **gom theo chương**; tap → jump + mở drawer đoạn   |
 
 Empty Note/Comment: “No notes yet” / tương đương — CTA quay vùng đọc (không navigate màn khác).

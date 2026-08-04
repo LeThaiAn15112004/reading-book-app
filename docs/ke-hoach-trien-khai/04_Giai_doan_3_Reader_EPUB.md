@@ -8,7 +8,7 @@
 
 **Điều kiện vào:** G2 import được ≥ 1 sách. ✅ (G2 đã đạt — 2026-07-25)
 
-**Trạng thái:** **T3.0 + T3.1 + T3.4 + T3.3 + T3.2 + T3.5 đạt** — UI SCR-03; IPC bytes; **`EpubRenderer`**; **`ReaderShell`**; nav page/section/scroll + footer scrub spine (2026-07-27). Tiếp: **T3.6** tap-center → **T3.7** TOC.
+**Trạng thái:** **T3.0–T3.9 đạt** — UI SCR-03; IPC bytes; **`EpubRenderer`**; **`ReaderShell`**; nav page/section/scroll + footer scrub spine + go-to-page; tap-center Invisible UI; TOC `nav.toc`; Library back; loading/error. Polish còn lại: smooth scroll máy yếu; không panel AI (đã đúng MVP).
 
 ---
 
@@ -47,11 +47,11 @@
 | **T3.2** | ~~Chốt `ReaderShell`~~ **Đạt** — `src/reader/ReaderShell.tsx`: vùng nội dung + chrome ẩn mặc định (reveal chevron; tap-center → T3.6)                                                                                                                                                                                                                    | FR-02, FR-03 |
 | **T3.3** | ~~`EpubRenderer`~~ **Đạt** — `src/reader/renderers/epub/`; mở ArrayBuffer qua epubjs; thay fake khi `format === epub`                                                                                                                                                                                                                                      | FR-02        |
 | **T3.4** | ~~Mở sách qua IPC~~ **Đạt** — `library:openBookContent(bookId)` → Main `assertPathAllowed` + `readFile` → `ArrayBuffer`; Renderer không nhận path FS                                                                                                                                                                                                      | FR-02        |
-| **T3.5** | ~~Navigation~~ **Đạt** — page next/prev (phím + click cạnh); Ctrl/Cmd+Arrow / `[` `]` = spine section; scroll `scrolled-doc`; footer scrub theo spine index (không CFI) | FR-03        |
-| T3.6     | Tap center toggle Tools / Settings / More (theo mockup) — hoàn thiện hành vi Invisible UI                                                                                                                                                                                                                                                                 | FR-03        |
-| T3.7     | Sidebar TOC (mục lục) từ EPUB (thay TOC fake)                                                                                                                                                                                                                                                                                                             | FR-03        |
-| T3.8     | Bấm nút library trên menu bar→ Library (giữ scroll Library nếu có) - cái này giờ chỉ check xem đã đạt chưa                                                                                                                                                                                                                                                | WF-01        |
-| T3.9     | Loading / lỗi mở sách rõ ràng (EPUB hỏng → message; không kẹt trắng)                                                                                                                                                                                                                                                                                      | —            |
+| **T3.5** | ~~Navigation~~ **Đạt** — page next/prev (phím Arrow ± iframe EPUB + click cạnh 25%; footer focus vẫn lật trang); Ctrl/Cmd+Arrow / `[` `]` = spine section; scroll `scrolled-doc`; footer scrub + go-to-page theo spine index (không CFI) | FR-03        |
+| **T3.6** | ~~Tap center toggle Tools / Settings / More~~ **Đạt** — tap giữa vùng đọc (fake + EPUB iframe 25%–75%) bật/tắt chrome; đóng Settings/More/Comment rồi toggle; sidebar đóng không flip chrome; Escape dismiss chain; giữ `ToolsStrip` + `ChromeRevealButton` | FR-03        |
+| **T3.7** | ~~Sidebar TOC~~ **Đạt** — mục lục từ EPUB `nav.toc` (sidebar Contents)                                                                                                                                                                                                                                                          | FR-03        |
+| **T3.8** | ~~Library từ Reader~~ **Đạt** — Menubar Library → SCR-01; giữ scroll hub                                                                                                                                                                                                                                                        | WF-01        |
+| **T3.9** | ~~Loading / lỗi~~ **Đạt** — IPC + EPUB timeout/message; không kẹt trắng                                                                                                                                                                                                                                                         | —            |
 
 
 ---
@@ -89,10 +89,10 @@ Không chờ engine EPUB mới làm UI. Fake content được phép đến hết
 
 - [x] Mở EPUB đã import → đọc được nội dung thật (thay fake) — T3.3
 - [x] Chrome ẩn mặc định (`ReaderShell` T3.2); tap giữa bật/tắt — **T3.6**
-- [x] **T3.5** Paginated: Arrow / click trái–phải lật trang (gồm spine bìa)
+- [x] **T3.5** Paginated: Arrow / click trái–phải lật trang (gồm spine bìa; phím hoạt động cả khi focus footer hoặc iframe EPUB)
 - [x] **T3.5** Aa → Scroll: EPUB cuộn được; dual vẫn paginated
 - [x] **T3.5** Section next/prev (Ctrl/Cmd+Arrow hoặc `[` / `]`)
-- [x] **T3.5** Footer scrub nhảy vị trí thô theo spine (không chỉ FAKE_CHAPTERS)
+- [x] **T3.5** Footer scrub nhảy vị trí thô theo spine (không chỉ FAKE_CHAPTERS); click số trang → go-to-page
 - [ ] Lật / cuộn không giật nặng trên máy dev trung bình
 - [x] Không sửa file EPUB trên đĩa (đọc qua bytes IPC)
 - [ ] Không có panel AI / linked libraries login trong UI

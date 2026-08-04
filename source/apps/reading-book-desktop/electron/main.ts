@@ -1,4 +1,4 @@
-import { app, BrowserWindow, Menu } from 'electron'
+import { app, BrowserWindow, Menu, ipcMain } from 'electron'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
 import {
@@ -7,6 +7,7 @@ import {
 } from './files/cover-protocol'
 import { ensureBooksSandbox } from './files/sandbox'
 import { registerAllIpcHandlers } from './ipc'
+import { AppChannels } from './ipc/channels'
 import { closeDatabase, openDatabase } from './persistence/db'
 import { backfillLibraryMetadataFromFiles } from './persistence/backfill-library-metadata'
 import {
@@ -17,6 +18,9 @@ import {
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 const DEFAULT_OVERLAY = titleBarOverlayOptions('night')
+
+/** Max wait for renderer session flush before closing the window (T4.2). */
+const FLUSH_BEFORE_CLOSE_TIMEOUT_MS = 2000
 
 // Custom schemes must be registered before app is ready.
 registerCoverSchemePrivileged()
@@ -40,6 +44,50 @@ export const RENDERER_DIST = path.join(process.env.APP_ROOT, 'dist')
 process.env.VITE_PUBLIC = VITE_DEV_SERVER_URL ? path.join(process.env.APP_ROOT, 'public') : RENDERER_DIST
 
 let win: BrowserWindow | null
+
+/** First close intercepted until renderer flush acks (or times out). */
+let sessionFlushDone = false
+let flushingClose = false
+/** Set when app.quit / Cmd+Q started — re-quit after deferred window close. */
+let quitAfterFlush = false
+
+/**
+ * Ask renderer to flush reading session; resolve on ack or timeout.
+ * Keeps SQLite open until the save IPC can finish.
+ */
+function requestSessionFlush(target: BrowserWindow): Promise<void> {
+  return new Promise((resolve) => {
+    let settled = false
+    const finish = () => {
+      if (settled) return
+      settled = true
+      clearTimeout(timer)
+      ipcMain.removeListener(AppChannels.flushSessionDone, onDone)
+      resolve()
+    }
+
+    const onDone = () => {
+      finish()
+    }
+
+    const timer = setTimeout(finish, FLUSH_BEFORE_CLOSE_TIMEOUT_MS)
+    ipcMain.once(AppChannels.flushSessionDone, onDone)
+
+    try {
+      if (
+        target.isDestroyed() ||
+        target.webContents.isDestroyed() ||
+        target.webContents.isLoadingMainFrame()
+      ) {
+        finish()
+        return
+      }
+      target.webContents.send(AppChannels.requestFlushSession)
+    } catch {
+      finish()
+    }
+  })
+}
 
 /** Drop File/Edit/View chrome; keep a minimal macOS menu for Quit / edit shortcuts. */
 function installApplicationMenu(): void {
@@ -72,6 +120,8 @@ function installApplicationMenu(): void {
 
 function createWindow() {
   const isMac = process.platform === 'darwin'
+  sessionFlushDone = false
+  flushingClose = false
 
   win = new BrowserWindow({
     icon: path.join(process.env.VITE_PUBLIC, 'electron-vite.svg'),
@@ -99,6 +149,30 @@ function createWindow() {
       nodeIntegration: false,
       sandbox: true,
     },
+  })
+
+  // T4.2: intercept first close → flush session → close again (safe for Cmd+Q).
+  win.on('close', (event) => {
+    const target = win
+    if (!target || target.isDestroyed()) return
+    if (sessionFlushDone || flushingClose) return
+
+    event.preventDefault()
+    flushingClose = true
+    void requestSessionFlush(target).finally(() => {
+      sessionFlushDone = true
+      flushingClose = false
+      if (!target.isDestroyed()) {
+        target.close()
+      }
+      if (quitAfterFlush) {
+        app.quit()
+      }
+    })
+  })
+
+  win.on('closed', () => {
+    if (win === null || win.isDestroyed()) win = null
   })
 
   win.once('ready-to-show', () => {
@@ -131,7 +205,13 @@ app.on('activate', () => {
   }
 })
 
+// Mark quit intent so deferred window close can re-enter app.quit() (macOS Cmd+Q).
 app.on('before-quit', () => {
+  quitAfterFlush = true
+})
+
+// Close DB after flush handshake / window close (not before — T4.2).
+app.on('will-quit', () => {
   closeDatabase()
 })
 

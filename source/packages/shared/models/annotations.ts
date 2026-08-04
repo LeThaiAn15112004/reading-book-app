@@ -1,10 +1,10 @@
-import type { Bookmark, Highlight, Note } from '@reading-book/domain';
+import type { Bookmark, Highlight } from '@reading-book/domain';
 
 /**
  * Aggregated annotations for a book (SDS class diagram — Annotations).
+ * Inline notes live on each Highlight (`note` column); no separate notes table.
  */
 export interface Annotations {
   highlights: Highlight[];
-  notes: Note[];
   bookmarks: Bookmark[];
 }

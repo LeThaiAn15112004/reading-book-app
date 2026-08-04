@@ -1,14 +1,18 @@
+import type { OverlayStore } from '@reading-book/domain';
 import type { Annotations } from '../models/annotations.js';
 
 /**
- * List highlights, notes, and bookmarks for a book (SDS — AnnotationService.listByBook).
- * Skeleton: OverlayStore has no list APIs yet — returns empty collections.
+ * List highlights and bookmarks for a book (SDS — AnnotationService.listByBook).
  */
 export class ListAnnotationsService {
-  async execute(_bookId: string): Promise<Annotations> {
+  constructor(private readonly overlays: OverlayStore) {}
+
+  async execute(bookId: string): Promise<Annotations> {
+    const id = bookId.trim();
+    if (!id) return { highlights: [], bookmarks: [] };
+    const highlights = await this.overlays.listHighlights(id);
     return {
-      highlights: [],
-      notes: [],
+      highlights,
       bookmarks: [],
     };
   }

@@ -1,8 +1,20 @@
 import ePubImport, { type Book, type Rendition } from 'epubjs'
+import { CfiLocation } from '@reading-book/domain'
 import {
   READER_THEME_COLORS,
+  fontFamilyCss,
+  type FontFamily,
+  type FontWeight,
+  type HighlightHandleRect,
   type ReaderTheme,
+  type TextAlign,
 } from '@reading-book/shared/models'
+import { DomCssOverlay } from '../../overlays/dom-css-overlay'
+import { cfiCodec, tryEncodeCfi, type EpubCfiDecodeResult } from './cfi-codec'
+import {
+  rangeToHighlightHandleRect,
+  splitCfiRange,
+} from './selection-cfi'
 
 /** Vite/CJS interop: default may be the ePub fn or a module namespace. */
 const ePub =
@@ -11,10 +23,13 @@ const ePub =
     : // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (ePubImport as any).default
 
-export type EpubPageLayout = 'single' | 'dual'
+export type EpubPageLayout = 'single' | 'dual' | 'triple'
 export type EpubPageMode = 'scroll' | 'paginated'
 
-/** Coarse location for footer scrub (not persisted — G4 owns CFI). */
+/**
+ * Coarse location for footer scrub / UI label.
+ * Persist uses CFI via getCurrentLocation() (T4.1) — not spine index.
+ */
 export type EpubNavState = {
   spineIndex: number
   spineLength: number
@@ -27,9 +42,21 @@ export type EpubNavState = {
   progress: number
 }
 
+export type EpubTocItem = {
+  id: string
+  label: string
+  href: string
+  level: number
+  children: EpubTocItem[]
+}
+
 export interface EpubjsHandle {
   book: Book
   rendition: Rendition
+  /** DomCssOverlay painter bound to this rendition (T5.3). */
+  overlayPainter: DomCssOverlay
+  /** Whether the EPUB already exposes a cover document in its reading spine. */
+  hasSpineCover: () => boolean
   destroy: () => void
   next: () => Promise<void>
   prev: () => Promise<void>
@@ -37,22 +64,184 @@ export interface EpubjsHandle {
   prevPage: () => Promise<void>
   nextSection: () => Promise<void>
   prevSection: () => Promise<void>
+  goToHref: (href: string) => Promise<void>
   goToSpineIndex: (index: number) => Promise<void>
   getSpineLength: () => number
   getNavState: () => EpubNavState
+  getToc: () => EpubTocItem[]
+  /** Stable CFI location for persist/resume (T4.1). Undefined until relocated. */
+  getCurrentLocation: () => CfiLocation | undefined
+  /** Jump to a stored CFI location (T4.1 / FR-05 resume). */
+  goToLocation: (location: CfiLocation) => Promise<void>
+  /** Clear text selection in the last EPUB iframe that reported a selection (T5.1). */
+  clearSelection: () => void
   setTheme: (theme: ReaderTheme) => void
   setLayout: (layout: EpubPageLayout) => void
   /** Reflow text size (EPUB zoom) — px base; epubjs applies as %. */
   setFontSize: (px: number) => void
+  setFontFamily: (family: FontFamily) => void
+  setFontWeight: (weight: FontWeight) => void
+  setLineHeight: (lineHeight: number) => void
+  setTextAlign: (textAlign: TextAlign) => void
+  setMargins: (enabled: boolean, preset: string) => void
+  setChromeHidden: (hidden: boolean) => void
   resize: () => void
+}
+
+/** Payload from epubjs `rendition.on('selected')` mapped to viewport coords (T5.1). */
+export type EpubSelectionPayload = {
+  cfiRange: string
+  locationStart: string
+  locationEnd: string
+  selectedText: string
+  rect: HighlightHandleRect
+  /** Spine section index from epubjs Contents (sidebar stub until T5.8). */
+  sectionIndex: number
+}
+
+/** Per-iframe helpers for building selection payloads on pointer release. */
+export type EpubFrameSelectionContext = {
+  sectionIndex: number
+  cfiFromRange: (range: Range) => string | null
+}
+
+function getEpubCFIClass():
+  | (new (range: Range, cfiBase: string) => { toString(): string })
+  | null {
+  const mod = ePubImport as {
+    EpubCFI?: unknown
+    default?: { EpubCFI?: unknown }
+  }
+  const C = mod.EpubCFI ?? mod.default?.EpubCFI
+  return typeof C === 'function'
+    ? (C as new (range: Range, cfiBase: string) => { toString(): string })
+    : null
+}
+
+/** Build highlight/select payload from the iframe's live selection (mouseup path). */
+export function buildEpubSelectionPayloadFromDocument(
+  doc: Document,
+  frameEl: HTMLElement | null,
+  ctx: EpubFrameSelectionContext,
+): EpubSelectionPayload | null {
+  const win = doc.defaultView
+  if (!win) return null
+
+  const sel = win.getSelection()
+  if (!sel || sel.isCollapsed || sel.rangeCount === 0) return null
+
+  let selectedText = ''
+  try {
+    selectedText = sel.toString()?.trim() ?? ''
+  } catch {
+    return null
+  }
+  if (!selectedText) return null
+
+  let range: Range
+  try {
+    range = sel.getRangeAt(0)
+  } catch {
+    return null
+  }
+
+  const cfiRange = ctx.cfiFromRange(range)?.trim() ?? ''
+  if (!cfiRange) return null
+
+  const { locationStart, locationEnd } = splitCfiRange(cfiRange)
+  if (!locationStart) return null
+
+  return {
+    cfiRange,
+    locationStart,
+    locationEnd: locationEnd || locationStart,
+    selectedText,
+    rect: rangeToHighlightHandleRect(range, frameEl),
+    sectionIndex: ctx.sectionIndex,
+  }
+}
+
+/** Capture CFI helpers from an epubjs rendered view for mouseup selection. */
+export function epubFrameContextFromView(view: unknown): {
+  doc: Document
+  ctx: EpubFrameSelectionContext
+} | null {
+  const v = view as {
+    document?: Document
+    index?: number
+    contents?: {
+      sectionIndex?: number
+      cfiFromRange?: (range: Range) => string
+      cfiBase?: string
+    }
+  }
+  const doc = v.document
+  if (!doc) return null
+
+  const contents = v.contents
+  const sectionIndex = contents?.sectionIndex ?? v.index ?? 0
+  const EpubCFI = getEpubCFIClass()
+
+  return {
+    doc,
+    ctx: {
+      sectionIndex,
+      cfiFromRange: (range) => {
+        try {
+          if (contents?.cfiFromRange) {
+            return contents.cfiFromRange(range)
+          }
+          if (EpubCFI && contents?.cfiBase) {
+            return new EpubCFI(range, contents.cfiBase).toString()
+          }
+        } catch {
+          /* invalid range / CFI */
+        }
+        return null
+      },
+    },
+  }
 }
 
 /** Default Aa panel size — zoom % is relative to this. */
 export const EPUB_BASE_FONT_PX = 18
 
+// #region agent log
+function agentEpubDebugLog(
+  location: string,
+  message: string,
+  hypothesisId: string,
+  data: Record<string, unknown>,
+) {
+  fetch('http://127.0.0.1:7770/ingest/06bdb65b-2ef4-48e0-b72a-ef894477e9f4', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Debug-Session-Id': 'e7d9d7',
+    },
+    body: JSON.stringify({
+      sessionId: 'e7d9d7',
+      runId: 'pre-fix',
+      hypothesisId,
+      location,
+      message,
+      data,
+      timestamp: Date.now(),
+    }),
+  }).catch(() => {})
+}
+// #endregion
+
 function spineLengthOf(book: Book): number {
   const spine = book.spine as { length?: number }
   return typeof spine.length === 'number' ? spine.length : 0
+}
+
+type SpineSectionLike = {
+  href?: string
+  idref?: string
+  properties?: string | string[]
+  linear?: string | boolean
 }
 
 function basenameLabel(href: string): string {
@@ -67,9 +256,175 @@ function basenameLabel(href: string): string {
   }
 }
 
+function propertyTokens(value: unknown): string[] {
+  if (!value) return []
+  if (Array.isArray(value)) return value.map(String).filter(Boolean)
+  if (typeof value === 'string') return value.split(/\s+/).filter(Boolean)
+  return String(value).split(/\s+/).filter(Boolean)
+}
+
+function spinePropertyTokens(section: SpineSectionLike | null | undefined): string[] {
+  return propertyTokens(section?.properties)
+}
+
+function manifestPropertyTokens(book: Book, idref: string | undefined): string[] {
+  if (!idref) return []
+  const manifest = (
+    book as unknown as {
+      packaging?: { manifest?: Record<string, { properties?: unknown }> }
+    }
+  ).packaging?.manifest
+  return propertyTokens(manifest?.[idref]?.properties)
+}
+
+function sectionPath(section: SpineSectionLike | null | undefined): string {
+  return `${section?.href ?? ''} ${section?.idref ?? ''}`.toLowerCase()
+}
+
+function isCoverSection(
+  section: SpineSectionLike | null | undefined,
+  book?: Book,
+): boolean {
+  const tokens = [
+    ...spinePropertyTokens(section),
+    ...(book ? manifestPropertyTokens(book, section?.idref) : []),
+  ]
+  if (
+    tokens.some(
+      (t) => t === 'cover-image' || t === 'cover' || t.startsWith('cover'),
+    )
+  ) {
+    return true
+  }
+  return /\bcover\b/.test(sectionPath(section))
+}
+
+/** Nav / TOC spine items — sidebar only; never rendered in the reading viewport. */
+function isTocSection(
+  section: SpineSectionLike | null | undefined,
+  book?: Book,
+): boolean {
+  if (!section || isCoverSection(section, book)) return false
+
+  const tokens = [
+    ...spinePropertyTokens(section),
+    ...(book ? manifestPropertyTokens(book, section.idref) : []),
+  ]
+  if (tokens.some((t) => t === 'nav' || t.startsWith('nav'))) return true
+
+  const linear = section.linear
+  if (linear === 'no' || linear === false) return true
+
+  const path = sectionPath(section)
+  return (
+    /(?:^|[/\\])(?:toc|nav|contents?)(?:\.(?:xhtml|html|htm|xml))?$/i.test(
+      path,
+    ) ||
+    /table[-_ ]?of[-_ ]?contents/i.test(path) ||
+    /(?:^|[/\\])nav(?:\.(?:xhtml|html|htm|xml))?$/i.test(path)
+  )
+}
+
+function visibleSpineIndicesOf(book: Book): number[] {
+  const length = spineLengthOf(book)
+  const indices: number[] = []
+
+  for (let i = 0; i < length; i += 1) {
+    const section = book.spine.get(i) as SpineSectionLike | undefined
+    // Cover belongs to the reading surface; TOC/nav/contents belongs only to sidebar.
+    if (!isCoverSection(section, book) && isTocSection(section, book)) continue
+    indices.push(i)
+  }
+
+  if (indices.length > 0) return indices
+  return Array.from({ length }, (_, index) => index)
+}
+
+function nearestVisiblePosition(
+  visibleIndices: number[],
+  rawIndex: number,
+): number {
+  if (visibleIndices.length === 0) return 0
+  const exact = visibleIndices.indexOf(rawIndex)
+  if (exact >= 0) return exact
+
+  let nearest = 0
+  let distance = Number.POSITIVE_INFINITY
+  visibleIndices.forEach((index, position) => {
+    const d = Math.abs(index - rawIndex)
+    if (d < distance) {
+      nearest = position
+      distance = d
+    }
+  })
+  return nearest
+}
+
+function normalizeTocItems(items: unknown, level = 0): EpubTocItem[] {
+  if (!Array.isArray(items)) return []
+
+  return items
+    .map((item, index) => {
+      const raw = item as {
+        id?: unknown
+        label?: unknown
+        href?: unknown
+        subitems?: unknown
+        children?: unknown
+      }
+      const href = typeof raw.href === 'string' ? raw.href : ''
+      const label =
+        typeof raw.label === 'string' && raw.label.trim()
+          ? raw.label.trim()
+          : href
+            ? basenameLabel(href)
+            : `Section ${index + 1}`
+      const id =
+        typeof raw.id === 'string' && raw.id.trim()
+          ? raw.id
+          : `${level}-${index}-${href || label}`
+      const children = normalizeTocItems(raw.subitems ?? raw.children, level + 1)
+      return {
+        id,
+        label,
+        href,
+        level,
+        children,
+      }
+    })
+    .filter((item) => item.href || item.children.length > 0)
+}
+
+function normalizeHrefForLocation(href: string): string {
+  return href
+    .split('#')[0]
+    .split('?')[0]
+    .replace(/^\.\//, '')
+    .replace(/\\/g, '/')
+}
+
+/** Human-readable TOC title for a spine href, including nested TOC entries. */
+export function resolveTocLocationLabel(
+  href: string,
+  items: EpubTocItem[],
+): string | undefined {
+  const target = normalizeHrefForLocation(href)
+  if (!target) return undefined
+  let match: EpubTocItem | undefined
+  const visit = (entries: EpubTocItem[]) => {
+    entries.forEach((entry) => {
+      if (normalizeHrefForLocation(entry.href) === target) match = entry
+      visit(entry.children)
+    })
+  }
+  visit(items)
+  return match?.label
+}
+
 export function buildEpubNavState(
   book: Book,
   spineIndex: number,
+  toc: EpubTocItem[] = [],
 ): EpubNavState {
   const spineLength = spineLengthOf(book)
   const pageTotal = Math.max(spineLength, 1)
@@ -80,8 +435,7 @@ export function buildEpubNavState(
   const pageCurrent = spineLength <= 0 ? 0 : clamped + 1
   const section = book.spine.get(clamped)
   const href = section?.href ?? ''
-  const base = href ? basenameLabel(href) : ''
-  const label = base || 'Page'
+  const label = resolveTocLocationLabel(href, toc) || (href ? basenameLabel(href) : '') || 'Page'
   const progress =
     spineLength <= 1 ? 0 : clamped / (spineLength - 1)
   return {
@@ -101,14 +455,145 @@ export function applyEpubFontSize(rendition: Rendition, px: number): void {
   rendition.themes.fontSize(`${pct}%`)
 }
 
-export function applyEpubTheme(rendition: Rendition, theme: ReaderTheme): void {
+type EpubContent = {
+  document?: Document
+}
+
+type ThemeableRendition = Rendition & {
+  getContents?: () => EpubContent[]
+  hooks?: {
+    content?: {
+      register?: (hook: (content: EpubContent) => void) => void
+    }
+  }
+}
+
+const epubThemeByRendition = new WeakMap<Rendition, ReaderTheme>()
+type EpubReadingStyle = {
+  fontFamily: FontFamily
+  fontWeight: FontWeight
+  lineHeight: number
+  textAlign: TextAlign
+  marginsEnabled: boolean
+  marginPreset: string
+  /** When true (chrome hidden), expand the text column to use more horizontal space. */
+  chromeHidden: boolean
+}
+
+const DEFAULT_EPUB_READING_STYLE: EpubReadingStyle = {
+  fontFamily: 'serif',
+  fontWeight: 400,
+  lineHeight: 1.65,
+  textAlign: 'justify',
+  marginsEnabled: true,
+  marginPreset: 'normal',
+  chromeHidden: true,
+}
+
+const epubReadingStyleByRendition = new WeakMap<Rendition, EpubReadingStyle>()
+
+function marginPadding(
+  enabled: boolean,
+  preset: string,
+  chromeHidden: boolean,
+): string {
+  if (!enabled) return chromeHidden ? '12px 16px' : '12px'
+  if (chromeHidden) {
+    if (preset === 'narrow') return '32px 32px'
+    if (preset === 'wide') return '32px 4vw'
+    return '32px 24px'
+  }
+  if (preset === 'narrow') return '32px 48px'
+  if (preset === 'wide') return '32px 12vw'
+  return '32px 8vw'
+}
+
+function contentMaxWidth(
+  enabled: boolean,
+  preset: string,
+  chromeHidden: boolean,
+): string {
+  if (!enabled || preset === 'off') return 'none'
+  if (chromeHidden) {
+    if (preset === 'narrow') return '720px'
+    if (preset === 'wide') return 'min(1100px, 95vw)'
+    return 'min(920px, 90vw)'
+  }
+  if (preset === 'narrow') return '580px'
+  if (preset === 'wide') return '780px'
+  return '680px'
+}
+
+function applyThemeVariables(doc: Document, theme: ReaderTheme): void {
   const { color, background, link, linkVisited, linkHover } =
     READER_THEME_COLORS[theme]
-  // !important so author EPUB CSS (often dark link on dark page) cannot hide TOC/links.
+  const root = doc.documentElement
+  root.style.setProperty('--epub-color', color)
+  root.style.setProperty('--epub-background', background)
+  root.style.setProperty('--epub-link', link)
+  root.style.setProperty('--epub-link-visited', linkVisited)
+  root.style.setProperty('--epub-link-hover', linkHover)
+}
+
+function applyReadingStyleVariables(
+  doc: Document,
+  style: EpubReadingStyle,
+): void {
+  const root = doc.documentElement
+  root.style.setProperty('--epub-font-family', fontFamilyCss(style.fontFamily))
+  root.style.setProperty('--epub-font-weight', String(style.fontWeight))
+  root.style.setProperty('--epub-line-height', String(style.lineHeight))
+  root.style.setProperty('--epub-text-align', style.textAlign)
+  root.style.setProperty(
+    '--epub-page-padding',
+    marginPadding(style.marginsEnabled, style.marginPreset, style.chromeHidden),
+  )
+  const maxWidth = contentMaxWidth(
+    style.marginsEnabled,
+    style.marginPreset,
+    style.chromeHidden,
+  )
+  root.style.setProperty('--epub-content-max-width', maxWidth)
+  root.style.setProperty(
+    '--epub-content-margin-x',
+    maxWidth === 'none' ? '0' : 'auto',
+  )
+}
+
+/**
+ * Register the EPUB overlay rules once per rendition. Values are assigned
+ * separately so a theme switch never replaces the EPUB stylesheet.
+ */
+export function injectEpubThemeStyles(rendition: Rendition): void {
+  const themeableRendition = rendition as unknown as ThemeableRendition
+  // !important so author EPUB CSS (often dark link on dark page) cannot hide links.
   rendition.themes.default({
     body: {
-      color,
-      background,
+      color: 'var(--epub-color)',
+      background: 'var(--epub-background)',
+      'font-family': 'var(--epub-font-family) !important',
+      'font-weight': 'var(--epub-font-weight) !important',
+      'line-height': 'var(--epub-line-height) !important',
+      'text-align': 'var(--epub-text-align) !important',
+      padding: 'var(--epub-page-padding) !important',
+      margin: '0 !important',
+      'box-sizing': 'border-box',
+    },
+    'p, li, blockquote, dd, dt': {
+      'font-family': 'var(--epub-font-family) !important',
+      'font-weight': 'var(--epub-font-weight) !important',
+      'line-height': 'var(--epub-line-height) !important',
+      'text-align': 'var(--epub-text-align) !important',
+    },
+    /* Center reflow column; width follows chrome visibility via CSS variables. */
+    '.calibre, [class*="calibre"], body > div:first-of-type': {
+      'max-width': 'var(--epub-content-max-width) !important',
+      'margin-left': 'var(--epub-content-margin-x) !important',
+      'margin-right': 'var(--epub-content-margin-x) !important',
+    },
+    /* In-document nav TOC belongs in Reader sidebar, not the page canvas. */
+    'nav[epub\\:type="toc"], nav[epub\\:type~="toc"], [role="doc-toc"]': {
+      display: 'none !important',
     },
     /* Cover / full-bleed images still participate as normal spine pages. */
     img: {
@@ -122,14 +607,58 @@ export function applyEpubTheme(rendition: Rendition, theme: ReaderTheme): void {
       'max-height': '100%',
     },
     a: {
-      color: `${link} !important`,
+      color: 'var(--epub-link) !important',
       'text-decoration': 'underline !important',
       'text-underline-offset': '2px',
     },
-    'a:link': { color: `${link} !important` },
-    'a:visited': { color: `${linkVisited} !important` },
-    'a:hover': { color: `${linkHover} !important` },
-    'a:focus': { color: `${linkHover} !important` },
+    'a:link': { color: 'var(--epub-link) !important' },
+    'a:visited': { color: 'var(--epub-link-visited) !important' },
+    'a:hover': { color: 'var(--epub-link-hover) !important' },
+    'a:focus': { color: 'var(--epub-link-hover) !important' },
+    /* Hide native scrollbar inside iframe — host supplies a custom overlay. */
+    '::-webkit-scrollbar': { display: 'none', width: '0', height: '0' },
+    'html, body': {
+      '-ms-overflow-style': 'none' as string,
+      'scrollbar-width': 'none',
+    },
+  })
+  themeableRendition.hooks?.content?.register((content: EpubContent) => {
+    const theme = epubThemeByRendition.get(rendition)
+    if (content.document && theme) applyThemeVariables(content.document, theme)
+    const readingStyle = epubReadingStyleByRendition.get(rendition)
+    if (content.document && readingStyle) {
+      applyReadingStyleVariables(content.document, readingStyle)
+    }
+  })
+}
+
+/**
+ * Updates the active iframe(s) in place. Future EPUB documents receive the
+ * same values from the content hook installed by injectEpubThemeStyles().
+ */
+export function applyEpubThemeVars(rendition: Rendition, theme: ReaderTheme): void {
+  epubThemeByRendition.set(rendition, theme)
+  const contents =
+    (rendition as unknown as ThemeableRendition).getContents?.() ?? []
+  const activeContents = Array.isArray(contents) ? contents : [contents]
+  activeContents.forEach((content: EpubContent) => {
+    if (content.document) applyThemeVariables(content.document, theme)
+  })
+}
+
+export function applyEpubReadingStyle(
+  rendition: Rendition,
+  patch: Partial<EpubReadingStyle>,
+): void {
+  const current = epubReadingStyleByRendition.get(rendition) ??
+    DEFAULT_EPUB_READING_STYLE
+  const next = { ...current, ...patch }
+  epubReadingStyleByRendition.set(rendition, next)
+  const contents =
+    (rendition as unknown as ThemeableRendition).getContents?.() ?? []
+  const activeContents = Array.isArray(contents) ? contents : [contents]
+  activeContents.forEach((content: EpubContent) => {
+    if (content.document) applyReadingStyleVariables(content.document, next)
   })
 }
 
@@ -203,9 +732,7 @@ function waitForHostSize(
   })
 }
 
-function flowForMode(pageMode: EpubPageMode, layout: EpubPageLayout): string {
-  // Dual spread requires paginated columns.
-  if (layout === 'dual') return 'paginated'
+function flowForMode(pageMode: EpubPageMode, _layout: EpubPageLayout): string {
   return pageMode === 'scroll' ? 'scrolled-doc' : 'paginated'
 }
 
@@ -213,14 +740,38 @@ function spreadForLayout(layout: EpubPageLayout): 'always' | 'none' {
   return layout === 'dual' ? 'always' : 'none'
 }
 
+/** Host + iframe chrome for page spread gutters drawn in React overlay. */
+function applyDualSpreadHost(host: HTMLElement, layout: EpubPageLayout): void {
+  host.dataset.epubSpread = layout
+}
+
 export type OpenEpubjsOptions = {
   theme?: ReaderTheme
   signal?: AbortSignal
-  /** 1 page vs 2-page spread (center gutter drawn in React). */
+  /** 1, 2, or 3 page spread (gutters drawn in React). */
   layout?: EpubPageLayout
   pageMode?: EpubPageMode
   /** Initial reflow size in px (default 18). */
   fontSize?: number
+  fontFamily?: FontFamily
+  fontWeight?: FontWeight
+  lineHeight?: number
+  textAlign?: TextAlign
+  marginsEnabled?: boolean
+  marginPreset?: string
+  /** Reader chrome hidden → wider text column (default true). */
+  chromeHidden?: boolean
+  /** Resume at CFI after theme/font apply (T4.1). Falls back to first spine. */
+  initialLocation?: CfiLocation
+  /** Text selection in iframe → FR-06 highlight tooltip (T5.1). */
+  onSelected?: (payload: EpubSelectionPayload) => void
+}
+
+type EpubjsContentsLike = {
+  document?: Document
+  window?: Window
+  sectionIndex?: number
+  range?: (cfi: string) => Range | null
 }
 
 /**
@@ -241,6 +792,18 @@ export async function openEpubjs(
   let layout: EpubPageLayout = options.layout ?? 'single'
   const pageMode: EpubPageMode = options.pageMode ?? 'paginated'
   const initialFontSize = options.fontSize ?? EPUB_BASE_FONT_PX
+  const initialReadingStyle: EpubReadingStyle = {
+    fontFamily: options.fontFamily ?? DEFAULT_EPUB_READING_STYLE.fontFamily,
+    fontWeight: options.fontWeight ?? DEFAULT_EPUB_READING_STYLE.fontWeight,
+    lineHeight: options.lineHeight ?? DEFAULT_EPUB_READING_STYLE.lineHeight,
+    textAlign: options.textAlign ?? DEFAULT_EPUB_READING_STYLE.textAlign,
+    marginsEnabled:
+      options.marginsEnabled ?? DEFAULT_EPUB_READING_STYLE.marginsEnabled,
+    marginPreset: options.marginPreset ?? DEFAULT_EPUB_READING_STYLE.marginPreset,
+    chromeHidden: options.chromeHidden ?? DEFAULT_EPUB_READING_STYLE.chromeHidden,
+  }
+  const initialLocation = options.initialLocation
+  const onSelected = options.onSelected
 
   if (typeof ePub !== 'function') {
     throw new Error('epubjs failed to load (default export is not a function)')
@@ -296,11 +859,28 @@ export async function openEpubjs(
       // Show every spine item in order (cover included when publishers put it in spine).
       allowScriptedContent: false,
     })
-    // Start at first spine item — cover or chapter, whatever the book defines.
-    await rendition.display()
-    throwIfAborted(signal)
-    applyEpubTheme(rendition, theme)
+    const visibleSpineIndices = visibleSpineIndicesOf(book)
+    // Apply reading styles before first display so resume CFI paginates with final typography.
+    injectEpubThemeStyles(rendition)
+    applyEpubThemeVars(rendition, theme)
+    applyEpubReadingStyle(rendition, initialReadingStyle)
     applyEpubFontSize(rendition, initialFontSize)
+    applyDualSpreadHost(host, layout)
+    throwIfAborted(signal)
+
+    // Resume at CFI when provided (T4.1); otherwise first readable spine item.
+    if (initialLocation) {
+      try {
+        const decoded = cfiCodec.decode(initialLocation) as EpubCfiDecodeResult
+        await rendition.display(decoded.cfi)
+      } catch {
+        await rendition.display(visibleSpineIndices[0] ?? 0)
+      }
+    } else {
+      // Cover is preserved; TOC/nav pages are sidebar-only.
+      await rendition.display(visibleSpineIndices[0] ?? 0)
+    }
+    throwIfAborted(signal)
   } catch (err) {
     destroyBook()
     throw err
@@ -315,6 +895,75 @@ export async function openEpubjs(
     throw new Error('EPUB rendition failed to start')
   }
 
+  let lastSelectionWindow: Window | null = null
+  const overlayPainter = new DomCssOverlay(activeRendition, host)
+
+  const handleSelected = (cfiRange: string, contents: EpubjsContentsLike) => {
+    if (!onSelected) return
+    const rangeCfi = typeof cfiRange === 'string' ? cfiRange.trim() : ''
+    if (!rangeCfi) return
+
+    const doc = contents.document
+    const win = contents.window ?? doc?.defaultView ?? null
+    if (win) lastSelectionWindow = win
+
+    let selectedText = ''
+    try {
+      selectedText = win?.getSelection()?.toString()?.trim() ?? ''
+    } catch {
+      selectedText = ''
+    }
+
+    let range: Range | null = null
+    try {
+      range = contents.range?.(rangeCfi) ?? null
+    } catch {
+      range = null
+    }
+    if (!range && win?.getSelection()?.rangeCount) {
+      try {
+        range = win.getSelection()!.getRangeAt(0)
+      } catch {
+        range = null
+      }
+    }
+    if (!selectedText && range) {
+      selectedText = range.toString().trim()
+    }
+    if (!selectedText) return
+
+    const { locationStart, locationEnd } = splitCfiRange(rangeCfi)
+    if (!locationStart) return
+
+    const frameEl =
+      (doc?.defaultView?.frameElement as HTMLElement | null) ??
+      (host.querySelector('iframe') as HTMLElement | null)
+    const rect = range
+      ? rangeToHighlightHandleRect(range, frameEl)
+      : {
+          top: 0,
+          left: 0,
+          width: 0,
+          height: 0,
+          start: { top: 0, left: 0, lineHeight: 0 },
+          end: { top: 0, left: 0, lineHeight: 0 },
+        }
+
+    onSelected({
+      cfiRange: rangeCfi,
+      locationStart,
+      locationEnd: locationEnd || locationStart,
+      selectedText,
+      rect,
+      sectionIndex:
+        typeof contents.sectionIndex === 'number' ? contents.sectionIndex : 0,
+    })
+  }
+
+  if (onSelected) {
+    activeRendition.on('selected', handleSelected)
+  }
+
   const resizeToHost = () => {
     const r = host.getBoundingClientRect()
     const w = Math.floor(r.width)
@@ -324,7 +973,20 @@ export async function openEpubjs(
     }
   }
 
-  const getSpineLength = () => spineLengthOf(book)
+  const getVisibleSpineIndices = () => visibleSpineIndicesOf(book)
+  const getSpineLength = () => getVisibleSpineIndices().length
+  const hasSpineCover = () => {
+    const length = spineLengthOf(book)
+    for (let index = 0; index < length; index += 1) {
+      const section = book.spine.get(index) as SpineSectionLike | undefined
+      if (isCoverSection(section, book)) return true
+    }
+    return false
+  }
+  const getToc = () =>
+    normalizeTocItems(
+      (book as unknown as { navigation?: { toc?: unknown } }).navigation?.toc,
+    )
 
   const currentSpineIndex = (): number => {
     const start = activeRendition.location?.start
@@ -332,24 +994,205 @@ export async function openEpubjs(
     return 0
   }
 
+  const currentVisiblePosition = (): number =>
+    nearestVisiblePosition(getVisibleSpineIndices(), currentSpineIndex())
+
   const goToSpineIndex = async (index: number) => {
-    const n = getSpineLength()
+    const visibleSpineIndices = getVisibleSpineIndices()
+    const n = visibleSpineIndices.length
     if (n <= 0) return
     const clamped = Math.min(Math.max(Math.round(index), 0), n - 1)
-    await activeRendition.display(clamped)
+    await activeRendition.display(visibleSpineIndices[clamped] ?? clamped)
+  }
+  const redirectIfExcludedSpine = async (direction: 'next' | 'prev' = 'next') => {
+    const visibleSpineIndices = getVisibleSpineIndices()
+    const rawIndex = currentSpineIndex()
+    const currentSection = book.spine.get(rawIndex) as
+      | SpineSectionLike
+      | undefined
+    if (!isTocSection(currentSection, book)) return
+
+    const candidates =
+      direction === 'next'
+        ? visibleSpineIndices.filter((index) => index > rawIndex)
+        : visibleSpineIndices.filter((index) => index < rawIndex).reverse()
+    const target =
+      candidates[0] ??
+      visibleSpineIndices[0] ??
+      visibleSpineIndices[visibleSpineIndices.length - 1]
+    if (typeof target === 'number' && target !== rawIndex) {
+      await activeRendition.display(target)
+    }
+  }
+
+  const goToHref = async (href: string) => {
+    if (!href) return
+    await activeRendition.display(href)
+    await redirectIfExcludedSpine('next')
+  }
+
+  const skipExcludedSection = async (direction: 'next' | 'prev') => {
+    await redirectIfExcludedSpine(direction)
+  }
+
+  const readRenditionLocation = (): unknown => {
+    const prop = activeRendition.location
+    if (prop?.start) return prop
+    const method = (
+      activeRendition as unknown as {
+        currentLocation?: () => unknown
+      }
+    ).currentLocation
+    if (typeof method === 'function') {
+      try {
+        return method.call(activeRendition)
+      } catch {
+        return undefined
+      }
+    }
+    return prop
+  }
+
+  const getCurrentLocation = (): CfiLocation | undefined =>
+    tryEncodeCfi(readRenditionLocation())
+
+  const goToLocation = async (location: CfiLocation): Promise<void> => {
+    const decoded = cfiCodec.decode(location) as EpubCfiDecodeResult
+    await activeRendition.display(decoded.cfi)
+    await redirectIfExcludedSpine('next')
+  }
+
+  const currentLocationSignature = (): string => {
+    const start = (
+      readRenditionLocation() as
+        | {
+            start?: {
+              index?: number
+              cfi?: string
+              displayed?: { page?: number; total?: number }
+            }
+          }
+        | undefined
+    )?.start
+    return JSON.stringify({
+      index: start?.index,
+      cfi: start?.cfi,
+      page: start?.displayed?.page,
+      total: start?.displayed?.total,
+    })
   }
 
   const nextPage = async () => {
-    await activeRendition.next()
+    const beforeIndex = currentSpineIndex()
+    const beforeLocation = currentLocationSignature()
+    // #region agent log
+    agentEpubDebugLog(
+      'source/apps/reading-book-desktop/src/reader/renderers/epub/openEpubjs.ts:nextPage',
+      'EPUB nextPage started',
+      'H4',
+      { beforeIndex, spineLength: getSpineLength() },
+    )
+    // #endregion
+    try {
+      await activeRendition.next()
+      const afterNextLocation = currentLocationSignature()
+      let usedFirstPageFallback = false
+      if (
+        afterNextLocation === beforeLocation &&
+        currentVisiblePosition() === 0 &&
+        getSpineLength() > 1
+      ) {
+        await goToSpineIndex(1)
+        usedFirstPageFallback = true
+      }
+      await skipExcludedSection('next')
+      // #region agent log
+      agentEpubDebugLog(
+        'source/apps/reading-book-desktop/src/reader/renderers/epub/openEpubjs.ts:nextPage',
+        'EPUB nextPage finished',
+        'H4',
+        {
+          beforeIndex,
+          afterIndex: currentSpineIndex(),
+          spineLength: getSpineLength(),
+          beforeLocation,
+          afterNextLocation,
+          finalLocation: currentLocationSignature(),
+          usedFirstPageFallback,
+        },
+      )
+      // #endregion
+    } catch (err) {
+      // #region agent log
+      agentEpubDebugLog(
+        'source/apps/reading-book-desktop/src/reader/renderers/epub/openEpubjs.ts:nextPage',
+        'EPUB nextPage failed',
+        'H4',
+        {
+          beforeIndex,
+          error: err instanceof Error ? err.message : String(err),
+        },
+      )
+      // #endregion
+      throw err
+    }
   }
   const prevPage = async () => {
-    await activeRendition.prev()
+    const beforeIndex = currentSpineIndex()
+    // #region agent log
+    agentEpubDebugLog(
+      'source/apps/reading-book-desktop/src/reader/renderers/epub/openEpubjs.ts:prevPage',
+      'EPUB prevPage started',
+      'H4',
+      { beforeIndex, spineLength: getSpineLength() },
+    )
+    // #endregion
+    try {
+      await activeRendition.prev()
+      await skipExcludedSection('prev')
+      // #region agent log
+      agentEpubDebugLog(
+        'source/apps/reading-book-desktop/src/reader/renderers/epub/openEpubjs.ts:prevPage',
+        'EPUB prevPage finished',
+        'H4',
+        {
+          beforeIndex,
+          afterIndex: currentSpineIndex(),
+          spineLength: getSpineLength(),
+        },
+      )
+      // #endregion
+    } catch (err) {
+      // #region agent log
+      agentEpubDebugLog(
+        'source/apps/reading-book-desktop/src/reader/renderers/epub/openEpubjs.ts:prevPage',
+        'EPUB prevPage failed',
+        'H4',
+        {
+          beforeIndex,
+          error: err instanceof Error ? err.message : String(err),
+        },
+      )
+      // #endregion
+      throw err
+    }
   }
 
   return {
     book,
     rendition: activeRendition,
+    overlayPainter,
+    hasSpineCover,
     destroy: () => {
+      void overlayPainter.clear()
+      if (onSelected) {
+        try {
+          activeRendition.off('selected', handleSelected)
+        } catch {
+          /* ignore */
+        }
+      }
+      lastSelectionWindow = null
       destroyBook()
     },
     next: nextPage,
@@ -357,24 +1200,86 @@ export async function openEpubjs(
     nextPage,
     prevPage,
     nextSection: async () => {
-      await goToSpineIndex(currentSpineIndex() + 1)
+      await goToSpineIndex(currentVisiblePosition() + 1)
     },
     prevSection: async () => {
-      await goToSpineIndex(currentSpineIndex() - 1)
+      await goToSpineIndex(currentVisiblePosition() - 1)
     },
+    goToHref,
     goToSpineIndex,
     getSpineLength,
-    getNavState: () => buildEpubNavState(book, currentSpineIndex()),
+    getCurrentLocation,
+    goToLocation,
+    clearSelection: () => {
+      try {
+        lastSelectionWindow?.getSelection()?.removeAllRanges()
+      } catch {
+        /* ignore */
+      }
+      host.querySelectorAll('iframe').forEach((frame) => {
+        try {
+          frame.contentWindow?.getSelection()?.removeAllRanges()
+        } catch {
+          /* ignore */
+        }
+      })
+    },
+    getNavState: () => {
+      const visibleSpineIndices = getVisibleSpineIndices()
+      const visiblePosition = nearestVisiblePosition(
+        visibleSpineIndices,
+        currentSpineIndex(),
+      )
+      const rawIndex = visibleSpineIndices[visiblePosition] ?? currentSpineIndex()
+      const state = buildEpubNavState(book, rawIndex, getToc())
+      return {
+        ...state,
+        spineIndex: visiblePosition,
+        spineLength: visibleSpineIndices.length,
+        pageCurrent: visibleSpineIndices.length <= 0 ? 0 : visiblePosition + 1,
+        pageTotal: Math.max(visibleSpineIndices.length, 1),
+        progress:
+          visibleSpineIndices.length <= 1
+            ? 0
+            : visiblePosition / (visibleSpineIndices.length - 1),
+      }
+    },
+    getToc,
     setTheme: (next) => {
-      applyEpubTheme(activeRendition, next)
+      applyEpubThemeVars(activeRendition, next)
     },
     setLayout: (next) => {
       layout = next
       activeRendition.spread(spreadForLayout(next))
+      applyDualSpreadHost(host, next)
       resizeToHost()
     },
     setFontSize: (px) => {
       applyEpubFontSize(activeRendition, px)
+      resizeToHost()
+    },
+    setFontFamily: (fontFamily) => {
+      applyEpubReadingStyle(activeRendition, { fontFamily })
+      resizeToHost()
+    },
+    setFontWeight: (fontWeight) => {
+      applyEpubReadingStyle(activeRendition, { fontWeight })
+      resizeToHost()
+    },
+    setLineHeight: (lineHeight) => {
+      applyEpubReadingStyle(activeRendition, { lineHeight })
+      resizeToHost()
+    },
+    setTextAlign: (textAlign) => {
+      applyEpubReadingStyle(activeRendition, { textAlign })
+      resizeToHost()
+    },
+    setMargins: (marginsEnabled, marginPreset) => {
+      applyEpubReadingStyle(activeRendition, { marginsEnabled, marginPreset })
+      resizeToHost()
+    },
+    setChromeHidden: (chromeHidden) => {
+      applyEpubReadingStyle(activeRendition, { chromeHidden })
       resizeToHost()
     },
     resize: resizeToHost,

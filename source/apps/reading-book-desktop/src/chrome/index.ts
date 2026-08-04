@@ -20,10 +20,15 @@ export {
 } from './OpenReadingContext'
 export type { OpenReadingTab } from './OpenReadingContext'
 export {
+  ReaderChromeMenuProvider,
+  useReaderChromeMenu,
+} from './ReaderChromeMenuContext'
+export {
   GlobalReadingPrefsProvider,
   useGlobalReadingPrefs,
   fontFamilyCss,
   DEFAULT_GLOBAL_READING_PREFS,
+  READER_THEME_COLORS,
 } from './GlobalReadingPrefsContext'
 export type {
   GlobalReadingPrefs,
@@ -32,3 +37,4 @@ export type {
   FontWeight,
   TextAlign,
 } from './GlobalReadingPrefsContext'
+export { SessionFlushBridge } from './SessionFlushBridge'

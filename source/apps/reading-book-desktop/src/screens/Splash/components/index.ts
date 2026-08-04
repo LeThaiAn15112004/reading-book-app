@@ -1,2 +1,2 @@
-export { SplashBrand } from './SplashBrand'
-export { SplashSpinner } from './SplashSpinner'
+export * from './brand'
+export * from './loading'

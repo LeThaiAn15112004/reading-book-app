@@ -5,6 +5,10 @@ export const AppChannels = {
   getAppInfo: 'app:getAppInfo',
   /** Sync native titleBarOverlay caption buttons to Night/Sepia/Paper. */
   setChromeTheme: 'app:setChromeTheme',
+  /** Main → renderer: flush reading session before window close (T4.2). */
+  requestFlushSession: 'app:requestFlushSession',
+  /** Renderer → main: session flush finished (or timed out client-side). */
+  flushSessionDone: 'app:flushSessionDone',
 } as const
 
 export const LibraryChannels = {
@@ -25,6 +29,11 @@ export const ImportChannels = {
 export const OverlayChannels = {
   list: 'overlay:list',
   addHighlight: 'overlay:addHighlight',
-  addNote: 'overlay:addNote',
+  updateHighlightNote: 'overlay:updateHighlightNote',
+  deleteHighlight: 'overlay:deleteHighlight',
   listBookmarks: 'overlay:listBookmarks',
+  saveBookmark: 'overlay:saveBookmark',
+  deleteBookmark: 'overlay:deleteBookmark',
+  getSessionState: 'overlay:getSessionState',
+  saveSessionState: 'overlay:saveSessionState',
 } as const

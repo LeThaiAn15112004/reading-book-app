@@ -3,22 +3,22 @@ import { AppTheme } from '@reading-book/domain';
 export type ThemeTokenName = '--bg' | '--text' | '--accent';
 export type ThemeTokens = Readonly<Record<ThemeTokenName, string>>;
 
-/** App chrome theme tokens stub (Design §4 / T0.3). CSS mapping is T0.12. */
+/** Legacy AppTheme mapping aligned with Reader BR-05 presets. */
 export const THEME_TOKENS: Readonly<Record<AppTheme, ThemeTokens>> = {
   [AppTheme.Day]: {
-    '--bg': '#FDFBF7',
-    '--text': '#2D2D2D',
-    '--accent': '#4A90E2',
+    '--bg': '#f8fafc',
+    '--text': '#334155',
+    '--accent': '#d97706',
   },
   [AppTheme.Sepia]: {
-    '--bg': '#F4ECD8',
-    '--text': '#2D2D2D',
-    '--accent': '#4A90E2',
+    '--bg': '#16120e',
+    '--text': '#e1cfb3',
+    '--accent': '#f59e0b',
   },
   [AppTheme.Night]: {
-    '--bg': '#1A1A1A',
-    '--text': '#E8E6E3',
-    '--accent': '#4A90E2',
+    '--bg': '#0f172a',
+    '--text': '#cbd5e1',
+    '--accent': '#f59e0b',
   },
 };
 

@@ -9,7 +9,7 @@ const OVERLAY: Record<
   ChromeThemeId,
   { color: string; symbolColor: string }
 > = {
-  night: { color: '#0f172a', symbolColor: '#e2e8f0' },
+  night: { color: '#0f172a', symbolColor: '#cbd5e1' },
   sepia: { color: '#16120e', symbolColor: '#e1cfb3' },
   paper: { color: '#f8fafc', symbolColor: '#0f172a' },
 }

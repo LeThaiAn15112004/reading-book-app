@@ -36,10 +36,10 @@ export { ReadingSessionState } from './reading-session-state.js';
 export type { ReadingSessionStateProps } from './reading-session-state.js';
 
 export { Highlight } from './highlight.js';
-export type { HighlightProps } from './highlight.js';
+export type { HighlightProps, HighlightStatus } from './highlight.js';
 
-export { Note } from './note.js';
-export type { NoteProps } from './note.js';
+export { Tag } from './tag.js';
+export type { TagProps } from './tag.js';
 
 export { Comment } from './comment.js';
 export type { CommentProps } from './comment.js';

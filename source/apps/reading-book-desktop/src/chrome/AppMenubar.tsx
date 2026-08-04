@@ -1,11 +1,13 @@
 import { useState, type DragEvent, type MouseEvent } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { flushRegisteredSession } from '../screens/Reader/sessionFlushRegistry'
 import {
   useAppNav,
   type AppNavId,
   type AppStubNavId,
 } from './AppNavContext'
 import { useOpenReading } from './OpenReadingContext'
+import { useReaderChromeMenu } from './ReaderChromeMenuContext'
 
 type NavItem =
   | { id: 'library' | 'settings' | 'reading'; label: string; to?: string }
@@ -133,7 +135,9 @@ function ReadingTabs() {
               aria-label={`Close ${tab.title}`}
               onClick={(e) => {
                 e.stopPropagation()
-                closeBook(tab.bookId)
+                void flushRegisteredSession().finally(() => {
+                  closeBook(tab.bookId)
+                })
               }}
               onMouseDown={(e) => e.stopPropagation()}
             >
@@ -155,6 +159,7 @@ export function AppMenubar() {
   const navigate = useNavigate()
   const { libraryNav } = useAppNav()
   const { tabs, goReading } = useOpenReading()
+  const { controls: readerChrome } = useReaderChromeMenu()
 
   const path = location.pathname
   if (path === '/') {
@@ -169,11 +174,21 @@ export function AppMenubar() {
       : (libraryNav?.activeId ?? 'library')
 
   function handleStub(id: AppStubNavId) {
-    if (libraryNav) {
-      libraryNav.onStubNav(id)
-      return
-    }
-    navigate('/library', { state: { openNav: id } })
+    void (async () => {
+      if (onReading) await flushRegisteredSession()
+      if (libraryNav) {
+        libraryNav.onStubNav(id)
+        return
+      }
+      navigate('/library', { state: { openNav: id } })
+    })()
+  }
+
+  function leaveReaderThen(run: () => void) {
+    void (async () => {
+      if (onReading) await flushRegisteredSession()
+      run()
+    })()
   }
 
   function renderItem(item: NavItem) {
@@ -214,7 +229,7 @@ export function AppMenubar() {
             aria-current={active ? 'page' : undefined}
             onClick={(e: MouseEvent<HTMLAnchorElement>) => {
               e.preventDefault()
-              libraryNav.onLibraryNav()
+              leaveReaderThen(() => libraryNav.onLibraryNav())
             }}
           >
             {item.label}
@@ -227,6 +242,11 @@ export function AppMenubar() {
           to={item.to}
           className={className}
           aria-current={active ? 'page' : undefined}
+          onClick={(e: MouseEvent<HTMLAnchorElement>) => {
+            if (!onReading) return
+            e.preventDefault()
+            leaveReaderThen(() => navigate(item.to!))
+          }}
         >
           {item.label}
         </Link>
@@ -251,7 +271,19 @@ export function AppMenubar() {
         className="app-menubar flex h-10 items-center gap-0.5 overflow-x-auto border-b border-lib-border-soft bg-lib-bg-deep/95 px-3 backdrop-blur-md"
         aria-label="Main navigation"
       >
-        {PRIMARY_ITEMS.map(renderItem)}
+        {renderItem(PRIMARY_ITEMS[0]!)}
+        {onReading ? (
+          <button
+            type="button"
+            className={itemClass(!!readerChrome?.toolsOpen)}
+            aria-expanded={readerChrome?.toolsOpen ?? false}
+            aria-controls="reader-tools-chrome"
+            onClick={() => readerChrome?.toggleTools()}
+          >
+            Tools
+          </button>
+        ) : null}
+        {PRIMARY_ITEMS.slice(1).map(renderItem)}
         <NavDivider />
         {renderItem(READING_ITEM)}
         <NavDivider />

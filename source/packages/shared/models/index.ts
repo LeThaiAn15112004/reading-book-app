@@ -22,12 +22,22 @@ export {
   type ShelfId,
 } from './library-book.js'
 export {
+  HIGHLIGHT_COLOR_HEX,
   TOOL_LABELS,
+  highlightColorFromHex,
   nextId,
   nextReaderOverlayId,
+  normalizeHighlightColorHex,
   type AnnotateTool,
+  type InteractionTool,
+  type EpubPendingSelection,
+  type EpubReaderHighlight,
   type ESignStamp,
+  type FakePendingSelection,
+  type FakeReaderHighlight,
   type HighlightColor,
+  type HighlightHandleAnchor,
+  type HighlightHandleRect,
   type PageLayout,
   type PageMode,
   type PendingSelection,
@@ -37,6 +47,7 @@ export {
   type ReaderNote,
   type ReaderSignature,
   type TypewriterMark,
+  type ViewportRect,
 } from './reader-session.js'
 export {
   DEFAULT_GLOBAL_READING_PREFS,
@@ -49,15 +60,22 @@ export {
   isTextAlign,
   normalizeGlobalReadingPrefs,
   parseGlobalReadingPrefsJson,
+  resolveReadingPrefs,
   toAppThemeAttr,
   type AppChromeTheme,
   type FontFamily,
   type FontWeight,
   type GlobalReadingPrefs,
   type ReaderTheme,
+  type ReadingLayout,
+  type ReadingMarginPreset,
+  type ReadingPageMode,
+  type ReadingPreferenceOverrides,
+  type ResolvedReadingPrefs,
   type TextAlign,
 } from './reading-prefs.js'
 export {
+  formatLastReadLine,
   shelfProgressForBook,
   type ShelfProgressView,
 } from './shelf-progress.js'

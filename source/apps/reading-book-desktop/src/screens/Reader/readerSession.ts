@@ -3,12 +3,22 @@
  * Demo signatures stay here (UI shell until book_signatures IPC).
  */
 export {
+  HIGHLIGHT_COLOR_HEX,
   TOOL_LABELS,
+  highlightColorFromHex,
   nextId,
   nextReaderOverlayId,
+  normalizeHighlightColorHex,
   type AnnotateTool,
+  type InteractionTool,
+  type EpubPendingSelection,
+  type EpubReaderHighlight,
   type ESignStamp,
+  type FakePendingSelection,
+  type FakeReaderHighlight,
   type HighlightColor,
+  type HighlightHandleAnchor,
+  type HighlightHandleRect,
   type PageLayout,
   type PageMode,
   type PendingSelection,
@@ -18,6 +28,7 @@ export {
   type ReaderNote,
   type ReaderSignature,
   type TypewriterMark,
+  type ViewportRect,
 } from '@reading-book/shared/models'
 
 export type { TextAlign } from '@reading-book/shared/models'

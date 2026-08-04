@@ -2,6 +2,7 @@ import { type ReactNode, useMemo } from 'react'
 import {
   DEFAULT_GLOBAL_READING_PREFS,
   GLOBAL_READING_PREFS_STORAGE_KEY,
+  READER_THEME_COLORS,
   fontFamilyCss,
   parseGlobalReadingPrefsJson,
   type FontFamily,
@@ -24,7 +25,12 @@ export type {
   ReaderTheme,
   TextAlign,
 }
-export { DEFAULT_GLOBAL_READING_PREFS, fontFamilyCss, useGlobalReadingPrefs }
+export {
+  DEFAULT_GLOBAL_READING_PREFS,
+  READER_THEME_COLORS,
+  fontFamilyCss,
+  useGlobalReadingPrefs,
+}
 
 const desktopStorage: GlobalReadingPrefsStorage = {
   load: () => {

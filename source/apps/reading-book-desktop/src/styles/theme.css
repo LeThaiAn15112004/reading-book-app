@@ -5,9 +5,10 @@
  */
 
 :root,
-[data-theme='night'] {
+[data-theme='night'],
+[data-theme='dark'] {
   --bg: #0f172a;
-  --text: #e2e8f0;
+  --text: #cbd5e1;
   --accent: #f59e0b;
 
   --lib-bg-deep: #0f172a;
@@ -17,7 +18,7 @@
   --lib-surface-hover: rgb(30 41 59 / 0.55);
   --lib-border: rgb(51 65 85 / 0.45);
   --lib-border-soft: rgb(51 65 85 / 0.28);
-  --lib-text: #e2e8f0;
+  --lib-text: #cbd5e1;
   --lib-text-strong: #f1f5f9;
   --lib-muted: #94a3b8;
   --lib-faint: #64748b;
@@ -31,7 +32,7 @@
   --lib-hint: rgb(15 23 42 / 0.28);
   --lib-chip: rgb(51 65 85 / 0.35);
   --lib-titlebar-bg: #0f172a;
-  --lib-titlebar-fg: #e2e8f0;
+  --lib-titlebar-fg: #cbd5e1;
   --lib-titlebar-muted: #cbd5e1;
   --lib-titlebar-border: rgb(51 65 85 / 0.35);
   --lib-chrome-bg:
@@ -95,19 +96,20 @@
   --lib-overlay-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
 }
 
-[data-theme='paper'] {
+[data-theme='paper'],
+[data-theme='day'] {
   --bg: #f8fafc;
   --text: #334155;
   --accent: #d97706;
 
-  --lib-bg-deep: #f1f5f9;
+  --lib-bg-deep: #f8fafc;
   --lib-bg-mid: #e2e8f0;
   --lib-surface: rgb(255 255 255 / 0.72);
   --lib-surface-strong: rgb(255 255 255 / 0.92);
   --lib-surface-hover: rgb(241 245 249 / 0.95);
   --lib-border: rgb(148 163 184 / 0.45);
   --lib-border-soft: rgb(148 163 184 / 0.3);
-  --lib-text: #475569;
+  --lib-text: #334155;
   --lib-text-strong: #0f172a;
   --lib-muted: #64748b;
   --lib-faint: #94a3b8;
@@ -138,18 +140,4 @@
     radial-gradient(circle, #f8fafc 0%, #e2e8f0 100%);
   --lib-menubar-tabs-bg: rgb(255 255 255 / 0.85);
   --lib-overlay-shadow: 0 12px 32px rgba(15, 23, 42, 0.12);
-}
-
-/* Legacy aliases from older applyTheme / config */
-[data-theme='day'] {
-  /* same as paper */
-  --bg: #f8fafc;
-  --text: #334155;
-  --accent: #d97706;
-}
-[data-theme='dark'] {
-  /* same as night — prefer migrating to night */
-  --bg: #0f172a;
-  --text: #e2e8f0;
-  --accent: #f59e0b;
 }

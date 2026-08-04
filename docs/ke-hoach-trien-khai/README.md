@@ -1,4 +1,4 @@
-# Kế hoạch triển khai — Làm app từng phần
+﻿# Kế hoạch triển khai — Làm app từng phần
 
 Bộ tài liệu này hướng dẫn **làm code theo thứ tự**, từng giai đoạn một, dựa trên SRS / SDS / mockup đã có.
 
@@ -54,17 +54,18 @@ Khác với [`docs/plan/`](../plan/) (tầm nhìn sản phẩm, map research →
 
 ---
 
-## Tiến độ hiện tại (2026-07-27)
+## Tiến độ hiện tại (2026-07-30)
 
 | Giai đoạn | Trạng thái | Ghi chú ngắn |
 | :--- | :--- | :--- |
 | **G0** Nền tảng | **Xong** | Electron, SQLite migrations `001`–`007`, IPC, domain/ports, feature flags off |
 | **G1** Splash + Library | **Xong** | Outcome đạt; **nợ G1-N1…N8** → [§5](./02_Giai_doan_1_Splash_Library.md) (last-read/favorite → G4; collections/settings → G6; **G1-N7** schema+list UI đã kéo sớm — còn backfill page/genre sách cũ + PDF page count → G6) |
 | **G2** Import | **Xong** | Outcome đạt; **nợ G2-N1…N7** → [§5](./03_Giai_doan_2_Import.md) (metadata đa format, signature, delete → G6) |
-| **G3** Reader EPUB | **T3.0–T3.5 xong** (thiếu T3.6–T3.9) | Nav page/section/scroll + scrub spine; tiếp T3.6 tap-center / T3.7 TOC |
-| G4…G8 | Chưa | Theo thứ tự checklist |
+| **G3** Reader EPUB | **T3.0–T3.9 xong** | Nav Arrow (± iframe/footer) + click cạnh + scrub/go-to-page; TOC; Library back; loading/error |
+| **G4** Tiến độ & Settings | **T4.1–T4.9** | CFI codec; debounce/flush; session repo + IPC (`overlay:get/saveSessionState`); resume CFI; SCR-05 per-book + app-default fallback; preset theme BR-05 global; location map scrubber + label không %; tiếp T4.10 Library / Continue Reading |
+| G5…G8 | Chưa | Theo thứ tự checklist |
 
-**Schema (SDS 1.18):** `description` / `page_count` trên `books`; `genres` + `book_genres` (n–n); `is_signed`, `book_signatures`, `comments`; **không** `app_settings`. Migrations `001`–`007`.
+**Schema (SDS 1.19):** `description` / `page_count` trên `books`; `genres` + `book_genres` (n–n); `is_signed`, `book_signatures`, `comments`; **không** `app_settings`. Migrations `001`–`009`. **`008`**: `reading_session_states` v2. **`009`**: `highlights` v2 (inline `note`, bỏ bảng `notes`) + `tags` / `highlight_tags`.
 
 **Chi tiết tick + bảng nợ:** [10_Checklist_nghiem_thu.md](./10_Checklist_nghiem_thu.md)  
 **Map note sản phẩm → giai đoạn:** [11_Backlog_tu_note_san_pham.md](./11_Backlog_tu_note_san_pham.md)

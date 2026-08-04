@@ -1,11 +1,8 @@
 import type { CSSProperties, ReactNode } from 'react'
-import { ChromeRevealButton } from '../screens/Reader/components/ChromeRevealButton'
 
 export type ReaderShellProps = {
   themeClassName: string
   style?: CSSProperties
-  chromeHidden: boolean
-  onToggleChrome: () => void
   topbar: ReactNode
   footer: ReactNode
   edges?: ReactNode
@@ -23,8 +20,6 @@ export type ReaderShellProps = {
 export function ReaderShell({
   themeClassName,
   style,
-  chromeHidden,
-  onToggleChrome,
   topbar,
   footer,
   edges,
@@ -38,18 +33,15 @@ export function ReaderShell({
       style={style}
       {...dataAttrs}
     >
-      <ChromeRevealButton
-        expanded={!chromeHidden}
-        onToggle={onToggleChrome}
-      />
-
       {edges}
 
-      {topbar}
+      <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
+        {children}
 
-      {children}
+        {topbar}
 
-      {footer}
+        {footer}
+      </div>
 
       {overlays}
     </div>

@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32" fill="none">
+  <!-- Highlighter pen cursor — tip hotspot near (6, 28) -->
+  <g transform="rotate(-42 16 16)">
+    <!-- Cap / body -->
+    <rect x="12.5" y="3" width="7" height="15" rx="2.2" fill="#f59e0b"/>
+    <rect x="13.6" y="5" width="1.4" height="10" rx="0.7" fill="#fde68a" opacity="0.85"/>
+    <!-- Neck -->
+    <path d="M12.5 18h7l-1.6 3.2h-3.8L12.5 18Z" fill="#d97706"/>
+    <!-- Chisel tip -->
+    <path d="M13.6 21.2 11.2 26.8h5.2l2.4-5.6h-5.2Z" fill="#f59e0b"/>
+  </g>
+  <!-- Stroke mark under tip -->
+  <rect x="3" y="27.2" width="12" height="2" rx="1" fill="#fbbf24" opacity="0.95"/>
+</svg>

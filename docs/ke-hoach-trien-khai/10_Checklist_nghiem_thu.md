@@ -2,7 +2,7 @@
 
 Dùng file này để đánh dấu tiến độ. Chỉ sang giai đoạn sau khi mục hiện tại đủ (hoặc ghi rõ nợ được chấp nhận).
 
-**Cập nhật tiến độ:** 2026-07-27 — G0–G2 đạt outcome; **G3: T3.0 + T3.1 + T3.4 + T3.3 + T3.2 + T3.5 đạt** (nav page/section/scroll + footer scrub spine); tiếp **T3.6** tap-center / **T3.7** TOC. Nợ G1/G2 + [11_Backlog](./11_Backlog_tu_note_san_pham.md) giữ nguyên.
+**Cập nhật tiến độ:** 2026-08-04 — G0–G2 đạt outcome; **G3: T3.0–T3.9 đạt**; **G4: T4.1–T4.10 đạt**; **schema migration 008** (reading session v2) + **009** (highlights v2, bỏ `notes`, thêm `tags`). **G5: T5.0 schema/domain + T5.2 persist highlight + T5.3 DomCssOverlay (EPUB repaint)**. Nợ G1/G2 + [11_Backlog](./11_Backlog_tu_note_san_pham.md) giữ nguyên.
 
 ---
 
@@ -41,10 +41,13 @@ Dùng file này để đánh dấu tiến độ. Chỉ sang giai đoạn sau khi
 - [x] **T3.4** Mở sách qua IPC: `library:openBookContent` → bytes + sandbox allowlist (không path FS cho Renderer)
 - [x] **T3.3** `EpubRenderer` — mở EPUB thật thay fake khi `format === epub`
 - [x] **T3.2** `ReaderShell` chung: vùng nội dung + chrome ẩn mặc định (reveal chevron)
-- [x] Invisible UI (chrome ẩn mặc định) — tap center còn **T3.6**
+- [x] Invisible UI (chrome ẩn mặc định) — **T3.6** tap center toggle Tools / Settings / More
+- [x] **T3.6** Tap giữa (fake + EPUB center zone) bật/tắt top+footer; đóng panel phụ theo mockup; Escape dismiss
 - [x] **T3.5** Nav EPUB: page (Arrow + click cạnh), section (Ctrl/Cmd+Arrow / `[` `]`), scroll mode
 - [x] **T3.5** Footer scrub theo spine index (EPUB); fake chapter keys khi non-EPUB
-- [ ] Mở EPUB: TOC đầy đủ từ `nav.toc` — **T3.7**
+- [x] **T3.7** Mở EPUB: TOC đầy đủ từ `nav.toc` (sidebar Contents)
+- [x] **T3.8** Menubar **Library** từ Reader → SCR-01; giữ scroll hub khi quay lại
+- [x] **T3.9** Loading / lỗi mở sách (IPC + EPUB) — không kẹt màn trắng
 - [x] Điều hướng cơ bản (page / section / scrub) — T3.5
 - [x] File gốc không bị ghi đè
 
@@ -52,18 +55,21 @@ Dùng file này để đánh dấu tiến độ. Chỉ sang giai đoạn sau khi
 
 - [ ] Resume đúng CFI sau restart
 - [ ] Continue Reading đúng sách
-- [ ] Theme light/sepia/dark + typography
-- [ ] Đổi theme không reload cả document
-- [ ] Last-read location trên Library + scrubber vị trí trong Reader (không % hoàn thành)
+- [x] Theme light/sepia/dark + typography
+- [x] Đổi theme không reload cả document
+- [x] Scrubber vị trí trong Reader (nhãn TOC/spine/cover, jump + CFI resume, không % hoàn thành)
+- [x] Last-read location trên Library / Continue Reading (T4.10)
 
 ## G5 — Highlight / Note / Bookmark
 
-- [ ] Highlight ≤ 2 thao tác; persist
-- [ ] Note CRUD; không note rỗng
-- [ ] Bookmark + jump
+- [x] Migration `009` + domain `Highlight` / `Tag` (bỏ bảng `notes`; **không** `app_settings`)
+- [ ] Highlight ≤ 2 thao tác; persist SQLite
+- [x] Ghi chú inline trên highlight (`highlights.note`); không note rỗng
+- [x] Xóa highlight đồng bộ overlay + DB (T5.10)
+- [x] Bookmark + jump
 - [ ] Comment theo trang (`comments` schema đã có — UI/IPC Reader còn lại)
 - [ ] Sidebar theo `bookId` (không SCR-04 toàn cục)
-- [ ] Vẽ lại overlay khi mở sách
+- [x] Vẽ lại overlay khi mở sách (`DomCssOverlay` / T5.3 — EPUB)
 
 ## G6 — Đa format + App Settings + polish MVP
 

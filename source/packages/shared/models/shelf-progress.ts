@@ -7,6 +7,10 @@ export type ShelfProgressView = {
   progressDone?: boolean
 }
 
+export function formatLastReadLine(location: string): string {
+  return `Last at · ${location.trim()}`
+}
+
 /**
  * Derive list progress chrome from LibraryBook status / last-read location.
  * Platforms map this into their list-item props.
@@ -23,7 +27,7 @@ export function shelfProgressForBook(book: LibraryBook): ShelfProgressView {
   if (book.lastReadLocation) {
     return {
       progressKind: 'last',
-      progressLabel: `Last at · ${book.lastReadLocation}`,
+      progressLabel: formatLastReadLine(book.lastReadLocation),
       progressDone: false,
     }
   }

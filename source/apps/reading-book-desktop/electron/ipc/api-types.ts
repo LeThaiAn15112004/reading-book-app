@@ -93,34 +93,107 @@ export interface MutationResult {
   id: string | null
 }
 
-/** Highlight or note row returned by overlay.list (stub shape). */
+/** Highlight row returned by overlay.list (inline note on highlight). */
 export interface AnnotationDto {
   id: string
   bookId: string
-  kind: 'highlight' | 'note'
-  selectedText?: string
-  content?: string
-  colorHex?: string
+  /** Packed `start|end` Location.toString() values. */
+  location: string
+  selectedText: string
+  colorHex: string
+  note?: string
+  status?: string
+  isChecked?: boolean
   createdAt: string
+  updatedAt: string
 }
 
 export interface BookmarkDto {
   id: string
   bookId: string
+  /** Location.toString() JSON; may include renderer `chapterIndex` extra. */
+  locationRef: string
   label?: string
   createdAt: string
 }
 
-export interface AddHighlightInput {
+export interface SaveBookmarkInput {
   bookId: string
-  selectedText: string
-  colorHex: string
+  id?: string
+  /** Location JSON (optionally with `chapterIndex` for ribbon matching). */
+  locationRef: string
+  label?: string
+  createdAt?: string
 }
 
-export interface AddNoteInput {
+export interface DeleteBookmarkInput {
   bookId: string
-  content: string
-  selectedText?: string
+  id: string
+}
+
+/** Clone-safe reading session for IPC (T4.3). Location is Location.toString() JSON. */
+export interface ReadingSessionStateDto {
+  bookId: string
+  /** Machine-readable Location JSON when the session has a resumable location. */
+  lastReadLocation?: string
+  /** Human-readable label for Library / Continue Reading. */
+  lastReadLabel?: string
+  /** Scrubber map 0–100; not "% complete". */
+  percent: number
+  fontFamily?: string
+  fontSize?: number
+  fontWeight?: string
+  lineHeight?: number
+  textAlign?: string
+  layoutMode?: string
+  pageTurnMode?: string
+  marginsEnabled?: boolean
+  marginPreset?: string
+  isLandscape?: boolean
+  /** ISO timestamp — maps from DB `updated_at` / DTO `lastReadAt`. */
+  updatedAt: string
+}
+
+/** Input for overlay:saveSessionState — location and typography/layout are independent. */
+export interface SaveReadingSessionStateInput {
+  bookId: string
+  lastReadLocation?: string
+  lastReadLabel?: string
+  percent?: number
+  fontFamily?: string
+  fontSize?: number
+  fontWeight?: string
+  lineHeight?: number
+  textAlign?: string
+  layoutMode?: string
+  pageTurnMode?: string
+  marginsEnabled?: boolean
+  marginPreset?: string
+  isLandscape?: boolean
+  updatedAt?: string
+}
+
+export interface AddHighlightInput {
+  bookId: string
+  id?: string
+  /** Packed `start|end` Location.toString() values. */
+  location: string
+  selectedText: string
+  colorHex: string
+  note?: string
+  createdAt?: string
+  updatedAt?: string
+}
+
+export interface UpdateHighlightNoteInput {
+  bookId: string
+  id: string
+  note: string
+}
+
+export interface DeleteHighlightInput {
+  bookId: string
+  id: string
 }
 
 export interface DesktopApi {
@@ -128,6 +201,12 @@ export interface DesktopApi {
   getAppInfo(): Promise<AppInfo>
   /** Update Windows/Linux caption button colors to match app theme. */
   setChromeTheme(theme: 'night' | 'sepia' | 'paper' | string): Promise<OkResult>
+  /**
+   * Subscribe to Main's pre-close flush request (T4.2).
+   * Handler should await session flush; preload acks when the promise settles.
+   * Returns unsubscribe.
+   */
+  onRequestFlushSession(handler: () => void | Promise<void>): () => void
   library: {
     listBooks(): Promise<BookSummaryDto[]>
     getBook(id: string): Promise<BookSummaryDto | null>
@@ -143,7 +222,12 @@ export interface DesktopApi {
   overlay: {
     list(bookId: string): Promise<AnnotationDto[]>
     addHighlight(input: AddHighlightInput): Promise<MutationResult>
-    addNote(input: AddNoteInput): Promise<MutationResult>
+    updateHighlightNote(input: UpdateHighlightNoteInput): Promise<MutationResult>
+    deleteHighlight(input: DeleteHighlightInput): Promise<OkResult>
     listBookmarks(bookId: string): Promise<BookmarkDto[]>
+    saveBookmark(input: SaveBookmarkInput): Promise<MutationResult>
+    deleteBookmark(input: DeleteBookmarkInput): Promise<OkResult>
+    getSessionState(bookId: string): Promise<ReadingSessionStateDto | null>
+    saveSessionState(input: SaveReadingSessionStateInput): Promise<OkResult>
   }
 }
