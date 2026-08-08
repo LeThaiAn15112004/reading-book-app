@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 import { appApi } from '../bridge'
-import { flushRegisteredSession } from '../screens/Reader/sessionFlushRegistry'
+import { flushRegisteredSession } from '../screens/Reader/logic'
 
 /**
  * App-level bridge: Main `app:requestFlushSession` → registered Reader flush (T4.2).

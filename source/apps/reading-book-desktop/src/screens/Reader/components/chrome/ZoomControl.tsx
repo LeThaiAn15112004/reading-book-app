@@ -7,7 +7,7 @@ import {
   formatZoomPercent,
   parseZoomPercentInput,
   type ZoomLayoutPreset,
-} from '../../readerZoom'
+} from '../../logic'
 
 type ZoomControlProps = {
   zoom: number

@@ -8,6 +8,9 @@ import migration006 from './migrations/006_book_library_metadata.sql?raw'
 import migration007 from './migrations/007_genres_nn.sql?raw'
 import migration008 from './migrations/008_reading_session_v2.sql?raw'
 import migration009 from './migrations/009_highlights_v2.sql?raw'
+import migration010 from './migrations/010_typewriter_notes.sql?raw'
+import migration011 from './migrations/011_annotations.sql?raw'
+import migration012 from './migrations/012_annotations_v2.sql?raw'
 
 interface Migration {
   name: string
@@ -24,6 +27,9 @@ const MIGRATIONS: Migration[] = [
   { name: '007_genres_nn.sql', sql: migration007 },
   { name: '008_reading_session_v2.sql', sql: migration008 },
   { name: '009_highlights_v2.sql', sql: migration009 },
+  { name: '010_typewriter_notes.sql', sql: migration010 },
+  { name: '011_annotations.sql', sql: migration011 },
+  { name: '012_annotations_v2.sql', sql: migration012 },
 ]
 
 /**

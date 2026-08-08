@@ -1,29 +1,5 @@
-import type { ShelfDetailItemData } from './components/shelves/ShelfDetailItem'
-import {
-  shelfProgressForBook,
-  type LibraryBook,
-} from '@reading-book/shared/models'
-
-export type {
-  BookSummaryInput,
-  CollectionSummary,
-  LibraryBook,
-  LibraryReadingStatus,
-  NavFilterId,
-  ShelfId,
-} from '@reading-book/shared/models'
-
-export {
-  NAV_FILTERS,
-  filterByNav,
-  filterByShelf,
-  formatFileSizeMb,
-  formatLastReadLine,
-  formatRelativeLastRead,
-  mapBookSummary,
-  matchesSearch,
-  pickContinueReading,
-} from '@reading-book/shared/models'
+import { shelfProgressForBook, type LibraryBook } from '@reading-book/shared/models'
+import type { ShelfDetailItemData } from '../components/shelves/ShelfDetailItem'
 
 /** Map LibraryBook → shelf/filter list row (desktop ShelfDetailItem chrome). */
 export function toShelfDetailItem(

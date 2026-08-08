@@ -77,39 +77,33 @@ entity "reading_session_states" as session {
   updated_at : TEXT NOT NULL
 }
 
-entity "highlights" as highlights {
+entity "annotations" as annotations {
   * id : TEXT <<PK>>
   --
   * book_id : TEXT <<FK>>
-  location_start : TEXT NOT NULL
-  location_end : TEXT NOT NULL
-  selected_text : TEXT NOT NULL
-  color_hex : TEXT NOT NULL
-  created_at : TEXT NOT NULL
-}
-
-entity "notes" as notes {
-  * id : TEXT <<PK>>
-  --
-  * book_id : TEXT <<FK>>
-  highlight_id : TEXT NULL <<FK>>
-  location_ref : TEXT NOT NULL
-  selected_text : TEXT NULL
-  content : TEXT NOT NULL
-  created_at : TEXT NOT NULL
-  updated_at : TEXT NOT NULL
-}
-
-entity "comments" as comments {
-  * id : TEXT <<PK>>
-  --
-  * book_id : TEXT <<FK>>
+  type : TEXT NOT NULL
   page_number : INTEGER NOT NULL
-  position_data : TEXT NOT NULL
-  content : TEXT NOT NULL
-  author_name : TEXT NULL
+  location_data : TEXT NOT NULL
+  content : TEXT NULL
+  color_hex : TEXT NULL
+  font_family : TEXT NULL
+  font_size : REAL NULL
+  status : TEXT NOT NULL
+  is_checked : INTEGER NOT NULL
   created_at : TEXT NOT NULL
   updated_at : TEXT NOT NULL
+}
+
+entity "tags" as tags {
+  * id : TEXT <<PK>>
+  --
+  name : TEXT NOT NULL
+  color_hex : TEXT NULL
+}
+
+entity "annotation_tags" as annotation_tags {
+  * annotation_id : TEXT <<FK>>
+  * tag_id : TEXT <<FK>>
 }
 
 entity "bookmarks" as bookmarks {
@@ -158,12 +152,11 @@ genres ||--o{ book_genres : "1 - n\nON DELETE CASCADE"
 
 books ||--o{ book_signatures : "1 - n\nON DELETE CASCADE"
 books ||--|| session : "1 - 1\nON DELETE CASCADE"
-books ||--o{ highlights : "1 - n\nON DELETE CASCADE"
-books ||--o{ notes : "1 - n\nON DELETE CASCADE"
-books ||--o{ comments : "1 - n\nON DELETE CASCADE"
+books ||--o{ annotations : "1 - n\nON DELETE CASCADE"
 books ||--o{ bookmarks : "1 - n\nON DELETE CASCADE"
 books ||--o{ chunks : "1 - n\nON DELETE CASCADE"
-highlights ||--o{ notes : "1 - n\nON DELETE SET NULL"
+annotations ||--o{ annotation_tags : "1 - n\nON DELETE CASCADE"
+tags ||--o{ annotation_tags : "1 - n\nON DELETE CASCADE"
 
 collections ||--o{ collection_books : "1 - n\nON DELETE CASCADE"
 books ||--o{ collection_books : "1 - n\nON DELETE CASCADE"
@@ -206,16 +199,12 @@ note right of chunks
   embedding: Phase 2
 end note
 
-note bottom of notes
+note right of annotations
   INDEX(book_id)
-  INDEX(highlight_id)
-end note
-
-note right of comments
-  INDEX(book_id)
-  page_number 1-based
-  position_data: JSON coords/bbox
-  SCR-03 Comment tab (local)
+  INDEX(type)
+  INDEX(status)
+  type: highlight | typewriter | shape
+  location_data: JSON coords/bbox or CFI
 end note
 
 note right of collections

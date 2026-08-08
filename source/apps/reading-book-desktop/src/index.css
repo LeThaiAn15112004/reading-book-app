@@ -114,6 +114,7 @@
   --cursor-hand-tool-active: grabbing;
   --cursor-select-tool: text;
   --cursor-highlight-tool: url('/cursors/highlighter.svg') 6 28, text;
+  --cursor-typewriter-tool: url('/cursors/typewriter.svg') 16 26, text;
 }
 
 @utility cursor-hand-tool {
@@ -130,6 +131,264 @@
 
 @utility cursor-highlight-tool {
   cursor: var(--cursor-highlight-tool);
+}
+
+@utility cursor-typewriter-tool {
+  cursor: var(--cursor-typewriter-tool);
+}
+
+/* Reader tools chrome height — sync inset for sidebar + reading viewport. */
+:root {
+  --reader-topbar-height: 4.25rem;
+}
+
+@media (min-width: 640px) {
+  :root {
+    --reader-topbar-height: 4.5rem;
+  }
+}
+
+/* Typewriter: editing box (transparent over book) vs committed static text. */
+.rb-typewriter-edit {
+  box-sizing: border-box;
+  min-height: 2.25rem;
+  width: 12rem;
+  margin: 0;
+  padding: 0.25rem 0.35rem;
+  resize: both;
+  overflow: auto;
+  border: 1px dashed #ffa500;
+  border-radius: 2px;
+  background-color: transparent;
+  outline: none;
+  box-shadow: none;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 13px;
+  line-height: 1.35;
+  color: var(--reader-text, var(--lib-text, #e2e8f0));
+  caret-color: #ffa500;
+}
+
+.rb-typewriter-richedit {
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.rb-typewriter-richedit[data-empty='true']:before {
+  content: attr(data-placeholder);
+  color: color-mix(in srgb, currentColor 45%, transparent);
+  pointer-events: none;
+}
+
+.rb-typewriter-edit:focus,
+.rb-typewriter-edit:focus-visible {
+  outline: none;
+  box-shadow: none;
+}
+
+.rb-typewriter-static {
+  box-sizing: border-box;
+  max-width: min(16rem, 70vw);
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 13px;
+  line-height: 1.35;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--reader-text, var(--lib-text, #e2e8f0));
+  cursor: grab;
+}
+
+.rb-typewriter-html {
+  display: inline-block;
+  max-width: min(16rem, 70vw);
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  line-height: 1.35;
+}
+
+.rb-typewriter-html b,
+.rb-typewriter-html strong,
+.rb-typewriter-richedit b,
+.rb-typewriter-richedit strong {
+  font-weight: 700;
+}
+
+.rb-typewriter-html i,
+.rb-typewriter-html em,
+.rb-typewriter-richedit i,
+.rb-typewriter-richedit em {
+  font-style: italic;
+}
+
+.rb-typewriter-html u,
+.rb-typewriter-richedit u {
+  text-decoration: underline;
+}
+
+.rb-tw-editor-root {
+  min-width: 12rem;
+}
+
+.rb-tw-toolbar-anchor {
+  position: absolute;
+  bottom: calc(100% + 0.55rem);
+  left: 50%;
+  z-index: 3;
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
+.rb-tw-toolbar-anchor .rb-tw-toolbar {
+  pointer-events: auto;
+}
+
+.rb-tw-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 0.2rem;
+  padding: 0.28rem 0.35rem;
+  border: 1px solid color-mix(in srgb, var(--lib-border, #334155) 85%, transparent);
+  border-radius: 0.65rem;
+  background: color-mix(in srgb, var(--lib-surface-strong, #0f172a) 92%, transparent);
+  box-shadow: 0 8px 24px rgb(2 6 23 / 0.35);
+  backdrop-filter: blur(10px);
+  white-space: nowrap;
+}
+
+.rb-tw-toolbar-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.55rem;
+  height: 1.55rem;
+  margin: 0;
+  padding: 0 0.25rem;
+  border: 1px solid transparent;
+  border-radius: 0.4rem;
+  background: transparent;
+  color: var(--lib-text, #e2e8f0);
+  font-size: 12px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.rb-tw-toolbar-btn:hover {
+  background: color-mix(in srgb, var(--lib-chip, #1e293b) 80%, transparent);
+}
+
+.rb-tw-toolbar-btn.is-active {
+  border-color: color-mix(in srgb, #ffa500 55%, transparent);
+  background: color-mix(in srgb, #ffa500 22%, transparent);
+  color: #ffb733;
+}
+
+.rb-tw-toolbar-sep {
+  width: 1px;
+  height: 1.1rem;
+  margin: 0 0.15rem;
+  background: color-mix(in srgb, var(--lib-border-soft, #475569) 80%, transparent);
+}
+
+.rb-tw-toolbar-size select {
+  height: 1.55rem;
+  min-width: 3.1rem;
+  padding: 0 0.2rem;
+  border: 1px solid transparent;
+  border-radius: 0.4rem;
+  background: transparent;
+  color: var(--lib-text, #e2e8f0);
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.rb-tw-toolbar-size select:hover,
+.rb-tw-toolbar-size select:focus {
+  border-color: color-mix(in srgb, var(--lib-border-soft, #475569) 80%, transparent);
+  outline: none;
+}
+
+/* Color picker — primary way to change text color. */
+.rb-tw-color-picker {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.55rem;
+  margin: 0;
+  border: 1px solid color-mix(in srgb, var(--lib-border-soft, #475569) 80%, transparent);
+  border-radius: 0.4rem;
+  background: color-mix(in srgb, var(--lib-chip, #1e293b) 55%, transparent);
+  cursor: pointer;
+  overflow: hidden;
+}
+
+.rb-tw-color-picker:hover {
+  border-color: color-mix(in srgb, #ffa500 45%, transparent);
+  background: color-mix(in srgb, #ffa500 12%, transparent);
+}
+
+.rb-tw-color-picker-preview {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1;
+  border-bottom: 3px solid currentColor;
+  pointer-events: none;
+}
+
+.rb-tw-color-picker input[type='color'] {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  border: none;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.rb-typewriter-drag-handle {
+  position: absolute;
+  top: -0.55rem;
+  left: 50%;
+  z-index: 1;
+  width: 1.75rem;
+  height: 0.4rem;
+  margin: 0;
+  padding: 0;
+  border: 1px solid #ffa500;
+  border-radius: 999px;
+  background: color-mix(in srgb, #ffa500 35%, transparent);
+  transform: translateX(-50%);
+  cursor: grab;
+}
+
+.rb-typewriter-drag-handle:active,
+.rb-typewriter-dragging .rb-typewriter-drag-handle,
+.rb-typewriter-dragging .rb-typewriter-static {
+  cursor: grabbing;
+}
+
+.rb-typewriter-dragging .rb-typewriter-edit {
+  border-color: #ffb733;
+  box-shadow: 0 0 0 1px color-mix(in srgb, #ffa500 40%, transparent);
+}
+
+/* Host-level pan affordance — iframe docs use injected rb-tool-* CSS. */
+.rb-tool-hand.rb-grabbing,
+.rb-grabbing.cursor-hand-tool {
+  cursor: var(--cursor-hand-tool-active) !important;
 }
 
 /*
@@ -184,6 +443,8 @@
      */
     --window-controls-width: 148px;
     --app-titlebar-h: 36px;
+    /* AppMenubar nav row (h-10). Content tier starts below titlebar + menubar. */
+    --app-menubar-h: 40px;
   }
 
   body {
@@ -333,10 +594,14 @@
 
 /* Shared app menubar (below window titlebar; text-only nav). */
 .app-menubar-stack {
+  position: relative;
+  z-index: 200;
+  flex-shrink: 0;
   -webkit-app-region: no-drag;
 }
 
 .app-menubar {
+  height: var(--app-menubar-h);
   scrollbar-width: thin;
   scrollbar-color: rgb(100 116 139 / 0.45) transparent;
 }
@@ -401,4 +666,14 @@
 
 .app-scroll::-webkit-scrollbar-corner {
   background: transparent;
+}
+
+/*
+ * EPUB continuous scroll — dashed rule between spine sections (.epub-view)
+ * so readers can tell where one chapter ends and the next begins.
+ */
+[data-epub-page-mode='scroll'] .epub-view + .epub-view {
+  margin-top: 0.75rem;
+  padding-top: 2rem;
+  border-top: 1px dashed color-mix(in srgb, var(--lib-text) 18%, transparent);
 }

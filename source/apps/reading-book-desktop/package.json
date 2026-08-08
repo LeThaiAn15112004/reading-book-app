@@ -12,6 +12,7 @@
     "rebuild:native": "electron-builder install-app-deps",
     "spike:epub:fixture": "node spikes/epub-engine/build-fixture.mjs",
     "spike:epub:eval": "node spikes/epub-engine/build-fixture.mjs && node spikes/epub-engine/run-node-evals.mjs",
+    "spike:overlay:cfi": "node --experimental-strip-types spikes/highlight-overlay/run-cfi-range.mjs",
     "spike:session:roundtrip": "node spikes/session-store/run-roundtrip.mjs",
     "spike:theme:contrast": "node spikes/theme-presets/run-contrast.mjs"
   },

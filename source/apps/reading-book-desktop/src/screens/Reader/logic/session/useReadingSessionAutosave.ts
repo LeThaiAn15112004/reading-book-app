@@ -5,7 +5,7 @@ import {
   type SessionThemeFields,
   type UseReadingSessionAutosaveOptions,
 } from '@reading-book/shared/hooks/reader'
-import { overlayApi } from '../../bridge'
+import { overlayApi } from '../../../../bridge'
 import { registerSessionFlushHandler } from './sessionFlushRegistry'
 
 export type {

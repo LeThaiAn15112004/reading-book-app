@@ -3,7 +3,7 @@
  * Word-like one-line carets with accent dots at each anchor.
  */
 
-import type { HighlightHandleRect } from '../../readerSession'
+import type { HighlightHandleRect } from '@reading-book/shared/models'
 
 export type { HighlightHandleRect }
 

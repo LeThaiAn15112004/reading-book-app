@@ -12,7 +12,7 @@ import {
   zoomFactorFromWheelDelta,
   type FitMetrics,
   type ZoomFocalPoint,
-} from '../../readerZoom'
+} from '../../logic'
 
 export type ReaderZoomViewportHandle = {
   getElement: () => HTMLDivElement | null

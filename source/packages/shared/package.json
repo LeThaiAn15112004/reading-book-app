@@ -12,7 +12,8 @@
     "./hooks/library": "./hooks/library/index.ts",
     "./hooks/reader": "./hooks/reader/index.ts",
     "./models": "./models/index.ts",
-    "./services": "./services/index.ts"
+    "./services": "./services/index.ts",
+    "./utils": "./utils/index.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit"

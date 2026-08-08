@@ -24,10 +24,13 @@ function App() {
             <OpenReadingProvider>
               <ReaderChromeMenuProvider>
                 <SessionFlushBridge />
+                {/* Flex 2-tier: Header (titlebar+menubar) / Content (routes). */}
                 <div className="flex h-screen flex-col overflow-hidden">
-                  <AppTitlebar />
-                  <AppMenubar />
-                  <div className="min-h-0 flex-1 overflow-hidden">
+                  <div className="relative z-[200] shrink-0">
+                    <AppTitlebar />
+                    <AppMenubar />
+                  </div>
+                  <div className="relative z-0 min-h-0 flex-1 overflow-hidden">
                     <Routes>
                       <Route path="/" element={<SplashScreen />} />
                       <Route path="/library" element={<LibraryScreen />} />

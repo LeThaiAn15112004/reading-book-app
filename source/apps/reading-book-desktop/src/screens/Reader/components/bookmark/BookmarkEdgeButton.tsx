@@ -9,7 +9,7 @@ export function BookmarkEdgeButton({
 }: BookmarkEdgeButtonProps) {
   return (
     <button
-      className={`fixed top-[calc(var(--app-titlebar-h,36px)+56px)] left-0 z-[81] flex h-12 w-9 cursor-pointer items-center justify-center rounded-r-lg border border-l-0 shadow-md transition-[width,color,background] hover:w-[42px] ${
+      className={`absolute top-14 left-0 z-[81] flex h-12 w-9 cursor-pointer items-center justify-center rounded-r-lg border border-l-0 shadow-md transition-[width,color,background] hover:w-[42px] ${
         active
           ? 'border-lib-accent-ring bg-lib-accent-soft text-lib-accent'
           : 'border-lib-border-soft bg-lib-bg-deep/75 text-lib-muted hover:bg-lib-bg-deep/95 hover:text-lib-accent'

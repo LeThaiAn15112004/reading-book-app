@@ -1,15 +1,18 @@
 /** Typed wrappers for overlay:* IPC via window.api. */
 
 export const overlayApi = {
-  list: (bookId: string) => window.api.overlay.list(bookId),
-  addHighlight: (...args: Parameters<typeof window.api.overlay.addHighlight>) =>
-    window.api.overlay.addHighlight(...args),
-  updateHighlightNote: (
-    ...args: Parameters<typeof window.api.overlay.updateHighlightNote>
-  ) => window.api.overlay.updateHighlightNote(...args),
-  deleteHighlight: (
-    ...args: Parameters<typeof window.api.overlay.deleteHighlight>
-  ) => window.api.overlay.deleteHighlight(...args),
+  listAnnotations: (
+    ...args: Parameters<typeof window.api.overlay.listAnnotations>
+  ) => window.api.overlay.listAnnotations(...args),
+  saveAnnotation: (
+    ...args: Parameters<typeof window.api.overlay.saveAnnotation>
+  ) => window.api.overlay.saveAnnotation(...args),
+  updateAnnotation: (
+    ...args: Parameters<typeof window.api.overlay.updateAnnotation>
+  ) => window.api.overlay.updateAnnotation(...args),
+  deleteAnnotation: (
+    ...args: Parameters<typeof window.api.overlay.deleteAnnotation>
+  ) => window.api.overlay.deleteAnnotation(...args),
   listBookmarks: (bookId: string) => window.api.overlay.listBookmarks(bookId),
   saveBookmark: (...args: Parameters<typeof window.api.overlay.saveBookmark>) =>
     window.api.overlay.saveBookmark(...args),

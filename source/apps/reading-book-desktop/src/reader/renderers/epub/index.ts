@@ -1,4 +1,8 @@
-export { EpubRenderer, type EpubRendererApi } from './EpubRenderer'
+export {
+  EpubRenderer,
+  type EpubPagePreview,
+  type EpubRendererApi,
+} from './EpubRenderer'
 export {
   CfiCodec,
   cfiCodec,
@@ -7,12 +11,27 @@ export {
   type EpubCfiDecodeResult,
 } from './cfi-codec'
 export {
+  cfiChapterSignature,
+  elementFromCfi,
+  findRangeByText,
+  isTrivialSectionStartCfi,
+  parseCfi,
+  rangeBetweenBoundaries,
+  rangeMatchesText,
+  resolveCfiBoundary,
+  resolveCfiRange,
+  splitCfiComponents,
+  type CfiBoundary,
+  type CfiDomOptions,
+} from './cfi-dom-range'
+export {
   cfiRangesOverlap,
   elementToHighlightHandleRect,
   emptyHighlightHandleRect,
   iframeRangeToViewportRect,
   rangeToHighlightHandleRect,
   splitCfiRange,
+  toEpubjsDisplayCfi,
   viewportRectToHighlightHandleRect,
   type SplitCfiRange,
 } from './selection-cfi'

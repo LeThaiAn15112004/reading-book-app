@@ -38,12 +38,14 @@ const api: DesktopApi = {
     fromUrl: (url) => ipcRenderer.invoke(ImportChannels.fromUrl, url),
   },
   overlay: {
-    list: (bookId) => ipcRenderer.invoke(OverlayChannels.list, bookId),
-    addHighlight: (input) => ipcRenderer.invoke(OverlayChannels.addHighlight, input),
-    updateHighlightNote: (input) =>
-      ipcRenderer.invoke(OverlayChannels.updateHighlightNote, input),
-    deleteHighlight: (input) =>
-      ipcRenderer.invoke(OverlayChannels.deleteHighlight, input),
+    listAnnotations: (input) =>
+      ipcRenderer.invoke(OverlayChannels.listAnnotations, input),
+    saveAnnotation: (input) =>
+      ipcRenderer.invoke(OverlayChannels.saveAnnotation, input),
+    updateAnnotation: (input) =>
+      ipcRenderer.invoke(OverlayChannels.updateAnnotation, input),
+    deleteAnnotation: (input) =>
+      ipcRenderer.invoke(OverlayChannels.deleteAnnotation, input),
     listBookmarks: (bookId) => ipcRenderer.invoke(OverlayChannels.listBookmarks, bookId),
     saveBookmark: (input) => ipcRenderer.invoke(OverlayChannels.saveBookmark, input),
     deleteBookmark: (input) =>

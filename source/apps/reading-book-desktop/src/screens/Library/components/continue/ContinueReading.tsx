@@ -2,7 +2,7 @@ import {
   formatLastReadLine,
   formatRelativeLastRead,
   type LibraryBook,
-} from '../../libraryModel'
+} from '@reading-book/shared/models'
 import { BookCover } from '../book/BookCover'
 
 export type ContinueReadingProps = {

@@ -38,7 +38,7 @@ Bám cây `source/packages/{domain,shared,config}` trong SDS §2.11. Domain **kh
 | Task | Chi tiết | Vị trí |
 | :--- | :--- | :--- |
 | T0.5 | Cấu trúc folder theo SDS §2.11: `electron/ipc`, `persistence`, `files`, `adapters` | desktop |
-| T0.6 | SQLite + migrations theo SDS §3 (overlay sách): `books` (+ `description`, `page_count`, `is_signed`), `genres`, `book_genres`, `book_signatures`, `authors`, `book_authors`, `collections`, `collection_books`, `reading_session_states`, `highlights` (v2), `tags`, `highlight_tags`, `comments`, `bookmarks`, `book_chunks` — files `001`…`009` (**không** `app_settings`; app prefs → electron-store / MMKV) | `electron/persistence` |
+| T0.6 | SQLite + migrations theo SDS §3 (overlay sách): `books` (+ `description`, `page_count`, `is_signed`), `genres`, `book_genres`, `book_signatures`, `authors`, `book_authors`, `collections`, `collection_books`, `reading_session_states`, `annotations`, `tags`, `annotation_tags`, `bookmarks`, `book_chunks` — files `001`…`011` (**không** `app_settings`; app prefs → electron-store / MMKV) | `electron/persistence` |
 | T0.7 | Sandbox path: thư mục books trong userData; allowlist path | `electron/files/sandbox.ts` |
 | T0.8 | Preload `contextBridge` — API hẹp typed | `electron/preload.ts` |
 | T0.9 | IPC channels: `library:*`, `import:*`, `overlay:*` (handler stub OK) | `electron/ipc` |

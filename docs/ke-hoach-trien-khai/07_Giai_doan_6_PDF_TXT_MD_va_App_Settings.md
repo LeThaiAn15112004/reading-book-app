@@ -40,7 +40,7 @@
 | :--- | :--- | :--- |
 | T6.8 | SCR-06 full-page theo mockup (**Linked libraries** stub — không Account/Sign-in); persist prefs bằng **electron-store** (không SQLite `app_settings`) | SCR-06 |
 | T6.9 | Phân biệt rõ SCR-05 (per-book đọc, SQLite `reading_session_states`) vs SCR-06 (app-level, platform store) | SDS |
-| T6.10 | Xóa sách + cascade (**FR-12**, BR-06) — gồm `comments`, `book_signatures` | FR-12 |
+| T6.10 | Xóa sách + cascade (**FR-12**, BR-06) — gồm `annotations`, `book_signatures` | FR-12 |
 | T6.10a | Detect chữ ký số (PDF) → `is_signed` + rows `book_signatures` | SDS §3 |
 | T6.11 | Favorites / Completed / To read đủ dùng MVP | SCR-01 |
 | T6.11a | Collections CRUD + gắn/gỡ sách đủ dùng MVP (FR-14) — thay session stub | SCR-01, FR-14 |

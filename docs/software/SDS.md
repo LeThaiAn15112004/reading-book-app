@@ -19,7 +19,7 @@
 **Changelog 1.13:** Phạm vi định dạng MVP = **6 format**: EPUB, PDF, TXT, Markdown, **DOCX**, **DOC** — cập nhật enum `file_format`, adapter, mockup chips; ngoài MVP: MOBI/AZW3/PPTX.  
 **Changelog 1.14:** Thêm **§3.10 Catalog bảng & thuộc tính** (SQLite vật lý: từng cột / kiểu / ràng buộc) — khớp migration `001_initial.sql`; desktop & mobile dùng cùng schema logic.  
 **Changelog 1.15:** Thêm **`BOOK.is_signed`** + bảng **`BOOK_SIGNATURE` / `book_signatures`** (chi tiết chữ ký số; cascade khi xóa sách) — migration `003_book_signatures.sql`.  
-**Changelog 1.16:** Thêm bảng **`COMMENT` / `comments`** (overlay comment theo trang + `position_data`; cascade khi xóa sách) — migration `004_comments.sql`; SCR-03 tab Comment.  
+**Changelog 1.21:** Gộp `highlights`, `notes`, `typewriter_notes` thành bảng duy nhất **`annotations`** (chứa type: highlight, typewriter, shape) — migration `011_annotations.sql`. Đổi `highlight_tags` thành `annotation_tags`.  
 **Changelog 1.17:** **Bỏ bảng `app_settings`** khỏi SQLite overlay — app preferences theo platform (desktop: `electron-store`; mobile: MMKV / AsyncStorage); model `AppPreferences` vẫn dùng chung; migration `005_drop_app_settings.sql`.  
 **Changelog 1.18:** Library metadata — `books.description`, `books.page_count` (006); thể loại **n–n** qua **`GENRE` / `BOOK_GENRE`** (`genres`, `book_genres`) thay cột `books.genre` (007). **Không** khôi phục `app_settings`.
 **Changelog 1.19:** **`highlights` v2** (009) — gộp ghi chú vào highlight (`note`, `status`, `is_checked`, `updated_at`); một cột `location` (pack `start|end`); **bỏ bảng `notes`**; thêm **`tags`** + **`highlight_tags`** (N–N). **`reading_session_states` v2** (008). **Không** khôi phục `app_settings`.
@@ -626,7 +626,7 @@ Bảng đối chiếu khi implement: mỗi entity dùng để làm gì, gắn v�
 
 `signature_status` — trên `book_signatures`: `valid` \| `invalid` \| `expired` \| `unknown`.
 
-`page_number` / `position_data` (trên `comments`) — neo comment theo trang (1-based) + chuỗi vị trí trên trang (JSON tọa độ / bounding box). Ưu tiên PDF; format khác map tương đương khi renderer hỗ trợ.
+`page_number` / `location_data` (trên `annotations`) — neo theo trang (1-based) + chuỗi vị trí trên trang (JSON tọa độ / bounding box hoặc CFI). Ưu tiên PDF; format khác map tương đương khi renderer hỗ trợ.
 
 `BOOK_CHUNK.embedding` — Phase 2; MVP có thể chỉ lưu `content` + FTS5 virtual table trên `content` / `selected_text` / `NOTE.content`.
 
@@ -658,8 +658,7 @@ Bảng đối chiếu khi implement: mỗi entity dùng để làm gì, gắn v�
 | App preferences  | **Không** SQLite `app_settings` — platform store (1.17)            |
 | Digital signature | Cột `BOOK.is_signed` + bảng `BOOK_SIGNATURE` / `book_signatures` (1–n) |
 | Bookmark         | Bảng riêng `BOOKMARK` (không gộp vào highlight)                    |
-| Comment          | Bảng riêng `COMMENT` / `comments` (page + position_data; khác NOTE) |
-| Note ↔ Highlight | Ghi chú **inline** trên `highlights.note` (không bảng `notes` riêng); optional **`tags`** qua `highlight_tags` |
+| Annotations      | Bảng chung `ANNOTATION` / `annotations` cho highlight, typewriter, shape (kèm tags qua `annotation_tags`) |
 | Chunk            | Có trong schema sớm; embedding nullable đến Phase 2                |
 | Cascade xóa sách | book_authors + book_genres + collection_books + book_signatures + ReadingSessionState + Highlight + Comment + Bookmark + Chunk + highlight_tags |
 | Collections      | `COLLECTION` + `COLLECTION_BOOK` (n–n); xóa collection cascade membership, **không** xóa sách |
@@ -695,7 +694,7 @@ Database Diagram — SQLite Overlay Schema (MVP)
 - Tên bảng snake_case (`books`, `authors`, `book_authors`, …); datetime lưu `TEXT` ISO-8601; boolean lưu `INTEGER` 0/1.
 - **Author không nằm trên** `books` — quan hệ **n - n** qua `book_authors` (PK `book_id` + `author_id`, `sort_order`).
 - File sách **không** trong DB — chỉ `file_path` / `normalized_path`.
-- Xóa `books` → **CASCADE** `book_authors`, `collection_books`, `book_signatures`, progress, highlights, comments, bookmarks, book_chunks, `highlight_tags`; xóa highlight → cascade `highlight_tags`.
+- Xóa `books` → **CASCADE** `book_authors`, `collection_books`, `book_signatures`, progress, annotations, bookmarks, book_chunks, `annotation_tags`; xóa annotation → cascade `annotation_tags`.
 - Xóa `collections` → **CASCADE** `collection_books` (sách vẫn còn trong Library).
 - `sha256` **UNIQUE**; `book_chunks` **UNIQUE(book_id, chunk_index)**; FTS5 là virtual table riêng (không vẽ như entity nghiệp vụ).
 
@@ -865,7 +864,7 @@ Theme Night / Sepia / Paper là preference toàn app ở localStorage và áp d�
 
 **Index:** PK composite `(highlight_id, tag_id)`.
 
-#### `comments` — overlay comment theo trang (SCR-03)
+#### `annotations` — bảng chung cho highlight, typewriter, shape
 
 | Cột | Kiểu | Ràng buộc | Mô tả |
 | :--- | :--- | :--- | :--- |

@@ -35,6 +35,14 @@ export type { CollectionProps, CollectionBookProps } from './collection.js';
 export { ReadingSessionState } from './reading-session-state.js';
 export type { ReadingSessionStateProps } from './reading-session-state.js';
 
+export { Annotation } from './annotation.js';
+export type {
+  AnnotationProps,
+  AnnotationStatus,
+  AnnotationStyle,
+  AnnotationType,
+} from './annotation.js';
+
 export { Highlight } from './highlight.js';
 export type { HighlightProps, HighlightStatus } from './highlight.js';
 

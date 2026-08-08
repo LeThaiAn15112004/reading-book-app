@@ -3,7 +3,12 @@
  *
  * Primary paint: resolve CFI → DOM Range → per-line rect overlays.
  * Works for poetry / <br> / span / div — not only simple <p> blocks.
- * When full-range CFI fails, rebuild Range from start/end point CFIs.
+ * The tolerant resolver in `cfi-dom-range` runs before epubjs `contents.range`
+ * so unresolvable text steps do not spam `No startContainer found`. Then a
+ * re-anchor by the mark's captured text. Whichever candidate reproduces that
+ * text wins.
+ * Highlight washes sit *under* the reading text (z-index) and are clipped to
+ * text-node boxes so verse line-boxes do not tint glyphs orange.
  * epubjs annotations.highlight is used only when it actually paints visible marks.
  */
 
@@ -14,6 +19,19 @@ import {
 } from '@reading-book/domain'
 import type { Rendition } from 'epubjs'
 import type { HighlightHandleRect } from '@reading-book/shared/models'
+import {
+  cfiChapterSignature,
+  elementFromCfi,
+  findRangeByText,
+  isTrivialSectionStartCfi,
+  rangeBetweenBoundaries,
+  rangeMatchesText,
+  resolveCfiBoundary,
+  resolveCfiRange,
+  splitCfiComponents,
+  withEpubjsStartContainerLogMuted,
+  type CfiDomOptions,
+} from '../renderers/epub/cfi-dom-range'
 import {
   elementToHighlightHandleRect,
   emptyHighlightHandleRect,
@@ -36,6 +54,8 @@ type EpubjsContentsLike = {
   document?: Document
   window?: Window
   range?: (cfi: string) => Range | null
+  /** Spine component of CFIs rendered in this iframe, e.g. `/6/60`. */
+  cfiBase?: string
 }
 
 type ThemeableRendition = Rendition & {
@@ -57,6 +77,8 @@ export type EpubPaintMark = {
   /** Point CFIs — used when full-range resolve fails. */
   locationStart: string
   locationEnd: string
+  /** Captured text — verifies a resolved Range and re-anchors broken CFIs. */
+  selectedText: string
   colorHex: string
   id: string
 }
@@ -68,17 +90,7 @@ const LOG_PREFIX = '[DomCssOverlay]'
 
 /** True when CFI looks like epubjs range form: epubcfi(base,start,end). */
 function looksLikeRangeCfi(cfi: string): boolean {
-  const trimmed = cfi.trim()
-  if (!trimmed.startsWith('epubcfi(') || !trimmed.endsWith(')')) return false
-  const inner = trimmed.slice('epubcfi('.length, -1)
-  let depth = 0
-  let commas = 0
-  for (const ch of inner) {
-    if (ch === '[') depth += 1
-    else if (ch === ']') depth = Math.max(0, depth - 1)
-    else if (ch === ',' && depth === 0) commas += 1
-  }
-  return commas >= 2
+  return splitCfiComponents(cfi).length >= 3
 }
 
 /**
@@ -98,31 +110,15 @@ export function rebuildRangeCfi(
   const parsePoint = (
     cfi: string,
   ): { base: string; local: string } | null => {
-    if (!cfi.startsWith('epubcfi(') || !cfi.endsWith(')')) return null
-    const inner = cfi.slice('epubcfi('.length, -1)
-    let depth = 0
-    let comma = -1
-    for (let i = 0; i < inner.length; i += 1) {
-      const ch = inner[i]
-      if (ch === '[') depth += 1
-      else if (ch === ']') depth = Math.max(0, depth - 1)
-      else if (ch === ',' && depth === 0) {
-        comma = i
-        break
-      }
-    }
-    if (comma <= 0) return null
-    return {
-      base: inner.slice(0, comma).trim(),
-      local: inner.slice(comma + 1).trim(),
-    }
+    const parts = splitCfiComponents(cfi)
+    if (parts.length !== 2) return null
+    return { base: parts[0], local: parts[1] }
   }
 
   const start = parsePoint(a)
   const end = parsePoint(b)
   if (!start || !end) return null
   if (start.base !== end.base) return null
-  if (!start.local || !end.local) return null
   return `epubcfi(${start.base},${start.local},${end.local})`
 }
 
@@ -153,6 +149,7 @@ export function highlightsToEpubMarks(
         cfiRange,
         locationStart,
         locationEnd,
+        selectedText: h.selectedText,
         colorHex: h.colorHex,
       })
     } catch {
@@ -208,6 +205,22 @@ export class DomCssOverlay implements OverlayPainter {
   private paintedViaRects = new Set<string>()
   private onMarkClick: ((mark: DomCssOverlayMarkClick) => void) | undefined
   private lastHighlights: Highlight[] = []
+  /** iframe documents that already have our geometry hit-test listener. */
+  private hitTestBound = new WeakSet<Document>()
+  /** Our own layers must stay invisible to CFI indexing and text re-anchoring. */
+  private readonly cfiDomOptions: CfiDomOptions = {
+    isIgnoredElement: (el) => {
+      if (
+        el.hasAttribute(LAYER_ATTR) ||
+        el.hasAttribute(RECT_ATTR) ||
+        el.hasAttribute(STYLE_ATTR)
+      ) {
+        return true
+      }
+      const className = el.getAttribute('class') ?? ''
+      return className.includes('epubjs-hl') || className.includes('rb-epub-hl')
+    },
+  }
 
   constructor(
     private rendition: ThemeableRendition,
@@ -219,6 +232,7 @@ export class DomCssOverlay implements OverlayPainter {
     this.rendition = rendition as ThemeableRendition
     this.paintedViaAnnotations.clear()
     this.paintedViaRects.clear()
+    this.hitTestBound = new WeakSet()
   }
 
   setOnMarkClick(
@@ -236,6 +250,8 @@ export class DomCssOverlay implements OverlayPainter {
     const list = overlays.highlights ?? []
     this.lastHighlights = list
     await this.clear()
+    // Drop leftover native selection so its amber wash does not stack on our marks.
+    this.clearNativeSelections()
     const marks = highlightsToEpubMarks(list)
     if (marks.length === 0) return
 
@@ -253,8 +269,30 @@ export class DomCssOverlay implements OverlayPainter {
       }
 
       logPaintFail(mark, 'all_strategies_failed', {
-        tried: ['range_full_cfi', 'range_start_end_points', 'epubjs_annotations'],
+        tried: [
+          'epubjs_range_cfi',
+          'epubjs_start_end_points',
+          'tolerant_range_cfi',
+          'tolerant_start_end_points',
+          'text_reanchor',
+          'epubjs_annotations',
+        ],
       })
+    }
+  }
+
+  private clearNativeSelections(): void {
+    for (const contents of this.contentsList()) {
+      try {
+        contents.window?.getSelection()?.removeAllRanges()
+      } catch {
+        /* ignore */
+      }
+      try {
+        contents.document?.defaultView?.getSelection()?.removeAllRanges()
+      } catch {
+        /* ignore */
+      }
     }
   }
 
@@ -318,6 +356,7 @@ export class DomCssOverlay implements OverlayPainter {
         const el = doc.createElement('span')
         el.setAttribute(RECT_ATTR, mark.id)
         el.setAttribute('data-rb-hl-cfi', mark.cfiRange)
+        el.setAttribute('data-rb-hl-color', mark.colorHex)
         el.className = 'rb-dom-hl-rect'
         el.style.position = 'absolute'
         el.style.left = `${Math.round(r.left - bodyRect.left)}px`
@@ -326,28 +365,9 @@ export class DomCssOverlay implements OverlayPainter {
         el.style.height = `${Math.max(1, Math.round(r.height))}px`
         el.style.background = colorWithAlpha(mark.colorHex, 0.38)
         el.style.borderRadius = '2px'
-        el.style.pointerEvents = 'auto'
-        el.style.cursor = 'pointer'
+        // Visual wash only — sits under glyphs; clicks use geometry hit-test.
+        el.style.pointerEvents = 'none'
         el.style.mixBlendMode = 'normal'
-        el.style.zIndex = '5'
-        el.addEventListener('click', (e) => {
-          e.preventDefault()
-          e.stopPropagation()
-          const target = e.currentTarget as HTMLElement
-          let rect = emptyHighlightHandleRect()
-          try {
-            rect = this.resolveHandleRectFromCfi(mark.cfiRange, target)
-          } catch {
-            /* ignore */
-          }
-          this.onMarkClick?.({
-            id: mark.id,
-            cfiRange: mark.cfiRange,
-            colorHex: mark.colorHex,
-            rect,
-            click: this.viewportPointFromIframeEvent(e, target),
-          })
-        })
         layer.appendChild(el)
       }
       painted = true
@@ -360,38 +380,124 @@ export class DomCssOverlay implements OverlayPainter {
   }
 
   /**
-   * Resolve a DOM Range for the mark:
-   * 1) full cfiRange via contents.range
-   * 2) rebuild range CFI from start/end points, then contents.range
-   * 3) join boundary points from start + end point CFIs
+   * Resolve a DOM Range for the mark, in increasing tolerance:
+   * 1) tolerant CFI resolver (offset overflow / element boundaries)
+   * 2) rebuilt / point CFIs through the same tolerant path
+   * 3) epubjs `contents.range` (only for the rendered section)
+   * 4) re-anchor by the mark's captured text
+   *
+   * The first candidate whose text equals the mark's captured text wins, so a
+   * clamped or re-anchored Range can override an epubjs Range that drifted.
    */
   private resolveRange(
     contents: EpubjsContentsLike,
     mark: EpubPaintMark,
   ): Range | null {
-    const tryRange = (cfi: string): Range | null => {
-      if (!cfi.trim() || !contents.range) return null
-      try {
-        return contents.range(cfi.trim()) ?? null
-      } catch {
-        return null
-      }
-    }
-
-    const fromFull = tryRange(mark.cfiRange)
-    if (fromFull && !fromFull.collapsed) return fromFull
+    const doc = contents.document
+    if (!doc) return null
+    // Off-section marks must not call epubjs.range — it console.logs
+    // `No startContainer found` instead of throwing.
+    if (!this.belongsToRenderedSection(contents, mark)) return null
 
     const rebuilt = rebuildRangeCfi(mark.locationStart, mark.locationEnd)
-    if (rebuilt && rebuilt !== mark.cfiRange) {
-      const fromRebuilt = tryRange(rebuilt)
-      if (fromRebuilt && !fromRebuilt.collapsed) return fromRebuilt
-    }
+    const strategies: Array<() => Range | null> = [
+      () => this.rangeFromTolerantCfi(doc, mark.cfiRange),
+      () =>
+        rebuilt && rebuilt !== mark.cfiRange
+          ? this.rangeFromTolerantCfi(doc, rebuilt)
+          : null,
+      () =>
+        this.rangeFromTolerantPointCfis(
+          doc,
+          mark.locationStart,
+          mark.locationEnd,
+        ),
+      () => this.rangeFromEpubjs(contents, mark.cfiRange),
+      () =>
+        rebuilt && rebuilt !== mark.cfiRange
+          ? this.rangeFromEpubjs(contents, rebuilt)
+          : null,
+      () => this.rangeFromPointCfis(contents, mark.locationStart, mark.locationEnd),
+      () =>
+        findRangeByText(
+          doc,
+          elementFromCfi(doc, mark.locationStart, this.cfiDomOptions) ??
+            elementFromCfi(doc, mark.cfiRange, this.cfiDomOptions),
+          mark.selectedText,
+          this.cfiDomOptions,
+        ),
+    ]
 
-    return this.rangeFromPointCfis(
-      contents,
-      mark.locationStart,
-      mark.locationEnd,
+    let fallback: Range | null = null
+    for (const resolve of strategies) {
+      let range: Range | null = null
+      try {
+        range = resolve()
+      } catch {
+        range = null
+      }
+      if (!range || range.collapsed) continue
+      if (rangeMatchesText(range, mark.selectedText)) return range
+      fallback ??= range
+    }
+    return fallback
+  }
+
+  /** Unknown spine base counts as a match so paint never regresses on it. */
+  private belongsToRenderedSection(
+    contents: EpubjsContentsLike,
+    mark: EpubPaintMark,
+  ): boolean {
+    const rendered = cfiChapterSignature(contents.cfiBase ?? '')
+    if (!rendered) return true
+    const marked =
+      cfiChapterSignature(mark.cfiRange) ??
+      cfiChapterSignature(mark.locationStart)
+    return !marked || marked === rendered
+  }
+
+  /** epubjs `Contents.range` — throws on offsets it cannot patch, so guard it. */
+  private rangeFromEpubjs(
+    contents: EpubjsContentsLike,
+    cfi: string,
+  ): Range | null {
+    const trimmed = cfi.trim()
+    if (!trimmed || !contents.range) return null
+    // Skip CFIs epubjs logs for without throwing (body with no leading text node).
+    if (isTrivialSectionStartCfi(trimmed)) return null
+    try {
+      return (
+        withEpubjsStartContainerLogMuted(() => contents.range!(trimmed)) ?? null
+      )
+    } catch {
+      return null
+    }
+  }
+
+  private rangeFromTolerantCfi(doc: Document, cfi: string): Range | null {
+    if (!cfi.trim()) return null
+    return resolveCfiRange(doc, cfi.trim(), this.cfiDomOptions)
+  }
+
+  private rangeFromTolerantPointCfis(
+    doc: Document,
+    locationStart: string,
+    locationEnd: string,
+  ): Range | null {
+    const start = resolveCfiBoundary(
+      doc,
+      locationStart.trim(),
+      this.cfiDomOptions,
+      false,
     )
+    const end = resolveCfiBoundary(
+      doc,
+      locationEnd.trim(),
+      this.cfiDomOptions,
+      true,
+    )
+    if (!start || !end) return null
+    return rangeBetweenBoundaries(doc, start, end)
   }
 
   /** Build Range by combining start/end point CFI boundary points. */
@@ -405,16 +511,24 @@ export class DomCssOverlay implements OverlayPainter {
     const startCfi = locationStart.trim()
     const endCfi = locationEnd.trim()
     if (!startCfi || !endCfi) return null
+    if (
+      isTrivialSectionStartCfi(startCfi) ||
+      isTrivialSectionStartCfi(endCfi)
+    ) {
+      return null
+    }
 
     let startRange: Range | null = null
     let endRange: Range | null = null
     try {
-      startRange = contents.range(startCfi)
+      startRange = withEpubjsStartContainerLogMuted(() =>
+        contents.range!(startCfi),
+      )
     } catch {
       startRange = null
     }
     try {
-      endRange = contents.range(endCfi)
+      endRange = withEpubjsStartContainerLogMuted(() => contents.range!(endCfi))
     } catch {
       endRange = null
     }
@@ -450,41 +564,54 @@ export class DomCssOverlay implements OverlayPainter {
   private paintMarkWithAnnotations(mark: EpubPaintMark): string | null {
     const annotations = this.rendition.annotations
     if (!annotations) return null
+    // annotations.highlight → contents.range; skip off-section / trivial CFIs.
+    const onScreen = this.contentsList().some((contents) =>
+      this.belongsToRenderedSection(contents, mark),
+    )
+    if (!onScreen) return null
 
     const cfisToTry = [
       mark.cfiRange,
       rebuildRangeCfi(mark.locationStart, mark.locationEnd),
-    ].filter((c, i, arr): c is string => !!c && arr.indexOf(c) === i)
+    ].filter(
+      (c, i, arr): c is string =>
+        !!c && arr.indexOf(c) === i && !isTrivialSectionStartCfi(c),
+    )
 
     for (const cfi of cfisToTry) {
       const before = this.countVisibleAnnotationNodes()
       try {
-        annotations.highlight(
-          cfi,
-          { id: mark.id },
-          (e: Event) => {
-            const target = e.target as HTMLElement | null
-            let rect = emptyHighlightHandleRect()
-            try {
-              rect = this.resolveHandleRectFromCfi(cfi, target)
-            } catch {
-              /* ignore */
-            }
-            this.onMarkClick?.({
-              id: mark.id,
-              cfiRange: mark.cfiRange,
-              colorHex: mark.colorHex,
-              rect,
-              click: this.viewportPointFromIframeEvent(e, target),
-            })
-          },
-          'rb-epub-hl',
-          {
-            fill: mark.colorHex,
-            'fill-opacity': '0.38',
-            'mix-blend-mode': 'normal',
-          },
-        )
+        withEpubjsStartContainerLogMuted(() => {
+          annotations.highlight(
+            cfi,
+            { id: mark.id },
+            (e: Event) => {
+              const target = e.target as HTMLElement | null
+              let rect = emptyHighlightHandleRect()
+              try {
+                rect = this.resolveHandleRectFromCfi(
+                  { ...mark, cfiRange: cfi },
+                  target,
+                )
+              } catch {
+                /* ignore */
+              }
+              this.onMarkClick?.({
+                id: mark.id,
+                cfiRange: mark.cfiRange,
+                colorHex: mark.colorHex,
+                rect,
+                click: this.viewportPointFromIframeEvent(e, target),
+              })
+            },
+            'rb-epub-hl',
+            {
+              fill: mark.colorHex,
+              'fill-opacity': '0.38',
+              'mix-blend-mode': 'normal',
+            },
+          )
+        })
       } catch (err) {
         logPaintFail(mark, 'annotations_threw', {
           cfi,
@@ -534,6 +661,7 @@ export class DomCssOverlay implements OverlayPainter {
 
   private ensureLayer(doc: Document): HTMLElement {
     this.ensureHighlightStyles(doc)
+    this.bindMarkHitTest(doc)
     const body = doc.body
     if (body) {
       const pos = doc.defaultView?.getComputedStyle(body).position
@@ -546,39 +674,126 @@ export class DomCssOverlay implements OverlayPainter {
       layer = doc.createElement('div')
       layer.setAttribute(LAYER_ATTR, '1')
       layer.className = 'rb-dom-hl-layer'
-      layer.style.position = 'absolute'
-      layer.style.left = '0'
-      layer.style.top = '0'
-      layer.style.width = '0'
-      layer.style.height = '0'
-      layer.style.overflow = 'visible'
-      layer.style.pointerEvents = 'none'
-      layer.style.zIndex = '5'
-      ;(body ?? doc.documentElement).appendChild(layer)
+    }
+    // Keep the wash under glyphs: first child + z-index 0; content elevated via CSS.
+    layer.style.position = 'absolute'
+    layer.style.left = '0'
+    layer.style.top = '0'
+    layer.style.width = '0'
+    layer.style.height = '0'
+    layer.style.overflow = 'visible'
+    layer.style.pointerEvents = 'none'
+    layer.style.zIndex = '0'
+    const host = body ?? doc.documentElement
+    if (layer.parentNode !== host || host.firstChild !== layer) {
+      host.insertBefore(layer, host.firstChild)
     }
     return layer
   }
 
   private ensureHighlightStyles(doc: Document): void {
-    if (doc.querySelector(`style[${STYLE_ATTR}]`)) return
-    const style = doc.createElement('style')
-    style.setAttribute(STYLE_ATTR, '1')
+    let style = doc.querySelector(`style[${STYLE_ATTR}]`) as HTMLStyleElement | null
+    if (!style) {
+      style = doc.createElement('style')
+      style.setAttribute(STYLE_ATTR, '1')
+      ;(doc.head ?? doc.documentElement).appendChild(style)
+    }
+    // Rewrite every paint so HMR / older iframes pick up stacking + clip rules.
     style.textContent = `
-      .rb-dom-hl-layer { position: absolute; left: 0; top: 0; width: 0; height: 0; overflow: visible; pointer-events: none; z-index: 5; }
-      .rb-dom-hl-rect { pointer-events: auto; box-decoration-break: clone; -webkit-box-decoration-break: clone; }
+      .rb-dom-hl-layer {
+        position: absolute; left: 0; top: 0; width: 0; height: 0;
+        overflow: visible; pointer-events: none; z-index: 0;
+      }
+      .rb-dom-hl-rect {
+        pointer-events: none;
+        cursor: pointer;
+        box-decoration-break: clone;
+        -webkit-box-decoration-break: clone;
+      }
+      /* Reading content above highlight wash — glyphs keep theme color. */
+      body > *:not([${LAYER_ATTR}]) {
+        position: relative;
+        z-index: 1;
+      }
       .rb-epub-hl, g.rb-epub-hl, .epubjs-hl { mix-blend-mode: normal !important; }
     `
-    ;(doc.head ?? doc.documentElement).appendChild(style)
   }
 
   /**
-   * Collect visible line boxes for a Range.
-   * Filters zero-size / absurd full-page rects (common with verse wrappers).
+   * Geometry hit-test: washes sit under text so they cannot receive clicks.
+   * Capture-phase listener maps the point onto painted rect boxes instead.
+   */
+  private bindMarkHitTest(doc: Document): void {
+    if (this.hitTestBound.has(doc)) return
+    this.hitTestBound.add(doc)
+    doc.addEventListener('click', this.onDocumentMarkClick, true)
+  }
+
+  private onDocumentMarkClick = (event: MouseEvent): void => {
+    if (!this.onMarkClick) return
+    const doc =
+      event.view?.document ??
+      ((event.target as Node | null)?.ownerDocument ?? null)
+    if (!doc) return
+
+    const x = event.clientX
+    const y = event.clientY
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return
+
+    let hit: HTMLElement | null = null
+    for (const node of doc.querySelectorAll(`[${RECT_ATTR}]`)) {
+      const el = node as HTMLElement
+      const r = el.getBoundingClientRect()
+      if (x >= r.left && x <= r.right && y >= r.top && y <= r.bottom) {
+        hit = el
+      }
+    }
+    if (!hit) return
+
+    event.preventDefault()
+    event.stopPropagation()
+
+    const hitEl = hit
+    const id = hitEl.getAttribute(RECT_ATTR) ?? ''
+    const cfiRange = hitEl.getAttribute('data-rb-hl-cfi') ?? ''
+    const colorHex = hitEl.getAttribute('data-rb-hl-color') ?? '#f59e0b'
+    const mark =
+      highlightsToEpubMarks(this.lastHighlights).find((m) => m.id === id) ?? {
+        id,
+        cfiRange,
+        locationStart: splitCfiRange(cfiRange).locationStart || cfiRange,
+        locationEnd: splitCfiRange(cfiRange).locationEnd || cfiRange,
+        selectedText: '',
+        colorHex,
+      }
+
+    let rect = emptyHighlightHandleRect()
+    try {
+      rect = this.resolveHandleRectFromCfi(mark, hitEl)
+    } catch {
+      /* ignore */
+    }
+    this.onMarkClick({
+      id: mark.id,
+      cfiRange: mark.cfiRange,
+      colorHex: mark.colorHex,
+      rect,
+      click: this.viewportPointFromIframeEvent(event, hitEl),
+    })
+  }
+
+  /**
+   * Collect paint boxes for a Range.
+   * Prefer per-text-node rects so poetry `<br>` line-boxes (full column width)
+   * do not become wide amber bars that tint the glyphs.
    */
   private collectPaintRects(range: Range): DOMRect[] {
-    let list: DOMRect[]
+    let list: DOMRect[] = []
     try {
-      list = Array.from(range.getClientRects())
+      list = this.rectsFromTextNodes(range)
+      if (list.length === 0) {
+        list = Array.from(range.getClientRects())
+      }
     } catch {
       return []
     }
@@ -587,30 +802,68 @@ export class DomCssOverlay implements OverlayPainter {
 
     const heights = usable.map((r) => r.height).sort((a, b) => a - b)
     const medianH = heights[Math.floor(heights.length / 2)] ?? 18
+    const widths = usable.map((r) => r.width).sort((a, b) => a - b)
+    const medianW = widths[Math.floor(widths.length / 2)] ?? 80
+    // Drop absurd full-page / full-column boxes when tighter text rects exist.
     const sane = usable.filter(
-      (r) => r.height <= Math.max(medianH * 3.5, 48) && r.width <= 2400,
+      (r) =>
+        r.height <= Math.max(medianH * 3.5, 48) &&
+        r.width <= Math.max(medianW * 3.5, 480) &&
+        r.width <= 2400,
     )
     return sane.length > 0 ? sane : usable
   }
 
+  /** Client rects from each text node intersecting the range (tight glyph boxes). */
+  private rectsFromTextNodes(range: Range): DOMRect[] {
+    const rootNode = range.commonAncestorContainer
+    const doc =
+      rootNode.nodeType === Node.DOCUMENT_NODE
+        ? (rootNode as Document)
+        : rootNode.ownerDocument
+    if (!doc) return []
+
+    const root =
+      rootNode.nodeType === Node.ELEMENT_NODE ||
+      rootNode.nodeType === Node.DOCUMENT_NODE
+        ? rootNode
+        : rootNode.parentNode
+    if (!root) return []
+
+    const out: DOMRect[] = []
+    const walker = doc.createTreeWalker(root, NodeFilter.SHOW_TEXT)
+    let node = walker.nextNode() as Text | null
+    while (node) {
+      if (!range.intersectsNode(node)) {
+        node = walker.nextNode() as Text | null
+        continue
+      }
+      const start = node === range.startContainer ? range.startOffset : 0
+      const end =
+        node === range.endContainer ? range.endOffset : node.data.length
+      if (start < end) {
+        try {
+          const sub = doc.createRange()
+          sub.setStart(node, start)
+          sub.setEnd(node, end)
+          for (const r of Array.from(sub.getClientRects())) {
+            if (r.width >= 1 && r.height >= 1) out.push(r)
+          }
+        } catch {
+          /* ignore invalid offsets */
+        }
+      }
+      node = walker.nextNode() as Text | null
+    }
+    return out
+  }
+
   private resolveHandleRectFromCfi(
-    cfi: string,
+    mark: EpubPaintMark,
     fallbackEl?: Element | null,
   ): HighlightHandleRect {
     for (const contents of this.contentsList()) {
-      let range: Range | null = null
-      try {
-        range = contents.range?.(cfi) ?? null
-      } catch {
-        range = null
-      }
-      if (!range) {
-        range = this.rangeFromPointCfis(
-          contents,
-          splitCfiRange(cfi).locationStart || cfi,
-          splitCfiRange(cfi).locationEnd || cfi,
-        )
-      }
+      const range = this.resolveRange(contents, mark)
       if (!range) continue
       const frameEl =
         (contents.document?.defaultView?.frameElement as HTMLElement | null) ??

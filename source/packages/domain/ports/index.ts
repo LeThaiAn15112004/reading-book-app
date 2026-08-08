@@ -1,6 +1,6 @@
 export type { LibraryStore } from './library-store.js';
 export type { CollectionStore } from './collection-store.js';
-export type { OverlayStore } from './overlay-store.js';
+export type { AnnotationQuery, OverlayStore } from './overlay-store.js';
 
 export type { DocumentImporter, ImportResult } from './document-importer.js';
 export type { UrlDocumentFetcher, UrlFetchResult } from './url-document-fetcher.js';

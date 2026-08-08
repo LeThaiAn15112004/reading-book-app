@@ -118,6 +118,32 @@ function installApplicationMenu(): void {
   Menu.setApplicationMenu(null)
 }
 
+/** F12 / Ctrl+Shift+I toggle DevTools while running against Vite dev server. */
+function installDevToolsShortcuts(target: BrowserWindow): void {
+  if (!VITE_DEV_SERVER_URL) return
+
+  target.webContents.on('before-input-event', (event, input) => {
+    if (input.type !== 'keyDown') return
+
+    const isF12 = input.key === 'F12'
+    const isCtrlShiftI =
+      input.key === 'I' &&
+      input.control &&
+      input.shift &&
+      !input.alt &&
+      !input.meta
+
+    if (!isF12 && !isCtrlShiftI) return
+
+    if (target.webContents.isDevToolsOpened()) {
+      target.webContents.closeDevTools()
+    } else {
+      target.webContents.openDevTools({ mode: 'detach' })
+    }
+    event.preventDefault()
+  })
+}
+
 function createWindow() {
   const isMac = process.platform === 'darwin'
   sessionFlushDone = false
@@ -178,6 +204,8 @@ function createWindow() {
   win.once('ready-to-show', () => {
     win?.show()
   })
+
+  installDevToolsShortcuts(win)
 
   if (VITE_DEV_SERVER_URL) {
     win.loadURL(VITE_DEV_SERVER_URL)

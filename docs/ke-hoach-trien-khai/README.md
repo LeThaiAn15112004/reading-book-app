@@ -49,6 +49,7 @@ Khác với [`docs/plan/`](../plan/) (tầm nhìn sản phẩm, map research →
 | 9 | [09_Giai_doan_8_Special_Sync_Mobile.md](./09_Giai_doan_8_Special_Sync_Mobile.md) | Phase 3 — linked libraries + mobile |
 | — | [10_Checklist_nghiem_thu.md](./10_Checklist_nghiem_thu.md) | Checklist DoD từng giai đoạn |
 | — | [11_Backlog_tu_note_san_pham.md](./11_Backlog_tu_note_san_pham.md) | Map đầy đủ nợ từ [`docs/note/note.txt`](../note/note.txt) |
+| — | [12_Reader_Tools_Search_Speech_Translate_Typewriter.md](./12_Reader_Tools_Search_Speech_Translate_Typewriter.md) | Kế hoạch Search / Speech / Translate / Typewriter (UI shell trước, chi tiết sau) |
 
 **Quy tắc:** Chỉ sang giai đoạn tiếp theo khi checklist của giai đoạn hiện tại đã tick đủ (hoặc ghi rõ nợ kỹ thuật được chấp nhận).
 
@@ -65,7 +66,7 @@ Khác với [`docs/plan/`](../plan/) (tầm nhìn sản phẩm, map research →
 | **G4** Tiến độ & Settings | **T4.1–T4.9** | CFI codec; debounce/flush; session repo + IPC (`overlay:get/saveSessionState`); resume CFI; SCR-05 per-book + app-default fallback; preset theme BR-05 global; location map scrubber + label không %; tiếp T4.10 Library / Continue Reading |
 | G5…G8 | Chưa | Theo thứ tự checklist |
 
-**Schema (SDS 1.19):** `description` / `page_count` trên `books`; `genres` + `book_genres` (n–n); `is_signed`, `book_signatures`, `comments`; **không** `app_settings`. Migrations `001`–`009`. **`008`**: `reading_session_states` v2. **`009`**: `highlights` v2 (inline `note`, bỏ bảng `notes`) + `tags` / `highlight_tags`.
+**Schema (SDS 1.21):** `description` / `page_count` trên `books`; `genres` + `book_genres` (n–n); `is_signed`, `book_signatures`, `annotations`; **không** `app_settings`. Migrations `001`–`011`. **`008`**: `reading_session_states` v2. **`011`**: gộp highlight, typewriter thành bảng `annotations`.
 
 **Chi tiết tick + bảng nợ:** [10_Checklist_nghiem_thu.md](./10_Checklist_nghiem_thu.md)  
 **Map note sản phẩm → giai đoạn:** [11_Backlog_tu_note_san_pham.md](./11_Backlog_tu_note_san_pham.md)

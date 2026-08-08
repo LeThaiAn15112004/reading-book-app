@@ -5,7 +5,7 @@ import {
   normalizeHighlightColorHex,
   type HighlightHandleRect,
   type PendingSelection,
-} from '../../readerSession'
+} from '@reading-book/shared/models'
 
 export type SelectionMenuAnchor = {
   x: number

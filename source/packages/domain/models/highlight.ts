@@ -1,14 +1,8 @@
+import type { AnnotationStatus } from './annotation.js';
 import { Location } from './location.js';
 
-/** Task / review status on a highlight (SDS §3 — HIGHLIGHT.status). */
-export type HighlightStatus =
-  | 'None'
-  | 'Accepted'
-  | 'Rejected'
-  | 'Cancelled'
-  | 'Completed'
-  | 'Deferred'
-  | 'Future';
+/** Task / review status on a highlight — same vocabulary as `annotations.status`. */
+export type HighlightStatus = AnnotationStatus;
 
 export interface HighlightProps {
   id: string;
@@ -24,7 +18,10 @@ export interface HighlightProps {
   updatedAt: string;
 }
 
-/** Highlight overlay on a book; optional inline note (SDS §3 — HIGHLIGHT). */
+/**
+ * Text-range view model used by renderers and overlay painters.
+ * Persistence goes through `Annotation` (`annotations` table).
+ */
 export class Highlight {
   readonly id: string;
   readonly bookId: string;

@@ -1,4 +1,4 @@
-import type { CollectionSummary } from '../../libraryModel'
+import type { CollectionSummary } from '@reading-book/shared/models'
 
 const STACK_GRADS = [
   'linear-gradient(135deg, #1e3a8a, #3b82f6)',

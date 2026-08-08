@@ -1,13 +1,14 @@
 import { useEffect, useState } from 'react'
-import type { ZoomLayoutPreset } from '../../readerZoom'
-import type { PageLayout, PageMode } from '../../readerSession'
+import type { ZoomLayoutPreset } from '../../logic'
+import type { PageLayout, PageMode } from '@reading-book/shared/models'
 import { ZoomControl } from './ZoomControl'
 
 const modeGroupClass =
   'inline-flex items-center gap-0.5 rounded-lg bg-lib-hint/70 p-0.5'
 const modeButtonClass =
   'inline-flex h-7 w-8 cursor-pointer items-center justify-center rounded-md border-none bg-transparent text-lib-muted transition-colors hover:bg-lib-chip hover:text-lib-text-strong'
-const modeButtonActiveClass = 'bg-lib-chip text-lib-accent'
+const modeButtonActiveClass =
+  'bg-lib-text-strong/12 text-lib-text-strong hover:bg-lib-text-strong/18'
 
 const layoutOptions: Array<{
   id: PageLayout
@@ -54,6 +55,26 @@ function PageTurnIcon() {
   )
 }
 
+function BookmarkIcon({ filled }: { filled: boolean }) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      fill={filled ? 'currentColor' : 'none'}
+      viewBox="0 0 24 24"
+      strokeWidth={1.8}
+      stroke="currentColor"
+      className="size-4"
+      aria-hidden
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M17.593 3.322c1.1.128 1.907 1.077 1.907 2.185V21L12 17.25 4.5 21V5.507c0-1.108.806-2.057 1.907-2.185a48.507 48.507 0 0 1 11.186 0Z"
+      />
+    </svg>
+  )
+}
+
 type ReaderFooterProps = {
   pageCurrent: number
   pageTotal: number
@@ -68,6 +89,8 @@ type ReaderFooterProps = {
   onZoomChange: (scale: number) => void
   onZoomStep: (direction: 1 | -1) => void
   onZoomLayoutPreset: (preset: ZoomLayoutPreset) => void
+  bookmarkActive?: boolean
+  onToggleBookmark?: () => void
 }
 
 export function ReaderFooter({
@@ -84,6 +107,8 @@ export function ReaderFooter({
   onZoomChange,
   onZoomStep,
   onZoomLayoutPreset,
+  bookmarkActive = false,
+  onToggleBookmark,
 }: ReaderFooterProps) {
   const [pageInput, setPageInput] = useState(String(pageCurrent))
 
@@ -179,6 +204,25 @@ export function ReaderFooter({
           &gt;&gt;
         </button>
         </span>
+
+        {onToggleBookmark ? (
+          <button
+            type="button"
+            className={`${modeButtonClass} ${
+              bookmarkActive
+                ? 'bg-lib-accent-soft text-lib-accent hover:bg-lib-accent-soft hover:text-lib-accent'
+                : ''
+            }`}
+            title={bookmarkActive ? 'Remove bookmark' : 'Bookmark this place'}
+            aria-label={
+              bookmarkActive ? 'Remove bookmark' : 'Bookmark this place'
+            }
+            aria-pressed={bookmarkActive}
+            onClick={onToggleBookmark}
+          >
+            <BookmarkIcon filled={bookmarkActive} />
+          </button>
+        ) : null}
 
         <span className={modeGroupClass} aria-label="Page count">
           {layoutOptions.map((option) => (

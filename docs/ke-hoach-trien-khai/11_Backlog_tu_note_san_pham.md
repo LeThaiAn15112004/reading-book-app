@@ -25,9 +25,9 @@ Quy tắc:
 | 7 | **Đánh dấu trang** (bookmark) | UI ribbon/sidebar stub in-memory; chưa SQLite | FR-11 · **NOTE-R5** | **G5** |
 | 8 | **Lưu yêu thích** | Cột `is_favorite`; chưa toggle UI / filter | FR-08 · **G1-N3** | **G4** |
 | 9 | **AI tóm tắt** sách dài | Feature flag off; chưa UI | FR-20+ · **NOTE-AI1** | **G7** (opt-in, không auto import) |
-| 10 | **Search trong docs** (find-in-book) | Titlebar search stub toast; chưa tìm text | **NOTE-R6** | Find cơ bản **G3/G4**; semantic **G7** |
+| 10 | **Search trong docs** (find-in-book) | Tools + titlebar stub toast; chưa tìm text | **NOTE-R6** · **TOOL-SEARCH1** | Find cơ bản **G3/G4**; chi tiết [12](./12_Reader_Tools_Search_Speech_Translate_Typewriter.md); semantic **G7** |
 | 11 | **Note** văn bản | UI modal/sidebar in-memory; chưa persist | FR-07 · **NOTE-R7** | **G5** |
-| 12 | **Đọc audio** (TTS) cho ai lười nhìn | Chưa có trong SDS MVP | **NOTE-TTS1** | Spike / **sau G7** (chưa cam kết MVP) |
+| 12 | **Đọc audio** (TTS) cho ai lười nhìn | Nút Speech trên Tools (stub); chưa TTS | **NOTE-TTS1** · **TOOL-SPEECH1** | Spike / **sau G7** — [12](./12_Reader_Tools_Search_Speech_Translate_Typewriter.md) |
 | 13 | Ít khi 2 trang ngang; **1 trang căn giữa**; khung chia 2 trang | Aa layout UI có; chưa EPUB thật + spine | SDS SCR-05 · **NOTE-R8** | **G4** |
 | 14 | **Chọn kiểu đọc** (scroll / lật trang) | Aa page mode UI; chưa renderer | SDS SCR-05 · **NOTE-R9** | **G4** |
 | 15 | **Bỏ quản lý user**; chỉ linked libs (GG Books, iCloud…) | Đã chốt BR-08 / không account; connector chưa làm | FR-30 · **NOTE-L1** | **G8** |
@@ -93,6 +93,17 @@ Xem [02 §5](./02_Giai_doan_1_Splash_Library.md) · [03 §5](./03_Giai_doan_2_Im
 
 - Không account app; GG Books / iCloud Books / Drive → **NOTE-L1**
 
+### Reader companion tools (UI shell 2026-08-05)
+
+Chi tiết task: [12_Reader_Tools_Search_Speech_Translate_Typewriter.md](./12_Reader_Tools_Search_Speech_Translate_Typewriter.md)
+
+| ID | Ý | Trạng thái | Trả ở |
+| :--- | :--- | :--- | :--- |
+| **TOOL-SEARCH1** | Search in-book | Nút Tools + toast | G3/G4 polish → G7 semantic |
+| **TOOL-SPEECH1** | Speech / TTS | Nút Tools + toast | Sau G7 (spike) |
+| **TOOL-TR1** | Translate đoạn/trang | Nút Tools + toast | Sau MVP / G7 provider |
+| **TOOL-TW1** | Typewriter overlay persist | Tool kích hoạt được trên fake; chưa SQLite/EPUB neo | Sau G5/G6 |
+
 ### Ngoài phạm vi / chưa cam kết MVP
 
 | ID | Ý | Lý do |
@@ -105,4 +116,5 @@ Xem [02 §5](./02_Giai_doan_1_Splash_Library.md) · [03 §5](./03_Giai_doan_2_Im
 ## Liên kết
 
 - Checklist tổng: [10_Checklist_nghiem_thu.md](./10_Checklist_nghiem_thu.md)
+- Companion tools: [12_Reader_Tools_Search_Speech_Translate_Typewriter.md](./12_Reader_Tools_Search_Speech_Translate_Typewriter.md)
 - Note gốc: [`docs/note/note.txt`](../note/note.txt)

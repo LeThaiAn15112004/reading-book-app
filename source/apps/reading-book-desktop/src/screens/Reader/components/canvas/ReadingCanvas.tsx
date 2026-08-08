@@ -1,21 +1,43 @@
-import { useCallback, useEffect, useRef, type MouseEvent, type PointerEvent as ReactPointerEvent } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type MouseEvent,
+  type PointerEvent as ReactPointerEvent,
+} from 'react'
 import { rangeToHighlightHandleRect, elementToHighlightHandleRect } from '../../../../reader/renderers/epub/selection-cfi'
 import {
   isPointInTextSelection,
   isTextNodeAtPoint,
   PAN_DRAG_THRESHOLD_PX,
 } from '../../../../reader/interaction-hit'
-import type { FakeChapter } from '../../fakeReaderContent'
-import type {
-  AnnotateTool,
-  ESignStamp,
-  HighlightHandleRect,
-  InteractionTool,
-  PendingSelection,
-  ReaderComment,
-  ReaderHighlight,
-  TypewriterMark,
-} from '../../readerSession'
+import {
+  blocksSelectionContextMenu,
+  isCrosshairAnnotateTool,
+  isDrawingTool,
+  type AnnotateTool,
+  type ESignStamp,
+  type HighlightHandleRect,
+  type InteractionTool,
+  type PendingSelection,
+  type ReaderHighlight,
+  type ReaderTypewriterNote,
+  type TypewriterBoxStyle,
+  type TypewriterMovePayload,
+} from '@reading-book/shared/models'
+import type { FakeChapter } from '../../logic'
+import {
+  beginTypewriterDrag,
+  tickTypewriterDrag,
+  type TypewriterDragSession,
+  type TypewriterPct,
+} from '../../../../reader/typewriterBoxDrag'
+import { hitTestTypewriterAtClientPoint } from '../../../../reader/typewriterHitTest'
+import {
+  TypewriterRichEditor,
+  TypewriterStaticHtml,
+} from '../../../../reader/typewriter'
 
 type MarginMode = 'narrow' | 'normal' | 'wide' | 'off'
 
@@ -29,11 +51,9 @@ type ReadingCanvasProps = {
   layout: 'single' | 'dual' | 'triple'
   activeTool: AnnotateTool
   highlights: ReaderHighlight[]
-  comments: ReaderComment[]
-  typewriterMarks: TypewriterMark[]
+  typewriterNotes: ReaderTypewriterNote[]
   eSignStamps: ESignStamp[]
   onCanvasBackgroundClick: () => void
-  onParagraphClick: (chapterIndex: number, paragraphIndex: number) => void
   onSelectionContextMenu: (
     selection: PendingSelection,
     anchor: { x: number; y: number },
@@ -47,10 +67,21 @@ type ReadingCanvasProps = {
     rect: HighlightHandleRect,
     click: { x: number; y: number },
   ) => void
-  onPlaceTypewriter: (chapterIndex: number, xPct: number, yPct: number) => void
+  onPlaceTypewriter: (
+    chapterIndex: number,
+    xPct: number,
+    yPct: number,
+  ) => string | void
   onPlaceESign: (chapterIndex: number, xPct: number, yPct: number) => void
   onTypewriterChange: (id: string, text: string) => void
-  onRequestInteractionTool?: (tool: InteractionTool) => void
+  /** Flush debounced content persist (e.g. on blur). */
+  onTypewriterBlur?: (id: string) => void
+  onTypewriterFocus?: (id: string) => void
+  onTypewriterStyleChange?: (id: string, patch: TypewriterBoxStyle) => void
+  /** Persist reposition after drag (T5.6c). */
+  onTypewriterMove?: (id: string, payload: TypewriterMovePayload) => void
+  /** Delete from canvas (empty + Delete/Backspace). */
+  onTypewriterDelete?: (id: string) => void
   /** Hand pan deltas — scroll the outer zoom viewport when provided. */
   onHandPanBy?: (dx: number, dy: number) => void
 }
@@ -109,6 +140,8 @@ function buildFakeSelection(
 function interactionToolOf(activeTool: AnnotateTool): InteractionTool {
   if (activeTool === 'highlight') return 'highlight'
   if (activeTool === 'select') return 'select'
+  if (activeTool === 'typewriter') return 'typewriter'
+  if (isCrosshairAnnotateTool(activeTool)) return 'annotate'
   return 'hand'
 }
 
@@ -122,11 +155,9 @@ export function ReadingCanvas({
   layout,
   activeTool,
   highlights,
-  comments,
-  typewriterMarks,
+  typewriterNotes,
   eSignStamps,
   onCanvasBackgroundClick,
-  onParagraphClick,
   onSelectionContextMenu,
   onTextSelected,
   onSelectionDismiss,
@@ -134,10 +165,106 @@ export function ReadingCanvas({
   onPlaceTypewriter,
   onPlaceESign,
   onTypewriterChange,
-  onRequestInteractionTool,
+  onTypewriterBlur,
+  onTypewriterFocus,
+  onTypewriterStyleChange,
+  onTypewriterMove,
+  onTypewriterDelete,
   onHandPanBy,
 }: ReadingCanvasProps) {
+  const [activeEditingId, setActiveEditingId] = useState<string | null>(null)
+  const activeEditingIdRef = useRef<string | null>(null)
+  activeEditingIdRef.current = activeEditingId
+  const typewriterNoteRefs = useRef(new Map<string, HTMLDivElement>())
+  const visibleTypewriterNoteIdsRef = useRef<string[]>([])
+  const dragSessionRef = useRef<TypewriterDragSession | null>(null)
+  const dragPreviewRef = useRef<(TypewriterPct & { id: string }) | null>(null)
+  const suppressTypewriterClickRef = useRef(false)
+  const [dragPreview, setDragPreview] = useState<
+    (TypewriterPct & { id: string }) | null
+  >(null)
+  const onTypewriterMoveRef = useRef(onTypewriterMove)
+  onTypewriterMoveRef.current = onTypewriterMove
   const renderedChapters = pageMode === 'scroll' ? chapters : [chapter]
+
+  const setTypewriterDragPreview = useCallback(
+    (next: (TypewriterPct & { id: string }) | null) => {
+      dragPreviewRef.current = next
+      setDragPreview(next)
+    },
+    [],
+  )
+
+  useEffect(() => {
+    function endDrag(commit: boolean, openEditIfClick: boolean) {
+      const session = dragSessionRef.current
+      dragSessionRef.current = null
+      const preview = dragPreviewRef.current
+      setTypewriterDragPreview(null)
+      if (!session) return
+      if (session.moved) {
+        suppressTypewriterClickRef.current = true
+        if (commit && preview && preview.id === session.id) {
+          onTypewriterMoveRef.current?.(session.id, {
+            xPct: preview.xPct,
+            yPct: preview.yPct,
+          })
+        }
+        return
+      }
+      if (openEditIfClick) {
+        setActiveEditingId(session.id)
+      }
+    }
+
+    function onPointerMove(e: PointerEvent) {
+      const session = dragSessionRef.current
+      if (!session || e.pointerId !== session.pointerId) return
+      const { session: next, preview } = tickTypewriterDrag(
+        session,
+        e.clientX,
+        e.clientY,
+      )
+      dragSessionRef.current = next
+      if (preview) {
+        setTypewriterDragPreview({ id: next.id, ...preview })
+      }
+    }
+    function onPointerUp(e: PointerEvent) {
+      const session = dragSessionRef.current
+      if (!session || e.pointerId !== session.pointerId) return
+      endDrag(true, true)
+    }
+    function onPointerCancel(e: PointerEvent) {
+      const session = dragSessionRef.current
+      if (!session || e.pointerId !== session.pointerId) return
+      endDrag(false, false)
+    }
+    window.addEventListener('pointermove', onPointerMove)
+    window.addEventListener('pointerup', onPointerUp)
+    window.addEventListener('pointercancel', onPointerCancel)
+    return () => {
+      window.removeEventListener('pointermove', onPointerMove)
+      window.removeEventListener('pointerup', onPointerUp)
+      window.removeEventListener('pointercancel', onPointerCancel)
+    }
+  }, [setTypewriterDragPreview])
+
+  // Hand + Typewriter tools keep inline edit; other tools commit and exit.
+  useEffect(() => {
+    if (!activeEditingId) return
+    if (activeTool === 'hand' || activeTool === 'typewriter') return
+    onTypewriterBlur?.(activeEditingId)
+    setActiveEditingId(null)
+  }, [activeTool, activeEditingId, onTypewriterBlur])
+
+  const beginHandTypewriterEdit = useCallback((id: string) => {
+    const prev = activeEditingIdRef.current
+    if (prev && prev !== id) {
+      onTypewriterBlur?.(prev)
+    }
+    setActiveEditingId(id)
+  }, [onTypewriterBlur])
 
   const marginLayout = chromeHidden ? MARGIN_IMMERSIVE : MARGIN
   const areaLayout =
@@ -165,6 +292,11 @@ export function ReadingCanvas({
     scrollTop: number
   } | null>(null)
 
+  const allowTextSelect = mode !== 'annotate' && mode !== 'typewriter'
+  /** Hand mode: I-beam only while hovering a real text node. */
+  const [handOverText, setHandOverText] = useState(false)
+  const handPanningRef = useRef(false)
+
   const applySurfaceSelect = (allowSelect: boolean) => {
     const root = surfaceRef.current
     if (!root) return
@@ -178,7 +310,11 @@ export function ReadingCanvas({
   }
 
   useEffect(() => {
-    applySurfaceSelect(mode !== 'hand')
+    applySurfaceSelect(allowTextSelect)
+  }, [allowTextSelect])
+
+  useEffect(() => {
+    if (mode !== 'hand') setHandOverText(false)
   }, [mode])
 
   const handleContextMenu = useCallback(
@@ -187,12 +323,7 @@ export function ReadingCanvas({
       targetChapterIndex: number,
       paragraphIndex: number,
     ) => {
-      if (
-        activeTool === 'comment' ||
-        activeTool === 'typewriter' ||
-        activeTool === 'esign' ||
-        activeTool === 'highlight'
-      ) {
+      if (blocksSelectionContextMenu(activeTool)) {
         return
       }
       // Suppress native menu; open floating toolbar only on the selection.
@@ -226,52 +357,49 @@ export function ReadingCanvas({
 
   const onPointerDown = (event: ReactPointerEvent<HTMLElement>) => {
     if (event.button !== 0 || isInteractiveTarget(event.target)) return
-    if (activeTool === 'typewriter' || activeTool === 'esign' || activeTool === 'comment') {
-      return
-    }
-    const hitText = isTextNodeAtPoint(document, event.clientX, event.clientY)
-    if (modeRef.current === 'hand') {
-      if (hitText) {
-        // Smart switch: arm Text Select so this gesture can select immediately.
-        modeRef.current = 'select'
-        onRequestInteractionTool?.('select')
-        applySurfaceSelect(true)
-        gestureRef.current = null
-        return
-      }
+    const tool = modeRef.current
+
+    // Crosshair annotate / typewriter: placement click wins — no text selection / pan.
+    if (tool === 'annotate' || tool === 'typewriter') {
       event.preventDefault()
-      gestureRef.current = {
-        startX: event.clientX,
-        startY: event.clientY,
-        lastX: event.clientX,
-        lastY: event.clientY,
-        hitText: false,
-        panned: false,
-        scrollTop: event.currentTarget.scrollTop,
-      }
-      return
-    }
-    // Highlight stays latched until the user picks another tool.
-    if (modeRef.current === 'highlight') {
       gestureRef.current = null
       return
     }
-    if (!hitText) {
-      gestureRef.current = {
-        startX: event.clientX,
-        startY: event.clientY,
-        lastX: event.clientX,
-        lastY: event.clientY,
-        hitText: false,
-        panned: false,
-        scrollTop: event.currentTarget.scrollTop,
-      }
-    } else {
+
+    // Highlight: let native selection run; paint on mouseup.
+    if (tool === 'highlight') {
       gestureRef.current = null
+      return
+    }
+
+    const hitText = isTextNodeAtPoint(document, event.clientX, event.clientY)
+    // Hand / Select: text → native select; margin → pan.
+    if (hitText) {
+      gestureRef.current = null
+      return
+    }
+
+    event.preventDefault()
+    handPanningRef.current = true
+    setHandOverText(false)
+    gestureRef.current = {
+      startX: event.clientX,
+      startY: event.clientY,
+      lastX: event.clientX,
+      lastY: event.clientY,
+      hitText: false,
+      panned: false,
+      scrollTop: event.currentTarget.scrollTop,
     }
   }
 
   const onPointerMove = (event: ReactPointerEvent<HTMLElement>) => {
+    // Hand hover cursor: I-beam on text nodes, grab elsewhere.
+    if (modeRef.current === 'hand' && !handPanningRef.current) {
+      const overText = isTextNodeAtPoint(document, event.clientX, event.clientY)
+      setHandOverText((prev) => (prev === overText ? prev : overText))
+    }
+
     const g = gestureRef.current
     if (!g || (event.buttons & 1) === 0) return
     const dx = event.clientX - g.lastX
@@ -281,53 +409,61 @@ export function ReadingCanvas({
     const total = Math.hypot(event.clientX - g.startX, event.clientY - g.startY)
     if (!g.panned && total >= PAN_DRAG_THRESHOLD_PX) g.panned = true
     const current = modeRef.current
-    if (current === 'hand' || (current === 'select' && !g.hitText)) {
+    if (current === 'hand' || current === 'select') {
       if (onHandPanBy) {
         onHandPanBy(dx, dy)
       } else {
         event.currentTarget.scrollTop -= dy
         event.currentTarget.scrollLeft -= dx
       }
-      if (g.panned) onRequestInteractionTool?.('hand')
     }
   }
 
   const onPointerUp = (event: ReactPointerEvent<HTMLElement>) => {
     const g = gestureRef.current
     gestureRef.current = null
+    handPanningRef.current = false
     if (!g || event.button !== 0) return
     const current = modeRef.current
-    if (current === 'highlight') return
-    if (g.panned) {
-      onRequestInteractionTool?.('hand')
+    if (
+      current === 'highlight' ||
+      current === 'annotate' ||
+      current === 'typewriter'
+    ) {
       return
     }
+    if (g.panned) return
     if (current === 'hand') {
-      // Margin tap: chrome toggle (text clicks already switched on pointerdown).
-      onRequestInteractionTool?.('hand')
-      if (!isInteractiveTarget(event.target) && isCenterTap(event)) {
-        onSelectionDismiss()
-        onCanvasBackgroundClick()
+      const hitId = hitTestTypewriterAtClientPoint(
+        visibleTypewriterNoteIdsRef.current,
+        typewriterNoteRefs.current,
+        event.clientX,
+        event.clientY,
+      )
+      if (hitId) {
+        beginHandTypewriterEdit(hitId)
+        return
       }
-      return
     }
-    if (!g.hitText) {
-      onRequestInteractionTool?.('hand')
+    // Margin tap: toggle chrome (toolbar tool unchanged).
+    if (!isInteractiveTarget(event.target) && isCenterTap(event)) {
       if (!hasTextSelection()) onSelectionDismiss()
-      if (!isInteractiveTarget(event.target) && isCenterTap(event)) {
-        onCanvasBackgroundClick()
-      }
+      onCanvasBackgroundClick()
     }
   }
 
   const cursorClass =
-    activeTool === 'typewriter' || activeTool === 'esign'
-      ? 'cursor-crosshair'
-      : mode === 'highlight'
-        ? 'cursor-highlight-tool'
-        : mode === 'select'
-          ? 'cursor-select-tool'
-          : 'cursor-hand-tool active:cursor-hand-tool-active'
+    mode === 'typewriter'
+      ? 'cursor-typewriter-tool'
+      : mode === 'annotate'
+        ? 'cursor-crosshair'
+        : mode === 'highlight'
+          ? 'cursor-highlight-tool'
+          : mode === 'select'
+            ? 'cursor-select-tool'
+            : handOverText
+              ? 'cursor-select-tool'
+              : 'cursor-hand-tool active:cursor-hand-tool-active'
 
   function renderChapterPage(
     renderedChapter: FakeChapter,
@@ -337,11 +473,8 @@ export function ReadingCanvas({
       (h): h is Extract<ReaderHighlight, { source: 'fake' }> =>
         h.source === 'fake' && h.chapterIndex === renderedChapterIndex,
     )
-    const chapterComments = comments.filter(
-      (c) => c.chapterIndex === renderedChapterIndex,
-    )
-    const chapterTw = typewriterMarks.filter(
-      (m) => m.chapterIndex === renderedChapterIndex,
+    const chapterTw = typewriterNotes.filter(
+      (m) => m.chapterIndex === renderedChapterIndex && m.type === 'textbox',
     )
     const chapterSign = eSignStamps.filter(
       (s) => s.chapterIndex === renderedChapterIndex,
@@ -350,6 +483,7 @@ export function ReadingCanvas({
     return (
       <div
         key={`${renderedChapter.num}-${renderedChapterIndex}`}
+        data-tw-chapter=""
         className={`relative mx-auto w-full transition-[max-width] duration-300 ${areaLayout} ${pageBlockFrame} ${
           pageMode === 'paginated' ? 'min-h-[calc(100%-48px)] snap-start' : ''
         }`}
@@ -360,10 +494,26 @@ export function ReadingCanvas({
             const yPct = ((e.clientY - area.top) / area.height) * 100
             e.stopPropagation()
             if (activeTool === 'typewriter') {
-              onPlaceTypewriter(renderedChapterIndex, xPct, yPct)
+              // Commit any in-progress edit before placing a new box.
+              if (activeEditingId) {
+                onTypewriterBlur?.(activeEditingId)
+                setActiveEditingId(null)
+              }
+              const newId = onPlaceTypewriter(
+                renderedChapterIndex,
+                xPct,
+                yPct,
+              )
+              if (typeof newId === 'string' && newId) {
+                setActiveEditingId(newId)
+              }
             } else {
               onPlaceESign(renderedChapterIndex, xPct, yPct)
             }
+            return
+          }
+          if (isDrawingTool(activeTool)) {
+            e.stopPropagation()
           }
         }}
       >
@@ -383,29 +533,17 @@ export function ReadingCanvas({
             lineHeight: 'var(--reader-reading-line-height)',
             textAlign: 'var(--reader-reading-align)' as 'left',
             color: 'var(--reader-text, #cbd5e1)',
-            userSelect: mode === 'hand' ? 'none' : 'text',
+            userSelect: allowTextSelect ? 'text' : 'none',
           }}
         >
           {renderedChapter.paragraphs.map((text, i) => {
             const hl = chapterHighlights.find((h) => h.paragraphIndex === i)
-            const commentCount = chapterComments.filter(
-              (c) => c.paragraphIndex === i,
-            ).length
             return (
               <div
                 key={`${renderedChapter.num}-${i}`}
-                className={`relative mb-[1.5em] rounded-md ${
-                  activeTool === 'comment'
-                    ? 'cursor-pointer outline outline-1 outline-transparent hover:bg-amber-500/5 hover:outline-amber-500/45'
-                    : ''
-                }`}
+                className="relative mb-[1.5em] rounded-md"
                 onClick={(e) => {
-                  if (activeTool === 'comment') {
-                    e.stopPropagation()
-                    onParagraphClick(renderedChapterIndex, i)
-                    return
-                  }
-                  if (activeTool === 'typewriter' || activeTool === 'esign') {
+                  if (isCrosshairAnnotateTool(activeTool)) {
                     return
                   }
                   if (mode === 'highlight' && hl) {
@@ -457,41 +595,135 @@ export function ReadingCanvas({
                   ) : null}
                   {text}
                 </p>
-                {commentCount > 0 ? (
-                  <button
-                    className="absolute top-0 -right-1 inline-flex h-5 min-w-5 cursor-pointer items-center justify-center rounded-full border-none bg-amber-500/15 px-1.5 text-[11px] font-bold text-amber-400"
-                    type="button"
-                    title={`${commentCount} comment(s)`}
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      onParagraphClick(renderedChapterIndex, i)
-                    }}
-                  >
-                    {commentCount}
-                  </button>
-                ) : null}
               </div>
             )
           })}
         </div>
 
-        {chapterTw.map((m) => (
-          <div
-            key={m.id}
-            className="absolute z-[5] min-w-[120px] -translate-x-1/2 -translate-y-1/2"
-            style={{ left: `${m.xPct}%`, top: `${m.yPct}%` }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <input
-              type="text"
-              value={m.text}
-              placeholder="Type..."
-              aria-label="Typewriter text"
-              className="h-8 w-40 rounded border border-dashed border-amber-500 bg-slate-950/85 px-2 font-mono text-[13px] text-slate-100 outline-none"
-              onChange={(e) => onTypewriterChange(m.id, e.target.value)}
-            />
-          </div>
-        ))}
+        {chapterTw.map((m) => {
+          let pos = { xPct: 0, yPct: 0 }
+          try {
+            pos = JSON.parse(m.positionData) as { xPct: number; yPct: number }
+          } catch {
+            // Keep the note visible at the page origin if stored data is invalid.
+          }
+          if (dragPreview?.id === m.id) {
+            pos = { xPct: dragPreview.xPct, yPct: dragPreview.yPct }
+          }
+          const editing = activeEditingId === m.id
+          const dragging = dragPreview?.id === m.id
+          const color =
+            typeof m.colorHex === 'string' && m.colorHex.trim()
+              ? m.colorHex
+              : undefined
+
+          const startDrag = (
+            e: ReactPointerEvent<HTMLElement>,
+            origin: TypewriterPct,
+          ) => {
+            e.stopPropagation()
+            if (e.button !== 0) return
+            const chapterArea = (e.currentTarget as HTMLElement).closest(
+              '[data-tw-chapter]',
+            )
+            if (!(chapterArea instanceof HTMLElement)) return
+            const bounds = chapterArea.getBoundingClientRect()
+            dragSessionRef.current = beginTypewriterDrag({
+              id: m.id,
+              pointerId: e.pointerId,
+              clientX: e.clientX,
+              clientY: e.clientY,
+              originXPct: origin.xPct,
+              originYPct: origin.yPct,
+              bounds,
+            })
+            try {
+              e.currentTarget.setPointerCapture(e.pointerId)
+            } catch {
+              /* ignore */
+            }
+          }
+
+          return (
+            <div
+              key={m.id}
+              ref={(el) => {
+                if (el) typewriterNoteRefs.current.set(m.id, el)
+                else typewriterNoteRefs.current.delete(m.id)
+              }}
+              data-typewriter-note={m.id}
+              className={`absolute z-[5] -translate-x-1/2 -translate-y-1/2 ${
+                dragging ? 'rb-typewriter-dragging' : ''
+              }`}
+              style={{ left: `${pos.xPct}%`, top: `${pos.yPct}%`, color }}
+              onClick={(e) => e.stopPropagation()}
+              onPointerDown={(e) => {
+                // Block chapter place-new while interacting with an existing box.
+                e.stopPropagation()
+              }}
+            >
+              {editing ? (
+                <TypewriterRichEditor
+                  autoFocus
+                  value={m.content}
+                  colorHex={m.colorHex}
+                  fontSize={m.fontSize}
+                  placeholder="Type..."
+                  onFocus={() => onTypewriterFocus?.(m.id)}
+                  onChange={(html) => onTypewriterChange(m.id, html)}
+                  onStyleChange={(patch) =>
+                    onTypewriterStyleChange?.(m.id, patch)
+                  }
+                  onBlur={() => {
+                    if (dragSessionRef.current?.id === m.id) return
+                    onTypewriterBlur?.(m.id)
+                    setActiveEditingId(null)
+                  }}
+                  onEmptyDelete={() => {
+                    setActiveEditingId(null)
+                    onTypewriterDelete?.(m.id)
+                  }}
+                  dragHandle={
+                    <button
+                      type="button"
+                      className="rb-typewriter-drag-handle"
+                      aria-label="Move typewriter note"
+                      onPointerDown={(e) => {
+                        e.preventDefault()
+                        startDrag(e, pos)
+                      }}
+                    />
+                  }
+                />
+              ) : (
+                <button
+                  type="button"
+                  className={`rb-typewriter-static border-none bg-transparent p-0 text-left ${
+                    mode === 'hand' ? 'cursor-text' : 'cursor-grab'
+                  }`}
+                  aria-label="Typewriter note"
+                  onPointerDown={(e) => {
+                    if (mode === 'typewriter') startDrag(e, pos)
+                  }}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    if (suppressTypewriterClickRef.current) {
+                      suppressTypewriterClickRef.current = false
+                      return
+                    }
+                    beginHandTypewriterEdit(m.id)
+                  }}
+                >
+                  <TypewriterStaticHtml
+                    html={m.content}
+                    colorHex={m.colorHex}
+                    fontSize={m.fontSize}
+                  />
+                </button>
+              )}
+            </div>
+          )
+        })}
 
         {chapterSign.map((s) => (
           <div
@@ -506,6 +738,10 @@ export function ReadingCanvas({
     )
   }
 
+  visibleTypewriterNoteIdsRef.current = typewriterNotes
+    .filter((m) => m.type === 'textbox')
+    .map((m) => m.id)
+
   return (
     <main
       ref={surfaceRef}
@@ -513,7 +749,7 @@ export function ReadingCanvas({
       className={`app-scroll relative min-h-0 flex-1 overflow-x-hidden overflow-y-auto px-6 pt-8 pb-20 overscroll-y-contain ${
         pageMode === 'paginated' ? 'snap-y snap-mandatory' : 'snap-none'
       } ${cursorClass}`}
-      style={{ userSelect: mode === 'hand' ? 'none' : 'text' }}
+      style={{ userSelect: allowTextSelect ? 'text' : 'none' }}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
@@ -522,16 +758,19 @@ export function ReadingCanvas({
       }}
       onClick={(e) => {
         if (e.defaultPrevented) return
-        if (activeTool === 'typewriter' || activeTool === 'esign') return
-        if (activeTool === 'comment') return
-        if (modeRef.current === 'hand') return
+        if (modeRef.current === 'annotate' || modeRef.current === 'typewriter') {
+          return
+        }
         if (isInteractiveTarget(e.target)) return
         if (hasTextSelection()) return
-        if (isTextNodeAtPoint(document, e.clientX, e.clientY)) return
-        onRequestInteractionTool?.('hand')
         onSelectionDismiss()
-        if (!isCenterTap(e)) return
-        onCanvasBackgroundClick()
+        // Text / empty click in the center zone toggles chrome; tool stays put.
+        if (isTextNodeAtPoint(document, e.clientX, e.clientY)) {
+          if (!isCenterTap(e)) return
+          onCanvasBackgroundClick()
+          return
+        }
+        // Margin clicks without a pan gesture are handled in pointerup.
       }}
     >
       <div

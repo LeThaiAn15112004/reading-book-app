@@ -1,26 +1,14 @@
-import { useEffect, useRef, useState } from 'react'
-import { useLocation, useNavigate } from 'react-router-dom'
-import {
-  useCollections,
-  useLibraryBooks,
-  useLibraryImport,
-  useLibraryView,
-} from '@reading-book/shared/hooks/library'
 import {
   ImportConflictDialog,
   ImportProgressDialog,
   ImportToast,
   ImportUrlDialog,
 } from '../../components/import'
-import { importApi, libraryApi } from '../../bridge'
-import { useAppNav, useOpenReading, type AppStubNavId } from '../../chrome'
-import type { BootLocationState } from '../boot'
 import {
   BootErrorBanner,
   CollectionsHub,
   ContinueReading,
   FilteredListView,
-  LIBRARY_SHELVES,
   LibraryBookInfoDialog,
   LibraryEmptyState,
   LibraryHint,
@@ -30,60 +18,24 @@ import {
   ShelfDetailView,
   ShelfRailCard,
 } from './components'
-import type { ShelfDetailItemData, ShelfRailContent } from './components'
-import {
-  NAV_FILTERS,
-  filterByNav,
-  filterByShelf,
-  matchesSearch,
-  pickContinueReading,
-  toShelfDetailItem,
-  type LibraryBook,
-} from './libraryModel'
-
-type LibraryLocationState = BootLocationState & {
-  openNav?: AppStubNavId
-}
+import type { ShelfRailContent } from './components'
+import { useLibraryScreen } from './logic'
 
 /** SCR-01 — Library hub shell (menubar + top bar + format hint). */
 export function LibraryScreen() {
-  const navigate = useNavigate()
-  const location = useLocation()
-  const { registerLibraryNav } = useAppNav()
-  const { openBook } = useOpenReading()
-  const locState = location.state as LibraryLocationState | null
-  const bootError = locState?.bootError
-  const [searchQuery, setSearchQuery] = useState('')
-
-  const [bookInfoId, setBookInfoId] = useState<string | null>(null)
-
-  const { books, refreshLibrary } = useLibraryBooks({
-    client: libraryApi,
-  })
-
-  function openReader(bookId: string) {
-    const title = books?.find((b) => b.id === bookId)?.title
-    openBook(bookId, title)
-  }
-
-  function handleOpenNotes(bookId: string) {
-    // Notes tab wiring lands with Reader chrome (G5); open book for now.
-    openReader(bookId)
-  }
-
-  function handleBookInfo(bookId: string) {
-    setBookInfoId(bookId)
-  }
-
-  const bookInfoBook =
-    bookInfoId != null
-      ? (books?.find((b) => b.id === bookInfoId) ?? null)
-      : null
-
   const {
+    navigate,
+    bootError,
+    searchQuery,
+    setSearchQuery,
+    bookInfoId,
+    setBookInfoId,
+    bookInfoBook,
+    openReader,
+    handleOpenNotes,
+    handleBookInfo,
     toast,
     clearToast,
-    showToast,
     progress,
     conflict,
     urlDialogOpen,
@@ -93,124 +45,38 @@ export function LibraryScreen() {
     handleUrlSubmit,
     handleConflictDiscard,
     handleConflictOpenExisting,
-  } = useLibraryImport({
-    client: importApi,
-    onImported: refreshLibrary,
-    onOpenExisting: openReader,
-  })
-
-  const {
     view,
-    sidebarActive,
     handleOpenShelf,
     handleCloseShelf,
-    handleStubNav,
-    goHub,
     goCollections,
     openCollection,
-  } = useLibraryView({
-    onComingSoon: () => showToast('Coming soon.', 'info'),
-  })
-
-  const libraryNavRef = useRef({
-    activeId: sidebarActive,
-    onStubNav: handleStubNav,
-    onLibraryNav: goHub,
-  })
-  libraryNavRef.current = {
-    activeId: sidebarActive,
-    onStubNav: handleStubNav,
-    onLibraryNav: goHub,
-  }
-
-  useEffect(() => {
-    registerLibraryNav({
-      activeId: sidebarActive,
-      onStubNav: (id) => libraryNavRef.current.onStubNav(id),
-      onLibraryNav: () => libraryNavRef.current.onLibraryNav(),
-    })
-    return () => registerLibraryNav(null)
-  }, [sidebarActive, registerLibraryNav])
-
-  useEffect(() => {
-    const openNav = locState?.openNav
-    if (!openNav) return
-    libraryNavRef.current.onStubNav(openNav)
-    navigate('/library', {
-      replace: true,
-      state: bootError ? { bootError } : null,
-    })
-  }, [locState?.openNav, navigate, bootError])
-
-  const {
     collections,
     newCollectionOpen,
     setNewCollectionOpen,
     handleCreateCollection,
-  } = useCollections({
-    onCreated: (created) =>
-      showToast(`Created “${created.name}” (session stub).`, 'info'),
-  })
-
-  const bookList = books ?? []
-  const isEmpty = books !== null && books.length === 0
-  const showHubChrome = view.kind === 'hub'
-  const continueBook = pickContinueReading(bookList)
-  const searchedBooks = bookList.filter((b) => matchesSearch(b, searchQuery))
-  const searchActive = searchQuery.trim().length > 0
-  const noSearchMatches =
-    showHubChrome && searchActive && !isEmpty && searchedBooks.length === 0
-  const showShelves =
-    showHubChrome && books !== null && books.length > 0 && !noSearchMatches
-  const shelfCounts = {
-    reading: searchedBooks.filter((b) => b.status === 'reading').length,
-    completed: searchedBooks.filter((b) => b.status === 'completed').length,
-    'not-started': searchedBooks.filter((b) => b.status === 'not-started')
-      .length,
-  }
-
-  const activeShelf =
-    view.kind === 'shelf'
-      ? LIBRARY_SHELVES.find((s) => s.id === view.shelfId)
-      : undefined
-
-  const shelfItems: ShelfDetailItemData[] =
-    view.kind === 'shelf'
-      ? filterByShelf(searchedBooks, view.shelfId).map((b) =>
-          toShelfDetailItem(b),
-        )
-      : []
+    isEmpty,
+    continueBook,
+    searchActive,
+    noSearchMatches,
+    showShelves,
+    shelfCounts,
+    activeShelf,
+    shelfItems,
+    shelfRailBooks,
+    filterConfig,
+    filterItems,
+    activeCollection,
+    collectionItems,
+  } = useLibraryScreen()
 
   const shelfRailContent: ShelfRailContent = {}
   for (const shelfId of ['reading', 'completed', 'not-started'] as const) {
-    const rows = filterByShelf(searchedBooks, shelfId)
+    const rows = shelfRailBooks[shelfId]
     if (rows.length === 0) continue
     shelfRailContent[shelfId] = rows.map((b) => (
       <ShelfRailCard key={b.id} book={b} onOpen={openReader} />
     ))
   }
-
-  const filterConfig =
-    view.kind === 'filter' ? NAV_FILTERS[view.filterId] : undefined
-  const filterItems =
-    view.kind === 'filter'
-      ? filterByNav(bookList, view.filterId).map((b) =>
-          toShelfDetailItem(b, {
-            forceFavoriteStar: filterConfig?.showStar,
-          }),
-        )
-      : []
-
-  const activeCollection =
-    view.kind === 'collection'
-      ? collections.find((c) => c.id === view.collectionId)
-      : undefined
-  const collectionItems: ShelfDetailItemData[] = activeCollection
-    ? activeCollection.bookIds
-        .map((id) => bookList.find((b) => b.id === id))
-        .filter((b): b is LibraryBook => Boolean(b))
-        .map((b) => toShelfDetailItem(b))
-    : []
 
   return (
     <div className="lib-chrome relative flex h-full w-full select-none overflow-hidden font-[system-ui,'Segoe_UI',sans-serif] text-lib-text antialiased">
@@ -279,7 +145,6 @@ export function LibraryScreen() {
                   />
                 ) : null}
 
-                {/* T1.7: only when a book has last_read (hidden for empty / never-opened). */}
                 {!isEmpty && continueBook ? (
                   <ContinueReading
                     book={continueBook}
@@ -288,7 +153,6 @@ export function LibraryScreen() {
                   />
                 ) : null}
 
-                {/* Shelves + book cover rails from listBooks. */}
                 {showShelves ? (
                   <LibraryShelves
                     onOpenShelf={handleOpenShelf}

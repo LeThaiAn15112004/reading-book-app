@@ -3,7 +3,7 @@
  */
 
 import { Location, TextOffsetLocation } from '@reading-book/domain'
-import type { ReaderBookmark } from './readerSession'
+import type { ReaderBookmark } from './reader-session.js'
 
 const FAKE_CHAPTER_RE = /^fake:(\d+)/
 
@@ -63,9 +63,52 @@ export function bookmarkDtoToReaderBookmark(dto: {
 export function readerBookmarkJumpLocation(
   bookmark: ReaderBookmark,
 ): Location | undefined {
+  return parseReaderBookmarkLocation(bookmark.locationRef)
+}
+
+export function parseReaderBookmarkLocation(raw: string): Location | undefined {
+  const locationRef = raw?.trim()
+  if (!locationRef) return undefined
   try {
-    return Location.parse(bookmark.locationRef)
+    return Location.parse(locationRef)
   } catch {
     return undefined
   }
+}
+
+/** Resolve the Location used to compare/toggle bookmarks at the current reading place. */
+export function resolveCurrentReaderBookmarkLocation(options: {
+  isEpubSurface: boolean
+  chapterIndex: number
+  epubLocation?: Location | null
+}): Location | undefined {
+  if (options.isEpubSurface) {
+    return options.epubLocation ?? undefined
+  }
+  return new TextOffsetLocation(0, `fake:${Math.max(0, options.chapterIndex)}`)
+}
+
+export function readerBookmarkMatchesLocation(
+  bookmark: ReaderBookmark,
+  location: Location,
+): boolean {
+  const bookmarkLocation = parseReaderBookmarkLocation(bookmark.locationRef)
+  if (!bookmarkLocation) return false
+  return bookmarkLocation.equals(location)
+}
+
+export function findReaderBookmarksAtLocation(
+  bookmarks: ReaderBookmark[],
+  location: Location,
+): ReaderBookmark[] {
+  return bookmarks.filter((bookmark) =>
+    readerBookmarkMatchesLocation(bookmark, location),
+  )
+}
+
+export function isReaderBookmarkAtLocation(
+  bookmarks: ReaderBookmark[],
+  location: Location,
+): boolean {
+  return findReaderBookmarksAtLocation(bookmarks, location).length > 0
 }

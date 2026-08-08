@@ -1,4 +1,4 @@
-import { formatLastReadLine, type LibraryBook } from '../../libraryModel'
+import { formatLastReadLine, type LibraryBook } from '@reading-book/shared/models'
 import { BookCover } from '../book/BookCover'
 
 export type ShelfRailCardProps = {

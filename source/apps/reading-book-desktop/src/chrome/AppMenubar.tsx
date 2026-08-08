@@ -1,6 +1,6 @@
 import { useState, type DragEvent, type MouseEvent } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { flushRegisteredSession } from '../screens/Reader/sessionFlushRegistry'
+import { flushRegisteredSession } from '../screens/Reader/logic'
 import {
   useAppNav,
   type AppNavId,
@@ -266,9 +266,9 @@ export function AppMenubar() {
   }
 
   return (
-    <div className="app-menubar-stack shrink-0">
+    <div className="app-menubar-stack">
       <nav
-        className="app-menubar flex h-10 items-center gap-0.5 overflow-x-auto border-b border-lib-border-soft bg-lib-bg-deep/95 px-3 backdrop-blur-md"
+        className="app-menubar flex items-center gap-0.5 overflow-x-auto border-b border-lib-border-soft bg-lib-bg-deep/95 px-3 backdrop-blur-md"
         aria-label="Main navigation"
       >
         {renderItem(PRIMARY_ITEMS[0]!)}

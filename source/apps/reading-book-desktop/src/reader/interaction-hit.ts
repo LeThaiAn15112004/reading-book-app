@@ -1,35 +1,126 @@
 /**
+ * Reading-surface hit targets — aligned with CSS cursor rules in `cursors.ts`.
+ */
+
+/** Tags that show I-beam in hand mode (must stay in sync with injected EPUB CSS). */
+export const TEXT_CURSOR_SELECTOR = [
+  'p',
+  'h1',
+  'h2',
+  'h3',
+  'h4',
+  'h5',
+  'h6',
+  'li',
+  'td',
+  'th',
+  'blockquote',
+  'pre',
+  'code',
+  'span',
+  'em',
+  'strong',
+  'i',
+  'b',
+  'u',
+  's',
+  'mark',
+  'label',
+  'figcaption',
+  'dt',
+  'dd',
+  'cite',
+  'q',
+  'small',
+  'sub',
+  'sup',
+].join(', ')
+
+const INTERACTIVE_SELECTOR =
+  'a[href], button, [role="button"], summary, input, textarea, select, [contenteditable="true"]'
+
+type CaretPoint = { node: Node; offset: number }
+
+/**
+ * Resolve caret node/offset at a viewport point.
+ * Prefers standard `caretPositionFromPoint`; falls back to legacy WebKit API.
+ */
+function caretPointFromPoint(
+  doc: Document,
+  clientX: number,
+  clientY: number,
+): CaretPoint | null {
+  const pos = doc.caretPositionFromPoint?.(clientX, clientY)
+  if (pos?.offsetNode) {
+    return { node: pos.offsetNode, offset: pos.offset }
+  }
+
+  // Legacy Chromium/WebKit — keep runtime fallback without using the deprecated
+  // `Document.caretRangeFromPoint` TypeScript signature.
+  const legacyCaretRangeFromPoint = (
+    doc as unknown as {
+      caretRangeFromPoint?: (x: number, y: number) => Range | null
+    }
+  ).caretRangeFromPoint
+  const range = legacyCaretRangeFromPoint?.call(doc, clientX, clientY) ?? null
+  if (range?.startContainer) {
+    return { node: range.startContainer, offset: range.startOffset }
+  }
+
+  return null
+}
+
+/** True when the element would receive the I-beam cursor in hand mode. */
+export function isTextCursorTarget(el: Element | null): boolean {
+  if (!el) return false
+  if (el.closest(INTERACTIVE_SELECTOR)) return false
+  return !!el.closest(TEXT_CURSOR_SELECTOR)
+}
+
+/** I-beam zone at viewport coords — matches CSS cursor, not just caret proximity. */
+export function isTextCursorTargetAtPoint(
+  doc: Document,
+  clientX: number,
+  clientY: number,
+): boolean {
+  const el = doc.elementFromPoint(clientX, clientY)
+  return isTextCursorTarget(el)
+}
+
+/**
+ * Targets that may switch away from grab after a hover dwell in Hand mode
+ * (text → I-beam, links/annotations → pointer).
+ */
+export function isHandHoverCursorTargetAtPoint(
+  doc: Document,
+  clientX: number,
+  clientY: number,
+): boolean {
+  const el = doc.elementFromPoint(clientX, clientY)
+  if (!el) return false
+  if (el.closest(INTERACTIVE_SELECTOR)) return true
+  if (el.closest('[data-rb-hl-id]')) return true
+  return isTextCursorTarget(el)
+}
+
+/**
+ * Hover dwell before Hand mode shows I-beam/pointer over text or annotations.
+ * Keeps grab while the pointer skims across text during a pan.
+ */
+export const HAND_HOVER_CURSOR_DELAY_MS = 300
+
+/**
  * Detect whether a viewport point lands on readable text (not empty margin).
- * Used by Hand ↔ Text Select smart switching.
+ * Used when native caret placement matters (selection menu, empty-click on text).
  */
 export function isTextNodeAtPoint(
   doc: Document,
   clientX: number,
   clientY: number,
 ): boolean {
-  const caretRange =
-    typeof doc.caretRangeFromPoint === 'function'
-      ? doc.caretRangeFromPoint(clientX, clientY)
-      : null
-
-  if (caretRange?.startContainer.nodeType === Node.TEXT_NODE) {
-    return (caretRange.startContainer.textContent?.trim().length ?? 0) > 0
-  }
-
-  const caretPos = (
-    doc as Document & {
-      caretPositionFromPoint?: (
-        x: number,
-        y: number,
-      ) => { offsetNode: Node; offset: number } | null
-    }
-  ).caretPositionFromPoint?.(clientX, clientY)
-
-  if (caretPos?.offsetNode?.nodeType === Node.TEXT_NODE) {
-    return (caretPos.offsetNode.textContent?.trim().length ?? 0) > 0
-  }
-
-  return false
+  const caret = caretPointFromPoint(doc, clientX, clientY)
+  if (caret?.node.nodeType !== Node.TEXT_NODE) return false
+  return (caret.node.textContent?.trim().length ?? 0) > 0
 }
 
 /**
@@ -52,44 +143,15 @@ export function isPointInTextSelection(
     return false
   }
 
-  const caretRange =
-    typeof doc.caretRangeFromPoint === 'function'
-      ? doc.caretRangeFromPoint(clientX, clientY)
-      : null
-  if (caretRange?.startContainer) {
+  const caret = caretPointFromPoint(doc, clientX, clientY)
+  if (caret) {
     try {
       if (typeof range.isPointInRange === 'function') {
-        return range.isPointInRange(
-          caretRange.startContainer,
-          caretRange.startOffset,
-        )
+        return range.isPointInRange(caret.node, caret.offset)
       }
-      const cmp = range.comparePoint(
-        caretRange.startContainer,
-        caretRange.startOffset,
-      )
-      return cmp === 0
+      return range.comparePoint(caret.node, caret.offset) === 0
     } catch {
       // Fall through to rect hit-test (cross-boundary edge cases).
-    }
-  }
-
-  const caretPos = (
-    doc as Document & {
-      caretPositionFromPoint?: (
-        x: number,
-        y: number,
-      ) => { offsetNode: Node; offset: number } | null
-    }
-  ).caretPositionFromPoint?.(clientX, clientY)
-  if (caretPos?.offsetNode) {
-    try {
-      if (typeof range.isPointInRange === 'function') {
-        return range.isPointInRange(caretPos.offsetNode, caretPos.offset)
-      }
-      return range.comparePoint(caretPos.offsetNode, caretPos.offset) === 0
-    } catch {
-      // Fall through.
     }
   }
 

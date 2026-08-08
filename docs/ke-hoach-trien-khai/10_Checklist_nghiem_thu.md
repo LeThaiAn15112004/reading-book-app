@@ -67,8 +67,8 @@ Dùng file này để đánh dấu tiến độ. Chỉ sang giai đoạn sau khi
 - [x] Ghi chú inline trên highlight (`highlights.note`); không note rỗng
 - [x] Xóa highlight đồng bộ overlay + DB (T5.10)
 - [x] Bookmark + jump
-- [ ] Comment theo trang (`comments` schema đã có — UI/IPC Reader còn lại)
-- [ ] Sidebar theo `bookId` (không SCR-04 toàn cục)
+- [ ] Typewriter Note theo trang (`annotations` schema đã có)
+- [x] Sidebar theo `bookId` (không SCR-04 toàn cục)
 - [x] Vẽ lại overlay khi mở sách (`DomCssOverlay` / T5.3 — EPUB)
 
 ## G6 — Đa format + App Settings + polish MVP
@@ -76,7 +76,7 @@ Dùng file này để đánh dấu tiến độ. Chỉ sang giai đoạn sau khi
 - [ ] PDF: mở + resume trang (+ overlay tối thiểu)
 - [ ] TXT + Markdown: mở + resume
 - [ ] DOCX + DOC: import + mở + resume (extract/render)
-- [ ] Xóa sách cascade (FR-12) — gồm signatures + comments
+- [ ] Xóa sách cascade (FR-12) — gồm signatures + annotations
 - [ ] Collections CRUD + gắn/gỡ sách (FR-14) đủ dùng MVP (hiện stub in-memory)
 - [ ] Digital signature: điền `is_signed` / `book_signatures` khi detect (schema sẵn)
 - [ ] SCR-06 App Settings dùng được phần cốt lõi
@@ -140,7 +140,8 @@ Chi tiết theo giai đoạn: [G1 §5](./02_Giai_doan_1_Splash_Library.md) · [G
 | 2026-07-27 | **NOTE-R3** | Xoay / landscape + dual-page | G4 |
 | 2026-07-27 | **NOTE-R4** | Next trang nhanh (EPUB thật) | G3 / G4 |
 | 2026-07-27 | **NOTE-R5** | Đánh dấu trang (bookmark) persist | G5 |
-| 2026-07-27 | **NOTE-R6** | Search trong sách (find-in-book; titlebar stub) | G3/G4 · semantic G7 |
+| 2026-07-27 | **NOTE-R6** | Search trong sách (find-in-book; Tools + titlebar stub) | G3/G4 · [12](./12_Reader_Tools_Search_Speech_Translate_Typewriter.md) · semantic G7 |
+| 2026-08-05 | **TOOL-TR1** / **TOOL-TW1** | Translate + Typewriter (Tools UI shell; chi tiết sau) | [12](./12_Reader_Tools_Search_Speech_Translate_Typewriter.md) |
 | 2026-07-27 | **NOTE-R7** | Note văn bản persist | G5 |
 | 2026-07-27 | **NOTE-R8** | 1 trang căn giữa / 2 trang + khung | G4 |
 | 2026-07-27 | **NOTE-R9** | Chọn kiểu đọc scroll vs lật trang | G4 |
@@ -148,10 +149,10 @@ Chi tiết theo giai đoạn: [G1 §5](./02_Giai_doan_1_Splash_Library.md) · [G
 | 2026-07-27 | **NOTE-R11** | Độ sáng + chế độ ngoài trời | G4 theme · G6 brightness |
 | 2026-07-27 | **NOTE-AI1** | AI tóm tắt sách dài | G7 opt-in |
 | 2026-07-27 | **NOTE-AI2** | AI gợi ý metadata (không auto import) | G7 opt-in |
-| 2026-07-27 | **NOTE-TTS1** | Đọc audio (TTS) — chưa cam kết MVP | Sau G7 / quyết định |
+| 2026-07-27 | **NOTE-TTS1** | Đọc audio (TTS) — Tools Speech stub; chưa cam kết MVP | Sau G7 · [12](./12_Reader_Tools_Search_Speech_Translate_Typewriter.md) |
 | 2026-07-27 | **NOTE-L1** | Linked libs only, không account user | G8 |
 | 2026-07-27 | — | Check bản quyền / DRM (note.txt) | **Ngoài phạm vi** |
 | 2026-07-22 | G1 / T1.5 | (cũ) Drag reorder — gộp **G1-N5** | G6 |
 | 2026-07-25 | G0 / shared | Use cases `packages/shared/services` skeleton; import ở Electron IPC | Refactor sau |
-| 2026-07-25 | Schema | `comments` / signatures migrate; UI Comment Reader + detect lúc import còn lại | G5 · G6 |
+| 2026-07-25 | Schema | `annotations` / signatures migrate; UI Reader + detect lúc import còn lại | G5 · G6 |
 | 2026-07-25 | G0 / G6 | Bỏ `app_settings`; prefs platform store chưa wire | G6 T6.8 |

@@ -12,8 +12,22 @@ import {
 import { DomCssOverlay } from '../../overlays/dom-css-overlay'
 import { cfiCodec, tryEncodeCfi, type EpubCfiDecodeResult } from './cfi-codec'
 import {
+  cfiChapterSignature,
+  isTrivialSectionStartCfi,
+  withEpubjsStartContainerLogMuted,
+  withEpubjsStartContainerLogMutedAsync,
+} from './cfi-dom-range'
+import {
+  captureHostPreview,
+  documentToPreviewDataUrl,
+  PREVIEW_THUMB_MAX_HEIGHT,
+  PREVIEW_THUMB_MAX_WIDTH,
+  wrapSpinePreviewHtml,
+} from './capture-page-preview'
+import {
   rangeToHighlightHandleRect,
   splitCfiRange,
+  toEpubjsDisplayCfi,
 } from './selection-cfi'
 
 /** Vite/CJS interop: default may be the ePub fn or a module namespace. */
@@ -86,6 +100,27 @@ export interface EpubjsHandle {
   setMargins: (enabled: boolean, preset: string) => void
   setChromeHidden: (hidden: boolean) => void
   resize: () => void
+  /**
+   * Snapshot the currently painted host into a JPEG data URL for Page Layout.
+   * Prefer scheduling on idle — capture walks iframe documents.
+   */
+  captureVisiblePreview: (
+    maxWidth?: number,
+    maxHeight?: number,
+  ) => Promise<string | null>
+  /**
+   * Load spine section markup for a 0-based *visible* spine position
+   * (matches goToSpineIndex / pageTotal indexing).
+   */
+  loadSpinePreviewHtml: (visibleIndex: number) => Promise<string | null>
+  /**
+   * Rasterize a spine section into a JPEG data URL for Page Layout thumbnails.
+   */
+  rasterizeSpinePreview: (
+    visibleIndex: number,
+    maxWidth?: number,
+    maxHeight?: number,
+  ) => Promise<string | null>
 }
 
 /** Payload from epubjs `rendition.on('selected')` mapped to viewport coords (T5.1). */
@@ -206,31 +241,58 @@ export function epubFrameContextFromView(view: unknown): {
 /** Default Aa panel size — zoom % is relative to this. */
 export const EPUB_BASE_FONT_PX = 18
 
-// #region agent log
-function agentEpubDebugLog(
-  location: string,
-  message: string,
-  hypothesisId: string,
-  data: Record<string, unknown>,
-) {
-  fetch('http://127.0.0.1:7770/ingest/06bdb65b-2ef4-48e0-b72a-ef894477e9f4', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'X-Debug-Session-Id': 'e7d9d7',
-    },
-    body: JSON.stringify({
-      sessionId: 'e7d9d7',
-      runId: 'pre-fix',
-      hypothesisId,
-      location,
-      message,
-      data,
-      timestamp: Date.now(),
-    }),
-  }).catch(() => {})
+/** Spine item index from package path `/6/N!` when epubjs lookup fails. */
+function spineIndexFromCfiPath(cfi: string): number | undefined {
+  const sig = cfiChapterSignature(cfi)
+  if (!sig) return undefined
+  const parts = sig.split('/').filter(Boolean)
+  if (parts.length < 2) return undefined
+  const last = Number.parseInt(parts[parts.length - 1] ?? '', 10)
+  if (!Number.isFinite(last) || last < 2 || last % 2 !== 0) return undefined
+  return last / 2 - 1
 }
-// #endregion
+
+function spineIndexFromCfi(book: Book, cfi: string, fallback: number): number {
+  try {
+    const section = book.spine.get(cfi) as { index?: number } | undefined
+    if (section && typeof section.index === 'number') return section.index
+  } catch {
+    /* malformed CFI / empty spine */
+  }
+  const fromPath = spineIndexFromCfiPath(cfi)
+  if (fromPath != null && fromPath >= 0) return fromPath
+  return fallback
+}
+
+/**
+ * Resume / jump without triggering epubjs `No startContainer found` logs.
+ * Range CFIs are reduced to a display point; shallow section-start CFIs open by
+ * spine index; deeper CFIs use display(cfi) with a spine-index fallback.
+ */
+async function displayCfiSafely(
+  book: Book,
+  rendition: Rendition,
+  cfi: string,
+  fallbackIndex: number,
+): Promise<void> {
+  const displayCfi = toEpubjsDisplayCfi(cfi)
+  if (!displayCfi) {
+    await rendition.display(fallbackIndex)
+    return
+  }
+  const index = spineIndexFromCfi(book, displayCfi, fallbackIndex)
+  if (isTrivialSectionStartCfi(displayCfi)) {
+    await rendition.display(index)
+    return
+  }
+  try {
+    await withEpubjsStartContainerLogMutedAsync(() =>
+      rendition.display(displayCfi),
+    )
+  } catch {
+    await rendition.display(index)
+  }
+}
 
 function spineLengthOf(book: Book): number {
   const spine = book.spine as { length?: number }
@@ -685,6 +747,106 @@ export function toArrayBuffer(data: ArrayBuffer | ArrayBufferView): ArrayBuffer 
   return copy.buffer
 }
 
+/**
+ * epubjs Rendition.destroy() leaves the task queue running (q.clear is commented
+ * out upstream). After StrictMode remount / abort, queued `start()` then hits
+ * `this.book.package` on a destroyed book → blank reader + console TypeError.
+ */
+function stopRenditionQueue(rendition: Rendition | null | undefined): void {
+  if (!rendition) return
+  const q = (
+    rendition as unknown as {
+      q?: { stop?: () => void; clear?: () => void; pause?: () => void }
+    }
+  ).q
+  try {
+    q?.stop?.()
+  } catch {
+    try {
+      q?.clear?.()
+      q?.pause?.()
+    } catch {
+      /* ignore */
+    }
+  }
+}
+
+function waitForFrames(count = 2): Promise<void> {
+  return new Promise((resolve) => {
+    const step = (left: number) => {
+      if (left <= 0) {
+        resolve()
+        return
+      }
+      requestAnimationFrame(() => step(left - 1))
+    }
+    step(count)
+  })
+}
+
+type EnsureInitialPaintOptions = {
+  /** Resume open — never reset to cover when iframe is still attaching. */
+  resume?: boolean
+  resumeRetry?: { book: Book; cfi: string; spineIndex: number }
+}
+
+/**
+ * First display often resolves before the host finishes layout (loading shell →
+ * reader). A resize + empty-iframe retry matches what a manual page-turn does.
+ */
+async function ensureInitialPaint(
+  host: HTMLElement,
+  rendition: Rendition,
+  fallbackSpine: number,
+  signal?: AbortSignal,
+  openToken?: string,
+  options?: EnsureInitialPaintOptions,
+): Promise<void> {
+  await waitForFrames(2)
+  throwIfAborted(signal)
+  if (openToken && host.dataset.epubOpen !== openToken) {
+    throw abortError()
+  }
+
+  const rect = host.getBoundingClientRect()
+  const width = Math.floor(rect.width)
+  const height = Math.floor(rect.height)
+  if (width > 0 && height > 0) {
+    try {
+      rendition.resize(width, height)
+    } catch {
+      /* destroyed / not started */
+    }
+  }
+
+  if (!host.querySelector('iframe')) {
+    if (options?.resume) {
+      await waitForFrames(3)
+      if (!host.querySelector('iframe') && options.resumeRetry) {
+        const { book, cfi, spineIndex } = options.resumeRetry
+        try {
+          await displayCfiSafely(book, rendition, cfi, spineIndex)
+        } catch {
+          await rendition.display(spineIndex)
+        }
+      }
+      if (width > 0 && height > 0) {
+        try {
+          rendition.resize(width, height)
+        } catch {
+          /* destroyed / not started */
+        }
+      }
+    } else {
+      try {
+        await rendition.display(fallbackSpine)
+      } catch {
+        /* ignore — caller already fell back once */
+      }
+    }
+  }
+}
+
 function waitForHostSize(
   host: HTMLElement,
   signal?: AbortSignal,
@@ -733,10 +895,26 @@ function waitForHostSize(
 }
 
 function flowForMode(pageMode: EpubPageMode, _layout: EpubPageLayout): string {
-  return pageMode === 'scroll' ? 'scrolled-doc' : 'paginated'
+  return pageMode === 'scroll' ? 'scrolled' : 'paginated'
 }
 
-function spreadForLayout(layout: EpubPageLayout): 'always' | 'none' {
+/**
+ * epubjs picks the View Manager from `manager`, independent of `flow`.
+ * Default manager renders one spine item at a time — next()/prev() clear
+ * and jump instead of appending, which breaks true continuous scroll.
+ * ContinuousViewManager appends the next section once scroll nears the
+ * bottom, so chapters flow into one another without a manual page-turn.
+ */
+function managerForMode(pageMode: EpubPageMode): 'default' | 'continuous' {
+  return pageMode === 'scroll' ? 'continuous' : 'default'
+}
+
+function spreadForLayout(
+  pageMode: EpubPageMode,
+  layout: EpubPageLayout,
+): 'always' | 'none' {
+  // Continuous scroll is a single reflowing column — no page spread gutters.
+  if (pageMode === 'scroll') return 'none'
   return layout === 'dual' ? 'always' : 'none'
 }
 
@@ -765,6 +943,8 @@ export type OpenEpubjsOptions = {
   initialLocation?: CfiLocation
   /** Text selection in iframe → FR-06 highlight tooltip (T5.1). */
   onSelected?: (payload: EpubSelectionPayload) => void
+  /** Fired once the first section iframe is painted (before open() fully settles). */
+  onFirstRender?: () => void
 }
 
 type EpubjsContentsLike = {
@@ -804,6 +984,7 @@ export async function openEpubjs(
   }
   const initialLocation = options.initialLocation
   const onSelected = options.onSelected
+  const onFirstRender = options.onFirstRender
 
   if (typeof ePub !== 'function') {
     throw new Error('epubjs failed to load (default export is not a function)')
@@ -822,9 +1003,32 @@ export async function openEpubjs(
   const book = ePub(bytes, { openAs: 'binary' }) as Book
   let rendition: Rendition | null = null
   let settled = false
+  let destroyed = false
+  let fallbackSpine = 0
+  let firstRenderNotified = false
+
+  const notifyFirstRender = () => {
+    if (firstRenderNotified || destroyed) return
+    if (host.dataset.epubOpen !== openToken) return
+    if (!host.querySelector('iframe')) return
+    firstRenderNotified = true
+    onFirstRender?.()
+  }
 
   const destroyBook = () => {
+    if (destroyed) return
+    destroyed = true
+    // Stop queued start/display before tearing down — see stopRenditionQueue.
+    stopRenditionQueue(rendition)
     try {
+      rendition?.destroy()
+    } catch {
+      /* ignore */
+    }
+    rendition = null
+    try {
+      // Avoid book.destroy → rendition.destroy recursion after we already cleaned it.
+      ;(book as unknown as { rendition?: Rendition | null }).rendition = null
       book.destroy()
     } catch {
       /* ignore */
@@ -855,7 +1059,8 @@ export async function openEpubjs(
       width: size.width,
       height: size.height,
       flow: flowForMode(pageMode, layout),
-      spread: spreadForLayout(layout),
+      manager: managerForMode(pageMode),
+      spread: spreadForLayout(pageMode, layout),
       // Show every spine item in order (cover included when publishers put it in spine).
       allowScriptedContent: false,
     })
@@ -866,21 +1071,47 @@ export async function openEpubjs(
     applyEpubReadingStyle(rendition, initialReadingStyle)
     applyEpubFontSize(rendition, initialFontSize)
     applyDualSpreadHost(host, layout)
+    rendition.on('rendered', notifyFirstRender)
     throwIfAborted(signal)
 
     // Resume at CFI when provided (T4.1); otherwise first readable spine item.
+    fallbackSpine = visibleSpineIndices[0] ?? 0
+    let resumeCfi: string | undefined
+    let resumeSpineIndex: number | undefined
     if (initialLocation) {
       try {
         const decoded = cfiCodec.decode(initialLocation) as EpubCfiDecodeResult
-        await rendition.display(decoded.cfi)
+        resumeCfi = decoded.cfi
+        resumeSpineIndex = spineIndexFromCfi(book, decoded.cfi, fallbackSpine)
+        await displayCfiSafely(book, rendition, decoded.cfi, resumeSpineIndex)
       } catch {
-        await rendition.display(visibleSpineIndices[0] ?? 0)
+        const idx =
+          resumeSpineIndex ??
+          (resumeCfi
+            ? spineIndexFromCfi(book, resumeCfi, fallbackSpine)
+            : fallbackSpine)
+        await rendition.display(idx)
       }
     } else {
       // Cover is preserved; TOC/nav pages are sidebar-only.
-      await rendition.display(visibleSpineIndices[0] ?? 0)
+      await rendition.display(fallbackSpine)
     }
     throwIfAborted(signal)
+    await ensureInitialPaint(
+      host,
+      rendition,
+      fallbackSpine,
+      signal,
+      openToken,
+      {
+        resume: Boolean(initialLocation),
+        resumeRetry:
+          resumeCfi && resumeSpineIndex != null
+            ? { book, cfi: resumeCfi, spineIndex: resumeSpineIndex }
+            : undefined,
+      },
+    )
+    notifyFirstRender()
   } catch (err) {
     destroyBook()
     throw err
@@ -916,7 +1147,9 @@ export async function openEpubjs(
 
     let range: Range | null = null
     try {
-      range = contents.range?.(rangeCfi) ?? null
+      range = contents.range
+        ? withEpubjsStartContainerLogMuted(() => contents.range!(rangeCfi))
+        : null
     } catch {
       range = null
     }
@@ -1031,6 +1264,97 @@ export async function openEpubjs(
     await redirectIfExcludedSpine('next')
   }
 
+  const captureVisiblePreview = async (
+    maxWidth = 160,
+    maxHeight = 220,
+  ): Promise<string | null> => {
+    try {
+      return await captureHostPreview(host, maxWidth, maxHeight)
+    } catch {
+      return null
+    }
+  }
+
+  const loadSpineSectionDocument = async (
+    visibleIndex: number,
+  ): Promise<{
+    doc: Document
+    unload: () => void
+  } | null> => {
+    const visibleSpineIndices = getVisibleSpineIndices()
+    const n = visibleSpineIndices.length
+    if (n <= 0) return null
+    const clamped = Math.min(Math.max(Math.round(visibleIndex), 0), n - 1)
+    const rawIndex = visibleSpineIndices[clamped]
+    if (typeof rawIndex !== 'number') return null
+
+    const section = book.spine.get(rawIndex) as unknown as
+      | {
+          load?: (fn: (path: string) => Promise<Document>) => Promise<Document>
+          unload?: () => void
+        }
+      | undefined
+    if (!section?.load) return null
+
+    const bookLoad = (
+      book as unknown as { load: (path: string) => Promise<Document> }
+    ).load.bind(book)
+
+    try {
+      const doc = await section.load(bookLoad)
+      if (!doc?.body) return null
+      return {
+        doc,
+        unload: () => {
+          try {
+            section.unload?.()
+          } catch {
+            /* ignore */
+          }
+        },
+      }
+    } catch {
+      return null
+    }
+  }
+
+  const loadSpinePreviewHtml = async (
+    visibleIndex: number,
+  ): Promise<string | null> => {
+    const loaded = await loadSpineSectionDocument(visibleIndex)
+    if (!loaded) return null
+    try {
+      const inner = loaded.doc.body.innerHTML?.trim()
+      if (!inner) return null
+      return wrapSpinePreviewHtml(inner)
+    } finally {
+      loaded.unload()
+    }
+  }
+
+  const rasterizeSpinePreview = async (
+    visibleIndex: number,
+    maxWidth = PREVIEW_THUMB_MAX_WIDTH,
+    maxHeight = PREVIEW_THUMB_MAX_HEIGHT,
+  ): Promise<string | null> => {
+    const loaded = await loadSpineSectionDocument(visibleIndex)
+    if (!loaded) return null
+    try {
+      const body = loaded.doc.body
+      const sw = Math.max(body.scrollWidth, body.clientWidth, 320)
+      const sh = Math.max(body.scrollHeight, body.clientHeight, 400)
+      return documentToPreviewDataUrl(
+        loaded.doc,
+        sw,
+        sh,
+        maxWidth,
+        maxHeight,
+      )
+    } finally {
+      loaded.unload()
+    }
+  }
+
   const skipExcludedSection = async (direction: 'next' | 'prev') => {
     await redirectIfExcludedSpine(direction)
   }
@@ -1058,8 +1382,41 @@ export async function openEpubjs(
 
   const goToLocation = async (location: CfiLocation): Promise<void> => {
     const decoded = cfiCodec.decode(location) as EpubCfiDecodeResult
-    await activeRendition.display(decoded.cfi)
+    const fallbackSpine = getVisibleSpineIndices()[0] ?? 0
+    await displayCfiSafely(book, activeRendition, decoded.cfi, fallbackSpine)
     await redirectIfExcludedSpine('next')
+  }
+
+  // Initial resume can land on TOC/nav; match goToLocation behavior.
+  // Keep teardown on abort: this runs after `settled`, so onAbort no longer destroys.
+  try {
+    if (initialLocation) {
+      await redirectIfExcludedSpine('next')
+      const decoded = cfiCodec.decode(initialLocation) as EpubCfiDecodeResult
+      const resumeSpineIndex = spineIndexFromCfi(
+        book,
+        decoded.cfi,
+        fallbackSpine,
+      )
+      await ensureInitialPaint(
+        host,
+        activeRendition,
+        fallbackSpine,
+        signal,
+        openToken,
+        {
+          resume: true,
+          resumeRetry: {
+            book,
+            cfi: decoded.cfi,
+            spineIndex: resumeSpineIndex,
+          },
+        },
+      )
+    }
+  } catch (err) {
+    destroyBook()
+    throw err
   }
 
   const currentLocationSignature = (): string => {
@@ -1083,99 +1440,21 @@ export async function openEpubjs(
   }
 
   const nextPage = async () => {
-    const beforeIndex = currentSpineIndex()
     const beforeLocation = currentLocationSignature()
-    // #region agent log
-    agentEpubDebugLog(
-      'source/apps/reading-book-desktop/src/reader/renderers/epub/openEpubjs.ts:nextPage',
-      'EPUB nextPage started',
-      'H4',
-      { beforeIndex, spineLength: getSpineLength() },
-    )
-    // #endregion
-    try {
-      await activeRendition.next()
-      const afterNextLocation = currentLocationSignature()
-      let usedFirstPageFallback = false
-      if (
-        afterNextLocation === beforeLocation &&
-        currentVisiblePosition() === 0 &&
-        getSpineLength() > 1
-      ) {
-        await goToSpineIndex(1)
-        usedFirstPageFallback = true
-      }
-      await skipExcludedSection('next')
-      // #region agent log
-      agentEpubDebugLog(
-        'source/apps/reading-book-desktop/src/reader/renderers/epub/openEpubjs.ts:nextPage',
-        'EPUB nextPage finished',
-        'H4',
-        {
-          beforeIndex,
-          afterIndex: currentSpineIndex(),
-          spineLength: getSpineLength(),
-          beforeLocation,
-          afterNextLocation,
-          finalLocation: currentLocationSignature(),
-          usedFirstPageFallback,
-        },
-      )
-      // #endregion
-    } catch (err) {
-      // #region agent log
-      agentEpubDebugLog(
-        'source/apps/reading-book-desktop/src/reader/renderers/epub/openEpubjs.ts:nextPage',
-        'EPUB nextPage failed',
-        'H4',
-        {
-          beforeIndex,
-          error: err instanceof Error ? err.message : String(err),
-        },
-      )
-      // #endregion
-      throw err
+    await activeRendition.next()
+    const afterNextLocation = currentLocationSignature()
+    if (
+      afterNextLocation === beforeLocation &&
+      currentVisiblePosition() === 0 &&
+      getSpineLength() > 1
+    ) {
+      await goToSpineIndex(1)
     }
+    await skipExcludedSection('next')
   }
   const prevPage = async () => {
-    const beforeIndex = currentSpineIndex()
-    // #region agent log
-    agentEpubDebugLog(
-      'source/apps/reading-book-desktop/src/reader/renderers/epub/openEpubjs.ts:prevPage',
-      'EPUB prevPage started',
-      'H4',
-      { beforeIndex, spineLength: getSpineLength() },
-    )
-    // #endregion
-    try {
-      await activeRendition.prev()
-      await skipExcludedSection('prev')
-      // #region agent log
-      agentEpubDebugLog(
-        'source/apps/reading-book-desktop/src/reader/renderers/epub/openEpubjs.ts:prevPage',
-        'EPUB prevPage finished',
-        'H4',
-        {
-          beforeIndex,
-          afterIndex: currentSpineIndex(),
-          spineLength: getSpineLength(),
-        },
-      )
-      // #endregion
-    } catch (err) {
-      // #region agent log
-      agentEpubDebugLog(
-        'source/apps/reading-book-desktop/src/reader/renderers/epub/openEpubjs.ts:prevPage',
-        'EPUB prevPage failed',
-        'H4',
-        {
-          beforeIndex,
-          error: err instanceof Error ? err.message : String(err),
-        },
-      )
-      // #endregion
-      throw err
-    }
+    await activeRendition.prev()
+    await skipExcludedSection('prev')
   }
 
   return {
@@ -1193,6 +1472,7 @@ export async function openEpubjs(
         }
       }
       lastSelectionWindow = null
+      stopRenditionQueue(activeRendition)
       destroyBook()
     },
     next: nextPage,
@@ -1224,6 +1504,9 @@ export async function openEpubjs(
         }
       })
     },
+    captureVisiblePreview,
+    loadSpinePreviewHtml,
+    rasterizeSpinePreview,
     getNavState: () => {
       const visibleSpineIndices = getVisibleSpineIndices()
       const visiblePosition = nearestVisiblePosition(
@@ -1250,7 +1533,7 @@ export async function openEpubjs(
     },
     setLayout: (next) => {
       layout = next
-      activeRendition.spread(spreadForLayout(next))
+      activeRendition.spread(spreadForLayout(pageMode, next))
       applyDualSpreadHost(host, next)
       resizeToHost()
     },

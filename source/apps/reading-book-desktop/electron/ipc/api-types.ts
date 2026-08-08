@@ -93,17 +93,41 @@ export interface MutationResult {
   id: string | null
 }
 
-/** Highlight row returned by overlay.list (inline note on highlight). */
+export type AnnotationTypeDto =
+  | 'highlight'
+  | 'underline'
+  | 'strikethrough'
+  | 'freehand'
+  | 'textbox'
+  | 'stamp'
+
+export type AnnotationStatusDto = 'None' | 'Review' | 'Done'
+
+/** Presentation attributes (`style_properties` JSON) — keys vary by type. */
+export interface AnnotationStyleDto {
+  colorHex?: string
+  strokeWidth?: number
+  opacity?: number
+  fontFamily?: string
+  fontSize?: number
+  /** Inline note written against a markup annotation. */
+  note?: string
+  [key: string]: unknown
+}
+
+/** Clone-safe annotation row for IPC (`annotations` table). */
 export interface AnnotationDto {
   id: string
   bookId: string
-  /** Packed `start|end` Location.toString() values. */
-  location: string
-  selectedText: string
-  colorHex: string
-  note?: string
-  status?: string
-  isChecked?: boolean
+  type: AnnotationTypeDto
+  /** 1-based page; reflowable formats anchor on `locationData` and use 1. */
+  pageNumber: number
+  /** Opaque per-type location: packed `start|end` Location, CFI, or JSON geometry. */
+  locationData: string
+  content?: string
+  style: AnnotationStyleDto
+  status: AnnotationStatusDto
+  isChecked: boolean
   createdAt: string
   updatedAt: string
 }
@@ -173,25 +197,41 @@ export interface SaveReadingSessionStateInput {
   updatedAt?: string
 }
 
-export interface AddHighlightInput {
+/** Filter for overlay:listAnnotations; omitted fields mean "any". */
+export interface ListAnnotationsInput {
+  bookId: string
+  types?: AnnotationTypeDto[]
+  pageNumber?: number
+}
+
+export interface SaveAnnotationInput {
   bookId: string
   id?: string
-  /** Packed `start|end` Location.toString() values. */
-  location: string
-  selectedText: string
-  colorHex: string
-  note?: string
+  type: AnnotationTypeDto
+  pageNumber?: number
+  locationData: string
+  content?: string
+  style?: AnnotationStyleDto
+  status?: AnnotationStatusDto
+  isChecked?: boolean
   createdAt?: string
   updatedAt?: string
 }
 
-export interface UpdateHighlightNoteInput {
+/** Partial patch — omitted fields keep their stored value. `style` merges. */
+export interface UpdateAnnotationInput {
   bookId: string
   id: string
-  note: string
+  content?: string
+  /** Opaque per-type location (e.g. typewriter `{xPct,yPct}` JSON). */
+  locationData?: string
+  pageNumber?: number
+  style?: AnnotationStyleDto
+  status?: AnnotationStatusDto
+  isChecked?: boolean
 }
 
-export interface DeleteHighlightInput {
+export interface DeleteAnnotationInput {
   bookId: string
   id: string
 }
@@ -220,10 +260,10 @@ export interface DesktopApi {
     fromUrl(url: string): Promise<ImportResult>
   }
   overlay: {
-    list(bookId: string): Promise<AnnotationDto[]>
-    addHighlight(input: AddHighlightInput): Promise<MutationResult>
-    updateHighlightNote(input: UpdateHighlightNoteInput): Promise<MutationResult>
-    deleteHighlight(input: DeleteHighlightInput): Promise<OkResult>
+    listAnnotations(input: ListAnnotationsInput): Promise<AnnotationDto[]>
+    saveAnnotation(input: SaveAnnotationInput): Promise<MutationResult>
+    updateAnnotation(input: UpdateAnnotationInput): Promise<MutationResult>
+    deleteAnnotation(input: DeleteAnnotationInput): Promise<OkResult>
     listBookmarks(bookId: string): Promise<BookmarkDto[]>
     saveBookmark(input: SaveBookmarkInput): Promise<MutationResult>
     deleteBookmark(input: DeleteBookmarkInput): Promise<OkResult>

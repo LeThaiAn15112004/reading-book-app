@@ -1,4 +1,4 @@
-import type { ReaderSignature } from '../../readerSession'
+import type { ReaderSignature } from '@reading-book/shared/models'
 
 type SignInfoPanelProps = {
   open: boolean

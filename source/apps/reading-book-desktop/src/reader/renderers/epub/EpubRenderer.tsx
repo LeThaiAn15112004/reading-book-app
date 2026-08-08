@@ -1,4 +1,11 @@
-import { useCallback, useEffect, useRef, useState, type MutableRefObject } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type MutableRefObject,
+  type PointerEvent as ReactPointerEvent,
+} from 'react'
 import { CfiLocation, Highlight } from '@reading-book/domain'
 import type {
   FontFamily,
@@ -6,11 +13,17 @@ import type {
   HighlightHandleRect,
   InteractionTool,
   ReaderTheme,
+  ReaderTypewriterNote,
   TextAlign,
+  TypewriterBoxStyle,
+  TypewriterDraft,
+  TypewriterMovePayload,
+  TypewriterPlacePayload,
 } from '@reading-book/shared/models'
-import type {
-  EpubReaderHighlight,
-  PendingSelection,
+import {
+  parseTypewriterPosition,
+  type EpubReaderHighlight,
+  type PendingSelection,
 } from '@reading-book/shared/models'
 import type { DomCssOverlay } from '../../overlays/dom-css-overlay'
 import {
@@ -25,12 +38,31 @@ import {
   type EpubSelectionPayload,
   type EpubTocItem,
 } from './openEpubjs'
+import {
+  captureTypewriterAnchor,
+  resolveTypewriterHostPoint,
+  typewriterBelongsToRenderedSection,
+} from './typewriter-cfi-anchor'
 import { applyInteractionToolSurface } from '../../cursors'
 import {
+  HAND_HOVER_CURSOR_DELAY_MS,
+  isHandHoverCursorTargetAtPoint,
   isPointInTextSelection,
+  isTextCursorTargetAtPoint,
   isTextNodeAtPoint,
   PAN_DRAG_THRESHOLD_PX,
 } from '../../interaction-hit'
+import {
+  beginTypewriterDrag,
+  tickTypewriterDrag,
+  type TypewriterDragSession,
+  type TypewriterPct,
+} from '../../typewriterBoxDrag'
+import { hitTestTypewriterAtClientPoint } from '../../typewriterHitTest'
+import {
+  TypewriterRichEditor,
+  TypewriterStaticHtml,
+} from '../../typewriter'
 /** Imperative nav for parent footer scrub / section jump. */
 export type EpubRendererApi = Pick<
   EpubjsHandle,
@@ -53,10 +85,20 @@ export type EpubRendererApi = Pick<
   | 'setTextAlign'
   | 'setMargins'
   | 'setChromeHidden'
+  | 'resize'
+  | 'captureVisiblePreview'
+  | 'loadSpinePreviewHtml'
 > & {
   /** Force DomCssOverlay full reload (T5.3) — usually driven by `rendered` / props. */
   repaintHighlights: () => void
+  /**
+   * Resolve a 1-based UI page into a JPEG thumbnail data URL (cover image,
+   * live snapshot, or rasterized spine section).
+   */
+  getPagePreview: (page: number) => Promise<EpubPagePreview | null>
 }
+
+export type EpubPagePreview = { kind: 'image'; src: string }
 
 type EpubRendererProps = {
   data: ArrayBuffer
@@ -106,14 +148,33 @@ type EpubRendererProps = {
   }) => void
   /** In-memory EPUB highlights to paint via epubjs annotations (T5.1). */
   highlights?: EpubReaderHighlight[]
-  /** Active Hand / Text Select mode for cursor + pointer behavior. */
-  interactionTool?: InteractionTool
   /**
-   * Smart Hand ↔ Text Select:
-   * - Hand + text press → Select (same gesture can select)
-   * - Auto Select + margin pan/click → Hand (unless toolbar-locked)
+   * Surface mode from toolbar (hand / select / highlight / typewriter / annotate).
+   * Never mutated by gestures — toolbar state stays authoritative.
    */
-  onRequestInteractionTool?: (tool: InteractionTool) => void
+  interactionTool?: InteractionTool
+  /** Persisted typewriter textboxes for the current book (host overlay paint). */
+  typewriterNotes?: ReaderTypewriterNote[]
+  /** Spine/chapter index used to filter which notes to paint. */
+  typewriterChapterIndex?: number
+  /** Virtual textbox while typing (owned by ReaderScreen). */
+  typewriterDraft?: TypewriterDraft | null
+  /** Typewriter tool: click page → place virtual textbox. */
+  onTypewriterPlace?: (payload: TypewriterPlacePayload) => void
+  onTypewriterDraftChange?: (content: string) => void
+  onTypewriterDraftStyleChange?: (patch: TypewriterBoxStyle) => void
+  /** Commit draft by id (ignore stale blur after place-replace). */
+  onTypewriterDraftCommit?: (draftId: string) => void
+  onTypewriterDraftCancel?: (draftId: string) => void
+  onTypewriterContentChange?: (id: string, text: string) => void
+  onTypewriterContentBlur?: (id: string) => void
+  onTypewriterContentFocus?: (id: string) => void
+  /** Box-level defaults → `style_properties` (font size / default color). */
+  onTypewriterStyleChange?: (id: string, patch: TypewriterBoxStyle) => void
+  /** Persist reposition after drag (T5.6c/d). */
+  onTypewriterMove?: (id: string, payload: TypewriterMovePayload) => void
+  /** Delete from canvas (empty + Delete/Backspace). */
+  onTypewriterDelete?: (id: string) => void
   /**
    * Hand + Ctrl/Meta wheel — focus-zoom. Coords are viewport (parent) space.
    * Return true if the event was handled.
@@ -173,6 +234,7 @@ function toApi(
   handle: EpubjsHandle,
   cover: SyntheticCoverNavigation,
   repaintHighlights: () => void,
+  getCoverUrl: () => string | undefined,
 ): EpubRendererApi {
   return {
     nextPage: async () => {
@@ -245,7 +307,28 @@ function toApi(
     setTextAlign: (textAlign) => handle.setTextAlign(textAlign),
     setMargins: (enabled, preset) => handle.setMargins(enabled, preset),
     setChromeHidden: (hidden) => handle.setChromeHidden(hidden),
+    resize: () => handle.resize(),
     clearSelection: () => handle.clearSelection(),
+    captureVisiblePreview: (maxWidth, maxHeight) =>
+      handle.captureVisiblePreview(maxWidth, maxHeight),
+    loadSpinePreviewHtml: (visibleIndex) =>
+      handle.loadSpinePreviewHtml(visibleIndex),
+    getPagePreview: async (page) => {
+      if (!Number.isFinite(page) || page < 1) return null
+      if (cover.isAvailable() && page === 1) {
+        const src = getCoverUrl()
+        return src ? { kind: 'image', src } : null
+      }
+      const spineIndex = cover.isAvailable() ? page - 2 : page - 1
+      if (spineIndex < 0) return null
+      const nav = cover.navState()
+      if (nav.pageCurrent === page) {
+        const snap = await handle.captureVisiblePreview(160, 220)
+        if (snap) return { kind: 'image', src: snap }
+      }
+      const raster = await handle.rasterizeSpinePreview(spineIndex, 160, 220)
+      return raster ? { kind: 'image', src: raster } : null
+    },
     repaintHighlights,
   }
 }
@@ -299,6 +382,27 @@ function selectionPayloadToPending(
   }
 }
 
+type IframeHostBox = {
+  left: number
+  top: number
+  width: number
+  height: number
+}
+
+function iframeHostBoxesEqual(
+  a: IframeHostBox | null,
+  b: IframeHostBox | null,
+): boolean {
+  if (a === b) return true
+  if (!a || !b) return false
+  return (
+    a.left === b.left &&
+    a.top === b.top &&
+    a.width === b.width &&
+    a.height === b.height
+  )
+}
+
 /**
  * Production EPUB surface (T3.3) — epubjs from ArrayBuffer; no FS paths.
  * Dual layout draws a center gutter; spine order includes cover as a normal page.
@@ -330,12 +434,142 @@ export function EpubRenderer({
   onHighlightMarkClick,
   highlights,
   interactionTool = 'hand',
-  onRequestInteractionTool,
+  typewriterNotes,
+  typewriterChapterIndex = 0,
+  typewriterDraft = null,
+  onTypewriterPlace,
+  onTypewriterDraftChange,
+  onTypewriterDraftStyleChange,
+  onTypewriterDraftCommit,
+  onTypewriterDraftCancel,
+  onTypewriterContentChange,
+  onTypewriterContentBlur,
+  onTypewriterContentFocus,
+  onTypewriterStyleChange,
+  onTypewriterMove,
+  onTypewriterDelete,
   onFocusZoomWheel,
   onHandPanBy,
   apiRef,
 }: EpubRendererProps) {
   const hostRef = useRef<HTMLDivElement>(null)
+  const [activeEditingId, setActiveEditingId] = useState<string | null>(null)
+  const activeEditingIdRef = useRef<string | null>(null)
+  activeEditingIdRef.current = activeEditingId
+  const typewriterNoteRefs = useRef(new Map<string, HTMLDivElement>())
+  const chapterTypewriterNoteIdsRef = useRef<string[]>([])
+  const dragSessionRef = useRef<TypewriterDragSession | null>(null)
+  const dragPreviewRef = useRef<(TypewriterPct & { id: string }) | null>(null)
+  const suppressTypewriterClickRef = useRef(false)
+  const [dragPreview, setDragPreview] = useState<
+    (TypewriterPct & { id: string }) | null
+  >(null)
+  const onTypewriterContentBlurRef = useRef(onTypewriterContentBlur)
+  onTypewriterContentBlurRef.current = onTypewriterContentBlur
+  const onTypewriterMoveRef = useRef(onTypewriterMove)
+  onTypewriterMoveRef.current = onTypewriterMove
+  const typewriterFrameRef = useRef<{
+    doc: Document
+    ctx: EpubFrameSelectionContext
+    cfiBase?: string
+  } | null>(null)
+  const remeasureTypewriterHostRef = useRef<() => void>(() => {})
+  const dragEndClientRef = useRef<{ x: number; y: number } | null>(null)
+  const iframeHostBoxRef = useRef<{
+    left: number
+    top: number
+    width: number
+    height: number
+  } | null>(null)
+
+  const setTypewriterDragPreview = useCallback(
+    (next: (TypewriterPct & { id: string }) | null) => {
+      dragPreviewRef.current = next
+      setDragPreview(next)
+    },
+    [],
+  )
+
+  useEffect(() => {
+    function endDrag(commit: boolean, openEditIfClick: boolean) {
+      const session = dragSessionRef.current
+      dragSessionRef.current = null
+      const preview = dragPreviewRef.current
+      setTypewriterDragPreview(null)
+      if (!session) return
+      if (session.moved) {
+        suppressTypewriterClickRef.current = true
+        if (commit && preview && preview.id === session.id) {
+          const frame = typewriterFrameRef.current
+          const host = hostRef.current
+          const iframe = host?.querySelector('iframe')
+          const ir = iframe?.getBoundingClientRect()
+          let movePayload: TypewriterMovePayload = {
+            xPct: preview.xPct,
+            yPct: preview.yPct,
+          }
+          const endPt = dragEndClientRef.current
+          if (frame && ir && endPt) {
+            const cap = captureTypewriterAnchor({
+              doc: frame.doc,
+              ctx: frame.ctx,
+              iframeClientX: endPt.x - ir.left,
+              iframeClientY: endPt.y - ir.top,
+              iframeRect: ir,
+            })
+            if (cap) {
+              movePayload = {
+                xPct: cap.xPct,
+                yPct: cap.yPct,
+                cfi: cap.cfi,
+                offsetPx: cap.offsetPx,
+              }
+            }
+          }
+          onTypewriterMoveRef.current?.(session.id, movePayload)
+          remeasureTypewriterHostRef.current()
+        }
+        return
+      }
+      if (openEditIfClick) {
+        setActiveEditingId(session.id)
+      }
+    }
+
+    function onPointerMove(e: PointerEvent) {
+      const session = dragSessionRef.current
+      if (!session || e.pointerId !== session.pointerId) return
+      const { session: next, preview } = tickTypewriterDrag(
+        session,
+        e.clientX,
+        e.clientY,
+      )
+      dragSessionRef.current = next
+      if (preview) {
+        setTypewriterDragPreview({ id: next.id, ...preview })
+      }
+    }
+    function onPointerUp(e: PointerEvent) {
+      const session = dragSessionRef.current
+      if (!session || e.pointerId !== session.pointerId) return
+      dragEndClientRef.current = { x: e.clientX, y: e.clientY }
+      endDrag(true, true)
+      dragEndClientRef.current = null
+    }
+    function onPointerCancel(e: PointerEvent) {
+      const session = dragSessionRef.current
+      if (!session || e.pointerId !== session.pointerId) return
+      endDrag(false, false)
+    }
+    window.addEventListener('pointermove', onPointerMove)
+    window.addEventListener('pointerup', onPointerUp)
+    window.addEventListener('pointercancel', onPointerCancel)
+    return () => {
+      window.removeEventListener('pointermove', onPointerMove)
+      window.removeEventListener('pointerup', onPointerUp)
+      window.removeEventListener('pointercancel', onPointerCancel)
+    }
+  }, [setTypewriterDragPreview])
   const handleRef = useRef<EpubjsHandle | null>(null)
   const overlayPainterRef = useRef<DomCssOverlay | null>(null)
   const highlightsRef = useRef<EpubReaderHighlight[]>(highlights ?? [])
@@ -343,13 +577,105 @@ export function EpubRenderer({
   const lastEpubSelectionRef = useRef<PendingSelection | null>(null)
   const interactionToolRef = useRef<InteractionTool>(interactionTool)
   interactionToolRef.current = interactionTool
-  const onRequestInteractionToolRef = useRef(onRequestInteractionTool)
-  onRequestInteractionToolRef.current = onRequestInteractionTool
+  const onTypewriterPlaceRef = useRef(onTypewriterPlace)
+  onTypewriterPlaceRef.current = onTypewriterPlace
+  const typewriterChapterIndexRef = useRef(typewriterChapterIndex)
+  typewriterChapterIndexRef.current = typewriterChapterIndex
   const onFocusZoomWheelRef = useRef(onFocusZoomWheel)
   onFocusZoomWheelRef.current = onFocusZoomWheel
   const onHandPanByRef = useRef(onHandPanBy)
   onHandPanByRef.current = onHandPanBy
   const grabbingRef = useRef(false)
+  /** Hand mode: I-beam/pointer armed after hover dwell over text/annotations. */
+  const hoverTextRef = useRef(false)
+  const hoverCursorTimerRef = useRef<number | null>(null)
+  const hoverOverTargetRef = useRef(false)
+  type HandPanGesture = {
+    pointerId: number
+    startX: number
+    startY: number
+    lastX: number
+    lastY: number
+    panned: boolean
+    scrollEl: Element | null
+    captureEl: HTMLElement | null
+    doc: Document
+  }
+  const panGestureRef = useRef<HandPanGesture | null>(null)
+
+  const releasePanPointerCapture = (
+    captureEl: HTMLElement | null,
+    pointerId: number,
+  ) => {
+    if (!captureEl?.hasPointerCapture?.(pointerId)) return
+    try {
+      captureEl.releasePointerCapture(pointerId)
+    } catch {
+      /* already released */
+    }
+  }
+
+  const clearHoverCursorTimer = () => {
+    if (hoverCursorTimerRef.current == null) return
+    window.clearTimeout(hoverCursorTimerRef.current)
+    hoverCursorTimerRef.current = null
+  }
+
+  const applyHandSurface = (options?: {
+    grabbing?: boolean
+    hoverText?: boolean
+  }) => {
+    const grabbing = options?.grabbing ?? grabbingRef.current
+    const hoverText =
+      options?.hoverText ?? (hoverTextRef.current && !grabbing)
+    grabbingRef.current = grabbing
+    hoverTextRef.current = hoverText && !grabbing
+    applyInteractionToolSurface(
+      hostRef.current,
+      interactionToolRef.current,
+      {
+        grabbing,
+        hoverText: hoverTextRef.current,
+      },
+    )
+  }
+
+  const disarmHoverTextCursor = () => {
+    clearHoverCursorTimer()
+    hoverOverTargetRef.current = false
+    if (!hoverTextRef.current) return
+    applyHandSurface({ hoverText: false })
+  }
+
+  const applyHandGrabbing = (grabbing: boolean) => {
+    if (grabbing) {
+      clearHoverCursorTimer()
+      hoverOverTargetRef.current = false
+      hoverTextRef.current = false
+    }
+    applyHandSurface({ grabbing, hoverText: grabbing ? false : hoverTextRef.current })
+  }
+
+  /** End hand pan — always clears grabbing cursor (even if pointerup fires outside iframe). */
+  const clearHandPanGesture = (event?: PointerEvent): HandPanGesture | null => {
+    const active = panGestureRef.current
+    if (active && event) {
+      if (event.pointerId !== active.pointerId) return null
+      if (event.type === 'pointerup' && event.button !== 0) return null
+    }
+    if (!active && !grabbingRef.current) return null
+
+    const ended = active
+    if (active) {
+      releasePanPointerCapture(active.captureEl, active.pointerId)
+      panGestureRef.current = null
+    }
+    if (grabbingRef.current) {
+      applyHandGrabbing(false)
+    }
+    return ended
+  }
+
   const onNavStateRef = useRef(onNavState)
   onNavStateRef.current = onNavState
   const onLocationChangeRef = useRef(onLocationChange)
@@ -424,6 +750,10 @@ export function EpubRenderer({
       chromeHidden,
       initialLocation: initialLocationRef.current,
       signal: ac.signal,
+      onFirstRender: () => {
+        if (ac.signal.aborted) return
+        setStatus('ready')
+      },
       onSelected: (payload) => {
         // Cache only — floating toolbar opens on right-click, not mouseup.
         // Highlight tool applies on pointerup (see attachFrameListeners).
@@ -487,6 +817,7 @@ export function EpubRenderer({
             handle,
             coverNavigation,
             paintHighlightsNow,
+            () => coverUrlRef.current,
           )
         }
 
@@ -501,18 +832,19 @@ export function EpubRenderer({
         const attachFrameListeners = (doc: Document | null | undefined) => {
           if (!doc || frameCleanups.has(doc)) return
 
-          type PointerGesture = {
-            startX: number
-            startY: number
-            lastX: number
-            lastY: number
-            hitText: boolean
-            panned: boolean
-            scrollEl: Element | null
-          }
-          let gesture: PointerGesture | null = null
-
           const scrollRoot = (): Element | null => {
+            // Scrolled flow: epubjs scrolls its own `.epub-container` wrapper
+            // in the host document — the iframe itself is expanded to full
+            // content height and never scrolls internally.
+            const outerContainer = hostRef.current?.querySelector<HTMLElement>(
+              '.epub-container',
+            )
+            if (
+              outerContainer &&
+              outerContainer.scrollHeight > outerContainer.clientHeight + 1
+            ) {
+              return outerContainer
+            }
             const scrolling = doc.scrollingElement
             if (scrolling && scrolling.scrollHeight > scrolling.clientHeight + 1) {
               return scrolling
@@ -526,13 +858,39 @@ export function EpubRenderer({
             return doc.scrollingElement ?? doc.documentElement
           }
 
-          const applySurface = (grabbing = false) => {
-            grabbingRef.current = grabbing
-            applyInteractionToolSurface(
-              hostRef.current,
-              interactionToolRef.current,
-              { grabbing },
+          /**
+           * Hand hover dwell: keep grab while skimming text during pan;
+           * arm I-beam/pointer only after a short pause over text/annotations.
+           */
+          const onPointerHoverMove = (event: PointerEvent) => {
+            if (interactionToolRef.current !== 'hand') return
+            if (grabbingRef.current || panGestureRef.current) return
+            if ((event.buttons & 1) !== 0) return
+
+            const overTarget = isHandHoverCursorTargetAtPoint(
+              doc,
+              event.clientX,
+              event.clientY,
             )
+            if (overTarget === hoverOverTargetRef.current) return
+            hoverOverTargetRef.current = overTarget
+            clearHoverCursorTimer()
+
+            if (!overTarget) {
+              if (hoverTextRef.current) applyHandSurface({ hoverText: false })
+              return
+            }
+
+            // Already armed — stay on I-beam/pointer while moving within text.
+            if (hoverTextRef.current) return
+
+            hoverCursorTimerRef.current = window.setTimeout(() => {
+              hoverCursorTimerRef.current = null
+              if (interactionToolRef.current !== 'hand') return
+              if (grabbingRef.current || panGestureRef.current) return
+              if (!hoverOverTargetRef.current) return
+              applyHandSurface({ hoverText: true })
+            }, HAND_HOVER_CURSOR_DELAY_MS)
           }
 
           // Keyboard page/section nav lives on ReaderScreen (window + iframe capture).
@@ -542,8 +900,11 @@ export function EpubRenderer({
             event.stopPropagation()
 
             // Floating toolbar only when right-clicking the active selection.
+            // Annotate / Typewriter / Highlight tools suppress the selection menu.
             if (
               interactionToolRef.current === 'highlight' ||
+              interactionToolRef.current === 'annotate' ||
+              interactionToolRef.current === 'typewriter' ||
               !hasFrameTextSelection(doc) ||
               !isPointInTextSelection(doc, event.clientX, event.clientY)
             ) {
@@ -576,56 +937,133 @@ export function EpubRenderer({
           const onPointerDown = (event: PointerEvent) => {
             if (event.button !== 0 || isInteractiveElement(event.target)) return
             const tool = interactionToolRef.current
-            const hitText = isTextNodeAtPoint(doc, event.clientX, event.clientY)
 
-            if (tool === 'hand') {
-              if (hitText) {
-                // Smart switch: arm Text Select so this gesture can select immediately.
-                interactionToolRef.current = 'select'
-                onRequestInteractionToolRef.current?.('select')
-                applySurface(false)
-                gesture = null
-                return
-              }
-              // Block native text selection while panning.
+            // Typewriter: place virtual textbox — block pan / text selection.
+            if (tool === 'typewriter') {
               event.preventDefault()
-              gesture = {
-                startX: event.clientX,
-                startY: event.clientY,
-                lastX: event.clientX,
-                lastY: event.clientY,
-                hitText: false,
-                panned: false,
-                scrollEl: scrollRoot(),
+              event.stopPropagation()
+
+              const editing = activeEditingIdRef.current
+              if (editing) {
+                onTypewriterContentBlurRef.current?.(editing)
+                setActiveEditingId(null)
               }
-              applySurface(true)
+
+              const frameEl = doc.defaultView?.frameElement as HTMLElement | null
+              const host = hostRef.current
+              if (!frameEl || !host) return
+
+              const fr = frameEl.getBoundingClientRect()
+              const hostRect = host.getBoundingClientRect()
+              const clientX = event.clientX + fr.left
+              const clientY = event.clientY + fr.top
+              const width = fr.width || 1
+              const height = fr.height || 1
+              const xPct = Math.min(
+                100,
+                Math.max(0, ((clientX - fr.left) / width) * 100),
+              )
+              const yPct = Math.min(
+                100,
+                Math.max(0, ((clientY - fr.top) / height) * 100),
+              )
+
+              // Prefer ReaderScreen spine index (includes synthetic cover adjust).
+              const chapterIndex = typewriterChapterIndexRef.current
+
+              const frameCtx = frameContextByDoc.get(doc)
+              let cfi: string | undefined
+              let offsetPx: { x: number; y: number } | undefined
+              if (frameCtx) {
+                const captured = captureTypewriterAnchor({
+                  doc,
+                  ctx: frameCtx,
+                  iframeClientX: event.clientX,
+                  iframeClientY: event.clientY,
+                  iframeRect: fr,
+                })
+                if (captured) {
+                  cfi = captured.cfi
+                  offsetPx = captured.offsetPx
+                }
+              }
+
+              onTypewriterPlaceRef.current?.({
+                chapterIndex,
+                xPct,
+                yPct,
+                clientX,
+                clientY,
+                hostX: clientX - hostRect.left,
+                hostY: clientY - hostRect.top,
+                ...(cfi ? { cfi, offsetPx } : {}),
+              })
               return
             }
 
-            // Highlight stays latched until the user picks another tool.
-            if (tool === 'highlight') {
-              gesture = null
+            // Crosshair annotate tools: placement wins — block text selection.
+            if (tool === 'annotate') {
+              event.preventDefault()
               return
             }
 
-            // Text Select: blank margin → pan (and auto-revert when unlocked).
-            if (!hitText) {
-              gesture = {
-                startX: event.clientX,
-                startY: event.clientY,
-                lastX: event.clientX,
-                lastY: event.clientY,
-                hitText: false,
-                panned: false,
-                scrollEl: scrollRoot(),
-              }
-            } else {
-              gesture = null
+            // Highlight / Select: native text selection only — no margin pan.
+            if (tool === 'highlight' || tool === 'select') {
+              return
+            }
+
+            // Hand: only select when hover dwell has armed I-beam; else pan
+            // (includes quick drags that skim across text — grab stays active).
+            if (
+              hoverTextRef.current &&
+              isTextCursorTargetAtPoint(doc, event.clientX, event.clientY)
+            ) {
+              return
+            }
+
+            disarmHoverTextCursor()
+
+            event.preventDefault()
+            const captureEl = doc.documentElement
+            try {
+              captureEl.setPointerCapture(event.pointerId)
+            } catch {
+              /* ignore */
+            }
+            panGestureRef.current = {
+              pointerId: event.pointerId,
+              startX: event.clientX,
+              startY: event.clientY,
+              lastX: event.clientX,
+              lastY: event.clientY,
+              panned: false,
+              scrollEl: scrollRoot(),
+              captureEl,
+              doc,
+            }
+            applyHandGrabbing(true)
+          }
+
+          const panSurfaceBy = (dx: number, dy: number) => {
+            if (onHandPanByRef.current) {
+              onHandPanByRef.current(dx, dy)
+              return
+            }
+            const el = panGestureRef.current?.scrollEl
+            if (el) {
+              el.scrollLeft -= dx
+              el.scrollTop -= dy
             }
           }
 
           const onPointerMove = (event: PointerEvent) => {
-            if (!gesture || (event.buttons & 1) === 0) return
+            const gesture = panGestureRef.current
+            if (!gesture || gesture.doc !== doc) return
+            if ((event.buttons & 1) === 0) {
+              clearHandPanGesture(event)
+              return
+            }
+            if (event.pointerId !== gesture.pointerId) return
             const dx = event.clientX - gesture.lastX
             const dy = event.clientY - gesture.lastY
             const totalDx = event.clientX - gesture.startX
@@ -640,59 +1078,54 @@ export function EpubRenderer({
               gesture.panned = true
             }
 
-            const tool = interactionToolRef.current
-            if (tool === 'hand' || (tool === 'select' && !gesture.hitText)) {
-              // Prefer outer zoom-viewport pan when the parent is scrolled/zoomed.
-              if (onHandPanByRef.current) {
-                onHandPanByRef.current(dx, dy)
-              } else {
-                const el = gesture.scrollEl
-                if (el) {
-                  el.scrollLeft -= dx
-                  el.scrollTop -= dy
-                }
-              }
-              if (gesture.panned) {
-                onRequestInteractionToolRef.current?.('hand')
-                applySurface(true)
-              }
+            if (interactionToolRef.current === 'hand') {
+              panSurfaceBy(dx, dy)
             }
           }
 
           const endGesture = (event: PointerEvent) => {
-            if (!gesture) return
-            const g = gesture
-            gesture = null
-            applySurface(false)
+            const g = clearHandPanGesture(event)
+            if (!g || g.doc !== doc) return
 
             const tool = interactionToolRef.current
-            if (tool === 'highlight') return
-
-            if (g.panned) {
-              // Margin / whitespace drag → Hand (ignored when Text Select is toolbar-locked).
-              onRequestInteractionToolRef.current?.('hand')
+            if (
+              tool === 'highlight' ||
+              tool === 'annotate' ||
+              tool === 'typewriter'
+            ) {
               return
             }
+
+            // Hand pan finished — toolbar tool unchanged.
+            if (g.panned) return
 
             if (tool === 'hand') {
-              // Margin tap: chrome toggle (text clicks already switched on pointerdown).
-              onRequestInteractionToolRef.current?.('hand')
-              if (!isInteractiveElement(event.target) && isCenterClick(event, doc)) {
-                onSelectionDismissRef.current?.()
-                onCenterTapRef.current?.()
+              const frameEl = doc.defaultView?.frameElement as HTMLElement | null
+              let clientX = event.clientX
+              let clientY = event.clientY
+              if (frameEl) {
+                const fr = frameEl.getBoundingClientRect()
+                clientX += fr.left
+                clientY += fr.top
               }
-              return
+              const hitId = hitTestTypewriterAtClientPoint(
+                chapterTypewriterNoteIdsRef.current,
+                typewriterNoteRefs.current,
+                clientX,
+                clientY,
+              )
+              if (hitId) {
+                beginHandTypewriterEditRef.current(hitId)
+                return
+              }
             }
 
-            // Auto-switched select: click outside text without a selection → Hand.
-            if (!g.hitText) {
-              onRequestInteractionToolRef.current?.('hand')
+            // Margin tap (no drag): dismiss selection chrome + toggle reader chrome.
+            if (!isInteractiveElement(event.target) && isCenterClick(event, doc)) {
               if (!hasFrameTextSelection(doc)) {
                 onSelectionDismissRef.current?.()
               }
-              if (!isInteractiveElement(event.target) && isCenterClick(event, doc)) {
-                onCenterTapRef.current?.()
-              }
+              onCenterTapRef.current?.()
             }
           }
 
@@ -734,27 +1167,20 @@ export function EpubRenderer({
               return
             }
 
-            // Hand-mode chrome taps are handled in pointerup.
-            if (interactionToolRef.current === 'hand') return
+            const tool = interactionToolRef.current
+            if (tool === 'annotate' || tool === 'typewriter') return
 
-            const hasSelection = hasFrameTextSelection(doc)
-            if (!hasSelection) {
-              onSelectionDismissRef.current?.()
-              // Auto-switched select + empty click (cancel / no range) → Hand.
-              // Locked toolbar select stays put (requestInteractionTool gates it).
-              if (
-                interactionToolRef.current === 'select' &&
-                !isTextNodeAtPoint(doc, event.clientX, event.clientY)
-              ) {
-                onRequestInteractionToolRef.current?.('hand')
-              }
+            // Text hit starts without a pan gesture — handle chrome toggle here
+            // when the click did not produce a selection.
+            if (hasFrameTextSelection(doc)) return
+            onSelectionDismissRef.current?.()
+            if (isTextNodeAtPoint(doc, event.clientX, event.clientY)) {
+              // Empty click on text: keep tool; optional chrome toggle in center.
+              if (!isCenterClick(event, doc)) return
+              onCenterTapRef.current?.()
+              return
             }
-            if (hasSelection) return
-
-            // Clicks on text stay in select; margin handled in pointerup.
-            if (isTextNodeAtPoint(doc, event.clientX, event.clientY)) return
-            if (!isCenterClick(event, doc)) return
-            onCenterTapRef.current?.()
+            // Margin clicks without a pan gesture are handled in pointerup.
           }
 
           const onWheel = (event: WheelEvent) => {
@@ -781,6 +1207,7 @@ export function EpubRenderer({
 
           doc.addEventListener('contextmenu', onContextMenu)
           doc.addEventListener('pointerdown', onPointerDown, { capture: true })
+          doc.addEventListener('pointermove', onPointerHoverMove, { capture: true })
           doc.addEventListener('pointermove', onPointerMove, { capture: true })
           doc.addEventListener('pointerup', onPointerUp, { capture: true })
           doc.addEventListener('pointercancel', onPointerCancel, { capture: true })
@@ -789,18 +1216,32 @@ export function EpubRenderer({
           frameCleanups.set(doc, () => {
             doc.removeEventListener('contextmenu', onContextMenu)
             doc.removeEventListener('pointerdown', onPointerDown, true)
+            doc.removeEventListener('pointermove', onPointerHoverMove, true)
             doc.removeEventListener('pointermove', onPointerMove, true)
             doc.removeEventListener('pointerup', onPointerUp, true)
             doc.removeEventListener('pointercancel', onPointerCancel, true)
             doc.removeEventListener('click', onClick)
             doc.removeEventListener('wheel', onWheel, true)
           })
+
+          // Inject CSS cursor/user-select rules for this frame immediately.
+          applyHandSurface({
+            grabbing: grabbingRef.current,
+            hoverText: hoverTextRef.current,
+          })
         }
         const attachOnRendered = (_section: unknown, view: unknown) => {
           const frame = epubFrameContextFromView(view)
           if (frame) {
             frameContextByDoc.set(frame.doc, frame.ctx)
+            const v = view as { contents?: { cfiBase?: string } }
+            typewriterFrameRef.current = {
+              doc: frame.doc,
+              ctx: frame.ctx,
+              cfiBase: v.contents?.cfiBase,
+            }
             attachFrameListeners(frame.doc)
+            remeasureTypewriterHostRef.current()
           }
           // T5.3 — section iframe may be fresh; reload DomCssOverlay marks.
           scheduleRepaint()
@@ -821,12 +1262,24 @@ export function EpubRenderer({
           setSyntheticCoverShown(true)
         }
         onNavStateRef.current?.(getAdjustedNavState())
-        const initialCfi = handle.getCurrentLocation()
-        if (initialCfi) onLocationChangeRef.current?.(initialCfi)
+        // When resuming, wait for `relocated` — immediate CFI may still be cover.
+        if (!initialLocationRef.current) {
+          const initialCfi = handle.getCurrentLocation()
+          if (initialCfi) onLocationChangeRef.current?.(initialCfi)
+        }
         onTocRef.current?.(handle.getToc())
         // Initial paint once rendition is ready (hydrate + live highlights).
         paintHighlightsNow()
         setStatus('ready')
+        // Host may still be settling after the loading shell unmounts; force a
+        // layout pass so the first page is not blank until the user turns a page.
+        requestAnimationFrame(() => {
+          if (ac.signal.aborted) return
+          requestAnimationFrame(() => {
+            if (ac.signal.aborted || handleRef.current !== handle) return
+            handle.resize()
+          })
+        })
 
         ac.signal.addEventListener(
           'abort',
@@ -853,8 +1306,6 @@ export function EpubRenderer({
         window.clearTimeout(repaintTimerRef.current)
         repaintTimerRef.current = null
       }
-      const currentLocation = handleRef.current?.getCurrentLocation()
-      if (currentLocation) initialLocationRef.current = currentLocation
       ac.abort()
       handleRef.current?.destroy()
       handleRef.current = null
@@ -918,12 +1369,38 @@ export function EpubRenderer({
   }, [chromeHidden, scheduleRepaint])
 
   useEffect(() => {
+    if (status !== 'ready') return
+
+    const onGlobalPointerEnd = (event: PointerEvent) => {
+      clearHandPanGesture(event)
+    }
+
+    window.addEventListener('pointerup', onGlobalPointerEnd, true)
+    window.addEventListener('pointercancel', onGlobalPointerEnd, true)
+    return () => {
+      window.removeEventListener('pointerup', onGlobalPointerEnd, true)
+      window.removeEventListener('pointercancel', onGlobalPointerEnd, true)
+      clearHandPanGesture()
+    }
+  }, [status])
+
+  useEffect(() => {
     const host = hostRef.current
     if (!host || status !== 'ready') return
+
+    if (interactionTool !== 'hand') {
+      clearHoverCursorTimer()
+      hoverOverTargetRef.current = false
+      hoverTextRef.current = false
+    }
 
     const apply = () =>
       applyInteractionToolSurface(host, interactionTool, {
         grabbing: grabbingRef.current && interactionTool === 'hand',
+        hoverText:
+          hoverTextRef.current &&
+          interactionTool === 'hand' &&
+          !grabbingRef.current,
       })
     apply()
 
@@ -931,7 +1408,20 @@ export function EpubRenderer({
     mo.observe(host, { childList: true, subtree: true })
     return () => {
       mo.disconnect()
-      applyInteractionToolSurface(host, 'hand', { grabbing: false })
+      if (panGestureRef.current) {
+        releasePanPointerCapture(
+          panGestureRef.current.captureEl,
+          panGestureRef.current.pointerId,
+        )
+        panGestureRef.current = null
+      }
+      grabbingRef.current = false
+      hoverTextRef.current = false
+      clearHoverCursorTimer()
+      applyInteractionToolSurface(host, 'hand', {
+        grabbing: false,
+        hoverText: false,
+      })
     }
   }, [interactionTool, status])
 
@@ -977,23 +1467,23 @@ export function EpubRenderer({
     return () => ro.disconnect()
   }, [status])
 
-  const showGutter = layout !== 'single' && status === 'ready'
+  // Continuous scroll is a single reflowing column — no page spread gutters.
+  const showGutter = layout !== 'single' && pageMode !== 'scroll' && status === 'ready'
 
   // ── Custom scrollbar for scroll mode ──────────────────────────────────────
+  // epubjs (scrolled / continuous flow) scrolls its own `.epub-container`
+  // wrapper inside `host` — individual iframes expand to full content height
+  // and never scroll internally, so the scrollbar must track that container.
   const [scrollThumb, setScrollThumb] = useState({ top: 0, height: 0 })
   const [scrollVisible, setScrollVisible] = useState(false)
   const scrollHideTimerRef = useRef<number | null>(null)
-  const scrollIframeRef = useRef<HTMLIFrameElement | null>(null)
+  const scrollContainerRef = useRef<HTMLElement | null>(null)
 
   const readScrollMetrics = useCallback(() => {
-    const iframe = scrollIframeRef.current
-    const doc = iframe?.contentDocument
-    const body = doc?.body || doc?.documentElement
-    if (!body) return null
-    const scrollTop = body.scrollTop || doc?.documentElement?.scrollTop || 0
-    const scrollHeight = body.scrollHeight || doc?.documentElement?.scrollHeight || 0
-    const clientHeight = body.clientHeight || doc?.documentElement?.clientHeight || 0
-    if (scrollHeight <= clientHeight) return null
+    const el = scrollContainerRef.current
+    if (!el) return null
+    const { scrollTop, scrollHeight, clientHeight } = el
+    if (scrollHeight <= clientHeight + 1) return null
     return { scrollTop, scrollHeight, clientHeight }
   }, [])
 
@@ -1018,47 +1508,44 @@ export function EpubRenderer({
     }, 1200)
   }, [pageMode, readScrollMetrics])
 
-  // Attach scroll listener to EPUB iframe doc whenever it changes (page turn / new section)
+  // `.epub-container` is created once by epubjs and persists across chapter
+  // appends in continuous mode — no need to re-bind on every content swap.
   useEffect(() => {
     if (pageMode !== 'scroll' || status !== 'ready') return
     const host = hostRef.current
     if (!host) return
 
-    let cleanup: (() => void) | null = null
+    let scrollCleanup: (() => void) | null = null
+    let mo: MutationObserver | null = null
 
-    const attachToIframe = () => {
-      const iframe = host.querySelector('iframe') as HTMLIFrameElement | null
-      if (!iframe || iframe === scrollIframeRef.current) return
-      scrollIframeRef.current = iframe
-
-      if (cleanup) cleanup()
-
-      const doc = iframe.contentDocument
-      const scrollTarget = doc?.body || doc?.documentElement
-      if (!scrollTarget) return
-
+    const bind = (el: HTMLElement) => {
+      scrollContainerRef.current = el
       const onScroll = () => updateScrollThumb()
-      scrollTarget.addEventListener('scroll', onScroll, { passive: true })
-      // Also listen on the iframe window level
-      iframe.contentWindow?.addEventListener('scroll', onScroll, { passive: true })
+      el.addEventListener('scroll', onScroll, { passive: true })
       updateScrollThumb()
-
-      cleanup = () => {
-        scrollTarget.removeEventListener('scroll', onScroll)
-        iframe.contentWindow?.removeEventListener('scroll', onScroll)
-      }
+      scrollCleanup = () => el.removeEventListener('scroll', onScroll)
     }
 
-    const mo = new MutationObserver(attachToIframe)
-    mo.observe(host, { childList: true, subtree: true })
-    attachToIframe()
-    const poll = window.setInterval(attachToIframe, 600)
+    const existing = host.querySelector<HTMLElement>('.epub-container')
+    if (existing) {
+      bind(existing)
+    } else {
+      // Rendition may still be attaching; bind as soon as it appears.
+      mo = new MutationObserver(() => {
+        const container = host.querySelector<HTMLElement>('.epub-container')
+        if (container) {
+          mo?.disconnect()
+          mo = null
+          bind(container)
+        }
+      })
+      mo.observe(host, { childList: true, subtree: true })
+    }
 
     return () => {
-      mo.disconnect()
-      window.clearInterval(poll)
-      cleanup?.()
-      scrollIframeRef.current = null
+      mo?.disconnect()
+      scrollCleanup?.()
+      scrollContainerRef.current = null
       if (scrollHideTimerRef.current != null) {
         window.clearTimeout(scrollHideTimerRef.current)
         scrollHideTimerRef.current = null
@@ -1067,6 +1554,90 @@ export function EpubRenderer({
   }, [pageMode, status, updateScrollThumb])
 
   const showCustomScrollbar = pageMode === 'scroll' && status === 'ready' && scrollThumb.height > 0
+
+  const [iframeHostBox, setIframeHostBox] = useState<IframeHostBox | null>(null)
+
+  useEffect(() => {
+    if (status !== 'ready') {
+      setIframeHostBox(null)
+      iframeHostBoxRef.current = null
+      remeasureTypewriterHostRef.current = () => {}
+      return
+    }
+    const measure = () => {
+      const host = hostRef.current
+      if (!host) return
+      const iframe = host.querySelector('iframe')
+      if (!iframe) {
+        if (iframeHostBoxRef.current !== null) {
+          iframeHostBoxRef.current = null
+          setIframeHostBox(null)
+        }
+        return
+      }
+      const hr = host.getBoundingClientRect()
+      const ir = iframe.getBoundingClientRect()
+      const box: IframeHostBox = {
+        left: ir.left - hr.left,
+        top: ir.top - hr.top,
+        width: ir.width,
+        height: ir.height,
+      }
+      if (iframeHostBoxesEqual(iframeHostBoxRef.current, box)) return
+      iframeHostBoxRef.current = box
+      setIframeHostBox(box)
+    }
+    remeasureTypewriterHostRef.current = measure
+    measure()
+    const host = hostRef.current
+    const ro = host ? new ResizeObserver(measure) : null
+    if (host) ro?.observe(host)
+    window.addEventListener('resize', measure)
+    return () => {
+      remeasureTypewriterHostRef.current = () => {}
+      ro?.disconnect()
+      window.removeEventListener('resize', measure)
+    }
+  }, [status, chromeHidden])
+
+  // Hand + Typewriter tools keep inline edit; other tools commit and exit.
+  useEffect(() => {
+    if (!activeEditingId) return
+    if (interactionTool === 'hand' || interactionTool === 'typewriter') return
+    onTypewriterContentBlur?.(activeEditingId)
+    setActiveEditingId(null)
+  }, [interactionTool, activeEditingId, onTypewriterContentBlur])
+
+  const chapterTypewriterNotes = (typewriterNotes ?? []).filter((n) => {
+    if (n.type !== 'textbox') return false
+    if (
+      !typewriterBelongsToRenderedSection(
+        n.positionData,
+        typewriterFrameRef.current?.cfiBase,
+      )
+    ) {
+      return false
+    }
+    if (n.cfi || n.source === 'epub') return true
+    return n.chapterIndex === typewriterChapterIndex
+  })
+  chapterTypewriterNoteIdsRef.current = chapterTypewriterNotes.map((n) => n.id)
+
+  const beginHandTypewriterEdit = useCallback((id: string) => {
+    const prev = activeEditingIdRef.current
+    if (prev && prev !== id) {
+      onTypewriterContentBlurRef.current?.(prev)
+    }
+    setActiveEditingId(id)
+  }, [])
+  const beginHandTypewriterEditRef = useRef(beginHandTypewriterEdit)
+  beginHandTypewriterEditRef.current = beginHandTypewriterEdit
+
+  const iframeRectForResolve = (): DOMRect | null => {
+    const host = hostRef.current
+    const iframe = host?.querySelector('iframe')
+    return iframe?.getBoundingClientRect() ?? null
+  }
 
   return (
     <main
@@ -1130,9 +1701,13 @@ export function EpubRenderer({
         className={`h-full w-full min-h-0 flex-1 [&_iframe]:h-full [&_iframe]:w-full ${
           interactionTool === 'highlight'
             ? 'cursor-highlight-tool'
-            : interactionTool === 'select'
-              ? 'cursor-select-tool'
-              : 'cursor-hand-tool'
+            : interactionTool === 'typewriter'
+              ? 'cursor-typewriter-tool'
+              : interactionTool === 'annotate'
+                ? 'cursor-crosshair'
+                : interactionTool === 'select'
+                  ? 'cursor-select-tool'
+                  : 'cursor-hand-tool'
         } ${
           showGutter
             ? 'bg-neutral-600/15 [&_.epub-container]:bg-transparent [&_.epub-view]:shadow-[0_0_0_1px_rgba(148,163,184,0.35)]'
@@ -1140,6 +1715,184 @@ export function EpubRenderer({
         }`}
         tabIndex={-1}
       />
+      {/* Typewriter host overlays — outside iframe so focus/blur work reliably.
+          overflow visible so the floating format toolbar isn't clipped. */}
+      <div className="pointer-events-none absolute inset-0 z-[11] overflow-visible">
+        {iframeHostBox
+          ? chapterTypewriterNotes.map((note) => {
+              const ir = iframeRectForResolve()
+              let left =
+                iframeHostBox.left +
+                (parseTypewriterPosition(note.positionData)?.xPct ?? 0) /
+                  100 *
+                  iframeHostBox.width
+              let top =
+                iframeHostBox.top +
+                (parseTypewriterPosition(note.positionData)?.yPct ?? 0) /
+                  100 *
+                  iframeHostBox.height
+
+              if (ir && dragPreview?.id !== note.id) {
+                const resolved = resolveTypewriterHostPoint({
+                  locationRaw: note.positionData,
+                  doc: typewriterFrameRef.current?.doc,
+                  iframeRect: ir,
+                  iframeHostBox,
+                })
+                if (resolved) {
+                  left = resolved.left
+                  top = resolved.top
+                }
+              }
+
+              if (dragPreview?.id === note.id) {
+                left =
+                  iframeHostBox.left +
+                  (dragPreview.xPct / 100) * iframeHostBox.width
+                top =
+                  iframeHostBox.top +
+                  (dragPreview.yPct / 100) * iframeHostBox.height
+              }
+              const editing = activeEditingId === note.id
+              const dragging = dragPreview?.id === note.id
+              const notePos = parseTypewriterPosition(note.positionData) ?? {
+                xPct: 0,
+                yPct: 0,
+              }
+              const color =
+                typeof note.colorHex === 'string' && note.colorHex.trim()
+                  ? note.colorHex
+                  : undefined
+
+              const startDrag = (
+                e: ReactPointerEvent<HTMLElement>,
+                origin: TypewriterPct,
+              ) => {
+                e.stopPropagation()
+                if (e.button !== 0) return
+                const box = iframeHostBoxRef.current
+                if (!box || box.width <= 0 || box.height <= 0) return
+                dragSessionRef.current = beginTypewriterDrag({
+                  id: note.id,
+                  pointerId: e.pointerId,
+                  clientX: e.clientX,
+                  clientY: e.clientY,
+                  originXPct: origin.xPct,
+                  originYPct: origin.yPct,
+                  bounds: new DOMRect(0, 0, box.width, box.height),
+                })
+                try {
+                  e.currentTarget.setPointerCapture(e.pointerId)
+                } catch {
+                  /* ignore */
+                }
+              }
+
+              return (
+                <div
+                  key={note.id}
+                  ref={(el) => {
+                    if (el) typewriterNoteRefs.current.set(note.id, el)
+                    else typewriterNoteRefs.current.delete(note.id)
+                  }}
+                  data-typewriter-note={note.id}
+                  className={`pointer-events-auto absolute z-[5] -translate-x-1/2 -translate-y-1/2 ${
+                    dragging ? 'rb-typewriter-dragging' : ''
+                  }`}
+                  style={{ left, top, color }}
+                  onClick={(e) => e.stopPropagation()}
+                  onPointerDown={(e) => e.stopPropagation()}
+                >
+                  {editing ? (
+                    <TypewriterRichEditor
+                      autoFocus
+                      value={note.content}
+                      colorHex={note.colorHex}
+                      fontSize={note.fontSize}
+                      onFocus={() => onTypewriterContentFocus?.(note.id)}
+                      onChange={(html) =>
+                        onTypewriterContentChange?.(note.id, html)
+                      }
+                      onStyleChange={(patch) =>
+                        onTypewriterStyleChange?.(note.id, patch)
+                      }
+                      onBlur={() => {
+                        if (dragSessionRef.current?.id === note.id) return
+                        onTypewriterContentBlur?.(note.id)
+                        setActiveEditingId(null)
+                      }}
+                      onEmptyDelete={() => {
+                        setActiveEditingId(null)
+                        onTypewriterDelete?.(note.id)
+                      }}
+                      dragHandle={
+                        <button
+                          type="button"
+                          className="rb-typewriter-drag-handle"
+                          aria-label="Move typewriter note"
+                          onPointerDown={(e) => {
+                            e.preventDefault()
+                            startDrag(e, notePos)
+                          }}
+                        />
+                      }
+                    />
+                  ) : (
+                    <button
+                      type="button"
+                      className={`rb-typewriter-static border-none bg-transparent p-0 text-left ${
+                        interactionTool === 'hand'
+                          ? 'cursor-text'
+                          : 'cursor-grab'
+                      }`}
+                      aria-label="Typewriter note"
+                      onPointerDown={(e) => {
+                        if (interactionTool === 'typewriter') startDrag(e, notePos)
+                      }}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        if (suppressTypewriterClickRef.current) {
+                          suppressTypewriterClickRef.current = false
+                          return
+                        }
+                        beginHandTypewriterEdit(note.id)
+                      }}
+                    >
+                      <TypewriterStaticHtml
+                        html={note.content}
+                        colorHex={note.colorHex}
+                        fontSize={note.fontSize}
+                      />
+                    </button>
+                  )}
+                </div>
+              )
+            })
+          : null}
+        {typewriterDraft ? (
+          <div
+            className="pointer-events-auto absolute z-[6] -translate-x-1/2 -translate-y-1/2"
+            style={{
+              left: typewriterDraft.hostX,
+              top: typewriterDraft.hostY,
+            }}
+            onClick={(e) => e.stopPropagation()}
+            onPointerDown={(e) => e.stopPropagation()}
+          >
+            <TypewriterRichEditor
+              autoFocus
+              value={typewriterDraft.content}
+              colorHex={typewriterDraft.colorHex}
+              fontSize={typewriterDraft.fontSize}
+              placeholder="Type..."
+              onChange={(html) => onTypewriterDraftChange?.(html)}
+              onStyleChange={(patch) => onTypewriterDraftStyleChange?.(patch)}
+              onBlur={() => onTypewriterDraftCommit?.(typewriterDraft.id)}
+              onCancel={() => onTypewriterDraftCancel?.(typewriterDraft.id)}
+            />
+          </div>
+        ) : null}
+      </div>
       {/* Custom thin scrollbar overlay — only in scroll mode */}
       {showCustomScrollbar ? (
         <div

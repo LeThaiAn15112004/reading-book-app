@@ -1,15 +1,22 @@
-import type { AnnotateTool, InteractionTool } from '../../readerSession'
+import type { AnnotateTool, DrawToolSettings } from '@reading-book/shared/models'
 import { MoreMenu } from './MoreMenu'
-import { ToolsStrip } from './ToolsMenu'
+import {
+  ToolsStrip,
+  type CompanionTool,
+  type ModeTool,
+} from './ToolsMenu'
 
 type ReaderTopbarProps = {
   chromeHidden: boolean
   moreOpen: boolean
   settingsOpen: boolean
   activeTool: AnnotateTool
+  drawSettings: DrawToolSettings
+  onDrawSettingsChange: (patch: Partial<DrawToolSettings>) => void
   onToggleMore: () => void
   onToggleSettings: () => void
-  onSelectTool: (tool: InteractionTool) => void
+  onSelectTool: (tool: ModeTool) => void
+  onCompanionTool: (tool: CompanionTool) => void
   onOpenSign: () => void
   onShare: () => void
   onFavorites: () => void
@@ -25,9 +32,12 @@ export function ReaderTopbar({
   moreOpen,
   settingsOpen,
   activeTool,
+  drawSettings,
+  onDrawSettingsChange,
   onToggleMore,
   onToggleSettings,
   onSelectTool,
+  onCompanionTool,
   onOpenSign,
   onShare,
   onFavorites,
@@ -37,7 +47,7 @@ export function ReaderTopbar({
   return (
     <header
       id="reader-tools-chrome"
-      className={`absolute inset-x-0 top-0 z-50 flex h-14 items-center gap-2 border-b border-lib-border-soft bg-lib-surface-strong px-3 backdrop-blur-md transition-all duration-300 sm:h-16 sm:gap-3 sm:px-5 ${
+      className={`absolute inset-x-0 top-0 z-50 flex h-[4.25rem] items-center gap-2 border-b border-lib-border-soft bg-lib-surface-strong px-3 backdrop-blur-md transition-all duration-300 sm:h-[4.5rem] sm:gap-3 sm:px-5 ${
         chromeHidden
           ? 'pointer-events-none -translate-y-full opacity-0'
           : 'translate-y-0 opacity-100'
@@ -46,7 +56,10 @@ export function ReaderTopbar({
     >
       <ToolsStrip
         activeTool={activeTool}
+        drawSettings={drawSettings}
+        onDrawSettingsChange={onDrawSettingsChange}
         onSelectTool={onSelectTool}
+        onCompanionTool={onCompanionTool}
         onOpenSign={onOpenSign}
       />
 

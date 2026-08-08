@@ -1,22 +1,24 @@
 import { randomUUID } from 'node:crypto'
 import { ipcMain } from 'electron'
-import { Highlight, Location } from '@reading-book/domain'
+import { Annotation, Location, type AnnotationType } from '@reading-book/domain'
 import {
   getOverlayStore,
   type SessionRecord,
 } from '../persistence/sqlite-overlay-store'
 import type {
-  AddHighlightInput,
   AnnotationDto,
+  AnnotationStyleDto,
   BookmarkDto,
+  DeleteAnnotationInput,
   DeleteBookmarkInput,
-  DeleteHighlightInput,
+  ListAnnotationsInput,
   MutationResult,
   OkResult,
   ReadingSessionStateDto,
+  SaveAnnotationInput,
   SaveBookmarkInput,
   SaveReadingSessionStateInput,
-  UpdateHighlightNoteInput,
+  UpdateAnnotationInput,
 } from './api-types'
 import { OverlayChannels } from './channels'
 
@@ -65,20 +67,35 @@ function inputToSessionRecord(input: SaveReadingSessionStateInput): SessionRecor
   }
 }
 
-function toAnnotationDto(h: Highlight): AnnotationDto {
+function toAnnotationDto(a: Annotation): AnnotationDto {
   const dto: AnnotationDto = {
-    id: h.id,
-    bookId: h.bookId,
-    location: h.location,
-    selectedText: h.selectedText,
-    colorHex: h.colorHex,
-    status: h.status,
-    isChecked: h.isChecked,
-    createdAt: h.createdAt,
-    updatedAt: h.updatedAt,
+    id: a.id,
+    bookId: a.bookId,
+    type: a.type,
+    pageNumber: a.pageNumber,
+    locationData: a.locationData,
+    style: { ...a.style },
+    status: a.status,
+    isChecked: a.isChecked,
+    createdAt: a.createdAt,
+    updatedAt: a.updatedAt,
   }
-  if (h.note) dto.note = h.note
+  if (a.content) dto.content = a.content
   return dto
+}
+
+/** Keep only clone-safe primitives so `style_properties` stays valid JSON. */
+function sanitizeStyle(style: unknown): AnnotationStyleDto | undefined {
+  if (!style || typeof style !== 'object' || Array.isArray(style)) return undefined
+  const out: AnnotationStyleDto = {}
+  for (const [key, value] of Object.entries(style as Record<string, unknown>)) {
+    if (value === undefined || value === null) continue
+    const kind = typeof value
+    if (kind === 'string' || kind === 'number' || kind === 'boolean') {
+      out[key] = value
+    }
+  }
+  return out
 }
 
 function toBookmarkDto(row: {
@@ -98,18 +115,31 @@ function toBookmarkDto(row: {
   return dto
 }
 
-/** Handlers for overlay:* — session (T4.3) + highlights + bookmarks (T5.5). */
+/** Handlers for overlay:* — session (T4.3) + annotations + bookmarks (T5.5). */
 export function registerOverlayIpc(): void {
   const overlays = getOverlayStore()
 
-  ipcMain.removeHandler(OverlayChannels.list)
+  ipcMain.removeHandler(OverlayChannels.listAnnotations)
   ipcMain.handle(
-    OverlayChannels.list,
-    async (_event, bookId: unknown): Promise<AnnotationDto[]> => {
+    OverlayChannels.listAnnotations,
+    async (_event, input: unknown): Promise<AnnotationDto[]> => {
       void _event
-      if (typeof bookId !== 'string' || !bookId.trim()) return []
+      if (!input || typeof input !== 'object') return []
+      const body = input as ListAnnotationsInput
+      if (typeof body.bookId !== 'string' || !body.bookId.trim()) return []
       try {
-        const list = await overlays.listHighlights(bookId.trim())
+        const types = Array.isArray(body.types)
+          ? body.types.filter((type): type is AnnotationType =>
+              Annotation.isType(type),
+            )
+          : undefined
+        const list = await overlays.listAnnotations({
+          bookId: body.bookId.trim(),
+          ...(types?.length ? { types } : {}),
+          ...(typeof body.pageNumber === 'number' && Number.isFinite(body.pageNumber)
+            ? { pageNumber: body.pageNumber }
+            : {}),
+        })
         return list.map(toAnnotationDto)
       } catch {
         return []
@@ -117,23 +147,18 @@ export function registerOverlayIpc(): void {
     },
   )
 
-  ipcMain.removeHandler(OverlayChannels.addHighlight)
+  ipcMain.removeHandler(OverlayChannels.saveAnnotation)
   ipcMain.handle(
-    OverlayChannels.addHighlight,
+    OverlayChannels.saveAnnotation,
     async (_event, input: unknown): Promise<MutationResult> => {
       void _event
       if (!input || typeof input !== 'object') return { ok: false, id: null }
-      const body = input as AddHighlightInput
+      const body = input as SaveAnnotationInput
       if (typeof body.bookId !== 'string' || !body.bookId.trim()) {
         return { ok: false, id: null }
       }
-      if (typeof body.location !== 'string' || !body.location.trim()) {
-        return { ok: false, id: null }
-      }
-      if (typeof body.selectedText !== 'string' || !body.selectedText.trim()) {
-        return { ok: false, id: null }
-      }
-      if (typeof body.colorHex !== 'string' || !body.colorHex.trim()) {
+      if (!Annotation.isType(body.type)) return { ok: false, id: null }
+      if (typeof body.locationData !== 'string' || !body.locationData.trim()) {
         return { ok: false, id: null }
       }
       try {
@@ -142,31 +167,34 @@ export function registerOverlayIpc(): void {
           typeof body.id === 'string' && body.id.trim()
             ? body.id.trim()
             : randomUUID()
-        const highlight = new Highlight({
+        const annotation = new Annotation({
           id,
           bookId: body.bookId.trim(),
-          location: body.location.trim(),
-          selectedText: body.selectedText,
-          colorHex: body.colorHex,
-          note: body.note,
+          type: body.type,
+          pageNumber: typeof body.pageNumber === 'number' ? body.pageNumber : 1,
+          locationData: body.locationData.trim(),
+          content: body.content,
+          style: sanitizeStyle(body.style),
+          status: Annotation.isStatus(body.status) ? body.status : 'None',
+          isChecked: body.isChecked === true,
           createdAt: body.createdAt?.trim() || now,
           updatedAt: body.updatedAt?.trim() || now,
         })
-        await overlays.saveHighlight(highlight)
-        return { ok: true, id: highlight.id }
+        await overlays.saveAnnotation(annotation)
+        return { ok: true, id: annotation.id }
       } catch {
         return { ok: false, id: null }
       }
     },
   )
 
-  ipcMain.removeHandler(OverlayChannels.updateHighlightNote)
+  ipcMain.removeHandler(OverlayChannels.updateAnnotation)
   ipcMain.handle(
-    OverlayChannels.updateHighlightNote,
+    OverlayChannels.updateAnnotation,
     async (_event, input: unknown): Promise<MutationResult> => {
       void _event
       if (!input || typeof input !== 'object') return { ok: false, id: null }
-      const body = input as UpdateHighlightNoteInput
+      const body = input as UpdateAnnotationInput
       if (typeof body.bookId !== 'string' || !body.bookId.trim()) {
         return { ok: false, id: null }
       }
@@ -174,13 +202,28 @@ export function registerOverlayIpc(): void {
         return { ok: false, id: null }
       }
       try {
-        const list = await overlays.listHighlights(body.bookId.trim())
-        const existing = list.find((h) => h.id === body.id.trim())
-        if (!existing) return { ok: false, id: null }
-        existing.updateNote(
-          typeof body.note === 'string' ? body.note : '',
+        const existing = await overlays.getAnnotation(
+          body.bookId.trim(),
+          body.id.trim(),
         )
-        await overlays.saveHighlight(existing)
+        if (!existing) return { ok: false, id: null }
+
+        if (typeof body.content === 'string') existing.updateContent(body.content)
+        if (typeof body.locationData === 'string' && body.locationData.trim()) {
+          existing.updateLocation(
+            body.locationData,
+            typeof body.pageNumber === 'number' ? body.pageNumber : undefined,
+          )
+        } else if (typeof body.pageNumber === 'number') {
+          existing.pageNumber = Annotation.normalizePageNumber(body.pageNumber)
+          existing.touch()
+        }
+        const style = sanitizeStyle(body.style)
+        if (style) existing.mergeStyle(style)
+        if (Annotation.isStatus(body.status)) existing.setStatus(body.status)
+        if (typeof body.isChecked === 'boolean') existing.setChecked(body.isChecked)
+
+        await overlays.saveAnnotation(existing)
         return { ok: true, id: existing.id }
       } catch {
         return { ok: false, id: null }
@@ -188,13 +231,13 @@ export function registerOverlayIpc(): void {
     },
   )
 
-  ipcMain.removeHandler(OverlayChannels.deleteHighlight)
+  ipcMain.removeHandler(OverlayChannels.deleteAnnotation)
   ipcMain.handle(
-    OverlayChannels.deleteHighlight,
+    OverlayChannels.deleteAnnotation,
     async (_event, input: unknown): Promise<OkResult> => {
       void _event
       if (!input || typeof input !== 'object') return { ok: false }
-      const body = input as DeleteHighlightInput
+      const body = input as DeleteAnnotationInput
       if (typeof body.bookId !== 'string' || !body.bookId.trim()) {
         return { ok: false }
       }
@@ -202,7 +245,7 @@ export function registerOverlayIpc(): void {
         return { ok: false }
       }
       try {
-        const removed = await overlays.deleteHighlight(
+        const removed = await overlays.deleteAnnotation(
           body.bookId.trim(),
           body.id.trim(),
         )

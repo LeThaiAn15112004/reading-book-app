@@ -1,4 +1,4 @@
-import type { PageLayout, PageMode } from '../../readerSession'
+import type { PageLayout, PageMode } from '@reading-book/shared/models'
 import type {
   FontFamily,
   FontWeight,

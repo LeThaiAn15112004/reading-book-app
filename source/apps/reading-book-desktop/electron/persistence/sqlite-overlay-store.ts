@@ -1,9 +1,10 @@
 import {
+  Annotation,
   Bookmark,
-  Highlight,
   Location,
   ReadingSessionState,
-  type HighlightStatus,
+  type AnnotationQuery,
+  type AnnotationType,
   type OverlayStore,
 } from '@reading-book/domain'
 import type { Database as SqliteDatabase } from 'better-sqlite3'
@@ -107,33 +108,35 @@ function rowToSessionRecord(row: SessionRow): SessionRecord {
   }
 }
 
-interface HighlightRow {
+interface AnnotationRow {
   id: string
   book_id: string
-  location: string
-  selected_text: string
-  color_hex: string
-  note: string | null
+  page_number: number
+  type: string
+  location_data: string
+  content: string | null
+  style_properties: string | null
   status: string
   is_checked: number
   created_at: string
   updated_at: string
 }
 
-const HIGHLIGHT_COLUMNS = `
-  id, book_id, location, selected_text, color_hex,
-  note, status, is_checked, created_at, updated_at
+const ANNOTATION_COLUMNS = `
+  id, book_id, page_number, type, location_data, content,
+  style_properties, status, is_checked, created_at, updated_at
 `
 
-function rowToHighlight(row: HighlightRow): Highlight {
-  return new Highlight({
+function rowToAnnotation(row: AnnotationRow): Annotation {
+  return new Annotation({
     id: row.id,
     bookId: row.book_id,
-    location: row.location,
-    selectedText: row.selected_text,
-    colorHex: row.color_hex,
-    note: row.note ?? undefined,
-    status: (row.status as HighlightStatus) || 'None',
+    type: Annotation.isType(row.type) ? row.type : 'highlight',
+    pageNumber: row.page_number,
+    locationData: row.location_data,
+    content: row.content ?? undefined,
+    style: Annotation.parseStyle(row.style_properties),
+    status: Annotation.isStatus(row.status) ? row.status : 'None',
     isChecked: row.is_checked === 1,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -163,7 +166,7 @@ function rowToBookmark(row: BookmarkRow): Bookmark {
 }
 
 /**
- * SQLite OverlayStore — session (T4.3) + highlights (T5.2 / T5.10) + bookmarks (T5.5).
+ * SQLite OverlayStore — session (T4.3) + annotations (T5.2 / T5.10) + bookmarks (T5.5).
  */
 export class SqliteOverlayStore implements OverlayStore {
   constructor(private readonly db: SqliteDatabase = getDatabase()) {}
@@ -322,60 +325,97 @@ export class SqliteOverlayStore implements OverlayStore {
       })
   }
 
-  async saveHighlight(h: Highlight): Promise<void> {
+  async saveAnnotation(a: Annotation): Promise<void> {
     this.db
       .prepare(
-        `INSERT INTO highlights (
-          id, book_id, location, selected_text, color_hex,
-          note, status, is_checked, created_at, updated_at
+        `INSERT INTO annotations (
+          id, book_id, page_number, type, location_data, content,
+          style_properties, status, is_checked, created_at, updated_at
         ) VALUES (
-          @id, @book_id, @location, @selected_text, @color_hex,
-          @note, @status, @is_checked, @created_at, @updated_at
+          @id, @book_id, @page_number, @type, @location_data, @content,
+          @style_properties, @status, @is_checked, @created_at, @updated_at
         )
         ON CONFLICT(id) DO UPDATE SET
           book_id = excluded.book_id,
-          location = excluded.location,
-          selected_text = excluded.selected_text,
-          color_hex = excluded.color_hex,
-          note = excluded.note,
+          page_number = excluded.page_number,
+          type = excluded.type,
+          location_data = excluded.location_data,
+          content = excluded.content,
+          style_properties = excluded.style_properties,
           status = excluded.status,
           is_checked = excluded.is_checked,
           updated_at = excluded.updated_at`,
       )
       .run({
-        id: h.id,
-        book_id: h.bookId,
-        location: h.location,
-        selected_text: h.selectedText,
-        color_hex: h.colorHex,
-        note: h.note ?? null,
-        status: h.status,
-        is_checked: h.isChecked ? 1 : 0,
-        created_at: h.createdAt,
-        updated_at: h.updatedAt,
+        id: a.id,
+        book_id: a.bookId,
+        page_number: a.pageNumber,
+        type: a.type,
+        location_data: a.locationData,
+        content: a.content ?? null,
+        style_properties: a.serializedStyle(),
+        status: a.status,
+        is_checked: a.isChecked ? 1 : 0,
+        created_at: a.createdAt,
+        updated_at: a.updatedAt,
       })
   }
 
-  async listHighlights(bookId: string): Promise<Highlight[]> {
-    const id = bookId.trim()
-    if (!id) return []
-    const rows = this.db
+  async getAnnotation(
+    bookId: string,
+    annotationId: string,
+  ): Promise<Annotation | undefined> {
+    const book = bookId.trim()
+    const id = annotationId.trim()
+    if (!book || !id) return undefined
+    const row = this.db
       .prepare(
-        `SELECT ${HIGHLIGHT_COLUMNS}
-         FROM highlights
-         WHERE book_id = ?
-         ORDER BY created_at DESC`,
+        `SELECT ${ANNOTATION_COLUMNS}
+         FROM annotations
+         WHERE book_id = ? AND id = ?`,
       )
-      .all(id) as HighlightRow[]
-    return rows.map(rowToHighlight)
+      .get(book, id) as AnnotationRow | undefined
+    return row ? rowToAnnotation(row) : undefined
   }
 
-  async deleteHighlight(bookId: string, highlightId: string): Promise<boolean> {
+  async listAnnotations(query: AnnotationQuery): Promise<Annotation[]> {
+    const book = query.bookId.trim()
+    if (!book) return []
+
+    const types = (query.types ?? []).filter((type): type is AnnotationType =>
+      Annotation.isType(type),
+    )
+    // An explicit but fully invalid type filter must not silently widen to "all".
+    if (query.types?.length && !types.length) return []
+
+    const params: Array<string | number> = [book]
+    let where = 'book_id = ?'
+    if (types.length) {
+      where += ` AND type IN (${types.map(() => '?').join(', ')})`
+      params.push(...types)
+    }
+    if (query.pageNumber != null && Number.isFinite(query.pageNumber)) {
+      where += ' AND page_number = ?'
+      params.push(Math.floor(query.pageNumber))
+    }
+
+    const rows = this.db
+      .prepare(
+        `SELECT ${ANNOTATION_COLUMNS}
+         FROM annotations
+         WHERE ${where}
+         ORDER BY created_at DESC`,
+      )
+      .all(...params) as AnnotationRow[]
+    return rows.map(rowToAnnotation)
+  }
+
+  async deleteAnnotation(bookId: string, annotationId: string): Promise<boolean> {
     const book = bookId.trim()
-    const id = highlightId.trim()
+    const id = annotationId.trim()
     if (!book || !id) return false
     const result = this.db
-      .prepare(`DELETE FROM highlights WHERE book_id = ? AND id = ?`)
+      .prepare(`DELETE FROM annotations WHERE book_id = ? AND id = ?`)
       .run(book, id)
     return result.changes > 0
   }

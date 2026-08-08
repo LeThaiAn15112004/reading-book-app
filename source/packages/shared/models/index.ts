@@ -1,5 +1,70 @@
 export type { BookSession } from './book-session.js'
-export type { Annotations } from './annotations.js'
+export {
+  annotationAdd,
+  annotationRemove,
+  annotationReplace,
+  createAnnotationHistory,
+  snapshotEntity,
+  snapshotId,
+  type AnnotationAction,
+  type AnnotationHistory,
+  type AnnotationSnapshot,
+} from './annotation-history.js'
+export {
+  applyAnnotationHistoryStep,
+  type AnnotationUndoHandlers,
+} from './annotation-undo.js'
+export type {
+  Annotation,
+  Annotations,
+  AnnotationStatus,
+  AnnotationStyle,
+  AnnotationType,
+} from './annotations.js'
+export {
+  bookmarkDtoToReaderBookmark,
+  chapterIndexFromBookmarkLocationRef,
+  findReaderBookmarksAtLocation,
+  isReaderBookmarkAtLocation,
+  packReaderBookmarkLocation,
+  parseReaderBookmarkLocation,
+  readerBookmarkJumpLocation,
+  readerBookmarkMatchesLocation,
+  resolveCurrentReaderBookmarkLocation,
+} from './bookmark-persistence.js'
+export {
+  annotationDtoToReaderHighlight,
+  epubJumpCfi,
+  packReaderHighlightLocation,
+  readerHighlightToAnnotationInput,
+  type HighlightAnnotationInput,
+} from './highlight-persistence.js'
+export {
+  annotationDtoToReaderTypewriter,
+  epubTypewriterJumpCfi,
+  parseTypewriterLocation,
+  parseTypewriterPosition,
+  readerTypewriterToAnnotationInput,
+  serializeTypewriterLocation,
+  serializeTypewriterPageRect,
+  serializeTypewriterPosition,
+  type TextboxAnnotationInput,
+  type TypewriterLocation,
+} from './typewriter-persistence.js'
+export {
+  TYPEWRITER_DEFAULT_COLOR_HEX,
+  TYPEWRITER_DEFAULT_FONT_SIZE,
+  TYPEWRITER_FONT_SIZES,
+  TYPEWRITER_TEXT_COLORS,
+  clampTypewriterFontSize,
+  normalizeTypewriterColorHex,
+  normalizeTypewriterContent,
+  sanitizeTypewriterHtml,
+  serializeTypewriterEditorHtml,
+  typewriterContentIsEmpty,
+  typewriterPlainText,
+  type TypewriterBoxStyle,
+} from './typewriter-rich-text.js'
 export type { CollectionSummary } from './collection-summary.js'
 export type {
   ImportClientResult,
@@ -28,7 +93,15 @@ export {
   nextId,
   nextReaderOverlayId,
   normalizeHighlightColorHex,
+  DEFAULT_DRAW_SETTINGS,
+  DRAW_COLOR_SWATCHES,
+  DRAW_STROKE_WIDTHS,
+  blocksSelectionContextMenu,
+  isCrosshairAnnotateTool,
+  isDrawingTool,
   type AnnotateTool,
+  type DrawToolSettings,
+  type DrawingTool,
   type InteractionTool,
   type EpubPendingSelection,
   type EpubReaderHighlight,
@@ -42,11 +115,18 @@ export {
   type PageMode,
   type PendingSelection,
   type ReaderBookmark,
-  type ReaderComment,
+  type ReaderTypewriterNote,
   type ReaderHighlight,
+  type ReaderAnnotation,
+  type ReaderAnnotationType,
+  type ReaderAnnotationStatus,
   type ReaderNote,
   type ReaderSignature,
+  type TypewriterDraft,
   type TypewriterMark,
+  type TypewriterMovePayload,
+  type TypewriterNoteSource,
+  type TypewriterPlacePayload,
   type ViewportRect,
 } from './reader-session.js'
 export {
@@ -74,6 +154,19 @@ export {
   type ResolvedReadingPrefs,
   type TextAlign,
 } from './reading-prefs.js'
+export {
+  READING_FONT_SIZE_MAX,
+  READING_FONT_SIZE_MIN,
+  clampReadingFontSize,
+  parseReadingLayoutMode,
+  readingPrefsFromGlobal,
+  readingPrefsFromSession,
+  type ReadingSessionPrefsFields,
+} from './reading-session-prefs.js'
+export {
+  findOverlappingHighlight,
+  selectionHasHighlight,
+} from './selection-overlap.js'
 export {
   formatLastReadLine,
   shelfProgressForBook,

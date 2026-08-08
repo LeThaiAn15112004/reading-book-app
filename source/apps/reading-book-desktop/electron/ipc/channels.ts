@@ -27,10 +27,10 @@ export const ImportChannels = {
 } as const
 
 export const OverlayChannels = {
-  list: 'overlay:list',
-  addHighlight: 'overlay:addHighlight',
-  updateHighlightNote: 'overlay:updateHighlightNote',
-  deleteHighlight: 'overlay:deleteHighlight',
+  listAnnotations: 'overlay:listAnnotations',
+  saveAnnotation: 'overlay:saveAnnotation',
+  updateAnnotation: 'overlay:updateAnnotation',
+  deleteAnnotation: 'overlay:deleteAnnotation',
   listBookmarks: 'overlay:listBookmarks',
   saveBookmark: 'overlay:saveBookmark',
   deleteBookmark: 'overlay:deleteBookmark',
