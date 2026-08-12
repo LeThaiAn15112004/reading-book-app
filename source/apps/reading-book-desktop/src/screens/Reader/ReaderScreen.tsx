@@ -33,8 +33,10 @@ import {
   SelectionTooltip,
   SidebarEdgeRail,
   sidebarContentInsetLeft,
+  sidebarContentInsetRight,
   SignInfoPanel,
   TocSidebar,
+  RightSidebarPanel,
   TrashConfirmDialog,
   useSidebarPanelResize,
 } from './components'
@@ -86,6 +88,7 @@ export function ReaderScreen() {
     activeTool: 'hand',
     isEpubSurface: false,
     sidebarOpen: false,
+    rightSidebarOpen: false,
   })
 
   const chrome = useReaderChromeUi({
@@ -97,7 +100,8 @@ export function ReaderScreen() {
     readerSearchQuery,
     readerSearchRequestId,
   })
-  const sidebarResize = useSidebarPanelResize()
+  const sidebarResize = useSidebarPanelResize('left')
+  const rightSidebarResize = useSidebarPanelResize('right')
 
   const annotations = useReaderAnnotations({
     bookId,
@@ -130,6 +134,7 @@ export function ReaderScreen() {
     setHighlights: annotations.setHighlights,
     setBookmarks: annotations.setBookmarks,
     setTypewriterNotes: annotations.setTypewriterNotes,
+    setFreehandStrokes: annotations.setFreehandStrokes,
     typewriterNotesRef: annotations.typewriterNotesRef,
     typewriterDraftRef: annotations.typewriterDraftRef,
     typewriterContentTimersRef: annotations.typewriterContentTimersRef,
@@ -157,7 +162,6 @@ export function ReaderScreen() {
     setSelectionMenu: annotations.setSelectionMenu,
     clearHighlightHandles: annotations.clearHighlightHandles,
     annotationShortcutsRef: annotations.annotationShortcutsRef,
-    activeToolIsHighlight: () => annotations.activeToolRef.current === 'highlight',
     hasHighlightEdit: () => annotations.highlightEditRef.current != null,
   })
 
@@ -226,6 +230,7 @@ export function ReaderScreen() {
     activeTool: annotations.activeTool,
     isEpubSurface: book.isEpubSurface,
     sidebarOpen: chrome.sidebarOpen,
+    rightSidebarOpen: chrome.rightSidebarOpen,
   }
 
   const readingStyle = useMemo(
@@ -257,7 +262,13 @@ export function ReaderScreen() {
         chrome.sidebarOpen,
         sidebarResize.panelWidth,
       )}
-      contentInsetResizing={sidebarResize.isResizing}
+      contentInsetRight={sidebarContentInsetRight(
+        chrome.rightSidebarOpen,
+        rightSidebarResize.panelWidth,
+      )}
+      contentInsetResizing={
+        sidebarResize.isResizing || rightSidebarResize.isResizing
+      }
       dataAttrs={{
         'data-content-status': book.contentStatus,
         'data-content-format': book.bookFormat ?? '',
@@ -388,6 +399,27 @@ export function ReaderScreen() {
             pagePreviews={pagePreviews}
             onRequestPagePreview={requestPagePreview}
           />
+
+          <RightSidebarPanel
+            open={chrome.rightSidebarOpen}
+            panelWidth={rightSidebarResize.panelWidth}
+            isResizing={rightSidebarResize.isResizing}
+            chromeHidden={chrome.chromeHidden}
+            onResizePointerDown={rightSidebarResize.onResizePointerDown}
+            title={
+              chrome.rightSidebarKind === 'typewriter'
+                ? 'Typewriter'
+                : 'Panel'
+            }
+            onClose={chrome.closeRightSidebar}
+          >
+            {/* Feature UIs render into this slot; typewriter details TBD. */}
+            {chrome.rightSidebarKind === 'typewriter' ? (
+              <div className="px-3 py-4 text-[13px] leading-relaxed text-lib-muted">
+                Typewriter side panel — content goes here.
+              </div>
+            ) : null}
+          </RightSidebarPanel>
 
           <AaSettingsPanel
             open={chrome.settingsOpen}
@@ -557,6 +589,12 @@ export function ReaderScreen() {
                         ? 'annotate'
                         : 'hand'
               }
+              drawingTool={
+                annotations.activeTool === 'pencil' ? 'pencil' : null
+              }
+              drawSettings={annotations.drawSettings}
+              freehandStrokes={annotations.freehandStrokes}
+              onFreehandStrokeComplete={annotations.handleFreehandStrokeComplete}
               typewriterNotes={annotations.typewriterNotes}
               typewriterChapterIndex={nav.epubNav?.spineIndex ?? 0}
               typewriterDraft={annotations.typewriterDraft}
@@ -570,9 +608,17 @@ export function ReaderScreen() {
               onTypewriterContentChange={annotations.handleTypewriterContentChange}
               onTypewriterContentBlur={annotations.flushTypewriterContent}
               onTypewriterContentFocus={annotations.handleTypewriterContentFocus}
+              onTypewriterContentCancel={annotations.cancelTypewriterContentEdit}
               onTypewriterStyleChange={annotations.handleTypewriterStyleChange}
               onTypewriterMove={annotations.moveTypewriter}
               onTypewriterDelete={annotations.deleteTypewriterById}
+              onTypewriterOpenSidePanel={() =>
+                chrome.toggleRightSidebar('typewriter')
+              }
+              typewriterSidePanelOpen={
+                chrome.rightSidebarOpen &&
+                chrome.rightSidebarKind === 'typewriter'
+              }
               onFocusZoomWheel={zoom.handleFocusZoomWheel}
               onHandPanBy={
                 zoom.viewZoom > 1.01 ? zoom.handleHandPanBy : undefined
@@ -599,6 +645,9 @@ export function ReaderScreen() {
               highlights={annotations.highlights}
               typewriterNotes={annotations.typewriterNotes}
               eSignStamps={annotations.eSignStamps}
+              freehandStrokes={annotations.freehandStrokes}
+              drawSettings={annotations.drawSettings}
+              onFreehandStrokeComplete={annotations.handleFreehandStrokeComplete}
               onCanvasBackgroundClick={chrome.handleCenterTap}
               onSelectionContextMenu={annotations.openSelectionMenu}
               onTextSelected={annotations.handleTextSelected}
@@ -620,9 +669,17 @@ export function ReaderScreen() {
               onTypewriterChange={annotations.handleTypewriterContentChange}
               onTypewriterBlur={annotations.flushTypewriterContent}
               onTypewriterFocus={annotations.handleTypewriterContentFocus}
+              onTypewriterContentCancel={annotations.cancelTypewriterContentEdit}
               onTypewriterStyleChange={annotations.handleTypewriterStyleChange}
               onTypewriterMove={annotations.moveTypewriter}
               onTypewriterDelete={annotations.deleteTypewriterById}
+              onTypewriterOpenSidePanel={() =>
+                chrome.toggleRightSidebar('typewriter')
+              }
+              typewriterSidePanelOpen={
+                chrome.rightSidebarOpen &&
+                chrome.rightSidebarKind === 'typewriter'
+              }
             />
           )}
         </ReaderZoomViewport>

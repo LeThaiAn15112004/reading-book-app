@@ -100,6 +100,7 @@ export function isHandHoverCursorTargetAtPoint(
   if (!el) return false
   if (el.closest(INTERACTIVE_SELECTOR)) return true
   if (el.closest('[data-rb-hl-id]')) return true
+  if (el.closest('[data-rb-tw-note], [data-rb-tw-draft]')) return true
   return isTextCursorTarget(el)
 }
 

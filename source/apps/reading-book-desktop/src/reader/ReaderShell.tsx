@@ -12,6 +12,8 @@ export type ReaderShellProps = {
   children: ReactNode
   /** Left inset reserved for icon rail (+ sidebar panel when open). */
   contentInsetLeft?: number
+  /** Right inset reserved for the shared right panel when open. */
+  contentInsetRight?: number
   /** When false, reserve top space for the tools chrome bar. */
   chromeHidden?: boolean
   /** Disable padding transition while dragging the sidebar resize handle. */
@@ -35,6 +37,7 @@ export function ReaderShell({
   overlays,
   children,
   contentInsetLeft = 0,
+  contentInsetRight = 0,
   chromeHidden = true,
   contentInsetResizing = false,
   dataAttrs,
@@ -52,10 +55,11 @@ export function ReaderShell({
           className={`relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden ${
             contentInsetResizing
               ? ''
-              : 'transition-[padding-left,padding-top] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]'
+              : 'transition-[padding-left,padding-right,padding-top] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]'
           }`}
           style={{
             paddingLeft: contentInsetLeft,
+            paddingRight: contentInsetRight,
             paddingTop: chromeTopInset,
           }}
         >

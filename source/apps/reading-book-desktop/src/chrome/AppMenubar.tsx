@@ -271,21 +271,23 @@ export function AppMenubar() {
         className="app-menubar flex items-center gap-0.5 overflow-x-auto border-b border-lib-border-soft bg-lib-bg-deep/95 px-3 backdrop-blur-md"
         aria-label="Main navigation"
       >
-        {renderItem(PRIMARY_ITEMS[0]!)}
-        {onReading ? (
-          <button
-            type="button"
-            className={itemClass(!!readerChrome?.toolsOpen)}
-            aria-expanded={readerChrome?.toolsOpen ?? false}
-            aria-controls="reader-tools-chrome"
-            onClick={() => readerChrome?.toggleTools()}
-          >
-            Tools
-          </button>
-        ) : null}
-        {PRIMARY_ITEMS.slice(1).map(renderItem)}
+        {PRIMARY_ITEMS.map(renderItem)}
         <NavDivider />
         {renderItem(READING_ITEM)}
+        {onReading ? (
+          <>
+            <NavDivider />
+            <button
+              type="button"
+              className={itemClass(!!readerChrome?.toolsOpen)}
+              aria-expanded={readerChrome?.toolsOpen ?? false}
+              aria-controls="reader-tools-chrome"
+              onClick={() => readerChrome?.toggleTools()}
+            >
+              Tools
+            </button>
+          </>
+        ) : null}
         <NavDivider />
         {CLOUD_ITEMS.map(renderItem)}
         <NavDivider />

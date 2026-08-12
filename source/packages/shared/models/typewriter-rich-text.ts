@@ -214,3 +214,21 @@ export function clampTypewriterFontSize(size: number | undefined): number {
   if ((TYPEWRITER_FONT_SIZES as readonly number[]).includes(rounded)) return rounded
   return Math.min(24, Math.max(11, rounded))
 }
+
+/** Step to the next/previous preset font size (A+ / A−). */
+export function stepTypewriterFontSize(
+  size: number | undefined,
+  delta: 1 | -1,
+): number {
+  const sizes = TYPEWRITER_FONT_SIZES as readonly number[]
+  const current = clampTypewriterFontSize(size)
+  let idx = sizes.indexOf(current)
+  if (idx < 0) {
+    idx = sizes.reduce(
+      (best, value, i) =>
+        Math.abs(value - current) < Math.abs(sizes[best]! - current) ? i : best,
+      0,
+    )
+  }
+  return sizes[Math.min(sizes.length - 1, Math.max(0, idx + delta))]!
+}

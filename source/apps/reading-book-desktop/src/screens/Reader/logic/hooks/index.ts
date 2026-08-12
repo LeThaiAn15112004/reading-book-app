@@ -3,6 +3,7 @@ export {
   useReaderChromeUi,
   type ReaderChromeAnnotationBridge,
   type ReaderChromeEscapeUi,
+  type RightSidebarKind,
 } from './useReaderChromeUi'
 export { useReaderBookOpen } from './useReaderBookOpen'
 export { useReaderNavigation } from './useReaderNavigation'

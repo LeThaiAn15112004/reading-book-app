@@ -11,8 +11,8 @@ import {
 } from '@reading-book/shared/models'
 import { DomCssOverlay } from '../../overlays/dom-css-overlay'
 import { cfiCodec, tryEncodeCfi, type EpubCfiDecodeResult } from './cfi-codec'
+import { spineIndexFromCfiPath } from '@reading-book/shared/utils'
 import {
-  cfiChapterSignature,
   isTrivialSectionStartCfi,
   withEpubjsStartContainerLogMuted,
   withEpubjsStartContainerLogMutedAsync,
@@ -240,17 +240,6 @@ export function epubFrameContextFromView(view: unknown): {
 
 /** Default Aa panel size — zoom % is relative to this. */
 export const EPUB_BASE_FONT_PX = 18
-
-/** Spine item index from package path `/6/N!` when epubjs lookup fails. */
-function spineIndexFromCfiPath(cfi: string): number | undefined {
-  const sig = cfiChapterSignature(cfi)
-  if (!sig) return undefined
-  const parts = sig.split('/').filter(Boolean)
-  if (parts.length < 2) return undefined
-  const last = Number.parseInt(parts[parts.length - 1] ?? '', 10)
-  if (!Number.isFinite(last) || last < 2 || last % 2 !== 0) return undefined
-  return last / 2 - 1
-}
 
 function spineIndexFromCfi(book: Book, cfi: string, fallback: number): number {
   try {
@@ -554,33 +543,22 @@ const DEFAULT_EPUB_READING_STYLE: EpubReadingStyle = {
 
 const epubReadingStyleByRendition = new WeakMap<Rendition, EpubReadingStyle>()
 
-function marginPadding(
-  enabled: boolean,
-  preset: string,
-  chromeHidden: boolean,
-): string {
-  if (!enabled) return chromeHidden ? '12px 16px' : '12px'
-  if (chromeHidden) {
-    if (preset === 'narrow') return '32px 32px'
-    if (preset === 'wide') return '32px 4vw'
-    return '32px 24px'
-  }
+/**
+ * Page padding inside the EPUB iframe.
+ * Always uses the tools-chrome gutters (not the immersive / chrome-hidden
+ * values) so the left breathing room beside the icon rail stays stable when
+ * Invisible UI toggles the top tools bar — matches "leave space like Tools open".
+ */
+function marginPadding(enabled: boolean, preset: string): string {
+  if (!enabled) return '12px'
   if (preset === 'narrow') return '32px 48px'
   if (preset === 'wide') return '32px 12vw'
   return '32px 8vw'
 }
 
-function contentMaxWidth(
-  enabled: boolean,
-  preset: string,
-  chromeHidden: boolean,
-): string {
+/** Reflow column width — same tools-open metrics for chrome on or off. */
+function contentMaxWidth(enabled: boolean, preset: string): string {
   if (!enabled || preset === 'off') return 'none'
-  if (chromeHidden) {
-    if (preset === 'narrow') return '720px'
-    if (preset === 'wide') return 'min(1100px, 95vw)'
-    return 'min(920px, 90vw)'
-  }
   if (preset === 'narrow') return '580px'
   if (preset === 'wide') return '780px'
   return '680px'
@@ -608,13 +586,9 @@ function applyReadingStyleVariables(
   root.style.setProperty('--epub-text-align', style.textAlign)
   root.style.setProperty(
     '--epub-page-padding',
-    marginPadding(style.marginsEnabled, style.marginPreset, style.chromeHidden),
+    marginPadding(style.marginsEnabled, style.marginPreset),
   )
-  const maxWidth = contentMaxWidth(
-    style.marginsEnabled,
-    style.marginPreset,
-    style.chromeHidden,
-  )
+  const maxWidth = contentMaxWidth(style.marginsEnabled, style.marginPreset)
   root.style.setProperty('--epub-content-max-width', maxWidth)
   root.style.setProperty(
     '--epub-content-margin-x',
@@ -647,7 +621,7 @@ export function injectEpubThemeStyles(rendition: Rendition): void {
       'line-height': 'var(--epub-line-height) !important',
       'text-align': 'var(--epub-text-align) !important',
     },
-    /* Center reflow column; width follows chrome visibility via CSS variables. */
+    /* Center reflow column; width stays on tools-open gutters (stable left rail). */
     '.calibre, [class*="calibre"], body > div:first-of-type': {
       'max-width': 'var(--epub-content-max-width) !important',
       'margin-left': 'var(--epub-content-margin-x) !important',

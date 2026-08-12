@@ -38,15 +38,20 @@ import {
   normalizeTypewriterColorHex,
   normalizeTypewriterContent,
   typewriterContentIsEmpty,
+  readerFreehandToAnnotationInput,
+  serializeFreehandPoints,
   type AnnotateTool,
   type AnnotationUndoHandlers,
   type DrawToolSettings,
   type ESignStamp,
+  type FreehandDraftStroke,
+  type FreehandPoint,
   type HighlightHandleRect,
   type PendingSelection,
   type ReaderAnnotationStatus,
   type ReaderBookmark,
   type ReaderHighlight,
+  type ReaderShapeAnnotation,
   type ReaderTypewriterNote,
   type TypewriterBoxStyle,
   type TypewriterDraft,
@@ -54,7 +59,12 @@ import {
   type TypewriterPlacePayload,
 } from '@reading-book/shared/models'
 import { overlayApi } from '../../../../bridge'
+import {
+  focusAnnotationInDocument,
+  waitForAnnotationLayoutSettle,
+} from '../../../../reader/annotationJump'
 import type { EpubRendererApi, EpubNavState } from '../../../../reader/renderers/epub'
+import { blurReaderSidebarFocus } from '../../../../reader/readerChromeInteraction'
 import type {
   CompanionTool,
   HighlightEditTarget,
@@ -161,6 +171,12 @@ export function useReaderAnnotations({
   const typewriterDraftRef = useRef(typewriterDraft)
   typewriterDraftRef.current = typewriterDraft
   const [eSignStamps, setESignStamps] = useState<ESignStamp[]>([])
+  /** Freehand strokes (T5.11b draw + T5.11e SQLite persist). */
+  const [freehandStrokes, setFreehandStrokes] = useState<ReaderShapeAnnotation[]>(
+    [],
+  )
+  const drawSettingsRef = useRef(drawSettings)
+  drawSettingsRef.current = drawSettings
 
   // Reset in-memory overlays when switching books.
   useEffect(() => {
@@ -175,6 +191,7 @@ export function useReaderAnnotations({
     setTypewriterNotes([])
     setTypewriterDraft(null)
     setESignStamps([])
+    setFreehandStrokes([])
     setActiveTool('hand')
     setSelectionMenu(null)
     clearHighlightHandles()
@@ -213,6 +230,7 @@ export function useReaderAnnotations({
     setActiveTool(next)
     setSelectionMenu(null)
     clearHighlightHandles()
+    blurReaderSidebarFocus()
   }
 
   function onCompanionTool(tool: CompanionTool) {
@@ -526,8 +544,9 @@ export function useReaderAnnotations({
     rect: HighlightHandleRect
     click?: { x: number; y: number }
   }) {
-    // Focus + floating toolbar only while Highlight tool is active.
-    if (activeToolRef.current !== 'highlight') return
+    // Hand browses + edits existing marks; Highlight tool also focuses on tap.
+    const tool = activeToolRef.current
+    if (tool !== 'hand' && tool !== 'highlight') return
     const existing = highlightsRef.current.find((h) => h.id === mark.id)
     setSelectionMenu(null)
     setHighlightEdit({
@@ -588,18 +607,48 @@ export function useReaderAnnotations({
     persistDeleteHighlight(highlightId)
   }
 
-  function jumpToHighlight(h: ReaderHighlight) {
+  async function jumpToHighlight(h: ReaderHighlight) {
     setChromeHidden(true)
-    if (h.source === 'epub') {
-      const cfi = epubJumpCfi(h)
-      if (cfi) {
-        void epubApiRef.current?.goToLocation(new CfiLocation(cfi)).catch(() => {
+    clearHighlightHandles()
+    closeSelectionMenu()
+    blurReaderSidebarFocus()
+    const epub = epubApiRef.current
+    epub?.setJumpViewportHidden(true)
+    try {
+      if (h.source === 'epub') {
+        const cfi = epubJumpCfi(h)
+        if (!cfi) {
           setToast('Could not jump to highlight.')
+          return
+        }
+        await epub?.goToLocation(new CfiLocation(cfi))
+        // Wait for chrome resize so center math uses the final viewport.
+        await waitForAnnotationLayoutSettle(true)
+        const focused = await epub?.focusAnnotation({
+          kind: 'highlight',
+          id: h.id,
         })
+        if (!focused) {
+          // Location opened; mark may still be painting — one more settle pass.
+          await waitForAnnotationLayoutSettle(false)
+          await epub?.focusAnnotation({
+            kind: 'highlight',
+            id: h.id,
+          })
+        }
+        return
       }
-      return
+      goChapterRef.current(h.chapterIndex)
+      await waitForAnnotationLayoutSettle(true)
+      await focusAnnotationInDocument(document, {
+        kind: 'highlight',
+        id: h.id,
+      })
+    } catch {
+      setToast('Could not jump to highlight.')
+    } finally {
+      epub?.setJumpViewportHidden(false)
     }
-    goChapterRef.current(h.chapterIndex)
   }
 
   function copyHighlightText(h: ReaderHighlight) {
@@ -750,16 +799,30 @@ export function useReaderAnnotations({
     persistDeleteBookmark(id)
   }
 
-  function jumpToBookmark(bookmark: ReaderBookmark) {
+  async function jumpToBookmark(bookmark: ReaderBookmark) {
     setChromeHidden(true)
-    const location = readerBookmarkJumpLocation(bookmark)
-    if (location instanceof CfiLocation) {
-      void epubApiRef.current?.goToLocation(location).catch(() => {
-        setToast('Could not jump to bookmark.')
-      })
-      return
+    clearHighlightHandles()
+    closeSelectionMenu()
+    blurReaderSidebarFocus()
+    const epub = epubApiRef.current
+    epub?.setJumpViewportHidden(true)
+    try {
+      const location = readerBookmarkJumpLocation(bookmark)
+      if (location instanceof CfiLocation) {
+        await epub?.goToLocation(location)
+        // Bookmarks have no painted mark — settle layout after chrome hide so
+        // epubjs resize does not yank the view back to the section start.
+        await waitForAnnotationLayoutSettle(true)
+        epub?.resize()
+        return
+      }
+      goChapterRef.current(bookmark.chapterIndex)
+      await waitForAnnotationLayoutSettle(true)
+    } catch {
+      setToast('Could not jump to bookmark.')
+    } finally {
+      epub?.setJumpViewportHidden(false)
     }
-    goChapterRef.current(bookmark.chapterIndex)
   }
 
   function resolveCurrentBookmarkLocation(): Location | undefined {
@@ -933,6 +996,27 @@ export function useReaderAnnotations({
     setTypewriterDraft(null)
   }
 
+  /** ESC while editing a committed note — revert to focus baseline without saving. */
+  function cancelTypewriterContentEdit(id: string) {
+    const timers = typewriterContentTimersRef.current
+    const pending = timers.get(id)
+    if (pending != null) {
+      window.clearTimeout(pending)
+      timers.delete(id)
+    }
+    const baseline = typewriterContentBaselineRef.current.get(id)
+    const note = typewriterNotesRef.current.find((n) => n.id === id)
+    typewriterContentBaselineRef.current.delete(id)
+    if (baseline === undefined || !note) return
+    if (typewriterContentIsEmpty(baseline)) {
+      deleteTypewriterById(id)
+      return
+    }
+    setTypewriterNotes((list) =>
+      list.map((n) => (n.id === id ? { ...n, content: baseline } : n)),
+    )
+  }
+
   function handleTypewriterPlace(payload: TypewriterPlacePayload) {
     if (bookFormatRef.current === 'pdf') {
       setToast('Typewriter on PDF — coming in a later release.')
@@ -959,9 +1043,13 @@ export function useReaderAnnotations({
   }
 
   function handleTypewriterDraftChange(content: string) {
-    setTypewriterDraft((d) =>
-      d ? { ...d, content: normalizeTypewriterContent(content) } : d,
-    )
+    setTypewriterDraft((d) => {
+      if (!d) return d
+      // Sync ref immediately so blur-commit does not race React render.
+      const next = { ...d, content: normalizeTypewriterContent(content) }
+      typewriterDraftRef.current = next
+      return next
+    })
   }
 
   function handleTypewriterDraftStyleChange(patch: TypewriterBoxStyle) {
@@ -1046,23 +1134,53 @@ export function useReaderAnnotations({
     persistTypewriterLocation(id, positionData)
   }
 
-  function jumpToTypewriterNote(note: ReaderTypewriterNote) {
+  async function jumpToTypewriterNote(note: ReaderTypewriterNote) {
     setChromeHidden(true)
-    const loc = parseTypewriterLocation(note.positionData)
-    if (note.source === 'epub' || isEpubSurfaceRef.current) {
-      const cfi = epubTypewriterJumpCfi(note)
-      if (cfi) {
-        void epubApiRef.current?.goToLocation(new CfiLocation(cfi)).catch(() => {
-          setToast('Could not jump to typewriter note.')
+    clearHighlightHandles()
+    closeSelectionMenu()
+    blurReaderSidebarFocus()
+    const epub = epubApiRef.current
+    epub?.setJumpViewportHidden(true)
+    try {
+      const loc = parseTypewriterLocation(note.positionData)
+      if (note.source === 'epub' || isEpubSurfaceRef.current) {
+        const cfi = epubTypewriterJumpCfi(note)
+        if (cfi) {
+          await epub?.goToLocation(new CfiLocation(cfi))
+        } else if (loc?.anchor === 'page-rect') {
+          goToPageRef.current(loc.page)
+        } else {
+          goChapterRef.current(note.chapterIndex)
+        }
+        await waitForAnnotationLayoutSettle(true)
+        const focused = await epub?.focusAnnotation({
+          kind: 'typewriter',
+          id: note.id,
         })
+        if (!focused) {
+          await waitForAnnotationLayoutSettle(false)
+          await epub?.focusAnnotation({
+            kind: 'typewriter',
+            id: note.id,
+          })
+        }
         return
       }
+      if (loc?.anchor === 'page-rect') {
+        goToPageRef.current(loc.page)
+      } else {
+        goChapterRef.current(note.chapterIndex)
+      }
+      await waitForAnnotationLayoutSettle(true)
+      await focusAnnotationInDocument(document, {
+        kind: 'typewriter',
+        id: note.id,
+      })
+    } catch {
+      setToast('Could not jump to typewriter note.')
+    } finally {
+      epub?.setJumpViewportHidden(false)
     }
-    if (loc?.anchor === 'page-rect') {
-      goToPageRef.current(loc.page)
-      return
-    }
-    goChapterRef.current(note.chapterIndex)
   }
 
   function persistAnnotationFlags(
@@ -1161,13 +1279,15 @@ export function useReaderAnnotations({
 
   function handleTypewriterContentChange(id: string, text: string) {
     const html = normalizeTypewriterContent(text)
-    setTypewriterNotes((list) =>
-      list.map((m) =>
+    setTypewriterNotes((list) => {
+      const next = list.map((m) =>
         m.id === id
           ? { ...m, content: html, updatedAt: new Date().toISOString() }
           : m,
-      ),
-    )
+      )
+      typewriterNotesRef.current = next
+      return next
+    })
     const timers = typewriterContentTimersRef.current
     const existing = timers.get(id)
     if (existing != null) window.clearTimeout(existing)
@@ -1310,10 +1430,57 @@ export function useReaderAnnotations({
     setToast('eSign stamp placed.')
   }
 
+  function persistFreehand(stroke: ReaderShapeAnnotation) {
+    if (!bookId) return
+    void overlayApi
+      .saveAnnotation(readerFreehandToAnnotationInput(bookId, stroke))
+      .catch(() => {
+        setToast('Could not save pencil stroke.')
+      })
+  }
+
+  /**
+   * Commit a finished pencil stroke into session state + SQLite (T5.11e).
+   * Accepts either a draft payload or raw points + chapter.
+   */
+  function handleFreehandStrokeComplete(
+    input:
+      | FreehandDraftStroke
+      | { chapterIndex: number; points: FreehandPoint[] },
+  ) {
+    const points = input.points
+    if (points.length === 0) return
+    const settings = drawSettingsRef.current
+    const colorHex =
+      'colorHex' in input && input.colorHex
+        ? input.colorHex
+        : settings.colorHex
+    const strokeWidth =
+      'strokeWidth' in input && typeof input.strokeWidth === 'number'
+        ? input.strokeWidth
+        : settings.strokeWidth
+    const now = new Date().toISOString()
+    const stroke: ReaderShapeAnnotation = {
+      id: nextReaderOverlayId('ink'),
+      type: 'freehand',
+      chapterIndex: input.chapterIndex,
+      locationData: serializeFreehandPoints(points),
+      points,
+      colorHex,
+      strokeWidth,
+      status: 'None',
+      isChecked: false,
+      createdAt: now,
+      updatedAt: now,
+    }
+    setFreehandStrokes((list) => [...list, stroke])
+    persistFreehand(stroke)
+  }
+
   function leaveAnnotateToolViaEscape() {
-    if (typewriterDraftRef.current) {
-      saveDraftAsTypewriterNote(typewriterDraftRef.current)
-      setTypewriterDraft(null)
+    const draft = typewriterDraftRef.current
+    if (draft) {
+      cancelTypewriterDraft(draft.id)
     }
     setActiveTool('hand')
     clearHighlightHandles()
@@ -1343,6 +1510,8 @@ export function useReaderAnnotations({
     typewriterDraftRef,
     typewriterContentTimersRef,
     eSignStamps,
+    freehandStrokes,
+    setFreehandStrokes,
     annotationShortcutsRef,
     highlightEditRef,
     selectTool,
@@ -1381,6 +1550,7 @@ export function useReaderAnnotations({
     handleTypewriterStyleChange,
     setTypewriterContent,
     handleTypewriterContentFocus,
+    cancelTypewriterContentEdit,
     flushTypewriterContent,
     moveTypewriter,
     jumpToTypewriterNote,
@@ -1390,6 +1560,7 @@ export function useReaderAnnotations({
     cycleAnnotationStatus,
     changeAnnotationColor,
     placeESign,
+    handleFreehandStrokeComplete,
     leaveAnnotateToolViaEscape,
     dismissPendingSelection,
   }

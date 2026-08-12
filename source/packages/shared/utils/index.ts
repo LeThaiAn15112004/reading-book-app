@@ -6,6 +6,7 @@ export {
 export {
   cfiChapterSignature,
   cfiRangesOverlap,
+  spineIndexFromCfiPath,
   splitCfiRange,
   splitTopLevelCommas,
   type SplitCfiRange,

@@ -193,7 +193,11 @@ export type TypewriterPlacePayload = {
   /** Viewport (parent) client coords. */
   clientX: number
   clientY: number
-  /** Position relative to EpubRenderer host (px). */
+  /**
+   * Paint origin for the virtual textbox.
+   * EPUB: body-relative px inside the section iframe.
+   * Fake canvas: px relative to the reading host.
+   */
   hostX: number
   hostY: number
   /** EPUB CFI anchor (T5.6d). */
@@ -209,6 +213,11 @@ export type TypewriterDraft = {
   xPct: number
   yPct: number
   content: string
+  /**
+   * Paint origin for the virtual textbox.
+   * EPUB: body-relative px inside the section iframe.
+   * Fake canvas: px relative to the reading host.
+   */
   hostX: number
   hostY: number
   /** Box-level defaults (mirrored into `style_properties` on commit). */
@@ -226,16 +235,44 @@ export type TypewriterMovePayload = {
   offsetPx?: { x: number; y: number }
 }
 
+/** One point in a freehand path — normalized 0..1 of the overlay host. */
+export type FreehandPoint = {
+  x: number
+  y: number
+}
+
+/**
+ * Opaque `location_data` geometry for pencil strokes (T5.11b session; T5.11e persist).
+ * `kind: 'path'` discriminates from future shape kinds (T5.11c).
+ */
+export type FreehandPathLocation = {
+  v: 1
+  kind: 'path'
+  points: FreehandPoint[]
+}
+
+/** In-session / view-model freehand stroke (Pencil tool). */
 export type ReaderShapeAnnotation = {
   id: string
   type: 'freehand'
   chapterIndex: number
+  /** Serialized FreehandPathLocation (`annotations.location_data`). */
   locationData: string
-  colorHex?: string
+  points: FreehandPoint[]
+  colorHex: string
+  strokeWidth: number
   status: ReaderAnnotationStatus
   isChecked: boolean
   createdAt: string
   updatedAt: string
+}
+
+/** Live stroke while the pointer is down (not yet in `freehandStrokes`). */
+export type FreehandDraftStroke = {
+  chapterIndex: number
+  points: FreehandPoint[]
+  colorHex: string
+  strokeWidth: number
 }
 
 export type ReaderAnnotation =

@@ -1,11 +1,13 @@
 import {
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
   type KeyboardEvent as ReactKeyboardEvent,
   type ReactNode,
   type Ref,
 } from 'react'
+import { createPortal } from 'react-dom'
 import {
   TYPEWRITER_DEFAULT_COLOR_HEX,
   clampTypewriterFontSize,
@@ -21,9 +23,17 @@ import {
 } from './TypewriterFormatToolbar'
 import {
   applyInlineTextColor,
+  caretColorFromEditorSelection,
   cloneEditorRange,
+  queryEditorCommandState,
   restoreEditorRange,
+  runEditorCommand,
 } from './typewriterSelection'
+import {
+  computeTypewriterToolbarPlacement,
+  getTopLevelBoundingClientRect,
+  type TypewriterToolbarPlacement,
+} from './typewriterToolbarPortal'
 
 type TypewriterRichEditorProps = {
   value: string
@@ -41,37 +51,12 @@ type TypewriterRichEditorProps = {
   editorRef?: Ref<HTMLDivElement | null>
   /** Show drag handle slot above the editor (caller renders the handle). */
   dragHandle?: ReactNode
+  /** Floating toolbar: open the shared right reader panel. */
+  onOpenSidePanel?: () => void
+  sidePanelOpen?: boolean
 }
 
-function queryCommandState(command: string): boolean {
-  try {
-    return document.queryCommandState(command)
-  } catch {
-    return false
-  }
-}
-
-function runCommand(command: string, value?: string): void {
-  try {
-    document.execCommand(command, false, value)
-  } catch {
-    /* ignore unsupported command */
-  }
-}
-
-function caretColorFromSelection(): string | null {
-  const sel = window.getSelection()
-  if (!sel || sel.rangeCount === 0) return null
-  let node: Node | null = sel.focusNode
-  if (node?.nodeType === Node.TEXT_NODE) node = node.parentElement
-  while (node && node instanceof HTMLElement) {
-    const color = node.style?.color?.trim()
-    if (color) return normalizeTypewriterColorHex(color)
-    if (node.isContentEditable) break
-    node = node.parentElement
-  }
-  return null
-}
+const CHANGE_DEBOUNCE_MS = 200
 
 /** Contenteditable typewriter box with a floating mini formatting toolbar. */
 export function TypewriterRichEditor({
@@ -89,12 +74,20 @@ export function TypewriterRichEditor({
   className = '',
   editorRef,
   dragHandle,
+  onOpenSidePanel,
+  sidePanelOpen,
 }: TypewriterRichEditorProps) {
   const rootRef = useRef<HTMLDivElement>(null)
   const localEditorRef = useRef<HTMLDivElement | null>(null)
   const toolbarRef = useRef<HTMLDivElement | null>(null)
   const savedRangeRef = useRef<Range | null>(null)
   const focusedRef = useRef(false)
+  const cancelingRef = useRef(false)
+  /** Parent setState from iframe typing can steal focus — restore once. */
+  const restoreFocusAfterEmitRef = useRef(false)
+  const changeTimerRef = useRef<number | null>(null)
+  const onChangeRef = useRef(onChange)
+  onChangeRef.current = onChange
 
   const resolvedColor =
     normalizeTypewriterColorHex(colorHex) ?? TYPEWRITER_DEFAULT_COLOR_HEX
@@ -107,6 +100,108 @@ export function TypewriterRichEditor({
     colorHex: resolvedColor,
     fontSize: resolvedSize,
   })
+  const [toolbarPos, setToolbarPos] = useState<TypewriterToolbarPlacement | null>(
+    null,
+  )
+  const [editorEmpty, setEditorEmpty] = useState(() =>
+    typewriterContentIsEmpty(value),
+  )
+
+  const updateToolbarPos = () => {
+    const el = rootRef.current
+    if (!el) return
+    const next = computeTypewriterToolbarPlacement(
+      getTopLevelBoundingClientRect(el),
+    )
+    setToolbarPos((prev) => {
+      if (
+        prev &&
+        prev.top === next.top &&
+        prev.left === next.left &&
+        prev.placement === next.placement
+      ) {
+        return prev
+      }
+      return next
+    })
+  }
+
+  const clearChangeTimer = () => {
+    if (changeTimerRef.current != null) {
+      window.clearTimeout(changeTimerRef.current)
+      changeTimerRef.current = null
+    }
+  }
+
+  const emitHtml = (mode: 'debounce' | 'flush' = 'debounce') => {
+    const el = localEditorRef.current
+    if (!el) return
+    const html = serializeTypewriterEditorHtml(el)
+    const push = () => {
+      // Parent re-render (portal into iframe) often drops iframe focus.
+      if (focusedRef.current) restoreFocusAfterEmitRef.current = true
+      onChangeRef.current(html)
+    }
+    if (mode === 'flush') {
+      clearChangeTimer()
+      push()
+      return
+    }
+    clearChangeTimer()
+    changeTimerRef.current = window.setTimeout(() => {
+      changeTimerRef.current = null
+      push()
+    }, CHANGE_DEBOUNCE_MS)
+  }
+
+  const restoreEditorFocus = () => {
+    const el = localEditorRef.current
+    if (!el || !focusedRef.current) return
+    const doc = el.ownerDocument
+    if (doc.activeElement === el) return
+    const saved = savedRangeRef.current
+    el.focus({ preventScroll: true })
+    restoreEditorRange(saved, el)
+  }
+
+  // Reclaim iframe focus after parent portal re-render from onChange.
+  useLayoutEffect(() => {
+    if (!restoreFocusAfterEmitRef.current) return
+    restoreFocusAfterEmitRef.current = false
+    restoreEditorFocus()
+    updateToolbarPos()
+  })
+
+  // Portal + fixed — escapes zoom transform / overflow clip / tools chrome z-50.
+  // Iframe nodes need frameElement offset for top-level fixed coords.
+  useLayoutEffect(() => {
+    updateToolbarPos()
+    const ownerWin = rootRef.current?.ownerDocument?.defaultView
+    const topWin = window
+    const onReposition = () => updateToolbarPos()
+    topWin.addEventListener('resize', onReposition)
+    topWin.addEventListener('scroll', onReposition, true)
+    ownerWin?.addEventListener('resize', onReposition)
+    ownerWin?.addEventListener('scroll', onReposition, true)
+    const ro =
+      typeof ResizeObserver !== 'undefined'
+        ? new ResizeObserver(onReposition)
+        : null
+    if (rootRef.current) ro?.observe(rootRef.current)
+    return () => {
+      topWin.removeEventListener('resize', onReposition)
+      topWin.removeEventListener('scroll', onReposition, true)
+      ownerWin?.removeEventListener('resize', onReposition)
+      ownerWin?.removeEventListener('scroll', onReposition, true)
+      ro?.disconnect()
+    }
+    // Re-bind when the editor mounts into a (possibly new) iframe document.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- rootRef identity is stable
+  }, [autoFocus])
+
+  useEffect(() => {
+    return () => clearChangeTimer()
+  }, [])
 
   const setEditorNode = (el: HTMLDivElement | null) => {
     localEditorRef.current = el
@@ -121,19 +216,15 @@ export function TypewriterRichEditor({
     }
   }
 
-  const emitHtml = () => {
-    const el = localEditorRef.current
-    if (!el) return
-    onChange(serializeTypewriterEditorHtml(el))
-  }
-
   const refreshFormatState = () => {
-    const inlineColor = caretColorFromSelection()
+    const el = localEditorRef.current
+    const inlineColor = caretColorFromEditorSelection(el)
     setFormat({
-      bold: queryCommandState('bold'),
-      italic: queryCommandState('italic'),
-      underline: queryCommandState('underline'),
-      colorHex: inlineColor ?? resolvedColor,
+      bold: queryEditorCommandState(el, 'bold'),
+      italic: queryEditorCommandState(el, 'italic'),
+      underline: queryEditorCommandState(el, 'underline'),
+      colorHex:
+        normalizeTypewriterColorHex(inlineColor ?? undefined) ?? resolvedColor,
       fontSize: resolvedSize,
     })
   }
@@ -157,50 +248,95 @@ export function TypewriterRichEditor({
   }, [resolvedColor, resolvedSize])
 
   useEffect(() => {
+    if (!focusedRef.current) {
+      setEditorEmpty(typewriterContentIsEmpty(value))
+    }
+  }, [value])
+
+  useEffect(() => {
     if (!autoFocus) return
-    const el = localEditorRef.current
-    if (!el) return
-    el.focus()
-    const sel = window.getSelection()
-    if (!sel) return
-    const range = document.createRange()
-    range.selectNodeContents(el)
-    range.collapse(false)
-    sel.removeAllRanges()
-    sel.addRange(range)
+    let cancelled = false
+
+    const focusEditor = () => {
+      const el = localEditorRef.current
+      if (!el || cancelled) return false
+      const doc = el.ownerDocument
+      const win = doc.defaultView
+      focusedRef.current = true
+      el.focus({ preventScroll: true })
+
+      if (typewriterContentIsEmpty(el.innerHTML)) {
+        const sel = win?.getSelection()
+        if (sel) {
+          const range = doc.createRange()
+          range.selectNodeContents(el)
+          range.collapse(true)
+          sel.removeAllRanges()
+          sel.addRange(range)
+        }
+      }
+      updateToolbarPos()
+      return doc.activeElement === el
+    }
+
+    // EPUB placement clicks inside an iframe — retry focus after the draft mounts.
+    focusEditor()
+    const raf = requestAnimationFrame(() => {
+      focusEditor()
+      window.setTimeout(focusEditor, 0)
+    })
+    return () => {
+      cancelled = true
+      cancelAnimationFrame(raf)
+    }
   }, [autoFocus])
 
   useEffect(() => {
     function onSelectionChange() {
       if (!focusedRef.current) return
       const el = localEditorRef.current
-      const sel = window.getSelection()
+      const win = el?.ownerDocument?.defaultView
+      const sel = win?.getSelection()
       if (!el || !sel || sel.rangeCount === 0) return
       if (!el.contains(sel.anchorNode)) return
       refreshFormatState()
+      updateToolbarPos()
     }
-    document.addEventListener('selectionchange', onSelectionChange)
-    return () => document.removeEventListener('selectionchange', onSelectionChange)
+    const doc = localEditorRef.current?.ownerDocument ?? document
+    doc.addEventListener('selectionchange', onSelectionChange)
+    return () => doc.removeEventListener('selectionchange', onSelectionChange)
   })
 
   const focusStillInside = () => {
-    const active = document.activeElement
-    return (
-      !!active &&
-      (!!localEditorRef.current?.contains(active) ||
-        !!toolbarRef.current?.contains(active) ||
-        !!rootRef.current?.contains(active))
-    )
+    const editor = localEditorRef.current
+    const editorDoc = editor?.ownerDocument
+    const editorActive = editorDoc?.activeElement ?? null
+    const hostActive = document.activeElement
+    if (toolbarRef.current?.contains(hostActive)) return true
+    if (editor && editorActive && editor.contains(editorActive)) return true
+    if (rootRef.current && editorActive && rootRef.current.contains(editorActive)) {
+      return true
+    }
+    return false
   }
 
   const handleBlur = () => {
-    focusedRef.current = false
     window.setTimeout(() => {
-      if (focusStillInside()) {
-        focusedRef.current = true
+      if (cancelingRef.current) {
+        cancelingRef.current = false
         return
       }
-      emitHtml()
+      if (focusStillInside()) {
+        return
+      }
+      // Spurious blur from parent portal re-render — reclaim focus.
+      if (restoreFocusAfterEmitRef.current) {
+        restoreFocusAfterEmitRef.current = false
+        restoreEditorFocus()
+        return
+      }
+      emitHtml('flush')
+      focusedRef.current = false
       onBlur?.()
     }, 0)
   }
@@ -214,9 +350,9 @@ export function TypewriterRichEditor({
     if (!el) return
     el.focus()
     restoreEditorRange(savedRangeRef.current, el)
-    runCommand(command)
+    runEditorCommand(el, command)
     savedRangeRef.current = cloneEditorRange(el)
-    emitHtml()
+    emitHtml('flush')
     refreshFormatState()
   }
 
@@ -228,22 +364,23 @@ export function TypewriterRichEditor({
     el.focus()
     restoreEditorRange(savedRangeRef.current, el)
 
-    const sel = window.getSelection()
+    const win = el.ownerDocument.defaultView
+    const sel = win?.getSelection()
     if (sel && sel.rangeCount > 0 && el.contains(sel.anchorNode)) {
       const range = sel.getRangeAt(0)
       if (!range.collapsed) {
         applyInlineTextColor(range.cloneRange(), normalized)
       } else {
         // Caret only — color for newly typed characters.
-        runCommand('styleWithCSS', 'true')
-        runCommand('foreColor', normalized)
+        runEditorCommand(el, 'styleWithCSS', 'true')
+        runEditorCommand(el, 'foreColor', normalized)
       }
     }
 
     onStyleChange?.({ colorHex: normalized })
     setFormat((prev) => ({ ...prev, colorHex: normalized }))
     savedRangeRef.current = cloneEditorRange(el)
-    emitHtml()
+    emitHtml('flush')
     refreshFormatState()
   }
 
@@ -257,6 +394,8 @@ export function TypewriterRichEditor({
     if (e.key === 'Escape') {
       e.preventDefault()
       e.stopPropagation()
+      cancelingRef.current = true
+      clearChangeTimer()
       if (onCancel) {
         onCancel()
         return
@@ -275,6 +414,7 @@ export function TypewriterRichEditor({
       if (el && typewriterContentIsEmpty(el.innerHTML)) {
         e.preventDefault()
         e.stopPropagation()
+        clearChangeTimer()
         onEmptyDelete()
       }
     }
@@ -293,22 +433,36 @@ export function TypewriterRichEditor({
     }
   }
 
-  const empty = typewriterContentIsEmpty(value)
+  const empty = editorEmpty
+
+  const toolbar =
+    toolbarPos && typeof document !== 'undefined'
+      ? createPortal(
+          <div
+            className="rb-tw-toolbar-portal"
+            style={{ top: toolbarPos.top, left: toolbarPos.left }}
+            data-rb-tw-toolbar=""
+          >
+            <TypewriterFormatToolbar
+              toolbarRef={toolbarRef}
+              state={format}
+              onSaveSelection={saveEditorSelection}
+              onBold={() => applyInline('bold')}
+              onItalic={() => applyInline('italic')}
+              onUnderline={() => applyInline('underline')}
+              onTextColor={applyTextColor}
+              onFontSize={applyFontSize}
+              onOpenSidePanel={onOpenSidePanel}
+              sidePanelOpen={sidePanelOpen}
+            />
+          </div>,
+          document.body,
+        )
+      : null
 
   return (
     <div ref={rootRef} className={`rb-tw-editor-root relative ${className}`}>
-      <div className="rb-tw-toolbar-anchor">
-        <TypewriterFormatToolbar
-          toolbarRef={toolbarRef}
-          state={format}
-          onSaveSelection={saveEditorSelection}
-          onBold={() => applyInline('bold')}
-          onItalic={() => applyInline('italic')}
-          onUnderline={() => applyInline('underline')}
-          onTextColor={applyTextColor}
-          onFontSize={applyFontSize}
-        />
-      </div>
+      {toolbar}
       {dragHandle}
       <div
         ref={setEditorNode}
@@ -326,11 +480,22 @@ export function TypewriterRichEditor({
           onFocus?.()
           refreshFormatState()
           saveEditorSelection()
+          updateToolbarPos()
         }}
         onMouseUp={saveEditorSelection}
         onKeyUp={saveEditorSelection}
         onBlur={handleBlur}
-        onInput={emitHtml}
+        onInput={() => {
+          const el = localEditorRef.current
+          if (el) {
+            setEditorEmpty(
+              typewriterContentIsEmpty(serializeTypewriterEditorHtml(el)),
+            )
+          }
+          saveEditorSelection()
+          emitHtml('debounce')
+          updateToolbarPos()
+        }}
         onKeyDown={onKeyDown}
         onPointerDown={(e) => e.stopPropagation()}
         onClick={(e) => e.stopPropagation()}

@@ -136,7 +136,61 @@ function hostPointFromPct(
   }
 }
 
-/** Resolve overlay host coordinates for a textbox on the current EPUB section. */
+function bodyOriginRect(doc: Document): DOMRect | null {
+  const body = doc.body
+  if (!body) return null
+  return body.getBoundingClientRect()
+}
+
+/** Body-relative px for painting a typewriter box inside the EPUB iframe. */
+export function resolveTypewriterIframePoint(input: {
+  locationRaw: string
+  doc: Document | null | undefined
+  /** Fallback size when only xPct/yPct is available (iframe client box). */
+  iframeSize: { width: number; height: number }
+}): TypewriterHostPoint | null {
+  const loc = parseTypewriterLocation(input.locationRaw)
+  if (!loc) return null
+
+  if (loc.anchor === 'cfi-offset' && input.doc) {
+    const origin = boundaryClientPoint(input.doc, loc.cfi)
+    const bodyRect = bodyOriginRect(input.doc)
+    if (origin && bodyRect) {
+      return {
+        left: origin.x - bodyRect.left + loc.offsetPx.x,
+        top: origin.y - bodyRect.top + loc.offsetPx.y,
+        usedCfi: true,
+      }
+    }
+  }
+
+  const width = input.iframeSize.width || 1
+  const height = input.iframeSize.height || 1
+  return {
+    left: (loc.xPct / 100) * width,
+    top: (loc.yPct / 100) * height,
+    usedCfi: false,
+  }
+}
+
+/** Click → body-relative px inside the iframe document. */
+export function iframeClientToBodyPoint(
+  doc: Document,
+  iframeClientX: number,
+  iframeClientY: number,
+): { left: number; top: number } | null {
+  const bodyRect = bodyOriginRect(doc)
+  if (!bodyRect) return null
+  return {
+    left: iframeClientX - bodyRect.left,
+    top: iframeClientY - bodyRect.top,
+  }
+}
+
+/**
+ * Resolve host-overlay coordinates (legacy) for a textbox on the current EPUB section.
+ * Prefer {@link resolveTypewriterIframePoint} for in-iframe paint.
+ */
 export function resolveTypewriterHostPoint(input: {
   locationRaw: string
   doc: Document | null | undefined

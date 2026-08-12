@@ -34,8 +34,10 @@ export {
 } from './bookmark-persistence.js'
 export {
   annotationDtoToReaderHighlight,
+  chapterIndexFromAnnotationDto,
   epubJumpCfi,
   packReaderHighlightLocation,
+  readerHighlightPageNumber,
   readerHighlightToAnnotationInput,
   type HighlightAnnotationInput,
 } from './highlight-persistence.js'
@@ -52,11 +54,24 @@ export {
   type TypewriterLocation,
 } from './typewriter-persistence.js'
 export {
+  annotationDtoToReaderFreehand,
+  appendFreehandPoint,
+  clampFreehandPoint,
+  clientPointToNormalized,
+  parseFreehandLocation,
+  readerFreehandPageNumber,
+  readerFreehandToAnnotationInput,
+  serializeFreehandLocation,
+  serializeFreehandPoints,
+  type FreehandAnnotationInput,
+} from './freehand-persistence.js'
+export {
   TYPEWRITER_DEFAULT_COLOR_HEX,
   TYPEWRITER_DEFAULT_FONT_SIZE,
   TYPEWRITER_FONT_SIZES,
   TYPEWRITER_TEXT_COLORS,
   clampTypewriterFontSize,
+  stepTypewriterFontSize,
   normalizeTypewriterColorHex,
   normalizeTypewriterContent,
   sanitizeTypewriterHtml,
@@ -121,7 +136,11 @@ export {
   type ReaderAnnotationType,
   type ReaderAnnotationStatus,
   type ReaderNote,
+  type ReaderShapeAnnotation,
   type ReaderSignature,
+  type FreehandDraftStroke,
+  type FreehandPathLocation,
+  type FreehandPoint,
   type TypewriterDraft,
   type TypewriterMark,
   type TypewriterMovePayload,

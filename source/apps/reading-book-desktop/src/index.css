@@ -109,6 +109,21 @@
     }
   }
 
+  /* Jump-to-annotation flash on host ReadingCanvas marks. */
+  @keyframes rb-annotation-jump-flash {
+    0%,
+    100% {
+      filter: brightness(1);
+      outline-color: transparent;
+    }
+    35% {
+      filter: brightness(1.45);
+    }
+    55% {
+      filter: brightness(1.15);
+    }
+  }
+
   /* Reading interaction cursors (Hand / Text Select / Highlight). */
   --cursor-hand-tool: grab;
   --cursor-hand-tool-active: grabbing;
@@ -135,6 +150,13 @@
 
 @utility cursor-typewriter-tool {
   cursor: var(--cursor-typewriter-tool);
+}
+
+/* Jump-to-annotation flash on host ReadingCanvas marks. */
+.rb-annotation-jump-flash {
+  animation: rb-annotation-jump-flash 0.9s ease-in-out;
+  outline: 2px solid rgba(245, 158, 11, 0.95);
+  outline-offset: 2px;
 }
 
 /* Reader tools chrome height — sync inset for sidebar + reading viewport. */
@@ -171,7 +193,11 @@
 
 .rb-typewriter-richedit {
   white-space: pre-wrap;
-  word-break: break-word;
+  overflow-wrap: break-word;
+  word-break: normal;
+  /* Parent reader surface sets user-select:none in typewriter mode. */
+  user-select: text;
+  -webkit-user-select: text;
 }
 
 .rb-typewriter-richedit[data-empty='true']:before {
@@ -188,6 +214,8 @@
 
 .rb-typewriter-static {
   box-sizing: border-box;
+  /* max-content: avoid 1-glyph columns inside the 0×0 iframe layer CB. */
+  width: max-content;
   max-width: min(16rem, 70vw);
   margin: 0;
   padding: 0;
@@ -197,16 +225,20 @@
   font-size: 13px;
   line-height: 1.35;
   white-space: pre-wrap;
-  word-break: break-word;
+  overflow-wrap: break-word;
+  word-break: normal;
   color: var(--reader-text, var(--lib-text, #e2e8f0));
   cursor: grab;
+  text-align: left;
 }
 
 .rb-typewriter-html {
   display: inline-block;
+  width: max-content;
   max-width: min(16rem, 70vw);
   white-space: pre-wrap;
-  word-break: break-word;
+  overflow-wrap: break-word;
+  word-break: normal;
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   line-height: 1.35;
 }
@@ -234,16 +266,15 @@
   min-width: 12rem;
 }
 
-.rb-tw-toolbar-anchor {
-  position: absolute;
-  bottom: calc(100% + 0.55rem);
-  left: 50%;
-  z-index: 3;
+/* Portaled above reader tools chrome (z-50) and zoom transform clipping. */
+.rb-tw-toolbar-portal {
+  position: fixed;
+  z-index: 130;
   transform: translateX(-50%);
   pointer-events: none;
 }
 
-.rb-tw-toolbar-anchor .rb-tw-toolbar {
+.rb-tw-toolbar-portal .rb-tw-toolbar {
   pointer-events: auto;
 }
 
@@ -294,22 +325,22 @@
   background: color-mix(in srgb, var(--lib-border-soft, #475569) 80%, transparent);
 }
 
-.rb-tw-toolbar-size select {
-  height: 1.55rem;
-  min-width: 3.1rem;
-  padding: 0 0.2rem;
-  border: 1px solid transparent;
-  border-radius: 0.4rem;
-  background: transparent;
-  color: var(--lib-text, #e2e8f0);
+.rb-tw-toolbar-a {
   font-size: 11px;
-  cursor: pointer;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1;
 }
 
-.rb-tw-toolbar-size select:hover,
-.rb-tw-toolbar-size select:focus {
-  border-color: color-mix(in srgb, var(--lib-border-soft, #475569) 80%, transparent);
-  outline: none;
+.rb-tw-toolbar-a-lg {
+  font-size: 13px;
+}
+
+.rb-tw-toolbar-panel-icon {
+  display: inline-block;
+  font-size: 13px;
+  line-height: 1;
+  transform: scaleX(-1);
 }
 
 /* Color picker — primary way to change text color. */

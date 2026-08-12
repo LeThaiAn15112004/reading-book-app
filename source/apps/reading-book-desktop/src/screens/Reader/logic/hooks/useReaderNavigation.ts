@@ -12,6 +12,7 @@ import type {
   EpubRendererApi,
   EpubTocItem,
 } from '../../../../reader/renderers/epub'
+import { blurReaderSidebarFocus } from '../../../../reader/readerChromeInteraction'
 import { FAKE_CHAPTERS } from '../demo/fakeReaderContent'
 import type { SelectionMenuState } from './useReaderAnnotations'
 
@@ -45,7 +46,6 @@ type UseReaderNavigationOptions = {
   setSelectionMenu: Dispatch<SetStateAction<SelectionMenuState | null>>
   clearHighlightHandles: () => void
   annotationShortcutsRef: MutableRefObject<AnnotationShortcuts>
-  activeToolIsHighlight: () => boolean
   hasHighlightEdit: () => boolean
 }
 
@@ -61,7 +61,6 @@ export function useReaderNavigation({
   setSelectionMenu,
   clearHighlightHandles,
   annotationShortcutsRef,
-  activeToolIsHighlight,
   hasHighlightEdit,
 }: UseReaderNavigationOptions) {
   const [chapterIndex, setChapterIndex] = useState(0)
@@ -76,11 +75,16 @@ export function useReaderNavigation({
     epubApiRef.current = null
   }, [bookId, epubApiRef])
 
+  function clearTransientNavUi() {
+    setSelectionMenu(null)
+    clearHighlightHandles()
+    blurReaderSidebarFocus()
+  }
+
   function goChapter(index: number) {
     const next = Math.min(Math.max(index, 0), FAKE_CHAPTERS.length - 1)
     setChapterIndex(next)
-    setSelectionMenu(null)
-    clearHighlightHandles()
+    clearTransientNavUi()
   }
 
   function switchPage(forward: boolean) {
@@ -88,6 +92,7 @@ export function useReaderNavigation({
       const api = epubApiRef.current
       if (!api) return
       navigateEpubByArrow(api, forward, pageMode)
+      clearTransientNavUi()
       return
     }
 
@@ -96,8 +101,7 @@ export function useReaderNavigation({
         ? Math.min(index + 1, FAKE_CHAPTERS.length - 1)
         : Math.max(index - 1, 0),
     )
-    setSelectionMenu(null)
-    clearHighlightHandles()
+    clearTransientNavUi()
   }
 
   function goToPage(page: number) {
@@ -105,6 +109,7 @@ export function useReaderNavigation({
       const api = epubApiRef.current
       if (!api) return
       void api.goToSpineIndex(page - 1)
+      clearTransientNavUi()
       return
     }
 
@@ -123,8 +128,7 @@ export function useReaderNavigation({
           Math.min(Math.max(page - 1, 0), FAKE_CHAPTERS.length - 1),
         )
       }
-      setSelectionMenu(null)
-      clearHighlightHandles()
+      clearTransientNavUi()
     },
     [clearHighlightHandles, isEpubSurface, setSelectionMenu],
   )
@@ -132,7 +136,7 @@ export function useReaderNavigation({
   function handleSelectTocItem(item: EpubTocItem) {
     if (!item.href) return
     closeFloating()
-    setSelectionMenu(null)
+    clearTransientNavUi()
     const api = epubApiRef.current
     if (!api) return
     void api.goToHref(item.href)
@@ -177,12 +181,11 @@ export function useReaderNavigation({
         }
       }
 
-      // Quick delete focused highlight while Highlight tool is active.
+      // Quick delete focused highlight (Hand browse-edit or Highlight tool).
       if (
         (e.key === 'Delete' || e.key === 'Backspace') &&
         !e.ctrlKey &&
         !e.metaKey &&
-        activeToolIsHighlight() &&
         hasHighlightEdit()
       ) {
         e.preventDefault()
@@ -206,6 +209,7 @@ export function useReaderNavigation({
         e.preventDefault()
         e.stopPropagation()
         navigateEpubByArrow(api, forward, pageMode)
+        clearTransientNavUi()
         return
       }
 
@@ -217,7 +221,7 @@ export function useReaderNavigation({
           : Math.max(i - 1, 0)
         return next
       })
-      setSelectionMenu(null)
+      clearTransientNavUi()
     }
 
     // Capture so it wins over focused footer controls; also works when body has focus.
@@ -254,7 +258,6 @@ export function useReaderNavigation({
       boundDocs.clear()
     }
   }, [
-    activeToolIsHighlight,
     annotationShortcutsRef,
     bookBytes,
     bookFormat,

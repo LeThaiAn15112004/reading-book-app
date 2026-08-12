@@ -8,6 +8,7 @@ import {
 } from 'react'
 import type { CfiLocation } from '@reading-book/domain'
 import {
+  annotationDtoToReaderFreehand,
   annotationDtoToReaderHighlight,
   annotationDtoToReaderTypewriter,
   bookmarkDtoToReaderBookmark,
@@ -15,9 +16,11 @@ import {
   readingPrefsFromGlobal,
   readingPrefsFromSession,
   readerTypewriterToAnnotationInput,
+  serializeTypewriterLocation,
   type GlobalReadingPrefs,
   type ReaderBookmark,
   type ReaderHighlight,
+  type ReaderShapeAnnotation,
   type ReaderTypewriterNote,
   type TypewriterDraft,
 } from '@reading-book/shared/models'
@@ -48,6 +51,7 @@ type UseReaderBookOpenOptions = {
   setHighlights: Dispatch<SetStateAction<ReaderHighlight[]>>
   setBookmarks: Dispatch<SetStateAction<ReaderBookmark[]>>
   setTypewriterNotes: Dispatch<SetStateAction<ReaderTypewriterNote[]>>
+  setFreehandStrokes: Dispatch<SetStateAction<ReaderShapeAnnotation[]>>
   typewriterNotesRef: MutableRefObject<ReaderTypewriterNote[]>
   typewriterDraftRef: MutableRefObject<TypewriterDraft | null>
   typewriterContentTimersRef: MutableRefObject<Map<string, number>>
@@ -62,6 +66,7 @@ export function useReaderBookOpen({
   setHighlights,
   setBookmarks,
   setTypewriterNotes,
+  setFreehandStrokes,
   typewriterNotesRef,
   typewriterDraftRef,
   typewriterContentTimersRef,
@@ -214,6 +219,22 @@ export function useReaderBookOpen({
         }
       })
 
+    // T5.11e: hydrate persisted freehand (pencil) strokes for this book.
+    overlayApi
+      .listAnnotations({ bookId, types: ['freehand'] })
+      .then((rows) => {
+        if (cancelled || generation !== sessionGenerationRef.current) return
+        const mapped = rows
+          .map(annotationDtoToReaderFreehand)
+          .filter((s): s is ReaderShapeAnnotation => s != null)
+        setFreehandStrokes(mapped)
+      })
+      .catch(() => {
+        if (!cancelled && generation === sessionGenerationRef.current) {
+          setFreehandStrokes([])
+        }
+      })
+
     // T3.4: open sandboxed bytes via Main allowlist (no FS path in renderer).
     libraryApi
       .openBookContent(bookId)
@@ -261,20 +282,34 @@ export function useReaderBookOpen({
       const draft = typewriterDraftRef.current
       if (draft?.content.trim()) {
         const now = new Date().toISOString()
+        const positionData = draft.cfi?.trim() && draft.offsetPx
+          ? serializeTypewriterLocation({
+              v: 2,
+              anchor: 'cfi-offset',
+              cfi: draft.cfi.trim(),
+              offsetPx: draft.offsetPx,
+              xPct: draft.xPct,
+              yPct: draft.yPct,
+            })
+          : serializeTypewriterLocation({
+              v: 2,
+              anchor: 'fake-pct',
+              xPct: draft.xPct,
+              yPct: draft.yPct,
+            })
         const newNote = {
           id: nextReaderOverlayId('tw'),
           type: 'textbox' as const,
           chapterIndex: draft.chapterIndex,
-          positionData: JSON.stringify({
-            xPct: draft.xPct,
-            yPct: draft.yPct,
-          }),
-          colorHex: '#f59e0b',
+          positionData,
+          colorHex: draft.colorHex ?? '#f59e0b',
+          fontSize: draft.fontSize ?? 13,
           content: draft.content.trim(),
           status: 'None' as const,
           isChecked: false,
           createdAt: now,
           updatedAt: now,
+          ...(draft.cfi?.trim() ? { cfi: draft.cfi.trim(), source: 'epub' as const } : {}),
         }
         void overlayApi
           .saveAnnotation(readerTypewriterToAnnotationInput(bookId, newNote))

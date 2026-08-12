@@ -140,7 +140,7 @@ function editPanelAnchorFromTarget(
 
 /**
  * Selection floating toolbar — opens on right-click over selected text (FR-06).
- * Also hosts the compact highlight color editor (Highlight tool mode).
+ * Also hosts the compact highlight color editor (Hand tap or Highlight tool).
  */
 export function SelectionTooltip({
   selection,

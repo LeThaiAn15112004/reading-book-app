@@ -24,6 +24,9 @@ const toolbarBtnClass =
 const rowMenuBtnClass =
   'inline-flex size-7 shrink-0 cursor-pointer items-center justify-center rounded-md border-none bg-transparent text-base leading-none text-lib-muted transition-colors hover:bg-lib-accent-soft hover:text-lib-accent'
 
+const jumpBtnClass =
+  'cursor-pointer border-none bg-transparent p-0 text-left outline-none focus:outline-none focus-visible:outline-none'
+
 function ExpandAllIcon() {
   return (
     <svg viewBox="0 0 24 24" className="size-4" fill="none" aria-hidden>
@@ -193,21 +196,32 @@ const STATUS_STYLES: Record<
 }
 
 function highlightPageNumber(h: ReaderHighlight): number {
-  return Math.max(1, h.chapterIndex + 1)
+  // chapterIndex is hydrated from annotations.page_number (or CFI spine fallback).
+  return Math.max(1, Math.floor(h.chapterIndex) + 1)
 }
 
 function typewriterPageNumber(note: ReaderTypewriterNote): number {
-  if (note.positionData) {
-    try {
-      const pos = JSON.parse(note.positionData) as { pageNumber?: number }
-      if (typeof pos.pageNumber === 'number' && Number.isFinite(pos.pageNumber)) {
-        return Math.max(1, Math.floor(pos.pageNumber))
-      }
-    } catch {
-      /* fall through */
+  // Prefer explicit page-rect location; otherwise use chapterIndex from DB page_number.
+  try {
+    const loc = JSON.parse(note.positionData) as {
+      anchor?: string
+      page?: number
+      pageNumber?: number
     }
+    if (
+      loc?.anchor === 'page-rect' &&
+      typeof loc.page === 'number' &&
+      Number.isFinite(loc.page)
+    ) {
+      return Math.max(1, Math.floor(loc.page))
+    }
+    if (typeof loc?.pageNumber === 'number' && Number.isFinite(loc.pageNumber)) {
+      return Math.max(1, Math.floor(loc.pageNumber))
+    }
+  } catch {
+    /* fall through */
   }
-  return Math.max(1, note.chapterIndex + 1)
+  return Math.max(1, Math.floor(note.chapterIndex) + 1)
 }
 
 function toItems(
@@ -321,7 +335,9 @@ function AnnotationContextMenu({
         type="button"
         role="menuitem"
         className={menuItemClass}
-        onClick={() => {
+        onClick={(e) => {
+          e.preventDefault()
+          e.stopPropagation()
           onClose()
           actions.onJump()
         }}
@@ -580,8 +596,13 @@ function AnnotationRow({
 
         <button
           type="button"
-          className="inline-flex min-w-0 flex-1 cursor-pointer items-center gap-1.5 border-none bg-transparent p-0 text-left"
-          onClick={onJump}
+          className={`inline-flex min-w-0 flex-1 items-center gap-1.5 ${jumpBtnClass}`}
+          onClick={(e) => {
+            e.preventDefault()
+            e.stopPropagation()
+            onJump()
+            e.currentTarget.blur()
+          }}
           title={`Jump · ${meta.label}`}
         >
           <span
@@ -648,8 +669,13 @@ function AnnotationRow({
       <div className="min-w-0 pl-6">
         <button
           type="button"
-          className="w-full cursor-pointer border-none bg-transparent p-0 text-left"
-          onClick={onJump}
+          className={`w-full ${jumpBtnClass}`}
+          onClick={(e) => {
+            e.preventDefault()
+            e.stopPropagation()
+            onJump()
+            e.currentTarget.blur()
+          }}
         >
           <p
             ref={contentRef}
@@ -724,8 +750,11 @@ function PageAccordion({
         </button>
         <button
           type="button"
-          className="flex min-w-0 flex-1 cursor-pointer items-center justify-between gap-2 border-none bg-transparent px-1 py-2.5 text-left hover:bg-lib-surface-hover"
-          onClick={() => onGoToPage(pageNumber)}
+          className={`flex min-w-0 flex-1 items-center justify-between gap-2 px-1 py-2.5 ${jumpBtnClass} hover:bg-lib-surface-hover`}
+          onClick={(e) => {
+            onGoToPage(pageNumber)
+            e.currentTarget.blur()
+          }}
           title={`Go to page ${pageNumber}`}
         >
           <span className="truncate text-[13px] font-semibold text-lib-text-strong">

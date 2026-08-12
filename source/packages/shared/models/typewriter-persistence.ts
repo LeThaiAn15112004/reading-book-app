@@ -2,6 +2,7 @@
  * Map reader typewriter notes ↔ generic `annotations` rows (T5.6b / T5.6d).
  */
 
+import { spineIndexFromCfiPath } from '../utils/epub-cfi.js'
 import type {
   ReaderAnnotationStatus,
   ReaderTypewriterNote,
@@ -14,9 +15,6 @@ import {
   normalizeTypewriterColorHex,
   normalizeTypewriterContent,
 } from './typewriter-rich-text.js'
-
-/** EPUB / reflowable — spine lives in `location_data`, not `page_number`. */
-const REFLOWABLE_PAGE_NUMBER = 1
 
 type AnnotationStyleLike = Record<string, unknown>
 
@@ -237,9 +235,9 @@ function pageNumberForLocation(
   loc: TypewriterLocation,
   chapterIndex: number,
 ): number {
-  if (loc.anchor === 'page-rect') return loc.page
-  if (loc.anchor === 'cfi-offset') return REFLOWABLE_PAGE_NUMBER
-  return Math.max(1, chapterIndex + 1)
+  if (loc.anchor === 'page-rect') return Math.max(1, Math.floor(loc.page))
+  // cfi-offset / pct: denormalize spine chapter into page_number for list grouping
+  return Math.max(1, Math.floor(chapterIndex) + 1)
 }
 
 export function readerTypewriterToAnnotationInput(
@@ -280,18 +278,24 @@ export function annotationDtoToReaderTypewriter(
   const loc = parseTypewriterLocation(dto.locationData)
   if (!loc) return null
 
-  const page =
-    typeof dto.pageNumber === 'number' && Number.isFinite(dto.pageNumber)
-      ? Math.max(1, Math.floor(dto.pageNumber))
-      : 1
-
-  let chapterIndex = Math.max(0, page - 1)
-  if (loc.anchor === 'page-rect') {
-    chapterIndex = Math.max(0, loc.page - 1)
-  }
-
   const source = typewriterLocationSource(loc)
   const cfi = typewriterLocationCfi(loc)
+
+  let chapterIndex = 0
+  if (loc.anchor === 'page-rect') {
+    chapterIndex = Math.max(0, Math.floor(loc.page) - 1)
+  } else {
+    const fromPage =
+      typeof dto.pageNumber === 'number' && Number.isFinite(dto.pageNumber)
+        ? Math.max(0, Math.floor(dto.pageNumber) - 1)
+        : 0
+    chapterIndex = fromPage
+    // Older cfi-offset rows were saved with page_number=1 — recover from CFI.
+    if (chapterIndex === 0 && cfi) {
+      const fromCfi = spineIndexFromCfiPath(cfi)
+      if (fromCfi != null && fromCfi > 0) chapterIndex = fromCfi
+    }
+  }
   const style = dto.style ?? {}
   const colorHex =
     normalizeTypewriterColorHex(styleString(style, 'colorHex')) ??

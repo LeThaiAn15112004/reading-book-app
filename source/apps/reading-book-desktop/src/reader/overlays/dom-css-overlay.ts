@@ -178,11 +178,20 @@ function colorWithAlpha(hex: string, alpha: number): string {
   return `rgba(${r}, ${g}, ${b}, ${alpha})`
 }
 
+/** Rate-limit paint warnings — off-section / scroll repaints used to spam thousands. */
+const paintFailLogAt = new Map<string, number>()
+const PAINT_FAIL_LOG_COOLDOWN_MS = 8000
+
 function logPaintFail(
   mark: EpubPaintMark,
   reason: string,
   detail?: Record<string, unknown>,
 ): void {
+  const key = `${mark.id}:${reason}`
+  const now = Date.now()
+  const last = paintFailLogAt.get(key) ?? 0
+  if (now - last < PAINT_FAIL_LOG_COOLDOWN_MS) return
+  paintFailLogAt.set(key, now)
   console.warn(LOG_PREFIX, 'paint failed', {
     id: mark.id,
     cfiRange: mark.cfiRange,
@@ -213,7 +222,18 @@ export class DomCssOverlay implements OverlayPainter {
       if (
         el.hasAttribute(LAYER_ATTR) ||
         el.hasAttribute(RECT_ATTR) ||
-        el.hasAttribute(STYLE_ATTR)
+        el.hasAttribute(STYLE_ATTR) ||
+        el.hasAttribute('data-rb-tw-layer') ||
+        el.hasAttribute('data-rb-tw-note') ||
+        el.hasAttribute('data-rb-tw-draft') ||
+        el.hasAttribute('data-rb-tw-style') ||
+        el.closest?.('[data-rb-tw-layer]') ||
+        el.hasAttribute('data-rb-ink-layer') ||
+        el.hasAttribute('data-rb-ink-stroke') ||
+        el.hasAttribute('data-rb-ink-draft') ||
+        el.hasAttribute('data-rb-ink-style') ||
+        el.hasAttribute('data-rb-ink-svg') ||
+        el.closest?.('[data-rb-ink-layer]')
       ) {
         return true
       }
@@ -246,6 +266,30 @@ export class DomCssOverlay implements OverlayPainter {
     return this.lastHighlights
   }
 
+  /**
+   * Geometry hit-test at iframe-local client coords (washes are pointer-events: none).
+   * Used by Hand-mode pointerup so annotation taps do not toggle reader chrome.
+   */
+  hitTestMarkAt(
+    clientX: number,
+    clientY: number,
+    doc?: Document | null,
+  ): DomCssOverlayMarkClick | null {
+    if (!Number.isFinite(clientX) || !Number.isFinite(clientY)) return null
+    const docs = doc
+      ? [doc]
+      : this.contentsList()
+          .map((c) => c.document)
+          .filter((d): d is Document => !!d)
+
+    for (const d of docs) {
+      const hit = this.findMarkElementAt(d, clientX, clientY)
+      if (!hit) continue
+      return this.markClickFromHit(hit, { x: clientX, y: clientY }, d)
+    }
+    return null
+  }
+
   async paint(overlays: { highlights?: Highlight[] }): Promise<void> {
     const list = overlays.highlights ?? []
     this.lastHighlights = list
@@ -255,7 +299,14 @@ export class DomCssOverlay implements OverlayPainter {
     const marks = highlightsToEpubMarks(list)
     if (marks.length === 0) return
 
+    const contents = this.contentsList()
     for (const mark of marks) {
+      // Skip quietly — highlights of other spine sections are not paintable here.
+      // Logging these on every `rendered`/scroll was flooding the console.
+      if (!contents.some((c) => this.belongsToRenderedSection(c, mark))) {
+        continue
+      }
+
       const paintedRects = this.paintMarkWithRects(mark)
       if (paintedRects) {
         this.paintedViaRects.add(mark.cfiRange)
@@ -270,11 +321,11 @@ export class DomCssOverlay implements OverlayPainter {
 
       logPaintFail(mark, 'all_strategies_failed', {
         tried: [
-          'epubjs_range_cfi',
-          'epubjs_start_end_points',
+          'text_reanchor',
           'tolerant_range_cfi',
           'tolerant_start_end_points',
-          'text_reanchor',
+          'epubjs_range_cfi',
+          'epubjs_start_end_points',
           'epubjs_annotations',
         ],
       })
@@ -320,36 +371,20 @@ export class DomCssOverlay implements OverlayPainter {
   /** Primary: CFI → Range → line rects (any HTML structure). */
   private paintMarkWithRects(mark: EpubPaintMark): boolean {
     let painted = false
-    let sawContents = false
-    let lastReason = 'no_contents'
 
     for (const contents of this.contentsList()) {
       const doc = contents.document
       if (!doc) continue
-      sawContents = true
 
       const range = this.resolveRange(contents, mark)
-      if (!range) {
-        lastReason = 'cfi_range_unresolved'
-        continue
-      }
-      if (range.collapsed) {
-        lastReason = 'cfi_range_collapsed'
-        continue
-      }
+      if (!range || range.collapsed) continue
 
       const rects = this.collectPaintRects(range)
-      if (rects.length === 0) {
-        lastReason = 'no_client_rects'
-        continue
-      }
+      if (rects.length === 0) continue
 
       const layer = this.ensureLayer(doc)
       const body = doc.body
-      if (!body) {
-        lastReason = 'no_body'
-        continue
-      }
+      if (!body) continue
       const bodyRect = body.getBoundingClientRect()
 
       for (const r of rects) {
@@ -373,21 +408,16 @@ export class DomCssOverlay implements OverlayPainter {
       painted = true
     }
 
-    if (!painted && sawContents) {
-      logPaintFail(mark, `rects_${lastReason}`)
-    }
     return painted
   }
 
   /**
-   * Resolve a DOM Range for the mark, in increasing tolerance:
-   * 1) tolerant CFI resolver (offset overflow / element boundaries)
-   * 2) rebuilt / point CFIs through the same tolerant path
-   * 3) epubjs `contents.range` (only for the rendered section)
-   * 4) re-anchor by the mark's captured text
+   * Resolve a DOM Range for the mark:
+   * 1) CFI strategies (tolerant → epubjs)
+   * 2) Text re-anchor (exact `selectedText`) — preferred over a truncated CFI
+   * 3) Expand a CFI prefix using text search near that prefix
    *
-   * The first candidate whose text equals the mark's captured text wins, so a
-   * clamped or re-anchored Range can override an epubjs Range that drifted.
+   * Never paint a short CFI clamp when `selectedText` says the mark is longer.
    */
   private resolveRange(
     contents: EpubjsContentsLike,
@@ -399,8 +429,13 @@ export class DomCssOverlay implements OverlayPainter {
     // `No startContainer found` instead of throwing.
     if (!this.belongsToRenderedSection(contents, mark)) return null
 
+    const hasText = mark.selectedText.trim().length > 0
+    const scope =
+      elementFromCfi(doc, mark.locationStart, this.cfiDomOptions) ??
+      elementFromCfi(doc, mark.cfiRange, this.cfiDomOptions)
+
     const rebuilt = rebuildRangeCfi(mark.locationStart, mark.locationEnd)
-    const strategies: Array<() => Range | null> = [
+    const cfiStrategies: Array<() => Range | null> = [
       () => this.rangeFromTolerantCfi(doc, mark.cfiRange),
       () =>
         rebuilt && rebuilt !== mark.cfiRange
@@ -417,19 +452,17 @@ export class DomCssOverlay implements OverlayPainter {
         rebuilt && rebuilt !== mark.cfiRange
           ? this.rangeFromEpubjs(contents, rebuilt)
           : null,
-      () => this.rangeFromPointCfis(contents, mark.locationStart, mark.locationEnd),
       () =>
-        findRangeByText(
-          doc,
-          elementFromCfi(doc, mark.locationStart, this.cfiDomOptions) ??
-            elementFromCfi(doc, mark.cfiRange, this.cfiDomOptions),
-          mark.selectedText,
-          this.cfiDomOptions,
+        this.rangeFromPointCfis(
+          contents,
+          mark.locationStart,
+          mark.locationEnd,
         ),
     ]
 
-    let fallback: Range | null = null
-    for (const resolve of strategies) {
+    let cfiHint: Range | null = null
+
+    for (const resolve of cfiStrategies) {
       let range: Range | null = null
       try {
         range = resolve()
@@ -437,10 +470,31 @@ export class DomCssOverlay implements OverlayPainter {
         range = null
       }
       if (!range || range.collapsed) continue
-      if (rangeMatchesText(range, mark.selectedText)) return range
-      fallback ??= range
+      if (hasText && rangeMatchesText(range, mark.selectedText)) return range
+      if (!hasText) return range
+      cfiHint ??= range
     }
-    return fallback
+
+    // Exact text re-anchor (body-wide). Prefer occurrence near the CFI hit.
+    if (hasText) {
+      try {
+        const byText = findRangeByText(
+          doc,
+          scope,
+          mark.selectedText,
+          this.cfiDomOptions,
+          cfiHint,
+        )
+        if (byText && !byText.collapsed) return byText
+      } catch {
+        /* ignore */
+      }
+    }
+
+    // No exact text match after CFI + re-anchor. Refuse truncated / over-long
+    // clamps — painting a first-line wash is worse than leaving the mark for
+    // the annotations fallback (or a later repaint).
+    return hasText ? null : cfiHint
   }
 
   /** Unknown spine base counts as a match so paint never regresses on it. */
@@ -710,12 +764,25 @@ export class DomCssOverlay implements OverlayPainter {
         box-decoration-break: clone;
         -webkit-box-decoration-break: clone;
       }
-      /* Reading content above highlight wash — glyphs keep theme color. */
-      body > *:not([${LAYER_ATTR}]) {
+      /* Reading content above highlight wash — glyphs keep theme color.
+         Typewriter layer stays excluded so its absolute stack is preserved. */
+      body > *:not([${LAYER_ATTR}]):not([data-rb-tw-layer]):not([data-rb-ink-layer]) {
         position: relative;
         z-index: 1;
       }
       .rb-epub-hl, g.rb-epub-hl, .epubjs-hl { mix-blend-mode: normal !important; }
+      /* Jump-to-annotation flash (sidebar / list). */
+      @keyframes rb-annotation-jump-flash {
+        0%, 100% { filter: brightness(1); outline-color: transparent; }
+        35% { filter: brightness(1.55); }
+        55% { filter: brightness(1.2); }
+      }
+      .rb-annotation-jump-flash {
+        animation: rb-annotation-jump-flash 0.9s ease-in-out;
+        outline: 2px solid rgba(245, 158, 11, 0.95);
+        outline-offset: 2px;
+        z-index: 3;
+      }
     `
   }
 
@@ -729,31 +796,32 @@ export class DomCssOverlay implements OverlayPainter {
     doc.addEventListener('click', this.onDocumentMarkClick, true)
   }
 
-  private onDocumentMarkClick = (event: MouseEvent): void => {
-    if (!this.onMarkClick) return
-    const doc =
-      event.view?.document ??
-      ((event.target as Node | null)?.ownerDocument ?? null)
-    if (!doc) return
-
-    const x = event.clientX
-    const y = event.clientY
-    if (!Number.isFinite(x) || !Number.isFinite(y)) return
-
+  private findMarkElementAt(
+    doc: Document,
+    clientX: number,
+    clientY: number,
+  ): HTMLElement | null {
     let hit: HTMLElement | null = null
     for (const node of doc.querySelectorAll(`[${RECT_ATTR}]`)) {
       const el = node as HTMLElement
       const r = el.getBoundingClientRect()
-      if (x >= r.left && x <= r.right && y >= r.top && y <= r.bottom) {
+      if (
+        clientX >= r.left &&
+        clientX <= r.right &&
+        clientY >= r.top &&
+        clientY <= r.bottom
+      ) {
         hit = el
       }
     }
-    if (!hit) return
+    return hit
+  }
 
-    event.preventDefault()
-    event.stopPropagation()
-
-    const hitEl = hit
+  private markClickFromHit(
+    hitEl: HTMLElement,
+    iframePoint: { x: number; y: number },
+    doc: Document,
+  ): DomCssOverlayMarkClick {
     const id = hitEl.getAttribute(RECT_ATTR) ?? ''
     const cfiRange = hitEl.getAttribute('data-rb-hl-cfi') ?? ''
     const colorHex = hitEl.getAttribute('data-rb-hl-color') ?? '#f59e0b'
@@ -773,13 +841,39 @@ export class DomCssOverlay implements OverlayPainter {
     } catch {
       /* ignore */
     }
-    this.onMarkClick({
+
+    const view = doc.defaultView
+    const synthetic = {
+      clientX: iframePoint.x,
+      clientY: iframePoint.y,
+      view,
+    } as MouseEvent
+
+    return {
       id: mark.id,
       cfiRange: mark.cfiRange,
       colorHex: mark.colorHex,
       rect,
-      click: this.viewportPointFromIframeEvent(event, hitEl),
-    })
+      click: this.viewportPointFromIframeEvent(synthetic, hitEl),
+    }
+  }
+
+  private onDocumentMarkClick = (event: MouseEvent): void => {
+    if (!this.onMarkClick) return
+    const doc =
+      event.view?.document ??
+      ((event.target as Node | null)?.ownerDocument ?? null)
+    if (!doc) return
+
+    const hit = this.findMarkElementAt(doc, event.clientX, event.clientY)
+    if (!hit) return
+
+    event.preventDefault()
+    event.stopPropagation()
+
+    this.onMarkClick(
+      this.markClickFromHit(hit, { x: event.clientX, y: event.clientY }, doc),
+    )
   }
 
   /**
@@ -802,13 +896,20 @@ export class DomCssOverlay implements OverlayPainter {
 
     const heights = usable.map((r) => r.height).sort((a, b) => a - b)
     const medianH = heights[Math.floor(heights.length / 2)] ?? 18
-    const widths = usable.map((r) => r.width).sort((a, b) => a - b)
-    const medianW = widths[Math.floor(widths.length / 2)] ?? 80
+    let boundsW = 0
+    try {
+      boundsW = range.getBoundingClientRect().width
+    } catch {
+      boundsW = 0
+    }
     // Drop absurd full-page / full-column boxes when tighter text rects exist.
+    // Cap width by the range bounds (plus slack), not median fragment width —
+    // a short first line must not cause later full-width lines to be dropped.
+    const maxW = Math.max(boundsW * 1.15, 480, 240)
     const sane = usable.filter(
       (r) =>
         r.height <= Math.max(medianH * 3.5, 48) &&
-        r.width <= Math.max(medianW * 3.5, 480) &&
+        r.width <= maxW &&
         r.width <= 2400,
     )
     return sane.length > 0 ? sane : usable

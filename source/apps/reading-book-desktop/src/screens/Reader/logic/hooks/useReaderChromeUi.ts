@@ -8,6 +8,7 @@ import {
 import type { AnnotateTool } from '@reading-book/shared/models'
 import type { EpubRendererApi } from '../../../../reader/renderers/epub'
 import {
+  blurReaderSidebarFocus,
   clearStuckChromeHover,
   scheduleEpubResizeAfterChromeTransition,
 } from '../../../../reader/readerChromeInteraction'
@@ -29,7 +30,11 @@ export type ReaderChromeEscapeUi = {
   activeTool: AnnotateTool
   isEpubSurface: boolean
   sidebarOpen: boolean
+  rightSidebarOpen: boolean
 }
+
+/** Which feature currently owns the shared right panel slot. */
+export type RightSidebarKind = 'typewriter' | null
 
 type UseReaderChromeUiOptions = {
   bookId: string | undefined
@@ -58,6 +63,9 @@ export function useReaderChromeUi({
   const [chromeHidden, setChromeHidden] = useState(true)
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [sidebarTab, setSidebarTab] = useState<SidebarTab>('chapters')
+  const [rightSidebarOpen, setRightSidebarOpen] = useState(false)
+  const [rightSidebarKind, setRightSidebarKind] =
+    useState<RightSidebarKind>(null)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [moreOpen, setMoreOpen] = useState(false)
   const [toast, setToast] = useState<string | null>(null)
@@ -69,6 +77,8 @@ export function useReaderChromeUi({
   useEffect(() => {
     setSidebarOpen(false)
     setSidebarTab('chapters')
+    setRightSidebarOpen(false)
+    setRightSidebarKind(null)
     setSettingsOpen(false)
     setMoreOpen(false)
     setSignOpen(false)
@@ -113,6 +123,32 @@ export function useReaderChromeUi({
     setSidebarOpen((open) => !open)
   }, [closeFloating])
 
+  const openRightSidebar = useCallback((kind: Exclude<RightSidebarKind, null>) => {
+    closeFloating()
+    setRightSidebarKind(kind)
+    setRightSidebarOpen(true)
+  }, [closeFloating])
+
+  const closeRightSidebar = useCallback(() => {
+    setRightSidebarOpen(false)
+    setRightSidebarKind(null)
+  }, [])
+
+  const toggleRightSidebar = useCallback(
+    (kind: Exclude<RightSidebarKind, null> = 'typewriter') => {
+      closeFloating()
+      setRightSidebarOpen((open) => {
+        if (open && rightSidebarKind === kind) {
+          setRightSidebarKind(null)
+          return false
+        }
+        setRightSidebarKind(kind)
+        return true
+      })
+    },
+    [closeFloating, rightSidebarKind],
+  )
+
   /**
    * Tap center clears transient reader UI without toggling the tools chrome.
    * The global menubar owns opening/closing tools via its Tools item.
@@ -123,6 +159,7 @@ export function useReaderChromeUi({
     closeFloating()
     bridge.closeSelectionMenu()
     bridge.dismissHighlightEditPanel()
+    blurReaderSidebarFocus()
     if (isEpubSurface) {
       epubApiRef.current?.clearSelection()
     } else {
@@ -165,7 +202,7 @@ export function useReaderChromeUi({
       epubApiRef,
       escapeUiRef.current.isEpubSurface,
     )
-  }, [chromeHidden, sidebarOpen, epubApiRef, escapeUiRef])
+  }, [chromeHidden, sidebarOpen, rightSidebarOpen, epubApiRef, escapeUiRef])
 
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
@@ -221,6 +258,12 @@ export function useReaderChromeUi({
         setSettingsOpen(false)
         return
       }
+      if (escapeUiRef.current.rightSidebarOpen) {
+        e.preventDefault()
+        setRightSidebarOpen(false)
+        setRightSidebarKind(null)
+        return
+      }
       if (!chromeHidden) {
         e.preventDefault()
         setChromeHidden(true)
@@ -245,6 +288,10 @@ export function useReaderChromeUi({
     setSidebarOpen,
     sidebarTab,
     setSidebarTab,
+    rightSidebarOpen,
+    rightSidebarKind,
+    setRightSidebarOpen,
+    setRightSidebarKind,
     settingsOpen,
     setSettingsOpen,
     moreOpen,
@@ -260,6 +307,9 @@ export function useReaderChromeUi({
     closeFloating,
     openSidebarTab,
     toggleSidebar,
+    openRightSidebar,
+    closeRightSidebar,
+    toggleRightSidebar,
     handleCenterTap,
     toggleChrome,
   }

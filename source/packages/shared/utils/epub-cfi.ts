@@ -49,6 +49,20 @@ export function cfiChapterSignature(cfi: string): string | null {
 }
 
 /**
+ * Best-effort spine item index from package path `/6/N!` (N even).
+ * Used when hydrating annotations that lack a reliable `page_number`.
+ */
+export function spineIndexFromCfiPath(cfi: string): number | undefined {
+  const sig = cfiChapterSignature(cfi)
+  if (!sig) return undefined
+  const parts = sig.split('/').filter(Boolean)
+  if (parts.length < 2) return undefined
+  const last = Number.parseInt(parts[parts.length - 1] ?? '', 10)
+  if (!Number.isFinite(last) || last < 2 || last % 2 !== 0) return undefined
+  return last / 2 - 1
+}
+
+/**
  * Split an epubjs `cfiRange` string into start/end CFIs suitable for domain Location.
  * Falls back to using the whole range for both ends when shape is unrecognized.
  */

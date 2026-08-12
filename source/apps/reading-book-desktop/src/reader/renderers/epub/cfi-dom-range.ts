@@ -304,29 +304,46 @@ function textEdgeBoundary(
 }
 
 /**
- * Continue an overflowing offset into the text nodes after `from`, staying
- * inside its parent element. This is the `<br>`-split paragraph case.
+ * Continue an overflowing offset into text nodes after `from`.
+ *
+ * epubjs often writes a large end offset (`/1:742`) against the first text
+ * chunk even when the selection continues into later `<p>` / `<span>` /
+ * `<br>` siblings. Walk wider ancestors until the offset is consumed so we
+ * do not clamp to a single short line.
  */
 function spillForward(
   from: Text,
   remaining: number,
   options: CfiDomOptions,
 ): CfiBoundary | null {
-  const scope = from.parentElement
-  if (!scope) return null
-  const nodes = descendantTextNodes(scope, options)
-  const index = nodes.indexOf(from)
-  if (index < 0) return null
-
-  let rest = remaining
-  for (let i = index + 1; i < nodes.length; i += 1) {
-    const node = nodes[i]
-    if (rest <= node.length) return { node, offset: rest }
-    rest -= node.length
+  if (remaining <= 0) {
+    return { node: from, offset: from.length }
   }
 
-  const last = nodes[nodes.length - 1]
-  return { node: last, offset: last.length }
+  const doc = from.ownerDocument
+  let scope: Element | null = from.parentElement
+  let lastClamp: CfiBoundary | null = null
+
+  while (scope) {
+    const nodes = descendantTextNodes(scope, options)
+    const index = nodes.indexOf(from)
+    if (index >= 0) {
+      let rest = remaining
+      for (let i = index + 1; i < nodes.length; i += 1) {
+        const node = nodes[i]
+        if (rest <= node.length) return { node, offset: rest }
+        rest -= node.length
+      }
+      const last = nodes[nodes.length - 1]
+      lastClamp = { node: last, offset: last.length }
+      if (rest <= 0) return lastClamp
+    }
+
+    if (scope === doc?.body || scope === doc?.documentElement) break
+    scope = scope.parentElement
+  }
+
+  return lastClamp
 }
 
 function boundaryFromSegment(
@@ -461,6 +478,22 @@ function squashWhitespace(text: string): string {
   return text.replace(/\s+/g, '')
 }
 
+/**
+ * Normalize punctuation so smart quotes / dashes from the browser selection
+ * still match EPUB source text (and vice versa).
+ * Length-preserving for single code points (ellipsis stays one char) so the
+ * squashed index stays 1:1 with DOM offsets.
+ */
+function normalizeForMatch(text: string): string {
+  return squashWhitespace(
+    text
+      .normalize('NFKC')
+      .replace(/[\u2010-\u2015\u2212\uFE58\uFE63\uFF0D]/g, '-')
+      .replace(/[\u2018\u2019\u201A\uFF07]/g, "'")
+      .replace(/[\u201C\u201D\u201E\uFF02]/g, '"'),
+  )
+}
+
 type SquashedIndex = {
   text: string
   /** `positions[i]` is the DOM boundary of `text[i]`. */
@@ -474,7 +507,10 @@ function buildSquashedIndex(nodes: Text[]): SquashedIndex {
     const raw = node.data
     for (let i = 0; i < raw.length; i += 1) {
       if (/\s/.test(raw[i])) continue
-      text += raw[i]
+      // Keep 1:1 with needle from normalizeForMatch (dashes / quotes).
+      const normalized = normalizeForMatch(raw[i])
+      if (!normalized) continue
+      text += normalized
       positions.push({ node, offset: i })
     }
   }
@@ -484,45 +520,108 @@ function buildSquashedIndex(nodes: Text[]): SquashedIndex {
 /**
  * Re-anchor a mark by the text it captured. Last-resort strategy for marks whose
  * stored CFI no longer resolves; ignores whitespace so verse line breaks match.
+ *
+ * When `hint` is set, prefer the occurrence whose start is closest to the hint
+ * start (CFI often lands on the correct opening words but truncates the end).
  */
 export function findRangeByText(
   doc: Document,
   scope: Node | null,
   text: string,
   options: CfiDomOptions = {},
+  hint?: Range | null,
 ): Range | null {
-  const needle = squashWhitespace(text)
+  const needle = normalizeForMatch(text)
   if (!needle) return null
 
-  const roots = [scope, doc.body, doc.documentElement].filter(
+  const hintAncestor =
+    hint && !hint.collapsed
+      ? hint.commonAncestorContainer.nodeType === ELEMENT_NODE
+        ? hint.commonAncestorContainer
+        : hint.commonAncestorContainer.parentNode
+      : null
+
+  const roots = [scope, hintAncestor, doc.body, doc.documentElement].filter(
     (root, index, list): root is Node =>
       !!root && list.indexOf(root) === index,
   )
 
+  let best: Range | null = null
+  let bestDist = Number.POSITIVE_INFINITY
+
   for (const root of roots) {
     const index = buildSquashedIndex(descendantTextNodes(root, options))
-    const at = index.text.indexOf(needle)
-    if (at < 0) continue
-    const start = index.positions[at]
-    const lastChar = index.positions[at + needle.length - 1]
-    if (!start || !lastChar) continue
-    const range = tryRange(doc, start, {
-      node: lastChar.node,
-      offset: lastChar.offset + 1,
-    })
-    if (range && !range.collapsed) return range
+    // Search every occurrence in this root; pick closest to hint when present.
+    let from = 0
+    while (from <= index.text.length) {
+      const at = index.text.indexOf(needle, from)
+      if (at < 0) break
+      const start = index.positions[at]
+      const lastChar = index.positions[at + needle.length - 1]
+      from = at + 1
+      if (!start || !lastChar) continue
+      const range = tryRange(doc, start, {
+        node: lastChar.node,
+        offset: lastChar.offset + 1,
+      })
+      if (!range || range.collapsed) continue
+
+      if (!hint || hint.collapsed) return range
+
+      try {
+        const dist =
+          Math.abs(
+            range.compareBoundaryPoints(Range.START_TO_START, hint),
+          ) === 0
+            ? 0
+            : (() => {
+                const a = hint.getBoundingClientRect()
+                const b = range.getBoundingClientRect()
+                return Math.hypot(a.top - b.top, a.left - b.left)
+              })()
+        if (dist < bestDist) {
+          bestDist = dist
+          best = range
+          if (dist === 0) return range
+        }
+      } catch {
+        best ??= range
+      }
+    }
+    if (best && !hint) return best
   }
 
-  return null
+  return best
 }
 
 /** True when a Range covers the same characters as the mark's captured text. */
 export function rangeMatchesText(range: Range, text: string): boolean {
-  const expected = squashWhitespace(text)
+  const expected = normalizeForMatch(text)
   if (!expected) return false
   try {
-    return squashWhitespace(range.toString()) === expected
+    return normalizeForMatch(range.toString()) === expected
   } catch {
     return false
+  }
+}
+
+/**
+ * How much of `text` a range covers (0 = unrelated). Exact match scores highest.
+ * Used to prefer a longer CFI resolve over a truncated first-line clamp.
+ */
+export function rangeTextCoverage(range: Range, text: string): number {
+  const expected = normalizeForMatch(text)
+  if (!expected) return 0
+  try {
+    const got = normalizeForMatch(range.toString())
+    if (!got) return 0
+    if (got === expected) return expected.length * 2
+    if (expected.startsWith(got) || got.startsWith(expected)) {
+      return Math.min(got.length, expected.length)
+    }
+    if (expected.includes(got)) return got.length
+    return 0
+  } catch {
+    return 0
   }
 }

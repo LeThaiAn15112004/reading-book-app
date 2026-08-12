@@ -4,12 +4,28 @@ import type { EpubRendererApi } from './renderers/epub'
 /** Matches ReaderShell / SidebarEdgeRail padding transition (ms). */
 export const READER_CHROME_TRANSITION_MS = 300
 
+const READER_SIDEBAR_FOCUS_ROOT =
+  '[data-reader-sidebar-panel], [data-reader-right-sidebar-panel], [aria-label="Sidebar navigation"]'
+
 const STUCK_HOVER_SELECTORS = [
   '.app-menubar button',
   '[aria-label="Sidebar navigation"] button',
+  '[data-reader-sidebar-panel] button',
+  '[data-reader-right-sidebar-panel] button',
   'button[aria-label="Open sidebar"]',
   'button[aria-label="Close sidebar"]',
 ] as const
+
+/** Drop sidebar panel / rail focus so accent rings do not stick after navigation. */
+export function blurReaderSidebarFocus(): void {
+  const active = document.activeElement
+  if (
+    active instanceof HTMLElement &&
+    active.closest(READER_SIDEBAR_FOCUS_ROOT)
+  ) {
+    active.blur()
+  }
+}
 
 /** Clear :hover / focus stuck after layout shifts under a stationary cursor. */
 export function clearStuckChromeHover(): void {
@@ -27,7 +43,7 @@ export function clearStuckChromeHover(): void {
   const active = document.activeElement
   if (
     active instanceof HTMLElement &&
-    active.closest('.app-menubar, [aria-label="Sidebar navigation"]')
+    active.closest(`.app-menubar, ${READER_SIDEBAR_FOCUS_ROOT}`)
   ) {
     active.blur()
   }

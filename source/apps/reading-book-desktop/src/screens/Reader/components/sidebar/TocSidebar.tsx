@@ -207,6 +207,7 @@ export function TocSidebar({
 
   return (
     <aside
+      data-reader-sidebar-panel
       className={`@container absolute z-[160] flex flex-col border-y border-r border-lib-border bg-lib-surface-strong shadow-lg ${
         isResizing
           ? ''
@@ -329,9 +330,14 @@ export function TocSidebar({
                         className="flex items-start gap-2 rounded-lg border border-lib-border-soft bg-lib-surface p-3"
                       >
                         <button
-                          className="min-w-0 flex-1 cursor-pointer border-none bg-transparent p-0 text-left text-sm text-lib-text"
+                          className="min-w-0 flex-1 cursor-pointer border-none bg-transparent p-0 text-left text-sm text-lib-text outline-none focus:outline-none focus-visible:outline-none"
                           type="button"
-                          onClick={() => onJumpBookmark(b)}
+                          onClick={(e) => {
+                            e.preventDefault()
+                            e.stopPropagation()
+                            onJumpBookmark(b)
+                            e.currentTarget.blur()
+                          }}
                         >
                           {b.label}
                         </button>

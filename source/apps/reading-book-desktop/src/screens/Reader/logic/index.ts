@@ -15,6 +15,7 @@ export {
   useReaderZoomControls,
   type ReaderChromeAnnotationBridge,
   type ReaderChromeEscapeUi,
+  type RightSidebarKind,
   type SelectionMenuState,
 } from './hooks'
 export { toReadingPrefs } from './prefs/toReadingPrefs'

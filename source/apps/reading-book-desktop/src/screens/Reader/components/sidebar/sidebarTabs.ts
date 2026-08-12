@@ -42,6 +42,14 @@ export function sidebarContentInsetLeft(
     : SIDEBAR_RAIL_WIDTH_PX
 }
 
+/** Right panel inset — shrinks reading area when open (no icon rail). */
+export function sidebarContentInsetRight(
+  open: boolean,
+  panelWidth: number = SIDEBAR_PANEL_WIDTH_PX,
+): number {
+  return open ? panelWidth : 0
+}
+
 export function clampSidebarPanelWidth(
   width: number,
   viewportWidth: number = typeof window !== 'undefined' ? window.innerWidth : 1280,

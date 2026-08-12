@@ -2,6 +2,7 @@ import type { ReactNode, Ref } from 'react'
 import {
   TYPEWRITER_FONT_SIZES,
   normalizeTypewriterColorHex,
+  stepTypewriterFontSize,
 } from '@reading-book/shared/models'
 
 export type TypewriterFormatState = {
@@ -19,6 +20,9 @@ type TypewriterFormatToolbarProps = {
   onUnderline: () => void
   onTextColor: (colorHex: string) => void
   onFontSize: (fontSize: number) => void
+  /** Open the shared right reader panel (typewriter detail UI, etc.). */
+  onOpenSidePanel?: () => void
+  sidePanelOpen?: boolean
   /** Call before toolbar controls steal focus (color picker, etc.). */
   onSaveSelection?: () => void
   toolbarRef?: Ref<HTMLDivElement>
@@ -55,7 +59,7 @@ function ToolBtn({
   )
 }
 
-/** Compact Word-like formatting bar for an active typewriter textbox. */
+/** Compact floating bar: B/I/U, A+/A−, color, and right-panel toggle. */
 export function TypewriterFormatToolbar({
   state,
   onBold,
@@ -63,10 +67,17 @@ export function TypewriterFormatToolbar({
   onUnderline,
   onTextColor,
   onFontSize,
+  onOpenSidePanel,
+  sidePanelOpen = false,
   onSaveSelection,
   toolbarRef,
 }: TypewriterFormatToolbarProps) {
   const pickerValue = normalizeTypewriterColorHex(state.colorHex) ?? '#f59e0b'
+  const canShrink =
+    state.fontSize > (TYPEWRITER_FONT_SIZES[0] ?? state.fontSize)
+  const canGrow =
+    state.fontSize <
+    (TYPEWRITER_FONT_SIZES[TYPEWRITER_FONT_SIZES.length - 1] ?? state.fontSize)
 
   return (
     <div
@@ -74,6 +85,11 @@ export function TypewriterFormatToolbar({
       className="rb-tw-toolbar"
       role="toolbar"
       aria-label="Typewriter formatting"
+      onMouseDown={(e) => {
+        // Keep contenteditable focused while using toolbar controls.
+        if ((e.target as HTMLElement | null)?.closest?.('select, input')) return
+        e.preventDefault()
+      }}
       onClick={(e) => e.stopPropagation()}
       onPointerDown={(e) => {
         e.stopPropagation()
@@ -107,24 +123,26 @@ export function TypewriterFormatToolbar({
 
       <span className="rb-tw-toolbar-sep" aria-hidden />
 
-      <label className="rb-tw-toolbar-size">
-        <span className="sr-only">Font size</span>
-        <select
-          value={state.fontSize}
-          aria-label="Font size"
-          onMouseDown={(e) => {
-            e.stopPropagation()
-            onSaveSelection?.()
-          }}
-          onChange={(e) => onFontSize(Number(e.target.value))}
-        >
-          {TYPEWRITER_FONT_SIZES.map((size) => (
-            <option key={size} value={size}>
-              {size}
-            </option>
-          ))}
-        </select>
-      </label>
+      <ToolBtn
+        label="Decrease font size"
+        onSaveSelection={onSaveSelection}
+        onClick={() => {
+          if (!canShrink) return
+          onFontSize(stepTypewriterFontSize(state.fontSize, -1))
+        }}
+      >
+        <span className="rb-tw-toolbar-a">A−</span>
+      </ToolBtn>
+      <ToolBtn
+        label="Increase font size"
+        onSaveSelection={onSaveSelection}
+        onClick={() => {
+          if (!canGrow) return
+          onFontSize(stepTypewriterFontSize(state.fontSize, 1))
+        }}
+      >
+        <span className="rb-tw-toolbar-a rb-tw-toolbar-a-lg">A+</span>
+      </ToolBtn>
 
       <span className="rb-tw-toolbar-sep" aria-hidden />
 
@@ -160,6 +178,22 @@ export function TypewriterFormatToolbar({
           }}
         />
       </label>
+
+      {onOpenSidePanel ? (
+        <>
+          <span className="rb-tw-toolbar-sep" aria-hidden />
+          <ToolBtn
+            label={sidePanelOpen ? 'Close side panel' : 'Open side panel'}
+            active={sidePanelOpen}
+            onSaveSelection={onSaveSelection}
+            onClick={onOpenSidePanel}
+          >
+            <span className="rb-tw-toolbar-panel-icon" aria-hidden>
+              ▤
+            </span>
+          </ToolBtn>
+        </>
+      ) : null}
     </div>
   )
 }

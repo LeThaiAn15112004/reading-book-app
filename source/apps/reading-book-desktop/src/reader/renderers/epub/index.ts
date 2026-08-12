@@ -3,6 +3,7 @@ export {
   type EpubPagePreview,
   type EpubRendererApi,
 } from './EpubRenderer'
+export type { AnnotationFocusTarget } from '../../annotationJump'
 export {
   CfiCodec,
   cfiCodec,
@@ -18,6 +19,7 @@ export {
   parseCfi,
   rangeBetweenBoundaries,
   rangeMatchesText,
+  rangeTextCoverage,
   resolveCfiBoundary,
   resolveCfiRange,
   splitCfiComponents,

@@ -13,19 +13,36 @@ import {
   PAN_DRAG_THRESHOLD_PX,
 } from '../../../../reader/interaction-hit'
 import {
+  appendFreehandPoint,
   blocksSelectionContextMenu,
+  clientPointToNormalized,
   isCrosshairAnnotateTool,
   isDrawingTool,
   type AnnotateTool,
+  type DrawToolSettings,
   type ESignStamp,
+  type FreehandDraftStroke,
+  type FreehandPoint,
   type HighlightHandleRect,
   type InteractionTool,
   type PendingSelection,
   type ReaderHighlight,
+  type ReaderShapeAnnotation,
   type ReaderTypewriterNote,
   type TypewriterBoxStyle,
   type TypewriterMovePayload,
 } from '@reading-book/shared/models'
+function freehandUnitPathD(points: FreehandPoint[]): string {
+  const first = points[0]
+  if (!first) return ''
+  let d = `M ${first.x} ${first.y}`
+  for (let i = 1; i < points.length; i += 1) {
+    const p = points[i]
+    if (!p) continue
+    d += ` L ${p.x} ${p.y}`
+  }
+  return d
+}
 import type { FakeChapter } from '../../logic'
 import {
   beginTypewriterDrag,
@@ -37,6 +54,10 @@ import { hitTestTypewriterAtClientPoint } from '../../../../reader/typewriterHit
 import {
   TypewriterRichEditor,
   TypewriterStaticHtml,
+  clearTypewriterCommitSuppress,
+  createTypewriterFocusSession,
+  isTypewriterToolbarTarget,
+  requestTypewriterActivation,
 } from '../../../../reader/typewriter'
 
 type MarginMode = 'narrow' | 'normal' | 'wide' | 'off'
@@ -53,6 +74,10 @@ type ReadingCanvasProps = {
   highlights: ReaderHighlight[]
   typewriterNotes: ReaderTypewriterNote[]
   eSignStamps: ESignStamp[]
+  /** Session freehand strokes (T5.11b). */
+  freehandStrokes?: ReaderShapeAnnotation[]
+  drawSettings?: DrawToolSettings
+  onFreehandStrokeComplete?: (draft: FreehandDraftStroke) => void
   onCanvasBackgroundClick: () => void
   onSelectionContextMenu: (
     selection: PendingSelection,
@@ -77,11 +102,15 @@ type ReadingCanvasProps = {
   /** Flush debounced content persist (e.g. on blur). */
   onTypewriterBlur?: (id: string) => void
   onTypewriterFocus?: (id: string) => void
+  onTypewriterContentCancel?: (id: string) => void
   onTypewriterStyleChange?: (id: string, patch: TypewriterBoxStyle) => void
   /** Persist reposition after drag (T5.6c). */
   onTypewriterMove?: (id: string, payload: TypewriterMovePayload) => void
   /** Delete from canvas (empty + Delete/Backspace). */
   onTypewriterDelete?: (id: string) => void
+  /** Floating toolbar → shared right reader panel. */
+  onTypewriterOpenSidePanel?: () => void
+  typewriterSidePanelOpen?: boolean
   /** Hand pan deltas — scroll the outer zoom viewport when provided. */
   onHandPanBy?: (dx: number, dy: number) => void
 }
@@ -157,6 +186,9 @@ export function ReadingCanvas({
   highlights,
   typewriterNotes,
   eSignStamps,
+  freehandStrokes = [],
+  drawSettings,
+  onFreehandStrokeComplete,
   onCanvasBackgroundClick,
   onSelectionContextMenu,
   onTextSelected,
@@ -167,14 +199,18 @@ export function ReadingCanvas({
   onTypewriterChange,
   onTypewriterBlur,
   onTypewriterFocus,
+  onTypewriterContentCancel,
   onTypewriterStyleChange,
   onTypewriterMove,
   onTypewriterDelete,
+  onTypewriterOpenSidePanel,
+  typewriterSidePanelOpen = false,
   onHandPanBy,
 }: ReadingCanvasProps) {
   const [activeEditingId, setActiveEditingId] = useState<string | null>(null)
   const activeEditingIdRef = useRef<string | null>(null)
   activeEditingIdRef.current = activeEditingId
+  const typewriterFocusSessionRef = useRef(createTypewriterFocusSession())
   const typewriterNoteRefs = useRef(new Map<string, HTMLDivElement>())
   const visibleTypewriterNoteIdsRef = useRef<string[]>([])
   const dragSessionRef = useRef<TypewriterDragSession | null>(null)
@@ -185,7 +221,128 @@ export function ReadingCanvas({
   >(null)
   const onTypewriterMoveRef = useRef(onTypewriterMove)
   onTypewriterMoveRef.current = onTypewriterMove
+  const onTypewriterBlurRef = useRef(onTypewriterBlur)
+  onTypewriterBlurRef.current = onTypewriterBlur
+  const drawSettingsRef = useRef(drawSettings)
+  drawSettingsRef.current = drawSettings
+  const onFreehandStrokeCompleteRef = useRef(onFreehandStrokeComplete)
+  onFreehandStrokeCompleteRef.current = onFreehandStrokeComplete
+  const inkDraftRef = useRef<{
+    pointerId: number
+    chapterIndex: number
+    host: HTMLElement
+    points: FreehandPoint[]
+    colorHex: string
+    strokeWidth: number
+  } | null>(null)
+  const [inkDraft, setInkDraft] = useState<FreehandDraftStroke | null>(null)
   const renderedChapters = pageMode === 'scroll' ? chapters : [chapter]
+  const activeToolRef = useRef(activeTool)
+  activeToolRef.current = activeTool
+
+  const syncInkDraft = useCallback((draft: FreehandDraftStroke | null) => {
+    setInkDraft(draft)
+  }, [])
+
+  const beginPencilStroke = useCallback(
+    (
+      event: ReactPointerEvent<HTMLElement>,
+      targetChapterIndex: number,
+      host: HTMLElement,
+    ) => {
+      if (activeToolRef.current !== 'pencil' || event.button !== 0) return false
+      event.preventDefault()
+      event.stopPropagation()
+      const settings = drawSettingsRef.current
+      const colorHex = settings?.colorHex ?? '#ef4444'
+      const strokeWidth = settings?.strokeWidth ?? 2
+      const rect = host.getBoundingClientRect()
+      const point = clientPointToNormalized(event.clientX, event.clientY, rect)
+      if (!point) return false
+      inkDraftRef.current = {
+        pointerId: event.pointerId,
+        chapterIndex: targetChapterIndex,
+        host,
+        points: [point],
+        colorHex,
+        strokeWidth,
+      }
+      syncInkDraft({
+        chapterIndex: targetChapterIndex,
+        points: [point],
+        colorHex,
+        strokeWidth,
+      })
+      try {
+        host.setPointerCapture(event.pointerId)
+      } catch {
+        /* ignore */
+      }
+      return true
+    },
+    [syncInkDraft],
+  )
+
+  // Pencil stroke: window-level move/up so release outside the chapter still commits.
+  useEffect(() => {
+    function onPointerMove(e: PointerEvent) {
+      const session = inkDraftRef.current
+      if (!session || e.pointerId !== session.pointerId) return
+      const rect = session.host.getBoundingClientRect()
+      const point = clientPointToNormalized(e.clientX, e.clientY, rect)
+      if (!point) return
+      session.points = appendFreehandPoint(session.points, point)
+      syncInkDraft({
+        chapterIndex: session.chapterIndex,
+        points: session.points,
+        colorHex: session.colorHex,
+        strokeWidth: session.strokeWidth,
+      })
+    }
+
+    function endStroke(e: PointerEvent, commit: boolean) {
+      const session = inkDraftRef.current
+      if (!session || e.pointerId !== session.pointerId) return
+      inkDraftRef.current = null
+      syncInkDraft(null)
+      try {
+        session.host.releasePointerCapture(e.pointerId)
+      } catch {
+        /* ignore */
+      }
+      if (commit && session.points.length > 0) {
+        onFreehandStrokeCompleteRef.current?.({
+          chapterIndex: session.chapterIndex,
+          points: session.points,
+          colorHex: session.colorHex,
+          strokeWidth: session.strokeWidth,
+        })
+      }
+    }
+
+    function onPointerUp(e: PointerEvent) {
+      endStroke(e, true)
+    }
+    function onPointerCancel(e: PointerEvent) {
+      endStroke(e, false)
+    }
+
+    window.addEventListener('pointermove', onPointerMove)
+    window.addEventListener('pointerup', onPointerUp)
+    window.addEventListener('pointercancel', onPointerCancel)
+    return () => {
+      window.removeEventListener('pointermove', onPointerMove)
+      window.removeEventListener('pointerup', onPointerUp)
+      window.removeEventListener('pointercancel', onPointerCancel)
+    }
+  }, [syncInkDraft])
+
+  const commitActiveTypewriterSession = useCallback(() => {
+    const editing = activeEditingIdRef.current
+    if (!editing) return
+    onTypewriterBlurRef.current?.(editing)
+    setActiveEditingId(null)
+  }, [])
 
   const setTypewriterDragPreview = useCallback(
     (next: (TypewriterPct & { id: string }) | null) => {
@@ -258,13 +415,52 @@ export function ReadingCanvas({
     setActiveEditingId(null)
   }, [activeTool, activeEditingId, onTypewriterBlur])
 
-  const beginHandTypewriterEdit = useCallback((id: string) => {
-    const prev = activeEditingIdRef.current
-    if (prev && prev !== id) {
-      onTypewriterBlur?.(prev)
+  // Click outside an active edit → save + exit (click 1 of double-click switch).
+  useEffect(() => {
+    if (!activeEditingId) return
+
+    function onPointerDown(event: PointerEvent) {
+      const target = event.target as Node | null
+      if (!target) return
+      if (isTypewriterToolbarTarget(target)) return
+      const editingId = activeEditingIdRef.current
+      if (!editingId) return
+      const noteEl = typewriterNoteRefs.current.get(editingId)
+      if (noteEl?.contains(target)) return
+      commitActiveTypewriterSession()
+      typewriterFocusSessionRef.current.suppressActivate = true
     }
+
+    function onPointerUp() {
+      window.setTimeout(() => {
+        clearTypewriterCommitSuppress(typewriterFocusSessionRef.current)
+      }, 0)
+    }
+
+    window.addEventListener('pointerdown', onPointerDown, true)
+    window.addEventListener('pointerup', onPointerUp, true)
+    return () => {
+      window.removeEventListener('pointerdown', onPointerDown, true)
+      window.removeEventListener('pointerup', onPointerUp, true)
+    }
+  }, [activeEditingId, commitActiveTypewriterSession])
+
+  /** Activate edit only when idle; while editing, first click commits only. */
+  const beginHandTypewriterEdit = useCallback((id: string) => {
+    const mayActivate = requestTypewriterActivation({
+      session: typewriterFocusSessionRef.current,
+      activeEditingId: activeEditingIdRef.current,
+      hasDraft: false,
+      targetId: id,
+      commitEditing: (editingId) => {
+        onTypewriterBlurRef.current?.(editingId)
+        setActiveEditingId(null)
+      },
+      commitDraft: () => {},
+    })
+    if (!mayActivate) return
     setActiveEditingId(id)
-  }, [onTypewriterBlur])
+  }, [])
 
   const marginLayout = chromeHidden ? MARGIN_IMMERSIVE : MARGIN
   const areaLayout =
@@ -359,6 +555,28 @@ export function ReadingCanvas({
     if (event.button !== 0 || isInteractiveTarget(event.target)) return
     const tool = modeRef.current
 
+    // Pencil: start stroke on the chapter under the pointer (surface-level fallback).
+    if (activeToolRef.current === 'pencil') {
+      event.preventDefault()
+      gestureRef.current = null
+      if (inkDraftRef.current) return
+      const target = event.target as Element | null
+      const chapterEl =
+        target?.closest?.('[data-tw-chapter]') ??
+        (event.currentTarget.querySelector('[data-tw-chapter]') as Element | null)
+      if (chapterEl instanceof HTMLElement) {
+        const chapters = event.currentTarget.querySelectorAll('[data-tw-chapter]')
+        let chapterIndexForHost = chapterIndex
+        chapters.forEach((el, i) => {
+          if (el === chapterEl) {
+            chapterIndexForHost = pageMode === 'scroll' ? i : chapterIndex
+          }
+        })
+        beginPencilStroke(event, chapterIndexForHost, chapterEl)
+      }
+      return
+    }
+
     // Crosshair annotate / typewriter: placement click wins — no text selection / pan.
     if (tool === 'annotate' || tool === 'typewriter') {
       event.preventDefault()
@@ -434,6 +652,12 @@ export function ReadingCanvas({
     }
     if (g.panned) return
     if (current === 'hand') {
+      // Existing highlight — let the paragraph onClick open the edit panel.
+      const hlHost = (event.target as Element | null)?.closest?.(
+        '[data-rb-hl-id]',
+      )
+      if (hlHost) return
+
       const hitId = hitTestTypewriterAtClientPoint(
         visibleTypewriterNoteIdsRef.current,
         typewriterNoteRefs.current,
@@ -479,6 +703,11 @@ export function ReadingCanvas({
     const chapterSign = eSignStamps.filter(
       (s) => s.chapterIndex === renderedChapterIndex,
     )
+    const chapterInk = freehandStrokes.filter(
+      (s) => s.chapterIndex === renderedChapterIndex,
+    )
+    const chapterDraft =
+      inkDraft?.chapterIndex === renderedChapterIndex ? inkDraft : null
 
     return (
       <div
@@ -487,6 +716,10 @@ export function ReadingCanvas({
         className={`relative mx-auto w-full transition-[max-width] duration-300 ${areaLayout} ${pageBlockFrame} ${
           pageMode === 'paginated' ? 'min-h-[calc(100%-48px)] snap-start' : ''
         }`}
+        onPointerDown={(e) => {
+          if (activeTool !== 'pencil') return
+          beginPencilStroke(e, renderedChapterIndex, e.currentTarget)
+        }}
         onClick={(e) => {
           if (activeTool === 'typewriter' || activeTool === 'esign') {
             const area = e.currentTarget.getBoundingClientRect()
@@ -494,11 +727,18 @@ export function ReadingCanvas({
             const yPct = ((e.clientY - area.top) / area.height) * 100
             e.stopPropagation()
             if (activeTool === 'typewriter') {
-              // Commit any in-progress edit before placing a new box.
-              if (activeEditingId) {
-                onTypewriterBlur?.(activeEditingId)
-                setActiveEditingId(null)
-              }
+              // Click 1 while editing → commit only; Click 2 → place + edit new box.
+              const mayPlace = requestTypewriterActivation({
+                session: typewriterFocusSessionRef.current,
+                activeEditingId: activeEditingIdRef.current,
+                hasDraft: false,
+                commitEditing: (id) => {
+                  onTypewriterBlurRef.current?.(id)
+                  setActiveEditingId(null)
+                },
+                commitDraft: () => {},
+              })
+              if (!mayPlace) return
               const newId = onPlaceTypewriter(
                 renderedChapterIndex,
                 xPct,
@@ -542,11 +782,13 @@ export function ReadingCanvas({
               <div
                 key={`${renderedChapter.num}-${i}`}
                 className="relative mb-[1.5em] rounded-md"
+                {...(hl ? { 'data-rb-hl-id': hl.id } : {})}
                 onClick={(e) => {
                   if (isCrosshairAnnotateTool(activeTool)) {
                     return
                   }
-                  if (mode === 'highlight' && hl) {
+                  // Hand + Highlight: tap an existing mark to edit (color / note / delete).
+                  if ((mode === 'highlight' || mode === 'hand') && hl) {
                     e.stopPropagation()
                     const el = e.currentTarget.querySelector('p')
                     const mapped = el ? elementToHighlightHandleRect(el) : null
@@ -652,6 +894,7 @@ export function ReadingCanvas({
                 else typewriterNoteRefs.current.delete(m.id)
               }}
               data-typewriter-note={m.id}
+              data-rb-tw-note={m.id}
               className={`absolute z-[5] -translate-x-1/2 -translate-y-1/2 ${
                 dragging ? 'rb-typewriter-dragging' : ''
               }`}
@@ -683,6 +926,12 @@ export function ReadingCanvas({
                     setActiveEditingId(null)
                     onTypewriterDelete?.(m.id)
                   }}
+                  onCancel={() => {
+                    onTypewriterContentCancel?.(m.id)
+                    setActiveEditingId(null)
+                  }}
+                  onOpenSidePanel={onTypewriterOpenSidePanel}
+                  sidePanelOpen={typewriterSidePanelOpen}
                   dragHandle={
                     <button
                       type="button"
@@ -698,12 +947,14 @@ export function ReadingCanvas({
               ) : (
                 <button
                   type="button"
-                  className={`rb-typewriter-static border-none bg-transparent p-0 text-left ${
-                    mode === 'hand' ? 'cursor-text' : 'cursor-grab'
-                  }`}
+                  className="rb-typewriter-static border-none bg-transparent p-0 text-left cursor-grab"
                   aria-label="Typewriter note"
                   onPointerDown={(e) => {
-                    if (mode === 'typewriter') startDrag(e, pos)
+                    e.stopPropagation()
+                    // Hand + typewriter: drag to move; click (no move) opens edit.
+                    if (mode === 'hand' || mode === 'typewriter') {
+                      startDrag(e, pos)
+                    }
                   }}
                   onClick={(e) => {
                     e.stopPropagation()
@@ -711,7 +962,9 @@ export function ReadingCanvas({
                       suppressTypewriterClickRef.current = false
                       return
                     }
-                    beginHandTypewriterEdit(m.id)
+                    if (mode === 'hand' || mode === 'typewriter') {
+                      beginHandTypewriterEdit(m.id)
+                    }
                   }}
                 >
                   <TypewriterStaticHtml
@@ -734,6 +987,55 @@ export function ReadingCanvas({
             {s.label}
           </div>
         ))}
+
+        {/* Ink above text; always mount while pencil is active so the first point paints. */}
+        {(activeTool === 'pencil' ||
+          chapterInk.length > 0 ||
+          chapterDraft) && (
+          <svg
+            data-rb-ink-layer=""
+            className="pointer-events-none absolute inset-0 z-[8] h-full w-full overflow-visible"
+            viewBox="0 0 1 1"
+            preserveAspectRatio="none"
+            aria-hidden
+          >
+            {chapterInk.map((stroke) => {
+              const d = freehandUnitPathD(stroke.points)
+              if (!d) return null
+              return (
+                <path
+                  key={stroke.id}
+                  data-rb-ink-stroke={stroke.id}
+                  d={d}
+                  fill="none"
+                  stroke={stroke.colorHex}
+                  strokeWidth={Math.max(1, stroke.strokeWidth)}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  vectorEffect="non-scaling-stroke"
+                />
+              )
+            })}
+            {chapterDraft
+              ? (() => {
+                  const d = freehandUnitPathD(chapterDraft.points)
+                  if (!d) return null
+                  return (
+                    <path
+                      data-rb-ink-draft=""
+                      d={d}
+                      fill="none"
+                      stroke={chapterDraft.colorHex}
+                      strokeWidth={Math.max(1, chapterDraft.strokeWidth)}
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      vectorEffect="non-scaling-stroke"
+                    />
+                  )
+                })()
+              : null}
+          </svg>
+        )}
       </div>
     )
   }
