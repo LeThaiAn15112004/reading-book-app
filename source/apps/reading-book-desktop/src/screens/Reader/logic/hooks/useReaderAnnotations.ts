@@ -38,6 +38,7 @@ import {
   normalizeTypewriterColorHex,
   normalizeTypewriterContent,
   typewriterContentIsEmpty,
+  readerFreehandPageNumber,
   readerFreehandToAnnotationInput,
   serializeFreehandPoints,
   type AnnotateTool,
@@ -62,11 +63,12 @@ import { overlayApi } from '../../../../bridge'
 import {
   focusAnnotationInDocument,
   waitForAnnotationLayoutSettle,
-} from '../../../../reader/annotationJump'
+} from '../../../../reader/annotations'
 import type { EpubRendererApi, EpubNavState } from '../../../../reader/renderers/epub'
-import { blurReaderSidebarFocus } from '../../../../reader/readerChromeInteraction'
+import { blurReaderSidebarFocus } from '../../../../reader/chrome'
 import type {
   CompanionTool,
+  FreehandEditTarget,
   HighlightEditTarget,
   ModeTool,
   SelectionMenuAnchor,
@@ -137,6 +139,11 @@ export function useReaderAnnotations({
     null,
   )
   highlightEditRef.current = highlightEdit
+  const [freehandEdit, setFreehandEdit] = useState<FreehandEditTarget | null>(
+    null,
+  )
+  const freehandEditRef = useRef<FreehandEditTarget | null>(null)
+  freehandEditRef.current = freehandEdit
   const [handleRect, setHandleRect] = useState<HighlightHandleRect | null>(null)
   const [handleFlash, setHandleFlash] = useState(false)
   const [noteModalOpen, setNoteModalOpen] = useState(false)
@@ -175,6 +182,8 @@ export function useReaderAnnotations({
   const [freehandStrokes, setFreehandStrokes] = useState<ReaderShapeAnnotation[]>(
     [],
   )
+  const freehandStrokesRef = useRef(freehandStrokes)
+  freehandStrokesRef.current = freehandStrokes
   const drawSettingsRef = useRef(drawSettings)
   drawSettingsRef.current = drawSettings
 
@@ -192,6 +201,7 @@ export function useReaderAnnotations({
     setTypewriterDraft(null)
     setESignStamps([])
     setFreehandStrokes([])
+    setFreehandEdit(null)
     setActiveTool('hand')
     setSelectionMenu(null)
     clearHighlightHandles()
@@ -402,6 +412,26 @@ export function useReaderAnnotations({
     persistDeleteBookmark(id)
   }
 
+  function restoreFreehandQuiet(stroke: ReaderShapeAnnotation) {
+    setFreehandStrokes((list) => {
+      const without = list.filter((s) => s.id !== stroke.id)
+      const next = [...without, stroke]
+      freehandStrokesRef.current = next
+      return next
+    })
+    persistFreehand(stroke)
+  }
+
+  function removeFreehandQuiet(id: string) {
+    setFreehandStrokes((list) => {
+      const next = list.filter((s) => s.id !== id)
+      freehandStrokesRef.current = next
+      return next
+    })
+    if (freehandEditRef.current?.id === id) setFreehandEdit(null)
+    persistDeleteFreehand(id)
+  }
+
   function buildAnnotationUndoHandlers(): AnnotationUndoHandlers {
     return {
       restoreHighlight: restoreHighlightQuiet,
@@ -410,6 +440,8 @@ export function useReaderAnnotations({
       removeTypewriter: removeTypewriterQuiet,
       restoreBookmark: restoreBookmarkQuiet,
       removeBookmark: removeBookmarkQuiet,
+      restoreFreehand: restoreFreehandQuiet,
+      removeFreehand: removeFreehandQuiet,
       onHighlightReplaced: (h: ReaderHighlight) => {
         if (highlightEditRef.current?.id === h.id) {
           setHighlightEdit((prev) =>
@@ -419,6 +451,19 @@ export function useReaderAnnotations({
                   colorHex: h.colorHex,
                   selectedText: h.selectedText,
                   hasNote: Boolean(h.note?.trim()),
+                }
+              : prev,
+          )
+        }
+      },
+      onFreehandReplaced: (s: ReaderShapeAnnotation) => {
+        if (freehandEditRef.current?.id === s.id) {
+          setFreehandEdit((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  colorHex: s.colorHex,
+                  hasNote: Boolean(s.note?.trim()),
                 }
               : prev,
           )
@@ -670,6 +715,37 @@ export function useReaderAnnotations({
     if (noteEditTarget) {
       const now = new Date().toISOString()
       const note = content.trim() || undefined
+
+      // Freehand note edit (opened via openFreehandNoteEditor).
+      const freehand = freehandStrokesRef.current.find(
+        (s) => s.id === noteEditTarget.id,
+      )
+      if (freehand) {
+        if ((freehand.note ?? '') === (note ?? '')) return
+        const after: ReaderShapeAnnotation = {
+          ...freehand,
+          note,
+          updatedAt: now,
+        }
+        setFreehandStrokes((list) => {
+          const next = list.map((s) => (s.id === after.id ? after : s))
+          freehandStrokesRef.current = next
+          return next
+        })
+        setNoteEditTarget({
+          ...noteEditTarget,
+          note,
+          updatedAt: now,
+        })
+        setFreehandEdit((prev) =>
+          prev && prev.id === after.id
+            ? { ...prev, hasNote: Boolean(note) }
+            : prev,
+        )
+        persistFreehandPatch(after.id, { content: note ?? 'Pencil' })
+        return
+      }
+
       const before = highlightsRef.current.find((h) => h.id === noteEditTarget.id)
       if (!before) return
       if ((before.note ?? '') === (note ?? '')) return
@@ -697,6 +773,29 @@ export function useReaderAnnotations({
 
   function closeNoteModal() {
     const baseline = noteEditBaselineRef.current
+    if (baseline) {
+      const freehand = freehandStrokesRef.current.find(
+        (s) => s.id === baseline.id,
+      )
+      if (freehand) {
+        if ((baseline.note ?? '') !== (freehand.note ?? '')) {
+          const beforeStroke: ReaderShapeAnnotation = {
+            ...freehand,
+            note: baseline.note,
+          }
+          annotationHistoryRef.current.push(
+            annotationReplace(
+              { entity: 'freehand', value: beforeStroke },
+              { entity: 'freehand', value: freehand },
+            ),
+          )
+        }
+        noteEditBaselineRef.current = null
+        setNoteModalOpen(false)
+        setNoteEditTarget(null)
+        return
+      }
+    }
     const current =
       baseline &&
       highlightsRef.current.find((h) => h.id === baseline.id)
@@ -1183,6 +1282,24 @@ export function useReaderAnnotations({
     }
   }
 
+  async function jumpToFreehandStroke(stroke: ReaderShapeAnnotation) {
+    setChromeHidden(true)
+    clearHighlightHandles()
+    closeSelectionMenu()
+    dismissFreehandEdit()
+    blurReaderSidebarFocus()
+    const epub = epubApiRef.current
+    epub?.setJumpViewportHidden(true)
+    try {
+      goToPageRef.current(readerFreehandPageNumber(stroke))
+      await waitForAnnotationLayoutSettle(true)
+    } catch {
+      setToast('Could not jump to pencil stroke.')
+    } finally {
+      epub?.setJumpViewportHidden(false)
+    }
+  }
+
   function persistAnnotationFlags(
     id: string,
     patch: { isChecked?: boolean; status?: ReaderAnnotationStatus },
@@ -1200,7 +1317,8 @@ export function useReaderAnnotations({
     const now = new Date().toISOString()
     const inHighlights = highlights.some((h) => h.id === id)
     const inTypewriter = typewriterNotes.some((n) => n.id === id)
-    if (!inHighlights && !inTypewriter) return
+    const inFreehand = freehandStrokesRef.current.some((s) => s.id === id)
+    if (!inHighlights && !inTypewriter && !inFreehand) return
 
     if (inHighlights) {
       setHighlights((list) =>
@@ -1216,13 +1334,23 @@ export function useReaderAnnotations({
         ),
       )
     }
+    if (inFreehand) {
+      setFreehandStrokes((list) => {
+        const next = list.map((s) =>
+          s.id === id ? { ...s, isChecked, updatedAt: now } : s,
+        )
+        freehandStrokesRef.current = next
+        return next
+      })
+    }
     persistAnnotationFlags(id, { isChecked })
   }
 
   function setAnnotationStatus(id: string, status: ReaderAnnotationStatus) {
     const highlight = highlights.find((h) => h.id === id)
     const typewriter = typewriterNotes.find((n) => n.id === id)
-    if (!highlight && !typewriter) return
+    const freehand = freehandStrokesRef.current.find((s) => s.id === id)
+    if (!highlight && !typewriter && !freehand) return
     const now = new Date().toISOString()
 
     if (highlight) {
@@ -1239,6 +1367,15 @@ export function useReaderAnnotations({
         ),
       )
     }
+    if (freehand) {
+      setFreehandStrokes((list) => {
+        const next = list.map((s) =>
+          s.id === id ? { ...s, status, updatedAt: now } : s,
+        )
+        freehandStrokesRef.current = next
+        return next
+      })
+    }
     persistAnnotationFlags(id, { status })
   }
 
@@ -1247,8 +1384,9 @@ export function useReaderAnnotations({
       status === 'None' ? 'Review' : status === 'Review' ? 'Done' : 'None'
     const highlight = highlights.find((h) => h.id === id)
     const typewriter = typewriterNotes.find((n) => n.id === id)
-    const current = highlight?.status ?? typewriter?.status
-    if (!highlight && !typewriter) return
+    const freehand = freehandStrokesRef.current.find((s) => s.id === id)
+    const current = highlight?.status ?? typewriter?.status ?? freehand?.status
+    if (!highlight && !typewriter && !freehand) return
     setAnnotationStatus(id, nextOf(current ?? 'None'))
   }
 
@@ -1256,6 +1394,11 @@ export function useReaderAnnotations({
     const highlight = highlights.find((h) => h.id === id)
     if (highlight) {
       changeHighlightColor(id, colorHex)
+      return
+    }
+    const freehand = freehandStrokesRef.current.find((s) => s.id === id)
+    if (freehand) {
+      changeFreehandColor(id, colorHex)
       return
     }
     const typewriter = typewriterNotes.find((n) => n.id === id)
@@ -1439,6 +1582,30 @@ export function useReaderAnnotations({
       })
   }
 
+  function persistDeleteFreehand(id: string) {
+    if (!bookId) return
+    void overlayApi
+      .deleteAnnotation({ bookId, id })
+      .then((result) => {
+        if (!result.ok) setToast('Could not delete pencil stroke.')
+      })
+      .catch(() => setToast('Could not delete pencil stroke.'))
+  }
+
+  function persistFreehandPatch(
+    id: string,
+    patch: {
+      content?: string
+      locationData?: string
+      style?: { colorHex?: string; strokeWidth?: number }
+    },
+  ) {
+    if (!bookId) return
+    void overlayApi
+      .updateAnnotation({ bookId, id, ...patch })
+      .catch(() => setToast('Could not update pencil stroke.'))
+  }
+
   /**
    * Commit a finished pencil stroke into session state + SQLite (T5.11e).
    * Accepts either a draft payload or raw points + chapter.
@@ -1473,8 +1640,184 @@ export function useReaderAnnotations({
       createdAt: now,
       updatedAt: now,
     }
-    setFreehandStrokes((list) => [...list, stroke])
+    annotationHistoryRef.current.push(
+      annotationAdd({ entity: 'freehand', value: stroke }),
+    )
+    setFreehandStrokes((list) => {
+      const next = [...list, stroke]
+      freehandStrokesRef.current = next
+      return next
+    })
     persistFreehand(stroke)
+  }
+
+  function dismissFreehandEdit() {
+    setFreehandEdit(null)
+  }
+
+  function selectFreehandStroke(
+    stroke: ReaderShapeAnnotation,
+    rect: FreehandEditTarget['rect'],
+    click?: { x: number; y: number },
+    hostRect?: FreehandEditTarget['hostRect'],
+  ) {
+    clearHighlightHandles()
+    closeSelectionMenu()
+    setFreehandEdit({
+      id: stroke.id,
+      colorHex: stroke.colorHex,
+      hasNote: Boolean(stroke.note?.trim()),
+      rect,
+      click,
+      hostRect,
+    })
+  }
+
+  function handleFreehandStrokeClick(payload: {
+    id: string
+    rect: FreehandEditTarget['rect']
+    click?: { x: number; y: number }
+    hostRect?: FreehandEditTarget['hostRect']
+  }) {
+    const stroke = freehandStrokesRef.current.find((s) => s.id === payload.id)
+    if (!stroke) return
+    const tool = activeToolRef.current
+    if (tool === 'eraser') {
+      deleteFreehandById(stroke.id)
+      return
+    }
+    if (tool === 'hand' || tool === 'select' || tool === 'pencil') {
+      selectFreehandStroke(stroke, payload.rect, payload.click, payload.hostRect)
+    }
+  }
+
+  function deleteFreehandById(id: string) {
+    const existing = freehandStrokesRef.current.find((s) => s.id === id)
+    if (!existing) return
+    annotationHistoryRef.current.push(
+      annotationRemove({ entity: 'freehand', value: existing }),
+    )
+    setFreehandStrokes((list) => {
+      const next = list.filter((s) => s.id !== id)
+      freehandStrokesRef.current = next
+      return next
+    })
+    if (freehandEditRef.current?.id === id) setFreehandEdit(null)
+    persistDeleteFreehand(id)
+  }
+
+  function changeFreehandColor(id: string, colorHex: string) {
+    const existing = freehandStrokesRef.current.find((s) => s.id === id)
+    if (!existing) return
+    const normalized =
+      normalizeHighlightColorHex(colorHex) ?? existing.colorHex
+    if (normalized === existing.colorHex) return
+    const after: ReaderShapeAnnotation = {
+      ...existing,
+      colorHex: normalized,
+      updatedAt: new Date().toISOString(),
+    }
+    annotationHistoryRef.current.push(
+      annotationReplace(
+        { entity: 'freehand', value: existing },
+        { entity: 'freehand', value: after },
+      ),
+    )
+    setFreehandStrokes((list) => {
+      const next = list.map((s) => (s.id === id ? after : s))
+      freehandStrokesRef.current = next
+      return next
+    })
+    setFreehandEdit((prev) =>
+      prev && prev.id === id ? { ...prev, colorHex: normalized } : prev,
+    )
+    persistFreehandPatch(id, { style: { colorHex: normalized } })
+  }
+
+  function resizeFreehandStroke(id: string, points: FreehandPoint[]) {
+    const existing = freehandStrokesRef.current.find((s) => s.id === id)
+    if (!existing || points.length === 0) return
+    const locationData = serializeFreehandPoints(points)
+    const after: ReaderShapeAnnotation = {
+      ...existing,
+      points,
+      locationData,
+      updatedAt: new Date().toISOString(),
+    }
+    // Live resize — push history once on pointer-up via replace if changed.
+    setFreehandStrokes((list) => {
+      const next = list.map((s) => (s.id === id ? after : s))
+      freehandStrokesRef.current = next
+      return next
+    })
+    persistFreehandPatch(id, { locationData })
+  }
+
+  function commitFreehandResize(id: string, beforePoints: FreehandPoint[]) {
+    const existing = freehandStrokesRef.current.find((s) => s.id === id)
+    if (!existing) return
+    const before: ReaderShapeAnnotation = {
+      ...existing,
+      points: beforePoints,
+      locationData: serializeFreehandPoints(beforePoints),
+    }
+    if (
+      before.locationData === existing.locationData &&
+      before.points.length === existing.points.length
+    ) {
+      return
+    }
+    annotationHistoryRef.current.push(
+      annotationReplace(
+        { entity: 'freehand', value: before },
+        { entity: 'freehand', value: existing },
+      ),
+    )
+  }
+
+  function openFreehandNoteEditor(id: string) {
+    const stroke = freehandStrokesRef.current.find((s) => s.id === id)
+    if (!stroke) return
+    // Reuse note modal with a synthetic highlight-shaped target for quote/content.
+    noteEditBaselineRef.current = {
+      source: 'fake',
+      id: stroke.id,
+      chapterIndex: stroke.chapterIndex,
+      paragraphIndex: 0,
+      selectedText: 'Pencil stroke',
+      color: 'yellow',
+      colorHex: stroke.colorHex,
+      note: stroke.note,
+      status: stroke.status,
+      isChecked: stroke.isChecked,
+      createdAt: stroke.createdAt,
+      updatedAt: stroke.updatedAt,
+    } as ReaderHighlight
+    setNoteEditTarget(noteEditBaselineRef.current)
+    setNoteModalOpen(true)
+    setChromeHidden(false)
+  }
+
+  /** Update freehand note from right sidebar without opening the modal. */
+  function updateFreehandNote(id: string, content: string) {
+    const existing = freehandStrokesRef.current.find((s) => s.id === id)
+    if (!existing) return
+    const note = content.trim() || undefined
+    if ((existing.note ?? '') === (note ?? '')) return
+    const after: ReaderShapeAnnotation = {
+      ...existing,
+      note,
+      updatedAt: new Date().toISOString(),
+    }
+    setFreehandStrokes((list) => {
+      const next = list.map((s) => (s.id === id ? after : s))
+      freehandStrokesRef.current = next
+      return next
+    })
+    setFreehandEdit((prev) =>
+      prev && prev.id === id ? { ...prev, hasNote: Boolean(note) } : prev,
+    )
+    persistFreehandPatch(id, { content: note ?? 'Pencil' })
   }
 
   function leaveAnnotateToolViaEscape() {
@@ -1482,6 +1825,7 @@ export function useReaderAnnotations({
     if (draft) {
       cancelTypewriterDraft(draft.id)
     }
+    setFreehandEdit(null)
     setActiveTool('hand')
     clearHighlightHandles()
   }
@@ -1495,6 +1839,7 @@ export function useReaderAnnotations({
     setSelectionMenu,
     pendingSelection,
     highlightEdit,
+    freehandEdit,
     handleRect,
     handleFlash,
     noteModalOpen,
@@ -1519,16 +1864,22 @@ export function useReaderAnnotations({
     openSelectionMenu,
     closeSelectionMenu,
     dismissHighlightEditPanel,
+    dismissFreehandEdit,
     clearHighlightHandles,
     handleSelectionDismiss,
     handleTextSelected,
     handleHighlightMarkClick,
+    handleFreehandStrokeClick,
     applyHighlight,
     changeHighlightColor,
+    changeFreehandColor,
     deleteHighlightById,
+    deleteFreehandById,
     jumpToHighlight,
     copyHighlightText,
     openHighlightNoteEditor,
+    openFreehandNoteEditor,
+    updateFreehandNote,
     autosaveHighlightNote,
     closeNoteModal,
     removeHighlightForSelection,
@@ -1554,6 +1905,7 @@ export function useReaderAnnotations({
     flushTypewriterContent,
     moveTypewriter,
     jumpToTypewriterNote,
+    jumpToFreehandStroke,
     deleteTypewriterById,
     toggleAnnotationChecked,
     setAnnotationStatus,
@@ -1561,6 +1913,8 @@ export function useReaderAnnotations({
     changeAnnotationColor,
     placeESign,
     handleFreehandStrokeComplete,
+    resizeFreehandStroke,
+    commitFreehandResize,
     leaveAnnotateToolViaEscape,
     dismissPendingSelection,
   }

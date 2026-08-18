@@ -334,7 +334,7 @@ export function readerFreehandToAnnotationInput(
 
     locationData,
 
-    content: 'Freehand',
+    content: stroke.note?.trim() || 'Pencil',
 
     style: {
 
@@ -415,6 +415,14 @@ export function annotationDtoToReaderFreehand(
     colorHex,
 
     strokeWidth,
+
+    note:
+      typeof dto.content === 'string' &&
+      dto.content.trim() &&
+      dto.content.trim() !== 'Freehand' &&
+      dto.content.trim() !== 'Pencil'
+        ? dto.content
+        : undefined,
 
     status: readerStatus(dto.status),
 

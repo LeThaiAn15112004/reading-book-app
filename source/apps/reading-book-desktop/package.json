@@ -5,8 +5,10 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "typecheck": "tsc --noEmit",
     "build": "tsc && vite build && electron-builder",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
+
     "preview": "vite preview",
     "postinstall": "electron-builder install-app-deps",
     "rebuild:native": "electron-builder install-app-deps",

@@ -8,6 +8,18 @@ export interface AppInfo {
   platform: NodeJS.Platform
 }
 
+export interface GoogleOAuthClientConfigDto {
+  clientType: 'installed' | 'web'
+  clientId: string
+  projectId?: string
+  authUri?: string
+  tokenUri?: string
+  authProviderCertUrl?: string
+  redirectUris: readonly string[]
+  scopes: readonly string[]
+  hasClientSecret: boolean
+}
+
 /** Shelf / nav reading status (user-marked completed; not derived from %). */
 export type ReadingStatusDto = 'reading' | 'completed' | 'not-started'
 
@@ -42,6 +54,24 @@ export interface BookSummaryDto {
 
 export interface OkResult {
   ok: boolean
+}
+
+export interface UpdateBookMetadataInput {
+  id: string
+  title: string
+  author?: string
+  genres?: string[]
+  description?: string
+  pageCount?: number
+}
+
+export interface CollectionSummaryDto {
+  id: string
+  name: string
+  description?: string
+  bookIds: string[]
+  createdAt: string
+  updatedAt: string
 }
 
 /** Stable codes for library.openBookContent failures (T3.4). */
@@ -239,8 +269,21 @@ export interface DeleteAnnotationInput {
 export interface DesktopApi {
   ping(): Promise<'pong'>
   getAppInfo(): Promise<AppInfo>
+  /** Sanitized Google OAuth client config loaded from local client_secret_*.json. */
+  getGoogleOAuthConfig(): Promise<GoogleOAuthClientConfigDto | null>
   /** Update Windows/Linux caption button colors to match app theme. */
   setChromeTheme(theme: 'night' | 'sepia' | 'paper' | string): Promise<OkResult>
+  /** Whether the app window is currently fullscreen. */
+  getFullscreen(): Promise<boolean>
+  /** Enter or leave OS-level window fullscreen. */
+  setFullscreen(value: boolean): Promise<{ ok: boolean; fullscreen: boolean }>
+  /** Toggle OS-level window fullscreen. */
+  toggleFullscreen(): Promise<{ ok: boolean; fullscreen: boolean }>
+  /**
+   * Subscribe to fullscreen enter/leave (F11, Esc, button, or OS chrome).
+   * Returns unsubscribe.
+   */
+  onFullscreenChanged(handler: (fullscreen: boolean) => void): () => void
   /**
    * Subscribe to Main's pre-close flush request (T4.2).
    * Handler should await session flush; preload acks when the promise settles.
@@ -253,7 +296,30 @@ export interface DesktopApi {
     openBookContent(id: string): Promise<OpenBookContentResult>
     /** After user opens Reader — book appears on Reading shelf. */
     markAsReading(id: string): Promise<OkResult>
-    deleteBook(id: string): Promise<OkResult>
+    markAsCompleted(id: string): Promise<OkResult>
+    setFavorite(id: string, value: boolean): Promise<OkResult>
+    updateMetadata(input: UpdateBookMetadataInput): Promise<OkResult>
+    showInFolder(id: string): Promise<OkResult>
+    copyFilePath(id: string): Promise<OkResult>
+    /** Remove the database record but keep the imported sandbox file. */
+    removeBook(id: string): Promise<OkResult>
+    /** Remove the database record and its imported sandbox file. */
+    deleteBookFile(id: string): Promise<OkResult>
+    listCollections(): Promise<CollectionSummaryDto[]>
+    createCollection(input: {
+      name: string
+      description?: string
+    }): Promise<CollectionSummaryDto>
+    updateCollection(
+      id: string,
+      input: { name: string; description?: string },
+    ): Promise<CollectionSummaryDto | null>
+    deleteCollection(id: string): Promise<OkResult>
+    addBookToCollection(collectionId: string, bookId: string): Promise<OkResult>
+    removeBookFromCollection(
+      collectionId: string,
+      bookId: string,
+    ): Promise<OkResult>
   }
   import: {
     fromFile(): Promise<ImportResult>

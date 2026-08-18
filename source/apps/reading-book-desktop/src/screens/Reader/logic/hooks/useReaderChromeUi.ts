@@ -11,7 +11,7 @@ import {
   blurReaderSidebarFocus,
   clearStuckChromeHover,
   scheduleEpubResizeAfterChromeTransition,
-} from '../../../../reader/readerChromeInteraction'
+} from '../../../../reader/chrome'
 import type { HighlightEditTarget, SidebarTab } from '../../components'
 import type { SelectionMenuState } from './useReaderAnnotations'
 
@@ -34,7 +34,7 @@ export type ReaderChromeEscapeUi = {
 }
 
 /** Which feature currently owns the shared right panel slot. */
-export type RightSidebarKind = 'typewriter' | null
+export type RightSidebarKind = 'typewriter' | 'freehand' | null
 
 type UseReaderChromeUiOptions = {
   bookId: string | undefined
@@ -49,6 +49,8 @@ type UseReaderChromeUiOptions = {
   escapeUiRef: MutableRefObject<ReaderChromeEscapeUi>
   readerSearchQuery: string
   readerSearchRequestId: number
+  /** OS fullscreen on Reader — collapse all chrome until edge-reveal. */
+  immersive?: boolean
 }
 
 export function useReaderChromeUi({
@@ -59,6 +61,7 @@ export function useReaderChromeUi({
   escapeUiRef,
   readerSearchQuery,
   readerSearchRequestId,
+  immersive = false,
 }: UseReaderChromeUiOptions) {
   const [chromeHidden, setChromeHidden] = useState(true)
   const [sidebarOpen, setSidebarOpen] = useState(false)
@@ -88,6 +91,17 @@ export function useReaderChromeUi({
     setToast(null)
   }, [bookId])
 
+  // Entering immersive fullscreen: hide tools/sidebars so the page fills the screen.
+  useEffect(() => {
+    if (!immersive) return
+    setChromeHidden(true)
+    setSidebarOpen(false)
+    setRightSidebarOpen(false)
+    setRightSidebarKind(null)
+    setMoreOpen(false)
+    setSettingsOpen(false)
+  }, [immersive])
+
   useEffect(() => {
     if (readerSearchRequestId === 0) return
     const q = readerSearchQuery.trim()
@@ -111,17 +125,19 @@ export function useReaderChromeUi({
 
   const openSidebarTab = useCallback(
     (tab: SidebarTab) => {
+      if (immersive) return
       closeFloating()
       setSidebarTab(tab)
       setSidebarOpen(true)
     },
-    [closeFloating],
+    [closeFloating, immersive],
   )
 
   const toggleSidebar = useCallback(() => {
+    if (immersive) return
     closeFloating()
     setSidebarOpen((open) => !open)
-  }, [closeFloating])
+  }, [closeFloating, immersive])
 
   const openRightSidebar = useCallback((kind: Exclude<RightSidebarKind, null>) => {
     closeFloating()
@@ -195,14 +211,21 @@ export function useReaderChromeUi({
     setSettingsOpen(false)
   }, [chromeHidden])
 
-  // After tools/sidebar layout animates, refresh EPUB metrics and clear stuck hover.
+  // After tools/sidebar/immersive layout animates, refresh EPUB metrics and clear stuck hover.
   useEffect(() => {
     clearStuckChromeHover()
     return scheduleEpubResizeAfterChromeTransition(
       epubApiRef,
       escapeUiRef.current.isEpubSurface,
     )
-  }, [chromeHidden, sidebarOpen, rightSidebarOpen, epubApiRef, escapeUiRef])
+  }, [
+    chromeHidden,
+    sidebarOpen,
+    rightSidebarOpen,
+    immersive,
+    epubApiRef,
+    escapeUiRef,
+  ])
 
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {

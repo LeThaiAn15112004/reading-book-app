@@ -15,3 +15,19 @@ export function toReadingPrefs(resolved: ResolvedReadingPrefs): ReadingPrefs {
     pageMode: resolved.pageMode,
   }
 }
+
+/** Map desktop Aa panel prefs back into shared resolved prefs. */
+export function fromReadingPrefs(prefs: ReadingPrefs): ResolvedReadingPrefs {
+  const marginOff = prefs.margin === 'off'
+  return {
+    fontFamily: prefs.fontFamily,
+    fontSize: prefs.fontSize,
+    fontWeight: prefs.fontWeight,
+    lineHeight: prefs.lineHeight,
+    textAlign: prefs.textAlign,
+    margin: marginOff ? 'normal' : prefs.margin,
+    marginEnabled: marginOff ? false : prefs.marginEnabled,
+    layout: prefs.layout,
+    pageMode: prefs.pageMode,
+  }
+}

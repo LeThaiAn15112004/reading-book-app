@@ -2,13 +2,14 @@ import {
   ShelfDetailItem,
   type ShelfDetailItemData,
 } from './ShelfDetailItem'
+import type { BookMenuPoint } from '../book'
 
 export type FilteredListViewProps = {
   title: string
   emptyMessage: string
   items: ShelfDetailItemData[]
   onOpenItem: (id: string) => void
-  onBookInfo?: (id: string) => void
+  onBookMenu: (id: string, point: BookMenuPoint) => void
 }
 
 /** SCR-01 nav filter list — Favorites / Completed / To read (no Back; switch via sidebar). */
@@ -17,7 +18,7 @@ export function FilteredListView({
   emptyMessage,
   items,
   onOpenItem,
-  onBookInfo,
+  onBookMenu,
 }: FilteredListViewProps) {
   const sub =
     items.length === 1 ? '1 book' : `${items.length} books`
@@ -48,7 +49,7 @@ export function FilteredListView({
                 key={item.id}
                 item={item}
                 onOpen={onOpenItem}
-                onBookInfo={onBookInfo}
+                onBookMenu={onBookMenu}
               />
             ))}
           </ul>

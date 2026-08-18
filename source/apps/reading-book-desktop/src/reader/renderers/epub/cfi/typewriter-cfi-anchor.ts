@@ -2,7 +2,7 @@
  * EPUB typewriter anchor — CFI point + pixel offset (T5.6d).
  */
 
-import type { EpubFrameSelectionContext } from './openEpubjs'
+import type { EpubFrameSelectionContext } from '../openEpubjs'
 import {
   parseTypewriterLocation,
   type TypewriterLocation,

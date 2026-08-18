@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import { READER_FOOTER_HEIGHT_PX } from './sidebarTabs'
-import { readerChromeTopInset } from '../../../../reader/readerChromeLayout'
+import { readerChromeTopInset } from '../../../../reader/chrome'
 
 /**
  * Generic right-edge reader panel shell.

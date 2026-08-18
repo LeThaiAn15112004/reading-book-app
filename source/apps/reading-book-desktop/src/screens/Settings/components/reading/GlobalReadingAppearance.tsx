@@ -154,7 +154,6 @@ export function GlobalReadingAppearance() {
             [
               ['single', '1 page'],
               ['dual', '2 pages'],
-              ['triple', '3 pages'],
             ] as const
           ).map(([id, label]) => (
             <button

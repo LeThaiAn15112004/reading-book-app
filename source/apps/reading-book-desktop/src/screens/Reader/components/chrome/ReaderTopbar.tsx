@@ -47,6 +47,7 @@ export function ReaderTopbar({
   return (
     <header
       id="reader-tools-chrome"
+      data-immersive-chrome=""
       className={`absolute inset-x-0 top-0 z-50 flex h-[4.25rem] items-center gap-2 border-b border-lib-border-soft bg-lib-surface-strong px-3 backdrop-blur-md transition-all duration-300 sm:h-[4.5rem] sm:gap-3 sm:px-5 ${
         chromeHidden
           ? 'pointer-events-none -translate-y-full opacity-0'

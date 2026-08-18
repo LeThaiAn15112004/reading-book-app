@@ -1,3 +1,4 @@
+// @refresh reset
 import {
   ImportConflictDialog,
   ImportProgressDialog,
@@ -6,8 +7,11 @@ import {
 } from '../../components/import'
 import {
   BootErrorBanner,
+  BookItemMenu,
   CollectionsHub,
+  ConfirmBookActionDialog,
   ContinueReading,
+  EditBookMetadataDialog,
   FilteredListView,
   LibraryBookInfoDialog,
   LibraryEmptyState,
@@ -34,6 +38,23 @@ export function LibraryScreen() {
     openReader,
     handleOpenNotes,
     handleBookInfo,
+    editMetadataBook,
+    setEditMetadataId,
+    bookMenu,
+    menuBook,
+    setBookMenu,
+    handleOpenBookMenu,
+    pendingRemoval,
+    pendingRemovalBook,
+    setPendingRemoval,
+    confirmPendingRemoval,
+    handleToggleFavorite,
+    handleMarkCompleted,
+    handleSaveMetadata,
+    handleOpenFileLocation,
+    handleCopyFilePath,
+    handleAddToCollection,
+    handleRemoveFromCollection,
     toast,
     clearToast,
     progress,
@@ -52,8 +73,14 @@ export function LibraryScreen() {
     openCollection,
     collections,
     newCollectionOpen,
-    setNewCollectionOpen,
-    handleCreateCollection,
+    openNewCollection,
+    openEditCollection,
+    closeCollectionDialog,
+    submitCollection,
+    editingCollection,
+    pendingCollectionDelete,
+    setPendingCollectionDeleteId,
+    confirmCollectionDelete,
     isEmpty,
     continueBook,
     searchActive,
@@ -74,7 +101,12 @@ export function LibraryScreen() {
     const rows = shelfRailBooks[shelfId]
     if (rows.length === 0) continue
     shelfRailContent[shelfId] = rows.map((b) => (
-      <ShelfRailCard key={b.id} book={b} onOpen={openReader} />
+      <ShelfRailCard
+        key={b.id}
+        book={b}
+        onOpen={openReader}
+        onBookMenu={handleOpenBookMenu}
+      />
     ))
   }
 
@@ -87,7 +119,7 @@ export function LibraryScreen() {
             items={shelfItems}
             onBack={handleCloseShelf}
             onOpenItem={openReader}
-            onBookInfo={handleBookInfo}
+            onBookMenu={handleOpenBookMenu}
           />
         ) : view.kind === 'filter' && filterConfig ? (
           <FilteredListView
@@ -95,13 +127,15 @@ export function LibraryScreen() {
             emptyMessage={filterConfig.empty}
             items={filterItems}
             onOpenItem={openReader}
-            onBookInfo={handleBookInfo}
+            onBookMenu={handleOpenBookMenu}
           />
         ) : view.kind === 'collections' ? (
           <CollectionsHub
             collections={collections}
-            onNewCollection={() => setNewCollectionOpen(true)}
+            onNewCollection={() => openNewCollection()}
             onOpenCollection={openCollection}
+            onEditCollection={openEditCollection}
+            onDeleteCollection={setPendingCollectionDeleteId}
           />
         ) : activeCollection ? (
           <ShelfDetailView
@@ -109,7 +143,7 @@ export function LibraryScreen() {
             items={collectionItems}
             onBack={goCollections}
             onOpenItem={openReader}
-            onBookInfo={handleBookInfo}
+            onBookMenu={handleOpenBookMenu}
             countLabel={
               collectionItems.length === 1
                 ? '1 book'
@@ -150,6 +184,7 @@ export function LibraryScreen() {
                     book={continueBook}
                     onResume={openReader}
                     onOpenNotes={handleOpenNotes}
+                    onBookMenu={handleOpenBookMenu}
                   />
                 ) : null}
 
@@ -185,8 +220,9 @@ export function LibraryScreen() {
 
       <NewCollectionDialog
         open={newCollectionOpen}
-        onClose={() => setNewCollectionOpen(false)}
-        onCreate={handleCreateCollection}
+        collection={editingCollection}
+        onClose={closeCollectionDialog}
+        onSubmit={submitCollection}
       />
 
       <ImportUrlDialog
@@ -229,6 +265,70 @@ export function LibraryScreen() {
         }
         onClose={() => setBookInfoId(null)}
       />
+
+      {bookMenu && menuBook ? (
+        <BookItemMenu
+          book={menuBook}
+          point={bookMenu.point}
+          collections={collections}
+          onClose={() => setBookMenu(null)}
+          onResume={openReader}
+          onAddToCollection={handleAddToCollection}
+          activeCollectionId={activeCollection?.id}
+          onRemoveFromCollection={handleRemoveFromCollection}
+          onNewCollection={() => openNewCollection(menuBook.id)}
+          onToggleFavorite={handleToggleFavorite}
+          onMarkCompleted={handleMarkCompleted}
+          onDetails={handleBookInfo}
+          onEditMetadata={setEditMetadataId}
+          onOpenFileLocation={handleOpenFileLocation}
+          onCopyFilePath={handleCopyFilePath}
+          onRemove={(bookId) =>
+            setPendingRemoval({ bookId, kind: 'remove' })
+          }
+          onDeleteFile={(bookId) =>
+            setPendingRemoval({ bookId, kind: 'delete-file' })
+          }
+        />
+      ) : null}
+
+      <EditBookMetadataDialog
+        book={editMetadataBook}
+        onClose={() => setEditMetadataId(null)}
+        onSave={handleSaveMetadata}
+      />
+
+      {pendingRemoval && pendingRemovalBook ? (
+        <ConfirmBookActionDialog
+          title={
+            pendingRemoval.kind === 'remove'
+              ? 'Remove from library?'
+              : 'Delete file permanently?'
+          }
+          message={
+            pendingRemoval.kind === 'remove'
+              ? `“${pendingRemovalBook.title}” will disappear from the library. Its imported file will be kept.`
+              : `“${pendingRemovalBook.title}” and its imported file will be permanently deleted. This cannot be undone.`
+          }
+          confirmLabel={
+            pendingRemoval.kind === 'remove' ? 'Remove' : 'Delete file'
+          }
+          destructive={pendingRemoval.kind === 'delete-file'}
+          onCancel={() => setPendingRemoval(null)}
+          onConfirm={confirmPendingRemoval}
+        />
+      ) : null}
+
+      {pendingCollectionDelete ? (
+        <ConfirmBookActionDialog
+          title="Delete collection?"
+          message={`“${pendingCollectionDelete.name}” will be deleted. Books in it will remain in your library.`}
+          confirmLabel="Delete collection"
+          destructive
+          onCancel={() => setPendingCollectionDeleteId(null)}
+          onConfirm={confirmCollectionDelete}
+        />
+      ) : null}
     </div>
   )
 }

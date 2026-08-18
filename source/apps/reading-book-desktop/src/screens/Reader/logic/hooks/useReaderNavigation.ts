@@ -12,7 +12,7 @@ import type {
   EpubRendererApi,
   EpubTocItem,
 } from '../../../../reader/renderers/epub'
-import { blurReaderSidebarFocus } from '../../../../reader/readerChromeInteraction'
+import { blurReaderSidebarFocus } from '../../../../reader/chrome'
 import { FAKE_CHAPTERS } from '../demo/fakeReaderContent'
 import type { SelectionMenuState } from './useReaderAnnotations'
 
@@ -22,7 +22,7 @@ function navigateEpubByArrow(
   pageMode: PageMode,
 ): void {
   if (pageMode === 'scroll') {
-    void (forward ? api.nextSection() : api.prevSection())
+    api.scrollByViewport(forward ? 1 : -1)
     return
   }
   void (forward ? api.nextPage() : api.prevPage())
@@ -66,12 +66,14 @@ export function useReaderNavigation({
   const [chapterIndex, setChapterIndex] = useState(0)
   const [epubNav, setEpubNav] = useState<EpubNavState | null>(null)
   const [epubToc, setEpubToc] = useState<EpubTocItem[]>([])
+  const [epubSections, setEpubSections] = useState<string[]>([])
 
   // Reset navigation state when switching books.
   useEffect(() => {
     setChapterIndex(0)
     setEpubNav(null)
     setEpubToc([])
+    setEpubSections([])
     epubApiRef.current = null
   }, [bookId, epubApiRef])
 
@@ -108,7 +110,7 @@ export function useReaderNavigation({
     if (isEpubSurface) {
       const api = epubApiRef.current
       if (!api) return
-      void api.goToSpineIndex(page - 1)
+      void api.goToLocationPage(page)
       clearTransientNavUi()
       return
     }
@@ -116,7 +118,7 @@ export function useReaderNavigation({
     goChapter(page - 1)
   }
 
-  /** Page layout thumbnails — navigate without closing the sidebar. */
+  /** Page layout thumbnails browse spine *sections*, not rendered pages. */
   const goToPageFromLayout = useCallback(
     (page: number) => {
       if (isEpubSurface) {
@@ -276,6 +278,8 @@ export function useReaderNavigation({
     setEpubNav,
     epubToc,
     setEpubToc,
+    epubSections,
+    setEpubSections,
     goChapter,
     switchPage,
     goToPage,

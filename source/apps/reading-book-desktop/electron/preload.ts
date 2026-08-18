@@ -10,8 +10,23 @@ import {
 const api: DesktopApi = {
   ping: () => ipcRenderer.invoke(AppChannels.ping),
   getAppInfo: () => ipcRenderer.invoke(AppChannels.getAppInfo),
+  getGoogleOAuthConfig: () =>
+    ipcRenderer.invoke(AppChannels.getGoogleOAuthConfig),
   setChromeTheme: (theme) =>
     ipcRenderer.invoke(AppChannels.setChromeTheme, theme),
+  getFullscreen: () => ipcRenderer.invoke(AppChannels.getFullscreen),
+  setFullscreen: (value) =>
+    ipcRenderer.invoke(AppChannels.setFullscreen, value),
+  toggleFullscreen: () => ipcRenderer.invoke(AppChannels.toggleFullscreen),
+  onFullscreenChanged: (handler) => {
+    const listener = (_event: Electron.IpcRendererEvent, fullscreen: boolean) => {
+      handler(Boolean(fullscreen))
+    }
+    ipcRenderer.on(AppChannels.fullscreenChanged, listener)
+    return () => {
+      ipcRenderer.removeListener(AppChannels.fullscreenChanged, listener)
+    }
+  },
   onRequestFlushSession: (handler) => {
     const listener = (): void => {
       void Promise.resolve()
@@ -31,7 +46,36 @@ const api: DesktopApi = {
     getBook: (id) => ipcRenderer.invoke(LibraryChannels.getBook, id),
     openBookContent: (id) => ipcRenderer.invoke(LibraryChannels.openBookContent, id),
     markAsReading: (id) => ipcRenderer.invoke(LibraryChannels.markAsReading, id),
-    deleteBook: (id) => ipcRenderer.invoke(LibraryChannels.deleteBook, id),
+    markAsCompleted: (id) =>
+      ipcRenderer.invoke(LibraryChannels.markAsCompleted, id),
+    setFavorite: (id, value) =>
+      ipcRenderer.invoke(LibraryChannels.setFavorite, id, value),
+    updateMetadata: (input) =>
+      ipcRenderer.invoke(LibraryChannels.updateMetadata, input),
+    showInFolder: (id) => ipcRenderer.invoke(LibraryChannels.showInFolder, id),
+    copyFilePath: (id) => ipcRenderer.invoke(LibraryChannels.copyFilePath, id),
+    removeBook: (id) => ipcRenderer.invoke(LibraryChannels.removeBook, id),
+    deleteBookFile: (id) =>
+      ipcRenderer.invoke(LibraryChannels.deleteBookFile, id),
+    listCollections: () => ipcRenderer.invoke(LibraryChannels.listCollections),
+    createCollection: (input) =>
+      ipcRenderer.invoke(LibraryChannels.createCollection, input),
+    updateCollection: (id, input) =>
+      ipcRenderer.invoke(LibraryChannels.updateCollection, id, input),
+    deleteCollection: (id) =>
+      ipcRenderer.invoke(LibraryChannels.deleteCollection, id),
+    addBookToCollection: (collectionId, bookId) =>
+      ipcRenderer.invoke(
+        LibraryChannels.addBookToCollection,
+        collectionId,
+        bookId,
+      ),
+    removeBookFromCollection: (collectionId, bookId) =>
+      ipcRenderer.invoke(
+        LibraryChannels.removeBookFromCollection,
+        collectionId,
+        bookId,
+      ),
   },
   import: {
     fromFile: () => ipcRenderer.invoke(ImportChannels.fromFile),

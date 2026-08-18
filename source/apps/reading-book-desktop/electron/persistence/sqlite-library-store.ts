@@ -28,6 +28,7 @@ interface BookRow {
   description: string | null
   page_count: number | null
   is_favorite: number
+  reading_status: 'reading' | 'completed' | 'not-started'
   is_signed: number
   source_url: string | null
   added_at: string
@@ -43,6 +44,7 @@ export type ReadingSessionSummary = {
 
 export type BookListItem = {
   book: Book
+  readingStatus: 'reading' | 'completed' | 'not-started'
   /** Comma-joined author display names (empty if none). */
   authorNames: string
   /** Genre / subject names (empty if none). */
@@ -50,10 +52,19 @@ export type BookListItem = {
   session?: ReadingSessionSummary
 }
 
+export type CollectionListItem = {
+  id: string
+  name: string
+  description?: string
+  bookIds: string[]
+  createdAt: string
+  updatedAt: string
+}
+
 const BOOK_COLUMNS = `
   id, title, file_path, normalized_path, file_format, cover_path,
   sha256, file_size_bytes, description, page_count,
-  is_favorite, is_signed, source_url, added_at, updated_at
+  is_favorite, reading_status, is_signed, source_url, added_at, updated_at
 `
 
 function rowToBook(row: BookRow): Book {
@@ -282,6 +293,7 @@ export class SqliteLibraryStore implements LibraryStore {
    * Does not overwrite a valid Location JSON (CFI); only fills empty with "Started".
    */
   markAsReading(bookId: string, now = new Date().toISOString()): void {
+    this.setReadingStatus(bookId, 'reading', now)
     const existing = this.db
       .prepare(
         `SELECT last_read_location FROM reading_session_states WHERE book_id = ?`,
@@ -318,6 +330,30 @@ export class SqliteLibraryStore implements LibraryStore {
          WHERE book_id = ?`,
       )
       .run(loc || STARTED_LOCATION_LABEL, now, bookId)
+  }
+
+  setReadingStatus(
+    bookId: string,
+    status: 'reading' | 'completed' | 'not-started',
+    now = new Date().toISOString(),
+  ): void {
+    this.db
+      .prepare(
+        `UPDATE books
+         SET reading_status = ?, updated_at = ?
+         WHERE id = ?`,
+      )
+      .run(status, now, bookId)
+  }
+
+  setFavorite(bookId: string, value: boolean): void {
+    this.db
+      .prepare(
+        `UPDATE books
+         SET is_favorite = ?, updated_at = ?
+         WHERE id = ?`,
+      )
+      .run(value ? 1 : 0, new Date().toISOString(), bookId)
   }
 
   /**
@@ -432,10 +468,138 @@ export class SqliteLibraryStore implements LibraryStore {
 
     return rows.map((row) => ({
       book: rowToBook(row),
+      readingStatus: row.reading_status,
       authorNames: this.authorNamesForBook(row.id),
       genreNames: this.genreNamesForBook(row.id),
       session: this.getReadingSessionSummary(row.id),
     }))
+  }
+
+  listCollections(): CollectionListItem[] {
+    const rows = this.db
+      .prepare(
+        `SELECT id, name, description, created_at, updated_at
+         FROM collections
+         ORDER BY updated_at DESC`,
+      )
+      .all() as Array<{
+      id: string
+      name: string
+      description: string | null
+      created_at: string
+      updated_at: string
+    }>
+    const books = this.db.prepare(
+      `SELECT book_id
+       FROM collection_books
+       WHERE collection_id = ?
+       ORDER BY sort_order ASC, added_at ASC`,
+    )
+    return rows.map((row) => ({
+      id: row.id,
+      name: row.name,
+      description: row.description ?? undefined,
+      bookIds: (books.all(row.id) as Array<{ book_id: string }>).map(
+        (item) => item.book_id,
+      ),
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+    }))
+  }
+
+  createCollection(input: {
+    name: string
+    description?: string
+  }): CollectionListItem {
+    const now = new Date().toISOString()
+    const collection: CollectionListItem = {
+      id: randomUUID(),
+      name: input.name.trim(),
+      description: input.description?.trim() || undefined,
+      bookIds: [],
+      createdAt: now,
+      updatedAt: now,
+    }
+    this.db
+      .prepare(
+        `INSERT INTO collections (id, name, description, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?)`,
+      )
+      .run(
+        collection.id,
+        collection.name,
+        collection.description ?? null,
+        collection.createdAt,
+        collection.updatedAt,
+      )
+    return collection
+  }
+
+  updateCollection(
+    collectionId: string,
+    input: { name: string; description?: string },
+  ): CollectionListItem | undefined {
+    const now = new Date().toISOString()
+    const result = this.db
+      .prepare(
+        `UPDATE collections
+         SET name = ?, description = ?, updated_at = ?
+         WHERE id = ?`,
+      )
+      .run(
+        input.name.trim(),
+        input.description?.trim() || null,
+        now,
+        collectionId,
+      )
+    if (result.changes === 0) return undefined
+    return this.listCollections().find((item) => item.id === collectionId)
+  }
+
+  deleteCollection(collectionId: string): boolean {
+    return (
+      this.db.prepare(`DELETE FROM collections WHERE id = ?`).run(collectionId)
+        .changes > 0
+    )
+  }
+
+  addBookToCollection(collectionId: string, bookId: string): void {
+    const now = new Date().toISOString()
+    const run = this.db.transaction(() => {
+      const next = this.db
+        .prepare(
+          `SELECT COALESCE(MAX(sort_order), -1) + 1 AS value
+           FROM collection_books
+           WHERE collection_id = ?`,
+        )
+        .get(collectionId) as { value: number }
+      this.db
+        .prepare(
+          `INSERT OR IGNORE INTO collection_books (
+             collection_id, book_id, sort_order, added_at
+           ) VALUES (?, ?, ?, ?)`,
+        )
+        .run(collectionId, bookId, next.value, now)
+      this.db
+        .prepare(`UPDATE collections SET updated_at = ? WHERE id = ?`)
+        .run(now, collectionId)
+    })
+    run()
+  }
+
+  removeBookFromCollection(collectionId: string, bookId: string): boolean {
+    const result = this.db
+      .prepare(
+        `DELETE FROM collection_books
+         WHERE collection_id = ? AND book_id = ?`,
+      )
+      .run(collectionId, bookId)
+    if (result.changes > 0) {
+      this.db
+        .prepare(`UPDATE collections SET updated_at = ? WHERE id = ?`)
+        .run(new Date().toISOString(), collectionId)
+    }
+    return result.changes > 0
   }
 
   authorNamesForBook(bookId: string): string {
@@ -565,6 +729,15 @@ export class SqliteLibraryStore implements LibraryStore {
     run()
   }
 
+  readingStatusForBook(
+    bookId: string,
+  ): 'reading' | 'completed' | 'not-started' {
+    const row = this.db
+      .prepare(`SELECT reading_status FROM books WHERE id = ?`)
+      .get(bookId) as { reading_status: BookRow['reading_status'] } | undefined
+    return row?.reading_status ?? 'not-started'
+  }
+
   /** Ensure a reading session row exists (restore after accidental cascade). */
   ensureReadingSession(bookId: string): void {
     const existing = this.db
@@ -574,8 +747,8 @@ export class SqliteLibraryStore implements LibraryStore {
     this.insertDefaultReadingSession(bookId)
   }
 
-  async deleteCascade(_bookId: string): Promise<void> {
-    throw new Error('SqliteLibraryStore.deleteCascade is not implemented yet')
+  async deleteCascade(bookId: string): Promise<void> {
+    this.db.prepare(`DELETE FROM books WHERE id = ?`).run(bookId)
   }
 }
 

@@ -3,14 +3,11 @@ import type {
   ReaderAnnotationStatus,
   ReaderBookmark,
   ReaderHighlight,
+  ReaderShapeAnnotation,
   ReaderTypewriterNote,
 } from '@reading-book/shared/models'
 import type { EpubTocItem } from '../../../../reader/renderers/epub'
 import type { FakeChapter } from '../../logic'
-import type {
-  PagePreviewEntry,
-  PreviewRequestPriority,
-} from '../../logic/pagePreview/usePagePreviewStore'
 import { NotesListPanel } from './NotesListPanel'
 import {
   PageLayoutPanel,
@@ -22,7 +19,7 @@ import {
   SIDEBAR_RAIL_WIDTH_PX,
   SIDEBAR_TAB_LABEL,
 } from './sidebarTabs'
-import { readerChromeTopInset } from '../../../../reader/readerChromeLayout'
+import { readerChromeTopInset } from '../../../../reader/chrome'
 
 export type SidebarTab =
   | 'chapters'
@@ -46,6 +43,7 @@ type TocSidebarProps = {
   bookmarks: ReaderBookmark[]
   highlights: ReaderHighlight[]
   typewriterNotes: ReaderTypewriterNote[]
+  freehandStrokes?: ReaderShapeAnnotation[]
   onClose: () => void
   onSelectChapter: (index: number) => void
   onSelectTocItem?: (item: EpubTocItem) => void
@@ -54,18 +52,24 @@ type TocSidebarProps = {
   onAddBookmark: () => void
   onJumpHighlight: (highlight: ReaderHighlight) => void
   onJumpTypewriterNote: (note: ReaderTypewriterNote) => void
+  onJumpPencilStroke?: (stroke: ReaderShapeAnnotation) => void
   onToggleAnnotationChecked: (id: string, isChecked: boolean) => void
   onSetAnnotationStatus: (id: string, status: ReaderAnnotationStatus) => void
   onEditHighlightNote: (highlight: ReaderHighlight) => void
   onEditTypewriterContent: (id: string, content: string) => void
+  onEditPencilNote?: (stroke: ReaderShapeAnnotation) => void
   onDeleteHighlight: (highlight: ReaderHighlight) => void
   onDeleteTypewriterNote: (id: string) => void
+  onDeletePencilStroke?: (id: string) => void
   onAnnotationTags?: () => void
+  /** 1-based visible spine section — layout grid + notes grouping. */
   pageCurrent: number
   pageTotal: number
   onGoToPage: (page: number) => void
-  pagePreviews: Map<number, PagePreviewEntry>
-  onRequestPagePreview: (page: number, priority?: PreviewRequestPriority) => void
+  /** Section titles indexed by 0-based spine position. */
+  sectionLabels?: string[]
+  /** Whether the reader is in immersive/fullscreen mode. */
+  immersive?: boolean
 }
 
 function noteCountForChapter(
@@ -173,6 +177,7 @@ export function TocSidebar({
   bookmarks,
   highlights,
   typewriterNotes,
+  freehandStrokes = [],
   onClose,
   onSelectChapter,
   onSelectTocItem,
@@ -181,18 +186,21 @@ export function TocSidebar({
   onAddBookmark,
   onJumpHighlight,
   onJumpTypewriterNote,
+  onJumpPencilStroke,
   onToggleAnnotationChecked,
   onSetAnnotationStatus,
   onEditHighlightNote,
   onEditTypewriterContent,
+  onEditPencilNote,
   onDeleteHighlight,
   onDeleteTypewriterNote,
+  onDeletePencilStroke,
   onAnnotationTags,
   pageCurrent,
   pageTotal,
   onGoToPage,
-  pagePreviews,
-  onRequestPagePreview,
+  sectionLabels,
+  immersive = false,
 }: TocSidebarProps) {
   const hasRealToc = !!tocItems && tocItems.length > 0
   const pageLayoutGrid = usePageLayoutGrid()
@@ -214,14 +222,15 @@ export function TocSidebar({
           : 'transition-[transform,top] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]'
       } ${
         open
-          ? 'pointer-events-auto translate-x-0 border-l-0'
-          : 'pointer-events-none -translate-x-full border-l'
+          ? 'pointer-events-auto border-l-0'
+          : 'pointer-events-none border-l'
       }`}
       style={{
         left: SIDEBAR_RAIL_WIDTH_PX,
         top: chromeTopInset,
         bottom: READER_FOOTER_HEIGHT_PX,
         width: panelWidth,
+        transform: open ? 'translateX(0)' : immersive ? `translateX(calc(-100% - ${SIDEBAR_RAIL_WIDTH_PX}px))` : 'translateX(-100%)',
       }}
       aria-hidden={!open}
     >
@@ -361,15 +370,21 @@ export function TocSidebar({
             <NotesListPanel
               highlights={highlights}
               typewriterNotes={typewriterNotes}
+              freehandStrokes={freehandStrokes}
               pageCurrent={pageCurrent}
               onGoToPage={onGoToPage}
               onJump={onJumpHighlight}
               onJumpTypewriterNote={onJumpTypewriterNote}
+              onJumpPencilStroke={onJumpPencilStroke}
               onToggleChecked={onToggleAnnotationChecked}
               onSetStatus={onSetAnnotationStatus}
               onEditContent={(item) => {
                 if (item.kind === 'highlight') {
                   onEditHighlightNote(item.highlight)
+                  return
+                }
+                if (item.kind === 'pencil') {
+                  onEditPencilNote?.(item.stroke)
                   return
                 }
                 const next = window.prompt('Edit note content', item.content)
@@ -379,6 +394,10 @@ export function TocSidebar({
               onDelete={(item) => {
                 if (item.kind === 'highlight') {
                   onDeleteHighlight(item.highlight)
+                  return
+                }
+                if (item.kind === 'pencil') {
+                  onDeletePencilStroke?.(item.id)
                   return
                 }
                 onDeleteTypewriterNote(item.id)
@@ -391,10 +410,9 @@ export function TocSidebar({
             <PageLayoutPanel
               pageCurrent={pageCurrent}
               pageTotal={pageTotal}
+              sectionLabels={sectionLabels}
               columns={pageLayoutGrid.columns}
               onGoToPage={onGoToPage}
-              previews={pagePreviews}
-              onRequestPreview={onRequestPagePreview}
             />
           ) : null}
 

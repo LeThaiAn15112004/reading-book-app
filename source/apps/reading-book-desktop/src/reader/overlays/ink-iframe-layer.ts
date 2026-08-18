@@ -454,6 +454,91 @@ export function iframeClientToNormalizedInkPoint(
 
 
 
+/**
+ * Ink SVG box in the top-level viewport — same space freehand points use
+ * (viewBox 0..1 via SVG CTM). Prefer this over the iframe element rect when
+ * placing selection chrome / hit padding.
+ */
+export function inkSvgTopLevelRect(
+  doc: Document,
+): { left: number; top: number; width: number; height: number } | null {
+  const layer = ensureInkIframeLayer(doc)
+  if (!layer) return null
+  const svg = syncInkSvgSize(layer)
+  if (!svg) return null
+
+  const frameEl = doc.defaultView?.frameElement as HTMLElement | null
+  const fr = frameEl?.getBoundingClientRect()
+  const ox = fr?.left ?? 0
+  const oy = fr?.top ?? 0
+  // Parent CSS zoom/transform scales the iframe's border box but not
+  // iframe-local client/CTM coordinates — convert before lifting.
+  const scaleX =
+    fr && frameEl && frameEl.clientWidth > 0
+      ? fr.width / frameEl.clientWidth
+      : 1
+  const scaleY =
+    fr && frameEl && frameEl.clientHeight > 0
+      ? fr.height / frameEl.clientHeight
+      : 1
+
+  // Capture uses getScreenCTM() with iframe-local client coords — map unit
+  // corners the same way, then lift into the parent viewport.
+  const ctm = svg.getScreenCTM()
+  if (ctm) {
+    try {
+      const p0 = svg.createSVGPoint()
+      p0.x = 0
+      p0.y = 0
+      const p1 = svg.createSVGPoint()
+      p1.x = 1
+      p1.y = 1
+      const a = p0.matrixTransform(ctm)
+      const b = p1.matrixTransform(ctm)
+      const left = Math.min(a.x, b.x) * scaleX + ox
+      const top = Math.min(a.y, b.y) * scaleY + oy
+      const width = Math.abs(b.x - a.x) * scaleX
+      const height = Math.abs(b.y - a.y) * scaleY
+      if (width > 0 && height > 0) {
+        return { left, top, width, height }
+      }
+    } catch {
+      /* fall through */
+    }
+  }
+
+  const rect = svg.getBoundingClientRect()
+  if (rect.width <= 0 || rect.height <= 0) return null
+
+  // Parent-accessed rect may already be top-level; only add frame offset when
+  // the SVG box still looks iframe-local (fits inside the frame size).
+  const looksIframeLocal =
+    Boolean(fr) &&
+    rect.left >= -1 &&
+    rect.top >= -1 &&
+    rect.right <= (fr?.width ?? 0) + 2 &&
+    rect.bottom <= (fr?.height ?? 0) + 2 &&
+    ((fr?.left ?? 0) > 1 || (fr?.top ?? 0) > 1)
+
+  if (looksIframeLocal && fr) {
+    return {
+      left: rect.left * scaleX + fr.left,
+      top: rect.top * scaleY + fr.top,
+      width: rect.width * scaleX,
+      height: rect.height * scaleY,
+    }
+  }
+
+  return {
+    left: rect.left,
+    top: rect.top,
+    width: rect.width,
+    height: rect.height,
+  }
+}
+
+
+
 function paintStrokePath(
 
   svg: SVGSVGElement,

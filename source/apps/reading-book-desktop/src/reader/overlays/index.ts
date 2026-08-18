@@ -23,6 +23,7 @@ export {
   ensureInkIframeLayer,
   freehandPointsToPathD,
   iframeClientToNormalizedInkPoint,
+  inkSvgTopLevelRect,
   isInkOverlayElement,
   paintInkStrokes,
   readerShapeToInkStroke,

@@ -71,7 +71,7 @@ export const HIGHLIGHT_COLOR_HEX: Record<HighlightColor, string> = {
   pink: '#ec4899',
 }
 
-export type PageLayout = 'single' | 'dual' | 'triple'
+export type PageLayout = 'single' | 'dual'
 export type PageMode = 'scroll' | 'paginated'
 
 /** Selection geometry in viewport coords (numbers only — no DOM nodes). */
@@ -261,6 +261,8 @@ export type ReaderShapeAnnotation = {
   points: FreehandPoint[]
   colorHex: string
   strokeWidth: number
+  /** Optional note text (SQLite `content` when not the default label). */
+  note?: string
   status: ReaderAnnotationStatus
   isChecked: boolean
   createdAt: string

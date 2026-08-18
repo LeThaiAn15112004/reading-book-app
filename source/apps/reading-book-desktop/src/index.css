@@ -130,6 +130,7 @@
   --cursor-select-tool: text;
   --cursor-highlight-tool: url('/cursors/highlighter.svg') 6 28, text;
   --cursor-typewriter-tool: url('/cursors/typewriter.svg') 16 26, text;
+  --cursor-pencil-tool: url('/cursors/pencil.svg') 4 28, crosshair;
 }
 
 @utility cursor-hand-tool {
@@ -150,6 +151,10 @@
 
 @utility cursor-typewriter-tool {
   cursor: var(--cursor-typewriter-tool);
+}
+
+@utility cursor-pencil-tool {
+  cursor: var(--cursor-pencil-tool);
 }
 
 /* Jump-to-annotation flash on host ReadingCanvas marks. */

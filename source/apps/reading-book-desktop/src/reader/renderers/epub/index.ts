@@ -1,17 +1,11 @@
-export {
-  EpubRenderer,
-  type EpubPagePreview,
-  type EpubRendererApi,
-} from './EpubRenderer'
-export type { AnnotationFocusTarget } from '../../annotationJump'
+export { EpubRenderer, type EpubRendererApi } from './EpubRenderer'
+export type { AnnotationFocusTarget } from '../../annotations'
 export {
   CfiCodec,
   cfiCodec,
   tryEncodeCfi,
   type EpubCfiEncodeInput,
   type EpubCfiDecodeResult,
-} from './cfi-codec'
-export {
   cfiChapterSignature,
   elementFromCfi,
   findRangeByText,
@@ -25,8 +19,6 @@ export {
   splitCfiComponents,
   type CfiBoundary,
   type CfiDomOptions,
-} from './cfi-dom-range'
-export {
   cfiRangesOverlap,
   elementToHighlightHandleRect,
   emptyHighlightHandleRect,
@@ -36,7 +28,11 @@ export {
   toEpubjsDisplayCfi,
   viewportRectToHighlightHandleRect,
   type SplitCfiRange,
-} from './selection-cfi'
+  cfiCharacterOffset,
+  characterOffsetToBoundary,
+  collectDescendantTextNodes,
+  documentTextLength,
+} from './cfi'
 export {
   openEpubjs,
   buildEpubSelectionPayloadFromDocument,
@@ -45,6 +41,7 @@ export {
   applyEpubThemeVars,
   applyEpubFontSize,
   buildEpubNavState,
+  toArrayBuffer,
   EPUB_BASE_FONT_PX,
   type EpubFrameSelectionContext,
   type EpubjsHandle,
@@ -54,3 +51,8 @@ export {
   type EpubSelectionPayload,
   type EpubTocItem,
 } from './openEpubjs'
+export {
+  cfiFromLocation,
+  displayedPagesFromLocation,
+  type EpubDisplayedPages,
+} from './progress'

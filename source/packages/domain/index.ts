@@ -28,6 +28,9 @@ export {
   DateTimeFormatPreference,
   AppPreferences,
   Preferences,
+  getProviderDisplayName,
+  createDefaultProviderInfo,
+  isSupportedExternalFormat,
 } from './models/index.js';
 export type {
   CfiLocationPlain,
@@ -54,6 +57,9 @@ export type {
   BookmarkProps,
   BookChunkProps,
   AppPreferencesProps,
+  ExternalLibraryConfig,
+  ExternalLibraryInfo,
+  ConnectionTestResult,
 } from './models/index.js';
 
 export type {
@@ -88,3 +94,4 @@ export {
   NoOpExternalLibraryConnector,
   NoOpSyncService,
 } from './ports/index.js';
+

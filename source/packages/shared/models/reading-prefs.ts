@@ -11,7 +11,7 @@ export type AppChromeTheme = ReaderTheme
 export type FontFamily = 'serif' | 'sans' | 'mono'
 export type FontWeight = 300 | 400 | 600
 export type TextAlign = 'left' | 'justify' | 'center'
-export type ReadingLayout = 'single' | 'dual' | 'triple'
+export type ReadingLayout = 'single' | 'dual'
 export type ReadingPageMode = 'scroll' | 'paginated'
 export type ReadingMarginPreset = 'narrow' | 'normal' | 'wide'
 
@@ -192,12 +192,12 @@ export function normalizeGlobalReadingPrefs(
     textAlign: isTextAlign(parsed.textAlign)
       ? parsed.textAlign
       : DEFAULT_GLOBAL_READING_PREFS.textAlign,
-    layout:
-      parsed.layout === 'single' ||
-      parsed.layout === 'dual' ||
-      parsed.layout === 'triple'
-        ? parsed.layout
-        : DEFAULT_GLOBAL_READING_PREFS.layout,
+    layout: (() => {
+      const rawLayout = parsed.layout as string | undefined
+      if (rawLayout === 'dual' || rawLayout === 'triple') return 'dual'
+      if (rawLayout === 'single') return 'single'
+      return DEFAULT_GLOBAL_READING_PREFS.layout
+    })(),
     pageMode:
       parsed.pageMode === 'scroll'
         ? 'scroll'

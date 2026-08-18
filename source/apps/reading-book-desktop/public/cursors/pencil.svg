@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32" fill="none">
+  <!-- Pencil cursor  tip hotspot near (4, 28) -->
+  <g transform="rotate(-40 16 16)">
+    <rect x="13" y="2" width="6" height="14" rx="1.5" fill="#64748b"/>
+    <rect x="14" y="3.5" width="1.2" height="11" rx="0.6" fill="#cbd5e1" opacity="0.9"/>
+    <path d="M13 16h6l-1.4 3.4h-3.2L13 16Z" fill="#94a3b8"/>
+    <path d="M14.2 19.4 11.5 27.2h4.6l2.7-7.8h-4.6Z" fill="#f59e0b"/>
+    <path d="M12.8 25.6 11.5 27.2h1.8l0.6-1.6h-1.1Z" fill="#1e293b"/>
+  </g>
+</svg>

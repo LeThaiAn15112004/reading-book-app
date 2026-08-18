@@ -13,3 +13,9 @@ export {
   type SessionThemeFields,
   type UseReadingSessionAutosaveOptions,
 } from './useReadingSessionAutosave.js'
+
+export {
+  useReaderBookOpen,
+  type ReaderBookOpenClient,
+  type UseReaderBookOpenOptions,
+} from './useReaderBookOpen.js'

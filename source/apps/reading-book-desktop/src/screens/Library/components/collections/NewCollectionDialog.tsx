@@ -2,29 +2,35 @@ import { useEffect, useId, useRef, useState, type FormEvent } from 'react'
 
 export type NewCollectionDialogProps = {
   open: boolean
+  collection?: { name: string; description?: string } | null
   onClose: () => void
-  /** G1 stub: parent may keep the collection in memory only. */
-  onCreate: (input: { name: string; description?: string }) => void
+  onSubmit: (input: {
+    name: string
+    description?: string
+  }) => boolean | void | Promise<boolean | void>
 }
 
-/** T1.9a — stub New collection dialog (persist / COLLECTION CRUD in later phase). */
+/** T1.9a — create a persisted Library collection. */
 export function NewCollectionDialog({
   open,
+  collection,
   onClose,
-  onCreate,
+  onSubmit,
 }: NewCollectionDialogProps) {
   const titleId = useId()
   const nameRef = useRef<HTMLInputElement>(null)
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
+  const [submitting, setSubmitting] = useState(false)
 
   useEffect(() => {
     if (!open) return
-    setName('')
-    setDescription('')
+    setName(collection?.name ?? '')
+    setDescription(collection?.description ?? '')
+    setSubmitting(false)
     const t = window.setTimeout(() => nameRef.current?.focus(), 0)
     return () => window.clearTimeout(t)
-  }, [open])
+  }, [open, collection])
 
   useEffect(() => {
     if (!open) return
@@ -40,15 +46,20 @@ export function NewCollectionDialog({
 
   if (!open) return null
 
-  function handleSubmit(e: FormEvent) {
+  async function handleSubmit(e: FormEvent) {
     e.preventDefault()
     const trimmed = name.trim()
-    if (!trimmed) return
-    onCreate({
-      name: trimmed,
-      description: description.trim() || undefined,
-    })
-    onClose()
+    if (!trimmed || submitting) return
+    setSubmitting(true)
+    try {
+      const result = await onSubmit({
+        name: trimmed,
+        description: description.trim() || undefined,
+      })
+      if (result !== false) onClose()
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   return (
@@ -69,10 +80,12 @@ export function NewCollectionDialog({
           id={titleId}
           className="m-0 mb-1 text-lg font-semibold text-lib-text-strong"
         >
-          New collection
+          {collection ? 'Edit collection' : 'New collection'}
         </h2>
         <p className="m-0 mb-4 text-[13px] text-lib-muted">
-          Stub dialog — collection stays in this session until persistence lands.
+          {collection
+            ? 'Update the name or description for this collection.'
+            : 'Create a set to organize books by topic or purpose.'}
         </p>
 
         <form className="flex flex-col gap-3" onSubmit={handleSubmit}>
@@ -112,9 +125,9 @@ export function NewCollectionDialog({
             <button
               type="submit"
               className="inline-flex h-[38px] cursor-pointer items-center rounded-lg border-none bg-lib-accent px-4 text-[13px] font-semibold text-lib-bg-deep transition-colors hover:bg-lib-accent-hover disabled:cursor-not-allowed disabled:opacity-50"
-              disabled={!name.trim()}
+              disabled={!name.trim() || submitting}
             >
-              Create
+              {submitting ? 'Saving…' : collection ? 'Save' : 'Create'}
             </button>
           </div>
         </form>

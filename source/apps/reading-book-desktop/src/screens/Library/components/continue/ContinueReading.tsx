@@ -3,12 +3,13 @@ import {
   formatRelativeLastRead,
   type LibraryBook,
 } from '@reading-book/shared/models'
-import { BookCover } from '../book/BookCover'
+import { BookCover, BookMenuButton, type BookMenuPoint } from '../book'
 
 export type ContinueReadingProps = {
   book: LibraryBook
   onResume: (bookId: string) => void
   onOpenNotes?: (bookId: string) => void
+  onBookMenu: (bookId: string, point: BookMenuPoint) => void
 }
 
 /**
@@ -19,6 +20,7 @@ export function ContinueReading({
   book,
   onResume,
   onOpenNotes,
+  onBookMenu,
 }: ContinueReadingProps) {
   const formatBadge = book.format.trim().toUpperCase()
   const relative = formatRelativeLastRead(book.lastReadAt)
@@ -39,7 +41,13 @@ export function ContinueReading({
         </h2>
       </div>
 
-      <div className="flex flex-wrap items-center justify-between gap-5 rounded-xl border border-lib-border bg-lib-surface p-5 backdrop-blur-[6px]">
+      <div
+        className="flex flex-wrap items-center justify-between gap-5 rounded-xl border border-lib-border bg-lib-surface p-5 backdrop-blur-[6px]"
+        onContextMenu={(event) => {
+          event.preventDefault()
+          onBookMenu(book.id, { x: event.clientX, y: event.clientY })
+        }}
+      >
         <div className="flex min-w-0 flex-1 items-center gap-5">
           <BookCover
             bookId={book.id}
@@ -96,6 +104,10 @@ export function ContinueReading({
           >
             {notesLabel}
           </button>
+          <BookMenuButton
+            title={book.title}
+            onOpen={(point) => onBookMenu(book.id, point)}
+          />
         </div>
       </div>
     </section>

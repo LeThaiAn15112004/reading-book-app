@@ -3,8 +3,17 @@
 export const AppChannels = {
   ping: 'app:ping',
   getAppInfo: 'app:getAppInfo',
+  getGoogleOAuthConfig: 'app:getGoogleOAuthConfig',
   /** Sync native titleBarOverlay caption buttons to Night/Sepia/Paper. */
   setChromeTheme: 'app:setChromeTheme',
+  /** Whether the BrowserWindow is currently fullscreen. */
+  getFullscreen: 'app:getFullscreen',
+  /** Enter or leave OS-level fullscreen. */
+  setFullscreen: 'app:setFullscreen',
+  /** Toggle OS-level fullscreen; returns the resulting state. */
+  toggleFullscreen: 'app:toggleFullscreen',
+  /** Main → renderer: fullscreen entered/left (F11, Esc, caption, or IPC). */
+  fullscreenChanged: 'app:fullscreenChanged',
   /** Main → renderer: flush reading session before window close (T4.2). */
   requestFlushSession: 'app:requestFlushSession',
   /** Renderer → main: session flush finished (or timed out client-side). */
@@ -18,7 +27,19 @@ export const LibraryChannels = {
   openBookContent: 'library:openBookContent',
   /** Mark book as in-progress → Library Reading shelf. */
   markAsReading: 'library:markAsReading',
-  deleteBook: 'library:deleteBook',
+  markAsCompleted: 'library:markAsCompleted',
+  setFavorite: 'library:setFavorite',
+  updateMetadata: 'library:updateMetadata',
+  showInFolder: 'library:showInFolder',
+  copyFilePath: 'library:copyFilePath',
+  removeBook: 'library:removeBook',
+  deleteBookFile: 'library:deleteBookFile',
+  listCollections: 'library:listCollections',
+  createCollection: 'library:createCollection',
+  updateCollection: 'library:updateCollection',
+  deleteCollection: 'library:deleteCollection',
+  addBookToCollection: 'library:addBookToCollection',
+  removeBookFromCollection: 'library:removeBookFromCollection',
 } as const
 
 export const ImportChannels = {

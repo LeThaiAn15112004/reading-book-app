@@ -27,6 +27,8 @@ import type {
 } from '@reading-book/shared/models'
 import {
   appendFreehandPoint,
+  freehandBoundingBox,
+  hitTestFreehandStrokes,
   parseTypewriterPosition,
   type EpubReaderHighlight,
   type PendingSelection,
@@ -35,12 +37,13 @@ import {
   focusAnnotationInEpubHost,
   setAnnotationJumpViewportHidden,
   type AnnotationFocusTarget,
-} from '../../annotationJump'
+} from '../../annotations'
 import type { DomCssOverlay } from '../../overlays/dom-css-overlay'
 import {
   draftToInkStroke,
   ensureInkIframeLayer,
   iframeClientToNormalizedInkPoint,
+  inkSvgTopLevelRect,
   paintInkStrokes,
   readerShapeToInkStroke,
 } from '../../overlays/ink-iframe-layer'
@@ -67,24 +70,22 @@ import {
   iframeClientToBodyPoint,
   resolveTypewriterIframePoint,
   typewriterBelongsToRenderedSection,
-} from './typewriter-cfi-anchor'
-import { applyInteractionToolSurface } from '../../cursors'
+} from './cfi/typewriter-cfi-anchor'
 import {
+  applyInteractionToolSurface,
   HAND_HOVER_CURSOR_DELAY_MS,
   isHandHoverCursorTargetAtPoint,
   isPointInTextSelection,
   isTextCursorTargetAtPoint,
   isTextNodeAtPoint,
   PAN_DRAG_THRESHOLD_PX,
-} from '../../interaction-hit'
+} from '../../interaction'
 import {
   beginTypewriterDrag,
   tickTypewriterDrag,
   type TypewriterDragSession,
   type TypewriterPct,
-} from '../../typewriterBoxDrag'
-import { hitTestTypewriterAtClientPoint } from '../../typewriterHitTest'
-import {
+  hitTestTypewriterAtClientPoint,
   TypewriterRichEditor,
   TypewriterStaticHtml,
   clearTypewriterCommitSuppress,
@@ -97,13 +98,16 @@ export type EpubRendererApi = Pick<
   EpubjsHandle,
   | 'nextPage'
   | 'prevPage'
+  | 'scrollByViewport'
   | 'nextSection'
   | 'prevSection'
   | 'goToHref'
   | 'goToSpineIndex'
+  | 'goToLocationPage'
   | 'getSpineLength'
   | 'getNavState'
   | 'getToc'
+  | 'getSectionLabels'
   | 'getCurrentLocation'
   | 'goToLocation'
   | 'clearSelection'
@@ -115,8 +119,6 @@ export type EpubRendererApi = Pick<
   | 'setMargins'
   | 'setChromeHidden'
   | 'resize'
-  | 'captureVisiblePreview'
-  | 'loadSpinePreviewHtml'
 > & {
   /** Force DomCssOverlay full reload (T5.3) — usually driven by `rendered` / props. */
   repaintHighlights: () => void
@@ -130,18 +132,11 @@ export type EpubRendererApi = Pick<
    * frame is shown (Read Era / Foxit style).
    */
   setJumpViewportHidden: (hidden: boolean) => void
-  /**
-   * Resolve a 1-based UI page into a JPEG thumbnail data URL (cover image,
-   * live snapshot, or rasterized spine section).
-   */
-  getPagePreview: (page: number) => Promise<EpubPagePreview | null>
 }
-
-export type EpubPagePreview = { kind: 'image'; src: string }
 
 type EpubRendererProps = {
   data: ArrayBuffer
-  /** Extracted cover shown as page 1 when the EPUB has no cover document in its spine. */
+  /** Extracted cover shown as a synthetic first *section* when the EPUB has none in its spine. */
   coverUrl?: string
   theme: ReaderTheme
   layout?: EpubPageLayout
@@ -165,6 +160,8 @@ type EpubRendererProps = {
   /** Stable CFI after relocated — for persist flush (T4.2). */
   onLocationChange?: (location: CfiLocation) => void
   onToc?: (items: EpubTocItem[]) => void
+  /** Spine section labels for the Page layout grid, index-aligned to sections. */
+  onSections?: (labels: string[]) => void
   /** Right-click on selected text → selection menu (FR-06). */
   onSelectionContextMenu?: (
     selection: PendingSelection,
@@ -193,14 +190,20 @@ type EpubRendererProps = {
    */
   interactionTool?: InteractionTool
   /**
-   * Pencil-only drawing signal (shape/eraser stay inert until T5.11c/d).
-   * Toolbar `activeTool === ''` while `interactionTool` is `annotate`.
+   * Pencil / eraser drawing signal while `interactionTool` is `annotate`.
    */
-  drawingTool?: 'pencil' | null
+  drawingTool?: 'pencil' | 'eraser' | null
   drawSettings?: DrawToolSettings
   /** Session freehand strokes for the open book (T5.11b). */
   freehandStrokes?: ReaderShapeAnnotation[]
   onFreehandStrokeComplete?: (draft: FreehandDraftStroke) => void
+  /** Hand / select / eraser: tap a painted stroke. */
+  onFreehandStrokeClick?: (payload: {
+    id: string
+    rect: { left: number; top: number; width: number; height: number }
+    click?: { x: number; y: number }
+    hostRect?: { left: number; top: number; width: number; height: number }
+  }) => void
   /** Persisted typewriter textboxes for the current book (painted inside EPUB iframe). */
   typewriterNotes?: ReaderTypewriterNote[]
   /** Spine/chapter index used to filter which notes to paint. */
@@ -299,11 +302,48 @@ type SyntheticCoverNavigation = {
   navState: () => EpubNavState
 }
 
+/** The synthetic cover is one extra page in front of the epub.js locations. */
+function withSyntheticCoverNav(
+  nav: EpubNavState,
+  onCover: boolean,
+): EpubNavState {
+  const spineLength = nav.spineLength + 1
+  const pageTotal = nav.pageCountReady ? nav.pageTotal + 1 : 0
+  if (onCover) {
+    return {
+      ...nav,
+      spineIndex: 0,
+      spineLength,
+      sectionPage: 1,
+      sectionPageTotal: 1,
+      pageCurrent: 1,
+      pageTotal,
+      href: '',
+      label: 'Cover',
+      progress: 0,
+      percentage: 0,
+      cfi: undefined,
+    }
+  }
+  const percentage =
+    pageTotal > 1 ? (1 + nav.percentage * nav.pageTotal) / pageTotal : 0
+  return {
+    ...nav,
+    spineIndex: nav.spineIndex + 1,
+    spineLength,
+    // Before locations exist, `pageCurrent` is a section-local page that the
+    // cover does not shift.
+    pageCurrent: nav.pageCountReady ? nav.pageCurrent + 1 : nav.pageCurrent,
+    pageTotal,
+    progress: percentage,
+    percentage,
+  }
+}
+
 function toApi(
   handle: EpubjsHandle,
   cover: SyntheticCoverNavigation,
   repaintHighlights: () => void,
-  getCoverUrl: () => string | undefined,
   getHost: () => HTMLElement | null,
 ): EpubRendererApi {
   return {
@@ -330,6 +370,7 @@ function toApi(
         await cover.show()
       }
     },
+    scrollByViewport: (direction) => handle.scrollByViewport(direction),
     nextSection: async () => {
       if (cover.isShown()) {
         cover.hide()
@@ -361,10 +402,26 @@ function toApi(
       }
       await handle.goToSpineIndex(i)
     },
+    goToLocationPage: async (page) => {
+      if (cover.isAvailable()) {
+        if (page <= 1) {
+          await cover.show()
+          return
+        }
+        cover.hide()
+        await handle.goToLocationPage(page - 1)
+        return
+      }
+      await handle.goToLocationPage(page)
+    },
     getSpineLength: () =>
       handle.getSpineLength() + (cover.isAvailable() ? 1 : 0),
     getNavState: cover.navState,
     getToc: () => handle.getToc(),
+    getSectionLabels: () =>
+      cover.isAvailable()
+        ? ['Cover', ...handle.getSectionLabels()]
+        : handle.getSectionLabels(),
     getCurrentLocation: () => handle.getCurrentLocation(),
     goToLocation: async (location) => {
       cover.hide()
@@ -379,10 +436,6 @@ function toApi(
     setChromeHidden: (hidden) => handle.setChromeHidden(hidden),
     resize: () => handle.resize(),
     clearSelection: () => handle.clearSelection(),
-    captureVisiblePreview: (maxWidth, maxHeight) =>
-      handle.captureVisiblePreview(maxWidth, maxHeight),
-    loadSpinePreviewHtml: (visibleIndex) =>
-      handle.loadSpinePreviewHtml(visibleIndex),
     focusAnnotation: async (target) => {
       const host = getHost()
       if (!host) return false
@@ -391,22 +444,6 @@ function toApi(
     },
     setJumpViewportHidden: (hidden) => {
       setAnnotationJumpViewportHidden(getHost(), hidden)
-    },
-    getPagePreview: async (page) => {
-      if (!Number.isFinite(page) || page < 1) return null
-      if (cover.isAvailable() && page === 1) {
-        const src = getCoverUrl()
-        return src ? { kind: 'image', src } : null
-      }
-      const spineIndex = cover.isAvailable() ? page - 2 : page - 1
-      if (spineIndex < 0) return null
-      const nav = cover.navState()
-      if (nav.pageCurrent === page) {
-        const snap = await handle.captureVisiblePreview(160, 220)
-        if (snap) return { kind: 'image', src: snap }
-      }
-      const raster = await handle.rasterizeSpinePreview(spineIndex, 160, 220)
-      return raster ? { kind: 'image', src: raster } : null
     },
     repaintHighlights,
   }
@@ -475,9 +512,30 @@ function iframeContentSizesEqual(
   return a.width === b.width && a.height === b.height
 }
 
+/** One mouse-wheel tick (or a firm trackpad flick) turns one paginated page. */
+const PAGE_TURN_WHEEL_THRESHOLD = 80
+
+function wheelAxisDelta(event: WheelEvent): { x: number; y: number } {
+  const unit =
+    event.deltaMode === WheelEvent.DOM_DELTA_LINE
+      ? 16
+      : event.deltaMode === WheelEvent.DOM_DELTA_PAGE
+        ? 600
+        : 1
+  return { x: event.deltaX * unit, y: event.deltaY * unit }
+}
+
+function isEditableWheelTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof Element)) return false
+  const el = target.closest('input, textarea, select, [contenteditable="true"]')
+  return el != null
+}
+
 /** In-flow synthetic cover for continuous scroll (not a fixed viewport overlay). */
 const SCROLL_COVER_ATTR = 'data-epub-synthetic-cover'
 const SCROLL_COVER_STYLE_ATTR = 'data-epub-scroll-cover-style'
+/** Coalesce epub.js relocated bursts after a page-turn before publishing footer pages. */
+const PAGINATED_NAV_SETTLE_MS = 80
 
 function ensureScrollCoverStyles(doc: Document): void {
   const host = doc.head ?? doc.documentElement
@@ -513,6 +571,26 @@ function ensureScrollCoverStyles(doc: Document): void {
 
 function getEpubScrollContainer(host: HTMLElement): HTMLElement | null {
   return host.querySelector('.epub-container')
+}
+
+/**
+ * Stretch one continuous-scroll iframe to its document height.
+ * Do not call rendition.resize() here — that rebuilds every spine view.
+ */
+function expandEpubIframeToContent(doc: Document): void {
+  const iframe = doc.defaultView?.frameElement as HTMLIFrameElement | null
+  if (!iframe) return
+  const height = Math.ceil(
+    Math.max(
+      doc.documentElement?.scrollHeight ?? 0,
+      doc.body?.scrollHeight ?? 0,
+    ),
+  )
+  if (height <= 0) return
+  if (Math.abs(iframe.clientHeight - height) < 2) return
+  iframe.style.height = `${height}px`
+  const viewEl = iframe.closest('.epub-view') as HTMLElement | null
+  if (viewEl) viewEl.style.height = `${height}px`
 }
 
 /** Keep cover as the first in-flow block inside the continuous scroll container. */
@@ -572,8 +650,9 @@ function isContinuousScrollCoverActive(host: HTMLElement | null): boolean {
     `[${SCROLL_COVER_ATTR}]`,
   ) as HTMLElement | null
   if (!container || !cover || cover.offsetHeight <= 0) return false
-  // Still on cover until most of it has scrolled away.
-  return container.scrollTop < cover.offsetHeight * 0.75
+  // Page 1 until the cover has fully left the viewport top — a partial
+  // scroll must not map onto later reference pages.
+  return container.scrollTop < cover.offsetHeight
 }
 
 function scrollPastContinuousCover(host: HTMLElement | null): void {
@@ -593,7 +672,8 @@ function scrollToContinuousCover(host: HTMLElement | null): void {
 
 /**
  * Production EPUB surface (T3.3) — epubjs from ArrayBuffer; no FS paths.
- * Dual layout draws a center gutter; spine order includes cover as a normal page.
+ * Dual layout draws a center gutter; spine order includes cover as a section.
+ * Footer page counter uses stable content-size EPUB reference pages.
  * T3.5: page/section nav + relocated state for footer scrub.
  */
 export function EpubRenderer({
@@ -616,6 +696,7 @@ export function EpubRenderer({
   onNavState,
   onLocationChange,
   onToc,
+  onSections,
   onSelectionContextMenu,
   onTextSelected,
   onSelectionDismiss,
@@ -626,6 +707,7 @@ export function EpubRenderer({
   drawSettings,
   freehandStrokes = [],
   onFreehandStrokeComplete,
+  onFreehandStrokeClick,
   typewriterNotes,
   typewriterChapterIndex = 0,
   typewriterDraft = null,
@@ -648,6 +730,7 @@ export function EpubRenderer({
   apiRef,
 }: EpubRendererProps) {
   const hostRef = useRef<HTMLDivElement>(null)
+  const epubRootRef = useRef<HTMLElement>(null)
   const typewriterDraftRootRef = useRef<HTMLDivElement | null>(null)
   const [activeEditingId, setActiveEditingId] = useState<string | null>(null)
   const activeEditingIdRef = useRef<string | null>(null)
@@ -811,6 +894,8 @@ export function EpubRenderer({
   drawSettingsRef.current = drawSettings
   const onFreehandStrokeCompleteRef = useRef(onFreehandStrokeComplete)
   onFreehandStrokeCompleteRef.current = onFreehandStrokeComplete
+  const onFreehandStrokeClickRef = useRef(onFreehandStrokeClick)
+  onFreehandStrokeClickRef.current = onFreehandStrokeClick
   const freehandStrokesRef = useRef(freehandStrokes)
   freehandStrokesRef.current = freehandStrokes
   const inkDraftRef = useRef<{
@@ -830,6 +915,13 @@ export function EpubRenderer({
   onFocusZoomWheelRef.current = onFocusZoomWheel
   const onHandPanByRef = useRef(onHandPanBy)
   onHandPanByRef.current = onHandPanBy
+  const pageModeRef = useRef(pageMode)
+  pageModeRef.current = pageMode
+  const pageTurnWheelAccRef = useRef(0)
+  const pageTurnBusyRef = useRef(false)
+  const turnPageFromWheelRef = useRef<(event: WheelEvent) => boolean>(
+    () => false,
+  )
 
   const paintInkLayerNow = useCallback(
     (draftOverride?: FreehandDraftStroke | null) => {
@@ -1055,6 +1147,7 @@ export function EpubRenderer({
       {
         grabbing,
         hoverText: hoverTextRef.current,
+        drawingTool: drawingToolRef.current,
       },
     )
   }
@@ -1101,6 +1194,8 @@ export function EpubRenderer({
   onLocationChangeRef.current = onLocationChange
   const onTocRef = useRef(onToc)
   onTocRef.current = onToc
+  const onSectionsRef = useRef(onSections)
+  onSectionsRef.current = onSections
   const onCenterTapRef = useRef(onCenterTap)
   onCenterTapRef.current = onCenterTap
   const onSelectionContextMenuRef = useRef(onSelectionContextMenu)
@@ -1117,8 +1212,36 @@ export function EpubRenderer({
   initialLocationRef.current = initialLocation
   const apiRefProp = useRef(apiRef)
   apiRefProp.current = apiRef
+  const adjustedNavRef = useRef<(() => EpubNavState) | null>(null)
+  turnPageFromWheelRef.current = (event) => {
+    if (pageModeRef.current !== 'paginated') return false
+    if (event.ctrlKey || event.metaKey) return false
+    if (inkDraftRef.current) return false
+    if (isEditableWheelTarget(event.target)) return false
 
-  const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading')
+    const { x, y } = wheelAxisDelta(event)
+    if (Math.abs(y) <= Math.abs(x)) return false
+
+    pageTurnWheelAccRef.current += y
+    if (Math.abs(pageTurnWheelAccRef.current) < PAGE_TURN_WHEEL_THRESHOLD) {
+      return true
+    }
+    const forward = pageTurnWheelAccRef.current > 0
+    pageTurnWheelAccRef.current = 0
+    if (pageTurnBusyRef.current) return true
+
+    const api = apiRefProp.current?.current
+    if (!api) return true
+    pageTurnBusyRef.current = true
+    void (forward ? api.nextPage() : api.prevPage()).finally(() => {
+      pageTurnBusyRef.current = false
+    })
+    return true
+  }
+
+  const [status, setStatus] = useState<
+    'opening' | 'rendering' | 'ready' | 'error'
+  >('opening')
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [syntheticCoverShown, setSyntheticCoverShown] = useState(false)
   const syntheticCoverShownRef = useRef(false)
@@ -1148,7 +1271,7 @@ export function EpubRenderer({
     if (!host) return
 
     const ac = new AbortController()
-    setStatus('loading')
+    setStatus('opening')
     setErrorMessage(null)
     syntheticCoverShownRef.current = false
     setSyntheticCoverShown(false)
@@ -1169,9 +1292,18 @@ export function EpubRenderer({
       chromeHidden,
       initialLocation: initialLocationRef.current,
       signal: ac.signal,
+      onStatusChange: (nextStatus) => {
+        if (ac.signal.aborted) return
+        setStatus(nextStatus)
+      },
       onFirstRender: () => {
         if (ac.signal.aborted) return
-        setStatus('ready')
+        // No longer setStatus('ready') here, it's handled by onStatusChange
+      },
+      onLocationsReady: () => {
+        if (ac.signal.aborted) return
+        const readNav = adjustedNavRef.current
+        if (readNav) onNavStateRef.current?.(readNav())
       },
       onSelected: (payload) => {
         // Cache only — floating toolbar opens on right-click, not mouseup.
@@ -1196,23 +1328,12 @@ export function EpubRenderer({
         const getAdjustedNavState = (): EpubNavState => {
           const nav = handle.getNavState()
           if (!hasSyntheticCover()) return nav
-          const spineLength = nav.spineLength + 1
           const onCover = isScrollMode
             ? isContinuousScrollCoverActive(host)
             : syntheticCoverShownRef.current
-          const spineIndex = onCover ? 0 : nav.spineIndex + 1
-          return {
-            ...nav,
-            spineIndex,
-            spineLength,
-            pageCurrent: spineIndex + 1,
-            pageTotal: spineLength,
-            href: onCover ? '' : nav.href,
-            label: onCover ? 'Cover' : nav.label,
-            progress:
-              spineLength <= 1 ? 0 : spineIndex / (spineLength - 1),
-          }
+          return withSyntheticCoverNav(nav, onCover)
         }
+        adjustedNavRef.current = getAdjustedNavState
         const hideSyntheticCover = () => {
           // Continuous scroll: cover is in-flow — just scroll past it.
           if (isScrollMode) {
@@ -1253,21 +1374,58 @@ export function EpubRenderer({
             handle,
             coverNavigation,
             paintHighlightsNow,
-            () => coverUrlRef.current,
             () => hostRef.current,
           )
         }
 
-        const onRelocated = () => {
-          onSelectionDismissRef.current?.()
+        let relocateTimer: number | null = null
+        const publishRelocatedNav = () => {
+          if (handleRef.current !== handle) return
           onNavStateRef.current?.(getAdjustedNavState())
           const location = handle.getCurrentLocation()
           if (location) onLocationChangeRef.current?.(location)
+        }
+        const onRelocated = () => {
+          onSelectionDismissRef.current?.()
+          if (pageMode !== 'paginated') {
+            if (relocateTimer != null) {
+              window.clearTimeout(relocateTimer)
+              relocateTimer = null
+            }
+            publishRelocatedNav()
+            return
+          }
+          if (relocateTimer != null) window.clearTimeout(relocateTimer)
+          relocateTimer = window.setTimeout(() => {
+            relocateTimer = null
+            publishRelocatedNav()
+          }, PAGINATED_NAV_SETTLE_MS)
         }
         const frameCleanups = new Map<Document, () => void>()
         const frameContextByDoc = new WeakMap<Document, EpubFrameSelectionContext>()
         const attachFrameListeners = (doc: Document | null | undefined) => {
           if (!doc || frameCleanups.has(doc)) return
+          let frameActive = true
+          let lateReflowTimer: number | null = null
+          const scheduleLateContentReflow = () => {
+            if (!frameActive || pageMode !== 'scroll') return
+            if (lateReflowTimer != null) {
+              window.clearTimeout(lateReflowTimer)
+            }
+            lateReflowTimer = window.setTimeout(() => {
+              lateReflowTimer = null
+              if (!frameActive || handleRef.current !== handle) return
+              expandEpubIframeToContent(doc)
+            }, 80)
+          }
+          const onLateResourceLoad = (event: Event) => {
+            const target = event.target as Element | null
+            if (target?.localName === 'img') scheduleLateContentReflow()
+          }
+          // Images often settle after the section iframe is measured. Expand
+          // only this view — a full rendition.resize() rebuilds every iframe
+          // and loops in continuous scroll.
+          doc.addEventListener('load', onLateResourceLoad, true)
 
           const scrollRoot = (): Element | null => {
             // Scrolled flow: epubjs scrolls its own `.epub-container` wrapper
@@ -1473,10 +1631,57 @@ export function EpubRenderer({
             }
 
             // Crosshair annotate tools: placement wins — block text selection.
-            // Pencil (T5.11b): start a freehand stroke; shape/eraser stay no-ops.
+            // Pencil: start freehand stroke; eraser: hit-test delete/select; shape stays no-op.
             if (tool === 'annotate') {
               event.preventDefault()
-              if (drawingToolRef.current !== 'pencil') return
+              const drawTool = drawingToolRef.current
+              if (drawTool === 'eraser') {
+                const point = iframeClientToNormalizedInkPoint(
+                  doc,
+                  event.clientX,
+                  event.clientY,
+                )
+                if (!point) return
+                const chapterIndex = typewriterChapterIndexRef.current
+                const chapterStrokes = freehandStrokesRef.current.filter(
+                  (s) => s.chapterIndex === chapterIndex,
+                )
+                const inkHost = inkSvgTopLevelRect(doc)
+                const hitId = hitTestFreehandStrokes(point, chapterStrokes, {
+                  hostWidthPx: inkHost?.width,
+                  hostHeightPx: inkHost?.height,
+                })
+                if (!hitId) return
+                const stroke = chapterStrokes.find((s) => s.id === hitId)
+                const bb = stroke ? freehandBoundingBox(stroke.points) : null
+                const frameEl = doc.defaultView?.frameElement as HTMLElement | null
+                const fr = frameEl?.getBoundingClientRect()
+                const click = {
+                  x: event.clientX + (fr?.left ?? 0),
+                  y: event.clientY + (fr?.top ?? 0),
+                }
+                if (!stroke || !bb || !inkHost) {
+                  onFreehandStrokeClickRef.current?.({
+                    id: hitId,
+                    rect: { left: click.x, top: click.y, width: 1, height: 1 },
+                    click,
+                  })
+                  return
+                }
+                onFreehandStrokeClickRef.current?.({
+                  id: hitId,
+                  rect: {
+                    left: inkHost.left + bb.minX * inkHost.width,
+                    top: inkHost.top + bb.minY * inkHost.height,
+                    width: Math.max(8, (bb.maxX - bb.minX) * inkHost.width),
+                    height: Math.max(8, (bb.maxY - bb.minY) * inkHost.height),
+                  },
+                  click,
+                  hostRect: inkHost,
+                })
+                return
+              }
+              if (drawTool !== 'pencil') return
 
               const point = iframeClientToNormalizedInkPoint(
                 doc,
@@ -1640,6 +1845,45 @@ export function EpubRenderer({
                 clientX += fr.left
                 clientY += fr.top
               }
+
+              const inkPoint = iframeClientToNormalizedInkPoint(
+                doc,
+                event.clientX,
+                event.clientY,
+              )
+              if (inkPoint) {
+                const chapterIndex = typewriterChapterIndexRef.current
+                const chapterStrokes = freehandStrokesRef.current.filter(
+                  (s) => s.chapterIndex === chapterIndex,
+                )
+                const inkHost = inkSvgTopLevelRect(doc)
+                const hitId = hitTestFreehandStrokes(inkPoint, chapterStrokes, {
+                  hostWidthPx: inkHost?.width,
+                  hostHeightPx: inkHost?.height,
+                })
+                if (hitId) {
+                  const stroke = chapterStrokes.find((s) => s.id === hitId)
+                  const bb = stroke ? freehandBoundingBox(stroke.points) : null
+                  if (stroke && bb && inkHost) {
+                    onFreehandStrokeClickRef.current?.({
+                      id: hitId,
+                      rect: {
+                        left: inkHost.left + bb.minX * inkHost.width,
+                        top: inkHost.top + bb.minY * inkHost.height,
+                        width: Math.max(8, (bb.maxX - bb.minX) * inkHost.width),
+                        height: Math.max(
+                          8,
+                          (bb.maxY - bb.minY) * inkHost.height,
+                        ),
+                      },
+                      click: { x: clientX, y: clientY },
+                      hostRect: inkHost,
+                    })
+                    return
+                  }
+                }
+              }
+
               const hitId = hitTestTypewriterAtClientPoint(
                 chapterTypewriterNoteIdsRef.current,
                 typewriterNoteRefs.current,
@@ -1735,7 +1979,34 @@ export function EpubRenderer({
           }
 
           const onWheel = (event: WheelEvent) => {
-            if (!(event.ctrlKey || event.metaKey)) return
+            if (!(event.ctrlKey || event.metaKey)) {
+              if (pageMode === 'scroll') {
+                const container = hostRef.current
+                  ? getEpubScrollContainer(hostRef.current)
+                  : null
+                if (!container) return
+
+                const unit =
+                  event.deltaMode === WheelEvent.DOM_DELTA_LINE
+                    ? 16
+                    : event.deltaMode === WheelEvent.DOM_DELTA_PAGE
+                      ? Math.max(1, container.clientHeight)
+                      : 1
+                container.scrollBy({
+                  left: event.deltaX * unit,
+                  top: event.deltaY * unit,
+                  behavior: 'auto',
+                })
+                event.preventDefault()
+                event.stopPropagation()
+                return
+              }
+              if (turnPageFromWheelRef.current(event)) {
+                event.preventDefault()
+                event.stopPropagation()
+              }
+              return
+            }
             if (interactionToolRef.current !== 'hand') return
             const frameEl = doc.defaultView?.frameElement as HTMLElement | null
             let clientX = event.clientX
@@ -1765,6 +2036,12 @@ export function EpubRenderer({
           doc.addEventListener('click', onClick)
           doc.addEventListener('wheel', onWheel, { capture: true, passive: false })
           frameCleanups.set(doc, () => {
+            frameActive = false
+            if (lateReflowTimer != null) {
+              window.clearTimeout(lateReflowTimer)
+              lateReflowTimer = null
+            }
+            doc.removeEventListener('load', onLateResourceLoad, true)
             doc.removeEventListener('contextmenu', onContextMenu)
             doc.removeEventListener('pointerdown', onPointerDown, true)
             doc.removeEventListener('pointermove', onPointerHoverMove, true)
@@ -1844,9 +2121,12 @@ export function EpubRenderer({
           if (initialCfi) onLocationChangeRef.current?.(initialCfi)
         }
         onTocRef.current?.(handle.getToc())
+        onSectionsRef.current?.(
+          apiRefProp.current?.current?.getSectionLabels() ??
+            handle.getSectionLabels(),
+        )
         // Initial paint once rendition is ready (hydrate + live highlights).
         paintHighlightsNow()
-        setStatus('ready')
         // Host may still be settling after the loading shell unmounts; force a
         // layout pass so the first page is not blank until the user turns a page.
         requestAnimationFrame(() => {
@@ -1860,6 +2140,10 @@ export function EpubRenderer({
         ac.signal.addEventListener(
           'abort',
           () => {
+            if (relocateTimer != null) {
+              window.clearTimeout(relocateTimer)
+              relocateTimer = null
+            }
             handle.rendition.off('relocated', onRelocated)
             cleanupFrameListeners()
           },
@@ -1886,6 +2170,7 @@ export function EpubRenderer({
       handleRef.current?.destroy()
       handleRef.current = null
       overlayPainterRef.current = null
+      adjustedNavRef.current = null
       syntheticCoverShownRef.current = false
       if (apiRefProp.current) apiRefProp.current.current = null
     }
@@ -1977,6 +2262,7 @@ export function EpubRenderer({
           hoverTextRef.current &&
           interactionTool === 'hand' &&
           !grabbingRef.current,
+        drawingTool,
       })
     apply()
 
@@ -1997,9 +2283,10 @@ export function EpubRenderer({
       applyInteractionToolSurface(host, 'hand', {
         grabbing: false,
         hoverText: false,
+        drawingTool: null,
       })
     }
-  }, [interactionTool, status])
+  }, [interactionTool, drawingTool, status])
 
   useEffect(() => {
     const handle = handleRef.current
@@ -2040,32 +2327,53 @@ export function EpubRenderer({
       syntheticCoverShownRef.current = true
       setSyntheticCoverShown(true)
       const nav = handle.getNavState()
-      const spineLength = nav.spineLength + 1
-      onNavStateRef.current?.({
-        ...nav,
-        spineIndex: 0,
-        spineLength,
-        pageCurrent: 1,
-        pageTotal: spineLength,
-        href: '',
-        label: 'Cover',
-        progress: 0,
-      })
+      onNavStateRef.current?.(withSyntheticCoverNav(nav, true))
     }
   }, [coverUrl, status, pageMode])
 
   useEffect(() => {
+    if (pageMode !== 'paginated' || status !== 'ready') return
+    const root = epubRootRef.current
+    if (!root) return
+    pageTurnWheelAccRef.current = 0
+    const onWheel = (event: WheelEvent) => {
+      if (turnPageFromWheelRef.current(event)) {
+        event.preventDefault()
+        event.stopPropagation()
+      }
+    }
+    root.addEventListener('wheel', onWheel, { capture: true, passive: false })
+    return () => root.removeEventListener('wheel', onWheel, true)
+  }, [pageMode, status])
+
+  useEffect(() => {
     const host = hostRef.current
     if (!host) return
+    let lastWidth = host.clientWidth
+    let lastHeight = host.clientHeight
+    let timer: number | null = null
     const ro = new ResizeObserver(() => {
-      handleRef.current?.resize()
+      const width = host.clientWidth
+      const height = host.clientHeight
+      if (width === lastWidth && height === lastHeight) return
+      lastWidth = width
+      lastHeight = height
+      if (timer != null) window.clearTimeout(timer)
+      timer = window.setTimeout(() => {
+        timer = null
+        handleRef.current?.resize()
+      }, 100)
     })
     ro.observe(host)
-    return () => ro.disconnect()
+    return () => {
+      if (timer != null) window.clearTimeout(timer)
+      ro.disconnect()
+    }
   }, [status])
 
   // Continuous scroll is a single reflowing column — no page spread gutters.
-  const showGutter = layout !== 'single' && pageMode !== 'scroll' && status === 'ready'
+  const showGutter =
+    layout !== 'single' && pageMode !== 'scroll' && status === 'ready'
 
   // ── Custom scrollbar for scroll mode ──────────────────────────────────────
   // epubjs (scrolled / continuous flow) scrolls its own `.epub-container`
@@ -2118,11 +2426,20 @@ export function EpubRenderer({
     let navRaf: number | null = null
     let lastOnCover: boolean | null = null
 
+    const publishScrollNav = () => {
+      const api = apiRefProp.current?.current
+      if (!api) return
+      onNavStateRef.current?.(api.getNavState())
+    }
+
     const publishCoverNav = () => {
       const api = apiRefProp.current?.current
       if (!api) return
       const onCover = isContinuousScrollCoverActive(host)
-      if (lastOnCover === onCover) return
+      if (lastOnCover === onCover) {
+        publishScrollNav()
+        return
+      }
       lastOnCover = onCover
       onNavStateRef.current?.(api.getNavState())
     }
@@ -2192,7 +2509,8 @@ export function EpubRenderer({
     }
   }, [pageMode, status, updateScrollThumb, coverUrl])
 
-  const showCustomScrollbar = pageMode === 'scroll' && status === 'ready' && scrollThumb.height > 0
+  const showCustomScrollbar =
+    pageMode === 'scroll' && status === 'ready' && scrollThumb.height > 0
 
   useEffect(() => {
     if (status !== 'ready') {
@@ -2586,47 +2904,51 @@ export function EpubRenderer({
 
   return (
     <main
+      ref={epubRootRef}
       className={`relative flex min-h-0 flex-1 flex-col overflow-hidden ${className ?? ''}`}
       data-epub-status={status}
       data-epub-layout={layout}
       data-epub-page-mode={pageMode}
     >
-      {status === 'loading' && (
-        <div className="pointer-events-none absolute inset-0 z-10 flex flex-col items-center justify-center gap-3">
-          <div
-            className="size-9 shrink-0 animate-spin rounded-full border-[3px] border-current/20 border-t-current opacity-80"
-            aria-hidden
-          />
-          <span className="text-sm opacity-70">Opening book…</span>
+      {(status === 'opening' || status === 'rendering') && (
+        <div className="pointer-events-none absolute inset-0 z-10 flex flex-col items-center justify-center gap-4 bg-lib-surface-strong/80 backdrop-blur-sm">
+          <div className="flex w-48 flex-col gap-3">
+            <div className="flex items-center justify-between text-sm font-medium text-lib-text-strong">
+              <span>
+                {status === 'opening'
+                  ? 'Opening book...'
+                  : 'Preparing your book...'}
+              </span>
+            </div>
+            <div className="h-1.5 w-full overflow-hidden rounded-full bg-lib-border-soft">
+              <div className="h-full w-1/3 animate-import-indeterminate rounded-full bg-lib-accent" />
+            </div>
+          </div>
         </div>
       )}
       {status === 'error' && (
-        <div className="absolute inset-0 z-10 flex items-center justify-center px-6 text-center text-sm text-rose-300">
-          {errorMessage ?? 'Could not open this EPUB.'}
+        <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-4 bg-lib-surface-strong px-6 text-center">
+          <div className="text-base font-medium text-rose-500">
+            {errorMessage ?? 'Unable to open this book'}
+          </div>
+          <button
+            type="button"
+            className="rounded-md bg-lib-surface-hover px-4 py-2 text-sm font-medium text-lib-text-strong hover:bg-lib-chip"
+            onClick={() => window.location.reload()}
+          >
+            Try Again
+          </button>
         </div>
       )}
-      {/* Multi-page spread gutters — visible gray bands between page columns. */}
+      {/* Dual-page spread gutter — visible gray band between page columns. */}
       {showGutter ? (
-        <>
-          <div
-            className={`pointer-events-none absolute inset-y-0 z-[7] flex w-3 -translate-x-1/2 flex-col items-center justify-stretch ${
-              layout === 'triple' ? 'left-1/3' : 'left-1/2'
-            }`}
-            aria-hidden
-          >
-            <div className="h-full w-full bg-neutral-500/20" />
-            <div className="absolute inset-y-0 left-1/2 w-px -translate-x-1/2 bg-neutral-400/75" />
-          </div>
-          {layout === 'triple' ? (
-            <div
-              className="pointer-events-none absolute inset-y-0 left-2/3 z-[7] flex w-3 -translate-x-1/2 flex-col items-center justify-stretch"
-              aria-hidden
-            >
-              <div className="h-full w-full bg-neutral-500/20" />
-              <div className="absolute inset-y-0 left-1/2 w-px -translate-x-1/2 bg-neutral-400/75" />
-            </div>
-          ) : null}
-        </>
+        <div
+          className="pointer-events-none absolute inset-y-0 left-1/2 z-[7] flex w-3 -translate-x-1/2 flex-col items-center justify-stretch"
+          aria-hidden
+        >
+          <div className="h-full w-full bg-neutral-500/20" />
+          <div className="absolute inset-y-0 left-1/2 w-px -translate-x-1/2 bg-neutral-400/75" />
+        </div>
       ) : null}
       {/* Paginated only: fixed overlay. Scroll mode injects cover into .epub-container. */}
       {syntheticCoverShown && coverUrl && pageMode !== 'scroll' ? (
@@ -2644,7 +2966,9 @@ export function EpubRenderer({
       ) : null}
       <div
         ref={hostRef}
-        className={`h-full w-full min-h-0 flex-1 [&_iframe]:h-full [&_iframe]:w-full ${
+        className={`h-full w-full min-h-0 flex-1 [&_iframe]:w-full ${
+          pageMode === 'scroll' ? '' : '[&_iframe]:h-full'
+        } ${
           interactionTool === 'highlight'
             ? 'cursor-highlight-tool'
             : interactionTool === 'typewriter'

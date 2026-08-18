@@ -1,14 +1,19 @@
 import path from 'node:path'
-import { ipcMain } from 'electron'
+import fsp from 'node:fs/promises'
+import { clipboard, ipcMain, shell } from 'electron'
 import type { Book } from '@reading-book/domain'
 import { coverUrlForBookId } from '../files/cover-protocol'
 import { openBookContent } from '../files/open-book-content'
+import { assertPathAllowed, getBooksSandboxPath } from '../files/sandbox'
 import { getLibraryStore } from '../persistence/sqlite-library-store'
 import type {
   BookSummaryDto,
+  CollectionSummaryDto,
   DocumentFormatDto,
   OkResult,
   OpenBookContentResult,
+  ReadingStatusDto,
+  UpdateBookMetadataInput,
 } from './api-types'
 import { LibraryChannels } from './channels'
 
@@ -17,6 +22,7 @@ function toSummaryDto(
   authorNames: string,
   genreNames: string[] = [],
   session?: { lastReadLocation?: string; lastReadAt?: string },
+  readingStatus: ReadingStatusDto = 'not-started',
 ): BookSummaryDto {
   const fileName = path.basename(book.filePath)
   const dto: BookSummaryDto = {
@@ -27,6 +33,7 @@ function toSummaryDto(
     updatedAt: book.updatedAt,
     fileName,
     isFavorite: book.isFavorite,
+    readingStatus,
   }
   if (book.coverPath) dto.coverUrl = coverUrlForBookId(book.id)
   if (authorNames.trim()) dto.author = authorNames
@@ -36,7 +43,6 @@ function toSummaryDto(
   if (book.pageCount != null) dto.pageCount = book.pageCount
   if (session?.lastReadLocation) {
     dto.lastReadLocation = session.lastReadLocation
-    dto.readingStatus = 'reading'
     if (session.lastReadAt) dto.lastReadAt = session.lastReadAt
   }
   return dto
@@ -47,8 +53,8 @@ export function registerLibraryIpc(): void {
   ipcMain.removeHandler(LibraryChannels.listBooks)
   ipcMain.handle(LibraryChannels.listBooks, async (): Promise<BookSummaryDto[]> => {
     const rows = await getLibraryStore().listAll()
-    return rows.map(({ book, authorNames, genreNames, session }) =>
-      toSummaryDto(book, authorNames, genreNames, session),
+    return rows.map(({ book, authorNames, genreNames, session, readingStatus }) =>
+      toSummaryDto(book, authorNames, genreNames, session, readingStatus),
     )
   })
 
@@ -63,7 +69,8 @@ export function registerLibraryIpc(): void {
       const authorNames = store.authorNamesForBook(book.id)
       const genreNames = store.genreNamesForBook(book.id)
       const session = store.getReadingSessionSummary(book.id)
-      return toSummaryDto(book, authorNames, genreNames, session)
+      const readingStatus = store.readingStatusForBook(book.id)
+      return toSummaryDto(book, authorNames, genreNames, session, readingStatus)
     },
   )
 
@@ -96,8 +103,251 @@ export function registerLibraryIpc(): void {
     },
   )
 
-  ipcMain.removeHandler(LibraryChannels.deleteBook)
-  ipcMain.handle(LibraryChannels.deleteBook, async (_event, _id: string): Promise<OkResult> => ({
-    ok: true,
-  }))
+  ipcMain.removeHandler(LibraryChannels.markAsCompleted)
+  ipcMain.handle(
+    LibraryChannels.markAsCompleted,
+    async (_event, id: unknown): Promise<OkResult> => {
+      if (typeof id !== 'string' || !id.trim()) return { ok: false }
+      const store = getLibraryStore()
+      if (!(await store.findById(id.trim()))) return { ok: false }
+      store.setReadingStatus(id.trim(), 'completed')
+      return { ok: true }
+    },
+  )
+
+  ipcMain.removeHandler(LibraryChannels.setFavorite)
+  ipcMain.handle(
+    LibraryChannels.setFavorite,
+    async (_event, id: unknown, value: unknown): Promise<OkResult> => {
+      if (
+        typeof id !== 'string' ||
+        !id.trim() ||
+        typeof value !== 'boolean'
+      ) {
+        return { ok: false }
+      }
+      const store = getLibraryStore()
+      if (!(await store.findById(id.trim()))) return { ok: false }
+      store.setFavorite(id.trim(), value)
+      return { ok: true }
+    },
+  )
+
+  ipcMain.removeHandler(LibraryChannels.updateMetadata)
+  ipcMain.handle(
+    LibraryChannels.updateMetadata,
+    async (_event, input: unknown): Promise<OkResult> => {
+      if (!input || typeof input !== 'object') return { ok: false }
+      const value = input as Partial<UpdateBookMetadataInput>
+      if (
+        typeof value.id !== 'string' ||
+        !value.id.trim() ||
+        typeof value.title !== 'string' ||
+        !value.title.trim()
+      ) {
+        return { ok: false }
+      }
+      const store = getLibraryStore()
+      const id = value.id.trim()
+      if (!(await store.findById(id))) return { ok: false }
+      store.updateLibraryMetadata(id, {
+        title: value.title,
+        description:
+          typeof value.description === 'string' ? value.description : null,
+        pageCount:
+          typeof value.pageCount === 'number' ? value.pageCount : null,
+      })
+      store.replaceAuthorsByName(
+        id,
+        typeof value.author === 'string' ? [value.author] : [],
+      )
+      store.replaceGenresByName(
+        id,
+        Array.isArray(value.genres)
+          ? value.genres.filter((genre): genre is string => typeof genre === 'string')
+          : [],
+      )
+      return { ok: true }
+    },
+  )
+
+  ipcMain.removeHandler(LibraryChannels.showInFolder)
+  ipcMain.handle(
+    LibraryChannels.showInFolder,
+    async (_event, id: unknown): Promise<OkResult> => {
+      if (typeof id !== 'string' || !id.trim()) return { ok: false }
+      const book = await getLibraryStore().findById(id.trim())
+      if (!book) return { ok: false }
+      shell.showItemInFolder(assertPathAllowed(book.filePath))
+      return { ok: true }
+    },
+  )
+
+  ipcMain.removeHandler(LibraryChannels.copyFilePath)
+  ipcMain.handle(
+    LibraryChannels.copyFilePath,
+    async (_event, id: unknown): Promise<OkResult> => {
+      if (typeof id !== 'string' || !id.trim()) return { ok: false }
+      const book = await getLibraryStore().findById(id.trim())
+      if (!book) return { ok: false }
+      clipboard.writeText(assertPathAllowed(book.filePath))
+      return { ok: true }
+    },
+  )
+
+  ipcMain.removeHandler(LibraryChannels.removeBook)
+  ipcMain.handle(
+    LibraryChannels.removeBook,
+    async (_event, id: unknown): Promise<OkResult> => {
+      if (typeof id !== 'string' || !id.trim()) return { ok: false }
+      const store = getLibraryStore()
+      if (!(await store.findById(id.trim()))) return { ok: false }
+      await store.deleteCascade(id.trim())
+      return { ok: true }
+    },
+  )
+
+  ipcMain.removeHandler(LibraryChannels.deleteBookFile)
+  ipcMain.handle(
+    LibraryChannels.deleteBookFile,
+    async (_event, id: unknown): Promise<OkResult> => {
+      if (typeof id !== 'string' || !id.trim()) return { ok: false }
+      const store = getLibraryStore()
+      const book = await store.findById(id.trim())
+      if (!book) return { ok: false }
+      const filePath = assertPathAllowed(book.filePath)
+      const bookDir = path.dirname(filePath)
+      if (path.resolve(bookDir) === path.resolve(getBooksSandboxPath())) {
+        return { ok: false }
+      }
+      await fsp.chmod(filePath, 0o666).catch(() => {})
+      await fsp.rm(bookDir, { recursive: true, force: true })
+      await store.deleteCascade(book.id)
+      return { ok: true }
+    },
+  )
+
+  ipcMain.removeHandler(LibraryChannels.listCollections)
+  ipcMain.handle(
+    LibraryChannels.listCollections,
+    async (): Promise<CollectionSummaryDto[]> =>
+      getLibraryStore().listCollections(),
+  )
+
+  ipcMain.removeHandler(LibraryChannels.createCollection)
+  ipcMain.handle(
+    LibraryChannels.createCollection,
+    async (_event, input: unknown): Promise<CollectionSummaryDto> => {
+      const value =
+        input && typeof input === 'object'
+          ? (input as { name?: unknown; description?: unknown })
+          : {}
+      if (typeof value.name !== 'string' || !value.name.trim()) {
+        throw new Error('Collection name is required')
+      }
+      return getLibraryStore().createCollection({
+        name: value.name,
+        description:
+          typeof value.description === 'string' ? value.description : undefined,
+      })
+    },
+  )
+
+  ipcMain.removeHandler(LibraryChannels.updateCollection)
+  ipcMain.handle(
+    LibraryChannels.updateCollection,
+    async (
+      _event,
+      collectionId: unknown,
+      input: unknown,
+    ): Promise<CollectionSummaryDto | null> => {
+      const value =
+        input && typeof input === 'object'
+          ? (input as { name?: unknown; description?: unknown })
+          : {}
+      if (
+        typeof collectionId !== 'string' ||
+        !collectionId.trim() ||
+        typeof value.name !== 'string' ||
+        !value.name.trim()
+      ) {
+        return null
+      }
+      return (
+        getLibraryStore().updateCollection(collectionId.trim(), {
+          name: value.name,
+          description:
+            typeof value.description === 'string'
+              ? value.description
+              : undefined,
+        }) ?? null
+      )
+    },
+  )
+
+  ipcMain.removeHandler(LibraryChannels.deleteCollection)
+  ipcMain.handle(
+    LibraryChannels.deleteCollection,
+    async (_event, collectionId: unknown): Promise<OkResult> => {
+      if (typeof collectionId !== 'string' || !collectionId.trim()) {
+        return { ok: false }
+      }
+      return {
+        ok: getLibraryStore().deleteCollection(collectionId.trim()),
+      }
+    },
+  )
+
+  ipcMain.removeHandler(LibraryChannels.addBookToCollection)
+  ipcMain.handle(
+    LibraryChannels.addBookToCollection,
+    async (
+      _event,
+      collectionId: unknown,
+      bookId: unknown,
+    ): Promise<OkResult> => {
+      if (
+        typeof collectionId !== 'string' ||
+        !collectionId.trim() ||
+        typeof bookId !== 'string' ||
+        !bookId.trim()
+      ) {
+        return { ok: false }
+      }
+      const store = getLibraryStore()
+      const hasCollection = store
+        .listCollections()
+        .some((collection) => collection.id === collectionId.trim())
+      if (!hasCollection || !(await store.findById(bookId.trim()))) {
+        return { ok: false }
+      }
+      store.addBookToCollection(collectionId.trim(), bookId.trim())
+      return { ok: true }
+    },
+  )
+
+  ipcMain.removeHandler(LibraryChannels.removeBookFromCollection)
+  ipcMain.handle(
+    LibraryChannels.removeBookFromCollection,
+    async (
+      _event,
+      collectionId: unknown,
+      bookId: unknown,
+    ): Promise<OkResult> => {
+      if (
+        typeof collectionId !== 'string' ||
+        !collectionId.trim() ||
+        typeof bookId !== 'string' ||
+        !bookId.trim()
+      ) {
+        return { ok: false }
+      }
+      return {
+        ok: getLibraryStore().removeBookFromCollection(
+          collectionId.trim(),
+          bookId.trim(),
+        ),
+      }
+    },
+  )
 }

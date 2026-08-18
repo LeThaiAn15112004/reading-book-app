@@ -36,7 +36,9 @@ export const READER_FOOTER_HEIGHT_PX = 40
 export function sidebarContentInsetLeft(
   open: boolean,
   panelWidth: number = SIDEBAR_PANEL_WIDTH_PX,
+  options?: { hideRail?: boolean },
 ): number {
+  if (options?.hideRail && !open) return 0
   return open
     ? SIDEBAR_RAIL_WIDTH_PX + panelWidth
     : SIDEBAR_RAIL_WIDTH_PX

@@ -24,6 +24,10 @@ export {
   useReaderChromeMenu,
 } from './ReaderChromeMenuContext'
 export {
+  ImmersiveReadingProvider,
+  useImmersiveReading,
+} from './ImmersiveReadingContext'
+export {
   GlobalReadingPrefsProvider,
   useGlobalReadingPrefs,
   fontFamilyCss,

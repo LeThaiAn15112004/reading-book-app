@@ -1,5 +1,5 @@
 import { formatFileSizeMb } from '@reading-book/shared/models'
-import { BookCover } from '../book/BookCover'
+import { BookCover, BookMenuButton, type BookMenuPoint } from '../book'
 
 export type ShelfDetailItemData = {
   id: string
@@ -44,22 +44,6 @@ function ChevronIcon({ className }: { className?: string }) {
   )
 }
 
-function MoreVertIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      viewBox="0 0 24 24"
-      fill="currentColor"
-      className={className}
-      aria-hidden
-    >
-      <circle cx="12" cy="5" r="1.75" />
-      <circle cx="12" cy="12" r="1.75" />
-      <circle cx="12" cy="19" r="1.75" />
-    </svg>
-  )
-}
-
 function buildMetaLine(item: ShelfDetailItemData): string | undefined {
   const parts: string[] = []
   const genreLabel =
@@ -79,14 +63,14 @@ function buildMetaLine(item: ShelfDetailItemData): string | undefined {
 export type ShelfDetailItemProps = {
   item: ShelfDetailItemData
   onOpen: (id: string) => void
-  onBookInfo?: (id: string) => void
+  onBookMenu: (id: string, point: BookMenuPoint) => void
 }
 
 /** One SCR-01a vertical row: cover · meta · progress · ⋮ · › */
 export function ShelfDetailItem({
   item,
   onOpen,
-  onBookInfo,
+  onBookMenu,
 }: ShelfDetailItemProps) {
   const formatBadge = item.format?.trim().toUpperCase()
   const progressKind =
@@ -96,7 +80,13 @@ export function ShelfDetailItem({
 
   return (
     <li>
-      <div className="group relative flex w-full items-center gap-3.5 rounded-[10px] border border-lib-border bg-lib-surface p-3 transition-[border-color,background-color,transform] hover:-translate-y-px hover:border-lib-accent-ring hover:bg-[rgb(30_41_59/0.55)] focus-within:border-lib-accent-ring">
+      <div
+        className="group relative flex w-full items-center gap-3.5 rounded-[10px] border border-lib-border bg-lib-surface p-3 transition-[border-color,background-color,transform] hover:-translate-y-px hover:border-lib-accent-ring hover:bg-[rgb(30_41_59/0.55)] focus-within:border-lib-accent-ring"
+        onContextMenu={(event) => {
+          event.preventDefault()
+          onBookMenu(item.id, { x: event.clientX, y: event.clientY })
+        }}
+      >
         <button
           type="button"
           className="flex min-w-0 flex-1 cursor-pointer items-center gap-3.5 border-none bg-transparent p-0 text-left font-[inherit] text-inherit focus-visible:outline-none"
@@ -159,21 +149,11 @@ export function ShelfDetailItem({
         </button>
 
         <div className="flex shrink-0 items-center gap-0.5">
-          {onBookInfo ? (
-            <button
-              type="button"
-              className="inline-flex size-9 cursor-pointer items-center justify-center rounded-lg border-none bg-transparent text-lib-faint opacity-70 transition-[opacity,color,background-color] group-hover:opacity-100 hover:bg-white/5 hover:text-lib-text-strong focus-visible:bg-white/5 focus-visible:text-lib-text-strong focus-visible:opacity-100 focus-visible:outline-none"
-              aria-label={`Book info for ${item.title}`}
-              title="Book info"
-              onClick={(e) => {
-                e.preventDefault()
-                e.stopPropagation()
-                onBookInfo(item.id)
-              }}
-            >
-              <MoreVertIcon className="size-5" />
-            </button>
-          ) : null}
+          <BookMenuButton
+            title={item.title}
+            className="opacity-70 group-hover:opacity-100 focus-visible:opacity-100"
+            onOpen={(point) => onBookMenu(item.id, point)}
+          />
 
           <button
             type="button"

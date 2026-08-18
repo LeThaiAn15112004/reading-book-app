@@ -5,6 +5,7 @@ import type {
 import type {
   ReaderBookmark,
   ReaderHighlight,
+  ReaderShapeAnnotation,
   ReaderTypewriterNote,
 } from './reader-session.js'
 
@@ -15,7 +16,10 @@ export type AnnotationUndoHandlers = {
   removeTypewriter: (id: string) => void
   restoreBookmark: (b: ReaderBookmark) => void
   removeBookmark: (id: string) => void
+  restoreFreehand: (s: ReaderShapeAnnotation) => void
+  removeFreehand: (id: string) => void
   onHighlightReplaced?: (h: ReaderHighlight) => void
+  onFreehandReplaced?: (s: ReaderShapeAnnotation) => void
 }
 
 function applySnapshot(
@@ -35,6 +39,10 @@ function applySnapshot(
     case 'bookmark':
       if (mode === 'restore') h.restoreBookmark(snapshot.value)
       else h.removeBookmark(snapshot.value.id)
+      break
+    case 'freehand':
+      if (mode === 'restore') h.restoreFreehand(snapshot.value)
+      else h.removeFreehand(snapshot.value.id)
       break
   }
 }
@@ -65,5 +73,8 @@ export function applyAnnotationHistoryStep(
   applySnapshot(target, 'restore', handlers)
   if (target.entity === 'highlight') {
     handlers.onHighlightReplaced?.(target.value)
+  }
+  if (target.entity === 'freehand') {
+    handlers.onFreehandReplaced?.(target.value)
   }
 }

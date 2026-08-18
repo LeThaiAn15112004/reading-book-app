@@ -7,6 +7,7 @@ import {
 } from './files/cover-protocol'
 import { ensureBooksSandbox } from './files/sandbox'
 import { registerAllIpcHandlers } from './ipc'
+import { installFullscreenShortcuts } from './ipc/app.ipc'
 import { AppChannels } from './ipc/channels'
 import { closeDatabase, openDatabase } from './persistence/db'
 import { backfillLibraryMetadataFromFiles } from './persistence/backfill-library-metadata'
@@ -206,6 +207,7 @@ function createWindow() {
   })
 
   installDevToolsShortcuts(win)
+  installFullscreenShortcuts(win)
 
   if (VITE_DEV_SERVER_URL) {
     win.loadURL(VITE_DEV_SERVER_URL)

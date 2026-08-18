@@ -10,4 +10,6 @@ export {
   type CompanionTool,
   type ModeTool,
 } from './ToolsMenu'
+export { FullscreenButton } from './FullscreenButton'
+export { ImmersiveExitButton } from './ImmersiveExitButton'
 export { ZoomControl } from './ZoomControl'

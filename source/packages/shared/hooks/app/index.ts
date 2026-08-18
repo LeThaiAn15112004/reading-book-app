@@ -34,3 +34,7 @@ export type {
   GlobalReadingPrefsProviderProps,
   GlobalReadingPrefsStorage,
 } from './GlobalReadingPrefsContext.js'
+
+export { useLinkedLibraries } from './useLinkedLibraries.js'
+export type { UseLinkedLibrariesOptions } from './useLinkedLibraries.js'
+

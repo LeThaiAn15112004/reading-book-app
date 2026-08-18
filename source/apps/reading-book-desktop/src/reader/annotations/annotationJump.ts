@@ -4,7 +4,7 @@
  * Read Era / Foxit style: land on the final centered frame (no smooth pan).
  */
 
-import { READER_CHROME_TRANSITION_MS } from './readerChromeInteraction'
+import { READER_CHROME_TRANSITION_MS } from '../chrome/readerChromeInteraction'
 
 export type AnnotationFocusTarget =
   | { kind: 'highlight'; id: string }

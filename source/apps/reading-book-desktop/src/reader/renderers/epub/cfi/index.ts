@@ -1,0 +1,46 @@
+export {
+  CfiCodec,
+  cfiCodec,
+  tryEncodeCfi,
+  type EpubCfiEncodeInput,
+  type EpubCfiDecodeResult,
+} from './cfi-codec'
+export {
+  cfiChapterSignature,
+  cfiCharacterOffset,
+  characterOffsetToBoundary,
+  collectDescendantTextNodes,
+  documentTextLength,
+  elementFromCfi,
+  findRangeByText,
+  isTrivialSectionStartCfi,
+  parseCfi,
+  rangeBetweenBoundaries,
+  rangeMatchesText,
+  rangeTextCoverage,
+  resolveCfiBoundary,
+  resolveCfiRange,
+  splitCfiComponents,
+  installEpubjsStartContainerLogFilter,
+  withEpubjsStartContainerLogMuted,
+  withEpubjsStartContainerLogMutedAsync,
+  type CfiBoundary,
+  type CfiDomOptions,
+} from './cfi-dom-range'
+export {
+  cfiRangesOverlap,
+  elementToHighlightHandleRect,
+  emptyHighlightHandleRect,
+  iframeRangeToViewportRect,
+  rangeToHighlightHandleRect,
+  splitCfiRange,
+  toEpubjsDisplayCfi,
+  viewportRectToHighlightHandleRect,
+  type SplitCfiRange,
+} from './selection-cfi'
+export {
+  captureTypewriterAnchor,
+  iframeClientToBodyPoint,
+  resolveTypewriterIframePoint,
+  typewriterBelongsToRenderedSection,
+} from './typewriter-cfi-anchor'

@@ -13,8 +13,12 @@
     "./hooks/reader": "./hooks/reader/index.ts",
     "./models": "./models/index.ts",
     "./services": "./services/index.ts",
-    "./utils": "./utils/index.ts"
+    "./utils": "./utils/index.ts",
+    "./storage": "./storage/index.ts",
+    "./repositories": "./repositories/index.ts",
+    "./adapters": "./adapters/external-libraries/index.ts"
   },
+
   "scripts": {
     "typecheck": "tsc --noEmit"
   },

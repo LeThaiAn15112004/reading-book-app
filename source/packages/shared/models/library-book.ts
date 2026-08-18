@@ -135,7 +135,9 @@ export function mapBookSummary(dto: BookSummaryInput): LibraryBook {
 
 /** Most recently updated book that has a last-read location (FR-08 / T1.7). */
 export function pickContinueReading(books: LibraryBook[]): LibraryBook | null {
-  const withLast = books.filter((b) => Boolean(b.lastReadLocation))
+  const withLast = books.filter(
+    (book) => book.status === 'reading' && Boolean(book.lastReadLocation),
+  )
   if (withLast.length === 0) return null
   return withLast.reduce((best, b) => {
     const a = best.lastReadAt ?? ''

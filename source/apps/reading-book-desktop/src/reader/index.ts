@@ -1,4 +1,4 @@
-export { ReaderShell, type ReaderShellProps } from './ReaderShell'
+export { ReaderShell, type ReaderShellProps } from './chrome'
 export {
   focusAnnotationInDocument,
   focusAnnotationInEpubHost,
@@ -7,7 +7,7 @@ export {
   setAnnotationJumpViewportHidden,
   waitForAnnotationLayoutSettle,
   type AnnotationFocusTarget,
-} from './annotationJump'
+} from './annotations'
 export {
   DomCssOverlay,
   highlightsToEpubMarks,

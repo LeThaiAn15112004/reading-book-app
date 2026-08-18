@@ -31,13 +31,11 @@ import {
   splitCfiComponents,
   withEpubjsStartContainerLogMuted,
   type CfiDomOptions,
-} from '../renderers/epub/cfi-dom-range'
-import {
   elementToHighlightHandleRect,
   emptyHighlightHandleRect,
   rangeToHighlightHandleRect,
   splitCfiRange,
-} from '../renderers/epub/selection-cfi'
+} from '../renderers/epub/cfi'
 
 type AnnotationsApi = {
   highlight: (

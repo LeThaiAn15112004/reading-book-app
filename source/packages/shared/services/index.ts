@@ -9,3 +9,12 @@ export { DeleteAnnotationService } from './delete-annotation.js';
 export { ListAnnotationsService } from './list-annotations.js';
 export { CreateCollectionService } from './create-collection.js';
 export { ManageCollectionBooksService } from './manage-collection-books.js';
+export {
+  linkExternalLibrary,
+  unlinkExternalLibrary,
+  pullExternalCatalog,
+  getExternalLibraryStatus,
+  getAllExternalLibrariesStatus,
+  testExternalLibraryConnection,
+} from './external-library.js';
+

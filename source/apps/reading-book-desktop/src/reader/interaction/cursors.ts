@@ -11,6 +11,10 @@ const HIGHLIGHT_CURSOR_PATH = '/cursors/highlighter.svg'
 const TYPEWRITER_CURSOR_HOTSPOT = { x: 16, y: 26 } as const
 const TYPEWRITER_CURSOR_PATH = '/cursors/typewriter.svg'
 
+/** Hotspot at the pencil tip (bottom-left). */
+const PENCIL_CURSOR_HOTSPOT = { x: 4, y: 28 } as const
+const PENCIL_CURSOR_PATH = '/cursors/pencil.svg'
+
 const SURFACE_STYLE_ID = 'rb-interaction-surface-style'
 
 const SURFACE_CLASSES = [
@@ -19,6 +23,8 @@ const SURFACE_CLASSES = [
   'rb-tool-highlight',
   'rb-tool-typewriter',
   'rb-tool-annotate',
+  'rb-drawing-pencil',
+  'rb-drawing-eraser',
   'rb-grabbing',
   'rb-hover-text',
 ] as const
@@ -42,6 +48,14 @@ export function typewriterToolCursorCss(): string {
   return `url("${href}") ${TYPEWRITER_CURSOR_HOTSPOT.x} ${TYPEWRITER_CURSOR_HOTSPOT.y}, text`
 }
 
+export function pencilToolCursorCss(): string {
+  const href =
+    typeof window !== 'undefined'
+      ? new URL(PENCIL_CURSOR_PATH, window.location.origin).href
+      : PENCIL_CURSOR_PATH
+  return `url("${href}") ${PENCIL_CURSOR_HOTSPOT.x} ${PENCIL_CURSOR_HOTSPOT.y}, crosshair`
+}
+
 /**
  * Stylesheet injected into EPUB iframes.
  * Hand I-beam/pointer over text requires `rb-hover-text` (armed after hover dwell).
@@ -49,6 +63,7 @@ export function typewriterToolCursorCss(): string {
 function surfaceStyleCss(): string {
   const highlightCursor = highlightToolCursorCss()
   const typewriterCursor = typewriterToolCursorCss()
+  const pencilCursor = pencilToolCursorCss()
   return `
 /* Hand default: grab everywhere — avoids cursor flicker while panning over text. */
 html.rb-tool-hand,
@@ -126,6 +141,24 @@ html.rb-tool-annotate body * {
   user-select: none;
   -webkit-user-select: none;
 }
+
+/* Pencil drawing tool: dedicated pencil cursor. */
+html.rb-tool-annotate.rb-drawing-pencil,
+html.rb-tool-annotate.rb-drawing-pencil body,
+html.rb-tool-annotate.rb-drawing-pencil body * {
+  cursor: ${pencilCursor};
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* Eraser: cell cursor for stroke deletion. */
+html.rb-tool-annotate.rb-drawing-eraser,
+html.rb-tool-annotate.rb-drawing-eraser body,
+html.rb-tool-annotate.rb-drawing-eraser body * {
+  cursor: cell;
+  user-select: none;
+  -webkit-user-select: none;
+}
 `
 }
 
@@ -151,11 +184,18 @@ function setSurfaceClasses(
   tool: InteractionTool,
   grabbing: boolean,
   hoverText: boolean,
+  drawingTool?: 'pencil' | 'eraser' | null,
 ) {
   el.classList.remove(...SURFACE_CLASSES)
   el.classList.add(`rb-tool-${tool}`)
   if (grabbing && tool === 'hand') el.classList.add('rb-grabbing')
   if (hoverText && tool === 'hand' && !grabbing) el.classList.add('rb-hover-text')
+  if (tool === 'annotate' && drawingTool === 'pencil') {
+    el.classList.add('rb-drawing-pencil')
+  }
+  if (tool === 'annotate' && drawingTool === 'eraser') {
+    el.classList.add('rb-drawing-eraser')
+  }
 }
 
 /**
@@ -166,29 +206,41 @@ function setSurfaceClasses(
 export function applyInteractionToolSurface(
   root: ParentNode | null,
   tool: InteractionTool,
-  options?: { grabbing?: boolean; hoverText?: boolean },
+  options?: {
+    grabbing?: boolean
+    hoverText?: boolean
+    drawingTool?: 'pencil' | 'eraser' | null
+  },
 ) {
   if (!root) return
   const grabbing = options?.grabbing === true
   const hoverText = options?.hoverText === true
+  const drawingTool = options?.drawingTool ?? null
 
   if (root instanceof HTMLElement) {
     clearInlineCursorSelect(root)
-    setSurfaceClasses(root, tool, grabbing, hoverText)
+    setSurfaceClasses(root, tool, grabbing, hoverText, drawingTool)
   }
 
   root.querySelectorAll('iframe').forEach((iframe) => {
     clearInlineCursorSelect(iframe)
-    setSurfaceClasses(iframe, tool, grabbing, hoverText)
+    setSurfaceClasses(iframe, tool, grabbing, hoverText, drawingTool)
     const doc = iframe.contentDocument
     if (!doc) return
     ensureSurfaceStyles(doc)
     if (doc.documentElement) {
       clearInlineCursorSelect(doc.documentElement)
-      setSurfaceClasses(doc.documentElement, tool, grabbing, hoverText)
+      setSurfaceClasses(
+        doc.documentElement,
+        tool,
+        grabbing,
+        hoverText,
+        drawingTool,
+      )
     }
     if (doc.body) {
       clearInlineCursorSelect(doc.body)
+      setSurfaceClasses(doc.body, tool, grabbing, hoverText, drawingTool)
     }
   })
 }

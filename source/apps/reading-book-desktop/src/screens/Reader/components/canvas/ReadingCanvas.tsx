@@ -6,16 +6,18 @@ import {
   type MouseEvent,
   type PointerEvent as ReactPointerEvent,
 } from 'react'
-import { rangeToHighlightHandleRect, elementToHighlightHandleRect } from '../../../../reader/renderers/epub/selection-cfi'
+import { rangeToHighlightHandleRect, elementToHighlightHandleRect } from '../../../../reader/renderers/epub'
 import {
   isPointInTextSelection,
   isTextNodeAtPoint,
   PAN_DRAG_THRESHOLD_PX,
-} from '../../../../reader/interaction-hit'
+} from '../../../../reader/interaction'
 import {
   appendFreehandPoint,
   blocksSelectionContextMenu,
   clientPointToNormalized,
+  freehandBoundingBox,
+  hitTestFreehandStrokes,
   isCrosshairAnnotateTool,
   isDrawingTool,
   type AnnotateTool,
@@ -49,9 +51,7 @@ import {
   tickTypewriterDrag,
   type TypewriterDragSession,
   type TypewriterPct,
-} from '../../../../reader/typewriterBoxDrag'
-import { hitTestTypewriterAtClientPoint } from '../../../../reader/typewriterHitTest'
-import {
+  hitTestTypewriterAtClientPoint,
   TypewriterRichEditor,
   TypewriterStaticHtml,
   clearTypewriterCommitSuppress,
@@ -69,7 +69,7 @@ type ReadingCanvasProps = {
   margin: MarginMode
   chromeHidden: boolean
   pageMode: 'scroll' | 'paginated'
-  layout: 'single' | 'dual' | 'triple'
+  layout: 'single' | 'dual'
   activeTool: AnnotateTool
   highlights: ReaderHighlight[]
   typewriterNotes: ReaderTypewriterNote[]
@@ -78,6 +78,12 @@ type ReadingCanvasProps = {
   freehandStrokes?: ReaderShapeAnnotation[]
   drawSettings?: DrawToolSettings
   onFreehandStrokeComplete?: (draft: FreehandDraftStroke) => void
+  onFreehandStrokeClick?: (payload: {
+    id: string
+    rect: { left: number; top: number; width: number; height: number }
+    click?: { x: number; y: number }
+    hostRect?: { left: number; top: number; width: number; height: number }
+  }) => void
   onCanvasBackgroundClick: () => void
   onSelectionContextMenu: (
     selection: PendingSelection,
@@ -142,10 +148,10 @@ const MARGIN: Record<MarginMode, string> = {
 }
 
 const MARGIN_IMMERSIVE: Record<MarginMode, string> = {
-  narrow: 'max-w-[720px]',
-  normal: 'max-w-[min(920px,90vw)]',
-  wide: 'max-w-[min(1100px,95vw)]',
-  off: 'max-w-full px-3',
+  narrow: 'max-w-[min(760px,92vw)]',
+  normal: 'max-w-[min(960px,94vw)]',
+  wide: 'max-w-[min(1140px,96vw)]',
+  off: 'max-w-full px-4 sm:px-6',
 }
 
 function buildFakeSelection(
@@ -189,6 +195,7 @@ export function ReadingCanvas({
   freehandStrokes = [],
   drawSettings,
   onFreehandStrokeComplete,
+  onFreehandStrokeClick,
   onCanvasBackgroundClick,
   onSelectionContextMenu,
   onTextSelected,
@@ -227,6 +234,10 @@ export function ReadingCanvas({
   drawSettingsRef.current = drawSettings
   const onFreehandStrokeCompleteRef = useRef(onFreehandStrokeComplete)
   onFreehandStrokeCompleteRef.current = onFreehandStrokeComplete
+  const onFreehandStrokeClickRef = useRef(onFreehandStrokeClick)
+  onFreehandStrokeClickRef.current = onFreehandStrokeClick
+  const freehandStrokesRef = useRef(freehandStrokes)
+  freehandStrokesRef.current = freehandStrokes
   const inkDraftRef = useRef<{
     pointerId: number
     chapterIndex: number
@@ -464,11 +475,9 @@ export function ReadingCanvas({
 
   const marginLayout = chromeHidden ? MARGIN_IMMERSIVE : MARGIN
   const areaLayout =
-    layout === 'triple'
-      ? 'max-w-[min(1500px,98vw)] columns-1 min-[900px]:columns-2 min-[1200px]:columns-3 min-[900px]:gap-12 min-[900px]:[column-rule:1px_dashed_rgb(51_65_85_/_0.45)]'
-      : layout === 'dual'
-        ? 'max-w-[min(1200px,95vw)] columns-1 min-[900px]:columns-2 min-[900px]:gap-16 min-[900px]:[column-rule:1px_dashed_rgb(51_65_85_/_0.45)]'
-        : marginLayout[margin]
+    layout === 'dual'
+      ? 'max-w-[min(1200px,95vw)] columns-1 min-[900px]:columns-2 min-[900px]:gap-16 min-[900px]:[column-rule:1px_dashed_rgb(51_65_85_/_0.45)]'
+      : marginLayout[margin]
   const pageBlockFrame =
     pageMode === 'scroll'
       ? 'rounded-sm border border-current/15 bg-lib-bg-deep/20 shadow-[0_14px_40px_rgba(0,0,0,0.22)]'
@@ -643,20 +652,73 @@ export function ReadingCanvas({
     handPanningRef.current = false
     if (!g || event.button !== 0) return
     const current = modeRef.current
+    const tool = activeToolRef.current
     if (
       current === 'highlight' ||
-      current === 'annotate' ||
-      current === 'typewriter'
+      current === 'typewriter' ||
+      (current === 'annotate' && tool !== 'eraser')
     ) {
       return
     }
     if (g.panned) return
-    if (current === 'hand') {
-      // Existing highlight — let the paragraph onClick open the edit panel.
+    if (current === 'hand' || current === 'select' || tool === 'eraser') {
       const hlHost = (event.target as Element | null)?.closest?.(
         '[data-rb-hl-id]',
       )
-      if (hlHost) return
+      if (hlHost && tool !== 'eraser') return
+
+      const chapterEl = (event.target as Element | null)?.closest?.(
+        '[data-tw-chapter]',
+      ) as HTMLElement | null
+      if (chapterEl) {
+        const rect = chapterEl.getBoundingClientRect()
+        const point = clientPointToNormalized(
+          event.clientX,
+          event.clientY,
+          rect,
+        )
+        if (point) {
+          const hosts = Array.from(
+            chapterEl.parentElement?.querySelectorAll<HTMLElement>(
+              '[data-tw-chapter]',
+            ) ?? [chapterEl],
+          )
+          const chapterIdx =
+            pageMode === 'scroll' ? hosts.indexOf(chapterEl) : chapterIndex
+          const chapterStrokes = freehandStrokesRef.current.filter(
+            (s) => s.chapterIndex === chapterIdx,
+          )
+          const hitId = hitTestFreehandStrokes(point, chapterStrokes, {
+            hostWidthPx: rect.width,
+            hostHeightPx: rect.height,
+          })
+          if (hitId) {
+            const stroke = chapterStrokes.find((s) => s.id === hitId)
+            const bb = stroke ? freehandBoundingBox(stroke.points) : null
+            if (stroke && bb) {
+              onFreehandStrokeClickRef.current?.({
+                id: hitId,
+                rect: {
+                  left: rect.left + bb.minX * rect.width,
+                  top: rect.top + bb.minY * rect.height,
+                  width: Math.max(8, (bb.maxX - bb.minX) * rect.width),
+                  height: Math.max(8, (bb.maxY - bb.minY) * rect.height),
+                },
+                click: { x: event.clientX, y: event.clientY },
+                hostRect: {
+                  left: rect.left,
+                  top: rect.top,
+                  width: rect.width,
+                  height: rect.height,
+                },
+              })
+              return
+            }
+          }
+        }
+      }
+
+      if (tool === 'eraser') return
 
       const hitId = hitTestTypewriterAtClientPoint(
         visibleTypewriterNoteIdsRef.current,
@@ -679,15 +741,19 @@ export function ReadingCanvas({
   const cursorClass =
     mode === 'typewriter'
       ? 'cursor-typewriter-tool'
-      : mode === 'annotate'
-        ? 'cursor-crosshair'
-        : mode === 'highlight'
-          ? 'cursor-highlight-tool'
-          : mode === 'select'
-            ? 'cursor-select-tool'
-            : handOverText
-              ? 'cursor-select-tool'
-              : 'cursor-hand-tool active:cursor-hand-tool-active'
+      : activeTool === 'pencil'
+        ? 'cursor-pencil-tool'
+        : activeTool === 'eraser'
+          ? 'cursor-cell'
+          : mode === 'annotate'
+            ? 'cursor-crosshair'
+            : mode === 'highlight'
+              ? 'cursor-highlight-tool'
+              : mode === 'select'
+                ? 'cursor-select-tool'
+                : handOverText
+                  ? 'cursor-select-tool'
+                  : 'cursor-hand-tool active:cursor-hand-tool-active'
 
   function renderChapterPage(
     renderedChapter: FakeChapter,

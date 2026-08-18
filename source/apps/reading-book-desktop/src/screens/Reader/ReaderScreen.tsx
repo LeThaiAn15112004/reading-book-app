@@ -11,6 +11,7 @@ import {
 import {
   useAppTitle,
   useGlobalReadingPrefs,
+  useImmersiveReading,
   useOpenReading,
   useReaderChromeMenu,
 } from '../../chrome'
@@ -28,8 +29,10 @@ import {
   ReaderOpenStatus,
   ReaderTopbar,
   ReaderZoomViewport,
+  ImmersiveExitButton,
   ReadingCanvas,
   HighlightRangeHandles,
+  FreehandEditOverlay,
   SelectionTooltip,
   SidebarEdgeRail,
   sidebarContentInsetLeft,
@@ -43,12 +46,12 @@ import {
 import {
   FAKE_CHAPTERS,
   FAKE_SIGNATURES,
-  usePagePreviewStore,
   useReaderAnnotations,
   useReaderBookOpen,
   useReaderChromeUi,
   useReaderNavigation,
   useReaderSessionBridge,
+  useImmersiveChromeReveal,
   useReaderZoomControls,
   type ReaderChromeAnnotationBridge,
   type ReaderChromeEscapeUi,
@@ -65,6 +68,9 @@ export function ReaderScreen() {
   const { ensureTab, updateBookTitle } = useOpenReading()
   const { registerReaderChrome } = useReaderChromeMenu()
   const { prefs: globalPrefs, setPrefs: setGlobalPrefs } = useGlobalReadingPrefs()
+  const { immersive, fullscreen, toggleFullscreen, exitFullscreen } =
+    useImmersiveReading()
+  const immersiveReveal = useImmersiveChromeReveal({ enabled: immersive })
   const globalPrefsRef = useRef(globalPrefs)
   globalPrefsRef.current = globalPrefs
 
@@ -99,6 +105,7 @@ export function ReaderScreen() {
     escapeUiRef,
     readerSearchQuery,
     readerSearchRequestId,
+    immersive,
   })
   const sidebarResize = useSidebarPanelResize('left')
   const rightSidebarResize = useSidebarPanelResize('right')
@@ -176,6 +183,15 @@ export function ReaderScreen() {
     activeToolRef: annotations.activeToolRef,
   })
 
+  // Immersive: tools/footer stay hidden unless an edge reveal is active. Left sidebar is disabled in fullscreen.
+  const toolsHidden = immersive
+    ? !immersiveReveal.reveal.top
+    : chrome.chromeHidden
+  const footerImmersiveHidden = immersive && !immersiveReveal.reveal.bottom
+  const contentInsetLeft = immersive
+    ? 0
+    : sidebarContentInsetLeft(chrome.sidebarOpen, sidebarResize.panelWidth)
+
   const chapter = FAKE_CHAPTERS[nav.chapterIndex] ?? FAKE_CHAPTERS[0]
   chapterTitleRef.current = chapter.title ?? ''
   const chapterLabel = chapter.title
@@ -185,17 +201,20 @@ export function ReaderScreen() {
   const pageTotal = book.isEpubSurface
     ? (nav.epubNav?.pageTotal ?? 0)
     : FAKE_CHAPTERS.length
-  const pagePreviewsEnabled =
-    chrome.sidebarOpen && chrome.sidebarTab === 'layout'
-  const { previews: pagePreviews, requestPreview: requestPagePreview } =
-    usePagePreviewStore({
-      enabled: pagePreviewsEnabled,
-      bookId,
-      pageCurrent,
-      pageTotal,
-      isEpubSurface: book.isEpubSurface,
-      epubApiRef,
-    })
+  const pageCountReady = book.isEpubSurface
+    ? Boolean(nav.epubNav?.pageCountReady)
+    : true
+  const sectionCurrent = book.isEpubSurface
+    ? (nav.epubNav?.spineLength
+        ? nav.epubNav.spineIndex + 1
+        : 0)
+    : nav.chapterIndex + 1
+  const sectionTotal = book.isEpubSurface
+    ? (nav.epubNav?.spineLength ?? 0)
+    : FAKE_CHAPTERS.length
+  const sectionLabels = book.isEpubSurface
+    ? nav.epubSections
+    : FAKE_CHAPTERS.map((c) => c.title)
   const effectiveMargin = book.prefs.marginEnabled ? book.prefs.margin : 'off'
   /** Chapter key for bookmark ribbon — EPUB spine, else fake chapter index. */
   const bookmarkChapterIndex = book.isEpubSurface
@@ -212,8 +231,6 @@ export function ReaderScreen() {
     [
       book.isEpubSurface,
       bookmarkChapterIndex,
-      nav.epubNav,
-      nav.chapterIndex,
     ],
   )
   const isCurrentPlaceBookmarked = currentBookmarkLocation
@@ -257,11 +274,8 @@ export function ReaderScreen() {
     <ReaderShell
       themeClassName={themeShell}
       style={readingStyle}
-      chromeHidden={chrome.chromeHidden}
-      contentInsetLeft={sidebarContentInsetLeft(
-        chrome.sidebarOpen,
-        sidebarResize.panelWidth,
-      )}
+      chromeHidden={toolsHidden}
+      contentInsetLeft={contentInsetLeft}
       contentInsetRight={sidebarContentInsetRight(
         chrome.rightSidebarOpen,
         rightSidebarResize.panelWidth,
@@ -275,22 +289,30 @@ export function ReaderScreen() {
         'data-content-bytes': book.bookBytes
           ? String(book.bookBytes.byteLength)
           : '0',
+        ...(immersive ? { 'data-immersive': '' } : {}),
       }}
       edges={
-        <SidebarEdgeRail
-          open={chrome.sidebarOpen}
-          activeTab={chrome.sidebarTab}
-          panelWidth={sidebarResize.panelWidth}
-          isResizing={sidebarResize.isResizing}
-          chromeHidden={chrome.chromeHidden}
-          bookmarkActive={isCurrentPlaceBookmarked}
-          onOpenTab={chrome.openSidebarTab}
-          onToggle={chrome.toggleSidebar}
-        />
+        <>
+          {!immersive ? (
+            <SidebarEdgeRail
+              open={chrome.sidebarOpen}
+              activeTab={chrome.sidebarTab}
+              panelWidth={sidebarResize.panelWidth}
+              isResizing={sidebarResize.isResizing}
+              chromeHidden={toolsHidden}
+              bookmarkActive={isCurrentPlaceBookmarked}
+              onOpenTab={chrome.openSidebarTab}
+              onToggle={chrome.toggleSidebar}
+            />
+          ) : null}
+          {immersive ? (
+            <ImmersiveExitButton onExit={exitFullscreen} />
+          ) : null}
+        </>
       }
       topbar={
         <ReaderTopbar
-          chromeHidden={chrome.chromeHidden}
+          chromeHidden={toolsHidden}
           moreOpen={chrome.moreOpen}
           settingsOpen={chrome.settingsOpen}
           activeTool={annotations.activeTool}
@@ -299,12 +321,12 @@ export function ReaderScreen() {
             annotations.setDrawSettings((prev) => ({ ...prev, ...patch }))
           }
           onToggleMore={() => {
-            if (chrome.chromeHidden) return
+            if (toolsHidden) return
             chrome.setSettingsOpen(false)
             chrome.setMoreOpen((v) => !v)
           }}
           onToggleSettings={() => {
-            if (chrome.chromeHidden) return
+            if (toolsHidden) return
             chrome.setMoreOpen(false)
             chrome.setSettingsOpen((v) => !v)
           }}
@@ -335,6 +357,7 @@ export function ReaderScreen() {
         <ReaderFooter
           pageCurrent={pageCurrent}
           pageTotal={pageTotal}
+          pageCountReady={pageCountReady}
           onPreviousPage={() => nav.switchPage(false)}
           onNextPage={() => nav.switchPage(true)}
           onGoToPage={nav.goToPage}
@@ -352,6 +375,9 @@ export function ReaderScreen() {
           onZoomChange={zoom.handleZoomChange}
           onZoomStep={zoom.handleZoomStep}
           onZoomLayoutPreset={zoom.handleZoomLayoutPreset}
+          fullscreen={fullscreen}
+          onToggleFullscreen={toggleFullscreen}
+          immersiveHidden={footerImmersiveHidden}
           bookmarkActive={isCurrentPlaceBookmarked}
           onToggleBookmark={annotations.toggleBookmark}
         />
@@ -359,11 +385,12 @@ export function ReaderScreen() {
       overlays={
         <>
           <TocSidebar
-            open={chrome.sidebarOpen}
+            immersive={immersive}
+            open={!immersive && chrome.sidebarOpen}
             tab={chrome.sidebarTab}
             panelWidth={sidebarResize.panelWidth}
             isResizing={sidebarResize.isResizing}
-            chromeHidden={chrome.chromeHidden}
+            chromeHidden={toolsHidden}
             onResizePointerDown={sidebarResize.onResizePointerDown}
             chapters={FAKE_CHAPTERS}
             chapterIndex={nav.chapterIndex}
@@ -373,6 +400,7 @@ export function ReaderScreen() {
             bookmarks={annotations.bookmarks}
             highlights={annotations.highlights}
             typewriterNotes={annotations.typewriterNotes}
+            freehandStrokes={annotations.freehandStrokes}
             onClose={() => chrome.setSidebarOpen(false)}
             onSelectChapter={nav.goChapter}
             onSelectTocItem={nav.handleSelectTocItem}
@@ -384,32 +412,38 @@ export function ReaderScreen() {
             }}
             onJumpHighlight={annotations.jumpToHighlight}
             onJumpTypewriterNote={annotations.jumpToTypewriterNote}
+            onJumpPencilStroke={annotations.jumpToFreehandStroke}
             onToggleAnnotationChecked={annotations.toggleAnnotationChecked}
             onSetAnnotationStatus={annotations.setAnnotationStatus}
             onEditHighlightNote={annotations.openHighlightNoteEditor}
             onEditTypewriterContent={annotations.setTypewriterContent}
+            onEditPencilNote={(stroke) =>
+              annotations.openFreehandNoteEditor(stroke.id)
+            }
             onDeleteHighlight={(h) => annotations.deleteHighlightById(h.id)}
             onDeleteTypewriterNote={annotations.deleteTypewriterById}
+            onDeletePencilStroke={annotations.deleteFreehandById}
             onAnnotationTags={() => {
               chrome.setToast('Tags — coming soon.')
             }}
-            pageCurrent={pageCurrent}
-            pageTotal={pageTotal}
+            pageCurrent={sectionCurrent}
+            pageTotal={sectionTotal}
+            sectionLabels={sectionLabels}
             onGoToPage={nav.goToPageFromLayout}
-            pagePreviews={pagePreviews}
-            onRequestPagePreview={requestPagePreview}
           />
 
           <RightSidebarPanel
             open={chrome.rightSidebarOpen}
             panelWidth={rightSidebarResize.panelWidth}
             isResizing={rightSidebarResize.isResizing}
-            chromeHidden={chrome.chromeHidden}
+            chromeHidden={toolsHidden}
             onResizePointerDown={rightSidebarResize.onResizePointerDown}
             title={
               chrome.rightSidebarKind === 'typewriter'
                 ? 'Typewriter'
-                : 'Panel'
+                : chrome.rightSidebarKind === 'freehand'
+                  ? 'Pencil'
+                  : 'Panel'
             }
             onClose={chrome.closeRightSidebar}
           >
@@ -417,6 +451,45 @@ export function ReaderScreen() {
             {chrome.rightSidebarKind === 'typewriter' ? (
               <div className="px-3 py-4 text-[13px] leading-relaxed text-lib-muted">
                 Typewriter side panel — content goes here.
+              </div>
+            ) : null}
+            {chrome.rightSidebarKind === 'freehand' ? (
+              <div className="px-3 py-4 text-[13px] leading-relaxed text-lib-muted">
+                {(() => {
+                  const stroke = annotations.freehandStrokes.find(
+                    (s) => s.id === annotations.freehandEdit?.id,
+                  )
+                  if (!stroke) {
+                    return 'Select a pencil stroke to edit its note here.'
+                  }
+                  return (
+                    <div className="flex flex-col gap-3">
+                      <p className="m-0 text-lib-text-strong">Pencil stroke</p>
+                      <p className="m-0 text-[12px] text-lib-faint">
+                        Color{' '}
+                        <span
+                          className="inline-block size-3 rounded-full align-middle"
+                          style={{ backgroundColor: stroke.colorHex }}
+                        />{' '}
+                        {stroke.colorHex}
+                      </p>
+                      <label className="flex flex-col gap-1.5 text-[12px] text-lib-muted">
+                        Note
+                        <textarea
+                          className="min-h-28 resize-y rounded-md border border-lib-border bg-lib-bg-deep px-2 py-1.5 text-[13px] text-lib-text-strong outline-none"
+                          value={stroke.note ?? ''}
+                          onChange={(e) =>
+                            annotations.updateFreehandNote(
+                              stroke.id,
+                              e.target.value,
+                            )
+                          }
+                          placeholder="Add a note for this stroke…"
+                        />
+                      </label>
+                    </div>
+                  )
+                })()}
               </div>
             ) : null}
           </RightSidebarPanel>
@@ -468,6 +541,27 @@ export function ReaderScreen() {
               annotations.deleteHighlightById(highlightId)
             }}
             onDismissEdit={annotations.dismissHighlightEditPanel}
+          />
+
+          <FreehandEditOverlay
+            editTarget={annotations.freehandEdit}
+            selectedStroke={
+              annotations.freehandEdit
+                ? (annotations.freehandStrokes.find(
+                    (s) => s.id === annotations.freehandEdit?.id,
+                  ) ?? null)
+                : null
+            }
+            hostRect={annotations.freehandEdit?.hostRect ?? null}
+            onChangeColor={annotations.changeFreehandColor}
+            onEditNote={annotations.openFreehandNoteEditor}
+            onOpenSidebar={() => {
+              chrome.openRightSidebar('freehand')
+            }}
+            onRemove={annotations.deleteFreehandById}
+            onDismiss={annotations.dismissFreehandEdit}
+            onResizePoints={annotations.resizeFreehandStroke}
+            onCommitPoints={annotations.commitFreehandResize}
           />
 
           <HighlightRangeHandles
@@ -571,7 +665,7 @@ export function ReaderScreen() {
               textAlign={book.prefs.textAlign}
               marginsEnabled={book.prefs.marginEnabled}
               marginPreset={book.prefs.margin}
-              chromeHidden={chrome.chromeHidden}
+              chromeHidden={immersive || chrome.chromeHidden}
               initialLocation={book.resumeLocation}
               onCenterTap={chrome.handleCenterTap}
               onSelectionContextMenu={annotations.openSelectionMenu}
@@ -590,11 +684,16 @@ export function ReaderScreen() {
                         : 'hand'
               }
               drawingTool={
-                annotations.activeTool === 'pencil' ? 'pencil' : null
+                annotations.activeTool === 'pencil'
+                  ? 'pencil'
+                  : annotations.activeTool === 'eraser'
+                    ? 'eraser'
+                    : null
               }
               drawSettings={annotations.drawSettings}
               freehandStrokes={annotations.freehandStrokes}
               onFreehandStrokeComplete={annotations.handleFreehandStrokeComplete}
+              onFreehandStrokeClick={annotations.handleFreehandStrokeClick}
               typewriterNotes={annotations.typewriterNotes}
               typewriterChapterIndex={nav.epubNav?.spineIndex ?? 0}
               typewriterDraft={annotations.typewriterDraft}
@@ -631,6 +730,7 @@ export function ReaderScreen() {
               onNavState={nav.setEpubNav}
               onLocationChange={session.handleEpubLocationChange}
               onToc={nav.setEpubToc}
+              onSections={nav.setEpubSections}
             />
           ) : (
             <ReadingCanvas
@@ -638,7 +738,7 @@ export function ReaderScreen() {
               chapter={chapter}
               chapterIndex={nav.chapterIndex}
               margin={effectiveMargin}
-              chromeHidden={chrome.chromeHidden}
+              chromeHidden={immersive || chrome.chromeHidden}
               pageMode={book.prefs.pageMode}
               layout={book.prefs.layout}
               activeTool={annotations.activeTool}
@@ -648,6 +748,7 @@ export function ReaderScreen() {
               freehandStrokes={annotations.freehandStrokes}
               drawSettings={annotations.drawSettings}
               onFreehandStrokeComplete={annotations.handleFreehandStrokeComplete}
+              onFreehandStrokeClick={annotations.handleFreehandStrokeClick}
               onCanvasBackgroundClick={chrome.handleCenterTap}
               onSelectionContextMenu={annotations.openSelectionMenu}
               onTextSelected={annotations.handleTextSelected}

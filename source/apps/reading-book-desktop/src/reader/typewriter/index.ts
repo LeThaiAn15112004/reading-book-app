@@ -18,3 +18,12 @@ export {
   getTopLevelBoundingClientRect,
   isTypewriterToolbarTarget,
 } from './typewriterToolbarPortal'
+export {
+  TYPEWRITER_DRAG_THRESHOLD_PX,
+  beginTypewriterDrag,
+  tickTypewriterDrag,
+  clampTypewriterPct,
+  type TypewriterDragSession,
+  type TypewriterPct,
+} from './typewriterBoxDrag'
+export { hitTestTypewriterAtClientPoint, pointInClientRect } from './typewriterHitTest'

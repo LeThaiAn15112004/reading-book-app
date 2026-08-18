@@ -166,15 +166,33 @@ export function isTrivialSectionStartCfi(cfi: string): boolean {
   return steps.length <= 2
 }
 
+function isStartContainerLog(args: unknown[]): boolean {
+  return (
+    typeof args[0] === 'string' &&
+    args[0].startsWith('No startContainer found')
+  )
+}
+
+let startContainerLogFilterInstalled = false
+
+/**
+ * epubjs `toRange` often logs after `display()` resolves (iframe load /
+ * relocated). A process-wide filter is the only reliable mute.
+ */
+export function installEpubjsStartContainerLogFilter(): void {
+  if (startContainerLogFilterInstalled) return
+  startContainerLogFilterInstalled = true
+  const original = console.log.bind(console)
+  console.log = (...args: unknown[]) => {
+    if (isStartContainerLog(args)) return
+    original(...(args as Parameters<typeof console.log>))
+  }
+}
+
 function muteEpubjsStartContainerLog(): () => void {
   const original = console.log
   console.log = (...args: unknown[]) => {
-    if (
-      typeof args[0] === 'string' &&
-      args[0].startsWith('No startContainer found')
-    ) {
-      return
-    }
+    if (isStartContainerLog(args)) return
     original.apply(console, args as Parameters<typeof console.log>)
   }
   return () => {
@@ -592,6 +610,63 @@ export function findRangeByText(
   }
 
   return best
+}
+
+/** All text nodes under `root` in document order, skipping overlay artifacts. */
+export function collectDescendantTextNodes(
+  root: Node,
+  options: CfiDomOptions = {},
+): Text[] {
+  return descendantTextNodes(root, options)
+}
+
+/** Total character length of visible text under `root`. */
+export function documentTextLength(
+  doc: Document,
+  options: CfiDomOptions = {},
+): number {
+  const root = doc.body ?? doc.documentElement
+  return collectDescendantTextNodes(root, options).reduce(
+    (sum, node) => sum + node.length,
+    0,
+  )
+}
+
+/** 0-based character offset of a point CFI within `doc`, or null when unresolved. */
+export function cfiCharacterOffset(
+  doc: Document,
+  cfi: string,
+  options: CfiDomOptions = {},
+): number | null {
+  const boundary = resolveCfiBoundary(doc, cfi, options)
+  if (!boundary) return null
+  const root = doc.body ?? doc.documentElement
+  const nodes = collectDescendantTextNodes(root, options)
+  if (nodes.length === 0) return 0
+
+  let offset = 0
+  for (const node of nodes) {
+    if (node === boundary.node) {
+      return Math.min(offset + boundary.offset, offset + node.length)
+    }
+    offset += node.length
+  }
+
+  const last = nodes[nodes.length - 1]
+  if (boundary.node === last) {
+    return offset - last.length + boundary.offset
+  }
+  return null
+}
+
+/** Map a 0-based character offset back to a DOM boundary under `root`. */
+export function characterOffsetToBoundary(
+  root: Node,
+  offset: number,
+  options: CfiDomOptions = {},
+): CfiBoundary | null {
+  const clamped = Math.max(0, Math.floor(offset))
+  return charOffsetBoundary(root, clamped, options)
 }
 
 /** True when a Range covers the same characters as the mark's captured text. */

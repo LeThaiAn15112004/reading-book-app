@@ -10,25 +10,66 @@ import {
   type TextAlign,
 } from '@reading-book/shared/models'
 import { DomCssOverlay } from '../../overlays/dom-css-overlay'
-import { cfiCodec, tryEncodeCfi, type EpubCfiDecodeResult } from './cfi-codec'
+import { cfiCodec, tryEncodeCfi, type EpubCfiDecodeResult } from './cfi/cfi-codec'
 import { spineIndexFromCfiPath } from '@reading-book/shared/utils'
 import {
   isTrivialSectionStartCfi,
+  installEpubjsStartContainerLogFilter,
   withEpubjsStartContainerLogMuted,
   withEpubjsStartContainerLogMutedAsync,
-} from './cfi-dom-range'
-import {
-  captureHostPreview,
-  documentToPreviewDataUrl,
-  PREVIEW_THUMB_MAX_HEIGHT,
-  PREVIEW_THUMB_MAX_WIDTH,
-  wrapSpinePreviewHtml,
-} from './capture-page-preview'
+} from './cfi/cfi-dom-range'
 import {
   rangeToHighlightHandleRect,
   splitCfiRange,
   toEpubjsDisplayCfi,
-} from './selection-cfi'
+} from './cfi/selection-cfi'
+import {
+  cfiFromLocation,
+  displayedPagesFromLocation,
+  EpubPaginationTracker,
+  type CumulativePageMetrics,
+} from './progress/reader-position'
+import {
+  buildLayoutFingerprint,
+  buildPaginationCacheKey,
+  fingerprintEpubBytes,
+  readPaginationCache,
+  writePaginationCache,
+} from './progress/epub-pagination-cache'
+
+type EpubjsViewLike = {
+  contents?: { document?: Document; cfiBase?: string; sectionIndex?: number }
+  section?: { cfiBase?: string; index?: number }
+  element?: HTMLElement
+}
+
+type EpubjsManagerLike = {
+  views?: {
+    displayed?: () => EpubjsViewLike[]
+    current?: () => EpubjsViewLike | undefined
+  }
+}
+
+function renditionManager(rendition: Rendition): EpubjsManagerLike | undefined {
+  return (rendition as unknown as { manager?: EpubjsManagerLike }).manager
+}
+
+function currentSectionView(rendition: Rendition): EpubjsViewLike | undefined {
+  const manager = renditionManager(rendition)
+  if (!manager) return undefined
+  const displayed = manager.views?.displayed?.()
+  const current = manager.views?.current?.()
+  if (current) return current
+  return Array.isArray(displayed) && displayed.length > 0 ? displayed[0] : undefined
+}
+
+function currentSectionDocument(rendition: Rendition): Document | null {
+  return currentSectionView(rendition)?.contents?.document ?? null
+}
+
+function epubScrollContainer(host: HTMLElement): HTMLElement | null {
+  return host.querySelector<HTMLElement>('.epub-container')
+}
 
 /** Vite/CJS interop: default may be the ePub fn or a module namespace. */
 const ePub =
@@ -37,23 +78,40 @@ const ePub =
     : // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (ePubImport as any).default
 
-export type EpubPageLayout = 'single' | 'dual' | 'triple'
+export type EpubPageLayout = 'single' | 'dual'
 export type EpubPageMode = 'scroll' | 'paginated'
 
 /**
- * Coarse location for footer scrub / UI label.
- * Persist uses CFI via getCurrentLocation() (T4.1) — not spine index.
+ * Live nav for footer / TOC.
+ * Persist uses CFI via getCurrentLocation() — never spine index or page number.
  */
 export type EpubNavState = {
+  /** 0-based spine section in the book spine. */
   spineIndex: number
   spineLength: number
-  /** 1-based spine page for UI (“3 / 42”). */
+  /**
+   * epub.js `location.start.displayed.page` — CSS pages *inside this Section*.
+   * Always available; fluctuates with viewport, font size, and spread.
+   */
+  sectionPage: number
+  /** epub.js `location.start.displayed.total` for the current Section only. */
+  sectionPageTotal: number
+  /**
+   * 1-based page counter (CSS-driven cumulative in paginated mode).
+   */
   pageCurrent: number
+  /** Cumulative CSS page total across all spine sections. */
   pageTotal: number
+  /** True once page counts are ready. */
+  pageCountReady: boolean
   href: string
   label: string
-  /** 0..1 from spine index (length 1 → 0). */
+  /** 0..1 book progress across the whole book. */
   progress: number
+  /** Same as `progress`. */
+  percentage: number
+  /** Current viewport start CFI when known. */
+  cfi?: string
 }
 
 export type EpubTocItem = {
@@ -76,13 +134,20 @@ export interface EpubjsHandle {
   prev: () => Promise<void>
   nextPage: () => Promise<void>
   prevPage: () => Promise<void>
+  /** Move the continuous scroller while retaining reading context overlap. */
+  scrollByViewport: (direction: -1 | 1) => void
   nextSection: () => Promise<void>
   prevSection: () => Promise<void>
   goToHref: (href: string) => Promise<void>
+  /** Open a spine *section* (0-based). */
   goToSpineIndex: (index: number) => Promise<void>
+  /** Jump to a 1-based epub.js location. No-op until locations are generated. */
+  goToLocationPage: (page: number) => Promise<void>
   getSpineLength: () => number
   getNavState: () => EpubNavState
   getToc: () => EpubTocItem[]
+  /** TOC-resolved display label per spine section, indexed by spine position. */
+  getSectionLabels: () => string[]
   /** Stable CFI location for persist/resume (T4.1). Undefined until relocated. */
   getCurrentLocation: () => CfiLocation | undefined
   /** Jump to a stored CFI location (T4.1 / FR-05 resume). */
@@ -100,27 +165,6 @@ export interface EpubjsHandle {
   setMargins: (enabled: boolean, preset: string) => void
   setChromeHidden: (hidden: boolean) => void
   resize: () => void
-  /**
-   * Snapshot the currently painted host into a JPEG data URL for Page Layout.
-   * Prefer scheduling on idle — capture walks iframe documents.
-   */
-  captureVisiblePreview: (
-    maxWidth?: number,
-    maxHeight?: number,
-  ) => Promise<string | null>
-  /**
-   * Load spine section markup for a 0-based *visible* spine position
-   * (matches goToSpineIndex / pageTotal indexing).
-   */
-  loadSpinePreviewHtml: (visibleIndex: number) => Promise<string | null>
-  /**
-   * Rasterize a spine section into a JPEG data URL for Page Layout thumbnails.
-   */
-  rasterizeSpinePreview: (
-    visibleIndex: number,
-    maxWidth?: number,
-    maxHeight?: number,
-  ) => Promise<string | null>
 }
 
 /** Payload from epubjs `rendition.on('selected')` mapped to viewport coords (T5.1). */
@@ -283,16 +327,19 @@ async function displayCfiSafely(
   }
 }
 
-function spineLengthOf(book: Book): number {
+export function spineLengthOf(book: Book): number {
   const spine = book.spine as { length?: number }
   return typeof spine.length === 'number' ? spine.length : 0
 }
 
 type SpineSectionLike = {
   href?: string
+  url?: string
   idref?: string
   properties?: string | string[]
   linear?: string | boolean
+  next?: () => SpineSectionLike | undefined
+  prev?: () => SpineSectionLike | undefined
 }
 
 function basenameLabel(href: string): string {
@@ -350,65 +397,27 @@ function isCoverSection(
   return /\bcover\b/.test(sectionPath(section))
 }
 
-/** Nav / TOC spine items — sidebar only; never rendered in the reading viewport. */
-function isTocSection(
-  section: SpineSectionLike | null | undefined,
-  book?: Book,
-): boolean {
-  if (!section || isCoverSection(section, book)) return false
-
-  const tokens = [
-    ...spinePropertyTokens(section),
-    ...(book ? manifestPropertyTokens(book, section.idref) : []),
-  ]
-  if (tokens.some((t) => t === 'nav' || t.startsWith('nav'))) return true
-
-  const linear = section.linear
-  if (linear === 'no' || linear === false) return true
-
-  const path = sectionPath(section)
-  return (
-    /(?:^|[/\\])(?:toc|nav|contents?)(?:\.(?:xhtml|html|htm|xml))?$/i.test(
-      path,
-    ) ||
-    /table[-_ ]?of[-_ ]?contents/i.test(path) ||
-    /(?:^|[/\\])nav(?:\.(?:xhtml|html|htm|xml))?$/i.test(path)
-  )
-}
-
-function visibleSpineIndicesOf(book: Book): number[] {
+/**
+ * epub.js leaves next()/prev() empty for `linear="no"` spine items.
+ * Linking next/prev across all spine items ensures next/prev navigation smoothly
+ * transitions across all sections (including cover, TOC, nav, and linear="no" items).
+ */
+export function linkSpineSections(book: Book): void {
   const length = spineLengthOf(book)
-  const indices: number[] = []
-
   for (let i = 0; i < length; i += 1) {
     const section = book.spine.get(i) as SpineSectionLike | undefined
-    // Cover belongs to the reading surface; TOC/nav/contents belongs only to sidebar.
-    if (!isCoverSection(section, book) && isTocSection(section, book)) continue
-    indices.push(i)
+    if (!section) continue
+    const prevIndex = i - 1
+    const nextIndex = i + 1
+    section.prev = () =>
+      prevIndex >= 0
+        ? (book.spine.get(prevIndex) as SpineSectionLike | undefined)
+        : undefined
+    section.next = () =>
+      nextIndex < length
+        ? (book.spine.get(nextIndex) as SpineSectionLike | undefined)
+        : undefined
   }
-
-  if (indices.length > 0) return indices
-  return Array.from({ length }, (_, index) => index)
-}
-
-function nearestVisiblePosition(
-  visibleIndices: number[],
-  rawIndex: number,
-): number {
-  if (visibleIndices.length === 0) return 0
-  const exact = visibleIndices.indexOf(rawIndex)
-  if (exact >= 0) return exact
-
-  let nearest = 0
-  let distance = Number.POSITIVE_INFINITY
-  visibleIndices.forEach((index, position) => {
-    const d = Math.abs(index - rawIndex)
-    if (d < distance) {
-      nearest = position
-      distance = d
-    }
-  })
-  return nearest
 }
 
 function normalizeTocItems(items: unknown, level = 0): EpubTocItem[] {
@@ -472,32 +481,138 @@ export function resolveTocLocationLabel(
   return match?.label
 }
 
+/** Coarse 0..1 book position from spine order, used for scroll mode or unpaginated state. */
+function spinePositionFraction(
+  spineIndex: number,
+  spineLength: number,
+  sectionPage: number,
+  sectionPageTotal: number,
+): number {
+  if (spineLength <= 0) return 0
+  const withinSection =
+    sectionPageTotal > 1 ? (sectionPage - 1) / sectionPageTotal : 0
+  return Math.min(1, Math.max(0, (spineIndex + withinSection) / spineLength))
+}
+
 export function buildEpubNavState(
   book: Book,
   spineIndex: number,
   toc: EpubTocItem[] = [],
+  displayed?: { page: number; total: number },
+  cfi?: string,
+  pagination?: CumulativePageMetrics | {
+    pageCurrent: number
+    pageTotal: number
+    progress: number
+    percentage?: number
+    pageCountReady?: boolean
+  },
 ): EpubNavState {
   const spineLength = spineLengthOf(book)
-  const pageTotal = Math.max(spineLength, 1)
   const clamped =
     spineLength <= 0
       ? 0
       : Math.min(Math.max(spineIndex, 0), spineLength - 1)
-  const pageCurrent = spineLength <= 0 ? 0 : clamped + 1
   const section = book.spine.get(clamped)
   const href = section?.href ?? ''
-  const label = resolveTocLocationLabel(href, toc) || (href ? basenameLabel(href) : '') || 'Page'
-  const progress =
-    spineLength <= 1 ? 0 : clamped / (spineLength - 1)
+  const label =
+    resolveTocLocationLabel(href, toc) ||
+    (href ? basenameLabel(href) : '') ||
+    'Section'
+  const sectionPage = displayed?.page ?? 1
+  const sectionPageTotal = displayed?.total ?? 1
+  const pageCountReady = pagination?.pageCountReady ?? true
+  const pageCurrent = pagination?.pageCurrent ?? sectionPage
+  const pageTotal = pagination?.pageTotal ?? sectionPageTotal
+  const percentage =
+    typeof pagination?.progress === 'number' && Number.isFinite(pagination.progress)
+      ? Math.min(1, Math.max(0, pagination.progress))
+      : spinePositionFraction(clamped, spineLength, sectionPage, sectionPageTotal)
   return {
     spineIndex: clamped,
     spineLength,
+    sectionPage,
+    sectionPageTotal,
     pageCurrent,
     pageTotal,
+    pageCountReady,
     href,
     label,
-    progress,
+    progress: percentage,
+    percentage,
+    cfi: cfi || undefined,
   }
+}
+
+/**
+ * Scan section text lengths in the background to seed initial page estimates.
+ */
+async function scanSpineCharCounts(
+  book: Book,
+  signal?: AbortSignal,
+): Promise<number[]> {
+  const len = spineLengthOf(book)
+  const charCounts: number[] = new Array(len).fill(0)
+  const archive = (
+    book as unknown as {
+      archive?: { getText?: (href: string) => Promise<string> }
+    }
+  ).archive
+
+  for (let i = 0; i < len; i += 1) {
+    if (signal?.aborted) break
+    const section = (book.spine.get(i) as unknown) as
+      | {
+          href?: string
+          load?: (request?: unknown) => Promise<unknown>
+        }
+      | undefined
+    if (!section) continue
+
+    try {
+      if (typeof archive?.getText === 'function' && section.href) {
+        const rawText = await archive.getText(section.href)
+        const stripped = rawText.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ')
+        charCounts[i] = stripped.length
+        continue
+      }
+      if (typeof section.load === 'function') {
+        const loaded = await section.load(book.load.bind(book))
+        const doc =
+          (loaded as { ownerDocument?: Document } | undefined)?.ownerDocument ||
+          loaded
+        const text =
+          (doc as Document | undefined)?.body?.textContent ||
+          (loaded as { textContent?: string } | undefined)?.textContent ||
+          ''
+        charCounts[i] = text.trim().length
+      }
+    } catch {
+      charCounts[i] = 1200
+    }
+  }
+  return charCounts
+}
+
+function getRenditionLayoutDelta(rendition: Rendition): number {
+  const manager = renditionManager(rendition) as
+    | {
+        layout?: { delta?: number; pageWidth?: number; width?: number }
+        container?: HTMLElement
+      }
+    | undefined
+  const delta =
+    manager?.layout?.delta ||
+    manager?.layout?.pageWidth ||
+    manager?.layout?.width
+  if (typeof delta === 'number' && Number.isFinite(delta) && delta > 0) {
+    return delta
+  }
+  const clientW = manager?.container?.clientWidth
+  if (typeof clientW === 'number' && Number.isFinite(clientW) && clientW > 0) {
+    return clientW
+  }
+  return 0
 }
 
 export function applyEpubFontSize(rendition: Rendition, px: number): void {
@@ -520,7 +635,7 @@ type ThemeableRendition = Rendition & {
 }
 
 const epubThemeByRendition = new WeakMap<Rendition, ReaderTheme>()
-type EpubReadingStyle = {
+export type EpubReadingStyle = {
   fontFamily: FontFamily
   fontWeight: FontWeight
   lineHeight: number
@@ -531,7 +646,7 @@ type EpubReadingStyle = {
   chromeHidden: boolean
 }
 
-const DEFAULT_EPUB_READING_STYLE: EpubReadingStyle = {
+export const DEFAULT_EPUB_READING_STYLE: EpubReadingStyle = {
   fontFamily: 'serif',
   fontWeight: 400,
   lineHeight: 1.65,
@@ -545,20 +660,37 @@ const epubReadingStyleByRendition = new WeakMap<Rendition, EpubReadingStyle>()
 
 /**
  * Page padding inside the EPUB iframe.
- * Always uses the tools-chrome gutters (not the immersive / chrome-hidden
- * values) so the left breathing room beside the icon rail stays stable when
- * Invisible UI toggles the top tools bar — matches "leave space like Tools open".
+ * Wider gutters when chrome is hidden (immersive / Invisible UI) so text
+ * uses more of the viewport; tighter when tools chrome is open.
  */
-function marginPadding(enabled: boolean, preset: string): string {
-  if (!enabled) return '12px'
+function marginPadding(
+  enabled: boolean,
+  preset: string,
+  chromeHidden: boolean,
+): string {
+  if (!enabled) return chromeHidden ? '16px' : '12px'
+  if (chromeHidden) {
+    if (preset === 'narrow') return '28px 5vw'
+    if (preset === 'wide') return '24px 3vw'
+    return '28px 4vw'
+  }
   if (preset === 'narrow') return '32px 48px'
   if (preset === 'wide') return '32px 12vw'
   return '32px 8vw'
 }
 
-/** Reflow column width — same tools-open metrics for chrome on or off. */
-function contentMaxWidth(enabled: boolean, preset: string): string {
+/** Reflow column width — expands when reader chrome is hidden. */
+function contentMaxWidth(
+  enabled: boolean,
+  preset: string,
+  chromeHidden: boolean,
+): string {
   if (!enabled || preset === 'off') return 'none'
+  if (chromeHidden) {
+    if (preset === 'narrow') return '760px'
+    if (preset === 'wide') return '1140px'
+    return '960px'
+  }
   if (preset === 'narrow') return '580px'
   if (preset === 'wide') return '780px'
   return '680px'
@@ -586,9 +718,13 @@ function applyReadingStyleVariables(
   root.style.setProperty('--epub-text-align', style.textAlign)
   root.style.setProperty(
     '--epub-page-padding',
-    marginPadding(style.marginsEnabled, style.marginPreset),
+    marginPadding(style.marginsEnabled, style.marginPreset, style.chromeHidden),
   )
-  const maxWidth = contentMaxWidth(style.marginsEnabled, style.marginPreset)
+  const maxWidth = contentMaxWidth(
+    style.marginsEnabled,
+    style.marginPreset,
+    style.chromeHidden,
+  )
   root.style.setProperty('--epub-content-max-width', maxWidth)
   root.style.setProperty(
     '--epub-content-margin-x',
@@ -600,7 +736,10 @@ function applyReadingStyleVariables(
  * Register the EPUB overlay rules once per rendition. Values are assigned
  * separately so a theme switch never replaces the EPUB stylesheet.
  */
-export function injectEpubThemeStyles(rendition: Rendition): void {
+export function injectEpubThemeStyles(
+  rendition: Rendition,
+  pageMode: EpubPageMode = 'paginated',
+): void {
   const themeableRendition = rendition as unknown as ThemeableRendition
   // !important so author EPUB CSS (often dark link on dark page) cannot hide links.
   rendition.themes.default({
@@ -627,14 +766,12 @@ export function injectEpubThemeStyles(rendition: Rendition): void {
       'margin-left': 'var(--epub-content-margin-x) !important',
       'margin-right': 'var(--epub-content-margin-x) !important',
     },
-    /* In-document nav TOC belongs in Reader sidebar, not the page canvas. */
-    'nav[epub\\:type="toc"], nav[epub\\:type~="toc"], [role="doc-toc"]': {
-      display: 'none !important',
-    },
     /* Cover / full-bleed images still participate as normal spine pages. */
     img: {
       'max-width': '100% !important',
-      'max-height': '100vh !important',
+      'max-height':
+        pageMode === 'scroll' ? 'none !important' : '100vh !important',
+      height: 'auto',
       'object-fit': 'contain',
       'object-position': 'center',
     },
@@ -745,7 +882,7 @@ function stopRenditionQueue(rendition: Rendition | null | undefined): void {
   }
 }
 
-function waitForFrames(count = 2): Promise<void> {
+export function waitForFrames(count = 2): Promise<void> {
   return new Promise((resolve) => {
     const step = (left: number) => {
       if (left <= 0) {
@@ -756,6 +893,60 @@ function waitForFrames(count = 2): Promise<void> {
     }
     step(count)
   })
+}
+
+function readHostLayoutSize(
+  host: HTMLElement,
+): { width: number; height: number } {
+  return {
+    width: Math.floor(host.clientWidth),
+    height: Math.floor(host.clientHeight),
+  }
+}
+
+/**
+ * Avoid deciding that a section is exhausted while its intrinsic layout is
+ * still changing. A timeout keeps broken remote resources from blocking nav;
+ * callers must not cross a spine boundary when this returns false.
+ */
+export async function waitForSectionResources(
+  doc: Document | null,
+  timeoutMs = 1200,
+): Promise<boolean> {
+  if (!doc) return true
+
+  const cleanups: Array<() => void> = []
+  const pending: Promise<unknown>[] = []
+
+  doc.querySelectorAll('img').forEach((img) => {
+    if (img.complete) return
+    pending.push(
+      new Promise<void>((resolve) => {
+        const settle = () => resolve()
+        img.addEventListener('load', settle, { once: true })
+        img.addEventListener('error', settle, { once: true })
+        cleanups.push(() => {
+          img.removeEventListener('load', settle)
+          img.removeEventListener('error', settle)
+        })
+      }),
+    )
+  })
+
+  if (pending.length === 0) return true
+
+  let timer: number | undefined
+  try {
+    return await Promise.race([
+      Promise.allSettled(pending).then(() => true),
+      new Promise<false>((resolve) => {
+        timer = window.setTimeout(() => resolve(false), timeoutMs)
+      }),
+    ])
+  } finally {
+    if (timer != null) window.clearTimeout(timer)
+    cleanups.forEach((cleanup) => cleanup())
+  }
 }
 
 type EnsureInitialPaintOptions = {
@@ -782,9 +973,7 @@ async function ensureInitialPaint(
     throw abortError()
   }
 
-  const rect = host.getBoundingClientRect()
-  const width = Math.floor(rect.width)
-  const height = Math.floor(rect.height)
+  const { width, height } = readHostLayoutSize(host)
   if (width > 0 && height > 0) {
     try {
       rendition.resize(width, height)
@@ -826,10 +1015,7 @@ function waitForHostSize(
   signal?: AbortSignal,
   timeoutMs = 4000,
 ): Promise<{ width: number; height: number }> {
-  const read = () => {
-    const r = host.getBoundingClientRect()
-    return { width: Math.floor(r.width), height: Math.floor(r.height) }
-  }
+  const read = () => readHostLayoutSize(host)
   const first = read()
   if (first.width > 0 && first.height > 0) return Promise.resolve(first)
 
@@ -868,7 +1054,7 @@ function waitForHostSize(
   })
 }
 
-function flowForMode(pageMode: EpubPageMode, _layout: EpubPageLayout): string {
+export function flowForMode(pageMode: EpubPageMode): string {
   return pageMode === 'scroll' ? 'scrolled' : 'paginated'
 }
 
@@ -879,11 +1065,11 @@ function flowForMode(pageMode: EpubPageMode, _layout: EpubPageLayout): string {
  * ContinuousViewManager appends the next section once scroll nears the
  * bottom, so chapters flow into one another without a manual page-turn.
  */
-function managerForMode(pageMode: EpubPageMode): 'default' | 'continuous' {
+export function managerForMode(pageMode: EpubPageMode): 'default' | 'continuous' {
   return pageMode === 'scroll' ? 'continuous' : 'default'
 }
 
-function spreadForLayout(
+export function spreadForLayout(
   pageMode: EpubPageMode,
   layout: EpubPageLayout,
 ): 'always' | 'none' {
@@ -893,14 +1079,14 @@ function spreadForLayout(
 }
 
 /** Host + iframe chrome for page spread gutters drawn in React overlay. */
-function applyDualSpreadHost(host: HTMLElement, layout: EpubPageLayout): void {
+export function applyDualSpreadHost(host: HTMLElement, layout: EpubPageLayout): void {
   host.dataset.epubSpread = layout
 }
 
 export type OpenEpubjsOptions = {
   theme?: ReaderTheme
   signal?: AbortSignal
-  /** 1, 2, or 3 page spread (gutters drawn in React). */
+  /** 1 or 2 page spread (gutters drawn in React). */
   layout?: EpubPageLayout
   pageMode?: EpubPageMode
   /** Initial reflow size in px (default 18). */
@@ -919,6 +1105,13 @@ export type OpenEpubjsOptions = {
   onSelected?: (payload: EpubSelectionPayload) => void
   /** Fired once the first section iframe is painted (before open() fully settles). */
   onFirstRender?: () => void
+  /** Fired when the loading lifecycle advances. */
+  onStatusChange?: (status: 'opening' | 'rendering' | 'ready') => void
+  /**
+   * Fired once `book.locations` finishes generating, so the footer can swap
+   * from the section counter to the book-wide page counter.
+   */
+  onLocationsReady?: () => void
 }
 
 type EpubjsContentsLike = {
@@ -959,11 +1152,14 @@ export async function openEpubjs(
   const initialLocation = options.initialLocation
   const onSelected = options.onSelected
   const onFirstRender = options.onFirstRender
+  const onStatusChange = options.onStatusChange
+  const onLocationsReady = options.onLocationsReady
 
   if (typeof ePub !== 'function') {
     throw new Error('epubjs failed to load (default export is not a function)')
   }
 
+  installEpubjsStartContainerLogFilter()
   throwIfAborted(signal)
 
   const bytes = toArrayBuffer(buffer)
@@ -976,10 +1172,13 @@ export async function openEpubjs(
 
   const book = ePub(bytes, { openAs: 'binary' }) as Book
   let rendition: Rendition | null = null
+  let activeReadingStyle: EpubReadingStyle = initialReadingStyle
   let settled = false
   let destroyed = false
   let fallbackSpine = 0
   let firstRenderNotified = false
+  let resumeCfi: string | undefined
+  let resumeSpineIndex: number | undefined
 
   const notifyFirstRender = () => {
     if (firstRenderNotified || destroyed) return
@@ -988,6 +1187,13 @@ export async function openEpubjs(
     firstRenderNotified = true
     onFirstRender?.()
   }
+
+  const updateStatus = (next: 'opening' | 'rendering' | 'ready') => {
+    if (destroyed) return
+    onStatusChange?.(next)
+  }
+
+  updateStatus('opening')
 
   const destroyBook = () => {
     if (destroyed) return
@@ -1002,7 +1208,10 @@ export async function openEpubjs(
     rendition = null
     try {
       // Avoid book.destroy → rendition.destroy recursion after we already cleaned it.
-      ;(book as unknown as { rendition?: Rendition | null }).rendition = null
+      const bookWithRendition = book as unknown as {
+        rendition?: Rendition | null
+      }
+      bookWithRendition.rendition = null
       book.destroy()
     } catch {
       /* ignore */
@@ -1029,18 +1238,19 @@ export async function openEpubjs(
       throw abortError()
     }
     host.replaceChildren()
+    updateStatus('rendering')
     rendition = book.renderTo(host, {
       width: size.width,
       height: size.height,
-      flow: flowForMode(pageMode, layout),
+      flow: flowForMode(pageMode),
       manager: managerForMode(pageMode),
       spread: spreadForLayout(pageMode, layout),
       // Show every spine item in order (cover included when publishers put it in spine).
       allowScriptedContent: false,
     })
-    const visibleSpineIndices = visibleSpineIndicesOf(book)
+    linkSpineSections(book)
     // Apply reading styles before first display so resume CFI paginates with final typography.
-    injectEpubThemeStyles(rendition)
+    injectEpubThemeStyles(rendition, pageMode)
     applyEpubThemeVars(rendition, theme)
     applyEpubReadingStyle(rendition, initialReadingStyle)
     applyEpubFontSize(rendition, initialFontSize)
@@ -1048,10 +1258,8 @@ export async function openEpubjs(
     rendition.on('rendered', notifyFirstRender)
     throwIfAborted(signal)
 
-    // Resume at CFI when provided (T4.1); otherwise first readable spine item.
-    fallbackSpine = visibleSpineIndices[0] ?? 0
-    let resumeCfi: string | undefined
-    let resumeSpineIndex: number | undefined
+    // Resume at CFI when provided (T4.1); otherwise first spine item.
+    fallbackSpine = 0
     if (initialLocation) {
       try {
         const decoded = cfiCodec.decode(initialLocation) as EpubCfiDecodeResult
@@ -1067,7 +1275,6 @@ export async function openEpubjs(
         await rendition.display(idx)
       }
     } else {
-      // Cover is preserved; TOC/nav pages are sidebar-only.
       await rendition.display(fallbackSpine)
     }
     throwIfAborted(signal)
@@ -1086,6 +1293,7 @@ export async function openEpubjs(
       },
     )
     notifyFirstRender()
+    updateStatus('ready')
   } catch (err) {
     destroyBook()
     throw err
@@ -1093,6 +1301,142 @@ export async function openEpubjs(
     settled = true
     signal?.removeEventListener('abort', onAbort)
   }
+
+  const paginationTracker = new EpubPaginationTracker(spineLengthOf(book))
+  const bookFingerprint = fingerprintEpubBytes(bytes)
+  let activeFontSize = initialFontSize
+  let paginationMeasureToken = 0
+  let paginationAbort: AbortController | null = null
+
+  const readHostSize = () => readHostLayoutSize(host)
+
+  const buildCacheKeyParts = () => {
+    const size = readHostSize()
+    const keyInput = {
+      bookFingerprint,
+      spineLength: spineLengthOf(book),
+      width: size.width,
+      height: size.height,
+      pageMode,
+      layout,
+      fontSize: activeFontSize,
+      fontFamily: activeReadingStyle.fontFamily,
+      fontWeight: activeReadingStyle.fontWeight,
+      lineHeight: activeReadingStyle.lineHeight,
+      textAlign: activeReadingStyle.textAlign,
+      marginsEnabled: activeReadingStyle.marginsEnabled,
+      marginPreset: activeReadingStyle.marginPreset,
+      chromeHidden: activeReadingStyle.chromeHidden,
+    }
+    return {
+      keyInput,
+      key: buildPaginationCacheKey(keyInput),
+      layoutFingerprint: buildLayoutFingerprint(keyInput),
+    }
+  }
+
+  const publishLocationsReady = () => {
+    if (destroyed || signal?.aborted) return
+    onLocationsReady?.()
+  }
+
+  const hydrateFromCache = async (): Promise<boolean> => {
+    if (pageMode !== 'paginated') return false
+    const { key } = buildCacheKeyParts()
+    const cached = await readPaginationCache(key)
+    if (destroyed || signal?.aborted) return false
+    if (!cached) return false
+    if (cached.spineLength !== spineLengthOf(book)) return false
+    if (cached.sectionPages.length !== spineLengthOf(book)) return false
+    paginationTracker.hydrateExactSectionPages(cached.sectionPages)
+    publishLocationsReady()
+    return true
+  }
+
+  const startHiddenPaginationMeasure = () => {
+    if (pageMode !== 'paginated') return
+    if (destroyed || signal?.aborted) return
+
+    const token = ++paginationMeasureToken
+    paginationAbort?.abort()
+    const localAbort = new AbortController()
+    paginationAbort = localAbort
+
+    const onParentAbort = () => localAbort.abort()
+    signal?.addEventListener('abort', onParentAbort, { once: true })
+
+    void (async () => {
+      try {
+        const hit = await hydrateFromCache()
+        if (hit || destroyed || signal?.aborted || token !== paginationMeasureToken) {
+          return
+        }
+
+        const size = readHostSize()
+        if (size.width <= 0 || size.height <= 0) return
+
+        const { measureHiddenEpubPagination } = await import(
+          './progress/hidden-epub-pagination'
+        )
+        if (destroyed || signal?.aborted || token !== paginationMeasureToken) {
+          return
+        }
+
+        const result = await measureHiddenEpubPagination({
+          buffer: bytes,
+          width: size.width,
+          height: size.height,
+          theme,
+          layout,
+          pageMode,
+          fontSize: activeFontSize,
+          readingStyle: { ...activeReadingStyle },
+          signal: localAbort.signal,
+        })
+
+        if (destroyed || signal?.aborted || token !== paginationMeasureToken) {
+          return
+        }
+        if (result.spineLength !== spineLengthOf(book)) return
+
+        paginationTracker.hydrateExactSectionPages(result.sectionPages)
+        const { key, layoutFingerprint } = buildCacheKeyParts()
+        await writePaginationCache({
+          key,
+          bookFingerprint,
+          layoutFingerprint,
+          spineLength: result.spineLength,
+          sectionPages: result.sectionPages,
+        })
+        publishLocationsReady()
+      } catch (err) {
+        if (destroyed || signal?.aborted || localAbort.signal.aborted) return
+        console.warn('[epub pagination] hidden measure failed', err)
+      } finally {
+        signal?.removeEventListener('abort', onParentAbort)
+        if (paginationAbort === localAbort) paginationAbort = null
+      }
+    })()
+  }
+
+  // Prefer cached totals immediately; measure in a hidden rendition on miss.
+  void hydrateFromCache().then((hit) => {
+    if (destroyed || signal?.aborted) return
+    if (!hit) startHiddenPaginationMeasure()
+  })
+
+  // Scan section text lengths in the background to seed character counts & page estimates
+  void scanSpineCharCounts(book, signal)
+    .then((charCounts) => {
+      if (destroyed || signal?.aborted) return
+      paginationTracker.initCharCounts(charCounts)
+      if (!paginationTracker.isFullyMeasured()) {
+        publishLocationsReady()
+      }
+    })
+    .catch(() => {
+      /* ignore */
+    })
 
   const activeRendition = rendition
   if (!activeRendition) {
@@ -1172,16 +1516,13 @@ export async function openEpubjs(
   }
 
   const resizeToHost = () => {
-    const r = host.getBoundingClientRect()
-    const w = Math.floor(r.width)
-    const h = Math.floor(r.height)
-    if (w > 0 && h > 0) {
-      activeRendition.resize(w, h)
+    const { width, height } = readHostLayoutSize(host)
+    if (width > 0 && height > 0) {
+      activeRendition.resize(width, height)
     }
   }
 
-  const getVisibleSpineIndices = () => visibleSpineIndicesOf(book)
-  const getSpineLength = () => getVisibleSpineIndices().length
+  const getSpineLength = () => spineLengthOf(book)
   const hasSpineCover = () => {
     const length = spineLengthOf(book)
     for (let index = 0; index < length; index += 1) {
@@ -1195,142 +1536,34 @@ export async function openEpubjs(
       (book as unknown as { navigation?: { toc?: unknown } }).navigation?.toc,
     )
 
+  const getSectionLabels = (): string[] => {
+    const toc = getToc()
+    return Array.from({ length: spineLengthOf(book) }, (_, index) => {
+      const href = book.spine.get(index)?.href ?? ''
+      return (
+        resolveTocLocationLabel(href, toc) ||
+        (href ? basenameLabel(href) : '') ||
+        `Section ${index + 1}`
+      )
+    })
+  }
+
   const currentSpineIndex = (): number => {
     const start = activeRendition.location?.start
     if (start && typeof start.index === 'number') return start.index
     return 0
   }
 
-  const currentVisiblePosition = (): number =>
-    nearestVisiblePosition(getVisibleSpineIndices(), currentSpineIndex())
-
   const goToSpineIndex = async (index: number) => {
-    const visibleSpineIndices = getVisibleSpineIndices()
-    const n = visibleSpineIndices.length
+    const n = spineLengthOf(book)
     if (n <= 0) return
     const clamped = Math.min(Math.max(Math.round(index), 0), n - 1)
-    await activeRendition.display(visibleSpineIndices[clamped] ?? clamped)
-  }
-  const redirectIfExcludedSpine = async (direction: 'next' | 'prev' = 'next') => {
-    const visibleSpineIndices = getVisibleSpineIndices()
-    const rawIndex = currentSpineIndex()
-    const currentSection = book.spine.get(rawIndex) as
-      | SpineSectionLike
-      | undefined
-    if (!isTocSection(currentSection, book)) return
-
-    const candidates =
-      direction === 'next'
-        ? visibleSpineIndices.filter((index) => index > rawIndex)
-        : visibleSpineIndices.filter((index) => index < rawIndex).reverse()
-    const target =
-      candidates[0] ??
-      visibleSpineIndices[0] ??
-      visibleSpineIndices[visibleSpineIndices.length - 1]
-    if (typeof target === 'number' && target !== rawIndex) {
-      await activeRendition.display(target)
-    }
+    await activeRendition.display(clamped)
   }
 
   const goToHref = async (href: string) => {
     if (!href) return
     await activeRendition.display(href)
-    await redirectIfExcludedSpine('next')
-  }
-
-  const captureVisiblePreview = async (
-    maxWidth = 160,
-    maxHeight = 220,
-  ): Promise<string | null> => {
-    try {
-      return await captureHostPreview(host, maxWidth, maxHeight)
-    } catch {
-      return null
-    }
-  }
-
-  const loadSpineSectionDocument = async (
-    visibleIndex: number,
-  ): Promise<{
-    doc: Document
-    unload: () => void
-  } | null> => {
-    const visibleSpineIndices = getVisibleSpineIndices()
-    const n = visibleSpineIndices.length
-    if (n <= 0) return null
-    const clamped = Math.min(Math.max(Math.round(visibleIndex), 0), n - 1)
-    const rawIndex = visibleSpineIndices[clamped]
-    if (typeof rawIndex !== 'number') return null
-
-    const section = book.spine.get(rawIndex) as unknown as
-      | {
-          load?: (fn: (path: string) => Promise<Document>) => Promise<Document>
-          unload?: () => void
-        }
-      | undefined
-    if (!section?.load) return null
-
-    const bookLoad = (
-      book as unknown as { load: (path: string) => Promise<Document> }
-    ).load.bind(book)
-
-    try {
-      const doc = await section.load(bookLoad)
-      if (!doc?.body) return null
-      return {
-        doc,
-        unload: () => {
-          try {
-            section.unload?.()
-          } catch {
-            /* ignore */
-          }
-        },
-      }
-    } catch {
-      return null
-    }
-  }
-
-  const loadSpinePreviewHtml = async (
-    visibleIndex: number,
-  ): Promise<string | null> => {
-    const loaded = await loadSpineSectionDocument(visibleIndex)
-    if (!loaded) return null
-    try {
-      const inner = loaded.doc.body.innerHTML?.trim()
-      if (!inner) return null
-      return wrapSpinePreviewHtml(inner)
-    } finally {
-      loaded.unload()
-    }
-  }
-
-  const rasterizeSpinePreview = async (
-    visibleIndex: number,
-    maxWidth = PREVIEW_THUMB_MAX_WIDTH,
-    maxHeight = PREVIEW_THUMB_MAX_HEIGHT,
-  ): Promise<string | null> => {
-    const loaded = await loadSpineSectionDocument(visibleIndex)
-    if (!loaded) return null
-    try {
-      const body = loaded.doc.body
-      const sw = Math.max(body.scrollWidth, body.clientWidth, 320)
-      const sh = Math.max(body.scrollHeight, body.clientHeight, 400)
-      return documentToPreviewDataUrl(
-        loaded.doc,
-        sw,
-        sh,
-        maxWidth,
-        maxHeight,
-      )
-    } finally {
-      loaded.unload()
-    }
-  }
-
-  const skipExcludedSection = async (direction: 'next' | 'prev') => {
-    await redirectIfExcludedSpine(direction)
   }
 
   const readRenditionLocation = (): unknown => {
@@ -1351,21 +1584,62 @@ export async function openEpubjs(
     return prop
   }
 
+  const goToLocationPage = async (page: number) => {
+    if (pageMode === 'scroll') {
+      const spineLength = spineLengthOf(book)
+      if (spineLength <= 0) return
+      const clamped = Math.min(Math.max(Math.round(page), 1), spineLength)
+      await goToSpineIndex(clamped - 1)
+      return
+    }
+
+    const { spineIndex, sectionPage } = paginationTracker.resolveTargetPage(page)
+    const currentSpine = currentSpineIndex()
+    const displayed = currentDisplayedBoundary()
+    const currentSectionP = displayed?.page ?? 1
+    const delta = getRenditionLayoutDelta(activeRendition)
+
+    const moveRenditionToOffset = (left: number) => {
+      const targetRendition = activeRendition as unknown as {
+        moveTo?: (offset: { top: number; left: number }) => void
+      }
+      targetRendition.moveTo?.({ top: 0, left })
+    }
+
+    if (spineIndex === currentSpine) {
+      if (sectionPage === currentSectionP) return
+      if (delta > 0) {
+        moveRenditionToOffset((sectionPage - 1) * delta)
+        await waitForFrames(2)
+        activeRendition.reportLocation()
+      }
+      return
+    }
+
+    await activeRendition.display(spineIndex)
+    await waitForFrames(2)
+    if (sectionPage > 1) {
+      const updatedDelta = getRenditionLayoutDelta(activeRendition) || delta
+      if (updatedDelta > 0) {
+        moveRenditionToOffset((sectionPage - 1) * updatedDelta)
+        await waitForFrames(2)
+        activeRendition.reportLocation()
+      }
+    }
+  }
+
   const getCurrentLocation = (): CfiLocation | undefined =>
     tryEncodeCfi(readRenditionLocation())
 
   const goToLocation = async (location: CfiLocation): Promise<void> => {
     const decoded = cfiCodec.decode(location) as EpubCfiDecodeResult
-    const fallbackSpine = getVisibleSpineIndices()[0] ?? 0
+    const fallbackSpine = 0
     await displayCfiSafely(book, activeRendition, decoded.cfi, fallbackSpine)
-    await redirectIfExcludedSpine('next')
   }
 
-  // Initial resume can land on TOC/nav; match goToLocation behavior.
   // Keep teardown on abort: this runs after `settled`, so onAbort no longer destroys.
   try {
     if (initialLocation) {
-      await redirectIfExcludedSpine('next')
       const decoded = cfiCodec.decode(initialLocation) as EpubCfiDecodeResult
       const resumeSpineIndex = spineIndexFromCfi(
         book,
@@ -1413,22 +1687,117 @@ export async function openEpubjs(
     })
   }
 
-  const nextPage = async () => {
-    const beforeLocation = currentLocationSignature()
-    await activeRendition.next()
-    const afterNextLocation = currentLocationSignature()
+  const currentDisplayedBoundary = (): {
+    page: number
+    total: number
+  } | null => {
+    const displayed = (
+      readRenditionLocation() as
+        | {
+            start?: {
+              displayed?: { page?: number; total?: number }
+            }
+          }
+        | undefined
+    )?.start?.displayed
     if (
-      afterNextLocation === beforeLocation &&
-      currentVisiblePosition() === 0 &&
-      getSpineLength() > 1
+      typeof displayed?.page !== 'number' ||
+      !Number.isFinite(displayed.page) ||
+      typeof displayed.total !== 'number' ||
+      !Number.isFinite(displayed.total) ||
+      displayed.page < 1 ||
+      displayed.total < 1
     ) {
-      await goToSpineIndex(1)
+      return null
     }
-    await skipExcludedSection('next')
+    return {
+      page: Math.floor(displayed.page),
+      total: Math.floor(displayed.total),
+    }
+  }
+
+  const scheduleFullPaginationRemeasure = () => {
+    if (pageMode !== 'paginated') return
+    paginationTracker.invalidate()
+    publishLocationsReady()
+    startHiddenPaginationMeasure()
+  }
+
+  const scrollByViewport = (direction: -1 | 1) => {
+    const container = epubScrollContainer(host)
+    if (!container) return
+    // Preserve a small overlap so no line sits exactly on both viewport edges.
+    const distance = Math.max(1, Math.floor(container.clientHeight * 0.9))
+    container.scrollBy({
+      top: direction * distance,
+      left: 0,
+      behavior: 'smooth',
+    })
+  }
+
+  const nextPage = async () => {
+    if (pageMode === 'scroll') {
+      scrollByViewport(1)
+      return
+    }
+
+    const beforeLocation = currentLocationSignature()
+    const beforeSpine = currentSpineIndex()
+    await activeRendition.next()
+    await waitForFrames(2)
+    if (currentLocationSignature() !== beforeLocation) return
+
+    const resourcesReady = await waitForSectionResources(
+      currentSectionDocument(activeRendition),
+    )
+    resizeToHost()
+    await waitForFrames(2)
+    await activeRendition.next()
+    await waitForFrames(2)
+    if (currentLocationSignature() !== beforeLocation) return
+
+    const displayed = currentDisplayedBoundary()
+    if (
+      resourcesReady &&
+      displayed &&
+      displayed.page >= displayed.total &&
+      currentSpineIndex() === beforeSpine &&
+      beforeSpine < getSpineLength() - 1
+    ) {
+      await goToSpineIndex(beforeSpine + 1)
+    }
   }
   const prevPage = async () => {
+    if (pageMode === 'scroll') {
+      scrollByViewport(-1)
+      return
+    }
+
+    const beforeLocation = currentLocationSignature()
+    const beforeSpine = currentSpineIndex()
     await activeRendition.prev()
-    await skipExcludedSection('prev')
+    await waitForFrames(2)
+    if (currentLocationSignature() !== beforeLocation) return
+
+    const resourcesReady = await waitForSectionResources(
+      currentSectionDocument(activeRendition),
+    )
+    resizeToHost()
+    await waitForFrames(2)
+    await activeRendition.prev()
+    await waitForFrames(2)
+    if (currentLocationSignature() !== beforeLocation) return
+
+    const displayed = currentDisplayedBoundary()
+    if (
+      resourcesReady &&
+      displayed &&
+      displayed.page <= 1 &&
+      currentSpineIndex() === beforeSpine &&
+      beforeSpine > 0
+    ) {
+      await goToSpineIndex(beforeSpine - 1)
+    }
   }
 
   return {
@@ -1437,6 +1806,8 @@ export async function openEpubjs(
     overlayPainter,
     hasSpineCover,
     destroy: () => {
+      paginationAbort?.abort()
+      paginationAbort = null
       void overlayPainter.clear()
       if (onSelected) {
         try {
@@ -1453,14 +1824,16 @@ export async function openEpubjs(
     prev: prevPage,
     nextPage,
     prevPage,
+    scrollByViewport,
     nextSection: async () => {
-      await goToSpineIndex(currentVisiblePosition() + 1)
+      await goToSpineIndex(currentSpineIndex() + 1)
     },
     prevSection: async () => {
-      await goToSpineIndex(currentVisiblePosition() - 1)
+      await goToSpineIndex(currentSpineIndex() - 1)
     },
     goToHref,
     goToSpineIndex,
+    goToLocationPage,
     getSpineLength,
     getCurrentLocation,
     goToLocation,
@@ -1478,30 +1851,54 @@ export async function openEpubjs(
         }
       })
     },
-    captureVisiblePreview,
-    loadSpinePreviewHtml,
-    rasterizeSpinePreview,
     getNavState: () => {
-      const visibleSpineIndices = getVisibleSpineIndices()
-      const visiblePosition = nearestVisiblePosition(
-        visibleSpineIndices,
-        currentSpineIndex(),
-      )
-      const rawIndex = visibleSpineIndices[visiblePosition] ?? currentSpineIndex()
-      const state = buildEpubNavState(book, rawIndex, getToc())
-      return {
-        ...state,
-        spineIndex: visiblePosition,
-        spineLength: visibleSpineIndices.length,
-        pageCurrent: visibleSpineIndices.length <= 0 ? 0 : visiblePosition + 1,
-        pageTotal: Math.max(visibleSpineIndices.length, 1),
-        progress:
-          visibleSpineIndices.length <= 1
-            ? 0
-            : visiblePosition / (visibleSpineIndices.length - 1),
+      const location = readRenditionLocation()
+      const displayed = displayedPagesFromLocation(location)
+      const cfi = cfiFromLocation(location)
+      const currentSpine = currentSpineIndex()
+
+      if (pageMode === 'paginated') {
+        const metrics = paginationTracker.getNavMetrics(
+          currentSpine,
+          displayed.page,
+          displayed.total,
+        )
+        const navState = buildEpubNavState(
+          book,
+          currentSpine,
+          getToc(),
+          displayed,
+          cfi,
+          metrics,
+        )
+        return navState
       }
+
+      const spineLength = spineLengthOf(book)
+      const progress = spinePositionFraction(
+        currentSpine,
+        spineLength,
+        displayed.page,
+        displayed.total,
+      )
+      const navState = buildEpubNavState(
+        book,
+        currentSpine,
+        getToc(),
+        displayed,
+        cfi,
+        {
+          pageCurrent: currentSpine + 1,
+          pageTotal: Math.max(1, spineLength),
+          progress,
+          percentage: progress,
+          pageCountReady: true,
+        },
+      )
+      return navState
     },
     getToc,
+    getSectionLabels,
     setTheme: (next) => {
       applyEpubThemeVars(activeRendition, next)
     },
@@ -1510,35 +1907,53 @@ export async function openEpubjs(
       activeRendition.spread(spreadForLayout(pageMode, next))
       applyDualSpreadHost(host, next)
       resizeToHost()
+      scheduleFullPaginationRemeasure()
     },
     setFontSize: (px) => {
+      activeFontSize = px
       applyEpubFontSize(activeRendition, px)
       resizeToHost()
+      scheduleFullPaginationRemeasure()
     },
     setFontFamily: (fontFamily) => {
+      activeReadingStyle = { ...activeReadingStyle, fontFamily }
       applyEpubReadingStyle(activeRendition, { fontFamily })
       resizeToHost()
+      scheduleFullPaginationRemeasure()
     },
     setFontWeight: (fontWeight) => {
+      activeReadingStyle = { ...activeReadingStyle, fontWeight }
       applyEpubReadingStyle(activeRendition, { fontWeight })
       resizeToHost()
+      scheduleFullPaginationRemeasure()
     },
     setLineHeight: (lineHeight) => {
+      activeReadingStyle = { ...activeReadingStyle, lineHeight }
       applyEpubReadingStyle(activeRendition, { lineHeight })
       resizeToHost()
+      scheduleFullPaginationRemeasure()
     },
     setTextAlign: (textAlign) => {
+      activeReadingStyle = { ...activeReadingStyle, textAlign }
       applyEpubReadingStyle(activeRendition, { textAlign })
       resizeToHost()
+      scheduleFullPaginationRemeasure()
     },
     setMargins: (marginsEnabled, marginPreset) => {
+      activeReadingStyle = { ...activeReadingStyle, marginsEnabled, marginPreset }
       applyEpubReadingStyle(activeRendition, { marginsEnabled, marginPreset })
       resizeToHost()
+      scheduleFullPaginationRemeasure()
     },
     setChromeHidden: (chromeHidden) => {
+      activeReadingStyle = { ...activeReadingStyle, chromeHidden }
       applyEpubReadingStyle(activeRendition, { chromeHidden })
       resizeToHost()
+      scheduleFullPaginationRemeasure()
     },
-    resize: resizeToHost,
+    resize: () => {
+      resizeToHost()
+      scheduleFullPaginationRemeasure()
+    },
   }
 }

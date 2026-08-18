@@ -2,6 +2,7 @@ import {
   ShelfDetailItem,
   type ShelfDetailItemData,
 } from './ShelfDetailItem'
+import type { BookMenuPoint } from '../book'
 
 function BackIcon({ className }: { className?: string }) {
   return (
@@ -28,7 +29,7 @@ export type ShelfDetailViewProps = {
   items: ShelfDetailItemData[]
   onBack: () => void
   onOpenItem: (id: string) => void
-  onBookInfo?: (id: string) => void
+  onBookMenu: (id: string, point: BookMenuPoint) => void
   /** Override subtitle (default: “N files”). */
   countLabel?: string
   emptyMessage?: string
@@ -41,7 +42,7 @@ export function ShelfDetailView({
   items,
   onBack,
   onOpenItem,
-  onBookInfo,
+  onBookMenu,
   countLabel,
   emptyMessage = 'No files in this section.',
   backAriaLabel = 'Back to library',
@@ -85,7 +86,7 @@ export function ShelfDetailView({
                 key={item.id}
                 item={item}
                 onOpen={onOpenItem}
-                onBookInfo={onBookInfo}
+                onBookMenu={onBookMenu}
               />
             ))}
           </ul>

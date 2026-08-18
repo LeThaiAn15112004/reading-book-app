@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import type { ZoomLayoutPreset } from '../../logic'
 import type { PageLayout, PageMode } from '@reading-book/shared/models'
 import { ZoomControl } from './ZoomControl'
+import { FullscreenButton } from './FullscreenButton'
 
 const modeGroupClass =
   'inline-flex items-center gap-0.5 rounded-lg bg-lib-hint/70 p-0.5'
@@ -12,15 +13,14 @@ const modeButtonActiveClass =
 
 const layoutOptions: Array<{
   id: PageLayout
-  count: 1 | 2 | 3
+  count: 1 | 2
   label: string
 }> = [
   { id: 'single', count: 1, label: '1 page' },
   { id: 'dual', count: 2, label: '2 pages' },
-  { id: 'triple', count: 3, label: '3 pages' },
 ]
 
-function PageCountIcon({ count }: { count: 1 | 2 | 3 }) {
+function PageCountIcon({ count }: { count: 1 | 2 }) {
   return (
     <span className="flex items-center gap-[2px]" aria-hidden>
       {Array.from({ length: count }).map((_, index) => (
@@ -78,6 +78,8 @@ function BookmarkIcon({ filled }: { filled: boolean }) {
 type ReaderFooterProps = {
   pageCurrent: number
   pageTotal: number
+  /** False until the EPUB reference-page model is available. */
+  pageCountReady?: boolean
   onPreviousPage: () => void
   onNextPage: () => void
   onGoToPage: (page: number) => void
@@ -89,6 +91,10 @@ type ReaderFooterProps = {
   onZoomChange: (scale: number) => void
   onZoomStep: (direction: 1 | -1) => void
   onZoomLayoutPreset: (preset: ZoomLayoutPreset) => void
+  fullscreen?: boolean
+  onToggleFullscreen?: () => void
+  /** Immersive fullscreen: slide footer away until bottom-edge reveal. */
+  immersiveHidden?: boolean
   bookmarkActive?: boolean
   onToggleBookmark?: () => void
 }
@@ -96,6 +102,7 @@ type ReaderFooterProps = {
 export function ReaderFooter({
   pageCurrent,
   pageTotal,
+  pageCountReady = true,
   onPreviousPage,
   onNextPage,
   onGoToPage,
@@ -107,6 +114,9 @@ export function ReaderFooter({
   onZoomChange,
   onZoomStep,
   onZoomLayoutPreset,
+  fullscreen = false,
+  onToggleFullscreen,
+  immersiveHidden = false,
   bookmarkActive = false,
   onToggleBookmark,
 }: ReaderFooterProps) {
@@ -118,7 +128,16 @@ export function ReaderFooter({
 
   function submitPage() {
     const requestedPage = Number.parseInt(pageInput, 10)
-    if (!Number.isFinite(requestedPage) || pageTotal <= 0) {
+    if (!Number.isFinite(requestedPage) || requestedPage < 1) {
+      setPageInput(String(pageCurrent))
+      return
+    }
+    if (!pageCountReady) {
+      setPageInput(String(pageCurrent))
+      onGoToPage(requestedPage)
+      return
+    }
+    if (pageTotal <= 0) {
       setPageInput(String(pageCurrent))
       return
     }
@@ -128,10 +147,22 @@ export function ReaderFooter({
     onGoToPage(page)
   }
 
+  const atStart = pageCountReady && pageCurrent <= 1
+  const atEnd = pageCountReady && pageTotal > 0 && pageCurrent >= pageTotal
+  const inputWidthCh = pageCountReady
+    ? Math.max(String(pageTotal).length + 1, 5)
+    : Math.max(String(pageCurrent).length + 1, 5)
+
   return (
     <footer
-      className="fixed inset-x-0 bottom-0 z-[90] flex h-10 items-center justify-between gap-3 border-t border-lib-border-soft bg-lib-surface-strong pl-12 pr-4 backdrop-blur-md sm:h-10 sm:pl-14"
+      data-immersive-chrome=""
+      className={`fixed inset-x-0 bottom-0 z-[90] flex h-10 items-center justify-between gap-3 border-t border-lib-border-soft bg-lib-surface-strong pl-12 pr-4 backdrop-blur-md transition-all duration-300 sm:h-10 sm:pl-14 ${
+        immersiveHidden
+          ? 'pointer-events-none translate-y-full opacity-0'
+          : 'translate-y-0 opacity-100'
+      }`}
       onClick={(e) => e.stopPropagation()}
+      onPointerEnter={(e) => e.stopPropagation()}
     >
       <div className="inline-flex min-w-0 items-center gap-3">
         <span className="inline-flex min-w-0 items-center gap-3 text-xs font-semibold tracking-wide text-lib-text-strong">
@@ -139,7 +170,7 @@ export function ReaderFooter({
           type="button"
           className="rounded px-2 py-1 text-sm hover:bg-lib-chip disabled:cursor-not-allowed disabled:opacity-40"
           aria-label="First page"
-          disabled={pageCurrent <= 1}
+          disabled={atStart}
           onClick={() => onGoToPage(1)}
         >
           &lt;&lt;
@@ -148,13 +179,17 @@ export function ReaderFooter({
           type="button"
           className="rounded px-2 py-1 text-sm hover:bg-lib-chip disabled:cursor-not-allowed disabled:opacity-40"
           aria-label="Previous page"
-          disabled={pageCurrent <= 1}
+          disabled={atStart}
           onClick={onPreviousPage}
         >
           &lt;
         </button>
-        {pageTotal > 0 ? (
-          <span className="inline-flex items-center gap-1">
+        {pageCurrent > 0 ? (
+          <span
+            className="inline-flex items-center gap-1"
+            aria-busy={!pageCountReady}
+            aria-live="polite"
+          >
             <input
               type="text"
               inputMode="numeric"
@@ -162,7 +197,7 @@ export function ReaderFooter({
               aria-label="Current page"
               className="rounded border border-transparent bg-transparent px-1 py-0.5 text-right font-semibold outline-none hover:border-lib-border-soft focus:border-lib-accent focus:bg-lib-chip"
               style={{
-                width: `${Math.max(String(pageTotal).length + 1, 5)}ch`,
+                width: `${inputWidthCh}ch`,
               }}
               value={pageInput}
               onChange={(event) =>
@@ -182,14 +217,27 @@ export function ReaderFooter({
               }}
             />
             <span aria-hidden="true">/</span>
-            <span>{pageTotal}</span>
+            {pageCountReady && pageTotal > 0 ? (
+              <span aria-label="Total pages">{pageTotal}</span>
+            ) : (
+              <span
+                className="inline-flex items-center gap-1.5 text-lib-muted"
+                aria-label="Calculating page count"
+              >
+                <span
+                  className="size-3 shrink-0 animate-spin rounded-full border-2 border-current/20 border-t-current"
+                  aria-hidden
+                />
+                <span>Calculating…</span>
+              </span>
+            )}
           </span>
         ) : null}
         <button
           type="button"
           className="rounded px-2 py-1 text-sm hover:bg-lib-chip disabled:cursor-not-allowed disabled:opacity-40"
           aria-label="Next page"
-          disabled={pageTotal <= 0 || pageCurrent >= pageTotal}
+          disabled={atEnd}
           onClick={onNextPage}
         >
           &gt;
@@ -198,7 +246,7 @@ export function ReaderFooter({
           type="button"
           className="rounded px-2 py-1 text-sm hover:bg-lib-chip disabled:cursor-not-allowed disabled:opacity-40"
           aria-label="Last page"
-          disabled={pageTotal <= 0 || pageCurrent >= pageTotal}
+          disabled={!pageCountReady || atEnd}
           onClick={() => onGoToPage(pageTotal)}
         >
           &gt;&gt;
@@ -270,12 +318,20 @@ export function ReaderFooter({
         </span>
       </div>
 
-      <ZoomControl
-        zoom={zoom}
-        onZoomChange={onZoomChange}
-        onZoomStep={onZoomStep}
-        onLayoutPreset={onZoomLayoutPreset}
-      />
+      <div className="inline-flex items-center gap-1">
+        <ZoomControl
+          zoom={zoom}
+          onZoomChange={onZoomChange}
+          onZoomStep={onZoomStep}
+          onLayoutPreset={onZoomLayoutPreset}
+        />
+        {onToggleFullscreen ? (
+          <FullscreenButton
+            fullscreen={fullscreen}
+            onToggle={onToggleFullscreen}
+          />
+        ) : null}
+      </div>
     </footer>
   )
 }

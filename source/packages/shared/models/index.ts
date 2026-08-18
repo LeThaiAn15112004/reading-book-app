@@ -66,6 +66,16 @@ export {
   type FreehandAnnotationInput,
 } from './freehand-persistence.js'
 export {
+  freehandBoundingBox,
+  freehandPathDistance,
+  hitTestFreehandStrokes,
+  resizeFreehandBBox,
+  scaleFreehandPointsToBox,
+  translateFreehandPoints,
+  type FreehandBBox,
+  type FreehandResizeHandle,
+} from './freehand-geometry.js'
+export {
   TYPEWRITER_DEFAULT_COLOR_HEX,
   TYPEWRITER_DEFAULT_FONT_SIZE,
   TYPEWRITER_FONT_SIZES,

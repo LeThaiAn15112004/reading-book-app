@@ -20,8 +20,8 @@ import {
   resolveCfiBoundary,
   resolveCfiRange,
   splitCfiComponents,
-} from '../../src/reader/renderers/epub/cfi-dom-range.ts'
-import { toEpubjsDisplayCfi } from '../../src/reader/renderers/epub/selection-cfi.ts'
+} from '../../src/reader/renderers/epub/cfi/cfi-dom-range.ts'
+import { toEpubjsDisplayCfi } from '../../src/reader/renderers/epub/cfi/selection-cfi.ts'
 
 // --- Minimal DOM + Range, enough for the resolver's node walking -------------
 

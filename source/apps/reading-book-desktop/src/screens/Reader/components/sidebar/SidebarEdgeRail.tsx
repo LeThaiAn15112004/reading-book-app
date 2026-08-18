@@ -4,7 +4,7 @@ import {
   SIDEBAR_RAIL_WIDTH_PX,
   SIDEBAR_TABS,
 } from './sidebarTabs'
-import { readerChromeTopInset } from '../../../../reader/readerChromeLayout'
+import { readerChromeTopInset } from '../../../../reader/chrome'
 
 type SidebarEdgeRailProps = {
   open: boolean
@@ -12,6 +12,8 @@ type SidebarEdgeRailProps = {
   panelWidth: number
   isResizing?: boolean
   chromeHidden?: boolean
+  /** Immersive fullscreen: hide rail until left-edge reveal. */
+  immersiveHidden?: boolean
   bookmarkActive?: boolean
   onOpenTab: (tab: SidebarTab) => void
   onToggle: () => void
@@ -23,6 +25,7 @@ export function SidebarEdgeRail({
   panelWidth,
   isResizing = false,
   chromeHidden = true,
+  immersiveHidden = false,
   bookmarkActive = false,
   onOpenTab,
   onToggle,
@@ -33,11 +36,16 @@ export function SidebarEdgeRail({
   const chromeTopInset = readerChromeTopInset(chromeHidden)
   const edgeTransition = isResizing
     ? ''
-    : 'transition-[top,left,color,border-color] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]'
+    : 'transition-[top,left,color,border-color,opacity,transform] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]'
+
+  // Hard-hide in immersive mode: translate alone leaves the chevron handle
+  // peeking (it only shifts by its own width, not the rail offset).
+  if (immersiveHidden) return null
 
   return (
     <>
       <nav
+        data-immersive-chrome=""
         className={`absolute left-0 z-[170] flex flex-col items-stretch py-1.5 ${edgeTransition} ${
           open
             ? 'border-r-0 bg-lib-hint/35'
@@ -85,6 +93,7 @@ export function SidebarEdgeRail({
       </nav>
 
       <button
+        data-immersive-chrome=""
         className={`absolute z-[175] flex w-5 cursor-pointer items-center justify-center rounded-r-md border border-l-0 border-lib-border-soft bg-lib-surface-strong text-lib-muted shadow-md hover:border-lib-accent-ring hover:text-lib-accent ${edgeTransition}`}
         style={{
           left: handleLeft,

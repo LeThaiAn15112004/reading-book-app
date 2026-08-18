@@ -8,10 +8,12 @@ import {
 } from 'react'
 import { createPortal } from 'react-dom'
 import {
+  readerFreehandPageNumber,
   typewriterPlainText,
   type ReaderAnnotationStatus,
   type ReaderAnnotationType,
   type ReaderHighlight,
+  type ReaderShapeAnnotation,
   type ReaderTypewriterNote,
 } from '@reading-book/shared/models'
 
@@ -139,14 +141,29 @@ type NoteListItem =
       updatedAt: string
       note: ReaderTypewriterNote
     }
+  | {
+      kind: 'pencil'
+      id: string
+      type: 'freehand'
+      pageNumber: number
+      content: string
+      status: ReaderAnnotationStatus
+      isChecked: boolean
+      colorHex?: string
+      updatedAt: string
+      stroke: ReaderShapeAnnotation
+    }
 
 type NotesListPanelProps = {
   highlights: ReaderHighlight[]
   typewriterNotes: ReaderTypewriterNote[]
+  freehandStrokes?: ReaderShapeAnnotation[]
+  /** 1-based spine section for grouping (annotations.page_number). Not a rendered page. */
   pageCurrent?: number
   onGoToPage: (page: number) => void
   onJump: (highlight: ReaderHighlight) => void
   onJumpTypewriterNote: (note: ReaderTypewriterNote) => void
+  onJumpPencilStroke?: (stroke: ReaderShapeAnnotation) => void
   onToggleChecked: (id: string, isChecked: boolean) => void
   onSetStatus: (id: string, status: ReaderAnnotationStatus) => void
   onEditContent: (item: NoteListItem) => void
@@ -172,7 +189,7 @@ const TYPE_META: Record<
   highlight: { icon: '🖍', label: 'Highlight' },
   underline: { icon: '‿', label: 'Underline' },
   strikethrough: { icon: '̶', label: 'Strikethrough' },
-  freehand: { icon: '✏️', label: 'Freehand' },
+  freehand: { icon: '✏️', label: 'Pencil' },
   textbox: { icon: '⌨️', label: 'Textbox' },
   stamp: { icon: '🏷', label: 'Stamp' },
 }
@@ -227,6 +244,7 @@ function typewriterPageNumber(note: ReaderTypewriterNote): number {
 function toItems(
   highlights: ReaderHighlight[],
   typewriterNotes: ReaderTypewriterNote[],
+  freehandStrokes: ReaderShapeAnnotation[] = [],
 ): NoteListItem[] {
   return [
     ...highlights.map((h) => ({
@@ -252,6 +270,18 @@ function toItems(
       colorHex: n.colorHex,
       updatedAt: n.updatedAt || n.createdAt,
       note: n,
+    })),
+    ...freehandStrokes.map((s) => ({
+      kind: 'pencil' as const,
+      id: s.id,
+      type: 'freehand' as const,
+      pageNumber: readerFreehandPageNumber(s),
+      content: s.note?.trim() || 'Pencil stroke',
+      status: s.status ?? 'None',
+      isChecked: s.isChecked ?? false,
+      colorHex: s.colorHex,
+      updatedAt: s.updatedAt || s.createdAt,
+      stroke: s,
     })),
   ]
 }
@@ -788,10 +818,12 @@ function PageAccordion({
 export function NotesListPanel({
   highlights,
   typewriterNotes,
+  freehandStrokes = [],
   pageCurrent,
   onGoToPage,
   onJump,
   onJumpTypewriterNote,
+  onJumpPencilStroke,
   onToggleChecked,
   onSetStatus,
   onEditContent,
@@ -808,8 +840,8 @@ export function NotesListPanel({
   const filterPanelRef = useRef<HTMLDivElement | null>(null)
 
   const allItems = useMemo(
-    () => toItems(highlights, typewriterNotes),
-    [highlights, typewriterNotes],
+    () => toItems(highlights, typewriterNotes, freehandStrokes),
+    [highlights, typewriterNotes, freehandStrokes],
   )
 
   const availableTypes = useMemo(() => {
@@ -962,6 +994,10 @@ export function NotesListPanel({
   function jumpItem(item: NoteListItem) {
     if (item.kind === 'highlight') {
       onJump(item.highlight)
+      return
+    }
+    if (item.kind === 'pencil') {
+      onJumpPencilStroke?.(item.stroke)
       return
     }
     onJumpTypewriterNote(item.note)

@@ -1,6 +1,7 @@
 import type {
   ReaderBookmark,
   ReaderHighlight,
+  ReaderShapeAnnotation,
   ReaderTypewriterNote,
 } from './reader-session.js'
 
@@ -9,6 +10,7 @@ export type AnnotationSnapshot =
   | { entity: 'highlight'; value: ReaderHighlight }
   | { entity: 'typewriter'; value: ReaderTypewriterNote }
   | { entity: 'bookmark'; value: ReaderBookmark }
+  | { entity: 'freehand'; value: ReaderShapeAnnotation }
 
 /** One reversible annotation mutation for Ctrl+Z / Ctrl+Y. */
 export type AnnotationAction =

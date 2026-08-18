@@ -40,9 +40,9 @@ export function clampReadingFontSize(px: number): number {
 export function parseReadingLayoutMode(
   value: string | undefined,
 ): ReadingLayout | undefined {
-  return value === 'single' || value === 'dual' || value === 'triple'
-    ? value
-    : undefined
+  if (value === 'dual' || value === 'triple') return 'dual'
+  if (value === 'single') return 'single'
+  return undefined
 }
 
 function parseMarginPreset(

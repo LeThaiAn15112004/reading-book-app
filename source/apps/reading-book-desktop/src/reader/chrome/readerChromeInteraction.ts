@@ -1,5 +1,5 @@
 import type { RefObject } from 'react'
-import type { EpubRendererApi } from './renderers/epub'
+import type { EpubRendererApi } from '../renderers/epub'
 
 /** Matches ReaderShell / SidebarEdgeRail padding transition (ms). */
 export const READER_CHROME_TRANSITION_MS = 300

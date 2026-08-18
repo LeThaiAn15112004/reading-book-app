@@ -1,10 +1,5 @@
 export { parseResumeLocation } from './book/parseResumeLocation'
 export { FAKE_CHAPTERS, chapterLocationLabel, type FakeChapter } from './demo/fakeReaderContent'
-export {
-  usePagePreviewStore,
-  type PagePreviewEntry,
-  type PreviewRequestPriority,
-} from './pagePreview/usePagePreviewStore'
 export { FAKE_SIGNATURES } from './demo/fakeSignatures'
 export {
   useReaderAnnotations,
@@ -12,13 +7,15 @@ export {
   useReaderChromeUi,
   useReaderNavigation,
   useReaderSessionBridge,
+  useReaderFullscreen,
+  useImmersiveChromeReveal,
   useReaderZoomControls,
   type ReaderChromeAnnotationBridge,
   type ReaderChromeEscapeUi,
   type RightSidebarKind,
   type SelectionMenuState,
 } from './hooks'
-export { toReadingPrefs } from './prefs/toReadingPrefs'
+export { fromReadingPrefs, toReadingPrefs } from './prefs/toReadingPrefs'
 export { anchorFromSelectionRect } from './selection/selectionAnchor'
 export {
   flushRegisteredSession,
