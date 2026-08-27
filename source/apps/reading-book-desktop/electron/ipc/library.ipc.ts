@@ -45,6 +45,10 @@ function toSummaryDto(
     dto.lastReadLocation = session.lastReadLocation
     if (session.lastReadAt) dto.lastReadAt = session.lastReadAt
   }
+  if (book.sourceProvider === 'google_drive' || book.sourceProvider === 'dropbox' || book.sourceProvider === 'onedrive') {
+    dto.sourceProvider = book.sourceProvider
+  }
+  if (book.externalId) dto.externalId = book.externalId
   return dto
 }
 

@@ -26,8 +26,8 @@ export class DefaultExternalLibraryRepository implements ExternalLibraryReposito
   private readonly storage: ExternalLibraryStorage;
   private readonly supportedProviders: ExternalLibraryProvider[] = [
     'google_drive',
-    'google_books',
-    'apple_books',
+    'dropbox',
+    'onedrive',
   ];
 
   constructor(storage?: ExternalLibraryStorage) {

@@ -40,3 +40,33 @@ export function loadGoogleOAuthClientConfig(): GoogleOAuthClientConfig | null {
     return null
   }
 }
+
+/**
+ * Main-process-only credentials for the Cloud Sources OAuth code exchange.
+ * Unlike `loadGoogleOAuthClientConfig`, this retains the client secret — it
+ * must never be sent to the renderer or logged.
+ */
+export function loadGoogleOAuthCredentials(): {
+  clientId: string
+  clientSecret?: string
+  redirectUris: readonly string[]
+} | null {
+  const secretPath = findClientSecretPath()
+  if (!secretPath) return null
+
+  try {
+    const raw = JSON.parse(readFileSync(secretPath, 'utf8')) as {
+      installed?: { client_id?: string; client_secret?: string; redirect_uris?: string[] }
+      web?: { client_id?: string; client_secret?: string; redirect_uris?: string[] }
+    }
+    const source = raw.installed ?? raw.web
+    if (!source?.client_id) return null
+    return {
+      clientId: source.client_id,
+      clientSecret: source.client_secret,
+      redirectUris: source.redirect_uris ?? [],
+    }
+  } catch {
+    return null
+  }
+}

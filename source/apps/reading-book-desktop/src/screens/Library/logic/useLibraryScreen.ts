@@ -14,6 +14,7 @@ import {
   matchesSearch,
   pickContinueReading,
   type LibraryBook,
+  type NavFilterId,
 } from '@reading-book/shared/models'
 import { importApi, libraryApi } from '../../../bridge'
 import { useAppNav, useOpenReading, type AppStubNavId } from '../../../chrome'
@@ -25,6 +26,9 @@ import type {
   ShelfDetailItemData,
 } from '../components'
 import { toShelfDetailItem } from './toShelfDetailItem'
+import { useCloudSources } from './useCloudSources'
+import { useSectionOrder } from './useSectionOrder'
+import { useShelfOrder } from './useShelfOrder'
 
 type LibraryLocationState = BootLocationState & {
   openNav?: AppStubNavId
@@ -34,6 +38,8 @@ export type PendingBookRemoval = {
   bookId: string
   kind: 'remove' | 'delete-file'
 }
+
+type LibraryFilterId = 'all' | NavFilterId
 
 /** Desktop Library screen controller — shared hooks + IPC clients + derived lists. */
 export function useLibraryScreen() {
@@ -61,6 +67,9 @@ export function useLibraryScreen() {
   const [pendingCollectionBookId, setPendingCollectionBookId] = useState<
     string | null
   >(null)
+  const [activeFilter, setActiveFilter] = useState<LibraryFilterId>('all')
+
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
 
   const { books, refreshLibrary } = useLibraryBooks({
     client: libraryApi,
@@ -110,7 +119,7 @@ export function useLibraryScreen() {
   const {
     view,
     sidebarActive,
-    handleOpenShelf,
+    handleOpenShelf: openShelfDetail,
     handleCloseShelf,
     handleStubNav,
     goHub,
@@ -119,6 +128,28 @@ export function useLibraryScreen() {
   } = useLibraryView({
     onComingSoon: () => showToast('Coming soon.', 'info'),
   })
+
+  const cloudSources = useCloudSources({
+    showToast,
+    onDownloaded: refreshLibrary,
+  })
+
+  function handleFilterChange(filter: LibraryFilterId) {
+    setActiveFilter(filter)
+  }
+
+  /** Section arrow/header click → dedicated full-page view for that section. */
+  function handleOpenShelf(shelfId: string) {
+    if (shelfId === 'favorites') {
+      handleStubNav('favorites')
+    } else if (
+      shelfId === 'reading' ||
+      shelfId === 'completed' ||
+      shelfId === 'not-started'
+    ) {
+      openShelfDetail(shelfId)
+    }
+  }
 
   const libraryNavRef = useRef({
     activeId: sidebarActive,
@@ -368,6 +399,7 @@ export function useLibraryScreen() {
   const showShelves =
     showHubChrome && books !== null && books.length > 0 && !noSearchMatches
   const shelfCounts = {
+    favorites: searchedBooks.filter((b) => b.isFavorite).length,
     reading: searchedBooks.filter((b) => b.status === 'reading').length,
     completed: searchedBooks.filter((b) => b.status === 'completed').length,
     'not-started': searchedBooks.filter((b) => b.status === 'not-started')
@@ -382,25 +414,58 @@ export function useLibraryScreen() {
   const shelfItems: ShelfDetailItemData[] =
     view.kind === 'shelf'
       ? filterByShelf(searchedBooks, view.shelfId).map((b) =>
-          toShelfDetailItem(b),
-        )
+        toShelfDetailItem(b),
+      )
       : []
 
+  const { orderShelf, reorderShelf } = useShelfOrder()
+  const { sectionOrder, reorderSections } = useSectionOrder()
+
+  /** Default rail order: most recently opened first (falls back below any saved drag order). */
+  function sortByRecency(list: LibraryBook[]): LibraryBook[] {
+    return [...list].sort((a, b) =>
+      (b.lastReadAt ?? '').localeCompare(a.lastReadAt ?? ''),
+    )
+  }
+
   const shelfRailBooks = {
-    reading: filterByShelf(searchedBooks, 'reading'),
-    completed: filterByShelf(searchedBooks, 'completed'),
-    'not-started': filterByShelf(searchedBooks, 'not-started'),
-  } as const
+    favorites: orderShelf(
+      'favorites',
+      sortByRecency(searchedBooks.filter((b) => b.isFavorite)),
+    ),
+    reading: orderShelf(
+      'reading',
+      sortByRecency(filterByShelf(searchedBooks, 'reading')),
+    ),
+    completed: orderShelf(
+      'completed',
+      sortByRecency(filterByShelf(searchedBooks, 'completed')),
+    ),
+    'not-started': orderShelf(
+      'not-started',
+      sortByRecency(filterByShelf(searchedBooks, 'not-started')),
+    ),
+  }
+
+  const visibleShelfIds =
+    activeFilter === 'all'
+      ? sectionOrder
+      : activeFilter === 'favorites'
+        ? (['favorites'] as const)
+        : activeFilter === 'to-read'
+          ? (['not-started'] as const)
+          : ([activeFilter] as const)
+  const hideEmptyShelves = searchActive || activeFilter !== 'all'
 
   const filterConfig =
     view.kind === 'filter' ? NAV_FILTERS[view.filterId] : undefined
   const filterItems =
     view.kind === 'filter'
       ? filterByNav(bookList, view.filterId).map((b) =>
-          toShelfDetailItem(b, {
-            forceFavoriteStar: filterConfig?.showStar,
-          }),
-        )
+        toShelfDetailItem(b, {
+          forceFavoriteStar: filterConfig?.showStar,
+        }),
+      )
       : []
 
   const activeCollection =
@@ -412,14 +477,14 @@ export function useLibraryScreen() {
     : undefined
   const pendingCollectionDelete = pendingCollectionDeleteId
     ? collections.find(
-        (collection) => collection.id === pendingCollectionDeleteId,
-      )
+      (collection) => collection.id === pendingCollectionDeleteId,
+    )
     : undefined
   const collectionItems: ShelfDetailItemData[] = activeCollection
     ? activeCollection.bookIds
-        .map((id) => bookList.find((b) => b.id === id))
-        .filter((b): b is LibraryBook => Boolean(b))
-        .map((b) => toShelfDetailItem(b))
+      .map((id) => bookList.find((b) => b.id === id))
+      .filter((b): b is LibraryBook => Boolean(b))
+      .map((b) => toShelfDetailItem(b))
     : []
 
   return {
@@ -486,9 +551,19 @@ export function useLibraryScreen() {
     activeShelf,
     shelfItems,
     shelfRailBooks,
+    reorderShelf,
+    reorderSections,
+    visibleShelfIds,
+    hideEmptyShelves,
     filterConfig,
     filterItems,
     activeCollection,
     collectionItems,
+    viewMode,
+    setViewMode,
+    activeFilter,
+    handleFilterChange,
+    cloudSources,
+    bookList,
   }
 }

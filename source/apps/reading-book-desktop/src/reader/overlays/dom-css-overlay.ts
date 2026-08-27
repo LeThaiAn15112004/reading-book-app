@@ -214,6 +214,17 @@ export class DomCssOverlay implements OverlayPainter {
   private lastHighlights: Highlight[] = []
   /** iframe documents that already have our geometry hit-test listener. */
   private hitTestBound = new WeakSet<Document>()
+  /**
+   * While true, `paint()` is a no-op that just remembers the latest request.
+   * A CFI jump (`goToLocation`) suspends painting for its duration: the
+   * `paintMarkWithAnnotations` fallback mutates the DOM (wraps the target
+   * text in a `<mark>`), which shifts child-node offsets out from under the
+   * *same* CFI epub.js's own `locationOf` is mid-computation for, throwing
+   * `IndexSizeError` and making epub.js fall back to the section's top. See
+   * `openEpubjs.ts`'s `goToLocation`, which pairs with `suspend`/`resume`.
+   */
+  private suspended = false
+  private pendingPaint: { highlights?: Highlight[] } | null = null
   /** Our own layers must stay invisible to CFI indexing and text re-anchoring. */
   private readonly cfiDomOptions: CfiDomOptions = {
     isIgnoredElement: (el) => {
@@ -288,7 +299,29 @@ export class DomCssOverlay implements OverlayPainter {
     return null
   }
 
+  /** Pause DOM-mutating repaints — see `suspended` field comment. */
+  suspend(): void {
+    this.suspended = true
+  }
+
+  /**
+   * Resume painting and repaint. Prefers the request queued while suspended;
+   * otherwise falls back to the last known highlight list, since a caller
+   * that cleared marks before suspending (see `goToLocation`) relies on this
+   * to always repaint something rather than leaving marks blank.
+   */
+  resume(): void {
+    this.suspended = false
+    const pending = this.pendingPaint ?? { highlights: this.lastHighlights }
+    this.pendingPaint = null
+    void this.paint(pending)
+  }
+
   async paint(overlays: { highlights?: Highlight[] }): Promise<void> {
+    if (this.suspended) {
+      this.pendingPaint = overlays
+      return
+    }
     const list = overlays.highlights ?? []
     this.lastHighlights = list
     await this.clear()
@@ -769,18 +802,6 @@ export class DomCssOverlay implements OverlayPainter {
         z-index: 1;
       }
       .rb-epub-hl, g.rb-epub-hl, .epubjs-hl { mix-blend-mode: normal !important; }
-      /* Jump-to-annotation flash (sidebar / list). */
-      @keyframes rb-annotation-jump-flash {
-        0%, 100% { filter: brightness(1); outline-color: transparent; }
-        35% { filter: brightness(1.55); }
-        55% { filter: brightness(1.2); }
-      }
-      .rb-annotation-jump-flash {
-        animation: rb-annotation-jump-flash 0.9s ease-in-out;
-        outline: 2px solid rgba(245, 158, 11, 0.95);
-        outline-offset: 2px;
-        z-index: 3;
-      }
     `
   }
 

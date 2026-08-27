@@ -12,8 +12,5 @@ export type { HighlightProps, HighlightStatus } from './highlight.js';
 export { Tag } from './tag.js';
 export type { TagProps } from './tag.js';
 
-export { Comment } from './comment.js';
-export type { CommentProps } from './comment.js';
-
 export { Bookmark } from './bookmark.js';
 export type { BookmarkProps } from './bookmark.js';

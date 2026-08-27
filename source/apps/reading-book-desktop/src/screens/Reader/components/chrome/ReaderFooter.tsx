@@ -80,6 +80,9 @@ type ReaderFooterProps = {
   pageTotal: number
   /** False until the EPUB reference-page model is available. */
   pageCountReady?: boolean
+  /** 0..1 book position, derived from spine/CFI order — not the page-count estimate. */
+  progress?: number
+  onSeekProgress?: (fraction: number) => void
   onPreviousPage: () => void
   onNextPage: () => void
   onGoToPage: (page: number) => void
@@ -103,6 +106,8 @@ export function ReaderFooter({
   pageCurrent,
   pageTotal,
   pageCountReady = true,
+  progress = 0,
+  onSeekProgress,
   onPreviousPage,
   onNextPage,
   onGoToPage,
@@ -164,6 +169,28 @@ export function ReaderFooter({
       onClick={(e) => e.stopPropagation()}
       onPointerEnter={(e) => e.stopPropagation()}
     >
+      <div
+        className={`absolute inset-x-0 top-0 h-1 ${onSeekProgress ? 'cursor-pointer' : ''}`}
+        role={onSeekProgress ? 'slider' : undefined}
+        aria-label={onSeekProgress ? 'Reading progress' : undefined}
+        aria-valuemin={onSeekProgress ? 0 : undefined}
+        aria-valuemax={onSeekProgress ? 100 : undefined}
+        aria-valuenow={onSeekProgress ? Math.round(progress * 100) : undefined}
+        title={`${Math.round(progress * 100)}% read`}
+        onClick={(e) => {
+          if (!onSeekProgress) return
+          const rect = e.currentTarget.getBoundingClientRect()
+          const fraction =
+            rect.width > 0 ? (e.clientX - rect.left) / rect.width : 0
+          onSeekProgress(Math.min(1, Math.max(0, fraction)))
+        }}
+      >
+        <div
+          className="h-full bg-lib-accent transition-[width] duration-150"
+          style={{ width: `${Math.min(100, Math.max(0, progress * 100))}%` }}
+        />
+      </div>
+
       <div className="inline-flex min-w-0 items-center gap-3">
         <span className="inline-flex min-w-0 items-center gap-3 text-xs font-semibold tracking-wide text-lib-text-strong">
         <button

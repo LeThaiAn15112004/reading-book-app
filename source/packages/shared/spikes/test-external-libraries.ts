@@ -11,7 +11,7 @@ async function runTests() {
   const storage = new MemoryExternalLibraryStorage();
   const repository = new DefaultExternalLibraryRepository(storage);
 
-  // Mock File Scanner cho folder-first mode
+  // Mock File Scanner for folder-first mode
   const mockFileScanner = {
     async scanDirectory(dir: string) {
       return [
@@ -29,30 +29,24 @@ async function runTests() {
     fileScanner: mockFileScanner,
   });
 
-  // 1. Kiểm tra danh sách Providers
+  // 1. Providers list — 3 supported cloud storage providers
   const providers = connector.listProviders();
   console.log('1. Providers:', providers);
-  assert.deepEqual(providers, ['google_drive', 'google_books', 'apple_books']);
+  assert.deepEqual(providers, ['google_drive', 'dropbox', 'onedrive']);
 
-  // 2. Kiểm tra trạng thái ban đầu (unlinked)
+  // 2. Initial status (unlinked)
   const initialStatus = await connector.getAllProvidersInfo();
   assert.equal(initialStatus.google_drive.status, 'unlinked');
-  assert.equal(initialStatus.google_books.status, 'unlinked');
-  assert.equal(initialStatus.apple_books.status, 'unlinked');
+  assert.equal(initialStatus.dropbox.status, 'unlinked');
+  assert.equal(initialStatus.onedrive.status, 'unlinked');
   console.log('2. Trạng thái ban đầu: Tất cả unlinked ✓');
 
-  // 3. Test Connection
+  // 3. Test Connection Google Drive
   const driveTest = await connector.testConnection('google_drive', {
     folderPath: 'C:/Users/Test/GoogleDrive',
   });
   assert.equal(driveTest.success, true);
   console.log('3. Test Connection Google Drive:', driveTest.message, '✓');
-
-  const booksTest = await connector.testConnection('google_books', {
-    apiKey: 'xxx',
-  });
-  assert.equal(booksTest.success, true);
-  console.log('3. Test Connection Google Books:', booksTest.message, '✓');
 
   // 4. Link Google Drive (Folder-first)
   const linkedDrive = await connector.link('google_drive', {
@@ -69,35 +63,23 @@ async function runTests() {
   assert.equal(driveCatalog[0]?.formatHint, 'epub');
   console.log('5. Pull Catalog Google Drive thành công: 4/4 files hợp lệ ✓');
 
-  // 6. Link Google Books (API mode với key 'xxx')
-  const linkedBooks = await connector.link('google_books', {
-    apiKey: 'xxx',
-    query: 'science fiction',
-  });
-  assert.equal(linkedBooks.status, 'linked');
-  console.log('6. Link Google Books thành công với key placeholder xxx ✓');
+  // 6. Dropbox link + catalog (sample mode with 'xxx' key)
+  const linkedDropbox = await connector.link('dropbox', { apiKey: 'xxx' });
+  assert.equal(linkedDropbox.status, 'linked');
+  console.log('6. Link Dropbox thành công ✓');
 
-  const booksCatalog = await connector.pullCatalog('google_books');
-  assert.ok(booksCatalog.length > 0);
-  console.log('6. Pull Catalog Google Books:', booksCatalog.length, 'sách ✓');
+  const dropboxCatalog = await connector.pullCatalog('dropbox');
+  assert.ok(dropboxCatalog.length > 0);
+  console.log('6. Pull Catalog Dropbox:', dropboxCatalog.length, 'sách ✓');
 
-  // 7. Link Apple Books
-  const linkedApple = await connector.link('apple_books', {
-    folderPath: 'C:/Users/Test/AppleBooks',
-  });
-  assert.equal(linkedApple.status, 'linked');
-  const appleCatalog = await connector.pullCatalog('apple_books');
-  assert.equal(appleCatalog.length, 4);
-  console.log('7. Link & Pull Apple Books thành công ✓');
-
-  // 8. Unlink Google Drive (đảm bảo không ảnh hưởng tới các provider khác)
+  // 7. Unlink Google Drive — should not affect Dropbox
   await connector.unlink('google_drive');
   const postUnlinkInfo = await connector.getProviderInfo('google_drive');
   assert.equal(postUnlinkInfo.status, 'unlinked');
 
-  const booksStillLinked = await connector.getProviderInfo('google_books');
-  assert.equal(booksStillLinked.status, 'linked');
-  console.log('8. Unlink Google Drive thành công, các nguồn khác vẫn an toàn ✓');
+  const dropboxStillLinked = await connector.getProviderInfo('dropbox');
+  assert.equal(dropboxStillLinked.status, 'linked');
+  console.log('7. Unlink Google Drive thành công, Dropbox vẫn an toàn ✓');
 
   console.log('\n===> TẤT CẢ CÁC BƯỚC TEST T8.1 ĐỀU ĐẠT CHUẨN THÀNH CÔNG! <===');
 }

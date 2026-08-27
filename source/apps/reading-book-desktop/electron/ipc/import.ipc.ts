@@ -80,7 +80,7 @@ function isUniqueConstraintError(err: unknown): boolean {
  * BR-03 / T2.7: hash local file; if sha256 already in DB, return duplicate
  * without copying into the sandbox.
  */
-async function rejectIfDuplicate(localPath: string): Promise<ImportResult | null> {
+export async function rejectIfDuplicate(localPath: string): Promise<ImportResult | null> {
   const { sha256 } = await hashFile(localPath)
   const existing = await getLibraryStore().findBySha256(sha256)
   if (!existing) return null
@@ -95,13 +95,20 @@ async function extractMetadataAfterCopy(
   return getDocumentImporter(format).import(destPath)
 }
 
+export type FinishImportOptions = {
+  sourceUrl?: string
+  /** Cloud Sources provenance — set when the file was fetched via Download/Read on a linked provider. */
+  sourceProvider?: string
+  externalId?: string
+}
+
 /**
  * T2.8: write books (+ authors + default reading session); return new book id.
  * On failure, caller should remove the sandbox copy.
  */
 function persistImportedBook(
   meta: DomainImportResult,
-  options: { sourceUrl?: string } = {},
+  options: FinishImportOptions = {},
 ): string {
   const now = new Date().toISOString()
   const book = new Book({
@@ -115,6 +122,8 @@ function persistImportedBook(
     description: meta.description,
     pageCount: meta.pageCount,
     sourceUrl: options.sourceUrl,
+    sourceProvider: options.sourceProvider,
+    externalId: options.externalId,
     addedAt: now,
     updatedAt: now,
   })
@@ -126,9 +135,10 @@ function persistImportedBook(
   return book.id
 }
 
-async function finishImportAfterCopy(
+/** Shared by import:fromFile/fromUrl and Cloud Sources download-and-import. */
+export async function finishImportAfterCopy(
   destPath: string,
-  options: { sourceUrl?: string } = {},
+  options: FinishImportOptions = {},
 ): Promise<ImportResult> {
   try {
     const meta = await extractMetadataAfterCopy(destPath)

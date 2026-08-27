@@ -31,6 +31,8 @@ interface BookRow {
   reading_status: 'reading' | 'completed' | 'not-started'
   is_signed: number
   source_url: string | null
+  source_provider: string | null
+  external_id: string | null
   added_at: string
   updated_at: string
 }
@@ -64,7 +66,8 @@ export type CollectionListItem = {
 const BOOK_COLUMNS = `
   id, title, file_path, normalized_path, file_format, cover_path,
   sha256, file_size_bytes, description, page_count,
-  is_favorite, reading_status, is_signed, source_url, added_at, updated_at
+  is_favorite, reading_status, is_signed, source_url, source_provider, external_id,
+  added_at, updated_at
 `
 
 function rowToBook(row: BookRow): Book {
@@ -82,6 +85,8 @@ function rowToBook(row: BookRow): Book {
     isFavorite: row.is_favorite === 1,
     isSigned: row.is_signed === 1,
     sourceUrl: row.source_url ?? undefined,
+    sourceProvider: row.source_provider ?? undefined,
+    externalId: row.external_id ?? undefined,
     addedAt: row.added_at,
     updatedAt: row.updated_at,
   })
@@ -111,17 +116,30 @@ export class SqliteLibraryStore implements LibraryStore {
     throw new Error('SqliteLibraryStore.findByAuthor is not implemented yet')
   }
 
+  /** Cloud Sources: find a book already imported from a given provider file (dedup lazy download). */
+  async findByProviderAndExternalId(
+    provider: string,
+    externalId: string,
+  ): Promise<Book | undefined> {
+    const row = this.db
+      .prepare(
+        `SELECT ${BOOK_COLUMNS} FROM books WHERE source_provider = ? AND external_id = ?`,
+      )
+      .get(provider, externalId) as BookRow | undefined
+    return row ? rowToBook(row) : undefined
+  }
+
   async save(book: Book): Promise<void> {
     this.db
       .prepare(
         `INSERT INTO books (
           id, title, file_path, normalized_path, file_format, cover_path,
           sha256, file_size_bytes, description, page_count,
-          is_favorite, is_signed, source_url, added_at, updated_at
+          is_favorite, is_signed, source_url, source_provider, external_id, added_at, updated_at
         ) VALUES (
           @id, @title, @file_path, @normalized_path, @file_format, @cover_path,
           @sha256, @file_size_bytes, @description, @page_count,
-          @is_favorite, @is_signed, @source_url, @added_at, @updated_at
+          @is_favorite, @is_signed, @source_url, @source_provider, @external_id, @added_at, @updated_at
         )`,
       )
       .run({
@@ -138,6 +156,8 @@ export class SqliteLibraryStore implements LibraryStore {
         is_favorite: book.isFavorite ? 1 : 0,
         is_signed: book.isSigned ? 1 : 0,
         source_url: book.sourceUrl ?? null,
+        source_provider: book.sourceProvider ?? null,
+        external_id: book.externalId ?? null,
         added_at: book.addedAt,
         updated_at: book.updatedAt,
       })
@@ -370,11 +390,11 @@ export class SqliteLibraryStore implements LibraryStore {
           `INSERT INTO books (
             id, title, file_path, normalized_path, file_format, cover_path,
             sha256, file_size_bytes, description, page_count,
-            is_favorite, is_signed, source_url, added_at, updated_at
+            is_favorite, is_signed, source_url, source_provider, external_id, added_at, updated_at
           ) VALUES (
             @id, @title, @file_path, @normalized_path, @file_format, @cover_path,
             @sha256, @file_size_bytes, @description, @page_count,
-            @is_favorite, @is_signed, @source_url, @added_at, @updated_at
+            @is_favorite, @is_signed, @source_url, @source_provider, @external_id, @added_at, @updated_at
           )`,
         )
         .run({
@@ -391,6 +411,8 @@ export class SqliteLibraryStore implements LibraryStore {
           is_favorite: book.isFavorite ? 1 : 0,
           is_signed: book.isSigned ? 1 : 0,
           source_url: book.sourceUrl ?? null,
+          source_provider: book.sourceProvider ?? null,
+          external_id: book.externalId ?? null,
           added_at: book.addedAt,
           updated_at: book.updatedAt,
         })

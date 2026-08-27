@@ -297,6 +297,8 @@ export type ReaderBookmark = {
   locationRef: string
   chapterIndex: number
   label: string
+  /** Opening text captured at the bookmarked location, for list previews. */
+  excerpt?: string
   createdAt?: string
 }
 

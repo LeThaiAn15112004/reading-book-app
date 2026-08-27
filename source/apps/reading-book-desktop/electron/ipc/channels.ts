@@ -47,6 +47,15 @@ export const ImportChannels = {
   fromUrl: 'import:fromUrl',
 } as const
 
+export const CloudChannels = {
+  connect: 'cloud:connect',
+  disconnect: 'cloud:disconnect',
+  getAccessToken: 'cloud:getAccessToken',
+  downloadAndImport: 'cloud:downloadAndImport',
+  /** Main → renderer: streamed byte progress while a cloud download is in flight. */
+  downloadProgress: 'cloud:downloadProgress',
+} as const
+
 export const OverlayChannels = {
   listAnnotations: 'overlay:listAnnotations',
   saveAnnotation: 'overlay:saveAnnotation',

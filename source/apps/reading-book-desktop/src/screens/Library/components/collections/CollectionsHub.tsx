@@ -57,7 +57,7 @@ export function CollectionsHub({
       role="region"
       aria-label="Collections"
     >
-      <header className="app-titlebar flex h-16 shrink-0 items-center justify-between gap-4 border-b border-lib-border-soft bg-lib-topbar pl-7 backdrop-blur-sm">
+      <header className="app-titlebar flex h-16 shrink-0 items-center justify-between gap-4 border-b border-lib-border-soft bg-lib-topbar pl-7 pr-7 backdrop-blur-sm">
         <div className="min-w-0">
           <h1 className="m-0 truncate text-[22px] leading-tight font-semibold tracking-tight text-lib-text-strong">
             Collections

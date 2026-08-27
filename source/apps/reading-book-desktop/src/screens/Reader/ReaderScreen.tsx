@@ -1,11 +1,15 @@
 import { useMemo, useRef, type CSSProperties } from 'react'
 import { useParams } from 'react-router-dom'
+import { CfiLocation } from '@reading-book/domain'
 import {
+  findReaderBookmarksAtLocation,
   fontFamilyCss,
   isCrosshairAnnotateTool,
   isReaderBookmarkAtLocation,
+  readerBookmarkJumpLocation,
   resolveCurrentReaderBookmarkLocation,
   selectionHasHighlight,
+  type PageMode,
   type ReaderHighlight,
 } from '@reading-book/shared/models'
 import {
@@ -15,7 +19,7 @@ import {
   useOpenReading,
   useReaderChromeMenu,
 } from '../../chrome'
-import { ReaderShell } from '../../reader'
+import { ReaderShell, readerChromeTopInset } from '../../reader'
 import {
   EpubRenderer,
   type EpubNavState,
@@ -83,6 +87,7 @@ export function ReaderScreen() {
   const bookmarkChapterIndexRef = useRef(0)
   const isEpubSurfaceRef = useRef(false)
   const bookFormatRef = useRef<string | null>(null)
+  const pageModeRef = useRef<PageMode>('paginated')
   const annotationBridgeRef = useRef<ReaderChromeAnnotationBridge>({
     closeSelectionMenu: () => {},
     dismissHighlightEditPanel: () => {},
@@ -177,6 +182,7 @@ export function ReaderScreen() {
   epubNavRef.current = nav.epubNav
   isEpubSurfaceRef.current = book.isEpubSurface
   bookFormatRef.current = book.bookFormat
+  pageModeRef.current = book.prefs.pageMode
 
   const zoom = useReaderZoomControls({
     bookId,
@@ -239,6 +245,32 @@ export function ReaderScreen() {
         currentBookmarkLocation,
       )
     : false
+  /**
+   * "You are here" bookmark for the sidebar list. EPUB uses viewport
+   * containment (not exact CFI equality) so scroll mode — where landing on a
+   * bookmark rarely reproduces its exact stored CFI string — highlights it
+   * the same way paginated mode already does after a jump.
+   *
+   * In continuous/scroll mode, epub.js can keep silently readjusting scroll
+   * position for a bit after a bookmark jump before its own geometry catches
+   * up, so viewport containment briefly reports no match right after the
+   * jump. Fall back to the bookmark just explicitly jumped to until live
+   * geometry resolves (or reports a different bookmark) on its own.
+   */
+  const currentBookmarkId = book.isEpubSurface
+    ? (annotations.bookmarks.find((b) => {
+        const loc = readerBookmarkJumpLocation(b)
+        return (
+          loc instanceof CfiLocation &&
+          (epubApiRef.current?.isCfiWithinCurrentView(loc.cfi) ?? false)
+        )
+      })?.id ?? annotations.justJumpedBookmarkId ?? undefined)
+    : currentBookmarkLocation
+      ? findReaderBookmarksAtLocation(
+          annotations.bookmarks,
+          currentBookmarkLocation,
+        )[0]?.id
+      : undefined
   const isSigned = FAKE_SIGNATURES.length > 0
 
   escapeUiRef.current = {
@@ -358,6 +390,8 @@ export function ReaderScreen() {
           pageCurrent={pageCurrent}
           pageTotal={pageTotal}
           pageCountReady={pageCountReady}
+          progress={book.isEpubSurface ? (nav.epubNav?.progress ?? 0) : 0}
+          onSeekProgress={book.isEpubSurface ? nav.goToProgress : undefined}
           onPreviousPage={() => nav.switchPage(false)}
           onNextPage={() => nav.switchPage(true)}
           onGoToPage={nav.goToPage}
@@ -398,6 +432,7 @@ export function ReaderScreen() {
             tocItems={book.isEpubSurface ? nav.epubToc : undefined}
             activeTocHref={book.isEpubSurface ? nav.epubNav?.href : undefined}
             bookmarks={annotations.bookmarks}
+            currentBookmarkId={currentBookmarkId}
             highlights={annotations.highlights}
             typewriterNotes={annotations.typewriterNotes}
             freehandStrokes={annotations.freehandStrokes}
@@ -620,6 +655,22 @@ export function ReaderScreen() {
             <div className="pointer-events-none fixed top-6 left-1/2 z-[999] -translate-x-1/2 rounded-full border border-lib-border bg-lib-surface-strong px-[18px] py-2.5 text-[13px] font-semibold text-lib-text-strong shadow-xl">
               {chrome.toast}
             </div>
+          ) : null}
+
+          {annotations.isJumpingToBookmark ? (
+            <div
+              aria-hidden
+              className="pointer-events-none absolute z-[150] bg-lib-bg-deep"
+              style={{
+                left: contentInsetLeft,
+                right: sidebarContentInsetRight(
+                  chrome.rightSidebarOpen,
+                  rightSidebarResize.panelWidth,
+                ),
+                top: readerChromeTopInset(toolsHidden),
+                bottom: 0,
+              }}
+            />
           ) : null}
         </>
       }

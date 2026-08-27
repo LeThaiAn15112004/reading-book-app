@@ -60,13 +60,23 @@ type AnnotationDtoLike = {
 
   type: string
 
-  /** 1-based UI / spine page from `annotations.page_number`. */
+  /**
 
-  pageNumber?: number
+   * Legacy 1-based spine page from `annotations.page_number`. EPUB is reflowable and
+
+   * writes null here — the CFI in `locationData` is the only positional source of truth.
+
+   */
+
+  pageNumber?: number | null
 
   locationData: string
 
   content?: string
+
+  /** Free-text note the user typed (`annotations.notes`). */
+
+  notes?: string | null
 
   style: AnnotationStyleLike
 
@@ -90,11 +100,17 @@ export type HighlightAnnotationInput = {
 
   type: 'highlight'
 
-  pageNumber: number
+  /** null for reflowable EPUB — see `readerHighlightPageNumber`. */
+
+  pageNumber: number | null
 
   locationData: string
 
   content: string
+
+  /** Free-text note the user typed; persisted to `annotations.notes`. */
+
+  notes?: string
 
   style: { colorHex: string; note?: string }
 
@@ -110,9 +126,19 @@ export type HighlightAnnotationInput = {
 
 
 
-/** Persist / list grouping page — 1-based from reader `chapterIndex`. */
+/**
 
-export function readerHighlightPageNumber(h: ReaderHighlight): number {
+ * Persist-time `page_number`. EPUB is reflowable and has no stable physical page, so
+
+ * it stores null and relies entirely on the CFI inside `locationData`; only the
+
+ * offset-addressed ("fake") surface keeps a 1-based section number.
+
+ */
+
+export function readerHighlightPageNumber(h: ReaderHighlight): number | null {
+
+  if (h.source === 'epub') return null
 
   return Math.max(1, Math.floor(h.chapterIndex) + 1)
 
@@ -122,39 +148,33 @@ export function readerHighlightPageNumber(h: ReaderHighlight): number {
 
 /**
 
- * Hydrate list/group page from DB `page_number`, with CFI spine fallback when
+ * Resolve the spine/chapter index used for grouping. The CFI is authoritative — the
 
- * older rows were incorrectly saved as page 1.
+ * legacy `page_number` is only consulted for pre-CFI rows that have no usable path.
 
  */
 
 export function chapterIndexFromAnnotationDto(
 
-  pageNumber: number | undefined,
+  pageNumber: number | null | undefined,
 
   cfi?: string,
 
 ): number {
 
-  const fromPage =
-
-    typeof pageNumber === 'number' && Number.isFinite(pageNumber)
-
-      ? Math.max(0, Math.floor(pageNumber) - 1)
-
-      : 0
-
-  if (fromPage > 0) return fromPage
-
   if (cfi) {
 
     const fromCfi = spineIndexFromCfiPath(cfi)
 
-    if (fromCfi != null && fromCfi > 0) return fromCfi
+    if (fromCfi != null && fromCfi >= 0) return fromCfi
 
   }
 
-  return fromPage
+  return typeof pageNumber === 'number' && Number.isFinite(pageNumber)
+
+    ? Math.max(0, Math.floor(pageNumber) - 1)
+
+    : 0
 
 }
 
@@ -209,6 +229,8 @@ export function readerHighlightToAnnotationInput(
     locationData: packReaderHighlightLocation(h),
 
     content: h.selectedText,
+
+    ...(h.note?.trim() ? { notes: h.note.trim() } : {}),
 
     style: {
 
@@ -270,7 +292,9 @@ export function annotationDtoToReaderHighlight(
 
     const color = highlightColorFromHex(colorHex)
 
-    const note = styleString(style, 'note')
+    // `annotations.notes` is the current home; `style.note` is the pre-016 fallback.
+
+    const note = dto.notes?.trim() || styleString(style, 'note')
 
     const selectedText = dto.content ?? ''
 

@@ -135,6 +135,32 @@ export function useReaderNavigation({
     [clearHighlightHandles, isEpubSurface, setSelectionMenu],
   )
 
+  /** Seek to a 0..1 fraction of book position (progress-bar click), by spine order. */
+  const goToProgress = useCallback(
+    (fraction: number) => {
+      const clampedFraction = Math.min(Math.max(fraction, 0), 1)
+      if (isEpubSurface) {
+        const api = epubApiRef.current
+        if (!api) return
+        const spineLength = epubNav?.spineLength ?? 1
+        const targetIndex = Math.min(
+          Math.max(Math.floor(clampedFraction * spineLength), 0),
+          Math.max(spineLength - 1, 0),
+        )
+        void api.goToSpineIndex(targetIndex)
+      } else {
+        setChapterIndex(
+          Math.min(
+            Math.max(Math.floor(clampedFraction * FAKE_CHAPTERS.length), 0),
+            FAKE_CHAPTERS.length - 1,
+          ),
+        )
+      }
+      clearTransientNavUi()
+    },
+    [clearHighlightHandles, epubApiRef, epubNav, isEpubSurface, setSelectionMenu],
+  )
+
   function handleSelectTocItem(item: EpubTocItem) {
     if (!item.href) return
     closeFloating()
@@ -284,6 +310,7 @@ export function useReaderNavigation({
     switchPage,
     goToPage,
     goToPageFromLayout,
+    goToProgress,
     handleSelectTocItem,
   }
 }

@@ -18,6 +18,10 @@ export interface BookProps {
   /** Denormalized flag: book has ≥ 1 digital signature row. */
   isSigned?: boolean;
   sourceUrl?: string;
+  /** Cloud Sources provenance: provider this file was downloaded from, if any. */
+  sourceProvider?: string;
+  /** Cloud Sources provenance: the provider's id for this file, if any. */
+  externalId?: string;
   addedAt: string;
   updatedAt: string;
   authors?: Author[];
@@ -42,6 +46,8 @@ export class Book {
   isFavorite: boolean;
   isSigned: boolean;
   sourceUrl?: string;
+  sourceProvider?: string;
+  externalId?: string;
   readonly addedAt: string;
   updatedAt: string;
   authors: Author[];
@@ -68,6 +74,8 @@ export class Book {
     this.isFavorite = props.isFavorite ?? false;
     this.isSigned = props.isSigned ?? false;
     this.sourceUrl = props.sourceUrl;
+    this.sourceProvider = props.sourceProvider;
+    this.externalId = props.externalId;
     this.addedAt = props.addedAt;
     this.updatedAt = props.updatedAt;
     this.authors = props.authors ? [...props.authors] : [];

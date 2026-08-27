@@ -22,6 +22,34 @@ export type ShelfDetailItemData = {
   isFavorite?: boolean
   /** Stable cover gradient 1–5; omit → hash from id. */
   coverGradientIndex?: 1 | 2 | 3 | 4 | 5
+  /** Cloud Sources provenance — set only for books downloaded from a linked provider. */
+  sourceProvider?: 'google_drive' | 'dropbox' | 'onedrive'
+}
+
+const PROVIDER_LABEL: Record<'google_drive' | 'dropbox' | 'onedrive', string> = {
+  google_drive: 'Google Drive',
+  dropbox: 'Dropbox',
+  onedrive: 'OneDrive',
+}
+
+function CloudBadgeIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      fill="none"
+      viewBox="0 0 24 24"
+      strokeWidth={2}
+      stroke="currentColor"
+      className={className}
+      aria-hidden
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M2.25 15a4.5 4.5 0 0 0 4.5 4.5H18a3.75 3.75 0 0 0 1.332-7.257 3 3 0 0 0-3.758-3.848 5.25 5.25 0 0 0-10.233 2.33A4.502 4.502 0 0 0 2.25 15Z"
+      />
+    </svg>
+  )
 }
 
 function ChevronIcon({ className }: { className?: string }) {
@@ -104,8 +132,16 @@ export function ShelfDetailItem({
           />
 
           <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-            <h3 className="m-0 truncate text-[13px] leading-snug font-semibold text-lib-text-strong">
-              {item.title}
+            <h3 className="m-0 flex items-center gap-1 truncate text-[13px] leading-snug font-semibold text-lib-text-strong">
+              <span className="truncate">{item.title}</span>
+              {item.sourceProvider ? (
+                <span
+                  className="inline-flex shrink-0"
+                  title={`Synced from ${PROVIDER_LABEL[item.sourceProvider]}`}
+                >
+                  <CloudBadgeIcon className="size-3 text-lib-faint" />
+                </span>
+              ) : null}
             </h3>
             {item.author ? (
               <p className="m-0 truncate text-[11px] text-lib-faint">

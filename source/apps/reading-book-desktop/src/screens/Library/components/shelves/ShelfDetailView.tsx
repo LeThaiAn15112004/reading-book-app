@@ -2,6 +2,8 @@ import {
   ShelfDetailItem,
   type ShelfDetailItemData,
 } from './ShelfDetailItem'
+import { ShelfRailCard } from './ShelfRailCard'
+import { ViewModeToggle, type ViewMode } from './ViewModeToggle'
 import type { BookMenuPoint } from '../book'
 
 function BackIcon({ className }: { className?: string }) {
@@ -34,9 +36,11 @@ export type ShelfDetailViewProps = {
   countLabel?: string
   emptyMessage?: string
   backAriaLabel?: string
+  viewMode?: ViewMode
+  onViewModeChange?: (mode: ViewMode) => void
 }
 
-/** SCR-01a — shelf detail: Back · title · N files + vertical list. */
+/** SCR-01a — shelf/collection detail: Back · title · N files + Grid/List toggle. */
 export function ShelfDetailView({
   title,
   items,
@@ -46,6 +50,8 @@ export function ShelfDetailView({
   countLabel,
   emptyMessage = 'No files in this section.',
   backAriaLabel = 'Back to library',
+  viewMode = 'list',
+  onViewModeChange,
 }: ShelfDetailViewProps) {
   const fileLabel =
     countLabel ?? (items.length === 1 ? '1 file' : `${items.length} files`)
@@ -57,7 +63,7 @@ export function ShelfDetailView({
       role="region"
       aria-label={`${title} shelf`}
     >
-      <header className="app-titlebar flex h-16 shrink-0 items-center gap-3 border-b border-lib-border-soft bg-lib-topbar pl-5 backdrop-blur-sm">
+      <header className="app-titlebar flex h-16 shrink-0 items-center gap-3 border-b border-lib-border-soft bg-lib-topbar pl-5 pr-5 backdrop-blur-sm">
         <button
           type="button"
           className="inline-flex size-11 shrink-0 cursor-pointer items-center justify-center rounded-lg border-none bg-transparent text-lib-muted transition-[color,background-color] hover:bg-white/5 hover:text-lib-accent focus-visible:bg-white/5 focus-visible:text-lib-accent focus-visible:outline-none"
@@ -73,23 +79,43 @@ export function ShelfDetailView({
           </h1>
           <p className="m-0 mt-0.5 text-xs text-lib-faint">{fileLabel}</p>
         </div>
+        {onViewModeChange ? (
+          <ViewModeToggle viewMode={viewMode} onChange={onViewModeChange} />
+        ) : null}
       </header>
 
       <div className="flex-1 overflow-x-hidden overflow-y-auto px-5 pt-4 pb-8">
         {items.length > 0 ? (
-          <ul
-            className="mx-auto m-0 flex w-full max-w-[720px] list-none flex-col gap-2.5 p-0"
-            role="list"
-          >
-            {items.map((item) => (
-              <ShelfDetailItem
-                key={item.id}
-                item={item}
-                onOpen={onOpenItem}
-                onBookMenu={onBookMenu}
-              />
-            ))}
-          </ul>
+          viewMode === 'grid' ? (
+            <div
+              className="mx-auto m-0 flex w-full max-w-[1180px] flex-wrap gap-5 p-0"
+              role="list"
+            >
+              {items.map((item) => (
+                <div key={item.id} className="w-[132px]">
+                  <ShelfRailCard
+                    book={item as any}
+                    onOpen={onOpenItem}
+                    onBookMenu={onBookMenu}
+                  />
+                </div>
+              ))}
+            </div>
+          ) : (
+            <ul
+              className="mx-auto m-0 flex w-full max-w-[720px] list-none flex-col gap-2.5 p-0"
+              role="list"
+            >
+              {items.map((item) => (
+                <ShelfDetailItem
+                  key={item.id}
+                  item={item}
+                  onOpen={onOpenItem}
+                  onBookMenu={onBookMenu}
+                />
+              ))}
+            </ul>
+          )
         ) : (
           <p className="m-0 text-center text-[13px] text-lib-faint">
             {emptyMessage}

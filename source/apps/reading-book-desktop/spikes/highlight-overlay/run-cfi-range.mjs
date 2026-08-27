@@ -329,11 +329,11 @@ assert.notEqual(cfiChapterSignature('epubcfi(/6/62!/4/2,/1:0,/1:5)'), '/6/60')
 
 assert.equal(
   toEpubjsDisplayCfi('epubcfi(/6/60!/4/2,/1:0,/1:9)'),
-  'epubcfi(/6/60!/4/2,/1:0)',
+  'epubcfi(/6/60!/4/2/1:0)',
 )
 assert.equal(
   toEpubjsDisplayCfi('epubcfi(/6/60!/4/2,/1:0)'),
-  'epubcfi(/6/60!/4/2,/1:0)',
+  'epubcfi(/6/60!/4/2/1:0)',
 )
 assert.equal(toEpubjsDisplayCfi(''), null)
 assert.equal(toEpubjsDisplayCfi('not-a-cfi'), null)

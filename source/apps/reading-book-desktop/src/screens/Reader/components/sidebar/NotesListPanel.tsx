@@ -8,7 +8,6 @@ import {
 } from 'react'
 import { createPortal } from 'react-dom'
 import {
-  readerFreehandPageNumber,
   typewriterPlainText,
   type ReaderAnnotationStatus,
   type ReaderAnnotationType,
@@ -17,7 +16,7 @@ import {
   type ReaderTypewriterNote,
 } from '@reading-book/shared/models'
 
-type SortMode = 'page' | 'az' | 'za'
+type SortMode = 'chapter' | 'az' | 'za'
 type ExpandOverride = 'expand' | 'collapse' | null
 
 const toolbarBtnClass =
@@ -116,51 +115,50 @@ function FilterIcon() {
   )
 }
 
+/**
+ * One row in the list. EPUB is reflowable, so items are keyed by `sectionIndex`
+ * (0-based spine position resolved from the annotation's CFI) — never a page number.
+ * `content` is the original text the user marked; `notes` is what they typed on top.
+ */
+type NoteListItemBase = {
+  id: string
+  sectionIndex: number
+  content: string
+  notes?: string
+  status: ReaderAnnotationStatus
+  isChecked: boolean
+  colorHex?: string
+  createdAt: string
+  updatedAt: string
+}
+
 type NoteListItem =
-  | {
+  | (NoteListItemBase & {
       kind: 'highlight'
-      id: string
       type: ReaderAnnotationType
-      pageNumber: number
-      content: string
-      status: ReaderAnnotationStatus
-      isChecked: boolean
-      colorHex?: string
-      updatedAt: string
       highlight: ReaderHighlight
-    }
-  | {
+    })
+  | (NoteListItemBase & {
       kind: 'typewriter'
-      id: string
       type: 'textbox'
-      pageNumber: number
-      content: string
-      status: ReaderAnnotationStatus
-      isChecked: boolean
-      colorHex?: string
-      updatedAt: string
       note: ReaderTypewriterNote
-    }
-  | {
+    })
+  | (NoteListItemBase & {
       kind: 'pencil'
-      id: string
       type: 'freehand'
-      pageNumber: number
-      content: string
-      status: ReaderAnnotationStatus
-      isChecked: boolean
-      colorHex?: string
-      updatedAt: string
       stroke: ReaderShapeAnnotation
-    }
+    })
 
 type NotesListPanelProps = {
   highlights: ReaderHighlight[]
   typewriterNotes: ReaderTypewriterNote[]
   freehandStrokes?: ReaderShapeAnnotation[]
-  /** 1-based spine section for grouping (annotations.page_number). Not a rendered page. */
-  pageCurrent?: number
-  onGoToPage: (page: number) => void
+  /** 1-based spine section currently on screen — seeds which group starts expanded. */
+  sectionCurrent?: number
+  /** TOC-resolved chapter titles indexed by 0-based spine position. */
+  sectionLabels?: string[]
+  /** Opens a 1-based spine section (`goToSpineIndex(n - 1)`), not a physical page. */
+  onGoToSection: (section: number) => void
   onJump: (highlight: ReaderHighlight) => void
   onJumpTypewriterNote: (note: ReaderTypewriterNote) => void
   onJumpPencilStroke?: (stroke: ReaderShapeAnnotation) => void
@@ -212,33 +210,39 @@ const STATUS_STYLES: Record<
   },
 }
 
-function highlightPageNumber(h: ReaderHighlight): number {
-  // chapterIndex is hydrated from annotations.page_number (or CFI spine fallback).
-  return Math.max(1, Math.floor(h.chapterIndex) + 1)
+/**
+ * Structural home of an annotation: the 0-based spine section. For EPUB highlights
+ * `chapterIndex` is resolved from the CFI itself, so this never depends on pagination.
+ */
+function sectionIndexOf(a: { chapterIndex: number }): number {
+  return Math.max(0, Math.floor(a.chapterIndex))
 }
 
-function typewriterPageNumber(note: ReaderTypewriterNote): number {
-  // Prefer explicit page-rect location; otherwise use chapterIndex from DB page_number.
-  try {
-    const loc = JSON.parse(note.positionData) as {
-      anchor?: string
-      page?: number
-      pageNumber?: number
+/** TOC title for a spine section, falling back to a stable structural label. */
+function sectionLabelFor(sectionIndex: number, labels?: string[]): string {
+  return labels?.[sectionIndex]?.trim() || `Section ${sectionIndex + 1}`
+}
+
+const RELATIVE_TIME_UNITS: Array<{ limit: number; div: number; unit: string }> = [
+  { limit: 60_000, div: 1_000, unit: 'sec' },
+  { limit: 3_600_000, div: 60_000, unit: 'min' },
+  { limit: 86_400_000, div: 3_600_000, unit: 'hour' },
+  { limit: 2_592_000_000, div: 86_400_000, unit: 'day' },
+]
+
+/** "5 min ago" — the reading-time context that replaces a page number in the meta line. */
+function relativeTime(iso: string): string {
+  const then = new Date(iso).getTime()
+  if (!Number.isFinite(then)) return ''
+  const elapsed = Date.now() - then
+  if (elapsed < 45_000) return 'just now'
+  for (const { limit, div, unit } of RELATIVE_TIME_UNITS) {
+    if (elapsed < limit) {
+      const value = Math.floor(elapsed / div)
+      return `${value} ${unit}${value === 1 ? '' : 's'} ago`
     }
-    if (
-      loc?.anchor === 'page-rect' &&
-      typeof loc.page === 'number' &&
-      Number.isFinite(loc.page)
-    ) {
-      return Math.max(1, Math.floor(loc.page))
-    }
-    if (typeof loc?.pageNumber === 'number' && Number.isFinite(loc.pageNumber)) {
-      return Math.max(1, Math.floor(loc.pageNumber))
-    }
-  } catch {
-    /* fall through */
   }
-  return Math.max(1, Math.floor(note.chapterIndex) + 1)
+  return new Date(then).toLocaleDateString()
 }
 
 function toItems(
@@ -251,11 +255,14 @@ function toItems(
       kind: 'highlight' as const,
       id: h.id,
       type: (h.type ?? 'highlight') as ReaderAnnotationType,
-      pageNumber: highlightPageNumber(h),
-      content: [h.selectedText, h.note].filter(Boolean).join(' · '),
+      sectionIndex: sectionIndexOf(h),
+      // Part 1 is the marked source text; part 2 is the user's own note.
+      content: h.selectedText,
+      notes: h.note?.trim() || undefined,
       status: h.status ?? 'None',
       isChecked: h.isChecked ?? false,
       colorHex: h.colorHex,
+      createdAt: h.createdAt,
       updatedAt: h.updatedAt || h.createdAt,
       highlight: h,
     })),
@@ -263,11 +270,12 @@ function toItems(
       kind: 'typewriter' as const,
       id: n.id,
       type: 'textbox' as const,
-      pageNumber: typewriterPageNumber(n),
+      sectionIndex: sectionIndexOf(n),
       content: typewriterPlainText(n.content) || n.content,
       status: n.status ?? 'None',
       isChecked: n.isChecked ?? false,
       colorHex: n.colorHex,
+      createdAt: n.createdAt,
       updatedAt: n.updatedAt || n.createdAt,
       note: n,
     })),
@@ -275,11 +283,13 @@ function toItems(
       kind: 'pencil' as const,
       id: s.id,
       type: 'freehand' as const,
-      pageNumber: readerFreehandPageNumber(s),
-      content: s.note?.trim() || 'Pencil stroke',
+      sectionIndex: sectionIndexOf(s),
+      content: 'Pencil stroke',
+      notes: s.note?.trim() || undefined,
       status: s.status ?? 'None',
       isChecked: s.isChecked ?? false,
       colorHex: s.colorHex,
+      createdAt: s.createdAt,
       updatedAt: s.updatedAt || s.createdAt,
       stroke: s,
     })),
@@ -475,11 +485,13 @@ function ContentFullDialog({
   open,
   title,
   content,
+  notes,
   onClose,
 }: {
   open: boolean
   title: string
   content: string
+  notes?: string
   onClose: () => void
 }) {
   useEffect(() => {
@@ -524,6 +536,16 @@ function ContentFullDialog({
           <p className="m-0 whitespace-pre-wrap text-[13px] leading-relaxed text-lib-text">
             {content.trim() || 'Empty'}
           </p>
+          {notes?.trim() ? (
+            <>
+              <p className="m-0 mt-4 mb-1 text-[11px] font-semibold tracking-wide text-lib-faint uppercase">
+                Note
+              </p>
+              <p className="m-0 border-l-2 border-lib-accent/50 pl-2.5 text-[13px] leading-relaxed whitespace-pre-wrap text-lib-muted">
+                {notes.trim()}
+              </p>
+            </>
+          ) : null}
         </div>
       </div>
     </div>,
@@ -533,11 +555,13 @@ function ContentFullDialog({
 
 function AnnotationRow({
   item,
+  sectionLabel,
   onJump,
   onToggleChecked,
   actions,
 }: {
   item: NoteListItem
+  sectionLabel: string
   onJump: () => void
   onToggleChecked: (isChecked: boolean) => void
   actions: AnnotationMenuActions
@@ -552,6 +576,9 @@ function AnnotationRow({
   const meta = TYPE_META[item.type] ?? TYPE_META.highlight
   const statusStyle = STATUS_STYLES[item.status] ?? STATUS_STYLES.None
   const contentText = item.content.trim() || 'Empty'
+  const notesText = item.notes?.trim() ?? ''
+  const timeText = relativeTime(item.updatedAt)
+  const metaLine = [sectionLabel, timeText].filter(Boolean).join(' • ')
 
   const closeMenu = () => {
     setMenuOpen(false)
@@ -696,63 +723,83 @@ function AnnotationRow({
         </div>
       </div>
 
-      <div className="min-w-0 pl-6">
-        <button
-          type="button"
-          className={`w-full ${jumpBtnClass}`}
-          onClick={(e) => {
-            e.preventDefault()
-            e.stopPropagation()
-            onJump()
-            e.currentTarget.blur()
-          }}
-        >
-          <p
-            ref={contentRef}
-            className="m-0 line-clamp-3 text-[13px] leading-snug text-lib-text"
-          >
-            {contentText}
-          </p>
-        </button>
-        {clamped ? (
+      <div className="flex min-w-0 gap-2 pl-6">
+        {/* Colour bar echoes the mark's own colour so the type reads at a glance. */}
+        <span
+          aria-hidden
+          className="mt-0.5 w-[3px] shrink-0 rounded-full"
+          style={{ backgroundColor: item.colorHex || 'var(--lib-border)' }}
+        />
+        <div className="min-w-0 flex-1">
           <button
             type="button"
-            className="mt-1 cursor-pointer border-none bg-transparent p-0 text-[11px] font-semibold text-lib-accent hover:underline"
+            className={`w-full ${jumpBtnClass}`}
             onClick={(e) => {
+              e.preventDefault()
               e.stopPropagation()
-              setFullOpen(true)
+              onJump()
+              e.currentTarget.blur()
             }}
           >
-            Show full
+            <p
+              ref={contentRef}
+              className="m-0 line-clamp-3 text-[13px] leading-snug text-lib-text"
+            >
+              {contentText}
+            </p>
+            {notesText ? (
+              <p className="m-0 mt-1 line-clamp-2 border-l-2 border-lib-accent/50 pl-2 text-[12px] leading-snug text-lib-muted italic">
+                {notesText}
+              </p>
+            ) : null}
+            <p className="m-0 mt-1.5 truncate text-[11px] text-lib-faint">
+              {metaLine}
+            </p>
           </button>
-        ) : null}
+          {clamped || notesText ? (
+            <button
+              type="button"
+              className="mt-1 cursor-pointer border-none bg-transparent p-0 text-[11px] font-semibold text-lib-accent hover:underline"
+              onClick={(e) => {
+                e.stopPropagation()
+                setFullOpen(true)
+              }}
+            >
+              Show full
+            </button>
+          ) : null}
+        </div>
       </div>
 
       <ContentFullDialog
         open={fullOpen}
-        title={meta.label}
+        title={`${meta.label} · ${sectionLabel}`}
         content={contentText}
+        notes={notesText}
         onClose={() => setFullOpen(false)}
       />
     </div>
   )
 }
 
-function PageAccordion({
-  pageNumber,
+/** One collapsible group per EPUB chapter/section — the reflowable stand-in for a page. */
+function ChapterAccordion({
+  sectionIndex,
+  sectionLabel,
   items,
   expanded,
   onToggleExpand,
-  onGoToPage,
+  onGoToSection,
   onJumpItem,
   onToggleChecked,
   getActions,
 }: {
-  pageNumber: number
+  sectionIndex: number
+  sectionLabel: string
   items: NoteListItem[]
   expanded: boolean
   onToggleExpand: () => void
-  onGoToPage: (page: number) => void
+  onGoToSection: (section: number) => void
   onJumpItem: (item: NoteListItem) => void
   onToggleChecked: (id: string, isChecked: boolean) => void
   getActions: (item: NoteListItem) => AnnotationMenuActions
@@ -765,7 +812,7 @@ function PageAccordion({
         <button
           type="button"
           className="inline-flex w-8 shrink-0 cursor-pointer items-center justify-center border-none bg-transparent text-lib-muted hover:bg-lib-surface-hover hover:text-lib-text-strong"
-          aria-label={expanded ? 'Collapse page' : 'Expand page'}
+          aria-label={expanded ? 'Collapse chapter' : 'Expand chapter'}
           aria-expanded={expanded}
           onClick={onToggleExpand}
         >
@@ -782,13 +829,14 @@ function PageAccordion({
           type="button"
           className={`flex min-w-0 flex-1 items-center justify-between gap-2 px-1 py-2.5 ${jumpBtnClass} hover:bg-lib-surface-hover`}
           onClick={(e) => {
-            onGoToPage(pageNumber)
+            // 1-based spine section — resolves to goToSpineIndex(n - 1).
+            onGoToSection(sectionIndex + 1)
             e.currentTarget.blur()
           }}
-          title={`Go to page ${pageNumber}`}
+          title={`Go to ${sectionLabel}`}
         >
           <span className="truncate text-[13px] font-semibold text-lib-text-strong">
-            Page {pageNumber}
+            {sectionLabel}
           </span>
           <span className="shrink-0 rounded-full bg-lib-hint px-2 py-0.5 text-[11px] font-semibold text-lib-muted">
             {countLabel}
@@ -802,6 +850,7 @@ function PageAccordion({
             <AnnotationRow
               key={item.id}
               item={item}
+              sectionLabel={sectionLabel}
               onJump={() => onJumpItem(item)}
               onToggleChecked={(isChecked) =>
                 onToggleChecked(item.id, isChecked)
@@ -819,8 +868,9 @@ export function NotesListPanel({
   highlights,
   typewriterNotes,
   freehandStrokes = [],
-  pageCurrent,
-  onGoToPage,
+  sectionCurrent,
+  sectionLabels,
+  onGoToSection,
   onJump,
   onJumpTypewriterNote,
   onJumpPencilStroke,
@@ -833,9 +883,11 @@ export function NotesListPanel({
   const [query, setQuery] = useState('')
   const [typeFilter, setTypeFilter] = useState<TypeFilter>('all')
   const [statusFilter, setStatusFilter] = useState<StatusQuickFilter>('all')
-  const [sortMode, setSortMode] = useState<SortMode>('page')
+  const [sortMode, setSortMode] = useState<SortMode>('chapter')
   const [filterOpen, setFilterOpen] = useState(false)
-  const [expandedPages, setExpandedPages] = useState<Set<number>>(() => new Set())
+  const [expandedSections, setExpandedSections] = useState<Set<number>>(
+    () => new Set(),
+  )
   const expandOverrideRef = useRef<ExpandOverride>(null)
   const filterPanelRef = useRef<HTMLDivElement | null>(null)
 
@@ -863,12 +915,12 @@ export function NotesListPanel({
     })
   }, [allItems, query, typeFilter, statusFilter])
 
-  const pageGroups = useMemo(() => {
+  const chapterGroups = useMemo(() => {
     const map = new Map<number, NoteListItem[]>()
     for (const item of filtered) {
-      const list = map.get(item.pageNumber)
+      const list = map.get(item.sectionIndex)
       if (list) list.push(item)
-      else map.set(item.pageNumber, [item])
+      else map.set(item.sectionIndex, [item])
     }
 
     const sortItems = (items: NoteListItem[]) => {
@@ -892,16 +944,17 @@ export function NotesListPanel({
 
     return [...map.entries()]
       .sort(([a], [b]) => a - b)
-      .map(([pageNumber, items]) => ({
-        pageNumber,
+      .map(([sectionIndex, items]) => ({
+        sectionIndex,
+        sectionLabel: sectionLabelFor(sectionIndex, sectionLabels),
         items: sortItems(items),
       }))
-  }, [filtered, sortMode])
+  }, [filtered, sortMode, sectionLabels])
 
-  // Auto-expand matching pages when searching / filtering; seed current page.
+  // Auto-expand matching chapters when searching / filtering; seed the current chapter.
   useEffect(() => {
-    if (pageGroups.length === 0) {
-      setExpandedPages(new Set())
+    if (chapterGroups.length === 0) {
+      setExpandedSections(new Set())
       return
     }
     const hasActiveFilter =
@@ -911,33 +964,38 @@ export function NotesListPanel({
 
     if (hasActiveFilter) {
       expandOverrideRef.current = null
-      setExpandedPages(new Set(pageGroups.map((g) => g.pageNumber)))
+      setExpandedSections(new Set(chapterGroups.map((g) => g.sectionIndex)))
       return
     }
 
     if (expandOverrideRef.current === 'collapse') {
-      setExpandedPages(new Set())
+      setExpandedSections(new Set())
       return
     }
     if (expandOverrideRef.current === 'expand') {
-      setExpandedPages(new Set(pageGroups.map((g) => g.pageNumber)))
+      setExpandedSections(new Set(chapterGroups.map((g) => g.sectionIndex)))
       return
     }
 
-    setExpandedPages((prev) => {
+    setExpandedSections((prev) => {
       if (prev.size > 0) {
         const next = new Set(
-          [...prev].filter((p) => pageGroups.some((g) => g.pageNumber === p)),
+          [...prev].filter((s) =>
+            chapterGroups.some((g) => g.sectionIndex === s),
+          ),
         )
         if (next.size > 0) return next
       }
+      // `sectionCurrent` is 1-based on screen; groups are keyed 0-based.
+      const current = sectionCurrent != null ? sectionCurrent - 1 : undefined
       const seed =
-        pageCurrent && pageGroups.some((g) => g.pageNumber === pageCurrent)
-          ? pageCurrent
-          : pageGroups[0]!.pageNumber
+        current != null &&
+        chapterGroups.some((g) => g.sectionIndex === current)
+          ? current
+          : chapterGroups[0]!.sectionIndex
       return new Set([seed])
     })
-  }, [pageGroups, query, typeFilter, statusFilter, pageCurrent])
+  }, [chapterGroups, query, typeFilter, statusFilter, sectionCurrent])
 
   useEffect(() => {
     if (!filterOpen) return
@@ -959,26 +1017,26 @@ export function NotesListPanel({
 
   function expandAll() {
     expandOverrideRef.current = 'expand'
-    setExpandedPages(new Set(pageGroups.map((g) => g.pageNumber)))
+    setExpandedSections(new Set(chapterGroups.map((g) => g.sectionIndex)))
   }
 
   function collapseAll() {
     expandOverrideRef.current = 'collapse'
-    setExpandedPages(new Set())
+    setExpandedSections(new Set())
   }
 
   function cycleSortMode() {
     setSortMode((prev) =>
-      prev === 'page' ? 'az' : prev === 'az' ? 'za' : 'page',
+      prev === 'chapter' ? 'az' : prev === 'az' ? 'za' : 'chapter',
     )
   }
 
-  function togglePage(pageNumber: number) {
+  function toggleSection(sectionIndex: number) {
     expandOverrideRef.current = null
-    setExpandedPages((prev) => {
+    setExpandedSections((prev) => {
       const next = new Set(prev)
-      if (next.has(pageNumber)) next.delete(pageNumber)
-      else next.add(pageNumber)
+      if (next.has(sectionIndex)) next.delete(sectionIndex)
+      else next.add(sectionIndex)
       return next
     })
   }
@@ -1047,13 +1105,13 @@ export function NotesListPanel({
         <button
           type="button"
           className={`${toolbarBtnClass} ${
-            sortMode !== 'page'
+            sortMode !== 'chapter'
               ? 'bg-lib-accent-soft text-lib-accent hover:bg-lib-accent-soft hover:text-lib-accent'
               : ''
           }`}
           title={sortLabel}
           aria-label={sortLabel}
-          aria-pressed={sortMode !== 'page'}
+          aria-pressed={sortMode !== 'chapter'}
           onClick={cycleSortMode}
         >
           <AzSortIcon />
@@ -1183,19 +1241,20 @@ export function NotesListPanel({
         </div>
       </div>
 
-      {pageGroups.length === 0 ? (
+      {chapterGroups.length === 0 ? (
         <p className="m-0 px-2 py-4 text-center text-[13px] text-lib-faint">
           No matches
         </p>
       ) : (
-        pageGroups.map((group) => (
-          <PageAccordion
-            key={group.pageNumber}
-            pageNumber={group.pageNumber}
+        chapterGroups.map((group) => (
+          <ChapterAccordion
+            key={group.sectionIndex}
+            sectionIndex={group.sectionIndex}
+            sectionLabel={group.sectionLabel}
             items={group.items}
-            expanded={expandedPages.has(group.pageNumber)}
-            onToggleExpand={() => togglePage(group.pageNumber)}
-            onGoToPage={onGoToPage}
+            expanded={expandedSections.has(group.sectionIndex)}
+            onToggleExpand={() => toggleSection(group.sectionIndex)}
+            onGoToSection={onGoToSection}
             onJumpItem={jumpItem}
             onToggleChecked={onToggleChecked}
             getActions={getActions}

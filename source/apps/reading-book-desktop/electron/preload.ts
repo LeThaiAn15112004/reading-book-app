@@ -2,6 +2,7 @@ import { contextBridge, ipcRenderer } from 'electron'
 import type { DesktopApi } from './ipc/api-types'
 import {
   AppChannels,
+  CloudChannels,
   ImportChannels,
   LibraryChannels,
   OverlayChannels,
@@ -98,6 +99,26 @@ const api: DesktopApi = {
       ipcRenderer.invoke(OverlayChannels.getSessionState, bookId),
     saveSessionState: (input) =>
       ipcRenderer.invoke(OverlayChannels.saveSessionState, input),
+  },
+  cloud: {
+    connect: (provider) => ipcRenderer.invoke(CloudChannels.connect, provider),
+    disconnect: (provider) => ipcRenderer.invoke(CloudChannels.disconnect, provider),
+    getAccessToken: (provider) =>
+      ipcRenderer.invoke(CloudChannels.getAccessToken, provider),
+    downloadAndImport: (provider, entry) =>
+      ipcRenderer.invoke(CloudChannels.downloadAndImport, provider, entry),
+    onDownloadProgress: (handler) => {
+      const listener = (
+        _event: Electron.IpcRendererEvent,
+        progress: Parameters<typeof handler>[0],
+      ) => {
+        handler(progress)
+      }
+      ipcRenderer.on(CloudChannels.downloadProgress, listener)
+      return () => {
+        ipcRenderer.removeListener(CloudChannels.downloadProgress, listener)
+      }
+    },
   },
 }
 

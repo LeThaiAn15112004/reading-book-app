@@ -81,6 +81,7 @@ function toAnnotationDto(a: Annotation): AnnotationDto {
     updatedAt: a.updatedAt,
   }
   if (a.content) dto.content = a.content
+  if (a.notes) dto.notes = a.notes
   return dto
 }
 
@@ -103,6 +104,7 @@ function toBookmarkDto(row: {
   book_id: string
   location_ref: string
   label: string | null
+  excerpt: string | null
   created_at: string
 }): BookmarkDto {
   const dto: BookmarkDto = {
@@ -112,6 +114,7 @@ function toBookmarkDto(row: {
     createdAt: row.created_at,
   }
   if (row.label) dto.label = row.label
+  if (row.excerpt) dto.excerpt = row.excerpt
   return dto
 }
 
@@ -171,9 +174,10 @@ export function registerOverlayIpc(): void {
           id,
           bookId: body.bookId.trim(),
           type: body.type,
-          pageNumber: typeof body.pageNumber === 'number' ? body.pageNumber : 1,
+          pageNumber: typeof body.pageNumber === 'number' ? body.pageNumber : null,
           locationData: body.locationData.trim(),
           content: body.content,
+          notes: typeof body.notes === 'string' ? body.notes : undefined,
           style: sanitizeStyle(body.style),
           status: Annotation.isStatus(body.status) ? body.status : 'None',
           isChecked: body.isChecked === true,
@@ -209,12 +213,17 @@ export function registerOverlayIpc(): void {
         if (!existing) return { ok: false, id: null }
 
         if (typeof body.content === 'string') existing.updateContent(body.content)
+        if (typeof body.notes === 'string' || body.notes === null) {
+          existing.updateNotes(body.notes)
+        }
         if (typeof body.locationData === 'string' && body.locationData.trim()) {
           existing.updateLocation(
             body.locationData,
-            typeof body.pageNumber === 'number' ? body.pageNumber : undefined,
+            typeof body.pageNumber === 'number' || body.pageNumber === null
+              ? body.pageNumber
+              : undefined,
           )
-        } else if (typeof body.pageNumber === 'number') {
+        } else if (typeof body.pageNumber === 'number' || body.pageNumber === null) {
           existing.pageNumber = Annotation.normalizePageNumber(body.pageNumber)
           existing.touch()
         }
@@ -300,6 +309,10 @@ export function registerOverlayIpc(): void {
           label:
             typeof body.label === 'string' && body.label.trim()
               ? body.label.trim()
+              : undefined,
+          excerpt:
+            typeof body.excerpt === 'string' && body.excerpt.trim()
+              ? body.excerpt.trim()
               : undefined,
           createdAt: body.createdAt?.trim() || now,
         })

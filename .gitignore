@@ -73,6 +73,9 @@ web_modules/
 # Local Google OAuth client secrets
 source/packages/config/client_secret_*.json
 
+# Local Dropbox / OneDrive app key & secret (see cloud-oauth-secrets.example.json)
+source/packages/config/cloud-oauth-secrets.json
+
 # parcel-bundler cache (https://parceljs.org/)
 .cache
 .parcel-cache

@@ -1,320 +1,225 @@
 import {
-  isSupportedExternalFormat,
   type ConnectionTestResult,
   type ExternalCatalogEntry,
   type ExternalLibraryProvider,
   type LinkLibraryOptions,
 } from '@reading-book/domain';
 import type { ExternalLibraryProviderAdapter } from './types.js';
+import {
+  GoogleDriveAuthService,
+  GoogleDriveFileService,
+  GoogleDriveSyncService,
+  GOOGLE_DRIVE_SUPPORTED_BOOK_EXTENSIONS,
+  type GoogleDriveFileMetadata,
+} from '../../services/google-drive/index.js';
+
+// ─── File System Scanner (folder-first mode) ────────────────────────────────
 
 export interface FileSystemScanner {
-  scanDirectory(path: string): Promise<Array<{
-    name: string;
-    path: string;
-    size?: number;
-    modifiedTime?: string;
-  }>>;
+  scanDirectory(path: string): Promise<
+    Array<{
+      name: string;
+      path: string;
+      size?: number;
+      modifiedTime?: string;
+    }>
+  >;
 }
 
+// ─── Re-export helpers from the service layer ────────────────────────────────
+
+export {
+  detectBookFormat as detectGoogleDriveBookFormat,
+  GoogleDriveFileService,
+} from '../../services/google-drive/index.js';
+
+// ─── Folder ID handling ─────────────────────────────────────────────────────
+
 /**
- * Định nghĩa cấu trúc file sách trả về từ Google Drive API
+ * Google Drive scopes listings by folder *ID* (the opaque string after
+ * `/folders/` in the folder's Drive URL), not a filesystem-style path.
+ * Returns `undefined` (search the whole Drive) when the field is empty, and
+ * throws a clear, actionable error when the value looks like a path instead
+ * of an ID so a bad query is never silently sent to the API.
  */
-export interface GoogleDriveBookFile {
-  id: string;
-  name: string;
-  mimeType: string;
-  size?: number;
-  modifiedTime?: string;
-  thumbnailLink?: string;
-  webViewLink?: string;
-  webContentLink?: string;
-  formatHint?: string;
+export function normalizeGoogleDriveFolderId(rawFolderPath?: string): string | undefined {
+  const trimmed = rawFolderPath?.trim();
+  if (!trimmed) return undefined;
+  if (trimmed.includes('/') || trimmed.includes('\\')) {
+    throw new Error(
+      `"${trimmed}" looks like a folder path, but Google Drive needs a folder ID instead ` +
+        `(the string after /folders/ in the folder's Drive URL). Leave the field empty to search your whole Drive.`,
+    );
+  }
+  return trimmed;
 }
 
-export interface PullCatalogOptions {
-  /** Thư mục cha cụ thể nếu chỉ muốn quét trong 1 folder, ví dụ: 'root' hoặc 'folder_id_xyz' */
-  folderId?: string;
-  /** Từ khóa tìm kiếm bổ sung theo tên tệp */
-  searchTerm?: string;
-  /** Số lượng tệp tối đa muốn lấy (mặc định: 100) */
-  pageSize?: number;
+// ─── Map a Drive metadata object to an ExternalCatalogEntry ────────────────
+
+function toCatalogEntry(file: GoogleDriveFileMetadata): ExternalCatalogEntry {
+  return {
+    externalId: `gdrive_${file.id}`,
+    sourceProvider: 'google_drive',
+    title: file.name.replace(/\.[^/.]+$/, ''),
+    formatHint: file.formatHint,
+    downloadUrl: file.webContentLink,
+    previewUrl: file.webViewLink,
+    coverUrl: file.thumbnailLink,
+    fileSizeBytes: file.size,
+    publishedDate: file.modifiedTime,
+    mimeType: file.mimeType,
+    description: `Book from Google Drive (${file.formatHint?.toUpperCase() ?? file.mimeType})`,
+  };
 }
 
-/**
- * Hàm hỗ trợ xác định định dạng sách dựa vào MIME type hoặc đuôi tệp
- */
-export function detectGoogleDriveBookFormat(name: string, mimeType: string): string {
-  const ext = name.split('.').pop()?.toLowerCase() ?? '';
-  if (mimeType === 'application/epub+zip' || ext === 'epub') return 'epub';
-  if (mimeType === 'application/pdf' || ext === 'pdf') return 'pdf';
-  if (mimeType === 'application/x-mobipocket-ebook' || ext === 'mobi') return 'mobi';
-  if (ext === 'azw3') return 'azw3';
-  if (ext === 'fb2') return 'fb2';
-  if (ext === 'cbz') return 'cbz';
-  if (ext === 'txt') return 'txt';
-  return ext || 'unknown';
-}
+// ─── Adapter ────────────────────────────────────────────────────────────────
 
 /**
- * Lấy danh sách sách từ Google Drive cá nhân của người dùng qua REST API v3.files.list
+ * Adapter connecting the `GoogleDriveLibraryService` layer to the
+ * `ExternalLibraryConnector` infrastructure. Supports two operating modes,
+ * tried in order — errors from either mode are thrown, never swallowed into
+ * placeholder data:
  *
- * @param accessToken OAuth2 Access Token nhận được sau khi người dùng xác thực Google
- * @param options Các tùy chọn lọc thêm (thư mục, tìm kiếm, số lượng)
- * @returns Mảng các tệp sách đạt chuẩn để hiển thị lên UI ứng dụng đọc sách
+ *  1. **OAuth2 API mode** – uses a live access token (`options.apiKey`, or the
+ *     adapter's own stored token) to query the Drive REST API in real-time.
+ *  2. **Folder-first mode** – scans a locally-synced Google Drive folder on disk
+ *     (via `FileSystemScanner`) when `options.folderPath` is provided and no
+ *     token is available.
  */
-export async function pullCatalogFromGoogleDrive(
-  accessToken: string,
-  options?: PullCatalogOptions,
-): Promise<GoogleDriveBookFile[]> {
-  if (!accessToken || !accessToken.trim()) {
-    throw new Error('Access Token không hợp lệ hoặc đã hết hạn.');
-  }
-
-  const { folderId, searchTerm, pageSize = 100 } = options ?? {};
-
-  // 1. Xây dựng câu truy vấn `q` (query)
-  // - Bỏ qua các file đã bị xóa (trashed = false)
-  // - Lọc các MIME types và đuôi file sách phổ biến
-  const formatConditions = [
-    "mimeType = 'application/epub+zip'",
-    "mimeType = 'application/pdf'",
-    "mimeType = 'application/x-mobipocket-ebook'",
-    "mimeType = 'application/vnd.amazon.ebook'",
-    "name contains '.epub'",
-    "name contains '.pdf'",
-    "name contains '.mobi'",
-    "name contains '.azw3'",
-    "name contains '.fb2'",
-    "name contains '.cbz'",
-    "name contains '.txt'",
-  ];
-
-  let queryConditions = `trashed = false and (${formatConditions.join(' or ')})`;
-
-  // Lọc theo thư mục cha nếu người dùng chỉ định
-  if (folderId) {
-    queryConditions += ` and '${folderId}' in parents`;
-  }
-
-  // Lọc theo từ khóa tìm kiếm tên file
-  if (searchTerm && searchTerm.trim()) {
-    const escapedTerm = searchTerm.replace(/'/g, "\\'");
-    queryConditions += ` and name contains '${escapedTerm}'`;
-  }
-
-  // 2. Chỉ định các trường (fields) cần thiết để tối ưu dung lượng payload
-  const fields = 'nextPageToken, files(id, name, mimeType, size, modifiedTime, thumbnailLink, webViewLink, webContentLink)';
-
-  const books: GoogleDriveBookFile[] = [];
-  let pageToken: string | undefined = undefined;
-
-  try {
-    do {
-      const url = new URL('https://www.googleapis.com/drive/v3/files');
-      url.searchParams.set('q', queryConditions);
-      url.searchParams.set('fields', fields);
-      url.searchParams.set('pageSize', Math.min(pageSize, 100).toString());
-      url.searchParams.set('spaces', 'drive');
-      url.searchParams.set('orderBy', 'modifiedTime desc');
-
-      if (pageToken) {
-        url.searchParams.set('pageToken', pageToken);
-      }
-
-      const response = await fetch(url.toString(), {
-        method: 'GET',
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          Accept: 'application/json',
-        },
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        const errorMessage =
-          (errorData as { error?: { message?: string } })?.error?.message ||
-          `Google Drive API Error (HTTP ${response.status}: ${response.statusText})`;
-        throw new Error(errorMessage);
-      }
-
-      const data = (await response.json()) as {
-        files?: Array<{
-          id?: string;
-          name?: string;
-          mimeType?: string;
-          size?: string | number;
-          modifiedTime?: string;
-          thumbnailLink?: string;
-          webViewLink?: string;
-          webContentLink?: string;
-        }>;
-        nextPageToken?: string;
-      };
-
-      const files = data.files || [];
-
-      for (const file of files) {
-        const name = file.name || 'Untitled';
-        const mimeType = file.mimeType || 'application/octet-stream';
-        books.push({
-          id: file.id || '',
-          name,
-          mimeType,
-          size: file.size ? Number(file.size) : undefined,
-          modifiedTime: file.modifiedTime,
-          thumbnailLink: file.thumbnailLink,
-          webViewLink: file.webViewLink,
-          webContentLink: file.webContentLink,
-          formatHint: detectGoogleDriveBookFormat(name, mimeType),
-        });
-      }
-
-      pageToken = data.nextPageToken;
-
-      if (books.length >= pageSize) break;
-    } while (pageToken);
-
-    return books;
-  } catch (error) {
-    console.error('Lỗi khi đồng bộ danh sách sách từ Google Drive API:', error);
-    throw error;
-  }
-}
-
 export class GoogleDriveLibraryAdapter implements ExternalLibraryProviderAdapter {
   readonly provider: ExternalLibraryProvider = 'google_drive';
+
+  private readonly fileService: GoogleDriveFileService;
+  private readonly syncService: GoogleDriveSyncService;
+  private readonly authService: GoogleDriveAuthService;
   private readonly fileScanner?: FileSystemScanner;
 
   constructor(fileScanner?: FileSystemScanner) {
     this.fileScanner = fileScanner;
+    this.fileService = new GoogleDriveFileService();
+    this.syncService = new GoogleDriveSyncService();
+    this.authService = new GoogleDriveAuthService();
   }
 
-  async testConnection(options?: LinkLibraryOptions): Promise<ConnectionTestResult> {
-    if (options?.folderPath) {
-      return {
-        success: true,
-        message: `Đã kết nối thư mục Google Drive: ${options.folderPath}`,
-      };
-    }
+  // ─── testConnection ──────────────────────────────────────────────────────
 
-    const token = options?.apiKey;
+  async testConnection(options?: LinkLibraryOptions): Promise<ConnectionTestResult> {
+    // Mode 1: OAuth2 token provided (or already stored) → verify by listing 1 file
+    const token = options?.apiKey && options.apiKey !== 'xxx'
+      ? options.apiKey
+      : await this.authService.getValidAccessToken() ?? undefined;
     if (token && token !== 'xxx') {
       try {
-        const sample = await pullCatalogFromGoogleDrive(token, { pageSize: 1 });
+        const result = await this.fileService.listFiles(token, { pageSize: 1 });
         return {
           success: true,
-          message: `Kết nối Google Drive API thành công. Tìm thấy ${sample.length} tệp sách.`,
-          itemCount: sample.length,
+          message: `Google Drive connected successfully. Found ${result.entries.length} book file(s) on first page.`,
+          itemCount: result.entries.length,
         };
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err);
+        console.error('[GoogleDriveAdapter] testConnection failed:', err);
         return {
           success: false,
-          message: `Lỗi kết nối Google Drive API: ${msg}`,
+          message: `Google Drive connection failed: ${msg}`,
         };
       }
     }
 
-    if (options?.oauthClientId) {
+    // Mode 2: Folder path on disk, and there's a scanner available to read it
+    if (options?.folderPath && this.fileScanner) {
       return {
         success: true,
-        message: 'Google Drive OAuth client đã được cấu hình.',
+        message: `Connected to local Google Drive folder: ${options.folderPath}`,
       };
     }
 
     return {
-      success: true,
-      message: 'Google Drive kết nối ở chế độ folder-first (API Key: xxx).',
+      success: false,
+      message: 'Not connected. Sign in with Google Drive, or provide a local synced folder path.',
     };
   }
+
+  // ─── pullCatalog ──────────────────────────────────────────────────────────
 
   async pullCatalog(
     options?: LinkLibraryOptions,
     query?: string,
   ): Promise<ExternalCatalogEntry[]> {
-    const results: ExternalCatalogEntry[] = [];
-
-    // 1. Google Drive REST API pull nếu có Access Token
-    const token = options?.apiKey;
+    // Mode 1: OAuth2 access token (explicit or already stored) → real Drive API call
+    const token = options?.apiKey && options.apiKey !== 'xxx'
+      ? options.apiKey
+      : await this.authService.getValidAccessToken() ?? undefined;
     if (token && token !== 'xxx') {
+      const folderId = normalizeGoogleDriveFolderId(options?.folderPath);
       try {
-        const driveFiles = await pullCatalogFromGoogleDrive(token, {
+        const result = await this.fileService.listFiles(token, {
           searchTerm: query,
+          folderId,
         });
-
-        return driveFiles.map((file) => ({
-          externalId: `gdrive_${file.id}`,
-          sourceProvider: 'google_drive',
-          title: file.name.replace(/\.[^/.]+$/, ''),
-          formatHint: file.formatHint,
-          downloadUrl: file.webContentLink,
-          previewUrl: file.webViewLink,
-          coverUrl: file.thumbnailLink,
-          fileSizeBytes: file.size,
-          publishedDate: file.modifiedTime,
-          mimeType: file.mimeType,
-          description: `Sách từ Google Drive (${file.formatHint?.toUpperCase() || file.mimeType})`,
-        }));
+        return result.entries.map(toCatalogEntry);
       } catch (err) {
-        console.warn('Google Drive API fetch failed, falling back to local/sample:', err);
+        console.error(
+          '[GoogleDriveAdapter] pullCatalog failed',
+          { folderId, query, error: err },
+        );
+        const msg = err instanceof Error ? err.message : String(err);
+        throw new Error(`Google Drive sync failed: ${msg}`);
       }
     }
 
-    // 2. Folder-first scan nếu đã liên kết thư mục đồng bộ Google Drive trên máy tính
+    // Mode 2: Folder-first — scan local synced directory
     if (options?.folderPath && this.fileScanner) {
-      try {
-        const files = await this.fileScanner.scanDirectory(options.folderPath);
-        for (const file of files) {
-          const ext = file.name.split('.').pop() ?? '';
-          if (isSupportedExternalFormat(ext)) {
-            const title = file.name.replace(/\.[^/.]+$/, '');
-            if (!query || title.toLowerCase().includes(query.toLowerCase())) {
-              results.push({
-                externalId: `gdrive_local_${encodeURIComponent(file.path)}`,
-                sourceProvider: 'google_drive',
-                title,
-                formatHint: ext.toLowerCase(),
-                localPath: file.path,
-                fileSizeBytes: file.size,
-                publishedDate: file.modifiedTime,
-              });
-            }
+      const files = await this.fileScanner.scanDirectory(options.folderPath);
+      const results: ExternalCatalogEntry[] = [];
+      for (const file of files) {
+        const ext = file.name.split('.').pop() ?? '';
+        if (
+          GOOGLE_DRIVE_SUPPORTED_BOOK_EXTENSIONS.includes(
+            ext.toLowerCase() as (typeof GOOGLE_DRIVE_SUPPORTED_BOOK_EXTENSIONS)[number],
+          )
+        ) {
+          const title = file.name.replace(/\.[^/.]+$/, '');
+          if (!query || title.toLowerCase().includes(query.toLowerCase())) {
+            results.push({
+              externalId: `gdrive_local_${encodeURIComponent(file.path)}`,
+              sourceProvider: 'google_drive',
+              title,
+              formatHint: ext.toLowerCase(),
+              localPath: file.path,
+              fileSizeBytes: file.size,
+              publishedDate: file.modifiedTime,
+            });
           }
         }
-        return results;
-      } catch {
-        /* Fallback if scanner fails */
       }
+      return results;
     }
 
-    // 3. Mock / Sample Mode (nếu chưa cấu hình token hoặc thư mục)
-    const sampleEntries: ExternalCatalogEntry[] = [
-      {
-        externalId: 'gdrive_sample_01',
-        sourceProvider: 'google_drive',
-        title: 'Google Drive Document Sample 1',
-        authorNames: ['Cloud Author'],
-        formatHint: 'epub',
-        localPath: options?.folderPath ? `${options.folderPath}/Sample1.epub` : undefined,
-        description: 'Tài liệu từ thư mục Google Drive đồng bộ.',
-      },
-      {
-        externalId: 'gdrive_sample_02',
-        sourceProvider: 'google_drive',
-        title: 'Google Drive Research Paper',
-        authorNames: ['Drive Team'],
-        formatHint: 'pdf',
-        localPath: options?.folderPath ? `${options.folderPath}/Paper.pdf` : undefined,
-        description: 'Báo cáo PDF từ Google Drive.',
-      },
-    ];
+    throw new Error(
+      'Google Drive is not connected. Connect first, or provide a local synced folder path.',
+    );
+  }
 
-    if (query) {
-      return sampleEntries.filter((e) =>
-        e.title.toLowerCase().includes(query.toLowerCase()),
-      );
-    }
+  // ─── runSync (bonus: delta sync via Changes API) ─────────────────────────
 
-    return sampleEntries;
+  /**
+   * Runs a full or incremental sync using the Google Drive Changes API.
+   * Returns the new page token to persist for the next sync run.
+   *
+   * @param accessToken     - Valid Google OAuth2 access token
+   * @param changesPageToken - Cursor from previous sync (undefined = first sync)
+   * @param folderId         - Scope sync to a specific Drive folder (optional)
+   */
+  async runSync(
+    accessToken: string,
+    changesPageToken?: string,
+    folderId?: string,
+  ) {
+    return this.syncService.sync({
+      accessToken,
+      changesPageToken,
+      folderId,
+    });
   }
 }

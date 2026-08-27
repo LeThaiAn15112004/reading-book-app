@@ -1,4 +1,5 @@
 // @refresh reset
+import { useState } from 'react'
 import {
   ImportConflictDialog,
   ImportProgressDialog,
@@ -8,16 +9,16 @@ import {
 import {
   BootErrorBanner,
   BookItemMenu,
+  CloudSourcesHub,
   CollectionsHub,
   ConfirmBookActionDialog,
-  ContinueReading,
   EditBookMetadataDialog,
   FilteredListView,
   LibraryBookInfoDialog,
   LibraryEmptyState,
-  LibraryHint,
   LibraryShelves,
   LibraryTopBar,
+  LibraryFilterToolbar,
   NewCollectionDialog,
   ShelfDetailView,
   ShelfRailCard,
@@ -36,7 +37,6 @@ export function LibraryScreen() {
     setBookInfoId,
     bookInfoBook,
     openReader,
-    handleOpenNotes,
     handleBookInfo,
     editMetadataBook,
     setEditMetadataId,
@@ -82,31 +82,74 @@ export function LibraryScreen() {
     setPendingCollectionDeleteId,
     confirmCollectionDelete,
     isEmpty,
-    continueBook,
-    searchActive,
     noSearchMatches,
     showShelves,
     shelfCounts,
     activeShelf,
     shelfItems,
     shelfRailBooks,
+    reorderShelf,
+    reorderSections,
+    visibleShelfIds,
+    hideEmptyShelves,
     filterConfig,
     filterItems,
     activeCollection,
     collectionItems,
+    viewMode,
+    setViewMode,
+    activeFilter,
+    handleFilterChange,
+    cloudSources,
+    bookList,
   } = useLibraryScreen()
 
+  const [draggedBook, setDraggedBook] = useState<{
+    shelfId: string
+    bookId: string
+  } | null>(null)
+
   const shelfRailContent: ShelfRailContent = {}
-  for (const shelfId of ['reading', 'completed', 'not-started'] as const) {
+  for (const shelfId of ['favorites', 'reading', 'completed', 'not-started'] as const) {
     const rows = shelfRailBooks[shelfId]
     if (rows.length === 0) continue
-    shelfRailContent[shelfId] = rows.map((b) => (
-      <ShelfRailCard
+    shelfRailContent[shelfId] = rows.map((b, index) => (
+      <div
         key={b.id}
-        book={b}
-        onOpen={openReader}
-        onBookMenu={handleOpenBookMenu}
-      />
+        className="shrink-0 cursor-grab active:cursor-grabbing"
+        draggable
+        onDragStart={(event) => {
+          setDraggedBook({ shelfId, bookId: b.id })
+          event.dataTransfer.effectAllowed = 'move'
+        }}
+        onDragOver={(event) => {
+          if (draggedBook?.shelfId === shelfId) event.preventDefault()
+        }}
+        onDrop={(event) => {
+          event.preventDefault()
+          if (
+            !draggedBook ||
+            draggedBook.shelfId !== shelfId ||
+            draggedBook.bookId === b.id
+          ) {
+            return
+          }
+          const fromIndex = rows.findIndex((r) => r.id === draggedBook.bookId)
+          if (fromIndex === -1) return
+          const reordered = [...rows]
+          const [moved] = reordered.splice(fromIndex, 1)
+          reordered.splice(index, 0, moved)
+          reorderShelf(shelfId, reordered)
+          setDraggedBook(null)
+        }}
+        onDragEnd={() => setDraggedBook(null)}
+      >
+        <ShelfRailCard
+          book={b}
+          onOpen={openReader}
+          onBookMenu={handleOpenBookMenu}
+        />
+      </div>
     ))
   }
 
@@ -120,6 +163,8 @@ export function LibraryScreen() {
             onBack={handleCloseShelf}
             onOpenItem={openReader}
             onBookMenu={handleOpenBookMenu}
+            viewMode={viewMode}
+            onViewModeChange={setViewMode}
           />
         ) : view.kind === 'filter' && filterConfig ? (
           <FilteredListView
@@ -128,6 +173,8 @@ export function LibraryScreen() {
             items={filterItems}
             onOpenItem={openReader}
             onBookMenu={handleOpenBookMenu}
+            viewMode={viewMode}
+            onViewModeChange={setViewMode}
           />
         ) : view.kind === 'collections' ? (
           <CollectionsHub
@@ -136,6 +183,25 @@ export function LibraryScreen() {
             onOpenCollection={openCollection}
             onEditCollection={openEditCollection}
             onDeleteCollection={setPendingCollectionDeleteId}
+          />
+        ) : view.kind === 'cloud-sources' ? (
+          <CloudSourcesHub
+            key={view.provider}
+            provider={view.provider}
+            info={cloudSources.providers[view.provider]}
+            entries={cloudSources.catalogs[view.provider] ?? []}
+            folderPath={cloudSources.folderPaths[view.provider]}
+            onFolderPathChange={(value) => cloudSources.setFolderPath(view.provider, value)}
+            isConnecting={cloudSources.connectingProvider === view.provider}
+            isSyncing={cloudSources.syncingProvider === view.provider}
+            downloadingId={cloudSources.downloadingId}
+            downloadProgress={cloudSources.downloadProgress}
+            onConnect={() => cloudSources.connect(view.provider)}
+            onDisconnect={() => cloudSources.disconnect(view.provider)}
+            onSync={() => cloudSources.sync(view.provider)}
+            onDownload={(entry) => cloudSources.download(view.provider, entry)}
+            books={bookList}
+            onOpenBook={openReader}
           />
         ) : activeCollection ? (
           <ShelfDetailView
@@ -151,6 +217,8 @@ export function LibraryScreen() {
             }
             emptyMessage="No books in this collection yet."
             backAriaLabel="Back to collections"
+            viewMode={viewMode}
+            onViewModeChange={setViewMode}
           />
         ) : (
           <>
@@ -159,6 +227,11 @@ export function LibraryScreen() {
               onSearchChange={setSearchQuery}
               onFromDevice={handleFromDevice}
               onFromUrl={handleFromUrl}
+            />
+
+            <LibraryFilterToolbar
+              activeFilter={activeFilter}
+              onFilterChange={handleFilterChange}
             />
 
             <div className="flex-1 overflow-x-hidden overflow-y-auto py-7">
@@ -170,8 +243,6 @@ export function LibraryScreen() {
                   />
                 ) : null}
 
-                <LibraryHint />
-
                 {isEmpty ? (
                   <LibraryEmptyState
                     onFromDevice={handleFromDevice}
@@ -179,21 +250,17 @@ export function LibraryScreen() {
                   />
                 ) : null}
 
-                {!isEmpty && continueBook ? (
-                  <ContinueReading
-                    book={continueBook}
-                    onResume={openReader}
-                    onOpenNotes={handleOpenNotes}
-                    onBookMenu={handleOpenBookMenu}
-                  />
-                ) : null}
-
                 {showShelves ? (
                   <LibraryShelves
                     onOpenShelf={handleOpenShelf}
                     counts={shelfCounts}
+                    shelfIds={visibleShelfIds}
                     railContent={shelfRailContent}
-                    hideEmpty={searchActive}
+                    hideEmpty={hideEmptyShelves}
+                    viewMode={viewMode}
+                    onReorderShelves={
+                      activeFilter === 'all' ? reorderSections : undefined
+                    }
                   />
                 ) : null}
 
@@ -249,18 +316,18 @@ export function LibraryScreen() {
         book={
           bookInfoBook
             ? {
-                id: bookInfoBook.id,
-                title: bookInfoBook.title,
-                author: bookInfoBook.author,
-                fileName: bookInfoBook.fileName,
-                format: bookInfoBook.format,
-                coverUrl: bookInfoBook.coverUrl,
-                genre: bookInfoBook.genre,
-                genres: bookInfoBook.genres,
-                fileSizeBytes: bookInfoBook.fileSizeBytes,
-                pageCount: bookInfoBook.pageCount,
-                description: bookInfoBook.description,
-              }
+              id: bookInfoBook.id,
+              title: bookInfoBook.title,
+              author: bookInfoBook.author,
+              fileName: bookInfoBook.fileName,
+              format: bookInfoBook.format,
+              coverUrl: bookInfoBook.coverUrl,
+              genre: bookInfoBook.genre,
+              genres: bookInfoBook.genres,
+              fileSizeBytes: bookInfoBook.fileSizeBytes,
+              pageCount: bookInfoBook.pageCount,
+              description: bookInfoBook.description,
+            }
             : null
         }
         onClose={() => setBookInfoId(null)}

@@ -5,6 +5,8 @@ export interface BookmarkProps {
   bookId: string;
   locationRef: Location;
   label?: string;
+  /** Opening text captured at the bookmarked location, for list previews. */
+  excerpt?: string;
   createdAt: string;
 }
 
@@ -14,6 +16,7 @@ export class Bookmark {
   readonly bookId: string;
   locationRef: Location;
   label?: string;
+  excerpt?: string;
   readonly createdAt: string;
 
   constructor(props: BookmarkProps) {
@@ -22,6 +25,7 @@ export class Bookmark {
     this.bookId = props.bookId;
     this.locationRef = props.locationRef;
     this.label = props.label?.trim() || undefined;
+    this.excerpt = props.excerpt?.trim() || undefined;
     this.createdAt = props.createdAt;
   }
 

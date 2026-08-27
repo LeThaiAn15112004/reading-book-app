@@ -1,7 +1,7 @@
 /** Feature flags for MVP / phase gates (SDS §2.11 / T0.3). */
 export interface FeatureFlags {
   readonly aiEnabled: boolean;
-  /** Phase 3 — Google Drive / Books / Apple Books connectors (not app account sync). */
+  /** Phase 3 — Google Drive / Google Books connectors (not app account sync). */
   readonly externalLibrariesEnabled: boolean;
   /** @deprecated Alias of externalLibrariesEnabled during migration. */
   readonly syncEnabled: boolean;
@@ -15,7 +15,7 @@ export interface FeatureFlags {
 
 export const defaultFeatures: FeatureFlags = {
   aiEnabled: false,
-  externalLibrariesEnabled: false,
+  externalLibrariesEnabled: true,
   syncEnabled: false,
   fileScanEnabled: true,
   autoImportEnabled: true,

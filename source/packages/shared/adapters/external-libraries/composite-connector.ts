@@ -12,9 +12,9 @@ import {
   DefaultExternalLibraryRepository,
   type ExternalLibraryRepository,
 } from '../../repositories/external-library-repository.js';
-import { AppleBooksLibraryAdapter } from './apple-books-adapter.js';
-import { GoogleBooksLibraryAdapter } from './google-books-adapter.js';
 import { GoogleDriveLibraryAdapter, type FileSystemScanner } from './google-drive-adapter.js';
+import { DropboxLibraryAdapter } from './dropbox-adapter.js';
+import { OneDriveLibraryAdapter } from './onedrive-adapter.js';
 import type { ExternalLibraryProviderAdapter } from './types.js';
 
 function createStoredConfig(options?: LinkLibraryOptions): ExternalLibraryInfo['config'] {
@@ -44,12 +44,12 @@ export class CompositeExternalLibraryConnector implements ExternalLibraryConnect
 
     const fileScanner = options?.fileScanner;
     this.adapters.set('google_drive', new GoogleDriveLibraryAdapter(fileScanner));
-    this.adapters.set('google_books', new GoogleBooksLibraryAdapter());
-    this.adapters.set('apple_books', new AppleBooksLibraryAdapter(fileScanner));
+    this.adapters.set('dropbox', new DropboxLibraryAdapter({ fileScanner }));
+    this.adapters.set('onedrive', new OneDriveLibraryAdapter({ fileScanner }));
   }
 
   listProviders(): ExternalLibraryProvider[] {
-    return ['google_drive', 'google_books', 'apple_books'];
+    return ['google_drive', 'dropbox', 'onedrive'];
   }
 
   status(provider: ExternalLibraryProvider): ExternalLibraryStatus {
@@ -99,7 +99,8 @@ export class CompositeExternalLibraryConnector implements ExternalLibraryConnect
     try {
       const catalog = await adapter.pullCatalog(options);
       initialCount = catalog.length;
-    } catch {
+    } catch (err) {
+      console.error(`[CompositeExternalLibraryConnector] link(${provider}) initial catalog pull failed:`, err);
       initialCount = 0;
     }
 
@@ -143,6 +144,7 @@ export class CompositeExternalLibraryConnector implements ExternalLibraryConnect
       return entries;
     } catch (err: unknown) {
       const errorMsg = err instanceof Error ? err.message : String(err);
+      console.error(`[CompositeExternalLibraryConnector] pullCatalog(${provider}) failed:`, err);
       await this.repository.updateSyncMetadata(provider, 0, errorMsg);
       throw err;
     }

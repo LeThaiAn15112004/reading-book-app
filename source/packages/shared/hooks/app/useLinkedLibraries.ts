@@ -39,15 +39,15 @@ export function useLinkedLibraries(options?: UseLinkedLibrariesOptions) {
       status: 'unlinked',
       config: { apiKey: 'xxx' },
     },
-    google_books: {
-      provider: 'google_books',
-      name: 'Google Books',
+    dropbox: {
+      provider: 'dropbox',
+      name: 'Dropbox',
       status: 'unlinked',
       config: { apiKey: 'xxx' },
     },
-    apple_books: {
-      provider: 'apple_books',
-      name: 'Apple Books',
+    onedrive: {
+      provider: 'onedrive',
+      name: 'Microsoft OneDrive',
       status: 'unlinked',
       config: { apiKey: 'xxx' },
     },

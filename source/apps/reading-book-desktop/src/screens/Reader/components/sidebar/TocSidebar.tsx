@@ -41,6 +41,8 @@ type TocSidebarProps = {
   tocItems?: EpubTocItem[]
   activeTocHref?: string
   bookmarks: ReaderBookmark[]
+  /** id of the bookmark that matches the current reading location, if any — drives the "you are here" highlight. */
+  currentBookmarkId?: string
   highlights: ReaderHighlight[]
   typewriterNotes: ReaderTypewriterNote[]
   freehandStrokes?: ReaderShapeAnnotation[]
@@ -175,6 +177,7 @@ export function TocSidebar({
   tocItems,
   activeTocHref,
   bookmarks,
+  currentBookmarkId,
   highlights,
   typewriterNotes,
   freehandStrokes = [],
@@ -333,33 +336,60 @@ export function TocSidebar({
                       No matches
                     </p>
                   ) : (
-                    filteredBookmarks.map((b) => (
-                      <div
-                        key={b.id}
-                        className="flex items-start gap-2 rounded-lg border border-lib-border-soft bg-lib-surface p-3"
-                      >
-                        <button
-                          className="min-w-0 flex-1 cursor-pointer border-none bg-transparent p-0 text-left text-sm text-lib-text outline-none focus:outline-none focus-visible:outline-none"
-                          type="button"
-                          onClick={(e) => {
-                            e.preventDefault()
-                            e.stopPropagation()
-                            onJumpBookmark(b)
-                            e.currentTarget.blur()
-                          }}
+                    filteredBookmarks.map((b) => {
+                      const isHere = b.id === currentBookmarkId
+                      return (
+                        <div
+                          key={b.id}
+                          className={`flex items-start gap-2 rounded-lg border p-3 transition-colors ${
+                            isHere
+                              ? 'border-lib-accent bg-lib-accent-soft'
+                              : 'border-lib-border-soft bg-lib-surface'
+                          }`}
                         >
-                          {b.label}
-                        </button>
-                        <button
-                          className="cursor-pointer border-none bg-transparent px-1 text-xs text-lib-faint hover:text-red-400"
-                          type="button"
-                          aria-label="Delete bookmark"
-                          onClick={() => onDeleteBookmark(b.id)}
-                        >
-                          ✕
-                        </button>
-                      </div>
-                    ))
+                          <button
+                            className="min-w-0 flex-1 cursor-pointer border-none bg-transparent p-0 text-left outline-none focus:outline-none focus-visible:outline-none"
+                            type="button"
+                            onClick={(e) => {
+                              e.preventDefault()
+                              e.stopPropagation()
+                              onJumpBookmark(b)
+                              e.currentTarget.blur()
+                            }}
+                          >
+                            <span className="flex min-w-0 items-center gap-1.5">
+                              <span
+                                className={`truncate text-sm ${isHere ? 'font-semibold text-lib-accent' : 'text-lib-text'}`}
+                              >
+                                {b.label}
+                              </span>
+                              {isHere ? (
+                                <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-lib-accent/15 px-1.5 py-0.5 text-[10px] font-bold tracking-wide text-lib-accent uppercase">
+                                  Here
+                                </span>
+                              ) : null}
+                            </span>
+                            {b.excerpt ? (
+                              <span className="mt-1 block line-clamp-2 text-xs leading-snug text-lib-muted">
+                                {b.excerpt}
+                              </span>
+                            ) : b.createdAt ? (
+                              <span className="mt-0.5 block text-[11px] text-lib-faint">
+                                {new Date(b.createdAt).toLocaleString()}
+                              </span>
+                            ) : null}
+                          </button>
+                          <button
+                            className="cursor-pointer border-none bg-transparent px-1 text-xs text-lib-faint hover:text-red-400"
+                            type="button"
+                            aria-label="Delete bookmark"
+                            onClick={() => onDeleteBookmark(b.id)}
+                          >
+                            ✕
+                          </button>
+                        </div>
+                      )
+                    })
                   )}
                 </>
               )}
@@ -371,8 +401,9 @@ export function TocSidebar({
               highlights={highlights}
               typewriterNotes={typewriterNotes}
               freehandStrokes={freehandStrokes}
-              pageCurrent={pageCurrent}
-              onGoToPage={onGoToPage}
+              sectionCurrent={pageCurrent}
+              sectionLabels={sectionLabels}
+              onGoToSection={onGoToPage}
               onJump={onJumpHighlight}
               onJumpTypewriterNote={onJumpTypewriterNote}
               onJumpPencilStroke={onJumpPencilStroke}

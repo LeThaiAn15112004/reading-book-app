@@ -1,0 +1,173 @@
+/*
+ * 3D page-turn structure. All animated values are `transform` (leaf rotation)
+ * and opacity-driven custom properties (--pt-shadow, --pt-fold) written by
+ * PageTurnController — nothing here ever animates layout-triggering properties.
+ */
+
+/* Perspective root: clips the flipping leaf and gives it 3D depth. Vertical
+   pan is left to the browser (text scroll); horizontal drag is claimed by the
+   controller so it never fights native touch scrolling. */
+.pt-viewport {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  perspective: 2200px;
+  touch-action: pan-y;
+  background: var(--pt-page-bg, #f6f1e7);
+  --pt-shadow: 0;
+  --pt-fold: 50%;
+}
+
+/* Incoming page sits flat underneath, revealed as the leaf rotates away. */
+.pt-base {
+  position: absolute;
+  inset: 0;
+}
+
+/* The page that physically turns. */
+.pt-leaf {
+  position: absolute;
+  inset: 0;
+  transform-style: preserve-3d;
+  will-change: transform;
+  transform: rotateY(0deg);
+}
+
+/* Only present during the release-to-settle animation — never during an
+   active drag, where the leaf must track the pointer with zero lag. */
+.pt-leaf.is-settling {
+  transition: transform var(--pt-duration, 320ms) cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+.pt-face {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  background: var(--pt-page-bg, #f6f1e7);
+}
+
+/* Resting rotation so this face reads correctly once the leaf has rotated
+   past 90deg, in either direction (leaf ends at +/-180, +180 = -180 mod 360). */
+.pt-face--back {
+  transform: rotateY(180deg);
+}
+
+/* Paper-fold lighting hugging the free (rotating) edge — 0 while flat on
+   either side, peaking at the 90deg midpoint via --pt-shadow. The fold stays
+   on the same screen edge for the whole gesture regardless of which face is
+   currently visible, so one gradient per direction covers both faces.
+   Four stops, not two: a dark crease right at the fold, a thin bright sheen
+   just past it (light grazing the bent paper), then fading to the true page
+   color — darker near the curl, lighter on the flat part, per spec. */
+.pt-face-shade {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: var(--pt-shadow, 0);
+}
+.pt-leaf[data-direction='forward'] .pt-face-shade {
+  background: linear-gradient(
+    to right,
+    rgba(0, 0, 0, 0.4) 0%,
+    rgba(0, 0, 0, 0.15) 16%,
+    rgba(255, 255, 255, 0.1) 28%,
+    transparent 55%
+  );
+}
+.pt-leaf[data-direction='backward'] .pt-face-shade {
+  background: linear-gradient(
+    to left,
+    rgba(0, 0, 0, 0.4) 0%,
+    rgba(0, 0, 0, 0.15) 16%,
+    rgba(255, 255, 255, 0.1) 28%,
+    transparent 55%
+  );
+}
+
+/*
+ * Corner curl: a 2-hinge flap pinned to the free edge, independent of the
+ * main leaf's own transform tree (see PageTurnController.applyCurl). This is
+ * a deliberately small approximation, not a mesh-warp of real page content —
+ * CSS transforms only rotate rigid flat planes, they cannot bend the pixels
+ * of live, selectable EPUB text (that needs canvas rasterization, which
+ * would break text selection and the highlight/typewriter overlays this app
+ * relies on). So the flap shows a plain paper surface, matching how every
+ * production reader actually renders a drag-curl — you see the blank/shaded
+ * underside of the paper, not warped text.
+ */
+.pt-curl {
+  position: absolute;
+  top: 0;
+  height: 100%;
+  width: var(--pt-curl-width, 24%);
+  transform-style: preserve-3d;
+  pointer-events: none;
+  z-index: 2;
+}
+.pt-curl[data-direction='forward'] {
+  right: 0;
+}
+.pt-curl[data-direction='backward'] {
+  left: 0;
+}
+
+.pt-curl-seg {
+  position: absolute;
+  top: 0;
+  height: 100%;
+  transform-style: preserve-3d;
+}
+/* Seam segment: half the flap, anchored where it visually meets the leaf. */
+.pt-curl-seg--seam {
+  width: 50%;
+}
+.pt-curl[data-direction='forward'] .pt-curl-seg--seam {
+  left: 0;
+}
+.pt-curl[data-direction='backward'] .pt-curl-seg--seam {
+  right: 0;
+}
+/* Tip segment: nested inside the seam segment, tiled immediately after it —
+   100% of the *seam's* box, which is the same absolute width as the seam. */
+.pt-curl-seg--tip {
+  width: 100%;
+}
+.pt-curl[data-direction='forward'] .pt-curl-seg--tip {
+  left: 100%;
+}
+.pt-curl[data-direction='backward'] .pt-curl-seg--tip {
+  right: 100%;
+}
+
+.pt-curl-face {
+  position: absolute;
+  inset: 0;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  background: var(--pt-page-bg, #f6f1e7);
+}
+/* Tip catches the most light at the crest of the bend — a soft specular
+   sheen, brightest exactly where the paper is curved most sharply. */
+.pt-curl-seg--tip .pt-curl-face {
+  background:
+    linear-gradient(105deg, rgba(255, 255, 255, 0.35), rgba(255, 255, 255, 0) 45%),
+    var(--pt-page-bg, #f6f1e7);
+}
+
+/* Ambient shadow the turning page casts onto the base page beneath it,
+   sweeping with the fold position as the drag progresses. */
+.pt-drop-shadow {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: var(--pt-shadow, 0);
+  background: radial-gradient(
+    140px circle at var(--pt-fold, 50%) 50%,
+    rgba(0, 0, 0, 0.35),
+    transparent 70%
+  );
+  mix-blend-mode: multiply;
+}

@@ -33,11 +33,6 @@ import {
   type EpubReaderHighlight,
   type PendingSelection,
 } from '@reading-book/shared/models'
-import {
-  focusAnnotationInEpubHost,
-  setAnnotationJumpViewportHidden,
-  type AnnotationFocusTarget,
-} from '../../annotations'
 import type { DomCssOverlay } from '../../overlays/dom-css-overlay'
 import {
   draftToInkStroke,
@@ -109,6 +104,8 @@ export type EpubRendererApi = Pick<
   | 'getToc'
   | 'getSectionLabels'
   | 'getCurrentLocation'
+  | 'getCurrentExcerpt'
+  | 'isCfiWithinCurrentView'
   | 'goToLocation'
   | 'clearSelection'
   | 'setFontSize'
@@ -122,16 +119,6 @@ export type EpubRendererApi = Pick<
 > & {
   /** Force DomCssOverlay full reload (T5.3) — usually driven by `rendered` / props. */
   repaintHighlights: () => void
-  /**
-   * After `goToLocation`, instant center-scroll + flash the painted annotation
-   * mark (searches all section iframes in continuous mode).
-   */
-  focusAnnotation: (target: AnnotationFocusTarget) => Promise<boolean>
-  /**
-   * Hide the EPUB host during jump navigation so only the final centered
-   * frame is shown (Read Era / Foxit style).
-   */
-  setJumpViewportHidden: (hidden: boolean) => void
 }
 
 type EpubRendererProps = {
@@ -344,7 +331,6 @@ function toApi(
   handle: EpubjsHandle,
   cover: SyntheticCoverNavigation,
   repaintHighlights: () => void,
-  getHost: () => HTMLElement | null,
 ): EpubRendererApi {
   return {
     nextPage: async () => {
@@ -423,6 +409,8 @@ function toApi(
         ? ['Cover', ...handle.getSectionLabels()]
         : handle.getSectionLabels(),
     getCurrentLocation: () => handle.getCurrentLocation(),
+    getCurrentExcerpt: () => handle.getCurrentExcerpt(),
+    isCfiWithinCurrentView: (cfi) => handle.isCfiWithinCurrentView(cfi),
     goToLocation: async (location) => {
       cover.hide()
       await handle.goToLocation(location)
@@ -436,15 +424,6 @@ function toApi(
     setChromeHidden: (hidden) => handle.setChromeHidden(hidden),
     resize: () => handle.resize(),
     clearSelection: () => handle.clearSelection(),
-    focusAnnotation: async (target) => {
-      const host = getHost()
-      if (!host) return false
-      repaintHighlights()
-      return focusAnnotationInEpubHost(host, target)
-    },
-    setJumpViewportHidden: (hidden) => {
-      setAnnotationJumpViewportHidden(getHost(), hidden)
-    },
     repaintHighlights,
   }
 }
@@ -1374,7 +1353,6 @@ export function EpubRenderer({
             handle,
             coverNavigation,
             paintHighlightsNow,
-            () => hostRef.current,
           )
         }
 

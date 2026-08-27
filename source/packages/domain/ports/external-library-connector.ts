@@ -1,7 +1,7 @@
 /**
  * External library catalog connector (Phase 3 / Giai đoạn 8 — SDS §2.9 / SRS FR-30, NFR-11, BR-08).
  *
- * Pulls document lists from Google Drive, Google Books, or Apple Books into
+ * Pulls document lists from Google Drive or Google Books into
  * the local Library. No app account: no email/password, no OAuth2 identity login.
  * Prefer folder / library path links already present on the device.
  */
@@ -25,7 +25,7 @@ export type {
 } from '../models/external-library.js';
 
 /**
- * Port for linking external libraries (Google Drive, Google Books, Apple Books)
+ * Port for linking external libraries (Google Drive, Google Books)
  * and querying/pulling their document catalogs into local Library.
  */
 export interface ExternalLibraryConnector {
@@ -66,7 +66,7 @@ export interface ExternalLibraryConnector {
 /** Fallback / No-Op stub — used when running in restricted environments or initial state. */
 export class NoOpExternalLibraryConnector implements ExternalLibraryConnector {
   listProviders(): ExternalLibraryProvider[] {
-    return ['google_drive', 'google_books', 'apple_books'];
+    return ['google_drive', 'dropbox', 'onedrive'];
   }
 
   status(_provider: ExternalLibraryProvider): ExternalLibraryStatus {
@@ -74,9 +74,14 @@ export class NoOpExternalLibraryConnector implements ExternalLibraryConnector {
   }
 
   async getProviderInfo(provider: ExternalLibraryProvider): Promise<ExternalLibraryInfo> {
+    const defaultNames: Record<ExternalLibraryProvider, string> = {
+      google_drive: 'Google Drive',
+      dropbox: 'Dropbox',
+      onedrive: 'Microsoft OneDrive',
+    };
     return {
       provider,
-      name: provider === 'google_drive' ? 'Google Drive' : provider === 'google_books' ? 'Google Books' : 'Apple Books',
+      name: defaultNames[provider] ?? provider,
       status: 'unlinked',
       config: { apiKey: 'xxx' },
     };
@@ -95,9 +100,14 @@ export class NoOpExternalLibraryConnector implements ExternalLibraryConnector {
     provider: ExternalLibraryProvider,
     options?: LinkLibraryOptions,
   ): Promise<ExternalLibraryInfo> {
+    const defaultNames: Record<ExternalLibraryProvider, string> = {
+      google_drive: 'Google Drive',
+      dropbox: 'Dropbox',
+      onedrive: 'Microsoft OneDrive',
+    };
     return {
       provider,
-      name: provider === 'google_drive' ? 'Google Drive' : provider === 'google_books' ? 'Google Books' : 'Apple Books',
+      name: defaultNames[provider] ?? provider,
       status: 'linked',
       linkedAt: new Date().toISOString(),
       config: {

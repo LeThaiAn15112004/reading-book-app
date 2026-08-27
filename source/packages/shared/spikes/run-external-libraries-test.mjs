@@ -1,10 +1,13 @@
 /**
  * Test spike runner for T8.1 External Library Connector & Adapters
  * Run with: node source/packages/shared/spikes/run-external-libraries-test.mjs
+ *
+ * Updated: google_books removed; Dropbox is now the second supported provider.
  */
 import assert from 'node:assert/strict';
 
 // Helper class definitions matching our TypeScript implementations for Node direct execution
+
 class MemoryExternalLibraryStorage {
   constructor() {
     this.store = new Map();
@@ -23,10 +26,14 @@ class MemoryExternalLibraryStorage {
 class DefaultExternalLibraryRepository {
   constructor(storage) {
     this.storage = storage ?? new MemoryExternalLibraryStorage();
-    this.supportedProviders = ['google_drive', 'google_books', 'apple_books'];
+    this.supportedProviders = ['google_drive', 'dropbox', 'onedrive'];
   }
   storageKey(provider) {
     return `reading_book:external_lib:${provider}`;
+  }
+  providerDisplayName(provider) {
+    const names = { google_drive: 'Google Drive', dropbox: 'Dropbox', onedrive: 'Microsoft OneDrive' };
+    return names[provider] ?? provider;
   }
   async getProvider(provider) {
     try {
@@ -34,7 +41,7 @@ class DefaultExternalLibraryRepository {
       if (!raw) {
         return {
           provider,
-          name: provider === 'google_drive' ? 'Google Drive' : provider === 'google_books' ? 'Google Books' : 'Apple Books',
+          name: this.providerDisplayName(provider),
           status: 'unlinked',
           config: { apiKey: 'xxx' },
         };
@@ -43,7 +50,7 @@ class DefaultExternalLibraryRepository {
     } catch {
       return {
         provider,
-        name: provider === 'google_drive' ? 'Google Drive' : provider === 'google_books' ? 'Google Books' : 'Apple Books',
+        name: this.providerDisplayName(provider),
         status: 'unlinked',
         config: { apiKey: 'xxx' },
       };
@@ -64,7 +71,7 @@ class DefaultExternalLibraryRepository {
       this.storageKey(provider),
       JSON.stringify({
         provider,
-        name: provider === 'google_drive' ? 'Google Drive' : provider === 'google_books' ? 'Google Books' : 'Apple Books',
+        name: this.providerDisplayName(provider),
         status: 'unlinked',
         config: { apiKey: 'xxx' },
       }),
@@ -91,9 +98,9 @@ class GoogleDriveLibraryAdapter {
   }
   async testConnection(options) {
     if (options?.folderPath) {
-      return { success: true, message: `Đã kết nối thư mục Google Drive: ${options.folderPath}` };
+      return { success: true, message: `Connected to local Google Drive folder: ${options.folderPath}` };
     }
-    return { success: true, message: 'Google Drive kết nối ở chế độ folder-first (API Key: xxx).' };
+    return { success: true, message: 'Google Drive ready (folder-first mode; configure OAuth to enable cloud sync).' };
   }
   async pullCatalog(options, query) {
     const results = [];
@@ -101,7 +108,7 @@ class GoogleDriveLibraryAdapter {
       const files = await this.fileScanner.scanDirectory(options.folderPath);
       for (const file of files) {
         const ext = file.name.split('.').pop()?.toLowerCase() ?? '';
-        if (['epub', 'pdf', 'txt', 'md'].includes(ext)) {
+        if (['epub', 'pdf', 'txt', 'md', 'docx', 'doc'].includes(ext)) {
           const title = file.name.replace(/\.[^/.]+$/, '');
           if (!query || title.toLowerCase().includes(query.toLowerCase())) {
             results.push({
@@ -118,50 +125,36 @@ class GoogleDriveLibraryAdapter {
       return results;
     }
     return [
-      { externalId: 'sample1', sourceProvider: 'google_drive', title: 'Drive Book 1', formatHint: 'epub' },
+      { externalId: 'gdrive_sample_01', sourceProvider: 'google_drive', title: 'Google Drive Sample Book', formatHint: 'epub' },
     ];
   }
 }
 
-class GoogleBooksLibraryAdapter {
+class DropboxLibraryAdapter {
   constructor() {
-    this.provider = 'google_books';
+    this.provider = 'dropbox';
   }
   async testConnection(options) {
-    const apiKey = options?.apiKey ?? 'xxx';
-    return { success: true, message: `Google Books đã sẵn sàng (chế độ Catalog public / API key: ${apiKey}).` };
+    return { success: true, message: `Dropbox ready (token: ${options?.apiKey ?? 'xxx'}).` };
   }
-  async pullCatalog(options, query) {
+  async pullCatalog() {
     return [
-      { externalId: 'gbooks_01', sourceProvider: 'google_books', title: 'Pride and Prejudice', authorNames: ['Jane Austen'], formatHint: 'epub' },
-      { externalId: 'gbooks_02', sourceProvider: 'google_books', title: 'Frankenstein', authorNames: ['Mary Shelley'], formatHint: 'epub' },
+      { externalId: 'dropbox_sample_01', sourceProvider: 'dropbox', title: 'Dropbox Book 1', formatHint: 'epub' },
+      { externalId: 'dropbox_sample_02', sourceProvider: 'dropbox', title: 'Dropbox Book 2', formatHint: 'pdf' },
     ];
   }
 }
 
-class AppleBooksLibraryAdapter {
-  constructor(fileScanner) {
-    this.provider = 'apple_books';
-    this.fileScanner = fileScanner;
+class OneDriveLibraryAdapter {
+  constructor() {
+    this.provider = 'onedrive';
   }
   async testConnection(options) {
-    return { success: true, message: 'Apple Books đã sẵn sàng (liên kết thư mục Apple Books cục bộ).' };
+    return { success: true, message: `OneDrive ready (token: ${options?.apiKey ?? 'xxx'}).` };
   }
-  async pullCatalog(options, query) {
-    if (options?.folderPath && this.fileScanner) {
-      const files = await this.fileScanner.scanDirectory(options.folderPath);
-      return files
-        .filter(f => ['epub', 'pdf', 'txt', 'md'].includes(f.name.split('.').pop()?.toLowerCase()))
-        .map(f => ({
-          externalId: `apple_${encodeURIComponent(f.path)}`,
-          sourceProvider: 'apple_books',
-          title: f.name.replace(/\.[^/.]+$/, ''),
-          formatHint: f.name.split('.').pop()?.toLowerCase(),
-          localPath: f.path,
-        }));
-    }
+  async pullCatalog() {
     return [
-      { externalId: 'apple_01', sourceProvider: 'apple_books', title: 'Apple Design Guide', formatHint: 'pdf' },
+      { externalId: 'onedrive_sample_01', sourceProvider: 'onedrive', title: 'OneDrive Book 1', formatHint: 'epub' },
     ];
   }
 }
@@ -172,13 +165,13 @@ class CompositeExternalLibraryConnector {
     this.adapters = new Map();
     const fileScanner = options?.fileScanner;
     this.adapters.set('google_drive', new GoogleDriveLibraryAdapter(fileScanner));
-    this.adapters.set('google_books', new GoogleBooksLibraryAdapter());
-    this.adapters.set('apple_books', new AppleBooksLibraryAdapter(fileScanner));
+    this.adapters.set('dropbox', new DropboxLibraryAdapter());
+    this.adapters.set('onedrive', new OneDriveLibraryAdapter());
   }
   listProviders() {
-    return ['google_drive', 'google_books', 'apple_books'];
+    return ['google_drive', 'dropbox', 'onedrive'];
   }
-  status(provider) {
+  status(_provider) {
     return 'unlinked';
   }
   async getProviderInfo(provider) {
@@ -193,9 +186,10 @@ class CompositeExternalLibraryConnector {
     const testResult = await adapter.testConnection(options);
     if (!testResult.success) throw new Error(testResult.message);
     const catalog = await adapter.pullCatalog(options);
+    const names = { google_drive: 'Google Drive', dropbox: 'Dropbox', onedrive: 'Microsoft OneDrive' };
     const info = {
       provider,
-      name: provider === 'google_drive' ? 'Google Drive' : provider === 'google_books' ? 'Google Books' : 'Apple Books',
+      name: names[provider] ?? provider,
       status: 'linked',
       linkedAt: new Date().toISOString(),
       lastSyncedAt: new Date().toISOString(),
@@ -227,7 +221,7 @@ class CompositeExternalLibraryConnector {
 }
 
 async function run() {
-  console.log('=== RUNNING T8.1 EXTERNAL LIBRARY INTEGRATION SPIKE ===');
+  console.log('=== RUNNING T8.1 EXTERNAL LIBRARY INTEGRATION SPIKE (Regression) ===');
   const storage = new MemoryExternalLibraryStorage();
   const repository = new DefaultExternalLibraryRepository(storage);
 
@@ -238,7 +232,7 @@ async function run() {
         { name: 'Microservices.pdf', path: `${dir}/Microservices.pdf`, size: 2097152 },
         { name: 'Summary.md', path: `${dir}/Summary.md`, size: 4096 },
         { name: 'Notes.txt', path: `${dir}/Notes.txt`, size: 1024 },
-        { name: 'Music.mp3', path: `${dir}/Music.mp3`, size: 5000000 },
+        { name: 'Music.mp3', path: `${dir}/Music.mp3`, size: 5000000 }, // should be filtered out
       ];
     },
   };
@@ -248,27 +242,27 @@ async function run() {
     fileScanner: mockFileScanner,
   });
 
-  // 1. Providers
+  // 1. Providers — must be google_drive + dropbox + onedrive
   const providers = connector.listProviders();
-  assert.deepEqual(providers, ['google_drive', 'google_books', 'apple_books']);
+  assert.deepEqual(providers, ['google_drive', 'dropbox', 'onedrive']);
   console.log('1. Providers check passed:', providers);
 
   // 2. Initial state
   const initial = await connector.getAllProvidersInfo();
   assert.equal(initial.google_drive.status, 'unlinked');
-  assert.equal(initial.google_books.status, 'unlinked');
-  assert.equal(initial.apple_books.status, 'unlinked');
+  assert.equal(initial.dropbox.status, 'unlinked');
+  assert.equal(initial.onedrive.status, 'unlinked');
   console.log('2. Initial unlinked state verified');
 
-  // 3. Test Connection
+  // 3. Test Connection Google Drive
   const driveTest = await connector.testConnection('google_drive', { folderPath: 'C:/Users/Drive' });
   assert.equal(driveTest.success, true);
   console.log('3. Google Drive test connection passed:', driveTest.message);
 
-  // 4. Link Google Drive
+  // 4. Link Google Drive (folder-first)
   const driveLinked = await connector.link('google_drive', { folderPath: 'C:/Users/Drive' });
   assert.equal(driveLinked.status, 'linked');
-  assert.equal(driveLinked.itemCount, 4); // 4 supported book formats
+  assert.equal(driveLinked.itemCount, 4); // epub, pdf, md, txt (mp3 filtered out)
   console.log('4. Google Drive linked:', driveLinked.itemCount, 'documents detected');
 
   // 5. Pull catalog
@@ -276,31 +270,30 @@ async function run() {
   assert.equal(driveDocs.length, 4);
   assert.equal(driveDocs[0].title, 'Domain Driven Design');
   assert.equal(driveDocs[0].formatHint, 'epub');
-  console.log('5. Google Drive catalog pull verified (filtered non-book files like mp3)');
+  console.log('5. Google Drive catalog pull verified (non-book files like mp3 filtered)');
 
-  // 6. Link Google Books
-  const gbooksLinked = await connector.link('google_books', { apiKey: 'xxx' });
-  assert.equal(gbooksLinked.status, 'linked');
-  assert.equal(gbooksLinked.config.apiKey, 'xxx');
-  const gbooksDocs = await connector.pullCatalog('google_books');
-  assert.equal(gbooksDocs.length, 2);
-  console.log('6. Google Books linked with key xxx & catalog pulled');
+  // 6. Test Connection Dropbox
+  const dropboxTest = await connector.testConnection('dropbox', { apiKey: 'xxx' });
+  assert.equal(dropboxTest.success, true);
+  console.log('6a. Dropbox test connection passed:', dropboxTest.message);
 
-  // 7. Link Apple Books
-  const appleLinked = await connector.link('apple_books', { folderPath: 'C:/Users/AppleBooks' });
-  assert.equal(appleLinked.status, 'linked');
-  assert.equal(appleLinked.itemCount, 4);
-  console.log('7. Apple Books linked & catalog scanned');
+  // 6b. Link Dropbox (sample mode with placeholder key 'xxx')
+  const dropboxLinked = await connector.link('dropbox', { apiKey: 'xxx' });
+  assert.equal(dropboxLinked.status, 'linked');
+  assert.equal(dropboxLinked.config.apiKey, 'xxx');
+  const dropboxDocs = await connector.pullCatalog('dropbox');
+  assert.equal(dropboxDocs.length, 2);
+  console.log('6b. Dropbox linked & catalog pulled:', dropboxDocs.length, 'books');
 
-  // 8. Unlink
+  // 7. Unlink Google Drive — Dropbox must remain linked
   await connector.unlink('google_drive');
   const postUnlinkDrive = await connector.getProviderInfo('google_drive');
   assert.equal(postUnlinkDrive.status, 'unlinked');
-  const postUnlinkGBooks = await connector.getProviderInfo('google_books');
-  assert.equal(postUnlinkGBooks.status, 'linked');
-  console.log('8. Unlink Google Drive verified (isolated per provider, non-destructive)');
+  const dropboxStillLinked = await connector.getProviderInfo('dropbox');
+  assert.equal(dropboxStillLinked.status, 'linked');
+  console.log('7. Unlink Google Drive verified (isolated per provider, non-destructive)');
 
-  console.log('\n>>> ALL T8.1 EXTERNAL LIBRARY CONNECTOR TESTS PASSED SUCCESSFULLY! <<<');
+  console.log('\n>>> ALL T8.1 EXTERNAL LIBRARY CONNECTOR REGRESSION TESTS PASSED! <<<');
 }
 
 run().catch((e) => {

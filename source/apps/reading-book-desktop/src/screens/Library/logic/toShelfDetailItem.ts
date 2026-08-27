@@ -21,6 +21,7 @@ export function toShelfDetailItem(
     genres: book.genres,
     pageCount: book.pageCount,
     isFavorite: showStar,
+    sourceProvider: book.sourceProvider,
     ...progress,
   }
 }

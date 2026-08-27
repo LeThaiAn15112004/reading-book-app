@@ -5,7 +5,6 @@ import {
   MemoryExternalLibraryStorage,
   GoogleDriveLibraryAdapter,
   GoogleBooksLibraryAdapter,
-  AppleBooksLibraryAdapter,
 } from '../index.ts';
 
 async function runTests() {
@@ -35,13 +34,12 @@ async function runTests() {
   // 1. Kiểm tra danh sách Providers
   const providers = connector.listProviders();
   console.log('1. Providers:', providers);
-  assert.deepEqual(providers, ['google_drive', 'google_books', 'apple_books']);
+  assert.deepEqual(providers, ['google_drive', 'google_books']);
 
   // 2. Kiểm tra trạng thái ban đầu (unlinked)
   const initialStatus = await connector.getAllProvidersInfo();
   assert.equal(initialStatus.google_drive.status, 'unlinked');
   assert.equal(initialStatus.google_books.status, 'unlinked');
-  assert.equal(initialStatus.apple_books.status, 'unlinked');
   console.log('2. Trạng thái ban đầu: Tất cả unlinked ✓');
 
   // 3. Test Connection
@@ -84,23 +82,14 @@ async function runTests() {
   assert.ok(booksCatalog.length > 0);
   console.log('6. Pull Catalog Google Books:', booksCatalog.length, 'sách ✓');
 
-  // 7. Link Apple Books
-  const linkedApple = await connector.link('apple_books', {
-    folderPath: 'C:/Users/Test/AppleBooks',
-  });
-  assert.equal(linkedApple.status, 'linked');
-  const appleCatalog = await connector.pullCatalog('apple_books');
-  assert.equal(appleCatalog.length, 4);
-  console.log('7. Link & Pull Apple Books thành công ✓');
-
-  // 8. Unlink Google Drive (đảm bảo không ảnh hưởng tới các provider khác)
+  // 7. Unlink Google Drive (đảm bảo không ảnh hưởng tới các provider khác)
   await connector.unlink('google_drive');
   const postUnlinkInfo = await connector.getProviderInfo('google_drive');
   assert.equal(postUnlinkInfo.status, 'unlinked');
 
   const booksStillLinked = await connector.getProviderInfo('google_books');
   assert.equal(booksStillLinked.status, 'linked');
-  console.log('8. Unlink Google Drive thành công, các nguồn khác vẫn an toàn ✓');
+  console.log('7. Unlink Google Drive thành công, các nguồn khác vẫn an toàn ✓');
 
   console.log('\n===> TẤT CẢ CÁC BƯỚC TEST T8.1 ĐỀU ĐẠT CHUẨN THÀNH CÔNG! <===');
 }

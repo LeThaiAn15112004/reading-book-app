@@ -17,7 +17,6 @@ import {
   applyAnnotationHistoryStep,
   blocksSelectionContextMenu,
   createAnnotationHistory,
-  epubJumpCfi,
   findOverlappingHighlight,
   highlightColorFromHex,
   nextReaderOverlayId,
@@ -28,7 +27,6 @@ import {
   resolveCurrentReaderBookmarkLocation,
   readerHighlightToAnnotationInput,
   readerTypewriterToAnnotationInput,
-  epubTypewriterJumpCfi,
   parseTypewriterLocation,
   serializeTypewriterLocation,
   selectionHasHighlight,
@@ -61,10 +59,10 @@ import {
 } from '@reading-book/shared/models'
 import { overlayApi } from '../../../../bridge'
 import {
-  focusAnnotationInDocument,
-  waitForAnnotationLayoutSettle,
-} from '../../../../reader/annotations'
-import type { EpubRendererApi, EpubNavState } from '../../../../reader/renderers/epub'
+  waitForFrames,
+  type EpubRendererApi,
+  type EpubNavState,
+} from '../../../../reader/renderers/epub'
 import { blurReaderSidebarFocus } from '../../../../reader/chrome'
 import type {
   CompanionTool,
@@ -168,6 +166,19 @@ export function useReaderAnnotations({
   }
   clearHighlightHandlesRef.current = clearHighlightHandles
 
+  /** True while teleporting to a bookmark — drives the reader's visual-shield overlay. */
+  const [isJumpingToBookmark, setIsJumpingToBookmark] = useState(false)
+  /**
+   * Bookmark just navigated to, as a "here" fallback while epub.js's continuous
+   * scroller is still settling — in scroll mode, epub.js can go through several
+   * silent/asynchronous scroll adjustments after a CFI jump before its own
+   * geometry-based location catches up, which otherwise left the sidebar's
+   * "here" highlight one click behind. Cleared once a newer jump supersedes it.
+   */
+  const [justJumpedBookmarkId, setJustJumpedBookmarkId] = useState<string | null>(
+    null,
+  )
+  const justJumpedBookmarkTimerRef = useRef<number | null>(null)
   const [bookmarks, setBookmarks] = useState<ReaderBookmark[]>([])
   const [typewriterNotes, setTypewriterNotes] = useState<ReaderTypewriterNote[]>([])
   const typewriterNotesRef = useRef(typewriterNotes)
@@ -208,12 +219,20 @@ export function useReaderAnnotations({
     setNoteModalOpen(false)
     setNoteEditTarget(null)
     setDrawSettings(DEFAULT_DRAW_SETTINGS)
+    if (justJumpedBookmarkTimerRef.current != null) {
+      window.clearTimeout(justJumpedBookmarkTimerRef.current)
+      justJumpedBookmarkTimerRef.current = null
+    }
+    setJustJumpedBookmarkId(null)
   }, [bookId])
 
   useEffect(() => {
     return () => {
       if (handleFlashTimerRef.current != null) {
         window.clearTimeout(handleFlashTimerRef.current)
+      }
+      if (justJumpedBookmarkTimerRef.current != null) {
+        window.clearTimeout(justJumpedBookmarkTimerRef.current)
       }
     }
   }, [])
@@ -283,7 +302,6 @@ export function useReaderAnnotations({
       selection,
       anchor: anchorFromSelectionRect(selection, anchor),
     })
-    setChromeHidden(false)
   }
 
   function closeSelectionMenu() {
@@ -327,7 +345,6 @@ export function useReaderAnnotations({
       })
       setHandleRect(selection.rect)
       setHandleFlash(false)
-      setChromeHidden(false)
       setToast('This passage is already highlighted.')
       return
     }
@@ -564,7 +581,6 @@ export function useReaderAnnotations({
       hasNote: Boolean(options?.note?.trim()),
       rect: selection.rect,
     })
-    setChromeHidden(false)
   }
 
   /**
@@ -604,7 +620,6 @@ export function useReaderAnnotations({
     })
     setHandleRect(mark.rect)
     setHandleFlash(false)
-    setChromeHidden(false)
   }
 
   function changeHighlightColor(highlightId: string, colorHex: string) {
@@ -652,48 +667,17 @@ export function useReaderAnnotations({
     persistDeleteHighlight(highlightId)
   }
 
+  /**
+   * CFI-based jump was removed — epubjs' locationOf can throw/mis-locate on
+   * stored CFIs (see docs/error/jump-to-location.md), so highlights jump by
+   * chapter only, same as jumpToFreehandStroke.
+   */
   async function jumpToHighlight(h: ReaderHighlight) {
-    setChromeHidden(true)
     clearHighlightHandles()
     closeSelectionMenu()
     blurReaderSidebarFocus()
-    const epub = epubApiRef.current
-    epub?.setJumpViewportHidden(true)
-    try {
-      if (h.source === 'epub') {
-        const cfi = epubJumpCfi(h)
-        if (!cfi) {
-          setToast('Could not jump to highlight.')
-          return
-        }
-        await epub?.goToLocation(new CfiLocation(cfi))
-        // Wait for chrome resize so center math uses the final viewport.
-        await waitForAnnotationLayoutSettle(true)
-        const focused = await epub?.focusAnnotation({
-          kind: 'highlight',
-          id: h.id,
-        })
-        if (!focused) {
-          // Location opened; mark may still be painting — one more settle pass.
-          await waitForAnnotationLayoutSettle(false)
-          await epub?.focusAnnotation({
-            kind: 'highlight',
-            id: h.id,
-          })
-        }
-        return
-      }
-      goChapterRef.current(h.chapterIndex)
-      await waitForAnnotationLayoutSettle(true)
-      await focusAnnotationInDocument(document, {
-        kind: 'highlight',
-        id: h.id,
-      })
-    } catch {
-      setToast('Could not jump to highlight.')
-    } finally {
-      epub?.setJumpViewportHidden(false)
-    }
+    setChromeHidden(true)
+    goChapterRef.current(h.chapterIndex)
   }
 
   function copyHighlightText(h: ReaderHighlight) {
@@ -870,6 +854,7 @@ export function useReaderAnnotations({
         id: b.id,
         locationRef: b.locationRef,
         label: b.label,
+        excerpt: b.excerpt,
         createdAt: b.createdAt,
       })
       .then((result) => {
@@ -899,28 +884,45 @@ export function useReaderAnnotations({
   }
 
   async function jumpToBookmark(bookmark: ReaderBookmark) {
-    setChromeHidden(true)
+    // Visual shield up first — hides the display()/reflow gap so the jump reads as instant.
+    setIsJumpingToBookmark(true)
     clearHighlightHandles()
     closeSelectionMenu()
     blurReaderSidebarFocus()
-    const epub = epubApiRef.current
-    epub?.setJumpViewportHidden(true)
+    if (justJumpedBookmarkTimerRef.current != null) {
+      window.clearTimeout(justJumpedBookmarkTimerRef.current)
+      justJumpedBookmarkTimerRef.current = null
+    }
     try {
       const location = readerBookmarkJumpLocation(bookmark)
       if (location instanceof CfiLocation) {
-        await epub?.goToLocation(location)
-        // Bookmarks have no painted mark — settle layout after chrome hide so
-        // epubjs resize does not yank the view back to the section start.
-        await waitForAnnotationLayoutSettle(true)
-        epub?.resize()
+        // "Here" fallback while epub.js is still settling — see declaration comment.
+        setJustJumpedBookmarkId(bookmark.id)
+        await epubApiRef.current?.goToLocation(location)
+        // Hide chrome only after the CFI jump settles — setting it before races
+        // the rendition resize it triggers against epub.js's own scroll-to-CFI
+        // work, which in continuous/scroll mode can leave the jump landing blank.
+        setChromeHidden(true)
+        // display() can resolve a frame or two before epub.js finishes pagination/reflow;
+        // wait it out under the shield instead of revealing a still-settling layout.
+        await waitForFrames(2)
+        // epub.js's continuous scroller can keep readjusting scroll position for a
+        // bit after display() resolves (belated native scroll events it doesn't
+        // suppress) — hold the fallback a little longer, then defer to live geometry.
+        justJumpedBookmarkTimerRef.current = window.setTimeout(() => {
+          justJumpedBookmarkTimerRef.current = null
+          setJustJumpedBookmarkId((current) =>
+            current === bookmark.id ? null : current,
+          )
+        }, 2000)
         return
       }
+      setChromeHidden(true)
       goChapterRef.current(bookmark.chapterIndex)
-      await waitForAnnotationLayoutSettle(true)
     } catch {
-      setToast('Could not jump to bookmark.')
+      setToast("Could not find this bookmark's location in the book.")
     } finally {
-      epub?.setJumpViewportHidden(false)
+      setIsJumpingToBookmark(false)
     }
   }
 
@@ -962,11 +964,13 @@ export function useReaderAnnotations({
       epubNavRef.current?.label?.trim() ||
       chapterTitleRef.current?.trim() ||
       'Bookmark'
+    const excerpt = epubApiRef.current?.getCurrentExcerpt()
     const bookmark: ReaderBookmark = {
       id: nextReaderOverlayId('bm'),
       locationRef: packReaderBookmarkLocation(location, placeIndex),
       chapterIndex: placeIndex,
       label,
+      excerpt,
       createdAt,
     }
     annotationHistoryRef.current.push(
@@ -1233,52 +1237,22 @@ export function useReaderAnnotations({
     persistTypewriterLocation(id, positionData)
   }
 
+  /**
+   * CFI-based jump was removed — epubjs' locationOf can throw/mis-locate on
+   * stored CFIs (see docs/error/jump-to-location.md), so notes jump by
+   * page/chapter only, same as jumpToFreehandStroke.
+   */
   async function jumpToTypewriterNote(note: ReaderTypewriterNote) {
     setChromeHidden(true)
     clearHighlightHandles()
     closeSelectionMenu()
     blurReaderSidebarFocus()
-    const epub = epubApiRef.current
-    epub?.setJumpViewportHidden(true)
-    try {
-      const loc = parseTypewriterLocation(note.positionData)
-      if (note.source === 'epub' || isEpubSurfaceRef.current) {
-        const cfi = epubTypewriterJumpCfi(note)
-        if (cfi) {
-          await epub?.goToLocation(new CfiLocation(cfi))
-        } else if (loc?.anchor === 'page-rect') {
-          goToPageRef.current(loc.page)
-        } else {
-          goChapterRef.current(note.chapterIndex)
-        }
-        await waitForAnnotationLayoutSettle(true)
-        const focused = await epub?.focusAnnotation({
-          kind: 'typewriter',
-          id: note.id,
-        })
-        if (!focused) {
-          await waitForAnnotationLayoutSettle(false)
-          await epub?.focusAnnotation({
-            kind: 'typewriter',
-            id: note.id,
-          })
-        }
-        return
-      }
-      if (loc?.anchor === 'page-rect') {
-        goToPageRef.current(loc.page)
-      } else {
-        goChapterRef.current(note.chapterIndex)
-      }
-      await waitForAnnotationLayoutSettle(true)
-      await focusAnnotationInDocument(document, {
-        kind: 'typewriter',
-        id: note.id,
-      })
-    } catch {
-      setToast('Could not jump to typewriter note.')
-    } finally {
-      epub?.setJumpViewportHidden(false)
+
+    const loc = parseTypewriterLocation(note.positionData)
+    if (loc?.anchor === 'page-rect') {
+      goToPageRef.current(loc.page)
+    } else {
+      goChapterRef.current(note.chapterIndex)
     }
   }
 
@@ -1288,15 +1262,10 @@ export function useReaderAnnotations({
     closeSelectionMenu()
     dismissFreehandEdit()
     blurReaderSidebarFocus()
-    const epub = epubApiRef.current
-    epub?.setJumpViewportHidden(true)
     try {
       goToPageRef.current(readerFreehandPageNumber(stroke))
-      await waitForAnnotationLayoutSettle(true)
     } catch {
       setToast('Could not jump to pencil stroke.')
-    } finally {
-      epub?.setJumpViewportHidden(false)
     }
   }
 
@@ -1848,6 +1817,8 @@ export function useReaderAnnotations({
     setHighlights,
     bookmarks,
     setBookmarks,
+    isJumpingToBookmark,
+    justJumpedBookmarkId,
     typewriterNotes,
     setTypewriterNotes,
     typewriterNotesRef,

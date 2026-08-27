@@ -111,10 +111,11 @@ function rowToSessionRecord(row: SessionRow): SessionRecord {
 interface AnnotationRow {
   id: string
   book_id: string
-  page_number: number
+  page_number: number | null
   type: string
   location_data: string
   content: string | null
+  notes: string | null
   style_properties: string | null
   status: string
   is_checked: number
@@ -123,7 +124,7 @@ interface AnnotationRow {
 }
 
 const ANNOTATION_COLUMNS = `
-  id, book_id, page_number, type, location_data, content,
+  id, book_id, page_number, type, location_data, content, notes,
   style_properties, status, is_checked, created_at, updated_at
 `
 
@@ -135,6 +136,7 @@ function rowToAnnotation(row: AnnotationRow): Annotation {
     pageNumber: row.page_number,
     locationData: row.location_data,
     content: row.content ?? undefined,
+    notes: row.notes,
     style: Annotation.parseStyle(row.style_properties),
     status: Annotation.isStatus(row.status) ? row.status : 'None',
     isChecked: row.is_checked === 1,
@@ -148,11 +150,12 @@ interface BookmarkRow {
   book_id: string
   location_ref: string
   label: string | null
+  excerpt: string | null
   created_at: string
 }
 
 const BOOKMARK_COLUMNS = `
-  id, book_id, location_ref, label, created_at
+  id, book_id, location_ref, label, excerpt, created_at
 `
 
 function rowToBookmark(row: BookmarkRow): Bookmark {
@@ -161,6 +164,7 @@ function rowToBookmark(row: BookmarkRow): Bookmark {
     bookId: row.book_id,
     locationRef: Location.parse(row.location_ref),
     label: row.label ?? undefined,
+    excerpt: row.excerpt ?? undefined,
     createdAt: row.created_at,
   })
 }
@@ -329,10 +333,10 @@ export class SqliteOverlayStore implements OverlayStore {
     this.db
       .prepare(
         `INSERT INTO annotations (
-          id, book_id, page_number, type, location_data, content,
+          id, book_id, page_number, type, location_data, content, notes,
           style_properties, status, is_checked, created_at, updated_at
         ) VALUES (
-          @id, @book_id, @page_number, @type, @location_data, @content,
+          @id, @book_id, @page_number, @type, @location_data, @content, @notes,
           @style_properties, @status, @is_checked, @created_at, @updated_at
         )
         ON CONFLICT(id) DO UPDATE SET
@@ -341,6 +345,7 @@ export class SqliteOverlayStore implements OverlayStore {
           type = excluded.type,
           location_data = excluded.location_data,
           content = excluded.content,
+          notes = excluded.notes,
           style_properties = excluded.style_properties,
           status = excluded.status,
           is_checked = excluded.is_checked,
@@ -353,6 +358,7 @@ export class SqliteOverlayStore implements OverlayStore {
         type: a.type,
         location_data: a.locationData,
         content: a.content ?? null,
+        notes: a.notes,
         style_properties: a.serializedStyle(),
         status: a.status,
         is_checked: a.isChecked ? 1 : 0,
@@ -429,19 +435,21 @@ export class SqliteOverlayStore implements OverlayStore {
     bookId: string
     locationRef: string
     label?: string
+    excerpt?: string
     createdAt: string
   }): Promise<void> {
     this.db
       .prepare(
         `INSERT INTO bookmarks (
-          id, book_id, location_ref, label, created_at
+          id, book_id, location_ref, label, excerpt, created_at
         ) VALUES (
-          @id, @book_id, @location_ref, @label, @created_at
+          @id, @book_id, @location_ref, @label, @excerpt, @created_at
         )
         ON CONFLICT(id) DO UPDATE SET
           book_id = excluded.book_id,
           location_ref = excluded.location_ref,
           label = excluded.label,
+          excerpt = excluded.excerpt,
           created_at = excluded.created_at`,
       )
       .run({
@@ -449,6 +457,7 @@ export class SqliteOverlayStore implements OverlayStore {
         book_id: input.bookId,
         location_ref: input.locationRef,
         label: input.label ?? null,
+        excerpt: input.excerpt ?? null,
         created_at: input.createdAt,
       })
   }
@@ -459,6 +468,7 @@ export class SqliteOverlayStore implements OverlayStore {
       bookId: b.bookId,
       locationRef: b.locationRef.toString(),
       label: b.label,
+      excerpt: b.excerpt,
       createdAt: b.createdAt,
     })
   }

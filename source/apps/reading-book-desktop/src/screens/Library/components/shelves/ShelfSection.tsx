@@ -44,13 +44,22 @@ function ChevronIcon({ className }: { className?: string }) {
 }
 
 export type ShelfSectionProps = {
-  id: ShelfId
+  id: ShelfId | 'favorites'
   title: string
   /** Defaults to 0 — empty data OK for T1.5. */
   fileCount?: number
   /** Horizontal rail cards; omit → empty-section copy. */
   children?: ReactNode
-  onOpen?: (id: ShelfId) => void
+  onOpen?: (id: ShelfId | 'favorites') => void
+  viewMode?: 'grid' | 'list'
+  /** Enables drag-to-reorder via the section's drag handle. */
+  draggable?: boolean
+  isDragging?: boolean
+  isDragOver?: boolean
+  onSectionDragStart?: () => void
+  onSectionDragOver?: () => void
+  onSectionDrop?: () => void
+  onSectionDragEnd?: () => void
 }
 
 /** One SCR-01 shelf: header (= · title · N files · ›) + horizontal rail (empty OK). */
@@ -60,19 +69,54 @@ export function ShelfSection({
   fileCount = 0,
   children,
   onOpen,
+  viewMode = 'grid',
+  draggable = false,
+  isDragging = false,
+  isDragOver = false,
+  onSectionDragStart,
+  onSectionDragOver,
+  onSectionDrop,
+  onSectionDragEnd,
 }: ShelfSectionProps) {
   const titleId = `shelf-${id}`
   const fileLabel = fileCount === 1 ? '1 file' : `${fileCount} files`
   const hasRailContent = children != null
 
   return (
-    <section className="mb-8" data-shelf={id} aria-labelledby={titleId}>
+    <section
+      className={`mb-8 rounded-lg transition-[opacity,outline-color] ${isDragging ? 'opacity-50' : ''} ${
+        isDragOver ? 'outline outline-2 outline-offset-4 outline-lib-accent' : ''
+      }`}
+      data-shelf={id}
+      aria-labelledby={titleId}
+      onDragOver={(event) => {
+        if (!draggable) return
+        event.preventDefault()
+        onSectionDragOver?.()
+      }}
+      onDrop={(event) => {
+        if (!draggable) return
+        event.preventDefault()
+        onSectionDrop?.()
+      }}
+    >
       <div className="mb-3 flex min-h-10 items-center justify-between gap-3">
         <div className="flex min-h-10 min-w-0 items-center gap-2">
-          {/* Drag reorder is deferred (G1 end / G6); handle is chrome-only for T1.5. */}
           <button
             type="button"
-            className="inline-flex size-9 shrink-0 cursor-grab touch-none items-center justify-center rounded-lg border-none bg-transparent text-lib-faint transition-[color,background-color,transform] select-none hover:bg-white/5 hover:text-lib-accent focus-visible:bg-white/5 focus-visible:text-lib-accent focus-visible:outline-none active:scale-110 active:cursor-grabbing active:text-lib-accent"
+            draggable={draggable}
+            onDragStart={(event) => {
+              if (!draggable) return
+              event.dataTransfer.effectAllowed = 'move'
+              onSectionDragStart?.()
+            }}
+            onDragEnd={() => {
+              if (!draggable) return
+              onSectionDragEnd?.()
+            }}
+            className={`inline-flex size-9 shrink-0 items-center justify-center rounded-lg border-none bg-transparent text-lib-faint transition-[color,background-color,transform] select-none hover:bg-white/5 hover:text-lib-accent focus-visible:bg-white/5 focus-visible:text-lib-accent focus-visible:outline-none active:scale-110 active:text-lib-accent ${
+              draggable ? 'cursor-grab touch-none active:cursor-grabbing' : 'cursor-default'
+            }`}
             aria-label={`Drag to reorder ${title} section`}
             title="Drag to reorder"
           >
@@ -103,12 +147,21 @@ export function ShelfSection({
       </div>
 
       {hasRailContent ? (
-        <div
-          className="flex gap-[18px] overflow-x-auto overflow-y-hidden pb-1"
-          role="list"
-        >
-          {children}
-        </div>
+        viewMode === 'list' ? (
+          <ul
+            className="flex w-full list-none flex-col gap-2.5 p-0 m-0"
+            role="list"
+          >
+            {children}
+          </ul>
+        ) : (
+          <div
+            className="flex gap-[18px] overflow-x-auto overflow-y-hidden pb-1"
+            role="list"
+          >
+            {children}
+          </div>
+        )
       ) : (
         <p className="m-0 text-[13px] text-lib-faint">No files in this section.</p>
       )}

@@ -29,9 +29,12 @@ export type LibraryBook = {
   genre?: string
   /** Page or spine-section count when known. */
   pageCount?: number
+  /** Cloud Sources provenance — set only for books downloaded from a linked provider. */
+  sourceProvider?: 'google_drive' | 'dropbox' | 'onedrive'
+  externalId?: string
 }
 
-export type NavFilterId = 'favorites' | 'completed' | 'to-read'
+export type NavFilterId = 'favorites' | 'completed' | 'to-read' | 'reading'
 
 /**
  * Platform book list row (IPC / store DTO). Apps map this into `LibraryBook`.
@@ -56,6 +59,8 @@ export type BookSummaryInput = {
   lastReadLocation?: string
   lastReadAt?: string
   noteCount?: number
+  sourceProvider?: 'google_drive' | 'dropbox' | 'onedrive'
+  externalId?: string
 }
 
 export const NAV_FILTERS: Record<
@@ -75,6 +80,11 @@ export const NAV_FILTERS: Record<
   'to-read': {
     title: 'To read',
     empty: 'Nothing queued yet. Books you have not started appear here.',
+    showStar: false,
+  },
+  reading: {
+    title: 'Recent Books',
+    empty: 'No recent books. Start reading to see them here.',
     showStar: false,
   },
 }
@@ -130,6 +140,8 @@ export function mapBookSummary(dto: BookSummaryInput): LibraryBook {
     genres: genres.length > 0 ? genres : undefined,
     genre,
     pageCount,
+    sourceProvider: dto.sourceProvider,
+    externalId: dto.externalId,
   }
 }
 
@@ -172,6 +184,8 @@ export function filterByNav(
       return books.filter((b) => b.status === 'completed')
     case 'to-read':
       return books.filter((b) => b.status === 'not-started')
+    case 'reading':
+      return books.filter((b) => b.status === 'reading')
   }
 }
 

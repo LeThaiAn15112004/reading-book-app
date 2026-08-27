@@ -2,8 +2,8 @@ import { DocumentFormat, isDocumentFormat } from '../book/document-format.js';
 
 export type ExternalLibraryProvider =
   | 'google_drive'
-  | 'google_books'
-  | 'apple_books';
+  | 'dropbox'
+  | 'onedrive';
 
 export type ExternalLibraryStatus =
   | 'unlinked'
@@ -13,20 +13,22 @@ export type ExternalLibraryStatus =
   | 'disabled';
 
 export interface ExternalLibraryConfig {
-  /** Local folder path when linking to local synced directory or Apple Books. */
+  /** Local folder path when linking to local synced directory. */
   readonly folderPath?: string;
   /** API key placeholder or key ('xxx' if not configured). */
   readonly apiKey?: string;
-  /** OAuth client id loaded from a local Google client_secret JSON file. */
+  /** OAuth client id loaded from a local Google client_secret JSON file or Dropbox App Key or Azure Client ID. */
   readonly oauthClientId?: string;
-  /** OAuth redirect URIs declared by the Google client. */
+  /** OAuth redirect URIs declared by the client. */
   readonly oauthRedirectUris?: readonly string[];
-  /** OAuth scopes requested by Google sync flows. */
+  /** OAuth scopes requested by sync flows. */
   readonly oauthScopes?: readonly string[];
   /** Optional custom search query or bookshelf identifier. */
   readonly query?: string;
   /** Auto sync interval in minutes if configured. */
   readonly autoSyncIntervalMinutes?: number;
+  /** Cloud provider specific cursor for delta sync */
+  readonly syncCursor?: string;
 }
 
 export interface ExternalLibraryInfo {
@@ -63,11 +65,11 @@ export interface LinkLibraryOptions {
   readonly folderPath?: string;
   /** API key or token if provider supports remote fetch (default/placeholder: 'xxx'). */
   readonly apiKey?: string;
-  /** OAuth client id loaded from a local Google client_secret JSON file. */
+  /** OAuth client id / App key. */
   readonly oauthClientId?: string;
-  /** OAuth redirect URIs declared by the Google client. */
+  /** OAuth redirect URIs declared by the client. */
   readonly oauthRedirectUris?: readonly string[];
-  /** OAuth scopes requested by Google sync flows. */
+  /** OAuth scopes requested by sync flows. */
   readonly oauthScopes?: readonly string[];
   /** Optional custom search query or bookshelf identifier. */
   readonly query?: string;
@@ -81,8 +83,8 @@ export interface ConnectionTestResult {
 
 const PROVIDER_NAMES: Record<ExternalLibraryProvider, string> = {
   google_drive: 'Google Drive',
-  google_books: 'Google Books',
-  apple_books: 'Apple Books',
+  dropbox: 'Dropbox',
+  onedrive: 'Microsoft OneDrive',
 };
 
 export function getProviderDisplayName(provider: ExternalLibraryProvider): string {
@@ -108,5 +110,5 @@ export function isSupportedExternalFormat(formatOrExt: string): boolean {
   if (isDocumentFormat(clean)) {
     return true;
   }
-  return ['epub', 'pdf', 'txt', 'md'].includes(clean);
+  return ['epub', 'pdf', 'txt', 'md', 'docx', 'doc', 'mobi', 'azw3', 'fb2', 'cbz'].includes(clean);
 }

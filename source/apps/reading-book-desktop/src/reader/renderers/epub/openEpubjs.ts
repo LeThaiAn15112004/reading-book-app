@@ -13,8 +13,10 @@ import { DomCssOverlay } from '../../overlays/dom-css-overlay'
 import { cfiCodec, tryEncodeCfi, type EpubCfiDecodeResult } from './cfi/cfi-codec'
 import { spineIndexFromCfiPath } from '@reading-book/shared/utils'
 import {
+  collectDescendantTextNodes,
   isTrivialSectionStartCfi,
   installEpubjsStartContainerLogFilter,
+  resolveCfiBoundary,
   withEpubjsStartContainerLogMuted,
   withEpubjsStartContainerLogMutedAsync,
 } from './cfi/cfi-dom-range'
@@ -150,6 +152,10 @@ export interface EpubjsHandle {
   getSectionLabels: () => string[]
   /** Stable CFI location for persist/resume (T4.1). Undefined until relocated. */
   getCurrentLocation: () => CfiLocation | undefined
+  /** Opening text at the current location — bookmark list preview. */
+  getCurrentExcerpt: () => string | undefined
+  /** True when a CFI is within the current viewport/page — bookmark "you are here". */
+  isCfiWithinCurrentView: (cfi: string) => boolean
   /** Jump to a stored CFI location (T4.1 / FR-05 resume). */
   goToLocation: (location: CfiLocation) => Promise<void>
   /** Clear text selection in the last EPUB iframe that reported a selection (T5.1). */
@@ -195,6 +201,23 @@ function getEpubCFIClass():
   return typeof C === 'function'
     ? (C as new (range: Range, cfiBase: string) => { toString(): string })
     : null
+}
+
+type EpubCFIComparator = { compare(a: string, b: string): number }
+
+/** epubjs' `EpubCFI.compare` is a generic utility method — any instance works. */
+function getCfiComparator(): EpubCFIComparator | null {
+  const mod = ePubImport as {
+    EpubCFI?: unknown
+    default?: { EpubCFI?: unknown }
+  }
+  const C = mod.EpubCFI ?? mod.default?.EpubCFI
+  if (typeof C !== 'function') return null
+  try {
+    return new (C as new () => EpubCFIComparator)()
+  } catch {
+    return null
+  }
 }
 
 /** Build highlight/select payload from the iframe's live selection (mouseup path). */
@@ -524,10 +547,14 @@ export function buildEpubNavState(
   const pageCountReady = pagination?.pageCountReady ?? true
   const pageCurrent = pagination?.pageCurrent ?? sectionPage
   const pageTotal = pagination?.pageTotal ?? sectionPageTotal
-  const percentage =
-    typeof pagination?.progress === 'number' && Number.isFinite(pagination.progress)
-      ? Math.min(1, Math.max(0, pagination.progress))
-      : spinePositionFraction(clamped, spineLength, sectionPage, sectionPageTotal)
+  // Always spine/CFI-derived — never the whole-book CSS-column page estimate,
+  // which drifts with font-size/line-height/margins (unlike spine order).
+  const percentage = spinePositionFraction(
+    clamped,
+    spineLength,
+    sectionPage,
+    sectionPageTotal,
+  )
   return {
     spineIndex: clamped,
     spineLength,
@@ -1515,11 +1542,80 @@ export async function openEpubjs(
     activeRendition.on('selected', handleSelected)
   }
 
-  const resizeToHost = () => {
-    const { width, height } = readHostLayoutSize(host)
-    if (width > 0 && height > 0) {
-      activeRendition.resize(width, height)
+  let resizeAnchorToken = 0
+
+  /**
+   * Drop any pending anchor restore. Navigation that lands inside the *same*
+   * section (a page turn, a page-scrub jump, a viewport scroll) is invisible to
+   * the spine guard below, so every nav entry point must disown the anchor
+   * explicitly or a late settle would yank the reader back.
+   */
+  const cancelResizeAnchor = () => {
+    resizeAnchorToken += 1
+  }
+
+  /**
+   * Both flows measure the anchor CFI's offset while the section epub.js just
+   * re-rendered is still reflowing, so the restore it runs from `resize()`
+   * lands at the start of the section instead of the real position: continuous
+   * scrolls to the section top, and paginated resolves `view.locationOf()` to a
+   * zero offset that `moveTo()` floors down to column 0 — page 1 of the spine
+   * section. Wait for that layout to settle, then re-issue the same display:
+   * the section is already mounted, so epub.js takes its "already shown" fast
+   * path and recomputes the offset against the now-stable layout — the same
+   * correction `goToLocation` makes for jumps.
+   */
+  const settleResizeAnchor = async (cfi: string): Promise<void> => {
+    const token = (resizeAnchorToken += 1)
+    const anchorSpine = spineIndexFromCfi(book, cfi, fallbackSpine)
+    await waitForSectionResources(currentSectionDocument(activeRendition))
+    await waitForFrames(2)
+    // A newer resize owns the position now.
+    if (token !== resizeAnchorToken) return
+    // A TOC jump / page nav landed elsewhere while the layout settled — that
+    // is the reader's intent, so never drag them back to the pre-resize spot.
+    if (currentSpineIndex() !== anchorSpine) return
+    try {
+      await displayCfiSafely(book, activeRendition, cfi, fallbackSpine)
+      await waitForFrames(2)
+      if (token !== resizeAnchorToken) return
+      activeRendition.reportLocation()
+    } catch {
+      /* rendition torn down mid-resize */
     }
+  }
+
+  /**
+   * `manager.resize()` clears every view and scrolls the container back to the
+   * top, then restores the reading position from `rendition.location.start.cfi`
+   * — the very field `readRenditionLocation()` exists to work around, because
+   * epub.js does not always keep it populated. When it is empty nothing
+   * restores the scroll and the reader silently lands at the start of the book,
+   * so resolve the anchor CFI here and hand it to epub.js explicitly.
+   */
+  const resizeToHost = (intent: 'preserve' | 'reflow' = 'preserve') => {
+    const { width, height } = readHostLayoutSize(host)
+    if (width <= 0 || height <= 0) return
+
+    // `reflow` is the mid-navigation recovery resize: the caller is about to
+    // move the reader itself, so pinning the pre-resize position would fight
+    // the turn it is trying to unstick.
+    if (intent === 'reflow') {
+      cancelResizeAnchor()
+      activeRendition.resize(width, height)
+      return
+    }
+
+    const anchorCfi = cfiFromLocation(readRenditionLocation())
+    // epub.js accepts a third `epubcfi` restore anchor that its bundled
+    // typings omit.
+    ;(
+      activeRendition as unknown as {
+        resize: (width: number, height: number, epubcfi?: string) => void
+      }
+    ).resize(width, height, anchorCfi || undefined)
+    if (anchorCfi) void settleResizeAnchor(anchorCfi)
+    else cancelResizeAnchor()
   }
 
   const getSpineLength = () => spineLengthOf(book)
@@ -1557,12 +1653,14 @@ export async function openEpubjs(
   const goToSpineIndex = async (index: number) => {
     const n = spineLengthOf(book)
     if (n <= 0) return
+    cancelResizeAnchor()
     const clamped = Math.min(Math.max(Math.round(index), 0), n - 1)
     await activeRendition.display(clamped)
   }
 
   const goToHref = async (href: string) => {
     if (!href) return
+    cancelResizeAnchor()
     await activeRendition.display(href)
   }
 
@@ -1585,6 +1683,7 @@ export async function openEpubjs(
   }
 
   const goToLocationPage = async (page: number) => {
+    cancelResizeAnchor()
     if (pageMode === 'scroll') {
       const spineLength = spineLengthOf(book)
       if (spineLength <= 0) return
@@ -1631,10 +1730,121 @@ export async function openEpubjs(
   const getCurrentLocation = (): CfiLocation | undefined =>
     tryEncodeCfi(readRenditionLocation())
 
+  const EXCERPT_MAX_CHARS = 160
+
+  /**
+   * Opening text at the current reading position, for bookmark previews —
+   * lets duplicate-labelled bookmarks (same chapter) still read as distinct.
+   */
+  const getCurrentExcerpt = (): string | undefined => {
+    const location = getCurrentLocation()
+    if (!location) return undefined
+
+    const contents =
+      (activeRendition as unknown as ThemeableRendition).getContents?.() ?? []
+    const activeContents = Array.isArray(contents) ? contents : [contents]
+    const doc = activeContents[0]?.document
+    if (!doc) return undefined
+
+    const root = doc.body ?? doc.documentElement
+    if (!root) return undefined
+    const nodes = collectDescendantTextNodes(root)
+    if (nodes.length === 0) return undefined
+
+    const boundary = resolveCfiBoundary(doc, location.cfi)
+    const startIndex = boundary ? nodes.indexOf(boundary.node as Text) : 0
+
+    let text = ''
+    for (
+      let i = Math.max(0, startIndex);
+      i < nodes.length && text.length < EXCERPT_MAX_CHARS;
+      i += 1
+    ) {
+      const node = nodes[i]
+      text +=
+        i === startIndex && boundary ? node.data.slice(boundary.offset) : node.data
+    }
+
+    const collapsed = text.replace(/\s+/g, ' ').trim()
+    return collapsed ? collapsed.slice(0, EXCERPT_MAX_CHARS).trim() : undefined
+  }
+
+  /**
+   * True when `cfi` falls within the currently visible range — the on-screen
+   * viewport in scroll mode, or the displayed page in paginated mode.
+   *
+   * Landing on a bookmark (by jump or by natural scrolling) rarely reproduces
+   * its exact stored CFI string byte-for-byte in scroll mode, so "is this
+   * bookmark here" needs range containment against `location.start`/`.end`,
+   * not string equality.
+   */
+  const isCfiWithinCurrentView = (cfi: string): boolean => {
+    const target = cfi.trim()
+    if (!target) return false
+
+    const loc = readRenditionLocation() as
+      | { start?: { cfi?: string }; end?: { cfi?: string } }
+      | undefined
+    const startCfi = loc?.start?.cfi
+    const endCfi = loc?.end?.cfi ?? startCfi
+    if (!startCfi) return false
+    if (startCfi === target || endCfi === target) return true
+
+    const comparator = getCfiComparator()
+    if (!comparator) return false
+    try {
+      return (
+        comparator.compare(startCfi, target) <= 0 &&
+        comparator.compare(target, endCfi ?? startCfi) <= 0
+      )
+    } catch {
+      return false
+    }
+  }
+
   const goToLocation = async (location: CfiLocation): Promise<void> => {
+    cancelResizeAnchor()
     const decoded = cfiCodec.decode(location) as EpubCfiDecodeResult
-    const fallbackSpine = 0
-    await displayCfiSafely(book, activeRendition, decoded.cfi, fallbackSpine)
+    const fallbackSpine = currentSpineIndex()
+    // Suspend overlay repaints for the whole settle sequence below: the
+    // `rendered` events each display() fires would otherwise trigger a
+    // highlight repaint mid-flight, and its DOM-mutating annotations
+    // fallback can wrap the very text this CFI points into — corrupting the
+    // child-node offsets epub.js's own locationOf is about to read for it
+    // (IndexSizeError → falls back to section top). See DomCssOverlay's
+    // `suspended` field comment for the full mechanism.
+    overlayPainter.suspend()
+    // The target section is often already mounted (continuous scroll keeps
+    // neighbors rendered), so a corrupting <mark> from an earlier, unrelated
+    // paint cycle can already be sitting in the DOM before this jump even
+    // starts — suspend() alone can't undo that. Strip all current marks so
+    // epub.js computes the location against clean, unwrapped text; resume()
+    // repaints them once the location has settled.
+    await overlayPainter.clear()
+    try {
+      await displayCfiSafely(book, activeRendition, decoded.cfi, fallbackSpine)
+      // Both managers compute the CFI's on-page offset (view.locationOf / column
+      // math) right after the target section is attached to the DOM — before the
+      // browser has finished reflow (fonts/images/layout) — so the first jump often
+      // lands at the top of the section instead of the real offset. This used to be
+      // corrected for continuous scroll only, but paginated mode hits the same
+      // not-yet-settled-layout race, which is why deep-linking into an annotation
+      // reads as "always jumps to the top of the chapter". A manual second jump
+      // "fixes" it because the section's layout has settled by then; wait for that
+      // settle, then re-issue the same display(): the section is already mounted, so
+      // epub.js takes its "already shown" fast path, recomputes the position against
+      // the now-stable layout — the same effect as the manual second click, for free.
+      await waitForSectionResources(currentSectionDocument(activeRendition))
+      await waitForFrames(2)
+      await displayCfiSafely(book, activeRendition, decoded.cfi, fallbackSpine)
+      await waitForFrames(2)
+      activeRendition.reportLocation()
+    } finally {
+      // Resume after the CFI addressing has settled — the queued repaint (if
+      // any arrived while suspended) now runs against a stable location, so
+      // it can no longer race the computation above.
+      overlayPainter.resume()
+    }
   }
 
   // Keep teardown on abort: this runs after `settled`, so onAbort no longer destroys.
@@ -1726,6 +1936,7 @@ export async function openEpubjs(
   const scrollByViewport = (direction: -1 | 1) => {
     const container = epubScrollContainer(host)
     if (!container) return
+    cancelResizeAnchor()
     // Preserve a small overlap so no line sits exactly on both viewport edges.
     const distance = Math.max(1, Math.floor(container.clientHeight * 0.9))
     container.scrollBy({
@@ -1741,6 +1952,7 @@ export async function openEpubjs(
       return
     }
 
+    cancelResizeAnchor()
     const beforeLocation = currentLocationSignature()
     const beforeSpine = currentSpineIndex()
     await activeRendition.next()
@@ -1750,7 +1962,7 @@ export async function openEpubjs(
     const resourcesReady = await waitForSectionResources(
       currentSectionDocument(activeRendition),
     )
-    resizeToHost()
+    resizeToHost('reflow')
     await waitForFrames(2)
     await activeRendition.next()
     await waitForFrames(2)
@@ -1773,6 +1985,7 @@ export async function openEpubjs(
       return
     }
 
+    cancelResizeAnchor()
     const beforeLocation = currentLocationSignature()
     const beforeSpine = currentSpineIndex()
     await activeRendition.prev()
@@ -1782,7 +1995,7 @@ export async function openEpubjs(
     const resourcesReady = await waitForSectionResources(
       currentSectionDocument(activeRendition),
     )
-    resizeToHost()
+    resizeToHost('reflow')
     await waitForFrames(2)
     await activeRendition.prev()
     await waitForFrames(2)
@@ -1836,6 +2049,8 @@ export async function openEpubjs(
     goToLocationPage,
     getSpineLength,
     getCurrentLocation,
+    getCurrentExcerpt,
+    isCfiWithinCurrentView,
     goToLocation,
     clearSelection: () => {
       try {

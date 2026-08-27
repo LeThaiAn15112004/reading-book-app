@@ -93,15 +93,6 @@ function ensureTypewriterIframeStyles(doc: Document): void {
     [${TYPEWRITER_DRAFT_ATTR}] {
       z-index: 6;
     }
-    @keyframes rb-annotation-jump-flash {
-      0%, 100% { filter: brightness(1); box-shadow: none; }
-      35% { filter: brightness(1.35); box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.85); }
-      55% { filter: brightness(1.15); box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.55); }
-    }
-    .rb-annotation-jump-flash {
-      animation: rb-annotation-jump-flash 0.9s ease-in-out;
-      z-index: 7 !important;
-    }
     .rb-typewriter-edit {
       box-sizing: border-box;
       min-height: 2.25rem;

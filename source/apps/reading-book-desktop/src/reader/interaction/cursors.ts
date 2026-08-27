@@ -163,11 +163,13 @@ html.rb-tool-annotate.rb-drawing-eraser body * {
 }
 
 function ensureSurfaceStyles(doc: Document): void {
+  const parent = doc.head ?? doc.documentElement
+  if (!parent) return // iframe document torn down / not yet ready (e.g. about:blank mid-swap)
   let style = doc.getElementById(SURFACE_STYLE_ID) as HTMLStyleElement | null
   if (!style) {
     style = doc.createElement('style')
     style.id = SURFACE_STYLE_ID
-    ;(doc.head ?? doc.documentElement).appendChild(style)
+    parent.appendChild(style)
   }
   // Rewrite so highlighter URL + rules stay current across HMR / new iframes.
   style.textContent = surfaceStyleCss()

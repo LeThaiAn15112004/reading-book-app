@@ -1,6 +1,32 @@
 import { formatLastReadLine, type LibraryBook } from '@reading-book/shared/models'
 import { BookCover, BookMenuButton, type BookMenuPoint } from '../book'
 
+const PROVIDER_LABEL: Record<'google_drive' | 'dropbox' | 'onedrive', string> = {
+  google_drive: 'Google Drive',
+  dropbox: 'Dropbox',
+  onedrive: 'OneDrive',
+}
+
+function CloudBadgeIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      fill="none"
+      viewBox="0 0 24 24"
+      strokeWidth={2}
+      stroke="currentColor"
+      className={className}
+      aria-hidden
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M2.25 15a4.5 4.5 0 0 0 4.5 4.5H18a3.75 3.75 0 0 0 1.332-7.257 3 3 0 0 0-3.758-3.848 5.25 5.25 0 0 0-10.233 2.33A4.502 4.502 0 0 0 2.25 15Z"
+      />
+    </svg>
+  )
+}
+
 export type ShelfRailCardProps = {
   book: LibraryBook
   onOpen: (bookId: string) => void
@@ -49,8 +75,13 @@ export function ShelfRailCard({ book, onOpen, onBookMenu }: ShelfRailCardProps) 
         </div>
       </button>
       <div className="mt-auto flex min-h-9 items-center justify-between gap-2 px-0.5">
-        <span className="inline-flex rounded bg-lib-chip px-1.5 py-0.5 text-[9px] font-bold tracking-wide text-lib-muted uppercase">
+        <span className="inline-flex items-center gap-1 rounded bg-lib-chip px-1.5 py-0.5 text-[9px] font-bold tracking-wide text-lib-muted uppercase">
           {book.format}
+          {book.sourceProvider ? (
+            <span title={`Synced from ${PROVIDER_LABEL[book.sourceProvider]}`}>
+              <CloudBadgeIcon className="size-2.5" />
+            </span>
+          ) : null}
         </span>
         <BookMenuButton
           title={book.title}

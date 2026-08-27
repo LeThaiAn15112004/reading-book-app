@@ -109,21 +109,6 @@
     }
   }
 
-  /* Jump-to-annotation flash on host ReadingCanvas marks. */
-  @keyframes rb-annotation-jump-flash {
-    0%,
-    100% {
-      filter: brightness(1);
-      outline-color: transparent;
-    }
-    35% {
-      filter: brightness(1.45);
-    }
-    55% {
-      filter: brightness(1.15);
-    }
-  }
-
   /* Reading interaction cursors (Hand / Text Select / Highlight). */
   --cursor-hand-tool: grab;
   --cursor-hand-tool-active: grabbing;
@@ -155,13 +140,6 @@
 
 @utility cursor-pencil-tool {
   cursor: var(--cursor-pencil-tool);
-}
-
-/* Jump-to-annotation flash on host ReadingCanvas marks. */
-.rb-annotation-jump-flash {
-  animation: rb-annotation-jump-flash 0.9s ease-in-out;
-  outline: 2px solid rgba(245, 158, 11, 0.95);
-  outline-offset: 2px;
 }
 
 /* Reader tools chrome height — sync inset for sidebar + reading viewport. */
@@ -649,6 +627,15 @@
 .app-menubar::-webkit-scrollbar-thumb {
   background: rgb(100 116 139 / 0.45);
   border-radius: 999px;
+}
+
+.app-menubar-popover,
+.app-menubar-popover * {
+  -webkit-app-region: no-drag;
+}
+
+.app-menubar-popover {
+  pointer-events: auto;
 }
 
 /* Content headers below the window titlebar (drag chrome only). */

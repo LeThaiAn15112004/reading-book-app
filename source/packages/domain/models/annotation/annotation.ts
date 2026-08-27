@@ -50,11 +50,19 @@ export interface AnnotationProps {
   id: string;
   bookId: string;
   type: AnnotationType;
-  /** 1-based page index; reflowable formats anchor on `locationData` and use 1. */
-  pageNumber: number;
-  /** Opaque per-type location: packed `start|end` Location, CFI, or JSON geometry. */
+  /**
+   * 1-based page index; null when the format has no fixed page (e.g. EPUB anchored
+   * purely via CFI in `locationData`, or before a virtual page has been computed).
+   */
+  pageNumber: number | null;
+  /**
+   * Opaque per-type location: packed `start|end` Location, CFI, or JSON geometry
+   * (e.g. `{"cfiRange": "..."}` for EPUB, a bounding box for PDF).
+   */
   locationData: string;
   content?: string;
+  /** Free-text note the user typed for this annotation, separate from `style.note`. */
+  notes?: string | null;
   style?: AnnotationStyle;
   status?: AnnotationStatus;
   isChecked?: boolean;
@@ -66,9 +74,10 @@ export class Annotation {
   readonly id: string;
   readonly bookId: string;
   type: AnnotationType;
-  pageNumber: number;
+  pageNumber: number | null;
   locationData: string;
   content?: string;
+  notes: string | null;
   style: AnnotationStyle;
   status: AnnotationStatus;
   isChecked: boolean;
@@ -94,6 +103,7 @@ export class Annotation {
     this.pageNumber = Annotation.normalizePageNumber(props.pageNumber);
     this.locationData = props.locationData.trim();
     this.content = props.content?.trim() || undefined;
+    this.notes = props.notes?.trim() || null;
     this.style = Annotation.normalizeStyle(props.style);
     this.status = props.status ?? 'None';
     this.isChecked = props.isChecked ?? false;
@@ -119,8 +129,8 @@ export class Annotation {
     return TEXT_RANGE_TYPES.includes(type);
   }
 
-  static normalizePageNumber(pageNumber: number): number {
-    if (!Number.isFinite(pageNumber)) return 1;
+  static normalizePageNumber(pageNumber: number | null | undefined): number | null {
+    if (pageNumber == null || !Number.isFinite(pageNumber)) return null;
     return Math.max(1, Math.floor(pageNumber));
   }
 
@@ -186,10 +196,15 @@ export class Annotation {
     this.touch(now);
   }
 
+  updateNotes(notes: string | undefined | null, now = new Date().toISOString()): void {
+    this.notes = notes?.trim() || null;
+    this.touch(now);
+  }
+
   /** Reposition / re-anchor; optional page when geometry is page-scoped. */
   updateLocation(
     locationData: string,
-    pageNumber?: number,
+    pageNumber?: number | null,
     now = new Date().toISOString(),
   ): void {
     const next = locationData.trim();

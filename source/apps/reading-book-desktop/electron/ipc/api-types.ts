@@ -50,10 +50,54 @@ export interface BookSummaryDto {
   lastReadLocation?: string
   lastReadAt?: string
   noteCount?: number
+  /** Cloud Sources provenance — set only for books downloaded from a linked provider. */
+  sourceProvider?: CloudProviderDto
+  externalId?: string
 }
 
 export interface OkResult {
   ok: boolean
+}
+
+// ─── Cloud Sources ──────────────────────────────────────────────────────────
+
+export type CloudProviderDto = 'google_drive' | 'dropbox' | 'onedrive'
+
+export interface CloudCatalogEntryDto {
+  externalId: string
+  sourceProvider: CloudProviderDto
+  title: string
+  authorNames?: string[]
+  formatHint?: string
+  localPath?: string
+  downloadUrl?: string
+  previewUrl?: string
+  coverUrl?: string
+  fileSizeBytes?: number
+  publishedDate?: string
+  description?: string
+  mimeType?: string
+}
+
+export interface CloudConnectResult {
+  ok: boolean
+  errorMessage?: string
+}
+
+export interface CloudDownloadResult {
+  ok: boolean
+  bookId: string | null
+  errorCode?: ImportErrorCode
+  errorMessage?: string
+}
+
+/** Streamed byte progress for one in-flight cloud download (main → renderer). */
+export interface CloudDownloadProgressDto {
+  externalId: string
+  sourceProvider: CloudProviderDto
+  receivedBytes: number
+  /** Total size from the provider's Content-Length header, or null when unknown. */
+  totalBytes: number | null
 }
 
 export interface UpdateBookMetadataInput {
@@ -150,11 +194,16 @@ export interface AnnotationDto {
   id: string
   bookId: string
   type: AnnotationTypeDto
-  /** 1-based page; reflowable formats anchor on `locationData` and use 1. */
-  pageNumber: number
-  /** Opaque per-type location: packed `start|end` Location, CFI, or JSON geometry. */
+  /** 1-based page; null when the format has no fixed page (e.g. EPUB anchored by CFI). */
+  pageNumber: number | null
+  /**
+   * Opaque per-type location: packed `start|end` Location, CFI, or JSON geometry
+   * (e.g. `{"cfiRange": "..."}` for EPUB, a bounding box for PDF).
+   */
   locationData: string
   content?: string
+  /** Free-text note the user typed for this annotation, separate from `style.note`. */
+  notes?: string | null
   style: AnnotationStyleDto
   status: AnnotationStatusDto
   isChecked: boolean
@@ -168,6 +217,8 @@ export interface BookmarkDto {
   /** Location.toString() JSON; may include renderer `chapterIndex` extra. */
   locationRef: string
   label?: string
+  /** Opening text captured at the bookmarked location, for list previews. */
+  excerpt?: string
   createdAt: string
 }
 
@@ -177,6 +228,8 @@ export interface SaveBookmarkInput {
   /** Location JSON (optionally with `chapterIndex` for ribbon matching). */
   locationRef: string
   label?: string
+  /** Opening text captured at the bookmarked location, for list previews. */
+  excerpt?: string
   createdAt?: string
 }
 
@@ -238,9 +291,11 @@ export interface SaveAnnotationInput {
   bookId: string
   id?: string
   type: AnnotationTypeDto
-  pageNumber?: number
+  pageNumber?: number | null
   locationData: string
   content?: string
+  /** Free-text note the user typed for this annotation, separate from `style.note`. */
+  notes?: string | null
   style?: AnnotationStyleDto
   status?: AnnotationStatusDto
   isChecked?: boolean
@@ -253,9 +308,11 @@ export interface UpdateAnnotationInput {
   bookId: string
   id: string
   content?: string
+  /** Free-text note the user typed for this annotation, separate from `style.note`. */
+  notes?: string | null
   /** Opaque per-type location (e.g. typewriter `{xPct,yPct}` JSON). */
   locationData?: string
-  pageNumber?: number
+  pageNumber?: number | null
   style?: AnnotationStyleDto
   status?: AnnotationStatusDto
   isChecked?: boolean
@@ -335,5 +392,20 @@ export interface DesktopApi {
     deleteBookmark(input: DeleteBookmarkInput): Promise<OkResult>
     getSessionState(bookId: string): Promise<ReadingSessionStateDto | null>
     saveSessionState(input: SaveReadingSessionStateInput): Promise<OkResult>
+  }
+  cloud: {
+    /** Opens the provider's OAuth consent screen in a popup and stores tokens securely on success. */
+    connect(provider: CloudProviderDto): Promise<CloudConnectResult>
+    /** Revokes and clears the securely stored tokens for a provider. */
+    disconnect(provider: CloudProviderDto): Promise<OkResult>
+    /** A short-lived, auto-refreshed access token for direct provider API calls from the renderer, or null when not connected. */
+    getAccessToken(provider: CloudProviderDto): Promise<string | null>
+    /** Lazily downloads one catalog entry to the local sandbox and imports it like any other book. */
+    downloadAndImport(
+      provider: CloudProviderDto,
+      entry: CloudCatalogEntryDto,
+    ): Promise<CloudDownloadResult>
+    /** Subscribe to byte progress for the in-flight cloud download(s). Returns unsubscribe. */
+    onDownloadProgress(handler: (progress: CloudDownloadProgressDto) => void): () => void
   }
 }

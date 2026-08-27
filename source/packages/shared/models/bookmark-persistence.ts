@@ -42,6 +42,7 @@ export function bookmarkDtoToReaderBookmark(dto: {
   id: string
   locationRef: string
   label?: string
+  excerpt?: string
   createdAt: string
 }): ReaderBookmark | null {
   const locationRef = dto.locationRef?.trim()
@@ -56,6 +57,7 @@ export function bookmarkDtoToReaderBookmark(dto: {
     locationRef,
     chapterIndex: chapterIndexFromBookmarkLocationRef(locationRef),
     label: dto.label?.trim() || 'Bookmark',
+    excerpt: dto.excerpt?.trim() || undefined,
     createdAt: dto.createdAt,
   }
 }

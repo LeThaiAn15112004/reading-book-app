@@ -8,7 +8,7 @@ import type {
 } from '@reading-book/domain';
 
 /**
- * Link an external library provider (Google Drive, Google Books, Apple Books)
+ * Link an external library provider (Google Drive, Google Books)
  * without requiring any user account/identity.
  */
 export async function linkExternalLibrary(

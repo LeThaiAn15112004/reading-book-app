@@ -1,6 +1,7 @@
 import { app, BrowserWindow, Menu, ipcMain } from 'electron'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
+import { OAUTH_CUSTOM_SCHEME } from '@reading-book/config'
 import {
   registerCoverProtocol,
   registerCoverSchemePrivileged,
@@ -9,6 +10,7 @@ import { ensureBooksSandbox } from './files/sandbox'
 import { registerAllIpcHandlers } from './ipc'
 import { installFullscreenShortcuts } from './ipc/app.ipc'
 import { AppChannels } from './ipc/channels'
+import { handleOAuthCallbackUrl } from './ipc/cloud.ipc'
 import { closeDatabase, openDatabase } from './persistence/db'
 import { backfillLibraryMetadataFromFiles } from './persistence/backfill-library-metadata'
 import {
@@ -25,6 +27,29 @@ const FLUSH_BEFORE_CLOSE_TIMEOUT_MS = 2000
 
 // Custom schemes must be registered before app is ready.
 registerCoverSchemePrivileged()
+
+// Claim the readmate-reader:// scheme so the OS routes Cloud Sources OAuth callbacks back to this
+// app (see electron-builder.json5 `protocols` for the packaged-build registration, and
+// ipc/cloud.ipc.ts for how the callback is consumed).
+//
+// In dev (`npm run dev`), process.execPath is the raw electron.exe binary and process.defaultApp
+// is true — registering the scheme without execPath/args points the OS handler at a bare
+// electron.exe with no script path, so OAuth redirects launch a blank Electron instance instead
+// of this app and the pending callback promise just times out. Electron's own docs call this out:
+// https://www.electronjs.org/docs/latest/api/app#appsetasdefaultprotocolclientprotocol-path-args
+if (process.defaultApp) {
+  if (process.argv.length >= 2) {
+    app.setAsDefaultProtocolClient(OAUTH_CUSTOM_SCHEME, process.execPath, [path.resolve(process.argv[1])])
+  }
+} else if (!app.isDefaultProtocolClient(OAUTH_CUSTOM_SCHEME)) {
+  app.setAsDefaultProtocolClient(OAUTH_CUSTOM_SCHEME)
+}
+
+/** Windows/Linux only get a single running instance so second-instance deep links can be forwarded. */
+const gotSingleInstanceLock = app.requestSingleInstanceLock()
+if (!gotSingleInstanceLock) {
+  app.quit()
+}
 
 // The built directory structure
 //
@@ -117,6 +142,20 @@ function installApplicationMenu(): void {
   }
 
   Menu.setApplicationMenu(null)
+}
+
+/** Picks the first `readmate-reader://` URL out of a process argv list (Windows/Linux deep links). */
+function findDeepLinkArg(argv: readonly string[]): string | undefined {
+  return argv.find((arg) => arg.startsWith(`${OAUTH_CUSTOM_SCHEME}://`))
+}
+
+/** Hands a `readmate-reader://` URL to its consumer(s) and brings the app window to the front. */
+function routeDeepLink(url: string): void {
+  handleOAuthCallbackUrl(url)
+
+  if (!win || win.isDestroyed()) return
+  if (win.isMinimized()) win.restore()
+  win.focus()
 }
 
 /** F12 / Ctrl+Shift+I toggle DevTools while running against Vite dev server. */
@@ -235,6 +274,24 @@ app.on('activate', () => {
   }
 })
 
+// macOS delivers readmate-reader:// links here, whether or not the app was already running.
+app.on('open-url', (event, url) => {
+  event.preventDefault()
+  routeDeepLink(url)
+})
+
+// Windows/Linux relaunch a second process for the deep link; requestSingleInstanceLock() above
+// forwards its argv here instead and lets that second process exit.
+app.on('second-instance', (_event, argv) => {
+  const url = findDeepLinkArg(argv)
+  if (url) {
+    routeDeepLink(url)
+  } else if (win && !win.isDestroyed()) {
+    if (win.isMinimized()) win.restore()
+    win.focus()
+  }
+})
+
 // Mark quit intent so deferred window close can re-enter app.quit() (macOS Cmd+Q).
 app.on('before-quit', () => {
   quitAfterFlush = true
@@ -257,4 +314,11 @@ app.whenReady().then(async () => {
   registerCoverProtocol()
   registerAllIpcHandlers()
   createWindow()
+
+  // Cold start via a readmate-reader:// link (Windows/Linux first instance) — Cloud Sources
+  // connect() only starts listening after this, so this is a defensive no-op today, not a live path.
+  const coldStartUrl = findDeepLinkArg(process.argv)
+  if (coldStartUrl) {
+    routeDeepLink(coldStartUrl)
+  }
 })

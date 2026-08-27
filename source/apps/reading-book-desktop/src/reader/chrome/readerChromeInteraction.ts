@@ -8,7 +8,7 @@ const READER_SIDEBAR_FOCUS_ROOT =
   '[data-reader-sidebar-panel], [data-reader-right-sidebar-panel], [aria-label="Sidebar navigation"]'
 
 const STUCK_HOVER_SELECTORS = [
-  '.app-menubar button',
+  '.app-menubar button:not([data-hover-menu-trigger])',
   '[aria-label="Sidebar navigation"] button',
   '[data-reader-sidebar-panel] button',
   '[data-reader-right-sidebar-panel] button',

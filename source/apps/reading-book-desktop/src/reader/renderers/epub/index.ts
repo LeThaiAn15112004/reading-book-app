@@ -1,5 +1,4 @@
 export { EpubRenderer, type EpubRendererApi } from './EpubRenderer'
-export type { AnnotationFocusTarget } from '../../annotations'
 export {
   CfiCodec,
   cfiCodec,
@@ -42,6 +41,7 @@ export {
   applyEpubFontSize,
   buildEpubNavState,
   toArrayBuffer,
+  waitForFrames,
   EPUB_BASE_FONT_PX,
   type EpubFrameSelectionContext,
   type EpubjsHandle,

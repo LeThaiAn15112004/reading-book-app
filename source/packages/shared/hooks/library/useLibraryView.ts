@@ -1,10 +1,16 @@
 import { useEffect, useState } from 'react'
 import type { ShelfId } from '../../models/library-book.js'
 import {
+  CLOUD_STUB_NAV_PROVIDER,
   navIdForView,
+  type LibraryCloudStubNavId,
   type LibraryStubNavId,
   type LibraryView,
 } from './libraryView.js'
+
+function isCloudStubNavId(id: LibraryStubNavId): id is LibraryCloudStubNavId {
+  return id === 'cloud-google-drive' || id === 'cloud-dropbox' || id === 'cloud-onedrive'
+}
 
 export type UseLibraryViewOptions = {
   /** Called for sidebar stubs not yet wired (e.g. tags). */
@@ -37,12 +43,16 @@ export function useLibraryView(options: UseLibraryViewOptions = {}) {
   }
 
   function handleStubNav(id: LibraryStubNavId) {
-    if (id === 'favorites' || id === 'completed' || id === 'to-read') {
+    if (id === 'favorites' || id === 'completed' || id === 'to-read' || id === 'reading') {
       setView({ kind: 'filter', filterId: id })
       return
     }
     if (id === 'collections') {
       setView({ kind: 'collections' })
+      return
+    }
+    if (isCloudStubNavId(id)) {
+      setView({ kind: 'cloud-sources', provider: CLOUD_STUB_NAV_PROVIDER[id] })
       return
     }
     onComingSoon?.()
@@ -51,7 +61,7 @@ export function useLibraryView(options: UseLibraryViewOptions = {}) {
   // SDS SCR-01a: Esc → Library hub (also closes collection detail).
   useEffect(() => {
     if (typeof window === 'undefined') return
-    if (view.kind !== 'shelf' && view.kind !== 'collection') return
+    if (view.kind !== 'shelf' && view.kind !== 'collection' && view.kind !== 'cloud-sources') return
     function onKeyDown(e: KeyboardEvent) {
       if (e.key === 'Escape') {
         e.preventDefault()
