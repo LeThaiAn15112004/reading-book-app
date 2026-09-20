@@ -2,7 +2,9 @@
 
 Dùng file này để đánh dấu tiến độ. Chỉ sang giai đoạn sau khi mục hiện tại đủ (hoặc ghi rõ nợ được chấp nhận).
 
-**Cập nhật tiến độ:** 2026-08-04 — G0–G2 đạt outcome; **G3: T3.0–T3.9 đạt**; **G4: T4.1–T4.10 đạt**; **schema migration 008** (reading session v2) + **009** (highlights v2, bỏ `notes`, thêm `tags`). **G5: T5.0 schema/domain + T5.2 persist highlight + T5.3 DomCssOverlay (EPUB repaint)**. Nợ G1/G2 + [11_Backlog](./11_Backlog_tu_note_san_pham.md) giữ nguyên.
+**Cập nhật tiến độ:** 2026-08-04 — G0–G2 đạt outcome; **G3: T3.0–T3.9 đạt**; **G4: T4.1–T4.10 đạt**; **schema migration 008** (reading session v2) + **009** (highlights v2, bỏ `notes`, thêm `tags`). **G5: T5.0 schema/domain + T5.2 persist highlight + T5.3 EPUB repaint**. Nợ G1/G2 + [11_Backlog](./11_Backlog_tu_note_san_pham.md) giữ nguyên.
+
+**Cập nhật kiến trúc (SDS 1.22, sau G5):** schema highlight/note/bookmark tiếp tục đi `009` → `annotations` (`011`–`017`) → gộp vào **`notes`** (`018` gộp `annotations`+`book_signatures`, `019` gộp thêm `bookmarks`). Bỏ hẳn `OverlayPainter`/`DomCssOverlay`/`InkIframeLayer`/`TypewriterIframeLayer` — EPUB tự vẽ mark qua API annotation của epub.js. Tool **Typewriter** và **Pencil/Shape** (freehand) bị bỏ khỏi kế hoạch gốc — xem [06_Giai_doan_5](./06_Giai_doan_5_Highlight_Note_Bookmark.md) để biết chi tiết & trạng thái cuối.
 
 ---
 
@@ -11,7 +13,7 @@ Dùng file này để đánh dấu tiến độ. Chỉ sang giai đoạn sau khi
 - [x] Desktop `npm run dev` chạy ổn
 - [x] SQLite + migration tạo được (`001`…`005_drop_app_settings`; không bảng `app_settings`)
 - [x] IPC preload hẹp; renderer không đụng FS trực tiếp
-- [x] `packages/domain` / `shared` skeleton: domain models SDS §3 (gồm Collection, BookSignature, Comment) + ports SDS §2.6 (gồm CollectionStore)
+- [x] `packages/domain` / `shared` skeleton: domain models SDS §3 (gồm Collection, BookSignature, Comment tại thời điểm G0 — cả hai đã bị xóa/gộp sau đó: `BookSignature` gộp vào cột `books` ở migration `018`, `Comment` xóa hẳn ở migration `010`) + ports SDS §2.6 (gồm CollectionStore)
 - [x] Feature flag AI / External libraries = off
 - [x] Không UI đăng nhập email/password / OAuth2
 
@@ -62,23 +64,23 @@ Dùng file này để đánh dấu tiến độ. Chỉ sang giai đoạn sau khi
 
 ## G5 — Highlight / Note / Bookmark
 
-- [x] Migration `009` + domain `Highlight` / `Tag` (bỏ bảng `notes`; **không** `app_settings`)
-- [ ] Highlight ≤ 2 thao tác; persist SQLite
-- [x] Ghi chú inline trên highlight (`highlights.note`); không note rỗng
+- [x] Migration `009`→`019` + domain `HighlightRecord`/`BookmarkRecord`/`Tag` — schema cuối là `notes` (JSON `note_json`) + `note_tags`, không còn bảng `highlights`/`annotations`/`bookmarks` riêng; **không** `app_settings`
+- [x] Highlight ≤ 2 thao tác; persist SQLite (drag-to-select với tool Highlight/Underline armed)
+- [x] Ghi chú inline trên highlight (`note_json.note`); không note rỗng
 - [x] Xóa highlight đồng bộ overlay + DB (T5.10)
 - [x] Bookmark + jump
-- [ ] Typewriter Note theo trang (`annotations` schema đã có)
+- [x] ~~Typewriter Note theo trang~~ — bỏ khỏi kế hoạch; thay bằng style kind `textbox` (sticky-note gắn vào selection, không phải ô tự do theo trang) — xem [06](./06_Giai_doan_5_Highlight_Note_Bookmark.md) §2.3
 - [x] Sidebar theo `bookId` (không SCR-04 toàn cục)
-- [x] Vẽ lại overlay khi mở sách (`DomCssOverlay` / T5.3 — EPUB)
+- [x] Vẽ lại mark khi mở sách (EPUB: `rendition.annotations` của epub.js tự tái gắn — không qua `DomCssOverlay`/`OverlayPainter`, đã bỏ port này)
 
 ## G6 — Đa format + App Settings + polish MVP
 
 - [ ] PDF: mở + resume trang (+ overlay tối thiểu)
 - [ ] TXT + Markdown: mở + resume
 - [ ] DOCX + DOC: import + mở + resume (extract/render)
-- [ ] Xóa sách cascade (FR-12) — gồm signatures + annotations
+- [ ] Xóa sách cascade (FR-12) — gồm `notes` (annotation + bookmark) + `note_tags`; chữ ký số là cột trên `books` nên xóa sách tự dọn, không cần cascade bảng con riêng
 - [ ] Collections CRUD + gắn/gỡ sách (FR-14) đủ dùng MVP (hiện stub in-memory)
-- [ ] Digital signature: điền `is_signed` / `book_signatures` khi detect (schema sẵn)
+- [ ] Digital signature: điền `is_signed` / `signer_name` / `signature_status` / `signed_at` trên `books` khi detect (schema sẵn, đã gộp khỏi `book_signatures` ở migration `018`)
 - [ ] SCR-06 App Settings dùng được phần cốt lõi
 - [ ] Manual test FR-01…14 P0
 - [ ] Không AI / linked libraries thật trong build
@@ -129,7 +131,7 @@ Chi tiết theo giai đoạn: [G1 §5](./02_Giai_doan_1_Splash_Library.md) · [G
 | 2026-07-27 | **G1-N7** | Card: thể loại / MB / trang / mô tả ngắn (note.txt) | Schema+UI list kéo sớm; backfill EPUB khi boot; còn PDF pages → G6 |
 | 2026-07-27 | **G1-N8** | UI bìa + bìa default + title (note.txt) | G6 polish |
 | 2026-07-27 | **G2-N1** | Adapter metadata/cover ngoài EPUB = stub | G6 |
-| 2026-07-27 | **G2-N2** | Detect chữ ký → `is_signed` / `book_signatures` | G6 |
+| 2026-07-27 | **G2-N2** | Detect chữ ký → `is_signed` / `signer_name` / `signature_status` (cột `books`, gộp từ `book_signatures` ở migration `018`) | G6 |
 | 2026-07-27 | **G2-N3** | FTS / `book_chunks` chưa fill khi import | G3/G6 |
 | 2026-07-27 | **G2-N4** | Gắn collection lúc import | G6 |
 | 2026-07-27 | **G2-N5** | Form enrich import (title/mô tả/thể loại/bìa tay) — note.txt | G6 polish |
@@ -141,7 +143,7 @@ Chi tiết theo giai đoạn: [G1 §5](./02_Giai_doan_1_Splash_Library.md) · [G
 | 2026-07-27 | **NOTE-R4** | Next trang nhanh (EPUB thật) | G3 / G4 |
 | 2026-07-27 | **NOTE-R5** | Đánh dấu trang (bookmark) persist | G5 |
 | 2026-07-27 | **NOTE-R6** | Search trong sách (find-in-book; Tools + titlebar stub) | G3/G4 · [12](./12_Reader_Tools_Search_Speech_Translate_Typewriter.md) · semantic G7 |
-| 2026-08-05 | **TOOL-TR1** / **TOOL-TW1** | Translate + Typewriter (Tools UI shell; chi tiết sau) | [12](./12_Reader_Tools_Search_Speech_Translate_Typewriter.md) |
+| 2026-08-05 | **TOOL-TR1** / ~~TOOL-TW1~~ | Translate (Tools UI shell; chi tiết sau); ~~Typewriter~~ đã bỏ khỏi kế hoạch, thay bằng style kind `textbox` — xem [06](./06_Giai_doan_5_Highlight_Note_Bookmark.md) §2.3 | [12](./12_Reader_Tools_Search_Speech_Translate_Typewriter.md) |
 | 2026-07-27 | **NOTE-R7** | Note văn bản persist | G5 |
 | 2026-07-27 | **NOTE-R8** | 1 trang căn giữa / 2 trang + khung | G4 |
 | 2026-07-27 | **NOTE-R9** | Chọn kiểu đọc scroll vs lật trang | G4 |
@@ -154,5 +156,5 @@ Chi tiết theo giai đoạn: [G1 §5](./02_Giai_doan_1_Splash_Library.md) · [G
 | 2026-07-27 | — | Check bản quyền / DRM (note.txt) | **Ngoài phạm vi** |
 | 2026-07-22 | G1 / T1.5 | (cũ) Drag reorder — gộp **G1-N5** | G6 |
 | 2026-07-25 | G0 / shared | Use cases `packages/shared/services` skeleton; import ở Electron IPC | Refactor sau |
-| 2026-07-25 | Schema | `annotations` / signatures migrate; UI Reader + detect lúc import còn lại | G5 · G6 |
+| 2026-07-25 | Schema | `annotations` (→ gộp vào `notes`, migration `018`/`019`) / signatures (→ gộp vào cột `books`, migration `018`) migrate; UI Reader + detect lúc import còn lại | G5 · G6 |
 | 2026-07-25 | G0 / G6 | Bỏ `app_settings`; prefs platform store chưa wire | G6 T6.8 |

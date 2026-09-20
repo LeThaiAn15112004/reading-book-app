@@ -1,4 +1,4 @@
-import { DocumentFormat } from '@reading-book/domain'
+import { DocumentFormat } from '@reading-book/book-reader-sdk'
 import fsp from 'node:fs/promises'
 import { readEpubLibraryMetadata } from '../adapters/epub.adapter'
 import { getLibraryStore } from './sqlite-library-store'

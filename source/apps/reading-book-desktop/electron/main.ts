@@ -6,6 +6,7 @@ import {
   registerCoverProtocol,
   registerCoverSchemePrivileged,
 } from './files/cover-protocol'
+import { disposeBookChunkWorkers } from './chunking/book-chunk-service'
 import { ensureBooksSandbox } from './files/sandbox'
 import { registerAllIpcHandlers } from './ipc'
 import { installFullscreenShortcuts } from './ipc/app.ipc'
@@ -243,6 +244,12 @@ function createWindow() {
 
   win.once('ready-to-show', () => {
     win?.show()
+    // Detached DevTools window on every launch while running against the
+    // Vite dev server — F12 / Ctrl+Shift+I (installDevToolsShortcuts below)
+    // still toggles it manually.
+    if (VITE_DEV_SERVER_URL) {
+      win?.webContents.openDevTools({ mode: 'detach' })
+    }
   })
 
   installDevToolsShortcuts(win)
@@ -299,6 +306,7 @@ app.on('before-quit', () => {
 
 // Close DB after flush handshake / window close (not before — T4.2).
 app.on('will-quit', () => {
+  disposeBookChunkWorkers()
   closeDatabase()
 })
 

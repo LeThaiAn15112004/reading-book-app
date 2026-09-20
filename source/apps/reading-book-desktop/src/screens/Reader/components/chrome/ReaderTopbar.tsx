@@ -1,7 +1,7 @@
-import type { AnnotateTool, DrawToolSettings } from '@reading-book/shared/models'
 import { MoreMenu } from './MoreMenu'
 import {
   ToolsStrip,
+  type AnnotationTool,
   type CompanionTool,
   type ModeTool,
 } from './ToolsMenu'
@@ -10,18 +10,22 @@ type ReaderTopbarProps = {
   chromeHidden: boolean
   moreOpen: boolean
   settingsOpen: boolean
-  activeTool: AnnotateTool
-  drawSettings: DrawToolSettings
-  onDrawSettingsChange: (patch: Partial<DrawToolSettings>) => void
+  activeTool: ModeTool | 'highlight' | 'underline' | 'strikethrough'
   onToggleMore: () => void
   onToggleSettings: () => void
   onSelectTool: (tool: ModeTool) => void
   onCompanionTool: (tool: CompanionTool) => void
+  onAnnotationTool: (tool: AnnotationTool) => void
   onOpenSign: () => void
   onShare: () => void
   onFavorites: () => void
   onBookInfo: () => void
   onTrash: () => void
+  searchOpen: boolean
+  searchQuery: string
+  onSearchQueryChange: (query: string) => void
+  onSearchSubmit: () => void
+  onCloseSearch: () => void
 }
 
 const chromeBtn =
@@ -32,17 +36,21 @@ export function ReaderTopbar({
   moreOpen,
   settingsOpen,
   activeTool,
-  drawSettings,
-  onDrawSettingsChange,
   onToggleMore,
   onToggleSettings,
   onSelectTool,
   onCompanionTool,
+  onAnnotationTool,
   onOpenSign,
   onShare,
   onFavorites,
   onBookInfo,
   onTrash,
+  searchOpen,
+  searchQuery,
+  onSearchQueryChange,
+  onSearchSubmit,
+  onCloseSearch,
 }: ReaderTopbarProps) {
   return (
     <header
@@ -57,11 +65,15 @@ export function ReaderTopbar({
     >
       <ToolsStrip
         activeTool={activeTool}
-        drawSettings={drawSettings}
-        onDrawSettingsChange={onDrawSettingsChange}
         onSelectTool={onSelectTool}
         onCompanionTool={onCompanionTool}
+        onAnnotationTool={onAnnotationTool}
         onOpenSign={onOpenSign}
+        searchOpen={searchOpen}
+        searchQuery={searchQuery}
+        onSearchQueryChange={onSearchQueryChange}
+        onSearchSubmit={onSearchSubmit}
+        onCloseSearch={onCloseSearch}
       />
 
       <div className="relative flex shrink-0 items-center gap-1.5 sm:gap-2">

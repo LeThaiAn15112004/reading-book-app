@@ -4,6 +4,10 @@ Tài liệu này mô tả cơ chế "nhảy tới một vị trí" (jump to loca
 nhảy tới highlight/annotation, bookmark, ghi chú typewriter, và việc resume đúng vị trí đọc dở
 khi mở lại sách. Phạm vi chính là EPUB (định dạng duy nhất hiện có cơ chế nhảy chính xác bằng CFI).
 
+> Các lỗi thực tế phát hiện được (màn che chậm ở continuous mode, panel/layout vỡ ở paginated
+> mode) và kế hoạch sửa nằm ở
+> [`docs/note/jump-to-location-bugfix-plan.md`](../note/jump-to-location-bugfix-plan.md).
+
 ## 1. Các điểm gọi "jump" trong app
 
 Tất cả nằm trong

@@ -1,5 +1,5 @@
 import {
-  READER_THEME_COLORS,
+  READER_THEME_PRESETS,
   useGlobalReadingPrefs,
   type FontFamily,
   type FontWeight,
@@ -39,7 +39,7 @@ export function GlobalReadingAppearance() {
               'paper',
             ] as const
           ).map((id) => {
-            const preset = READER_THEME_COLORS[id]
+            const preset = READER_THEME_PRESETS[id]
             return (
             <button
               key={id}
@@ -149,7 +149,7 @@ export function GlobalReadingAppearance() {
 
       <div className="mb-5">
         <div className={sectionTitle}>Page defaults</div>
-        <div className={`${toggleGroup} mb-2`}>
+        <div className={toggleGroup}>
           {(
             [
               ['single', '1 page'],
@@ -161,23 +161,6 @@ export function GlobalReadingAppearance() {
               className={`${toggleItem} ${prefs.layout === id ? toggleActive : toggleIdle}`}
               type="button"
               onClick={() => setPrefs({ layout: id })}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-        <div className={toggleGroup}>
-          {(
-            [
-              ['paginated', 'Page-turn'],
-              ['scroll', 'Continuous'],
-            ] as const
-          ).map(([id, label]) => (
-            <button
-              key={id}
-              className={`${toggleItem} ${prefs.pageMode === id ? toggleActive : toggleIdle}`}
-              type="button"
-              onClick={() => setPrefs({ pageMode: id })}
             >
               {label}
             </button>

@@ -26,7 +26,7 @@ export const FAKE_CHAPTERS: FakeChapter[] = [
       'Balancing feedback works like a room thermostat. When temperature rises past a threshold, cooling turns on and pulls it back down. The loop resists change and steers the system toward a stable target.',
       'Reinforcing feedback does the opposite — it multiplies. Like compound interest or a chain reaction, growth in the stock increases inflow, which grows the stock further. That pattern drives runaway growth or cascading collapse.',
       'Use the location scrubber in the footer to jump between these fake sections. The label shows where you are (section title), not a completion percentage — matching the product rule for last-read location.',
-      'Try Tools for Note, Highlight, Comment, Typewriter, Sign, and eSign. Overlays stay in memory for this shell; SQLite persistence lands in a later phase.',
+      'Use Hand to browse or Select for native text selection.',
     ],
   },
 ]

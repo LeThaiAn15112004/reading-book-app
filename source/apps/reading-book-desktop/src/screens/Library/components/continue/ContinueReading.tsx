@@ -2,7 +2,7 @@ import {
   formatLastReadLine,
   formatRelativeLastRead,
   type LibraryBook,
-} from '@reading-book/shared/models'
+} from '@reading-book/book-reader-sdk'
 import { BookCover, BookMenuButton, type BookMenuPoint } from '../book'
 
 export type ContinueReadingProps = {

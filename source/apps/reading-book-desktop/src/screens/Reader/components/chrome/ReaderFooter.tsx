@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { ZoomLayoutPreset } from '../../logic'
-import type { PageLayout, PageMode } from '@reading-book/shared/models'
+import type { PageLayout, ReadingViewMode } from '@reading-book/book-reader-sdk'
 import { ZoomControl } from './ZoomControl'
 import { FullscreenButton } from './FullscreenButton'
 
@@ -19,41 +19,6 @@ const layoutOptions: Array<{
   { id: 'single', count: 1, label: '1 page' },
   { id: 'dual', count: 2, label: '2 pages' },
 ]
-
-function PageCountIcon({ count }: { count: 1 | 2 }) {
-  return (
-    <span className="flex items-center gap-[2px]" aria-hidden>
-      {Array.from({ length: count }).map((_, index) => (
-        <span
-          key={index}
-          className="h-4 w-[7px] rounded-[2px] border border-current/75 bg-current/10"
-        />
-      ))}
-    </span>
-  )
-}
-
-function ContinuousIcon() {
-  return (
-    <span className="flex flex-col gap-[2px]" aria-hidden>
-      <span className="h-[6px] w-4 rounded-[2px] border border-current/75 bg-current/10" />
-      <span className="h-[6px] w-4 rounded-[2px] border border-current/75 bg-current/10" />
-      <span className="h-[6px] w-4 rounded-[2px] border border-current/75 bg-current/10" />
-    </span>
-  )
-}
-
-function PageTurnIcon() {
-  return (
-    <span
-      className="relative inline-flex h-4 w-4 items-center justify-center"
-      aria-hidden
-    >
-      <span className="absolute h-4 w-3 rounded-[2px] border border-current/75 bg-current/10" />
-      <span className="absolute right-[1px] h-3 w-px bg-current/70" />
-    </span>
-  )
-}
 
 function BookmarkIcon({ filled }: { filled: boolean }) {
   return (
@@ -75,6 +40,53 @@ function BookmarkIcon({ filled }: { filled: boolean }) {
   )
 }
 
+function ViewModeIcon({ mode }: { mode: ReadingViewMode }) {
+  if (mode === 'scroll') {
+    return (
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={1.8}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        className="size-4"
+        aria-hidden
+      >
+        <path d="M12 3v18M8 7l4-4 4 4M8 17l4 4 4-4" />
+      </svg>
+    )
+  }
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.8}
+      className="size-4"
+      aria-hidden
+    >
+      <rect x="4" y="4" width="7" height="16" rx="1" />
+      <rect x="13" y="4" width="7" height="16" rx="1" />
+    </svg>
+  )
+}
+
+function PageCountIcon({ count }: { count: 1 | 2 }) {
+  return (
+    <span className="flex items-center gap-[2px]" aria-hidden>
+      {Array.from({ length: count }).map((_, index) => (
+        <span
+          key={index}
+          className="h-4 w-[7px] rounded-[2px] border border-current/75 bg-current/10"
+        />
+      ))}
+    </span>
+  )
+}
+
 type ReaderFooterProps = {
   pageCurrent: number
   pageTotal: number
@@ -87,9 +99,10 @@ type ReaderFooterProps = {
   onNextPage: () => void
   onGoToPage: (page: number) => void
   layout: PageLayout
-  pageMode: PageMode
   onLayoutChange: (layout: PageLayout) => void
-  onPageModeChange: (pageMode: PageMode) => void
+  /** Paginated (default) vs. continuous vertical scroll within a section. */
+  viewMode?: ReadingViewMode
+  onViewModeChange?: (viewMode: ReadingViewMode) => void
   zoom: number
   onZoomChange: (scale: number) => void
   onZoomStep: (direction: 1 | -1) => void
@@ -98,8 +111,11 @@ type ReaderFooterProps = {
   onToggleFullscreen?: () => void
   /** Immersive fullscreen: slide footer away until bottom-edge reveal. */
   immersiveHidden?: boolean
+  /** True when the reader's current place already has a bookmark (FR-11). */
   bookmarkActive?: boolean
   onToggleBookmark?: () => void
+  /** Background text chunking for search is running long enough to be worth a subtle hint. */
+  searchIndexing?: boolean
 }
 
 export function ReaderFooter({
@@ -112,9 +128,9 @@ export function ReaderFooter({
   onNextPage,
   onGoToPage,
   layout,
-  pageMode,
   onLayoutChange,
-  onPageModeChange,
+  viewMode = 'paginated',
+  onViewModeChange,
   zoom,
   onZoomChange,
   onZoomStep,
@@ -124,6 +140,7 @@ export function ReaderFooter({
   immersiveHidden = false,
   bookmarkActive = false,
   onToggleBookmark,
+  searchIndexing = false,
 }: ReaderFooterProps) {
   const [pageInput, setPageInput] = useState(String(pageCurrent))
 
@@ -152,6 +169,7 @@ export function ReaderFooter({
     onGoToPage(page)
   }
 
+  const isScrollMode = viewMode === 'scroll'
   const atStart = pageCountReady && pageCurrent <= 1
   const atEnd = pageCountReady && pageTotal > 0 && pageCurrent >= pageTotal
   const inputWidthCh = pageCountReady
@@ -197,7 +215,7 @@ export function ReaderFooter({
           type="button"
           className="rounded px-2 py-1 text-sm hover:bg-lib-chip disabled:cursor-not-allowed disabled:opacity-40"
           aria-label="First page"
-          disabled={atStart}
+          disabled={isScrollMode || atStart}
           onClick={() => onGoToPage(1)}
         >
           &lt;&lt;
@@ -211,7 +229,16 @@ export function ReaderFooter({
         >
           &lt;
         </button>
-        {pageCurrent > 0 ? (
+        {isScrollMode ? (
+          // Absolute page numbers have no meaning once CSS-column pagination
+          // measurement is skipped in scroll mode — show book progress instead.
+          <span
+            className="inline-flex items-center gap-1 tabular-nums text-lib-muted"
+            aria-label="Reading progress"
+          >
+            {Math.round(progress * 100)}%
+          </span>
+        ) : pageCurrent > 0 ? (
           <span
             className="inline-flex items-center gap-1"
             aria-busy={!pageCountReady}
@@ -273,7 +300,7 @@ export function ReaderFooter({
           type="button"
           className="rounded px-2 py-1 text-sm hover:bg-lib-chip disabled:cursor-not-allowed disabled:opacity-40"
           aria-label="Last page"
-          disabled={!pageCountReady || atEnd}
+          disabled={isScrollMode || !pageCountReady || atEnd}
           onClick={() => onGoToPage(pageTotal)}
         >
           &gt;&gt;
@@ -317,35 +344,48 @@ export function ReaderFooter({
           ))}
         </span>
 
-        <span className={modeGroupClass} aria-label="Reading flow">
-          <button
-            type="button"
-            className={`${modeButtonClass} ${
-              pageMode === 'scroll' ? modeButtonActiveClass : ''
-            }`}
-            title="Continuous vertical scroll"
-            aria-label="Continuous vertical scroll"
-            aria-pressed={pageMode === 'scroll'}
-            onClick={() => onPageModeChange('scroll')}
-          >
-            <ContinuousIcon />
-          </button>
-          <button
-            type="button"
-            className={`${modeButtonClass} ${
-              pageMode === 'paginated' ? modeButtonActiveClass : ''
-            }`}
-            title="Page-turn"
-            aria-label="Page-turn"
-            aria-pressed={pageMode === 'paginated'}
-            onClick={() => onPageModeChange('paginated')}
-          >
-            <PageTurnIcon />
-          </button>
-        </span>
+        {onViewModeChange ? (
+          <span className={modeGroupClass} aria-label="View mode">
+            <button
+              type="button"
+              className={`${modeButtonClass} ${!isScrollMode ? modeButtonActiveClass : ''}`}
+              title="Lật trang"
+              aria-label="Lật trang"
+              aria-pressed={!isScrollMode}
+              onClick={() => onViewModeChange('paginated')}
+            >
+              <ViewModeIcon mode="paginated" />
+            </button>
+            <button
+              type="button"
+              className={`${modeButtonClass} ${isScrollMode ? modeButtonActiveClass : ''}`}
+              title="Cuộn dọc"
+              aria-label="Cuộn dọc"
+              aria-pressed={isScrollMode}
+              onClick={() => onViewModeChange('scroll')}
+            >
+              <ViewModeIcon mode="scroll" />
+            </button>
+          </span>
+        ) : null}
       </div>
 
       <div className="inline-flex items-center gap-1">
+        {/* Always mounted so it can fade out; never intercepts pointer input or steals focus. */}
+        <span
+          role="status"
+          aria-live="polite"
+          aria-hidden={!searchIndexing}
+          className={`pointer-events-none mr-2 inline-flex items-center gap-1.5 overflow-hidden whitespace-nowrap text-[11px] text-lib-muted transition-all duration-500 ${
+            searchIndexing ? 'max-w-[220px] opacity-70' : 'max-w-0 opacity-0'
+          }`}
+        >
+          <span
+            className="size-3 shrink-0 animate-spin rounded-full border-2 border-current/20 border-t-current"
+            aria-hidden
+          />
+          {searchIndexing ? 'Đang tối ưu hóa tìm kiếm...' : null}
+        </span>
         <ZoomControl
           zoom={zoom}
           onZoomChange={onZoomChange}

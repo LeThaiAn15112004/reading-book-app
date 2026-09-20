@@ -2,7 +2,7 @@ import { SUPPORTED_EXTENSIONS, SUPPORTED_FORMATS } from '@reading-book/config'
 import {
   Book,
   type ImportResult as DomainImportResult,
-} from '@reading-book/domain'
+} from '@reading-book/book-reader-sdk'
 import { BrowserWindow, dialog, ipcMain } from 'electron'
 import { randomUUID } from 'node:crypto'
 import fsp from 'node:fs/promises'

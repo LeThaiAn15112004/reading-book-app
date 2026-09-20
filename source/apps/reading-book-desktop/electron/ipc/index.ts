@@ -1,4 +1,5 @@
 import { registerAppIpc } from './app.ipc'
+import { registerBookIndexIpc } from './book-index.ipc'
 import { registerCloudIpc } from './cloud.ipc'
 import { registerImportIpc } from './import.ipc'
 import { registerLibraryIpc } from './library.ipc'
@@ -11,4 +12,5 @@ export function registerAllIpcHandlers(): void {
   registerImportIpc()
   registerOverlayIpc()
   registerCloudIpc()
+  registerBookIndexIpc()
 }

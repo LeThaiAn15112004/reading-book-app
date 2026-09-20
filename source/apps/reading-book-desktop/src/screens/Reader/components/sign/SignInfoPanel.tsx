@@ -1,4 +1,4 @@
-import type { ReaderSignature } from '@reading-book/shared/models'
+import type { ReaderSignature } from '@reading-book/book-reader-sdk'
 
 type SignInfoPanelProps = {
   open: boolean

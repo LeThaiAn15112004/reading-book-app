@@ -1,4 +1,4 @@
-import { CfiLocation, Location } from '@reading-book/domain'
+import { CfiLocation, Location } from '@reading-book/book-reader-sdk'
 import { toEpubjsDisplayCfi } from '../../../../reader/renderers/epub'
 
 /** Ignore absent, legacy, malformed, or non-EPUB saved locations. */

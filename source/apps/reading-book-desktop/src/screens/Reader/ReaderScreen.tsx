@@ -1,17 +1,10 @@
-import { useMemo, useRef, type CSSProperties } from 'react'
+import { useMemo, useRef, useState, type CSSProperties } from 'react'
 import { useParams } from 'react-router-dom'
-import { CfiLocation } from '@reading-book/domain'
 import {
-  findReaderBookmarksAtLocation,
   fontFamilyCss,
-  isCrosshairAnnotateTool,
-  isReaderBookmarkAtLocation,
-  readerBookmarkJumpLocation,
-  resolveCurrentReaderBookmarkLocation,
-  selectionHasHighlight,
-  type PageMode,
-  type ReaderHighlight,
-} from '@reading-book/shared/models'
+  formatHighlightCitation,
+  type InteractionTool,
+} from '@reading-book/book-reader-sdk'
 import {
   useAppTitle,
   useGlobalReadingPrefs,
@@ -19,47 +12,62 @@ import {
   useOpenReading,
   useReaderChromeMenu,
 } from '../../chrome'
-import { ReaderShell, readerChromeTopInset } from '../../reader'
+import { ReaderShell, readerChromeTopInset, readerChromeBottomInset } from '../../reader'
 import {
   EpubRenderer,
-  type EpubNavState,
   type EpubRendererApi,
 } from '../../reader/renderers/epub'
 import {
   AaSettingsPanel,
   BookInfoDialog,
-  NoteModal,
+  HighlightContextMenu,
+  HighlightEditPopup,
+  NoteFloatingMenu,
+  NoteTextboxPopup,
   ReaderFooter,
   ReaderOpenStatus,
   ReaderTopbar,
   ReaderZoomViewport,
   ImmersiveExitButton,
   ReadingCanvas,
-  HighlightRangeHandles,
-  FreehandEditOverlay,
-  SelectionTooltip,
   SidebarEdgeRail,
   sidebarContentInsetLeft,
-  sidebarContentInsetRight,
   SignInfoPanel,
   TocSidebar,
-  RightSidebarPanel,
   TrashConfirmDialog,
   useSidebarPanelResize,
+  type AnnotationTool,
+  type CompanionTool,
 } from './components'
 import {
   FAKE_CHAPTERS,
   FAKE_SIGNATURES,
-  useReaderAnnotations,
+  useBookIndexing,
+  useReaderBookmarks,
+  useReaderHighlights,
   useReaderBookOpen,
   useReaderChromeUi,
   useReaderNavigation,
   useReaderSessionBridge,
   useImmersiveChromeReveal,
   useReaderZoomControls,
-  type ReaderChromeAnnotationBridge,
+  type HighlightShortcuts,
   type ReaderChromeEscapeUi,
 } from './logic'
+
+const COMPANION_LABELS: Record<CompanionTool, string> = {
+  search: 'Search',
+  speech: 'Speech',
+  translate: 'Translate',
+}
+
+const ANNOTATION_LABELS: Record<AnnotationTool, string> = {
+  highlight: 'Highlight',
+  underline: 'Underline',
+  strikethrough: 'Strikethrough',
+  textarea: 'Textbox',
+  freehand: 'Freehand',
+}
 
 /** SCR-03 — session wiring; layout/chrome live in ReaderShell (T3.2). */
 export function ReaderScreen() {
@@ -67,7 +75,9 @@ export function ReaderScreen() {
   const {
     setDocumentSubtitle,
     readerSearchQuery,
+    setReaderSearchQuery,
     readerSearchRequestId,
+    requestReaderSearch,
   } = useAppTitle()
   const { ensureTab, updateBookTitle } = useOpenReading()
   const { registerReaderChrome } = useReaderChromeMenu()
@@ -79,63 +89,41 @@ export function ReaderScreen() {
   globalPrefsRef.current = globalPrefs
 
   const epubApiRef = useRef<EpubRendererApi | null>(null)
-  const clearHighlightHandlesRef = useRef<() => void>(() => {})
-  const goChapterRef = useRef<(index: number) => void>(() => {})
-  const goToPageRef = useRef<(page: number) => void>(() => {})
-  const epubNavRef = useRef<EpubNavState | null>(null)
-  const chapterTitleRef = useRef('')
-  const bookmarkChapterIndexRef = useRef(0)
-  const isEpubSurfaceRef = useRef(false)
-  const bookFormatRef = useRef<string | null>(null)
-  const pageModeRef = useRef<PageMode>('paginated')
-  const annotationBridgeRef = useRef<ReaderChromeAnnotationBridge>({
-    closeSelectionMenu: () => {},
-    dismissHighlightEditPanel: () => {},
-    leaveAnnotateToolViaEscape: () => {},
-  })
   const escapeUiRef = useRef<ReaderChromeEscapeUi>({
-    highlightEdit: null,
-    selectionMenu: null,
-    activeTool: 'hand',
     isEpubSurface: false,
-    sidebarOpen: false,
-    rightSidebarOpen: false,
+  })
+  const highlightShortcutsRef = useRef<HighlightShortcuts>({
+    undo: () => {},
+    redo: () => {},
+    deleteFocused: () => {},
+    hasFocusedHighlight: () => false,
+    cancelAnnotationTool: () => false,
   })
 
   const chrome = useReaderChromeUi({
     bookId,
     registerReaderChrome,
     epubApiRef,
-    annotationBridgeRef,
     escapeUiRef,
     readerSearchQuery,
     readerSearchRequestId,
     immersive,
   })
   const sidebarResize = useSidebarPanelResize('left')
-  const rightSidebarResize = useSidebarPanelResize('right')
 
-  const annotations = useReaderAnnotations({
-    bookId,
-    isEpubSurfaceRef,
-    bookFormatRef,
-    epubApiRef,
-    epubNavRef,
-    chapterTitleRef,
-    bookmarkChapterIndexRef,
-    closeFloating: chrome.closeFloating,
-    setChromeHidden: chrome.setChromeHidden,
-    setToast: chrome.setToast,
-    goChapterRef,
-    goToPageRef,
-    clearHighlightHandlesRef,
-  })
-
-  annotationBridgeRef.current = {
-    closeSelectionMenu: annotations.closeSelectionMenu,
-    dismissHighlightEditPanel: annotations.dismissHighlightEditPanel,
-    leaveAnnotateToolViaEscape: annotations.leaveAnnotateToolViaEscape,
-  }
+  /**
+   * Toolbar mode — a single value drives both groups of buttons: Hand/Select (navigation) and
+   * Highlight/Underline/Strikethrough (markup). Only one can be "on" at a time, which is also the
+   * correct UX here — dragging on the reading surface can either pan/select or instant-mark,
+   * never both.
+   */
+  const [activeTool, setActiveTool] = useState<InteractionTool>('hand')
+  const activeToolRef = useRef(activeTool)
+  activeToolRef.current = activeTool
+  const activeAnnotationTool =
+    activeTool === 'highlight' || activeTool === 'underline' || activeTool === 'strikethrough'
+      ? activeTool
+      : null
 
   const book = useReaderBookOpen({
     bookId,
@@ -143,13 +131,12 @@ export function ReaderScreen() {
     updateBookTitle,
     setDocumentSubtitle,
     globalPrefsRef,
-    setHighlights: annotations.setHighlights,
-    setBookmarks: annotations.setBookmarks,
-    setTypewriterNotes: annotations.setTypewriterNotes,
-    setFreehandStrokes: annotations.setFreehandStrokes,
-    typewriterNotesRef: annotations.typewriterNotesRef,
-    typewriterDraftRef: annotations.typewriterDraftRef,
-    typewriterContentTimersRef: annotations.typewriterContentTimersRef,
+  })
+
+  // Silent background chunking for search — starts only after the book is already on screen.
+  const searchIndexing = useBookIndexing({
+    bookId,
+    ready: book.contentStatus === 'ready',
   })
 
   const session = useReaderSessionBridge({
@@ -157,7 +144,6 @@ export function ReaderScreen() {
     epubApiRef,
     prefsRef: book.prefsRef,
     prefsDirtyRef: book.prefsDirtyRef,
-    clearHighlightHandlesRef,
     prefs: book.prefs,
     sessionLoadStatus: book.sessionLoadStatus,
   })
@@ -168,25 +154,14 @@ export function ReaderScreen() {
     bookBytes: book.bookBytes,
     bookFormat: book.bookFormat,
     isEpubSurface: book.isEpubSurface,
-    pageMode: book.prefs.pageMode,
     epubApiRef,
     closeFloating: chrome.closeFloating,
-    setSelectionMenu: annotations.setSelectionMenu,
-    clearHighlightHandles: annotations.clearHighlightHandles,
-    annotationShortcutsRef: annotations.annotationShortcutsRef,
-    hasHighlightEdit: () => annotations.highlightEditRef.current != null,
+    highlightShortcutsRef,
   })
-
-  goChapterRef.current = nav.goChapter
-  goToPageRef.current = nav.goToPageFromLayout
-  epubNavRef.current = nav.epubNav
-  isEpubSurfaceRef.current = book.isEpubSurface
-  bookFormatRef.current = book.bookFormat
-  pageModeRef.current = book.prefs.pageMode
 
   const zoom = useReaderZoomControls({
     bookId,
-    activeToolRef: annotations.activeToolRef,
+    activeToolRef,
   })
 
   // Immersive: tools/footer stay hidden unless an edge reveal is active. Left sidebar is disabled in fullscreen.
@@ -199,7 +174,6 @@ export function ReaderScreen() {
     : sidebarContentInsetLeft(chrome.sidebarOpen, sidebarResize.panelWidth)
 
   const chapter = FAKE_CHAPTERS[nav.chapterIndex] ?? FAKE_CHAPTERS[0]
-  chapterTitleRef.current = chapter.title ?? ''
   const chapterLabel = chapter.title
   const pageCurrent = book.isEpubSurface
     ? (nav.epubNav?.pageCurrent ?? 0)
@@ -222,64 +196,52 @@ export function ReaderScreen() {
     ? nav.epubSections
     : FAKE_CHAPTERS.map((c) => c.title)
   const effectiveMargin = book.prefs.marginEnabled ? book.prefs.margin : 'off'
-  /** Chapter key for bookmark ribbon — EPUB spine, else fake chapter index. */
-  const bookmarkChapterIndex = book.isEpubSurface
-    ? (nav.epubNav?.spineIndex ?? 0)
-    : nav.chapterIndex
-  bookmarkChapterIndexRef.current = bookmarkChapterIndex
-  const currentBookmarkLocation = useMemo(
-    () =>
-      resolveCurrentReaderBookmarkLocation({
-        isEpubSurface: book.isEpubSurface,
-        chapterIndex: bookmarkChapterIndex,
-        epubLocation: epubApiRef.current?.getCurrentLocation(),
-      }),
-    [
-      book.isEpubSurface,
-      bookmarkChapterIndex,
-    ],
-  )
-  const isCurrentPlaceBookmarked = currentBookmarkLocation
-    ? isReaderBookmarkAtLocation(
-        annotations.bookmarks,
-        currentBookmarkLocation,
-      )
-    : false
-  /**
-   * "You are here" bookmark for the sidebar list. EPUB uses viewport
-   * containment (not exact CFI equality) so scroll mode — where landing on a
-   * bookmark rarely reproduces its exact stored CFI string — highlights it
-   * the same way paginated mode already does after a jump.
-   *
-   * In continuous/scroll mode, epub.js can keep silently readjusting scroll
-   * position for a bit after a bookmark jump before its own geometry catches
-   * up, so viewport containment briefly reports no match right after the
-   * jump. Fall back to the bookmark just explicitly jumped to until live
-   * geometry resolves (or reports a different bookmark) on its own.
-   */
-  const currentBookmarkId = book.isEpubSurface
-    ? (annotations.bookmarks.find((b) => {
-        const loc = readerBookmarkJumpLocation(b)
-        return (
-          loc instanceof CfiLocation &&
-          (epubApiRef.current?.isCfiWithinCurrentView(loc.cfi) ?? false)
-        )
-      })?.id ?? annotations.justJumpedBookmarkId ?? undefined)
-    : currentBookmarkLocation
-      ? findReaderBookmarksAtLocation(
-          annotations.bookmarks,
-          currentBookmarkLocation,
-        )[0]?.id
-      : undefined
   const isSigned = FAKE_SIGNATURES.length > 0
 
-  escapeUiRef.current = {
-    highlightEdit: annotations.highlightEdit,
-    selectionMenu: annotations.selectionMenu,
-    activeTool: annotations.activeTool,
+  const bookmarks = useReaderBookmarks({
+    bookId,
     isEpubSurface: book.isEpubSurface,
-    sidebarOpen: chrome.sidebarOpen,
-    rightSidebarOpen: chrome.rightSidebarOpen,
+    epubApiRef,
+    epubNav: nav.epubNav ?? null,
+    chapterIndex: nav.chapterIndex,
+    chapterLabel,
+    goChapter: nav.goChapter,
+    setChromeHidden: chrome.setChromeHidden,
+    setToast: chrome.setToast,
+  })
+
+  const highlights = useReaderHighlights({
+    bookId,
+    isEpubSurface: book.isEpubSurface,
+    epubApiRef,
+    epubNav: nav.epubNav ?? null,
+    setToast: chrome.setToast,
+    setChromeHidden: chrome.setChromeHidden,
+    activeAnnotationTool,
+  })
+
+  highlightShortcutsRef.current = {
+    undo: highlights.undo,
+    redo: highlights.redo,
+    deleteFocused: highlights.deleteFocused,
+    hasFocusedHighlight: highlights.hasFocusedHighlight,
+    // Escape while Highlight/Underline/Strikethrough is armed: drop back to Select instead of
+    // leaving the reader (matches Foxit/Adobe — Escape backs a modal tool out one level at a time).
+    cancelAnnotationTool: () => {
+      if (
+        activeToolRef.current !== 'highlight' &&
+        activeToolRef.current !== 'underline' &&
+        activeToolRef.current !== 'strikethrough'
+      ) {
+        return false
+      }
+      setActiveTool('select')
+      return true
+    },
+  }
+
+  escapeUiRef.current = {
+    isEpubSurface: book.isEpubSurface,
   }
 
   const readingStyle = useMemo(
@@ -302,19 +264,21 @@ export function ReaderScreen() {
 
   const themeShell = 'bg-lib-bg-deep text-lib-text [--reader-text:var(--lib-text)]'
 
+  function copyHighlightText(text: string | undefined) {
+    if (!text) return
+    void navigator.clipboard.writeText(text)
+    chrome.setToast('Copied.')
+  }
+
   return (
     <ReaderShell
       themeClassName={themeShell}
       style={readingStyle}
       chromeHidden={toolsHidden}
       contentInsetLeft={contentInsetLeft}
-      contentInsetRight={sidebarContentInsetRight(
-        chrome.rightSidebarOpen,
-        rightSidebarResize.panelWidth,
-      )}
-      contentInsetResizing={
-        sidebarResize.isResizing || rightSidebarResize.isResizing
-      }
+      contentInsetRight={0}
+      contentInsetBottom={readerChromeBottomInset(book.prefs.viewMode, footerImmersiveHidden)}
+      contentInsetResizing={sidebarResize.isResizing}
       dataAttrs={{
         'data-content-status': book.contentStatus,
         'data-content-format': book.bookFormat ?? '',
@@ -332,7 +296,7 @@ export function ReaderScreen() {
               panelWidth={sidebarResize.panelWidth}
               isResizing={sidebarResize.isResizing}
               chromeHidden={toolsHidden}
-              bookmarkActive={isCurrentPlaceBookmarked}
+              bookmarkActive={bookmarks.isCurrentPlaceBookmarked}
               onOpenTab={chrome.openSidebarTab}
               onToggle={chrome.toggleSidebar}
             />
@@ -347,11 +311,7 @@ export function ReaderScreen() {
           chromeHidden={toolsHidden}
           moreOpen={chrome.moreOpen}
           settingsOpen={chrome.settingsOpen}
-          activeTool={annotations.activeTool}
-          drawSettings={annotations.drawSettings}
-          onDrawSettingsChange={(patch) =>
-            annotations.setDrawSettings((prev) => ({ ...prev, ...patch }))
-          }
+          activeTool={activeTool}
           onToggleMore={() => {
             if (toolsHidden) return
             chrome.setSettingsOpen(false)
@@ -362,8 +322,33 @@ export function ReaderScreen() {
             chrome.setMoreOpen(false)
             chrome.setSettingsOpen((v) => !v)
           }}
-          onSelectTool={annotations.selectTool}
-          onCompanionTool={annotations.onCompanionTool}
+          onSelectTool={setActiveTool}
+          onCompanionTool={(tool) => {
+            if (tool === 'search') {
+              chrome.toggleSearch()
+              return
+            }
+            chrome.setToast(`${COMPANION_LABELS[tool]} — coming soon.`)
+          }}
+          searchOpen={chrome.searchOpen}
+          searchQuery={readerSearchQuery}
+          onSearchQueryChange={setReaderSearchQuery}
+          onSearchSubmit={() => {
+            requestReaderSearch()
+          }}
+          onCloseSearch={() => chrome.setSearchOpen(false)}
+          onAnnotationTool={(tool) => {
+            if (tool !== 'highlight' && tool !== 'underline' && tool !== 'strikethrough') {
+              // Textbox / Freehand: no drag-to-select instant-apply story yet (see
+              // `pdfAnnotationTools.ts`) — unchanged "coming soon" stub.
+              chrome.setToast(`${ANNOTATION_LABELS[tool]} — coming soon.`)
+              return
+            }
+            // Click the armed tool again to disarm it (back to Select); otherwise arm it —
+            // sticky across multiple highlights/underlines/strikethroughs until toggled off,
+            // Escape, or Hand/Select.
+            setActiveTool((current) => (current === tool ? 'select' : tool))
+          }}
           onOpenSign={() => {
             chrome.setSignOpen(true)
           }}
@@ -396,14 +381,14 @@ export function ReaderScreen() {
           onNextPage={() => nav.switchPage(true)}
           onGoToPage={nav.goToPage}
           layout={book.prefs.layout}
-          pageMode={book.prefs.pageMode}
           onLayoutChange={(layout) => {
             book.prefsDirtyRef.current = true
             book.setPrefs((p) => ({ ...p, layout }))
           }}
-          onPageModeChange={(pageMode) => {
+          viewMode={book.prefs.viewMode}
+          onViewModeChange={(viewMode) => {
             book.prefsDirtyRef.current = true
-            book.setPrefs((p) => ({ ...p, pageMode }))
+            book.setPrefs((p) => ({ ...p, viewMode }))
           }}
           zoom={zoom.viewZoom}
           onZoomChange={zoom.handleZoomChange}
@@ -412,8 +397,9 @@ export function ReaderScreen() {
           fullscreen={fullscreen}
           onToggleFullscreen={toggleFullscreen}
           immersiveHidden={footerImmersiveHidden}
-          bookmarkActive={isCurrentPlaceBookmarked}
-          onToggleBookmark={annotations.toggleBookmark}
+          bookmarkActive={bookmarks.isCurrentPlaceBookmarked}
+          onToggleBookmark={bookmarks.toggleBookmark}
+          searchIndexing={searchIndexing}
         />
       }
       overlays={
@@ -428,106 +414,33 @@ export function ReaderScreen() {
             onResizePointerDown={sidebarResize.onResizePointerDown}
             chapters={FAKE_CHAPTERS}
             chapterIndex={nav.chapterIndex}
-            currentPlaceBookmarked={isCurrentPlaceBookmarked}
             tocItems={book.isEpubSurface ? nav.epubToc : undefined}
             activeTocHref={book.isEpubSurface ? nav.epubNav?.href : undefined}
-            bookmarks={annotations.bookmarks}
-            currentBookmarkId={currentBookmarkId}
-            highlights={annotations.highlights}
-            typewriterNotes={annotations.typewriterNotes}
-            freehandStrokes={annotations.freehandStrokes}
             onClose={() => chrome.setSidebarOpen(false)}
             onSelectChapter={nav.goChapter}
             onSelectTocItem={nav.handleSelectTocItem}
-            onJumpBookmark={annotations.jumpToBookmark}
-            onDeleteBookmark={annotations.deleteBookmarkById}
-            onAddBookmark={() => {
-              annotations.toggleBookmark()
-              chrome.setSidebarTab('bookmarks')
-            }}
-            onJumpHighlight={annotations.jumpToHighlight}
-            onJumpTypewriterNote={annotations.jumpToTypewriterNote}
-            onJumpPencilStroke={annotations.jumpToFreehandStroke}
-            onToggleAnnotationChecked={annotations.toggleAnnotationChecked}
-            onSetAnnotationStatus={annotations.setAnnotationStatus}
-            onEditHighlightNote={annotations.openHighlightNoteEditor}
-            onEditTypewriterContent={annotations.setTypewriterContent}
-            onEditPencilNote={(stroke) =>
-              annotations.openFreehandNoteEditor(stroke.id)
-            }
-            onDeleteHighlight={(h) => annotations.deleteHighlightById(h.id)}
-            onDeleteTypewriterNote={annotations.deleteTypewriterById}
-            onDeletePencilStroke={annotations.deleteFreehandById}
-            onAnnotationTags={() => {
-              chrome.setToast('Tags — coming soon.')
-            }}
             pageCurrent={sectionCurrent}
             pageTotal={sectionTotal}
             sectionLabels={sectionLabels}
             onGoToPage={nav.goToPageFromLayout}
+            bookmarks={bookmarks.bookmarks}
+            currentBookmarkId={bookmarks.currentBookmarkId}
+            currentPlaceBookmarked={bookmarks.isCurrentPlaceBookmarked}
+            onToggleBookmark={bookmarks.toggleBookmark}
+            onJumpBookmark={(bookmark) => {
+              void bookmarks.jumpToBookmark(bookmark)
+            }}
+            onDeleteBookmark={bookmarks.deleteBookmarkById}
+            highlights={highlights.highlights}
+            onJumpHighlight={(highlight) => {
+              void highlights.jumpToHighlight(highlight)
+            }}
+            onDeleteHighlight={highlights.deleteHighlight}
+            onChangeHighlightColor={highlights.updateHighlightColor}
+            onChangeHighlightNote={(id, note) => highlights.updateHighlightNote(id, note)}
+            onCopyHighlight={(highlight) => copyHighlightText(highlight.selectionText?.highlight)}
+            onAskAiHighlight={() => chrome.setToast('AI Ask — coming soon.')}
           />
-
-          <RightSidebarPanel
-            open={chrome.rightSidebarOpen}
-            panelWidth={rightSidebarResize.panelWidth}
-            isResizing={rightSidebarResize.isResizing}
-            chromeHidden={toolsHidden}
-            onResizePointerDown={rightSidebarResize.onResizePointerDown}
-            title={
-              chrome.rightSidebarKind === 'typewriter'
-                ? 'Typewriter'
-                : chrome.rightSidebarKind === 'freehand'
-                  ? 'Pencil'
-                  : 'Panel'
-            }
-            onClose={chrome.closeRightSidebar}
-          >
-            {/* Feature UIs render into this slot; typewriter details TBD. */}
-            {chrome.rightSidebarKind === 'typewriter' ? (
-              <div className="px-3 py-4 text-[13px] leading-relaxed text-lib-muted">
-                Typewriter side panel — content goes here.
-              </div>
-            ) : null}
-            {chrome.rightSidebarKind === 'freehand' ? (
-              <div className="px-3 py-4 text-[13px] leading-relaxed text-lib-muted">
-                {(() => {
-                  const stroke = annotations.freehandStrokes.find(
-                    (s) => s.id === annotations.freehandEdit?.id,
-                  )
-                  if (!stroke) {
-                    return 'Select a pencil stroke to edit its note here.'
-                  }
-                  return (
-                    <div className="flex flex-col gap-3">
-                      <p className="m-0 text-lib-text-strong">Pencil stroke</p>
-                      <p className="m-0 text-[12px] text-lib-faint">
-                        Color{' '}
-                        <span
-                          className="inline-block size-3 rounded-full align-middle"
-                          style={{ backgroundColor: stroke.colorHex }}
-                        />{' '}
-                        {stroke.colorHex}
-                      </p>
-                      <label className="flex flex-col gap-1.5 text-[12px] text-lib-muted">
-                        Note
-                        <textarea
-                          className="min-h-28 resize-y rounded-md border border-lib-border bg-lib-bg-deep px-2 py-1.5 text-[13px] text-lib-text-strong outline-none"
-                          value={stroke.note ?? ''}
-                          onChange={(e) =>
-                            annotations.updateFreehandNote(
-                              stroke.id,
-                              e.target.value,
-                            )
-                          }
-                          placeholder="Add a note for this stroke…"
-                        />
-                      </label>
-                    </div>
-                  )
-                })()}
-              </div>
-            ) : null}
-          </RightSidebarPanel>
 
           <AaSettingsPanel
             open={chrome.settingsOpen}
@@ -539,87 +452,6 @@ export function ReaderScreen() {
               book.setPrefs((p) => ({ ...p, ...patch }))
             }}
             onThemeChange={(theme) => setGlobalPrefs({ theme })}
-          />
-
-          <SelectionTooltip
-            selection={annotations.pendingSelection}
-            anchor={annotations.selectionMenu?.anchor ?? null}
-            hasExistingHighlight={
-              annotations.pendingSelection
-                ? selectionHasHighlight(
-                    annotations.pendingSelection,
-                    annotations.highlights,
-                  )
-                : false
-            }
-            onHighlight={(hex) => annotations.applyHighlight(hex)}
-            onNote={annotations.openNoteFromSelection}
-            onCopy={annotations.copySelection}
-            onSearch={() => annotations.stubSelectionAction('Search / Lookup')}
-            onAskAi={() =>
-              annotations.stubSelectionAction('Ask AI / Explain')
-            }
-            onShare={() =>
-              annotations.stubSelectionAction('Share / Export Snippet')
-            }
-            onRemoveHighlight={annotations.removeHighlightForSelection}
-            onDismiss={annotations.dismissPendingSelection}
-            editTarget={annotations.highlightEdit}
-            onChangeHighlightColor={annotations.changeHighlightColor}
-            onEditNote={(highlightId) => {
-              const existing = annotations.highlights.find(
-                (h) => h.id === highlightId,
-              )
-              if (existing) annotations.openHighlightNoteEditor(existing)
-            }}
-            onRemoveEditHighlight={(highlightId) => {
-              annotations.deleteHighlightById(highlightId)
-            }}
-            onDismissEdit={annotations.dismissHighlightEditPanel}
-          />
-
-          <FreehandEditOverlay
-            editTarget={annotations.freehandEdit}
-            selectedStroke={
-              annotations.freehandEdit
-                ? (annotations.freehandStrokes.find(
-                    (s) => s.id === annotations.freehandEdit?.id,
-                  ) ?? null)
-                : null
-            }
-            hostRect={annotations.freehandEdit?.hostRect ?? null}
-            onChangeColor={annotations.changeFreehandColor}
-            onEditNote={annotations.openFreehandNoteEditor}
-            onOpenSidebar={() => {
-              chrome.openRightSidebar('freehand')
-            }}
-            onRemove={annotations.deleteFreehandById}
-            onDismiss={annotations.dismissFreehandEdit}
-            onResizePoints={annotations.resizeFreehandStroke}
-            onCommitPoints={annotations.commitFreehandResize}
-          />
-
-          <HighlightRangeHandles
-            rect={
-              chrome.sidebarOpen || !annotations.highlightEdit
-                ? null
-                : annotations.handleRect
-            }
-            flash={annotations.handleFlash}
-          />
-
-          <NoteModal
-            open={annotations.noteModalOpen}
-            quote={
-              annotations.noteEditTarget?.selectedText ??
-              annotations.pendingSelection?.selectedText ??
-              ''
-            }
-            initialContent={annotations.noteEditTarget?.note ?? ''}
-            title={annotations.noteEditTarget ? 'Edit note' : 'Add note'}
-            allowEmpty={!!annotations.noteEditTarget}
-            onClose={annotations.closeNoteModal}
-            onAutosave={annotations.autosaveHighlightNote}
           />
 
           <SignInfoPanel
@@ -657,16 +489,120 @@ export function ReaderScreen() {
             </div>
           ) : null}
 
-          {annotations.isJumpingToBookmark ? (
+          {highlights.selectionMenu ? (
+            <HighlightContextMenu
+              point={highlights.selectionMenu.point}
+              selectedText={highlights.selectionMenu.selection.text}
+              onHighlight={() =>
+                highlights.createHighlight(highlights.lastUsedColorHex, 'highlight')
+              }
+              onUnderline={() =>
+                highlights.createHighlight(highlights.lastUsedColorHex, 'underline')
+              }
+              onStrikethrough={() =>
+                highlights.createHighlight(highlights.lastUsedColorHex, 'strikethrough')
+              }
+              onAddNote={() =>
+                highlights.createHighlight(highlights.lastUsedColorHex, 'textbox')
+              }
+              onBookmarkHere={bookmarks.toggleBookmark}
+              onCopy={() => copyHighlightText(highlights.selectionMenu?.selection.text)}
+              onCopyWithCitation={() => {
+                const menu = highlights.selectionMenu
+                if (!menu) return
+                const citation = formatHighlightCitation({
+                  text: menu.selection.text,
+                  bookTitle: book.bookTitle,
+                  author: book.author,
+                  locationLabel: nav.epubNav?.label,
+                })
+                copyHighlightText(citation)
+              }}
+              onDismiss={highlights.closeSelectionMenu}
+            />
+          ) : null}
+
+          {highlights.activeHighlight?.highlight.styleKind === 'textbox' ? (
+            // A textbox note's entire purpose is its text — its own dedicated popup, regardless
+            // of hand/select mode (unlike highlight/underline/strikethrough below).
+            <NoteTextboxPopup
+              anchorRect={highlights.activeHighlight.rect}
+              highlight={highlights.activeHighlight.highlight}
+              onSave={(note) =>
+                highlights.updateHighlightNote(highlights.activeHighlight!.highlight.id, note)
+              }
+              onDelete={() => highlights.deleteHighlight(highlights.activeHighlight!.highlight.id)}
+              onDismiss={highlights.closeEditPopup}
+            />
+          ) : null}
+
+          {highlights.activeHighlight &&
+          highlights.activeHighlight.highlight.styleKind !== 'textbox' &&
+          activeTool === 'hand' ? (
+            // Hand mode: a click on the highlight's mark in the book gets the exact same floating
+            // toolbar as the "⋯" kebab on its sidebar note card (see NoteFloatingMenu) — same
+            // actions, same look, regardless of where the click came from.
+            <NoteFloatingMenu
+              open
+              anchorRect={highlights.activeHighlight.rect}
+              highlight={highlights.activeHighlight.highlight}
+              onChangeColor={(hex) =>
+                highlights.updateHighlightColor(highlights.activeHighlight!.highlight.id, hex)
+              }
+              onEditNote={(note) =>
+                highlights.updateHighlightNote(highlights.activeHighlight!.highlight.id, note)
+              }
+              onCopy={() =>
+                copyHighlightText(highlights.activeHighlight?.highlight.selectionText?.highlight)
+              }
+              onAskAi={() => chrome.setToast('AI Ask — coming soon.')}
+              onDelete={() => highlights.deleteHighlight(highlights.activeHighlight!.highlight.id)}
+              onDismiss={highlights.closeEditPopup}
+            />
+          ) : null}
+
+          {highlights.activeHighlight &&
+          highlights.activeHighlight.highlight.styleKind !== 'textbox' &&
+          activeTool !== 'hand' ? (
+            <HighlightEditPopup
+              anchorRect={highlights.activeHighlight.rect}
+              highlight={highlights.activeHighlight.highlight}
+              onChangeColor={(hex) =>
+                highlights.updateHighlightColor(highlights.activeHighlight!.highlight.id, hex)
+              }
+              onToggleUnderline={(isUnderline) =>
+                highlights.updateHighlightStyleKind(
+                  highlights.activeHighlight!.highlight.id,
+                  isUnderline ? 'underline' : 'highlight',
+                )
+              }
+              onToggleStrikethrough={(isStrikethrough) =>
+                highlights.updateHighlightStyleKind(
+                  highlights.activeHighlight!.highlight.id,
+                  isStrikethrough ? 'strikethrough' : 'highlight',
+                )
+              }
+              onChangeNote={(note) =>
+                highlights.updateHighlightNote(highlights.activeHighlight!.highlight.id, note)
+              }
+              onChangeTags={(tags) =>
+                highlights.updateHighlightTags(highlights.activeHighlight!.highlight.id, tags)
+              }
+              onCopy={() =>
+                copyHighlightText(highlights.activeHighlight?.highlight.selectionText?.highlight)
+              }
+              onDelete={() => highlights.deleteHighlight(highlights.activeHighlight!.highlight.id)}
+              onClose={highlights.closeEditPopup}
+            />
+          ) : null}
+
+          {chrome.isChromeResizeSettling ? (
             <div
               aria-hidden
               className="pointer-events-none absolute z-[150] bg-lib-bg-deep"
               style={{
                 left: contentInsetLeft,
-                right: sidebarContentInsetRight(
-                  chrome.rightSidebarOpen,
-                  rightSidebarResize.panelWidth,
-                ),
+                right: 0,
                 top: readerChromeTopInset(toolsHidden),
                 bottom: 0,
               }}
@@ -699,7 +635,7 @@ export function ReaderScreen() {
           ref={zoom.zoomViewportRef}
           zoom={zoom.viewZoom}
           onZoomChange={zoom.setViewZoom}
-          focusZoomEnabled={annotations.activeTool === 'hand'}
+          focusZoomEnabled={activeTool === 'hand'}
         >
           {book.bookFormat === 'epub' && book.bookBytes ? (
             <EpubRenderer
@@ -708,7 +644,7 @@ export function ReaderScreen() {
               coverUrl={book.coverUrl}
               theme={globalPrefs.theme}
               layout={book.prefs.layout}
-              pageMode={book.prefs.pageMode}
+              viewMode={book.prefs.viewMode}
               fontSize={book.prefs.fontSize}
               fontFamily={book.prefs.fontFamily}
               fontWeight={book.prefs.fontWeight}
@@ -718,65 +654,21 @@ export function ReaderScreen() {
               marginPreset={book.prefs.margin}
               chromeHidden={immersive || chrome.chromeHidden}
               initialLocation={book.resumeLocation}
-              onCenterTap={chrome.handleCenterTap}
-              onSelectionContextMenu={annotations.openSelectionMenu}
-              onTextSelected={annotations.handleTextSelected}
-              onSelectionDismiss={annotations.handleSelectionDismiss}
-              onHighlightMarkClick={annotations.handleHighlightMarkClick}
-              interactionTool={
-                annotations.activeTool === 'highlight'
-                  ? 'highlight'
-                  : annotations.activeTool === 'typewriter'
-                    ? 'typewriter'
-                    : annotations.activeTool === 'select'
-                      ? 'select'
-                      : isCrosshairAnnotateTool(annotations.activeTool)
-                        ? 'annotate'
-                        : 'hand'
-              }
-              drawingTool={
-                annotations.activeTool === 'pencil'
-                  ? 'pencil'
-                  : annotations.activeTool === 'eraser'
-                    ? 'eraser'
-                    : null
-              }
-              drawSettings={annotations.drawSettings}
-              freehandStrokes={annotations.freehandStrokes}
-              onFreehandStrokeComplete={annotations.handleFreehandStrokeComplete}
-              onFreehandStrokeClick={annotations.handleFreehandStrokeClick}
-              typewriterNotes={annotations.typewriterNotes}
-              typewriterChapterIndex={nav.epubNav?.spineIndex ?? 0}
-              typewriterDraft={annotations.typewriterDraft}
-              onTypewriterPlace={annotations.handleTypewriterPlace}
-              onTypewriterDraftChange={annotations.handleTypewriterDraftChange}
-              onTypewriterDraftStyleChange={
-                annotations.handleTypewriterDraftStyleChange
-              }
-              onTypewriterDraftCommit={annotations.commitTypewriterDraft}
-              onTypewriterDraftCancel={annotations.cancelTypewriterDraft}
-              onTypewriterContentChange={annotations.handleTypewriterContentChange}
-              onTypewriterContentBlur={annotations.flushTypewriterContent}
-              onTypewriterContentFocus={annotations.handleTypewriterContentFocus}
-              onTypewriterContentCancel={annotations.cancelTypewriterContentEdit}
-              onTypewriterStyleChange={annotations.handleTypewriterStyleChange}
-              onTypewriterMove={annotations.moveTypewriter}
-              onTypewriterDelete={annotations.deleteTypewriterById}
-              onTypewriterOpenSidePanel={() =>
-                chrome.toggleRightSidebar('typewriter')
-              }
-              typewriterSidePanelOpen={
-                chrome.rightSidebarOpen &&
-                chrome.rightSidebarKind === 'typewriter'
-              }
+              onCenterTap={() => {
+                chrome.handleCenterTap()
+                highlights.dismissAnnotationUi()
+              }}
+              onSelectionContextMenu={(x, y) => highlights.openSelectionMenuAtPoint(x, y)}
+              onHighlightContextMenu={(info) => highlights.openHighlightContextMenu(info)}
+              onHighlightClick={(info) => highlights.focusHighlightFromClick(info)}
+              onSurfaceClick={() => {
+                highlights.dismissAnnotationUi()
+              }}
+              interactionTool={activeTool}
               onFocusZoomWheel={zoom.handleFocusZoomWheel}
               onHandPanBy={
                 zoom.viewZoom > 1.01 ? zoom.handleHandPanBy : undefined
               }
-              highlights={annotations.highlights.filter(
-                (h): h is Extract<ReaderHighlight, { source: 'epub' }> =>
-                  h.source === 'epub',
-              )}
               apiRef={epubApiRef}
               onNavState={nav.setEpubNav}
               onLocationChange={session.handleEpubLocationChange}
@@ -785,52 +677,16 @@ export function ReaderScreen() {
             />
           ) : (
             <ReadingCanvas
-              chapters={FAKE_CHAPTERS}
               chapter={chapter}
               chapterIndex={nav.chapterIndex}
               margin={effectiveMargin}
               chromeHidden={immersive || chrome.chromeHidden}
-              pageMode={book.prefs.pageMode}
               layout={book.prefs.layout}
-              activeTool={annotations.activeTool}
-              highlights={annotations.highlights}
-              typewriterNotes={annotations.typewriterNotes}
-              eSignStamps={annotations.eSignStamps}
-              freehandStrokes={annotations.freehandStrokes}
-              drawSettings={annotations.drawSettings}
-              onFreehandStrokeComplete={annotations.handleFreehandStrokeComplete}
-              onFreehandStrokeClick={annotations.handleFreehandStrokeClick}
+              interactionTool={activeTool}
               onCanvasBackgroundClick={chrome.handleCenterTap}
-              onSelectionContextMenu={annotations.openSelectionMenu}
-              onTextSelected={annotations.handleTextSelected}
-              onSelectionDismiss={annotations.handleSelectionDismiss}
-              onHighlightClick={(hl, rect, click) =>
-                annotations.handleHighlightMarkClick({
-                  id: hl.id,
-                  cfiRange: '',
-                  colorHex: hl.colorHex,
-                  rect,
-                  click,
-                })
-              }
+              onSelectionDismiss={() => {}}
               onHandPanBy={
                 zoom.viewZoom > 1.01 ? zoom.handleHandPanBy : undefined
-              }
-              onPlaceTypewriter={annotations.placeTypewriter}
-              onPlaceESign={annotations.placeESign}
-              onTypewriterChange={annotations.handleTypewriterContentChange}
-              onTypewriterBlur={annotations.flushTypewriterContent}
-              onTypewriterFocus={annotations.handleTypewriterContentFocus}
-              onTypewriterContentCancel={annotations.cancelTypewriterContentEdit}
-              onTypewriterStyleChange={annotations.handleTypewriterStyleChange}
-              onTypewriterMove={annotations.moveTypewriter}
-              onTypewriterDelete={annotations.deleteTypewriterById}
-              onTypewriterOpenSidePanel={() =>
-                chrome.toggleRightSidebar('typewriter')
-              }
-              typewriterSidePanelOpen={
-                chrome.rightSidebarOpen &&
-                chrome.rightSidebarKind === 'typewriter'
               }
             />
           )}

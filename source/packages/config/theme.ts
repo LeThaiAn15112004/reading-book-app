@@ -1,4 +1,4 @@
-import { AppTheme } from '@reading-book/domain';
+import { AppTheme } from '@reading-book/book-reader-sdk';
 
 export type ThemeTokenName = '--bg' | '--text' | '--accent';
 export type ThemeTokens = Readonly<Record<ThemeTokenName, string>>;

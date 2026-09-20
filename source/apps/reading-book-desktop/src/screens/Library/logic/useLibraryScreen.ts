@@ -6,7 +6,7 @@ import {
   useLibraryBooks,
   useLibraryImport,
   useLibraryView,
-} from '@reading-book/shared/hooks/library'
+} from '../../../hooks/library/index.js'
 import {
   NAV_FILTERS,
   filterByNav,
@@ -15,7 +15,7 @@ import {
   pickContinueReading,
   type LibraryBook,
   type NavFilterId,
-} from '@reading-book/shared/models'
+} from '@reading-book/book-reader-sdk'
 import { importApi, libraryApi } from '../../../bridge'
 import { useAppNav, useOpenReading, type AppStubNavId } from '../../../chrome'
 import type { BootLocationState } from '../../boot'

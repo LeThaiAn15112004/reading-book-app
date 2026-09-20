@@ -1,7 +1,7 @@
 import {
   toAppThemeAttr,
   type ReaderTheme,
-} from '@reading-book/shared/models'
+} from '@reading-book/book-reader-sdk'
 import { appApi } from '../bridge/app'
 
 /** App chrome theme ids (Night / Sepia / Paper). */

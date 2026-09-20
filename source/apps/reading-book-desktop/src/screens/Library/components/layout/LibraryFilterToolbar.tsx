@@ -1,4 +1,4 @@
-import type { NavFilterId } from '@reading-book/shared/models'
+import type { NavFilterId } from '@reading-book/book-reader-sdk'
 
 export type LibraryFilterId = 'all' | NavFilterId
 export type LibraryViewMode = 'grid' | 'list'

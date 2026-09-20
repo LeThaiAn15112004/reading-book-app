@@ -66,7 +66,7 @@ Khác với [`docs/plan/`](../plan/) (tầm nhìn sản phẩm, map research →
 | **G4** Tiến độ & Settings | **T4.1–T4.9** | CFI codec; debounce/flush; session repo + IPC (`overlay:get/saveSessionState`); resume CFI; SCR-05 per-book + app-default fallback; preset theme BR-05 global; location map scrubber + label không %; tiếp T4.10 Library / Continue Reading |
 | G5…G8 | Chưa | Theo thứ tự checklist |
 
-**Schema (SDS 1.21):** `description` / `page_count` trên `books`; `genres` + `book_genres` (n–n); `is_signed`, `book_signatures`, `annotations`; **không** `app_settings`. Migrations `001`–`011`. **`008`**: `reading_session_states` v2. **`011`**: gộp highlight, typewriter thành bảng `annotations`.
+**Schema (SDS 1.22):** `description` / `page_count` trên `books`; `genres` + `book_genres` (n–n); `is_signed`/`signer_name`/`signature_status` (cột `books`); `notes` (bảng chung highlight/underline/strikethrough/textbox + bookmark, JSON `note_json`); **không** `app_settings`. Migrations `001`–`019`. **`008`**: `reading_session_states` v2. **`011`→`017`**: gộp highlight, typewriter thành bảng `annotations` (giai đoạn trung gian, đã bỏ). **`018`**: gộp `annotations` + `book_signatures` vào `notes`/`books`. **`019`**: gộp thêm `bookmarks` vào `notes`.
 
 **Chi tiết tick + bảng nợ:** [10_Checklist_nghiem_thu.md](./10_Checklist_nghiem_thu.md)  
 **Map note sản phẩm → giai đoạn:** [11_Backlog_tu_note_san_pham.md](./11_Backlog_tu_note_san_pham.md)

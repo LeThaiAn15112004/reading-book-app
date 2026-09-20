@@ -2,7 +2,7 @@ import { type ReactNode, useMemo } from 'react'
 import {
   DEFAULT_GLOBAL_READING_PREFS,
   GLOBAL_READING_PREFS_STORAGE_KEY,
-  READER_THEME_COLORS,
+  READER_THEME_PRESETS,
   fontFamilyCss,
   parseGlobalReadingPrefsJson,
   type FontFamily,
@@ -10,12 +10,12 @@ import {
   type GlobalReadingPrefs,
   type ReaderTheme,
   type TextAlign,
-} from '@reading-book/shared/models'
+} from '@reading-book/book-reader-sdk'
 import {
   GlobalReadingPrefsProvider as SharedGlobalReadingPrefsProvider,
   useGlobalReadingPrefs,
   type GlobalReadingPrefsStorage,
-} from '@reading-book/shared/hooks/app'
+} from '../hooks/app/index.js'
 import { applyTheme } from '../theme/applyTheme'
 
 export type {
@@ -27,7 +27,7 @@ export type {
 }
 export {
   DEFAULT_GLOBAL_READING_PREFS,
-  READER_THEME_COLORS,
+  READER_THEME_PRESETS,
   fontFamilyCss,
   useGlobalReadingPrefs,
 }

@@ -32,7 +32,7 @@ export {
   useGlobalReadingPrefs,
   fontFamilyCss,
   DEFAULT_GLOBAL_READING_PREFS,
-  READER_THEME_COLORS,
+  READER_THEME_PRESETS,
 } from './GlobalReadingPrefsContext'
 export type {
   GlobalReadingPrefs,

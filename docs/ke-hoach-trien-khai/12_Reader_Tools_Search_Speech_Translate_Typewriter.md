@@ -17,7 +17,7 @@ Thanh Tools Reader dùng layout **icon trên / nhãn dưới** (tiết kiệm ch
 | **Search** | Find-in-book | Nút + toast stub |
 | **Speech** | Text-to-speech | Nút + toast stub |
 | **Translate** | Dịch đoạn / trang | Nút + toast stub |
-| **Typewriter** | Gõ chữ đè lên trang (fake canvas đã có) | Nút kích hoạt tool; persist / EPUB thật → sau |
+| ~~Typewriter~~ | ~~Gõ chữ đè lên trang~~ | **Đã bỏ khỏi kế hoạch** (xem §5) — thay bằng style kind `textbox` trong hệ highlight |
 | Sign | Panel chữ ký | Đã có shell |
 
 **Không** coi các tool companion là DoD của G3–G5 hiện tại — chỉ chừa chỗ UX + kế hoạch.
@@ -111,42 +111,17 @@ Thanh Tools Reader dùng layout **icon trên / nhãn dưới** (tiết kiệm ch
 
 ---
 
-## 5. Typewriter
+## 5. Typewriter — ĐÃ BỎ KHỎI KẾ HOẠCH
 
-**ID nợ:** **TOOL-TW1**  
-**Giai đoạn đề xuất:** polish sau **G5** (overlay) / **G6** (đa format)
+**ID nợ:** ~~TOOL-TW1~~ — đóng, không phải nợ nữa.
 
-### Outcome mong muốn
-
-1. Tool Typewriter trên thanh Tools → click trang → nhập text đè lên bề mặt đọc.
-2. Lưu overlay SQLite (không ghi file gốc) — cùng tinh thần highlight/note.
-3. Sửa / xóa / kéo vị trí (desktop).
-4. EPUB thật: neo theo location ổn định (không chỉ % fake canvas).
-
-### Việc cần làm (sau)
-
-| Task | Chi tiết |
-| :--- | :--- |
-| **W1** | Model + migration overlay `annotations` (đã có migration 011) |
-| **W2** | Persist IPC; repaint khi đổi trang / resume |
-| **W3** | EPUB: toạ độ / CFI neo; PDF: page + point |
-| **W4** | UX edit inline; z-index không chặn Select/Highlight |
-
-### Hiện có
-
-- `ReaderTypewriterNote` + persist `annotations` `type=textbox` (T5.6a–d)
-- Fake canvas + EPUB host overlay: đặt / sửa / xóa / kéo vị trí; click textbox cũ → edit
-- EPUB: `location_data` v2 `cfi-offset` (CFI + pixel offset); sidebar jump qua CFI
-- PDF: contract `page-rect` (`serializeTypewriterPageRect`); chặn đặt mới đến G6 T6.2
-- Nút Tools kích hoạt tool (toggle về Hand)
-
-### Nghiệm thu (khi làm)
-
-- [ ] Đặt typewriter → đóng sách → mở lại còn đúng chỗ (EPUB: CFI+offset; fake: `%`)
-- [ ] Tool Typewriter → click textbox cũ → edit (không tạo mới); kéo vị trí persist + nâng cấp legacy `%` → CFI; xóa + undo
-- [ ] EPUB: đổi font/margin → textbox vẫn neo đúng; sidebar jump qua CFI
-- [ ] File gốc không bị sửa
-- [ ] Hand / Select / Highlight vẫn dùng được khi không ở mode Typewriter
+> Toàn bộ mục §5 gốc (bên dưới) mô tả Typewriter như một **ô văn bản tự do kéo-thả** riêng biệt với highlight, kể cả một mục "Hiện có" từng liệt kê `ReaderTypewriterNote`, "Fake canvas + EPUB host overlay", contract `page-rect` (`serializeTypewriterPageRect`)… — **không còn đúng**: toàn bộ thư mục `src/reader/typewriter/` (`TypewriterRichEditor.tsx`, `TypewriterFormatToolbar.tsx`, `typewriterBoxDrag.ts`, `typewriterHitTest.ts`, `typewriterFocusSession.ts`, `typewriterSelection.ts`, `typewriterToolbarPortal.ts`) cùng `typewriter-cfi-anchor.ts` đã bị **xóa khỏi codebase**. Bảng `annotations`/`notes` vẫn giữ giá trị `type` liên quan (`textbox`) nhưng với ngữ nghĩa khác hẳn kế hoạch gốc:
+>
+> - `textbox` bây giờ là một **`HighlightStyleKind`** — cùng họ với `highlight`/`underline`/`strikethrough` — áp lên một **selection có sẵn** trong text (giống mọi highlight khác), không phải một ô đặt tự do tại toạ độ bất kỳ trên trang.
+> - Không kéo-thả vị trí; không rich-text toolbar; không z-index riêng để tránh chặn Select/Highlight — vì nó dùng chung pipeline click/right-click/resize với highlight (`useReaderHighlights.ts`, `HighlightContextMenu.tsx`, `NoteTextboxPopup.tsx`).
+> - Không có khái niệm PDF `page-rect` cho textbox — PDF chưa có renderer nên chưa render được bất kỳ loại note nào.
+>
+> Xem trạng thái cuối tại [06_Giai_doan_5](./06_Giai_doan_5_Highlight_Note_Bookmark.md) §2.3.
 
 ---
 
@@ -154,11 +129,12 @@ Thanh Tools Reader dùng layout **icon trên / nhãn dưới** (tiết kiệm ch
 
 ```text
 Search local (S1–S3)     ← giá trị đọc hàng ngày, không cần AI
-  → Typewriter persist (W1–W3)  ← cùng lớp overlay G5/G6
   → Translate selection (T1–T2) ← cần provider
   → Speech TTS (P1–P3)          ← spike UX + OS API
   → Semantic Search / cloud voice / batch translate ← G7+
 ```
+
+(Typewriter đã bỏ khỏi thứ tự này — xem §5.)
 
 ---
 
@@ -180,5 +156,5 @@ Search local (S1–S3)     ← giá trị đọc hàng ngày, không cần AI
 | Tools strip UI | `source/apps/reading-book-desktop/src/screens/Reader/components/chrome/ToolsMenu.tsx` |
 | Topbar | `.../chrome/ReaderTopbar.tsx` |
 | Stub companion | `ReaderScreen` → `onCompanionTool` (toast) |
-| Typewriter state | `reader-session.ts` · `ReadingCanvas` |
+| `textbox` (thay Typewriter) | `useReaderHighlights.ts`, `HighlightContextMenu.tsx`, `NoteTextboxPopup.tsx` dưới `src/screens/Reader/` — xem §5 |
 | Titlebar search (stub) | `AppTitlebar` + `readerSearchQuery` |

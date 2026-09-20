@@ -6,7 +6,7 @@ import {
   DEFAULT_GLOBAL_READING_PREFS,
   GLOBAL_READING_PREFS_STORAGE_KEY,
   parseGlobalReadingPrefsJson,
-} from '@reading-book/shared/models'
+} from '@reading-book/book-reader-sdk'
 import { applyTheme } from './theme/applyTheme'
 import { syncWindowControlsInset } from './theme/syncWindowControlsInset'
 

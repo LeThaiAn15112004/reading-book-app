@@ -1,24 +1,25 @@
-import { randomUUID } from 'node:crypto'
+import {
+  Location,
+  type BookmarkRecord,
+  type HighlightRecord,
+  type NoteLocator,
+  type NoteSelectionText,
+} from '@reading-book/book-reader-sdk'
 import { ipcMain } from 'electron'
-import { Annotation, Location, type AnnotationType } from '@reading-book/domain'
 import {
   getOverlayStore,
   type SessionRecord,
 } from '../persistence/sqlite-overlay-store'
 import type {
-  AnnotationDto,
-  AnnotationStyleDto,
   BookmarkDto,
-  DeleteAnnotationInput,
   DeleteBookmarkInput,
-  ListAnnotationsInput,
-  MutationResult,
+  DeleteHighlightInput,
+  HighlightDto,
   OkResult,
   ReadingSessionStateDto,
-  SaveAnnotationInput,
   SaveBookmarkInput,
+  SaveHighlightInput,
   SaveReadingSessionStateInput,
-  UpdateAnnotationInput,
 } from './api-types'
 import { OverlayChannels } from './channels'
 
@@ -67,286 +68,66 @@ function inputToSessionRecord(input: SaveReadingSessionStateInput): SessionRecor
   }
 }
 
-function toAnnotationDto(a: Annotation): AnnotationDto {
-  const dto: AnnotationDto = {
-    id: a.id,
-    bookId: a.bookId,
-    type: a.type,
-    pageNumber: a.pageNumber,
-    locationData: a.locationData,
-    style: { ...a.style },
-    status: a.status,
-    isChecked: a.isChecked,
-    createdAt: a.createdAt,
-    updatedAt: a.updatedAt,
-  }
-  if (a.content) dto.content = a.content
-  if (a.notes) dto.notes = a.notes
-  return dto
-}
-
-/** Keep only clone-safe primitives so `style_properties` stays valid JSON. */
-function sanitizeStyle(style: unknown): AnnotationStyleDto | undefined {
-  if (!style || typeof style !== 'object' || Array.isArray(style)) return undefined
-  const out: AnnotationStyleDto = {}
-  for (const [key, value] of Object.entries(style as Record<string, unknown>)) {
-    if (value === undefined || value === null) continue
-    const kind = typeof value
-    if (kind === 'string' || kind === 'number' || kind === 'boolean') {
-      out[key] = value
-    }
-  }
-  return out
-}
-
-function toBookmarkDto(row: {
-  id: string
-  book_id: string
-  location_ref: string
-  label: string | null
-  excerpt: string | null
-  created_at: string
-}): BookmarkDto {
+function toBookmarkDto(bookmark: BookmarkRecord): BookmarkDto {
   const dto: BookmarkDto = {
-    id: row.id,
-    bookId: row.book_id,
-    locationRef: row.location_ref,
-    createdAt: row.created_at,
+    id: bookmark.id,
+    bookId: bookmark.bookId,
+    locatorRef: JSON.stringify(bookmark.locator),
+    createdAt: bookmark.createdAt,
   }
-  if (row.label) dto.label = row.label
-  if (row.excerpt) dto.excerpt = row.excerpt
+  if (bookmark.label) dto.label = bookmark.label
+  if (bookmark.excerpt) dto.excerpt = bookmark.excerpt
   return dto
 }
 
-/** Handlers for overlay:* — session (T4.3) + annotations + bookmarks (T5.5). */
+function toHighlightDto(highlight: HighlightRecord): HighlightDto {
+  const dto: HighlightDto = {
+    id: highlight.id,
+    bookId: highlight.bookId,
+    locatorRef: JSON.stringify(highlight.locator),
+    styleKind: highlight.styleKind,
+    colorHex: highlight.colorHex,
+    tags: highlight.tags,
+    createdAt: highlight.createdAt,
+    updatedAt: highlight.updatedAt,
+  }
+  if (highlight.note) dto.note = highlight.note
+  if (highlight.selectionText) dto.selectionTextRef = JSON.stringify(highlight.selectionText)
+  return dto
+}
+
+/**
+ * Decodes a renderer-supplied locator string. Returns undefined when it is not a valid
+ * `Location` JSON, so a malformed bookmark is rejected at the boundary instead of being stored
+ * and only failing later, at jump time, when it can no longer be traced back to its origin.
+ */
+function parseLocatorRef(raw: unknown): NoteLocator | undefined {
+  if (typeof raw !== 'string' || !raw.trim()) return undefined
+  try {
+    // Location.parse validates `kind` and its required fields; extras like `chapterIndex`
+    // ride along in the JSON untouched.
+    Location.parse(raw)
+    return JSON.parse(raw) as NoteLocator
+  } catch {
+    return undefined
+  }
+}
+
+/** Parses the JSON `{before?, highlight?, after?}` blob a highlight's selection carries. */
+function parseSelectionTextRef(raw: unknown): NoteSelectionText | undefined {
+  if (typeof raw !== 'string' || !raw.trim()) return undefined
+  try {
+    return JSON.parse(raw) as NoteSelectionText
+  } catch {
+    return undefined
+  }
+}
+
+/**
+ * Handlers for overlay:* — reading session state (T4.3), bookmarks (FR-11), and highlights.
+ */
 export function registerOverlayIpc(): void {
   const overlays = getOverlayStore()
-
-  ipcMain.removeHandler(OverlayChannels.listAnnotations)
-  ipcMain.handle(
-    OverlayChannels.listAnnotations,
-    async (_event, input: unknown): Promise<AnnotationDto[]> => {
-      void _event
-      if (!input || typeof input !== 'object') return []
-      const body = input as ListAnnotationsInput
-      if (typeof body.bookId !== 'string' || !body.bookId.trim()) return []
-      try {
-        const types = Array.isArray(body.types)
-          ? body.types.filter((type): type is AnnotationType =>
-              Annotation.isType(type),
-            )
-          : undefined
-        const list = await overlays.listAnnotations({
-          bookId: body.bookId.trim(),
-          ...(types?.length ? { types } : {}),
-          ...(typeof body.pageNumber === 'number' && Number.isFinite(body.pageNumber)
-            ? { pageNumber: body.pageNumber }
-            : {}),
-        })
-        return list.map(toAnnotationDto)
-      } catch {
-        return []
-      }
-    },
-  )
-
-  ipcMain.removeHandler(OverlayChannels.saveAnnotation)
-  ipcMain.handle(
-    OverlayChannels.saveAnnotation,
-    async (_event, input: unknown): Promise<MutationResult> => {
-      void _event
-      if (!input || typeof input !== 'object') return { ok: false, id: null }
-      const body = input as SaveAnnotationInput
-      if (typeof body.bookId !== 'string' || !body.bookId.trim()) {
-        return { ok: false, id: null }
-      }
-      if (!Annotation.isType(body.type)) return { ok: false, id: null }
-      if (typeof body.locationData !== 'string' || !body.locationData.trim()) {
-        return { ok: false, id: null }
-      }
-      try {
-        const now = new Date().toISOString()
-        const id =
-          typeof body.id === 'string' && body.id.trim()
-            ? body.id.trim()
-            : randomUUID()
-        const annotation = new Annotation({
-          id,
-          bookId: body.bookId.trim(),
-          type: body.type,
-          pageNumber: typeof body.pageNumber === 'number' ? body.pageNumber : null,
-          locationData: body.locationData.trim(),
-          content: body.content,
-          notes: typeof body.notes === 'string' ? body.notes : undefined,
-          style: sanitizeStyle(body.style),
-          status: Annotation.isStatus(body.status) ? body.status : 'None',
-          isChecked: body.isChecked === true,
-          createdAt: body.createdAt?.trim() || now,
-          updatedAt: body.updatedAt?.trim() || now,
-        })
-        await overlays.saveAnnotation(annotation)
-        return { ok: true, id: annotation.id }
-      } catch {
-        return { ok: false, id: null }
-      }
-    },
-  )
-
-  ipcMain.removeHandler(OverlayChannels.updateAnnotation)
-  ipcMain.handle(
-    OverlayChannels.updateAnnotation,
-    async (_event, input: unknown): Promise<MutationResult> => {
-      void _event
-      if (!input || typeof input !== 'object') return { ok: false, id: null }
-      const body = input as UpdateAnnotationInput
-      if (typeof body.bookId !== 'string' || !body.bookId.trim()) {
-        return { ok: false, id: null }
-      }
-      if (typeof body.id !== 'string' || !body.id.trim()) {
-        return { ok: false, id: null }
-      }
-      try {
-        const existing = await overlays.getAnnotation(
-          body.bookId.trim(),
-          body.id.trim(),
-        )
-        if (!existing) return { ok: false, id: null }
-
-        if (typeof body.content === 'string') existing.updateContent(body.content)
-        if (typeof body.notes === 'string' || body.notes === null) {
-          existing.updateNotes(body.notes)
-        }
-        if (typeof body.locationData === 'string' && body.locationData.trim()) {
-          existing.updateLocation(
-            body.locationData,
-            typeof body.pageNumber === 'number' || body.pageNumber === null
-              ? body.pageNumber
-              : undefined,
-          )
-        } else if (typeof body.pageNumber === 'number' || body.pageNumber === null) {
-          existing.pageNumber = Annotation.normalizePageNumber(body.pageNumber)
-          existing.touch()
-        }
-        const style = sanitizeStyle(body.style)
-        if (style) existing.mergeStyle(style)
-        if (Annotation.isStatus(body.status)) existing.setStatus(body.status)
-        if (typeof body.isChecked === 'boolean') existing.setChecked(body.isChecked)
-
-        await overlays.saveAnnotation(existing)
-        return { ok: true, id: existing.id }
-      } catch {
-        return { ok: false, id: null }
-      }
-    },
-  )
-
-  ipcMain.removeHandler(OverlayChannels.deleteAnnotation)
-  ipcMain.handle(
-    OverlayChannels.deleteAnnotation,
-    async (_event, input: unknown): Promise<OkResult> => {
-      void _event
-      if (!input || typeof input !== 'object') return { ok: false }
-      const body = input as DeleteAnnotationInput
-      if (typeof body.bookId !== 'string' || !body.bookId.trim()) {
-        return { ok: false }
-      }
-      if (typeof body.id !== 'string' || !body.id.trim()) {
-        return { ok: false }
-      }
-      try {
-        const removed = await overlays.deleteAnnotation(
-          body.bookId.trim(),
-          body.id.trim(),
-        )
-        return { ok: removed }
-      } catch {
-        return { ok: false }
-      }
-    },
-  )
-
-  ipcMain.removeHandler(OverlayChannels.listBookmarks)
-  ipcMain.handle(
-    OverlayChannels.listBookmarks,
-    async (_event, bookId: unknown): Promise<BookmarkDto[]> => {
-      void _event
-      if (typeof bookId !== 'string' || !bookId.trim()) return []
-      try {
-        const rows = await overlays.listBookmarkRecords(bookId.trim())
-        return rows.map(toBookmarkDto)
-      } catch {
-        return []
-      }
-    },
-  )
-
-  ipcMain.removeHandler(OverlayChannels.saveBookmark)
-  ipcMain.handle(
-    OverlayChannels.saveBookmark,
-    async (_event, input: unknown): Promise<MutationResult> => {
-      void _event
-      if (!input || typeof input !== 'object') return { ok: false, id: null }
-      const body = input as SaveBookmarkInput
-      if (typeof body.bookId !== 'string' || !body.bookId.trim()) {
-        return { ok: false, id: null }
-      }
-      if (typeof body.locationRef !== 'string' || !body.locationRef.trim()) {
-        return { ok: false, id: null }
-      }
-      const locationRef = body.locationRef.trim()
-      try {
-        // Validate Location JSON (extras like chapterIndex are ignored by parse).
-        Location.parse(locationRef)
-        const now = new Date().toISOString()
-        const id =
-          typeof body.id === 'string' && body.id.trim()
-            ? body.id.trim()
-            : randomUUID()
-        await overlays.saveBookmarkRecord({
-          id,
-          bookId: body.bookId.trim(),
-          locationRef,
-          label:
-            typeof body.label === 'string' && body.label.trim()
-              ? body.label.trim()
-              : undefined,
-          excerpt:
-            typeof body.excerpt === 'string' && body.excerpt.trim()
-              ? body.excerpt.trim()
-              : undefined,
-          createdAt: body.createdAt?.trim() || now,
-        })
-        return { ok: true, id }
-      } catch {
-        return { ok: false, id: null }
-      }
-    },
-  )
-
-  ipcMain.removeHandler(OverlayChannels.deleteBookmark)
-  ipcMain.handle(
-    OverlayChannels.deleteBookmark,
-    async (_event, input: unknown): Promise<OkResult> => {
-      void _event
-      if (!input || typeof input !== 'object') return { ok: false }
-      const body = input as DeleteBookmarkInput
-      if (typeof body.bookId !== 'string' || !body.bookId.trim()) {
-        return { ok: false }
-      }
-      if (typeof body.id !== 'string' || !body.id.trim()) {
-        return { ok: false }
-      }
-      try {
-        const removed = await overlays.deleteBookmark(
-          body.bookId.trim(),
-          body.id.trim(),
-        )
-        return { ok: removed }
-      } catch {
-        return { ok: false }
-      }
-    },
-  )
 
   ipcMain.removeHandler(OverlayChannels.getSessionState)
   ipcMain.handle(
@@ -371,6 +152,128 @@ export function registerOverlayIpc(): void {
         const state = inputToSessionRecord(body)
         await overlays.saveSessionPreferences(state)
         return { ok: true }
+      } catch {
+        return { ok: false }
+      }
+    },
+  )
+
+  ipcMain.removeHandler(OverlayChannels.listBookmarks)
+  ipcMain.handle(
+    OverlayChannels.listBookmarks,
+    async (_event, bookId: unknown): Promise<BookmarkDto[]> => {
+      void _event
+      if (typeof bookId !== 'string' || !bookId.trim()) return []
+      const bookmarks = await overlays.listBookmarks(bookId.trim())
+      return bookmarks.map(toBookmarkDto)
+    },
+  )
+
+  ipcMain.removeHandler(OverlayChannels.saveBookmark)
+  ipcMain.handle(
+    OverlayChannels.saveBookmark,
+    async (_event, input: unknown): Promise<BookmarkDto | null> => {
+      void _event
+      if (!input || typeof input !== 'object') return null
+      const body = input as SaveBookmarkInput
+      if (typeof body.bookId !== 'string' || !body.bookId.trim()) return null
+
+      const locator = parseLocatorRef(body.locatorRef)
+      if (!locator) return null
+
+      try {
+        const saved = await overlays.saveBookmark({
+          id: body.id?.trim() || undefined,
+          bookId: body.bookId.trim(),
+          locator,
+          label: body.label?.trim() || undefined,
+          excerpt: body.excerpt?.trim() || undefined,
+          createdAt: body.createdAt?.trim() || undefined,
+        })
+        return toBookmarkDto(saved)
+      } catch {
+        return null
+      }
+    },
+  )
+
+  ipcMain.removeHandler(OverlayChannels.deleteBookmark)
+  ipcMain.handle(
+    OverlayChannels.deleteBookmark,
+    async (_event, input: unknown): Promise<OkResult> => {
+      void _event
+      if (!input || typeof input !== 'object') return { ok: false }
+      const body = input as DeleteBookmarkInput
+      if (typeof body.bookId !== 'string' || typeof body.id !== 'string') {
+        return { ok: false }
+      }
+      try {
+        const ok = await overlays.deleteBookmark(body.bookId, body.id)
+        return { ok }
+      } catch {
+        return { ok: false }
+      }
+    },
+  )
+
+  ipcMain.removeHandler(OverlayChannels.listHighlights)
+  ipcMain.handle(
+    OverlayChannels.listHighlights,
+    async (_event, bookId: unknown): Promise<HighlightDto[]> => {
+      void _event
+      if (typeof bookId !== 'string' || !bookId.trim()) return []
+      const highlights = await overlays.listHighlights(bookId.trim())
+      return highlights.map(toHighlightDto)
+    },
+  )
+
+  ipcMain.removeHandler(OverlayChannels.saveHighlight)
+  ipcMain.handle(
+    OverlayChannels.saveHighlight,
+    async (_event, input: unknown): Promise<HighlightDto | null> => {
+      void _event
+      if (!input || typeof input !== 'object') return null
+      const body = input as SaveHighlightInput
+      if (typeof body.bookId !== 'string' || !body.bookId.trim()) return null
+
+      const locator = parseLocatorRef(body.locatorRef)
+      if (!locator) return null
+      const validStyleKinds = ['highlight', 'underline', 'strikethrough', 'textbox']
+      if (!validStyleKinds.includes(body.styleKind)) return null
+      if (typeof body.colorHex !== 'string' || !body.colorHex.trim()) return null
+
+      try {
+        const saved = await overlays.saveHighlight({
+          id: body.id?.trim() || undefined,
+          bookId: body.bookId.trim(),
+          locator,
+          styleKind: body.styleKind,
+          colorHex: body.colorHex.trim(),
+          note: body.note?.trim() || undefined,
+          tags: body.tags,
+          selectionText: parseSelectionTextRef(body.selectionTextRef),
+          createdAt: body.createdAt?.trim() || undefined,
+        })
+        return toHighlightDto(saved)
+      } catch {
+        return null
+      }
+    },
+  )
+
+  ipcMain.removeHandler(OverlayChannels.deleteHighlight)
+  ipcMain.handle(
+    OverlayChannels.deleteHighlight,
+    async (_event, input: unknown): Promise<OkResult> => {
+      void _event
+      if (!input || typeof input !== 'object') return { ok: false }
+      const body = input as DeleteHighlightInput
+      if (typeof body.bookId !== 'string' || typeof body.id !== 'string') {
+        return { ok: false }
+      }
+      try {
+        const ok = await overlays.deleteHighlight(body.bookId, body.id)
+        return { ok }
       } catch {
         return { ok: false }
       }

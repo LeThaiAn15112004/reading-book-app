@@ -1,4 +1,4 @@
-import { DocumentFormat, type DocumentImporter } from '@reading-book/domain'
+import { DocumentFormat, type DocumentImporter } from '@reading-book/book-reader-sdk'
 import { docAdapter } from './doc.adapter'
 import { docxAdapter } from './docx.adapter'
 import { epubAdapter } from './epub.adapter'

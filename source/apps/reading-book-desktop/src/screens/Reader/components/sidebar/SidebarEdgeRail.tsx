@@ -14,6 +14,7 @@ type SidebarEdgeRailProps = {
   chromeHidden?: boolean
   /** Immersive fullscreen: hide rail until left-edge reveal. */
   immersiveHidden?: boolean
+  /** Marks the Bookmark tab when the current place is bookmarked (FR-11). */
   bookmarkActive?: boolean
   onOpenTab: (tab: SidebarTab) => void
   onToggle: () => void

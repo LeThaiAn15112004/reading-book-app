@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32" fill="none">
+  <!-- Underline pen cursor — tip hotspot near (6, 28) -->
+  <g transform="rotate(-42 16 16)">
+    <!-- Cap / body -->
+    <rect x="12.5" y="3" width="7" height="15" rx="2.2" fill="#3b82f6"/>
+    <rect x="13.6" y="5" width="1.4" height="10" rx="0.7" fill="#bfdbfe" opacity="0.85"/>
+    <!-- Neck -->
+    <path d="M12.5 18h7l-1.6 3.2h-3.8L12.5 18Z" fill="#1d4ed8"/>
+    <!-- Fine tip -->
+    <path d="M14.3 21.2 12.6 26.8h2.8l1.7-5.6h-2.8Z" fill="#3b82f6"/>
+  </g>
+  <!-- Straight underline stroke beneath the tip -->
+  <rect x="3" y="27.4" width="12" height="1.6" rx="0.8" fill="#60a5fa" opacity="0.95"/>
+</svg>

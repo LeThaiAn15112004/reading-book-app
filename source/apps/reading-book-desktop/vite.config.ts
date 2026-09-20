@@ -8,9 +8,8 @@ import react from '@vitejs/plugin-react'
 export default defineConfig({
   resolve: {
     alias: {
-      '@reading-book/shared': path.resolve(__dirname, '../../packages/shared'),
       '@reading-book/config': path.resolve(__dirname, '../../packages/config'),
-      '@reading-book/domain': path.resolve(__dirname, '../../packages/domain'),
+      '@reading-book/book-reader-sdk': path.resolve(__dirname, '../book-reader-sdk/src/index.ts'),
     },
   },
   optimizeDeps: {
@@ -23,13 +22,17 @@ export default defineConfig({
     electron({
       main: {
         // Shortcut of `build.lib.entry`.
-        entry: 'electron/main.ts',
+        // The chunking worker is its own entry so `new Worker()` can load `book-chunk.worker.js`
+        // from dist-electron, next to main.js.
+        entry: {
+          main: 'electron/main.ts',
+          'book-chunk.worker': 'electron/chunking/book-chunk.worker.ts',
+        },
         vite: {
           resolve: {
             alias: {
-              '@reading-book/shared': path.resolve(__dirname, '../../packages/shared'),
               '@reading-book/config': path.resolve(__dirname, '../../packages/config'),
-              '@reading-book/domain': path.resolve(__dirname, '../../packages/domain'),
+              '@reading-book/book-reader-sdk': path.resolve(__dirname, '../book-reader-sdk/src/index.ts'),
             },
           },
           build: {

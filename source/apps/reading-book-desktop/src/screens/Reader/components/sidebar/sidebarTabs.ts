@@ -7,7 +7,7 @@ export const SIDEBAR_TABS: {
 }[] = [
   { id: 'chapters', label: 'Contents', icon: '📑' },
   { id: 'bookmarks', label: 'Bookmark', icon: '🔖' },
-  { id: 'notes', label: 'Note', icon: '📝' },
+  { id: 'highlights', label: 'Notes', icon: '🖍️' },
   { id: 'layout', label: 'Page layout', icon: '📄' },
   { id: 'attachments', label: 'Attachment', icon: '📎' },
 ]
@@ -15,7 +15,7 @@ export const SIDEBAR_TABS: {
 export const SIDEBAR_TAB_LABEL: Record<SidebarTab, string> = {
   chapters: 'Contents',
   bookmarks: 'Bookmark',
-  notes: 'Note',
+  highlights: 'Notes',
   layout: 'Page layout',
   attachments: 'Attachment',
 }

@@ -1,40 +1,24 @@
 import {
   useCallback,
   useEffect,
+  useRef,
   useState,
   type MutableRefObject,
   type RefObject,
 } from 'react'
-import type { AnnotateTool } from '@reading-book/shared/models'
 import type { EpubRendererApi } from '../../../../reader/renderers/epub'
 import {
+  READER_CHROME_RESIZE_SETTLE_MS,
   blurReaderSidebarFocus,
   clearStuckChromeHover,
   scheduleEpubResizeAfterChromeTransition,
 } from '../../../../reader/chrome'
-import type { HighlightEditTarget, SidebarTab } from '../../components'
-import type { SelectionMenuState } from './useReaderAnnotations'
-
-/** Callbacks owned by annotations / selection that chrome UI must invoke. */
-export type ReaderChromeAnnotationBridge = {
-  closeSelectionMenu: () => void
-  dismissHighlightEditPanel: () => void
-  /** Escape while an annotate tool is active: commit draft, reset tool, clear handles. */
-  leaveAnnotateToolViaEscape: () => void
-}
+import type { SidebarTab } from '../../components'
 
 /** Live UI snapshot for Escape / center-tap (filled by ReaderScreen each render). */
 export type ReaderChromeEscapeUi = {
-  highlightEdit: HighlightEditTarget | null
-  selectionMenu: SelectionMenuState | null
-  activeTool: AnnotateTool
   isEpubSurface: boolean
-  sidebarOpen: boolean
-  rightSidebarOpen: boolean
 }
-
-/** Which feature currently owns the shared right panel slot. */
-export type RightSidebarKind = 'typewriter' | 'freehand' | null
 
 type UseReaderChromeUiOptions = {
   bookId: string | undefined
@@ -45,7 +29,6 @@ type UseReaderChromeUiOptions = {
     toggleTools: () => void
   } | null) => void
   epubApiRef: RefObject<EpubRendererApi | null>
-  annotationBridgeRef: MutableRefObject<ReaderChromeAnnotationBridge>
   escapeUiRef: MutableRefObject<ReaderChromeEscapeUi>
   readerSearchQuery: string
   readerSearchRequestId: number
@@ -57,7 +40,6 @@ export function useReaderChromeUi({
   bookId,
   registerReaderChrome,
   epubApiRef,
-  annotationBridgeRef,
   escapeUiRef,
   readerSearchQuery,
   readerSearchRequestId,
@@ -66,11 +48,10 @@ export function useReaderChromeUi({
   const [chromeHidden, setChromeHidden] = useState(true)
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [sidebarTab, setSidebarTab] = useState<SidebarTab>('chapters')
-  const [rightSidebarOpen, setRightSidebarOpen] = useState(false)
-  const [rightSidebarKind, setRightSidebarKind] =
-    useState<RightSidebarKind>(null)
+  const [isChromeResizeSettling, setIsChromeResizeSettling] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [moreOpen, setMoreOpen] = useState(false)
+  const [searchOpen, setSearchOpen] = useState(false)
   const [toast, setToast] = useState<string | null>(null)
   const [signOpen, setSignOpen] = useState(false)
   const [bookInfoOpen, setBookInfoOpen] = useState(false)
@@ -80,10 +61,9 @@ export function useReaderChromeUi({
   useEffect(() => {
     setSidebarOpen(false)
     setSidebarTab('chapters')
-    setRightSidebarOpen(false)
-    setRightSidebarKind(null)
     setSettingsOpen(false)
     setMoreOpen(false)
+    setSearchOpen(false)
     setSignOpen(false)
     setBookInfoOpen(false)
     setTrashOpen(false)
@@ -96,10 +76,9 @@ export function useReaderChromeUi({
     if (!immersive) return
     setChromeHidden(true)
     setSidebarOpen(false)
-    setRightSidebarOpen(false)
-    setRightSidebarKind(null)
     setMoreOpen(false)
     setSettingsOpen(false)
+    setSearchOpen(false)
   }, [immersive])
 
   useEffect(() => {
@@ -121,7 +100,15 @@ export function useReaderChromeUi({
   const closeFloating = useCallback(() => {
     setMoreOpen(false)
     setSettingsOpen(false)
+    setSearchOpen(false)
   }, [])
+
+  const toggleSearch = useCallback(() => {
+    if (immersive) return
+    setMoreOpen(false)
+    setSettingsOpen(false)
+    setSearchOpen((open) => !open)
+  }, [immersive])
 
   const openSidebarTab = useCallback(
     (tab: SidebarTab) => {
@@ -139,42 +126,13 @@ export function useReaderChromeUi({
     setSidebarOpen((open) => !open)
   }, [closeFloating, immersive])
 
-  const openRightSidebar = useCallback((kind: Exclude<RightSidebarKind, null>) => {
-    closeFloating()
-    setRightSidebarKind(kind)
-    setRightSidebarOpen(true)
-  }, [closeFloating])
-
-  const closeRightSidebar = useCallback(() => {
-    setRightSidebarOpen(false)
-    setRightSidebarKind(null)
-  }, [])
-
-  const toggleRightSidebar = useCallback(
-    (kind: Exclude<RightSidebarKind, null> = 'typewriter') => {
-      closeFloating()
-      setRightSidebarOpen((open) => {
-        if (open && rightSidebarKind === kind) {
-          setRightSidebarKind(null)
-          return false
-        }
-        setRightSidebarKind(kind)
-        return true
-      })
-    },
-    [closeFloating, rightSidebarKind],
-  )
-
   /**
    * Tap center clears transient reader UI without toggling the tools chrome.
    * The global menubar owns opening/closing tools via its Tools item.
    */
   function handleCenterTap() {
-    const bridge = annotationBridgeRef.current
     const { isEpubSurface } = escapeUiRef.current
     closeFloating()
-    bridge.closeSelectionMenu()
-    bridge.dismissHighlightEditPanel()
     blurReaderSidebarFocus()
     if (isEpubSurface) {
       epubApiRef.current?.clearSelection()
@@ -204,11 +162,12 @@ export function useReaderChromeUi({
     return () => registerReaderChrome(null)
   }, [chromeHidden, closeFloating, registerReaderChrome, toggleChrome])
 
-  // When chrome hides, drop Settings / More so panels cannot linger off-screen.
+  // When chrome hides, drop Settings / More / Search so panels cannot linger off-screen.
   useEffect(() => {
     if (!chromeHidden) return
     setMoreOpen(false)
     setSettingsOpen(false)
+    setSearchOpen(false)
   }, [chromeHidden])
 
   // After tools/sidebar/immersive layout animates, refresh EPUB metrics and clear stuck hover.
@@ -218,14 +177,35 @@ export function useReaderChromeUi({
       epubApiRef,
       escapeUiRef.current.isEpubSurface,
     )
-  }, [
-    chromeHidden,
-    sidebarOpen,
-    rightSidebarOpen,
-    immersive,
-    epubApiRef,
-    escapeUiRef,
-  ])
+  }, [chromeHidden, sidebarOpen, immersive, epubApiRef, escapeUiRef])
+
+  /**
+   * Left sidebar and immersive toggles resize the EPUB host's *width*
+   * (via contentInsetLeft), not just its top padding. The CSS padding
+   * transition above animates instantly, but epub.js only re-paginates to
+   * the new width once that transition settles — so for a window of a few
+   * hundred ms the reading column paints at its old pixel width inside an
+   * already-resized host, which looks like a broken/squeezed layout. Cover
+   * the reading surface for that window (skipping the very first mount,
+   * where nothing is animating) so the stale-width repaint is never visible
+   * — same "hide the glitch" pattern used for CFI jumps.
+   */
+  const skipInitialResizeSettleRef = useRef(true)
+  useEffect(() => {
+    if (skipInitialResizeSettleRef.current) {
+      skipInitialResizeSettleRef.current = false
+      return
+    }
+    if (!escapeUiRef.current.isEpubSurface) return
+    setIsChromeResizeSettling(true)
+    const id = window.setTimeout(() => {
+      setIsChromeResizeSettling(false)
+    }, READER_CHROME_RESIZE_SETTLE_MS)
+    return () => {
+      window.clearTimeout(id)
+      setIsChromeResizeSettling(false)
+    }
+  }, [sidebarOpen, immersive, escapeUiRef])
 
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
@@ -239,52 +219,11 @@ export function useReaderChromeUi({
         return
       }
 
-      const bridge = annotationBridgeRef.current
-      const {
-        highlightEdit,
-        selectionMenu,
-        activeTool,
-        isEpubSurface,
-      } = escapeUiRef.current
-
-      if (highlightEdit) {
-        e.preventDefault()
-        bridge.dismissHighlightEditPanel()
-        return
-      }
-      if (selectionMenu) {
-        e.preventDefault()
-        if (isEpubSurface) {
-          epubApiRef.current?.clearSelection()
-        } else {
-          window.getSelection()?.removeAllRanges()
-        }
-        bridge.closeSelectionMenu()
-        return
-      }
-      if (
-        activeTool === 'select' ||
-        activeTool === 'highlight' ||
-        activeTool === 'typewriter' ||
-        activeTool === 'pencil' ||
-        activeTool === 'shape' ||
-        activeTool === 'eraser' ||
-        activeTool === 'esign'
-      ) {
-        e.preventDefault()
-        bridge.leaveAnnotateToolViaEscape()
-        return
-      }
-      if (settingsOpen || moreOpen) {
+      if (settingsOpen || moreOpen || searchOpen) {
         e.preventDefault()
         setMoreOpen(false)
         setSettingsOpen(false)
-        return
-      }
-      if (escapeUiRef.current.rightSidebarOpen) {
-        e.preventDefault()
-        setRightSidebarOpen(false)
-        setRightSidebarKind(null)
+        setSearchOpen(false)
         return
       }
       if (!chromeHidden) {
@@ -295,14 +234,23 @@ export function useReaderChromeUi({
 
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [
-    annotationBridgeRef,
-    chromeHidden,
-    epubApiRef,
-    escapeUiRef,
-    moreOpen,
-    settingsOpen,
-  ])
+  }, [chromeHidden, moreOpen, settingsOpen, searchOpen])
+
+  // Ctrl+F / Cmd+F: reveal chrome if hidden and open the (UI-only) in-book search panel.
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key.toLowerCase() !== 'f' || !(e.ctrlKey || e.metaKey)) return
+      if (immersive) return
+      e.preventDefault()
+      setChromeHidden(false)
+      setMoreOpen(false)
+      setSettingsOpen(false)
+      setSearchOpen(true)
+    }
+
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [immersive])
 
   return {
     chromeHidden,
@@ -311,14 +259,14 @@ export function useReaderChromeUi({
     setSidebarOpen,
     sidebarTab,
     setSidebarTab,
-    rightSidebarOpen,
-    rightSidebarKind,
-    setRightSidebarOpen,
-    setRightSidebarKind,
+    isChromeResizeSettling,
     settingsOpen,
     setSettingsOpen,
     moreOpen,
     setMoreOpen,
+    searchOpen,
+    setSearchOpen,
+    toggleSearch,
     toast,
     setToast,
     signOpen,
@@ -330,9 +278,6 @@ export function useReaderChromeUi({
     closeFloating,
     openSidebarTab,
     toggleSidebar,
-    openRightSidebar,
-    closeRightSidebar,
-    toggleRightSidebar,
     handleCenterTap,
     toggleChrome,
   }

@@ -1,0 +1,41 @@
+{
+  "name": "@reading-book/book-reader-sdk",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Platform-agnostic core of reading-book-app: domain types, CFI utils, EPUB package parsing, annotation logic and zustand (vanilla) stores. All I/O is injected by the host.",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.mts",
+        "default": "./dist/index.mjs"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "sideEffects": false,
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json",
+    "build": "node scripts/build.mjs",
+    "example:node": "node examples/node-host/host.mjs",
+    "example:typecheck": "tsc -p examples/electron-host/tsconfig.json",
+    "verify": "npm run typecheck && npm run build && npm run example:typecheck && npm run example:node"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.13",
+    "rolldown": "^1.1.5",
+    "typescript": "^5.9.3",
+    "zustand": "^5.0.15"
+  }
+}

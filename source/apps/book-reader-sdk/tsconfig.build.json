@@ -1,0 +1,13 @@
+{
+  // Declaration-only emit; JS bundles come from rolldown (scripts/build.mjs).
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "declaration": true,
+    "emitDeclarationOnly": true,
+    "declarationMap": false,
+    "outDir": "dist/types",
+    "rootDir": "src"
+  },
+  "include": ["src/**/*.ts"]
+}

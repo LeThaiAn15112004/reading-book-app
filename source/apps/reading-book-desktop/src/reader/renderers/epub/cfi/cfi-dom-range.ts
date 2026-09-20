@@ -77,7 +77,7 @@ export function splitCfiComponents(cfi: string): string[] {
   return parts.map((p) => p.trim()).filter(Boolean)
 }
 
-export { cfiChapterSignature } from '@reading-book/shared/utils'
+export { cfiChapterSignature } from '@reading-book/book-reader-sdk'
 
 function parseCfiStep(token: string): CfiStep | null {
   const num = Number.parseInt(token, 10)
@@ -423,6 +423,30 @@ export function rangeBetweenBoundaries(
   const swapped = tryRange(doc, b, a)
   if (swapped && !swapped.collapsed) return swapped
   return direct ?? swapped
+}
+
+/**
+ * Hit-test a document-local point to a collapsed Range boundary — Chromium's
+ * `caretRangeFromPoint`, with `caretPositionFromPoint` as a fallback for engines that only
+ * implement the standardized name. Used to translate a drag pointer's live position into a DOM
+ * boundary while resizing a highlight's range.
+ */
+export function caretRangeAtPoint(doc: Document, x: number, y: number): Range | null {
+  const extended = doc as Document & {
+    caretRangeFromPoint?: (x: number, y: number) => Range | null
+    caretPositionFromPoint?: (x: number, y: number) => { offsetNode: Node; offset: number } | null
+  }
+  try {
+    if (extended.caretRangeFromPoint) return extended.caretRangeFromPoint(x, y)
+    const pos = extended.caretPositionFromPoint?.(x, y)
+    if (!pos) return null
+    const range = doc.createRange()
+    range.setStart(pos.offsetNode, pos.offset)
+    range.collapse(true)
+    return range
+  } catch {
+    return null
+  }
 }
 
 /** Resolve one point CFI to a DOM boundary. */

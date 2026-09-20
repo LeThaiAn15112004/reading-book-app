@@ -1,7 +1,7 @@
 import path from 'node:path'
 import fsp from 'node:fs/promises'
 import { clipboard, ipcMain, shell } from 'electron'
-import type { Book } from '@reading-book/domain'
+import type { Book } from '@reading-book/book-reader-sdk'
 import { coverUrlForBookId } from '../files/cover-protocol'
 import { openBookContent } from '../files/open-book-content'
 import { assertPathAllowed, getBooksSandboxPath } from '../files/sandbox'

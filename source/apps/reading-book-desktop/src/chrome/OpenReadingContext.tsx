@@ -4,7 +4,7 @@ import {
   OpenReadingProvider as SharedOpenReadingProvider,
   useOpenReading,
   type OpenReadingTab,
-} from '@reading-book/shared/hooks/app'
+} from '../hooks/app/index.js'
 
 export { useOpenReading }
 export type { OpenReadingTab }

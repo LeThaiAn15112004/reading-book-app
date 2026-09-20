@@ -1,4 +1,4 @@
-import type { DocumentFormat, DocumentImporter, ImportResult } from '@reading-book/domain'
+import type { DocumentFormat, DocumentImporter, ImportResult } from '@reading-book/book-reader-sdk'
 import path from 'node:path'
 import { resolveFormatFromExtension } from '@reading-book/config'
 import { hashFile } from '../files/file-hash'

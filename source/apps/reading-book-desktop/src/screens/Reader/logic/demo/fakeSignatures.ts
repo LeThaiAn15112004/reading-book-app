@@ -1,4 +1,4 @@
-import type { ReaderSignature } from '@reading-book/shared/models'
+import type { ReaderSignature } from '@reading-book/book-reader-sdk'
 
 /** Demo signatures for UI shell until detect/import fills `book_signatures`. */
 export const FAKE_SIGNATURES: ReaderSignature[] = [

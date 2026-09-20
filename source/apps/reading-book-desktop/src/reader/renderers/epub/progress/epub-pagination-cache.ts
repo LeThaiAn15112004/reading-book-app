@@ -17,7 +17,6 @@ export type EpubPaginationCacheKeyInput = {
   spineLength: number
   width: number
   height: number
-  pageMode: string
   layout: string
   fontSize: number
   fontFamily: string
@@ -79,7 +78,6 @@ export function buildLayoutFingerprint(
     `s${input.spineLength}`,
     `w${Math.round(input.width)}`,
     `h${Math.round(input.height)}`,
-    `pm:${input.pageMode}`,
     `ly:${input.layout}`,
     `fs:${Math.round(input.fontSize)}`,
     `ff:${input.fontFamily}`,

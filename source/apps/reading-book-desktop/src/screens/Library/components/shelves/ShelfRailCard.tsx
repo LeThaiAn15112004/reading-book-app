@@ -1,4 +1,4 @@
-import { formatLastReadLine, type LibraryBook } from '@reading-book/shared/models'
+import { formatLastReadLine, type LibraryBook } from '@reading-book/book-reader-sdk'
 import { BookCover, BookMenuButton, type BookMenuPoint } from '../book'
 
 const PROVIDER_LABEL: Record<'google_drive' | 'dropbox' | 'onedrive', string> = {

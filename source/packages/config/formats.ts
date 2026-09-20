@@ -1,4 +1,4 @@
-import { DocumentFormat } from '@reading-book/domain';
+import { DocumentFormat } from '@reading-book/book-reader-sdk';
 
 export interface FormatDescriptor {
   format: DocumentFormat;

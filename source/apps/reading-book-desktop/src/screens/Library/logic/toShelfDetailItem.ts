@@ -1,4 +1,4 @@
-import { shelfProgressForBook, type LibraryBook } from '@reading-book/shared/models'
+import { shelfProgressForBook, type LibraryBook } from '@reading-book/book-reader-sdk'
 import type { ShelfDetailItemData } from '../components/shelves/ShelfDetailItem'
 
 /** Map LibraryBook → shelf/filter list row (desktop ShelfDetailItem chrome). */

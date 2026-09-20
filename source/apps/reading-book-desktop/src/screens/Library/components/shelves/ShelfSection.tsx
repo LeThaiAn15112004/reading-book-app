@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import type { ShelfId } from '@reading-book/shared/models'
+import type { ShelfId } from '@reading-book/book-reader-sdk'
 
 export type { ShelfId }
 

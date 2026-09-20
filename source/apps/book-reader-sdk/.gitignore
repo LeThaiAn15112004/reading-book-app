@@ -1,0 +1,2 @@
+node_modules/
+# dist/ is intentionally NOT ignored: copying this folder (with dist/) is the distribution model.

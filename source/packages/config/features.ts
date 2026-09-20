@@ -3,8 +3,6 @@ export interface FeatureFlags {
   readonly aiEnabled: boolean;
   /** Phase 3 — Google Drive / Google Books connectors (not app account sync). */
   readonly externalLibrariesEnabled: boolean;
-  /** @deprecated Alias of externalLibrariesEnabled during migration. */
-  readonly syncEnabled: boolean;
   readonly fileScanEnabled: boolean;
   readonly autoImportEnabled: boolean;
   readonly multiDocEnabled: boolean;
@@ -16,7 +14,6 @@ export interface FeatureFlags {
 export const defaultFeatures: FeatureFlags = {
   aiEnabled: false,
   externalLibrariesEnabled: true,
-  syncEnabled: false,
   fileScanEnabled: true,
   autoImportEnabled: true,
   multiDocEnabled: true,

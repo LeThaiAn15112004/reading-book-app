@@ -1,4 +1,4 @@
-import type { UrlDocumentFetcher, UrlFetchResult } from '@reading-book/domain'
+import type { UrlDocumentFetcher, UrlFetchResult } from '@reading-book/book-reader-sdk'
 import { app } from 'electron'
 import { randomUUID } from 'node:crypto'
 import fs from 'node:fs'

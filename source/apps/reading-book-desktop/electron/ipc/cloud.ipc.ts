@@ -6,18 +6,22 @@ import path from 'node:path'
 import {
   DropboxAuthService,
   DropboxDownloadService,
+  generatePkcePair as generateDropboxPkcePair,
+  type DropboxStoredTokens,
+} from '../../../book-reader-sdk/host-adapters/services/dropbox/index.js'
+import {
   GoogleDriveAuthService,
   GoogleDriveDownloadService,
+  generateGoogleDrivePkcePair,
+  type GoogleDriveStoredTokens,
+} from '../../../book-reader-sdk/host-adapters/services/google-drive/index.js'
+import {
   OneDriveAuthService,
   OneDriveDownloadService,
-  generateGoogleDrivePkcePair,
   generateOneDrivePkcePair,
-  generatePkcePair as generateDropboxPkcePair,
-  type DownloadProgressListener,
-  type DropboxStoredTokens,
-  type GoogleDriveStoredTokens,
   type OneDriveStoredTokens,
-} from '@reading-book/shared/services'
+} from '../../../book-reader-sdk/host-adapters/services/onedrive/index.js'
+import type { DownloadProgressListener } from '../../../book-reader-sdk/host-adapters/services/download-progress.js'
 import { GOOGLE_OAUTH_LOOPBACK_REDIRECT_URI, OAUTH_REDIRECT_URI } from '@reading-book/config'
 import { loadDropboxOAuthCredentials, loadOneDriveOAuthCredentials } from '../config/cloud-oauth-config'
 import { loadGoogleOAuthCredentials } from '../config/google-oauth-config'

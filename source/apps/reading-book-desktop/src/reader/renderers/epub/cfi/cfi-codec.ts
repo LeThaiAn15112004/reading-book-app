@@ -4,7 +4,7 @@ import {
   type LocationCodec,
   type LocationDecodeResult,
   type LocationEncodeInput,
-} from '@reading-book/domain'
+} from '@reading-book/book-reader-sdk'
 
 /**
  * epubjs location / relocated payload shape used for encode.

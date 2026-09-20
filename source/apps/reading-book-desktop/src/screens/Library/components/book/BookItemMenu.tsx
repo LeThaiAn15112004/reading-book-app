@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type MouseEvent as ReactMouseEvent } from 
 import type {
   CollectionSummary,
   LibraryBook,
-} from '@reading-book/shared/models'
+} from '@reading-book/book-reader-sdk'
 
 export type BookMenuPoint = { x: number; y: number }
 

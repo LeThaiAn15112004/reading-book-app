@@ -4,7 +4,7 @@ import {
   type SessionNavMeta,
   type SessionThemeFields,
   type UseReadingSessionAutosaveOptions,
-} from '@reading-book/shared/hooks/reader'
+} from '../../../../hooks/reader/index.js'
 import { overlayApi } from '../../../../bridge'
 import { registerSessionFlushHandler } from './sessionFlushRegistry'
 

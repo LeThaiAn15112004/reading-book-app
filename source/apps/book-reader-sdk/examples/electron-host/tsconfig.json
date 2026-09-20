@@ -1,0 +1,21 @@
+{
+  // Proves a TypeScript host resolves the SDK's types through a plain relative path to dist/.
+  // Requires `npm run build` first. @types/node, @types/better-sqlite3, @types/react and jszip
+  // are the HOST's dependencies (resolved from the workspace node_modules), not the SDK's.
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "lib": ["ES2022", "DOM"],
+    "types": ["node"],
+    "jsx": "react-jsx",
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "isolatedModules": true,
+    "verbatimModuleSyntax": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "noEmit": true
+  },
+  "include": ["main/**/*.ts", "renderer/**/*.ts", "renderer/**/*.tsx"]
+}

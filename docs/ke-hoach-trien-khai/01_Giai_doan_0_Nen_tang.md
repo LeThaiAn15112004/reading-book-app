@@ -41,6 +41,8 @@ Bám cây `source/packages/{domain,shared,config}` trong SDS §2.11. Domain **kh
 | T0.6 | SQLite + migrations theo SDS §3 (overlay sách): `books` (+ `description`, `page_count`, `is_signed`), `genres`, `book_genres`, `book_signatures`, `authors`, `book_authors`, `collections`, `collection_books`, `reading_session_states`, `annotations`, `tags`, `annotation_tags`, `bookmarks`, `book_chunks` — files `001`…`011` (**không** `app_settings`; app prefs → electron-store / MMKV) | `electron/persistence` |
 | T0.7 | Sandbox path: thư mục books trong userData; allowlist path | `electron/files/sandbox.ts` |
 | T0.8 | Preload `contextBridge` — API hẹp typed | `electron/preload.ts` |
+
+> **Cập nhật (SDS 1.22, sau G5):** một số thứ ở T0.1/T0.2/T0.4/T0.6 đã đổi so với bản gốc trên — ghi lại đây để tránh nhầm là hiện trạng: `BookSignature`/`Comment` (T0.1) không còn là model/table riêng (gộp vào `books` / xóa hẳn); `OverlayPainter` (T0.2) đã bị bỏ khỏi ports; `addHighlight`/`updateHighlightNote`/`listAnnotations` (T0.4) không còn ở `packages/shared/services` — logic chuyển vào hook phía app (`useReaderHighlights.ts`); `annotations`/`annotation_tags`/`bookmarks`/`book_signatures` (T0.6) đã được thay bằng `notes`/`note_tags` (migration `018`/`019`) và cột trên `books`. Chi tiết: SDS §2.6/§3, [06_Giai_doan_5](./06_Giai_doan_5_Highlight_Note_Bookmark.md).
 | T0.9 | IPC channels: `library:*`, `import:*`, `overlay:*` (handler stub OK) | `electron/ipc` |
 
 ### 2.3. Presentation skeleton

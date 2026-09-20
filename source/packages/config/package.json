@@ -12,7 +12,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@reading-book/domain": "*"
+    "@reading-book/book-reader-sdk": "*"
   },
   "devDependencies": {
     "typescript": "^5.2.2"

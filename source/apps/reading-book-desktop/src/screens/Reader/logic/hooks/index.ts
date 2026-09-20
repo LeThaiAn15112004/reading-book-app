@@ -1,11 +1,11 @@
-export { useReaderAnnotations, type SelectionMenuState } from './useReaderAnnotations'
 export {
   useReaderChromeUi,
-  type ReaderChromeAnnotationBridge,
   type ReaderChromeEscapeUi,
-  type RightSidebarKind,
 } from './useReaderChromeUi'
+export { useBookIndexing } from './useBookIndexing'
 export { useReaderBookOpen } from './useReaderBookOpen'
+export { useReaderBookmarks } from './useReaderBookmarks'
+export { useReaderHighlights, type HighlightShortcuts } from './useReaderHighlights'
 export { useReaderNavigation } from './useReaderNavigation'
 export { useReaderSessionBridge } from './useReaderSessionBridge'
 export { useReaderFullscreen } from './useReaderFullscreen'

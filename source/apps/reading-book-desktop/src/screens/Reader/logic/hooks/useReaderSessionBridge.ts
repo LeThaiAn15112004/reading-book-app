@@ -1,6 +1,6 @@
 import { useCallback, useEffect, type MutableRefObject, type RefObject } from 'react'
 import { useNavigate } from 'react-router-dom'
-import type { CfiLocation } from '@reading-book/domain'
+import type { CfiLocation } from '@reading-book/book-reader-sdk'
 import type { EpubRendererApi } from '../../../../reader/renderers/epub'
 import type { ReadingPrefs } from '../../components'
 import {
@@ -13,7 +13,6 @@ type UseReaderSessionBridgeOptions = {
   epubApiRef: RefObject<EpubRendererApi | null>
   prefsRef: MutableRefObject<ReadingPrefs>
   prefsDirtyRef: MutableRefObject<boolean>
-  clearHighlightHandlesRef: MutableRefObject<() => void>
   prefs: ReadingPrefs
   sessionLoadStatus: 'loading' | 'ready'
 }
@@ -23,7 +22,6 @@ export function useReaderSessionBridge({
   epubApiRef,
   prefsRef,
   prefsDirtyRef,
-  clearHighlightHandlesRef,
   prefs,
   sessionLoadStatus,
 }: UseReaderSessionBridgeOptions) {
@@ -48,7 +46,6 @@ export function useReaderSessionBridge({
             lineHeight: readingPrefs.lineHeight,
             textAlign: readingPrefs.textAlign,
             layoutMode: readingPrefs.layout,
-            pageTurnMode: readingPrefs.pageMode,
             marginsEnabled: readingPrefs.marginEnabled,
             marginPreset: readingPrefs.margin,
             isLandscape: readingPrefs.layout !== 'single',
@@ -65,7 +62,6 @@ export function useReaderSessionBridge({
 
   const handleEpubLocationChange = useCallback(
     (location: CfiLocation) => {
-      clearHighlightHandlesRef.current()
       const latest = getLatestSessionSnapshot()
       const readingPrefs = prefsRef.current
       const nav = epubApiRef.current?.getNavState()
@@ -84,20 +80,13 @@ export function useReaderSessionBridge({
           lineHeight: readingPrefs.lineHeight,
           textAlign: readingPrefs.textAlign,
           layoutMode: readingPrefs.layout,
-          pageTurnMode: readingPrefs.pageMode,
           marginsEnabled: readingPrefs.marginEnabled,
           marginPreset: readingPrefs.margin,
           isLandscape: readingPrefs.layout !== 'single',
         },
       )
     },
-    [
-      clearHighlightHandlesRef,
-      epubApiRef,
-      getLatestSessionSnapshot,
-      noteLocation,
-      prefsRef,
-    ],
+    [epubApiRef, getLatestSessionSnapshot, noteLocation, prefsRef],
   )
 
   const leaveToLibrary = useCallback(async () => {

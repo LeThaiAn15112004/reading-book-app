@@ -1,11 +1,12 @@
-import type { PageLayout, PageMode } from '@reading-book/shared/models'
+import type { PageLayout } from '@reading-book/book-reader-sdk'
 import type {
   FontFamily,
   FontWeight,
   ReaderTheme,
+  ReadingViewMode,
   TextAlign,
-} from '@reading-book/shared/models'
-import { READER_THEME_COLORS } from '@reading-book/shared/models'
+} from '@reading-book/book-reader-sdk'
+import { READER_THEME_PRESETS } from '@reading-book/book-reader-sdk'
 
 export type MarginMode = 'narrow' | 'normal' | 'wide' | 'off'
 
@@ -19,7 +20,7 @@ export type ReadingPrefs = {
   margin: MarginMode
   marginEnabled: boolean
   layout: PageLayout
-  pageMode: PageMode
+  viewMode: ReadingViewMode
 }
 
 type AaSettingsPanelProps = {
@@ -87,7 +88,7 @@ export function AaSettingsPanel({
           <div className={sectionTitle}>Theme</div>
           <div className="grid grid-cols-3 gap-2">
             {themeIds.map((id) => {
-              const preset = READER_THEME_COLORS[id]
+              const preset = READER_THEME_PRESETS[id]
               return (
               <button
                 key={id}
@@ -181,6 +182,26 @@ export function AaSettingsPanel({
                 {label}
               </button>
             ))}
+          </div>
+        </div>
+
+        <div className="mb-5">
+          <div className={sectionTitle}>Chế độ xem</div>
+          <div className={toggleGroup}>
+            <button
+              className={`${toggleItem} ${prefs.viewMode !== 'scroll' ? toggleActive : toggleIdle}`}
+              type="button"
+              onClick={() => onChange({ viewMode: 'paginated' })}
+            >
+              Lật trang
+            </button>
+            <button
+              className={`${toggleItem} ${prefs.viewMode === 'scroll' ? toggleActive : toggleIdle}`}
+              type="button"
+              onClick={() => onChange({ viewMode: 'scroll' })}
+            >
+              Cuộn dọc
+            </button>
           </div>
         </div>
 

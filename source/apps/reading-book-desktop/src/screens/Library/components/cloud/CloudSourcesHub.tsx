@@ -4,8 +4,8 @@ import {
   type ExternalCatalogEntry,
   type ExternalLibraryInfo,
   type ExternalLibraryProvider,
-} from '@reading-book/domain'
-import { formatFileSizeMb, type LibraryBook } from '@reading-book/shared/models'
+} from '@reading-book/book-reader-sdk'
+import { formatFileSizeMb, type LibraryBook } from '@reading-book/book-reader-sdk'
 
 const FORMAT_LABELS: Record<string, string> = {
   epub: 'EPUB',

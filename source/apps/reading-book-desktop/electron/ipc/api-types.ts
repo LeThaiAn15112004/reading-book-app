@@ -162,82 +162,6 @@ export interface ImportResult {
   errorMessage?: string
 }
 
-export interface MutationResult {
-  ok: boolean
-  id: string | null
-}
-
-export type AnnotationTypeDto =
-  | 'highlight'
-  | 'underline'
-  | 'strikethrough'
-  | 'freehand'
-  | 'textbox'
-  | 'stamp'
-
-export type AnnotationStatusDto = 'None' | 'Review' | 'Done'
-
-/** Presentation attributes (`style_properties` JSON) — keys vary by type. */
-export interface AnnotationStyleDto {
-  colorHex?: string
-  strokeWidth?: number
-  opacity?: number
-  fontFamily?: string
-  fontSize?: number
-  /** Inline note written against a markup annotation. */
-  note?: string
-  [key: string]: unknown
-}
-
-/** Clone-safe annotation row for IPC (`annotations` table). */
-export interface AnnotationDto {
-  id: string
-  bookId: string
-  type: AnnotationTypeDto
-  /** 1-based page; null when the format has no fixed page (e.g. EPUB anchored by CFI). */
-  pageNumber: number | null
-  /**
-   * Opaque per-type location: packed `start|end` Location, CFI, or JSON geometry
-   * (e.g. `{"cfiRange": "..."}` for EPUB, a bounding box for PDF).
-   */
-  locationData: string
-  content?: string
-  /** Free-text note the user typed for this annotation, separate from `style.note`. */
-  notes?: string | null
-  style: AnnotationStyleDto
-  status: AnnotationStatusDto
-  isChecked: boolean
-  createdAt: string
-  updatedAt: string
-}
-
-export interface BookmarkDto {
-  id: string
-  bookId: string
-  /** Location.toString() JSON; may include renderer `chapterIndex` extra. */
-  locationRef: string
-  label?: string
-  /** Opening text captured at the bookmarked location, for list previews. */
-  excerpt?: string
-  createdAt: string
-}
-
-export interface SaveBookmarkInput {
-  bookId: string
-  id?: string
-  /** Location JSON (optionally with `chapterIndex` for ribbon matching). */
-  locationRef: string
-  label?: string
-  /** Opening text captured at the bookmarked location, for list previews. */
-  excerpt?: string
-  createdAt?: string
-}
-
-export interface DeleteBookmarkInput {
-  bookId: string
-  id: string
-}
-
 /** Clone-safe reading session for IPC (T4.3). Location is Location.toString() JSON. */
 export interface ReadingSessionStateDto {
   bookId: string
@@ -280,47 +204,86 @@ export interface SaveReadingSessionStateInput {
   updatedAt?: string
 }
 
-/** Filter for overlay:listAnnotations; omitted fields mean "any". */
-export interface ListAnnotationsInput {
+/**
+ * Clone-safe bookmark for IPC (FR-11). `locatorRef` is the jump target serialized the same way
+ * `ReadingSessionStateDto.lastReadLocation` is — `Location.toString()` JSON, plus the
+ * `chapterIndex` the reader was on when the bookmark was placed.
+ */
+export interface BookmarkDto {
+  id: string
   bookId: string
-  types?: AnnotationTypeDto[]
-  pageNumber?: number
+  locatorRef: string
+  label?: string
+  excerpt?: string
+  createdAt: string
 }
 
-export interface SaveAnnotationInput {
+/** Input for overlay:saveBookmark — omit `id` to insert, pass it to update that bookmark. */
+export interface SaveBookmarkInput {
   bookId: string
   id?: string
-  type: AnnotationTypeDto
-  pageNumber?: number | null
-  locationData: string
-  content?: string
-  /** Free-text note the user typed for this annotation, separate from `style.note`. */
-  notes?: string | null
-  style?: AnnotationStyleDto
-  status?: AnnotationStatusDto
-  isChecked?: boolean
+  locatorRef: string
+  label?: string
+  excerpt?: string
   createdAt?: string
-  updatedAt?: string
 }
 
-/** Partial patch — omitted fields keep their stored value. `style` merges. */
-export interface UpdateAnnotationInput {
+export interface DeleteBookmarkInput {
   bookId: string
   id: string
-  content?: string
-  /** Free-text note the user typed for this annotation, separate from `style.note`. */
-  notes?: string | null
-  /** Opaque per-type location (e.g. typewriter `{xPct,yPct}` JSON). */
-  locationData?: string
-  pageNumber?: number | null
-  style?: AnnotationStyleDto
-  status?: AnnotationStatusDto
-  isChecked?: boolean
 }
 
-export interface DeleteAnnotationInput {
+/**
+ * Clone-safe highlight/underline for IPC. `locatorRef` is the jump target serialized the same
+ * way `BookmarkDto.locatorRef` is (a range CFI, plus `chapterIndex`); `selectionTextRef` is the
+ * JSON of the captured `{before?, highlight?, after?}` selection context, when present.
+ */
+export interface HighlightDto {
+  id: string
+  bookId: string
+  locatorRef: string
+  styleKind: 'highlight' | 'underline' | 'strikethrough' | 'textbox'
+  colorHex: string
+  note?: string
+  tags: string[]
+  selectionTextRef?: string
+  createdAt: string
+  updatedAt: string
+}
+
+/** Input for overlay:saveHighlight — omit `id` to insert, pass it to update that highlight. */
+export interface SaveHighlightInput {
+  bookId: string
+  id?: string
+  locatorRef: string
+  styleKind: 'highlight' | 'underline' | 'strikethrough' | 'textbox'
+  colorHex: string
+  note?: string
+  tags?: string[]
+  selectionTextRef?: string
+  createdAt?: string
+}
+
+export interface DeleteHighlightInput {
   bookId: string
   id: string
+}
+
+/** Outcome of asking Main to chunk a book's text for search (returns before the work finishes). */
+export interface EnsureBookIndexResult {
+  /**
+   * ready = chunks already exist; indexing = a background worker is running (a
+   * `BookIndexStatusDto` follows); unsupported = format has no text extractor yet; error = failed.
+   */
+  state: 'ready' | 'indexing' | 'unsupported' | 'error'
+}
+
+/** Main → renderer push while a book is being chunked in the background. */
+export interface BookIndexStatusDto {
+  bookId: string
+  state: 'indexing' | 'done' | 'error'
+  chunkCount?: number
+  errorMessage?: string
 }
 
 export interface DesktopApi {
@@ -383,15 +346,22 @@ export interface DesktopApi {
     fromUrl(url: string): Promise<ImportResult>
   }
   overlay: {
-    listAnnotations(input: ListAnnotationsInput): Promise<AnnotationDto[]>
-    saveAnnotation(input: SaveAnnotationInput): Promise<MutationResult>
-    updateAnnotation(input: UpdateAnnotationInput): Promise<MutationResult>
-    deleteAnnotation(input: DeleteAnnotationInput): Promise<OkResult>
-    listBookmarks(bookId: string): Promise<BookmarkDto[]>
-    saveBookmark(input: SaveBookmarkInput): Promise<MutationResult>
-    deleteBookmark(input: DeleteBookmarkInput): Promise<OkResult>
     getSessionState(bookId: string): Promise<ReadingSessionStateDto | null>
     saveSessionState(input: SaveReadingSessionStateInput): Promise<OkResult>
+    listBookmarks(bookId: string): Promise<BookmarkDto[]>
+    /** Resolves to null when the input is rejected (bad book id or unparsable locator). */
+    saveBookmark(input: SaveBookmarkInput): Promise<BookmarkDto | null>
+    deleteBookmark(input: DeleteBookmarkInput): Promise<OkResult>
+    listHighlights(bookId: string): Promise<HighlightDto[]>
+    /** Resolves to null when the input is rejected (bad book id or unparsable locator). */
+    saveHighlight(input: SaveHighlightInput): Promise<HighlightDto | null>
+    deleteHighlight(input: DeleteHighlightInput): Promise<OkResult>
+  }
+  bookIndex: {
+    /** Fire-and-forget from the reader after the book is shown; never blocks on chunking. */
+    ensure(bookId: string): Promise<EnsureBookIndexResult>
+    /** Subscribe to background chunking status pushes. Returns unsubscribe. */
+    onStatus(handler: (status: BookIndexStatusDto) => void): () => void
   }
   cloud: {
     /** Opens the provider's OAuth consent screen in a popup and stores tokens securely on success. */

@@ -62,7 +62,7 @@ Nguồn ý sản phẩm: [`docs/note/note.txt`](../note/note.txt) — map đầy
 | ID | Nợ (gồm ý từ note.txt) | Hiện trạng (code) | Trả ở |
 | :--- | :--- | :--- | :--- |
 | **G2-N1** | Metadata / cover PDF · TXT · MD · DOCX · DOC | Ngoài EPUB = filename fallback | **G6** |
-| **G2-N2** | Detect chữ ký số → `is_signed` / `book_signatures` | Schema sẵn; chưa detect lúc import | **G6** |
+| **G2-N2** | Detect chữ ký số → `is_signed` / `signer_name` / `signature_status` (cột `books`, gộp từ `book_signatures` ở migration `018`) | Schema sẵn; chưa detect lúc import | **G6** |
 | **G2-N3** | FTS / `book_chunks` | Bảng có; chưa fill | **G3/G6** |
 | **G2-N4** | Gắn Collection lúc import | Không bắt buộc G2 | **G6** |
 | **G2-N5** | **Form enrich import:** Title, mô tả ngắn, thể loại, tác giả, **ảnh bìa thủ công**, link file (note.txt) | Chỉ metadata file/filename; chưa form sau pick | **G6** polish |

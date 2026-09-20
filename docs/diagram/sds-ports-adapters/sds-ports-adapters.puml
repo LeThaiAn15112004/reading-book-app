@@ -14,7 +14,6 @@ package "Ports (interfaces)" as Ports #FFF3CD {
   component "DocumentImporter" as P1
   component "DocumentNormalizer" as P2
   component "DocumentRenderer" as P3
-  component "OverlayPainter" as P4
   component "LocationCodec" as P5
   component "LibraryStore /\nCollectionStore /\nOverlayStore" as P6
   component "AiProvider" as P7
@@ -24,18 +23,24 @@ package "Ports (interfaces)" as Ports #FFF3CD {
 package "Adapters (Infrastructure)" as Adapters #FCE4EC {
   component "Epub/Pdf/Txt/Md\nDocx/Doc Importers" as A1
   component "Doc/Docx Normalizer\n(+ pass-through)" as A2
-  component "ReflowHtmlRenderer\nPdfPageRenderer" as A3
-  component "DomCssOverlay\nPdfCanvasOverlay" as A4
+  component "ReflowHtmlRenderer (epub.js)\nPdfPageRenderer (chua co)" as A3
   component "Cfi / PageRect /\nTextOffset Codecs" as A5
   component "SqliteStore + FTS5" as A6
   component "NoOpAiProvider\n(MVP)" as A7
   component "NoOpExternalLibraryConnector\n(MVP)" as A8
 }
 
+note bottom of A3
+  Khong con port OverlayPainter / adapter
+  DomCssOverlay rieng (SDS 1.22). Renderer
+  tu ve lai highlight/underline/strikethrough/
+  textbox qua API annotation cua chinh engine
+  (vd. epub.js rendition.annotations).
+end note
+
 UC --> P1
 UC --> P2
 UC --> P3
-UC --> P4
 UC --> P5
 UC --> P6
 UC --> P7
@@ -44,7 +49,6 @@ UC --> P8
 A1 ..|> P1
 A2 ..|> P2
 A3 ..|> P3
-A4 ..|> P4
 A5 ..|> P5
 A6 ..|> P6
 A7 ..|> P7

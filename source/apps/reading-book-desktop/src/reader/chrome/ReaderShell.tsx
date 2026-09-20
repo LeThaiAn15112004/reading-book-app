@@ -14,6 +14,13 @@ export type ReaderShellProps = {
   contentInsetLeft?: number
   /** Right inset reserved for the shared right panel when open. */
   contentInsetRight?: number
+  /**
+   * Bottom inset reserved so content never renders behind the fixed footer —
+   * 0 in paginated mode (see `readerChromeBottomInset`); non-zero in scroll
+   * mode so the last lines of a chapter stop above the footer instead of
+   * disappearing under it.
+   */
+  contentInsetBottom?: number
   /** When false, reserve top space for the tools chrome bar. */
   chromeHidden?: boolean
   /** Disable padding transition while dragging the sidebar resize handle. */
@@ -38,6 +45,7 @@ export function ReaderShell({
   children,
   contentInsetLeft = 0,
   contentInsetRight = 0,
+  contentInsetBottom = 0,
   chromeHidden = true,
   contentInsetResizing = false,
   dataAttrs,
@@ -55,12 +63,13 @@ export function ReaderShell({
           className={`relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden ${
             contentInsetResizing
               ? ''
-              : 'transition-[padding-left,padding-right,padding-top] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]'
+              : 'transition-[padding-left,padding-right,padding-top,padding-bottom] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]'
           }`}
           style={{
             paddingLeft: contentInsetLeft,
             paddingRight: contentInsetRight,
             paddingTop: chromeTopInset,
+            paddingBottom: contentInsetBottom,
           }}
         >
           {children}

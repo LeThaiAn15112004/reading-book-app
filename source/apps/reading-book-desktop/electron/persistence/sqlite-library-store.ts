@@ -6,7 +6,7 @@ import {
   Genre,
   parseDocumentFormat,
   type LibraryStore,
-} from '@reading-book/domain'
+} from '@reading-book/book-reader-sdk'
 import type { Database as SqliteDatabase } from 'better-sqlite3'
 import { randomUUID } from 'node:crypto'
 import { getDatabase } from './db'

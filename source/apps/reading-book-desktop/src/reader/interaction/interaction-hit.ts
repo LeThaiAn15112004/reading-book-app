@@ -89,7 +89,7 @@ export function isTextCursorTargetAtPoint(
 
 /**
  * Targets that may switch away from grab after a hover dwell in Hand mode
- * (text → I-beam, links/annotations → pointer).
+ * (text → I-beam, links → pointer).
  */
 export function isHandHoverCursorTargetAtPoint(
   doc: Document,
@@ -99,13 +99,11 @@ export function isHandHoverCursorTargetAtPoint(
   const el = doc.elementFromPoint(clientX, clientY)
   if (!el) return false
   if (el.closest(INTERACTIVE_SELECTOR)) return true
-  if (el.closest('[data-rb-hl-id]')) return true
-  if (el.closest('[data-rb-tw-note], [data-rb-tw-draft]')) return true
   return isTextCursorTarget(el)
 }
 
 /**
- * Hover dwell before Hand mode shows I-beam/pointer over text or annotations.
+ * Hover dwell before Hand mode shows I-beam/pointer over text.
  * Keeps grab while the pointer skims across text during a pan.
  */
 export const HAND_HOVER_CURSOR_DELAY_MS = 300

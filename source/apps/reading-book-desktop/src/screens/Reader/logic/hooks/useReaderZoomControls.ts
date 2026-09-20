@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type RefObject } from 'react'
-import type { AnnotateTool } from '@reading-book/shared/models'
+import type { InteractionTool } from '@reading-book/book-reader-sdk'
 import type { ReaderZoomViewportHandle } from '../../components'
 import {
   ZOOM_DEFAULT,
@@ -12,7 +12,7 @@ import {
 
 type UseReaderZoomControlsOptions = {
   bookId: string | undefined
-  activeToolRef: RefObject<AnnotateTool>
+  activeToolRef: RefObject<InteractionTool>
 }
 
 export function useReaderZoomControls({

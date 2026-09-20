@@ -1,8 +1,12 @@
 export { parseResumeLocation } from './book/parseResumeLocation'
+export { highlightPopoverPosition } from './highlights/highlightPopoverPosition'
+export { useDismissOnOutsideOrEscape } from './highlights/useDismissOnOutsideOrEscape'
 export { FAKE_CHAPTERS, chapterLocationLabel, type FakeChapter } from './demo/fakeReaderContent'
 export { FAKE_SIGNATURES } from './demo/fakeSignatures'
 export {
-  useReaderAnnotations,
+  useBookIndexing,
+  useReaderBookmarks,
+  useReaderHighlights,
   useReaderBookOpen,
   useReaderChromeUi,
   useReaderNavigation,
@@ -10,13 +14,10 @@ export {
   useReaderFullscreen,
   useImmersiveChromeReveal,
   useReaderZoomControls,
-  type ReaderChromeAnnotationBridge,
+  type HighlightShortcuts,
   type ReaderChromeEscapeUi,
-  type RightSidebarKind,
-  type SelectionMenuState,
 } from './hooks'
 export { fromReadingPrefs, toReadingPrefs } from './prefs/toReadingPrefs'
-export { anchorFromSelectionRect } from './selection/selectionAnchor'
 export {
   flushRegisteredSession,
   registerSessionFlushHandler,

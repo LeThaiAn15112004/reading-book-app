@@ -4,6 +4,17 @@ import type { EpubRendererApi } from '../renderers/epub'
 /** Matches ReaderShell / SidebarEdgeRail padding transition (ms). */
 export const READER_CHROME_TRANSITION_MS = 300
 
+/**
+ * How long to keep the reading surface covered after a sidebar toggle that
+ * resizes the EPUB host (left/right panel open/close, immersive enter/exit).
+ * Must span the padding CSS transition (`READER_CHROME_TRANSITION_MS`) *plus*
+ * the epub.js resize/re-pagination that only starts once that transition
+ * settles — otherwise the reader briefly paints its old (pre-resize) column
+ * width inside the already-resized host, which reads as a "broken/squeezed"
+ * layout to the user.
+ */
+export const READER_CHROME_RESIZE_SETTLE_MS = READER_CHROME_TRANSITION_MS + 250
+
 const READER_SIDEBAR_FOCUS_ROOT =
   '[data-reader-sidebar-panel], [data-reader-right-sidebar-panel], [aria-label="Sidebar navigation"]'
 

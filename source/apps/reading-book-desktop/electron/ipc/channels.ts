@@ -57,13 +57,19 @@ export const CloudChannels = {
 } as const
 
 export const OverlayChannels = {
-  listAnnotations: 'overlay:listAnnotations',
-  saveAnnotation: 'overlay:saveAnnotation',
-  updateAnnotation: 'overlay:updateAnnotation',
-  deleteAnnotation: 'overlay:deleteAnnotation',
+  getSessionState: 'overlay:getSessionState',
+  saveSessionState: 'overlay:saveSessionState',
   listBookmarks: 'overlay:listBookmarks',
   saveBookmark: 'overlay:saveBookmark',
   deleteBookmark: 'overlay:deleteBookmark',
-  getSessionState: 'overlay:getSessionState',
-  saveSessionState: 'overlay:saveSessionState',
+  listHighlights: 'overlay:listHighlights',
+  saveHighlight: 'overlay:saveHighlight',
+  deleteHighlight: 'overlay:deleteHighlight',
+} as const
+
+export const BookIndexChannels = {
+  /** Renderer → main: make sure a book's text is chunked (background; returns immediately). */
+  ensure: 'bookIndex:ensure',
+  /** Main → renderer: background chunking started / finished / failed. */
+  status: 'bookIndex:status',
 } as const

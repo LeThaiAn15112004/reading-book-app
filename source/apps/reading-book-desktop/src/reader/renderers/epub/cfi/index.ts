@@ -6,6 +6,7 @@ export {
   type EpubCfiDecodeResult,
 } from './cfi-codec'
 export {
+  caretRangeAtPoint,
   cfiChapterSignature,
   cfiCharacterOffset,
   characterOffsetToBoundary,
@@ -29,18 +30,7 @@ export {
 } from './cfi-dom-range'
 export {
   cfiRangesOverlap,
-  elementToHighlightHandleRect,
-  emptyHighlightHandleRect,
-  iframeRangeToViewportRect,
-  rangeToHighlightHandleRect,
   splitCfiRange,
   toEpubjsDisplayCfi,
-  viewportRectToHighlightHandleRect,
   type SplitCfiRange,
 } from './selection-cfi'
-export {
-  captureTypewriterAnchor,
-  iframeClientToBodyPoint,
-  resolveTypewriterIframePoint,
-  typewriterBelongsToRenderedSection,
-} from './typewriter-cfi-anchor'

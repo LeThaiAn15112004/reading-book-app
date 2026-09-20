@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { bootErrorMessage, sleep, withTimeout } from '@reading-book/shared/utils'
+import { bootErrorMessage, sleep, withTimeout } from '@reading-book/book-reader-sdk'
 import type { BootLocationState } from '../../boot'
 import { INIT_TIMEOUT_MS, MIN_BRAND_MS, probeReady } from './splashBoot'
 

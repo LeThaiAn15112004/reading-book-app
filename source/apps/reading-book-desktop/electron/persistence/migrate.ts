@@ -15,6 +15,9 @@ import migration013 from './migrations/013_book_reading_status.sql?raw'
 import migration014 from './migrations/014_cloud_provenance.sql?raw'
 import migration015 from './migrations/015_bookmark_excerpt.sql?raw'
 import migration016 from './migrations/016_annotations_notes.sql?raw'
+import migration017 from './migrations/017_annotations_location_ref.sql?raw'
+import migration018 from './migrations/018_notes_thorium.sql?raw'
+import migration019 from './migrations/019_bookmarks_notes_merge.sql?raw'
 
 interface Migration {
   name: string
@@ -38,6 +41,9 @@ const MIGRATIONS: Migration[] = [
   { name: '014_cloud_provenance.sql', sql: migration014 },
   { name: '015_bookmark_excerpt.sql', sql: migration015 },
   { name: '016_annotations_notes.sql', sql: migration016 },
+  { name: '017_annotations_location_ref.sql', sql: migration017 },
+  { name: '018_notes_thorium.sql', sql: migration018 },
+  { name: '019_bookmarks_notes_merge.sql', sql: migration019 },
 ]
 
 /**

@@ -2,6 +2,7 @@ import { contextBridge, ipcRenderer } from 'electron'
 import type { DesktopApi } from './ipc/api-types'
 import {
   AppChannels,
+  BookIndexChannels,
   CloudChannels,
   ImportChannels,
   LibraryChannels,
@@ -83,22 +84,37 @@ const api: DesktopApi = {
     fromUrl: (url) => ipcRenderer.invoke(ImportChannels.fromUrl, url),
   },
   overlay: {
-    listAnnotations: (input) =>
-      ipcRenderer.invoke(OverlayChannels.listAnnotations, input),
-    saveAnnotation: (input) =>
-      ipcRenderer.invoke(OverlayChannels.saveAnnotation, input),
-    updateAnnotation: (input) =>
-      ipcRenderer.invoke(OverlayChannels.updateAnnotation, input),
-    deleteAnnotation: (input) =>
-      ipcRenderer.invoke(OverlayChannels.deleteAnnotation, input),
-    listBookmarks: (bookId) => ipcRenderer.invoke(OverlayChannels.listBookmarks, bookId),
-    saveBookmark: (input) => ipcRenderer.invoke(OverlayChannels.saveBookmark, input),
-    deleteBookmark: (input) =>
-      ipcRenderer.invoke(OverlayChannels.deleteBookmark, input),
     getSessionState: (bookId) =>
       ipcRenderer.invoke(OverlayChannels.getSessionState, bookId),
     saveSessionState: (input) =>
       ipcRenderer.invoke(OverlayChannels.saveSessionState, input),
+    listBookmarks: (bookId) =>
+      ipcRenderer.invoke(OverlayChannels.listBookmarks, bookId),
+    saveBookmark: (input) =>
+      ipcRenderer.invoke(OverlayChannels.saveBookmark, input),
+    deleteBookmark: (input) =>
+      ipcRenderer.invoke(OverlayChannels.deleteBookmark, input),
+    listHighlights: (bookId) =>
+      ipcRenderer.invoke(OverlayChannels.listHighlights, bookId),
+    saveHighlight: (input) =>
+      ipcRenderer.invoke(OverlayChannels.saveHighlight, input),
+    deleteHighlight: (input) =>
+      ipcRenderer.invoke(OverlayChannels.deleteHighlight, input),
+  },
+  bookIndex: {
+    ensure: (bookId) => ipcRenderer.invoke(BookIndexChannels.ensure, bookId),
+    onStatus: (handler) => {
+      const listener = (
+        _event: Electron.IpcRendererEvent,
+        status: Parameters<typeof handler>[0],
+      ) => {
+        handler(status)
+      }
+      ipcRenderer.on(BookIndexChannels.status, listener)
+      return () => {
+        ipcRenderer.removeListener(BookIndexChannels.status, listener)
+      }
+    },
   },
   cloud: {
     connect: (provider) => ipcRenderer.invoke(CloudChannels.connect, provider),

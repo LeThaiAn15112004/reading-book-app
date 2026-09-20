@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react'
-import type { LibraryBook } from '@reading-book/shared/models'
+import type { LibraryBook } from '@reading-book/book-reader-sdk'
 
 const STORAGE_KEY = 'rb-library-shelf-order-v1'
 

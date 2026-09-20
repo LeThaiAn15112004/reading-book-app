@@ -1,10 +1,4 @@
-export {
-  applyInteractionToolSurface,
-  applyHighlightToolCursor,
-  highlightToolCursorCss,
-  typewriterToolCursorCss,
-  pencilToolCursorCss,
-} from './cursors'
+export { applyInteractionToolSurface } from './cursors'
 export {
   HAND_HOVER_CURSOR_DELAY_MS,
   PAN_DRAG_THRESHOLD_PX,

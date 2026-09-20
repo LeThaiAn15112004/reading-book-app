@@ -3,7 +3,7 @@ import {
   resolveFormatFromExtension,
   SUPPORTED_FORMATS,
 } from '@reading-book/config'
-import type { DocumentFormat } from '@reading-book/domain'
+import type { DocumentFormat } from '@reading-book/book-reader-sdk'
 import path from 'node:path'
 
 /** Stable code mapped to ImportErrorCode.unsupported_format. */

@@ -7,23 +7,21 @@
  */
 
 import ePubImport, { type Book, type Rendition } from 'epubjs'
-import type { ReaderTheme } from '@reading-book/shared/models'
+import type { ReaderTheme } from '@reading-book/book-reader-sdk'
 import {
   applyDualSpreadHost,
   applyEpubFontSize,
   applyEpubReadingStyle,
   applyEpubThemeVars,
-  flowForMode,
+  EPUB_VIEW_MANAGER,
   injectEpubThemeStyles,
   linkSpineSections,
-  managerForMode,
   spineLengthOf,
   spreadForLayout,
   toArrayBuffer,
   waitForFrames,
   waitForSectionResources,
   type EpubPageLayout,
-  type EpubPageMode,
   type EpubReadingStyle,
 } from '../openEpubjs'
 import { displayedPagesFromLocation } from './reader-position'
@@ -41,7 +39,6 @@ export type HiddenPaginationMeasureInput = {
   height: number
   theme: ReaderTheme
   layout: EpubPageLayout
-  pageMode: EpubPageMode
   fontSize: number
   readingStyle: EpubReadingStyle
   signal?: AbortSignal
@@ -146,9 +143,6 @@ function currentSectionDocument(rendition: Rendition): Document | null {
 export async function measureHiddenEpubPagination(
   input: HiddenPaginationMeasureInput,
 ): Promise<HiddenPaginationMeasureResult> {
-  if (input.pageMode !== 'paginated') {
-    return { sectionPages: [], spineLength: 0 }
-  }
   if (typeof ePub !== 'function') {
     throw new Error('epubjs failed to load for hidden pagination')
   }
@@ -205,16 +199,20 @@ export async function measureHiddenEpubPagination(
       return { sectionPages: [], spineLength: 0 }
     }
 
+    // This pipeline only ever measures CSS multi-column pagination — it is
+    // never invoked when the visible reader is in scroll mode (see the
+    // `viewMode === 'scroll'` guard on `scheduleFullPaginationRemeasure` in
+    // `openEpubjs.ts`), so `flow` here is always `'paginated'`.
     rendition = book.renderTo(host, {
       width,
       height,
-      flow: flowForMode(input.pageMode),
-      manager: managerForMode(input.pageMode),
-      spread: spreadForLayout(input.pageMode, input.layout),
+      flow: 'paginated',
+      manager: EPUB_VIEW_MANAGER,
+      spread: spreadForLayout(input.layout),
       allowScriptedContent: false,
     })
     linkSpineSections(book)
-    injectEpubThemeStyles(rendition, input.pageMode)
+    injectEpubThemeStyles(rendition)
     applyEpubThemeVars(rendition, input.theme)
     applyEpubReadingStyle(rendition, input.readingStyle)
     applyEpubFontSize(rendition, input.fontSize)

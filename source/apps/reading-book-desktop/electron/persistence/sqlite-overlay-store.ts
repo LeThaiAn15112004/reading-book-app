@@ -1,13 +1,18 @@
 import {
-  Annotation,
-  Bookmark,
   Location,
   ReadingSessionState,
-  type AnnotationQuery,
-  type AnnotationType,
+  type BookmarkRecord,
+  type HighlightRecord,
+  type HighlightStyleKind,
+  type INoteState,
+  type NoteLocator,
+  type NoteSelectionText,
   type OverlayStore,
-} from '@reading-book/domain'
+  type SaveBookmarkInput,
+  type SaveHighlightInput,
+} from '@reading-book/book-reader-sdk'
 import type { Database as SqliteDatabase } from 'better-sqlite3'
+import { randomUUID } from 'node:crypto'
 import { getDatabase } from './db'
 import {
   packSessionLocation,
@@ -108,69 +113,146 @@ function rowToSessionRecord(row: SessionRow): SessionRecord {
   }
 }
 
-interface AnnotationRow {
+interface NoteRow {
   id: string
   book_id: string
-  page_number: number | null
-  type: string
-  location_data: string
-  content: string | null
-  notes: string | null
-  style_properties: string | null
-  status: string
-  is_checked: number
+  note_json: string
   created_at: string
   updated_at: string
 }
 
-const ANNOTATION_COLUMNS = `
-  id, book_id, page_number, type, location_data, content, notes,
-  style_properties, status, is_checked, created_at, updated_at
-`
+const NOTE_COLUMNS = `id, book_id, note_json, created_at, updated_at`
 
-function rowToAnnotation(row: AnnotationRow): Annotation {
-  return new Annotation({
+/**
+ * Bookmark rows are `notes` rows whose `note_json.group` is `'bookmark'` (migration 019).
+ * A missing `group` means `'annotation'` by convention, and `json_extract` yields NULL there —
+ * NULL never equals `'bookmark'`, so annotations stay out of every bookmark query while the
+ * predicate still matches the expression index `idx_notes_group` verbatim.
+ */
+const BOOKMARK_GROUP_PREDICATE = `json_extract(note_json, '$.group') = 'bookmark'`
+
+function rowToBookmarkRecord(row: NoteRow): BookmarkRecord | undefined {
+  let note: INoteState
+  try {
+    note = JSON.parse(row.note_json) as INoteState
+  } catch {
+    return undefined
+  }
+
+  const locator = note.locatorExtended?.locator
+  // A bookmark with no jump target cannot be rendered or jumped to — skip the row rather
+  // than surfacing an entry that would silently do nothing when clicked.
+  if (!locator) return undefined
+
+  return {
     id: row.id,
     bookId: row.book_id,
-    type: Annotation.isType(row.type) ? row.type : 'highlight',
-    pageNumber: row.page_number,
-    locationData: row.location_data,
-    content: row.content ?? undefined,
-    notes: row.notes,
-    style: Annotation.parseStyle(row.style_properties),
-    status: Annotation.isStatus(row.status) ? row.status : 'None',
-    isChecked: row.is_checked === 1,
+    locator,
+    label: note.label?.trim() || undefined,
+    excerpt: note.textualValue?.trim() || undefined,
+    createdAt: row.created_at,
+  }
+}
+
+function buildBookmarkNoteJson(input: {
+  locator: NoteLocator
+  label?: string
+  excerpt?: string
+  createdAt: string
+  modifiedAt: string
+}): string {
+  const note: INoteState = {
+    schemaVersion: 1,
+    type: 'bookmark',
+    group: 'bookmark',
+    locatorExtended: { locator: input.locator },
+    textualValue: input.excerpt,
+    label: input.label,
+    created: input.createdAt,
+    modified: input.modifiedAt,
+  }
+  return JSON.stringify(note)
+}
+
+const DEFAULT_HIGHLIGHT_COLOR = '#FFEB3B'
+
+/**
+ * Highlight rows are `notes` rows whose group is `'annotation'` (or absent — pre-019 rows
+ * default to annotation by convention) and whose type is one of the two styles this feature
+ * supports. The explicit `type IN (...)` guard keeps legacy freehand/textbox/stamp rows left
+ * over from the deleted overlay system out of every highlight query.
+ */
+const HIGHLIGHT_TYPE_PREDICATE = `
+  (json_extract(note_json, '$.group') IS NULL OR json_extract(note_json, '$.group') = 'annotation')
+  AND json_extract(note_json, '$.type') IN ('highlight', 'underline', 'strikethrough', 'textbox')
+`
+
+const HIGHLIGHT_STYLE_KINDS: HighlightStyleKind[] = [
+  'highlight',
+  'underline',
+  'strikethrough',
+  'textbox',
+]
+
+function rowToHighlightRecord(row: NoteRow): HighlightRecord | undefined {
+  let note: INoteState
+  try {
+    note = JSON.parse(row.note_json) as INoteState
+  } catch {
+    return undefined
+  }
+
+  const locator = note.locatorExtended?.locator
+  if (!locator) return undefined
+  const styleKind: HighlightStyleKind = HIGHLIGHT_STYLE_KINDS.includes(note.type as HighlightStyleKind)
+    ? (note.type as HighlightStyleKind)
+    : 'highlight'
+
+  return {
+    id: row.id,
+    bookId: row.book_id,
+    locator,
+    styleKind,
+    colorHex: note.style?.colorHex?.trim() || DEFAULT_HIGHLIGHT_COLOR,
+    note: note.note?.trim() || undefined,
+    tags: Array.isArray(note.tags) ? note.tags : [],
+    selectionText: note.locatorExtended?.text,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
-  })
+  }
 }
 
-interface BookmarkRow {
-  id: string
-  book_id: string
-  location_ref: string
-  label: string | null
-  excerpt: string | null
-  created_at: string
-}
-
-const BOOKMARK_COLUMNS = `
-  id, book_id, location_ref, label, excerpt, created_at
-`
-
-function rowToBookmark(row: BookmarkRow): Bookmark {
-  return new Bookmark({
-    id: row.id,
-    bookId: row.book_id,
-    locationRef: Location.parse(row.location_ref),
-    label: row.label ?? undefined,
-    excerpt: row.excerpt ?? undefined,
-    createdAt: row.created_at,
-  })
+function buildHighlightNoteJson(input: {
+  locator: NoteLocator
+  styleKind: HighlightStyleKind
+  colorHex: string
+  note?: string
+  tags?: string[]
+  selectionText?: NoteSelectionText
+  createdAt: string
+  modifiedAt: string
+}): string {
+  const note: INoteState = {
+    schemaVersion: 1,
+    type: input.styleKind,
+    group: 'annotation',
+    locatorExtended: { locator: input.locator, text: input.selectionText },
+    textualValue: input.selectionText?.highlight,
+    note: input.note ?? null,
+    style: { colorHex: input.colorHex },
+    tags: input.tags?.length ? input.tags : undefined,
+    created: input.createdAt,
+    modified: input.modifiedAt,
+  }
+  return JSON.stringify(note)
 }
 
 /**
- * SQLite OverlayStore — session (T4.3) + annotations (T5.2 / T5.10) + bookmarks (T5.5).
+ * SQLite OverlayStore — reading session state (T4.3), bookmarks (FR-11), and highlights.
+ *
+ * Bookmarks live in the unified `notes` table (`note_json.group = 'bookmark'`) since migration
+ * 019 dropped the standalone `bookmarks` table. Highlights/underlines live in the same table
+ * as `note_json.group = 'annotation'` (or absent) rows with `type` `'highlight'`/`'underline'`.
  */
 export class SqliteOverlayStore implements OverlayStore {
   constructor(private readonly db: SqliteDatabase = getDatabase()) {}
@@ -309,7 +391,17 @@ export class SqliteOverlayStore implements OverlayStore {
           margins_enabled = excluded.margins_enabled,
           margin_preset = excluded.margin_preset,
           is_landscape = excluded.is_landscape,
-          updated_at = excluded.updated_at`,
+          updated_at = excluded.updated_at
+        -- Renderer-side autosave already serializes writes to a single
+        -- in-flight IPC call (see useReadingSessionAutosave's inFlightRef
+        -- chain), so this is a defense-in-depth guard, not the primary
+        -- ordering mechanism: it protects against any future caller that
+        -- bypasses that hook (a second window, a sync engine) firing two
+        -- saveSessionState calls whose IPC responses resolve out of send
+        -- order. @updated_at is an ISO-8601 string (fixed-width, so plain
+        -- text comparison is chronological); a write older than the row
+        -- already on disk is silently dropped instead of clobbering it.
+        WHERE excluded.updated_at >= reading_session_states.updated_at`,
       )
       .run({
         book_id: s.bookId,
@@ -329,175 +421,190 @@ export class SqliteOverlayStore implements OverlayStore {
       })
   }
 
-  async saveAnnotation(a: Annotation): Promise<void> {
-    this.db
-      .prepare(
-        `INSERT INTO annotations (
-          id, book_id, page_number, type, location_data, content, notes,
-          style_properties, status, is_checked, created_at, updated_at
-        ) VALUES (
-          @id, @book_id, @page_number, @type, @location_data, @content, @notes,
-          @style_properties, @status, @is_checked, @created_at, @updated_at
-        )
-        ON CONFLICT(id) DO UPDATE SET
-          book_id = excluded.book_id,
-          page_number = excluded.page_number,
-          type = excluded.type,
-          location_data = excluded.location_data,
-          content = excluded.content,
-          notes = excluded.notes,
-          style_properties = excluded.style_properties,
-          status = excluded.status,
-          is_checked = excluded.is_checked,
-          updated_at = excluded.updated_at`,
-      )
-      .run({
-        id: a.id,
-        book_id: a.bookId,
-        page_number: a.pageNumber,
-        type: a.type,
-        location_data: a.locationData,
-        content: a.content ?? null,
-        notes: a.notes,
-        style_properties: a.serializedStyle(),
-        status: a.status,
-        is_checked: a.isChecked ? 1 : 0,
-        created_at: a.createdAt,
-        updated_at: a.updatedAt,
-      })
-  }
-
-  async getAnnotation(
-    bookId: string,
-    annotationId: string,
-  ): Promise<Annotation | undefined> {
-    const book = bookId.trim()
-    const id = annotationId.trim()
-    if (!book || !id) return undefined
-    const row = this.db
-      .prepare(
-        `SELECT ${ANNOTATION_COLUMNS}
-         FROM annotations
-         WHERE book_id = ? AND id = ?`,
-      )
-      .get(book, id) as AnnotationRow | undefined
-    return row ? rowToAnnotation(row) : undefined
-  }
-
-  async listAnnotations(query: AnnotationQuery): Promise<Annotation[]> {
-    const book = query.bookId.trim()
-    if (!book) return []
-
-    const types = (query.types ?? []).filter((type): type is AnnotationType =>
-      Annotation.isType(type),
-    )
-    // An explicit but fully invalid type filter must not silently widen to "all".
-    if (query.types?.length && !types.length) return []
-
-    const params: Array<string | number> = [book]
-    let where = 'book_id = ?'
-    if (types.length) {
-      where += ` AND type IN (${types.map(() => '?').join(', ')})`
-      params.push(...types)
-    }
-    if (query.pageNumber != null && Number.isFinite(query.pageNumber)) {
-      where += ' AND page_number = ?'
-      params.push(Math.floor(query.pageNumber))
-    }
+  async listBookmarks(bookId: string): Promise<BookmarkRecord[]> {
+    const id = bookId.trim()
+    if (!id) return []
 
     const rows = this.db
       .prepare(
-        `SELECT ${ANNOTATION_COLUMNS}
-         FROM annotations
-         WHERE ${where}
-         ORDER BY created_at DESC`,
+        `SELECT ${NOTE_COLUMNS}
+         FROM notes
+         WHERE book_id = ? AND ${BOOKMARK_GROUP_PREDICATE}
+         ORDER BY created_at ASC`,
       )
-      .all(...params) as AnnotationRow[]
-    return rows.map(rowToAnnotation)
+      .all(id) as NoteRow[]
+
+    return rows
+      .map(rowToBookmarkRecord)
+      .filter((b): b is BookmarkRecord => b !== undefined)
   }
 
-  async deleteAnnotation(bookId: string, annotationId: string): Promise<boolean> {
-    const book = bookId.trim()
-    const id = annotationId.trim()
-    if (!book || !id) return false
+  async saveBookmark(input: SaveBookmarkInput): Promise<BookmarkRecord> {
+    const bookId = input.bookId.trim()
+    if (!bookId) throw new Error('saveBookmark requires a bookId')
+
+    const now = new Date().toISOString()
+    const existingId = input.id?.trim()
+    const id = existingId || randomUUID()
+
+    // An update must not rewrite when the bookmark was first placed; only an insert dates it.
+    const existingCreatedAt = existingId
+      ? (
+          this.db
+            .prepare(`SELECT created_at FROM notes WHERE id = ? AND book_id = ?`)
+            .get(existingId, bookId) as { created_at: string } | undefined
+        )?.created_at
+      : undefined
+    const createdAt = input.createdAt?.trim() || existingCreatedAt || now
+
+    const label = input.label?.trim() || undefined
+    const excerpt = input.excerpt?.trim() || undefined
+    const noteJson = buildBookmarkNoteJson({
+      locator: input.locator,
+      label,
+      excerpt,
+      createdAt,
+      modifiedAt: now,
+    })
+
     const result = this.db
-      .prepare(`DELETE FROM annotations WHERE book_id = ? AND id = ?`)
-      .run(book, id)
+      .prepare(
+        `INSERT INTO notes (id, book_id, note_json, created_at, updated_at)
+         VALUES (@id, @book_id, @note_json, @created_at, @updated_at)
+         ON CONFLICT(id) DO UPDATE SET
+           note_json = @note_json,
+           updated_at = @updated_at
+         -- Guard against an id that belongs to an annotation row: a bookmark write must
+         -- never silently convert someone's highlight/note into a bookmark.
+         WHERE ${BOOKMARK_GROUP_PREDICATE}`,
+      )
+      .run({
+        id,
+        book_id: bookId,
+        note_json: noteJson,
+        created_at: createdAt,
+        updated_at: now,
+      })
+
+    if (result.changes === 0) {
+      throw new Error(`saveBookmark: note ${id} exists but is not a bookmark`)
+    }
+
+    return { id, bookId, locator: input.locator, label, excerpt, createdAt }
+  }
+
+  async deleteBookmark(bookId: string, id: string): Promise<boolean> {
+    const book = bookId.trim()
+    const noteId = id.trim()
+    if (!book || !noteId) return false
+
+    const result = this.db
+      .prepare(
+        `DELETE FROM notes
+         WHERE id = ? AND book_id = ? AND ${BOOKMARK_GROUP_PREDICATE}`,
+      )
+      .run(noteId, book)
+
     return result.changes > 0
   }
 
-  /**
-   * Persist bookmark row. `locationRef` is opaque Location JSON and may include
-   * renderer extras (e.g. `chapterIndex`) ignored by Location.parse.
-   */
-  async saveBookmarkRecord(input: {
-    id: string
-    bookId: string
-    locationRef: string
-    label?: string
-    excerpt?: string
-    createdAt: string
-  }): Promise<void> {
-    this.db
-      .prepare(
-        `INSERT INTO bookmarks (
-          id, book_id, location_ref, label, excerpt, created_at
-        ) VALUES (
-          @id, @book_id, @location_ref, @label, @excerpt, @created_at
-        )
-        ON CONFLICT(id) DO UPDATE SET
-          book_id = excluded.book_id,
-          location_ref = excluded.location_ref,
-          label = excluded.label,
-          excerpt = excluded.excerpt,
-          created_at = excluded.created_at`,
-      )
-      .run({
-        id: input.id,
-        book_id: input.bookId,
-        location_ref: input.locationRef,
-        label: input.label ?? null,
-        excerpt: input.excerpt ?? null,
-        created_at: input.createdAt,
-      })
-  }
-
-  async saveBookmark(b: Bookmark): Promise<void> {
-    await this.saveBookmarkRecord({
-      id: b.id,
-      bookId: b.bookId,
-      locationRef: b.locationRef.toString(),
-      label: b.label,
-      excerpt: b.excerpt,
-      createdAt: b.createdAt,
-    })
-  }
-
-  async listBookmarkRecords(bookId: string): Promise<BookmarkRow[]> {
+  async listHighlights(bookId: string): Promise<HighlightRecord[]> {
     const id = bookId.trim()
     if (!id) return []
-    return this.db
+
+    const rows = this.db
       .prepare(
-        `SELECT ${BOOKMARK_COLUMNS}
-         FROM bookmarks
-         WHERE book_id = ?
+        `SELECT ${NOTE_COLUMNS}
+         FROM notes
+         WHERE book_id = ? AND ${HIGHLIGHT_TYPE_PREDICATE}
          ORDER BY created_at ASC`,
       )
-      .all(id) as BookmarkRow[]
+      .all(id) as NoteRow[]
+
+    return rows
+      .map(rowToHighlightRecord)
+      .filter((h): h is HighlightRecord => h !== undefined)
   }
 
-  async listBookmarks(bookId: string): Promise<Bookmark[]> {
-    const rows = await this.listBookmarkRecords(bookId)
-    return rows.map(rowToBookmark)
-  }
+  async saveHighlight(input: SaveHighlightInput): Promise<HighlightRecord> {
+    const bookId = input.bookId.trim()
+    if (!bookId) throw new Error('saveHighlight requires a bookId')
 
-  async deleteBookmark(bookId: string, bookmarkId: string): Promise<boolean> {
-    const book = bookId.trim()
-    const id = bookmarkId.trim()
-    if (!book || !id) return false
+    const now = new Date().toISOString()
+    const existingId = input.id?.trim()
+    const id = existingId || randomUUID()
+
+    // An update must not rewrite when the highlight was first created; only an insert dates it.
+    const existingCreatedAt = existingId
+      ? (
+          this.db
+            .prepare(`SELECT created_at FROM notes WHERE id = ? AND book_id = ?`)
+            .get(existingId, bookId) as { created_at: string } | undefined
+        )?.created_at
+      : undefined
+    const createdAt = input.createdAt?.trim() || existingCreatedAt || now
+
+    const note = input.note?.trim() || undefined
+    const noteJson = buildHighlightNoteJson({
+      locator: input.locator,
+      styleKind: input.styleKind,
+      colorHex: input.colorHex,
+      note,
+      tags: input.tags,
+      selectionText: input.selectionText,
+      createdAt,
+      modifiedAt: now,
+    })
+
     const result = this.db
-      .prepare(`DELETE FROM bookmarks WHERE book_id = ? AND id = ?`)
-      .run(book, id)
+      .prepare(
+        `INSERT INTO notes (id, book_id, note_json, created_at, updated_at)
+         VALUES (@id, @book_id, @note_json, @created_at, @updated_at)
+         ON CONFLICT(id) DO UPDATE SET
+           note_json = @note_json,
+           updated_at = @updated_at
+         -- Guard against an id that belongs to a bookmark row: a highlight write must never
+         -- silently convert a bookmark into a highlight.
+         WHERE (json_extract(note_json, '$.group') IS NULL OR json_extract(note_json, '$.group') = 'annotation')`,
+      )
+      .run({
+        id,
+        book_id: bookId,
+        note_json: noteJson,
+        created_at: createdAt,
+        updated_at: now,
+      })
+
+    if (result.changes === 0) {
+      throw new Error(`saveHighlight: note ${id} exists but is not an annotation`)
+    }
+
+    return {
+      id,
+      bookId,
+      locator: input.locator,
+      styleKind: input.styleKind,
+      colorHex: input.colorHex,
+      note,
+      tags: input.tags ?? [],
+      selectionText: input.selectionText,
+      createdAt,
+      updatedAt: now,
+    }
+  }
+
+  async deleteHighlight(bookId: string, id: string): Promise<boolean> {
+    const book = bookId.trim()
+    const noteId = id.trim()
+    if (!book || !noteId) return false
+
+    const result = this.db
+      .prepare(
+        `DELETE FROM notes
+         WHERE id = ? AND book_id = ? AND ${HIGHLIGHT_TYPE_PREDICATE}`,
+      )
+      .run(noteId, book)
+
     return result.changes > 0
   }
 }

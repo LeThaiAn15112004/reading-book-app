@@ -1,4 +1,4 @@
-import type { ResolvedReadingPrefs } from '@reading-book/shared/models'
+import type { ResolvedReadingPrefs } from '@reading-book/book-reader-sdk'
 import type { ReadingPrefs } from '../../components/settings/AaSettingsPanel'
 
 /** Map shared resolved prefs into desktop Aa panel prefs shape. */
@@ -12,7 +12,7 @@ export function toReadingPrefs(resolved: ResolvedReadingPrefs): ReadingPrefs {
     margin: resolved.margin,
     marginEnabled: resolved.marginEnabled,
     layout: resolved.layout,
-    pageMode: resolved.pageMode,
+    viewMode: resolved.viewMode,
   }
 }
 
@@ -25,9 +25,9 @@ export function fromReadingPrefs(prefs: ReadingPrefs): ResolvedReadingPrefs {
     fontWeight: prefs.fontWeight,
     lineHeight: prefs.lineHeight,
     textAlign: prefs.textAlign,
-    margin: marginOff ? 'normal' : prefs.margin,
+    margin: prefs.margin === 'off' ? 'normal' : prefs.margin,
     marginEnabled: marginOff ? false : prefs.marginEnabled,
     layout: prefs.layout,
-    pageMode: prefs.pageMode,
+    viewMode: prefs.viewMode,
   }
 }

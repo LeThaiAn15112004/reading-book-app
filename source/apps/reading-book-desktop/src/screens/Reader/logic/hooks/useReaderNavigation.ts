@@ -2,11 +2,8 @@ import {
   useCallback,
   useEffect,
   useState,
-  type Dispatch,
   type MutableRefObject,
-  type SetStateAction,
 } from 'react'
-import type { PageMode } from '@reading-book/shared/models'
 import type {
   EpubNavState,
   EpubRendererApi,
@@ -14,24 +11,10 @@ import type {
 } from '../../../../reader/renderers/epub'
 import { blurReaderSidebarFocus } from '../../../../reader/chrome'
 import { FAKE_CHAPTERS } from '../demo/fakeReaderContent'
-import type { SelectionMenuState } from './useReaderAnnotations'
+import type { HighlightShortcuts } from './useReaderHighlights'
 
-function navigateEpubByArrow(
-  api: EpubRendererApi,
-  forward: boolean,
-  pageMode: PageMode,
-): void {
-  if (pageMode === 'scroll') {
-    api.scrollByViewport(forward ? 1 : -1)
-    return
-  }
+function navigateEpubByArrow(api: EpubRendererApi, forward: boolean): void {
   void (forward ? api.nextPage() : api.prevPage())
-}
-
-type AnnotationShortcuts = {
-  undo: () => void
-  redo: () => void
-  deleteFocused: () => void
 }
 
 type UseReaderNavigationOptions = {
@@ -40,13 +23,9 @@ type UseReaderNavigationOptions = {
   bookBytes: ArrayBuffer | null
   bookFormat: string | null
   isEpubSurface: boolean
-  pageMode: PageMode
   epubApiRef: MutableRefObject<EpubRendererApi | null>
   closeFloating: () => void
-  setSelectionMenu: Dispatch<SetStateAction<SelectionMenuState | null>>
-  clearHighlightHandles: () => void
-  annotationShortcutsRef: MutableRefObject<AnnotationShortcuts>
-  hasHighlightEdit: () => boolean
+  highlightShortcutsRef: MutableRefObject<HighlightShortcuts>
 }
 
 export function useReaderNavigation({
@@ -55,13 +34,9 @@ export function useReaderNavigation({
   bookBytes,
   bookFormat,
   isEpubSurface,
-  pageMode,
   epubApiRef,
   closeFloating,
-  setSelectionMenu,
-  clearHighlightHandles,
-  annotationShortcutsRef,
-  hasHighlightEdit,
+  highlightShortcutsRef,
 }: UseReaderNavigationOptions) {
   const [chapterIndex, setChapterIndex] = useState(0)
   const [epubNav, setEpubNav] = useState<EpubNavState | null>(null)
@@ -78,8 +53,6 @@ export function useReaderNavigation({
   }, [bookId, epubApiRef])
 
   function clearTransientNavUi() {
-    setSelectionMenu(null)
-    clearHighlightHandles()
     blurReaderSidebarFocus()
   }
 
@@ -93,7 +66,7 @@ export function useReaderNavigation({
     if (isEpubSurface) {
       const api = epubApiRef.current
       if (!api) return
-      navigateEpubByArrow(api, forward, pageMode)
+      navigateEpubByArrow(api, forward)
       clearTransientNavUi()
       return
     }
@@ -132,7 +105,7 @@ export function useReaderNavigation({
       }
       clearTransientNavUi()
     },
-    [clearHighlightHandles, isEpubSurface, setSelectionMenu],
+    [isEpubSurface],
   )
 
   /** Seek to a 0..1 fraction of book position (progress-bar click), by spine order. */
@@ -158,7 +131,7 @@ export function useReaderNavigation({
       }
       clearTransientNavUi()
     },
-    [clearHighlightHandles, epubApiRef, epubNav, isEpubSurface, setSelectionMenu],
+    [epubApiRef, epubNav, isEpubSurface],
   )
 
   function handleSelectTocItem(item: EpubTocItem) {
@@ -183,7 +156,6 @@ export function useReaderNavigation({
   }
 
   // Page navigation uses only ArrowLeft/ArrowRight (window + EPUB iframes).
-  // Also hosts annotation undo/redo shortcuts so one capture listener stays cohesive.
   useEffect(() => {
     if (contentStatus !== 'ready') return
 
@@ -191,34 +163,44 @@ export function useReaderNavigation({
       if (isReaderTypingTarget(e.target)) return
       if (e.altKey) return
 
-      // Annotation undo / redo (Ctrl/Cmd+Z, Ctrl/Cmd+Y, Ctrl/Cmd+Shift+Z).
+      // Highlight/Underline tool armed: Escape drops back to Select instead of leaving the
+      // reader — checked first since it should win over any other Escape-driven UI.
+      if (e.key === 'Escape') {
+        if (highlightShortcutsRef.current.cancelAnnotationTool()) {
+          e.preventDefault()
+          e.stopPropagation()
+        }
+        return
+      }
+
+      // Highlight undo / redo (Ctrl/Cmd+Z, Ctrl/Cmd+Y, Ctrl/Cmd+Shift+Z).
       if (e.ctrlKey || e.metaKey) {
         const key = e.key.toLowerCase()
         if (key === 'z') {
           e.preventDefault()
           e.stopPropagation()
-          if (e.shiftKey) annotationShortcutsRef.current.redo()
-          else annotationShortcutsRef.current.undo()
+          if (e.shiftKey) highlightShortcutsRef.current.redo()
+          else highlightShortcutsRef.current.undo()
           return
         }
         if (key === 'y') {
           e.preventDefault()
           e.stopPropagation()
-          annotationShortcutsRef.current.redo()
+          highlightShortcutsRef.current.redo()
           return
         }
       }
 
-      // Quick delete focused highlight (Hand browse-edit or Highlight tool).
+      // Delete the focused highlight (its edit popup is open).
       if (
         (e.key === 'Delete' || e.key === 'Backspace') &&
         !e.ctrlKey &&
         !e.metaKey &&
-        hasHighlightEdit()
+        highlightShortcutsRef.current.hasFocusedHighlight()
       ) {
         e.preventDefault()
         e.stopPropagation()
-        annotationShortcutsRef.current.deleteFocused()
+        highlightShortcutsRef.current.deleteFocused()
         return
       }
 
@@ -236,7 +218,7 @@ export function useReaderNavigation({
         if (!api) return
         e.preventDefault()
         e.stopPropagation()
-        navigateEpubByArrow(api, forward, pageMode)
+        navigateEpubByArrow(api, forward)
         clearTransientNavUi()
         return
       }
@@ -285,17 +267,7 @@ export function useReaderNavigation({
       })
       boundDocs.clear()
     }
-  }, [
-    annotationShortcutsRef,
-    bookBytes,
-    bookFormat,
-    chapterIndex,
-    contentStatus,
-    hasHighlightEdit,
-    isEpubSurface,
-    pageMode,
-    setSelectionMenu,
-  ])
+  }, [bookBytes, bookFormat, chapterIndex, contentStatus, isEpubSurface, highlightShortcutsRef])
 
   return {
     chapterIndex,

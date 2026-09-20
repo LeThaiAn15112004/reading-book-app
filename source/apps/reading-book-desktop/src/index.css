@@ -114,6 +114,10 @@
   --cursor-hand-tool-active: grabbing;
   --cursor-select-tool: text;
   --cursor-highlight-tool: url('/cursors/highlighter.svg') 6 28, text;
+  --cursor-underline-tool: url('/cursors/underline.svg') 6 28, text;
+  /* Strikethrough reuses the underline cursor art, same as it reuses the underline mark's
+     geometry in openEpubjs.ts — there's no dedicated cursor asset. */
+  --cursor-strikethrough-tool: url('/cursors/underline.svg') 6 28, text;
   --cursor-typewriter-tool: url('/cursors/typewriter.svg') 16 26, text;
   --cursor-pencil-tool: url('/cursors/pencil.svg') 4 28, crosshair;
 }
@@ -132,6 +136,14 @@
 
 @utility cursor-highlight-tool {
   cursor: var(--cursor-highlight-tool);
+}
+
+@utility cursor-underline-tool {
+  cursor: var(--cursor-underline-tool);
+}
+
+@utility cursor-strikethrough-tool {
+  cursor: var(--cursor-strikethrough-tool);
 }
 
 @utility cursor-typewriter-tool {
@@ -255,6 +267,64 @@
   z-index: 130;
   transform: translateX(-50%);
   pointer-events: none;
+}
+
+/*
+ * epub.js/marks-pane underline marks (`.epubjs-ul`, see openEpubjs.ts styleAttrsFor) draw a
+ * per-line hitbox `<rect fill="none">` alongside the visible `<line>` stroke. Neither element sets
+ * its own `stroke`, so both inherit the `stroke`/`stroke-opacity` we set on the mark's wrapping
+ * `<g>` (for the highlight color) — which makes the "invisible" rect render as a colored bounding
+ * box around the whole line. Force the rect to stay stroke-less, and force the line (which
+ * marks-pane hardcodes to `stroke="black"`) to actually take the color from the `<g>` instead.
+ */
+.epubjs-ul rect {
+  stroke: none !important;
+}
+.epubjs-ul line {
+  stroke: inherit !important;
+}
+
+/*
+ * "Focused" outline for whichever highlight/underline mark was last clicked (see
+ * `setFocusedHighlight` in openEpubjs.ts, toggled from useReaderHighlights.ts). For a fill
+ * highlight the child `<rect>`s have no `stroke` of their own, so this paints a real outline
+ * around each line box via inheritance; for an underline it recolors/bolds the visible `<line>`
+ * (which already inherits `stroke` — see the rule above) instead, since that mark has no separate
+ * outline to draw. The invisible underline hitbox `<rect>` stays untouched by `stroke: none`
+ * above regardless, since a direct rule always wins over an inherited value.
+ */
+.rb-hl-focused {
+  stroke: #4fc3f7 !important;
+  stroke-width: 2px !important;
+}
+
+/*
+ * `textbox` notes use epub.js's plain `mark()` annotation (openEpubjs.ts `epubAnnotationTypeFor`)
+ * instead of a colored highlight/underline — it places one `<a>` per note, always tagged
+ * `ref="epubjs-mk"` (hardcoded by epub.js/iframe.js, no custom className support for this type),
+ * positioned via inline `top`/`left` at the right edge of the noted text. This is the only
+ * styling hook available for it, so the 📝 glyph is pure CSS content rather than real markup.
+ */
+a[ref='epubjs-mk'] {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+  text-decoration: none;
+  transform: translate(2px, -4px);
+}
+a[ref='epubjs-mk']::before {
+  content: '📝';
+}
+/* Same focused outline concept as `.rb-hl-focused` above, adapted for a plain HTML element
+   instead of an SVG mark (no `stroke` to lean on). */
+a[ref='epubjs-mk'].rb-hl-focused {
+  border-radius: 999px;
+  box-shadow: 0 0 0 2px #4fc3f7;
 }
 
 .rb-tw-toolbar-portal .rb-tw-toolbar {
@@ -514,7 +584,7 @@
 
 /*
  * App window titlebar — optional document title (center on Reader),
- * reader search (right), native caption buttons (Electron titleBarOverlay).
+ * native caption buttons (Electron titleBarOverlay).
  */
 .app-window-titlebar {
   position: relative;
@@ -548,62 +618,6 @@
   letter-spacing: 0.01em;
   color: var(--lib-titlebar-muted);
   pointer-events: none;
-}
-
-.app-window-titlebar.is-reader .app-window-titlebar-center {
-  /* Keep clear of the search field on the right. */
-  left: calc(50% - 70px);
-  max-width: min(34vw, 280px);
-}
-
-.app-window-titlebar-search {
-  position: relative;
-  z-index: 1;
-  display: flex;
-  align-items: center;
-  margin-left: auto;
-  width: min(220px, 30vw);
-  min-width: 140px;
-  -webkit-app-region: no-drag;
-}
-
-.app-window-titlebar-search-icon {
-  position: absolute;
-  left: 8px;
-  width: 13px;
-  height: 13px;
-  color: var(--lib-muted);
-  pointer-events: none;
-}
-
-.app-window-titlebar-search input {
-  box-sizing: border-box;
-  width: 100%;
-  height: 26px;
-  margin: 0;
-  border: 1px solid var(--lib-border);
-  border-radius: 6px;
-  background: var(--lib-input);
-  padding: 0 8px 0 26px;
-  font: inherit;
-  font-size: 12px;
-  line-height: 1;
-  color: var(--lib-text);
-  outline: none;
-  transition: border-color 0.15s ease, box-shadow 0.15s ease;
-}
-
-.app-window-titlebar-search input::placeholder {
-  color: var(--lib-muted);
-}
-
-.app-window-titlebar-search input::-webkit-search-cancel-button {
-  -webkit-appearance: none;
-}
-
-.app-window-titlebar-search input:focus {
-  border-color: var(--lib-accent);
-  box-shadow: 0 0 0 2px var(--lib-accent-ring);
 }
 
 /* Shared app menubar (below window titlebar; text-only nav). */

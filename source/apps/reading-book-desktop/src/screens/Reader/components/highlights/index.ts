@@ -1,10 +1,4 @@
-export { HighlightRangeHandles, type HighlightHandleRect } from './HighlightRangeHandles'
-export {
-  FreehandEditOverlay,
-  type FreehandEditTarget,
-} from './FreehandEditOverlay'
-export {
-  SelectionTooltip,
-  type HighlightEditTarget,
-  type SelectionMenuAnchor,
-} from './SelectionTooltip'
+export { HighlightColorPicker } from './HighlightColorPicker'
+export { HighlightContextMenu } from './HighlightContextMenu'
+export { HighlightEditPopup } from './HighlightEditPopup'
+export { NoteTextboxPopup } from './NoteTextboxPopup'

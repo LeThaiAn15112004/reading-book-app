@@ -102,7 +102,7 @@ Chi tiết task: [12_Reader_Tools_Search_Speech_Translate_Typewriter.md](./12_Re
 | **TOOL-SEARCH1** | Search in-book | Nút Tools + toast | G3/G4 polish → G7 semantic |
 | **TOOL-SPEECH1** | Speech / TTS | Nút Tools + toast | Sau G7 (spike) |
 | **TOOL-TR1** | Translate đoạn/trang | Nút Tools + toast | Sau MVP / G7 provider |
-| **TOOL-TW1** | Typewriter overlay persist | Tool kích hoạt được trên fake; chưa SQLite/EPUB neo | Sau G5/G6 |
+| ~~TOOL-TW1~~ | ~~Typewriter overlay persist~~ | **Đóng** — bỏ khỏi kế hoạch, thay bằng style kind `textbox` trong hệ highlight (xem [06](./06_Giai_doan_5_Highlight_Note_Bookmark.md) §2.3) | Đã xong theo hướng khác |
 
 ### Ngoài phạm vi / chưa cam kết MVP
 

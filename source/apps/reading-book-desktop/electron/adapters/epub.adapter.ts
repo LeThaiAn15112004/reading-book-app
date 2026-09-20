@@ -1,5 +1,5 @@
-import type { DocumentImporter, ImportResult } from '@reading-book/domain'
-import { DocumentFormat } from '@reading-book/domain'
+import type { DocumentImporter, ImportResult } from '@reading-book/book-reader-sdk'
+import { DocumentFormat } from '@reading-book/book-reader-sdk'
 import { resolveFormatFromExtension } from '@reading-book/config'
 import { XMLParser } from 'fast-xml-parser'
 import fsp from 'node:fs/promises'
@@ -348,4 +348,66 @@ export const epubAdapter: DocumentImporter = {
       pageCount,
     })
   },
+}
+
+export interface EpubSpineDocument {
+  /** Position in the OPF spine — matches the reader's `spineIndex` / `chapterIndex`. */
+  index: number
+  /** Zip-internal path of the (X)HTML document. */
+  href: string
+  html: string
+}
+
+const HTML_MEDIA_TYPES = new Set(['application/xhtml+xml', 'text/html'])
+
+/**
+ * Stream the readable (X)HTML documents of an EPUB in spine order, for text extraction.
+ * Skips non-linear items and non-HTML resources; a missing zip entry is skipped, not fatal.
+ */
+export async function* readEpubSpineDocuments(
+  filePath: string,
+): AsyncGenerator<EpubSpineDocument> {
+  const zip = await JSZip.loadAsync(await fsp.readFile(filePath))
+
+  const containerEntry = zip.file('META-INF/container.xml')
+  if (!containerEntry) return
+  const opfPath = parseContainerRootfile(await containerEntry.async('string'))
+  if (!opfPath) return
+  const opfEntry = zip.file(opfPath)
+  if (!opfEntry) return
+
+  const opf = asRecord(xmlParser.parse(await opfEntry.async('string'))) ?? {}
+  const manifestById = new Map<string, Record<string, unknown>>()
+  for (const item of findManifestItems(opf)) {
+    const id = typeof item['@_id'] === 'string' ? item['@_id'] : undefined
+    if (id) manifestById.set(id, item)
+  }
+
+  const opfDir = path.posix.dirname(opfPath)
+  const spine = findSpineItemrefs(opf)
+
+  for (let index = 0; index < spine.length; index += 1) {
+    const itemref = spine[index]
+    if (itemref['@_linear'] === 'no') continue
+
+    const idref = typeof itemref['@_idref'] === 'string' ? itemref['@_idref'] : undefined
+    const item = idref ? manifestById.get(idref) : undefined
+    const href = item && typeof item['@_href'] === 'string' ? item['@_href'] : undefined
+    const media = item && typeof item['@_media-type'] === 'string' ? item['@_media-type'] : ''
+    if (!href || !HTML_MEDIA_TYPES.has(media)) continue
+
+    const base = opfDir === '.' ? '' : opfDir
+    const entryPath = resolveZipRelative(base, href)
+    let entry = zip.file(entryPath)
+    if (!entry) {
+      try {
+        entry = zip.file(resolveZipRelative(base, decodeURIComponent(href)))
+      } catch {
+        entry = null
+      }
+    }
+    if (!entry || entry.dir) continue
+
+    yield { index, href: entryPath, html: await entry.async('string') }
+  }
 }

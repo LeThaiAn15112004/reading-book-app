@@ -1,4 +1,4 @@
-import { DocumentFormat } from '@reading-book/domain'
+import { DocumentFormat } from '@reading-book/book-reader-sdk'
 import { createFilenameFallbackImporter } from './filename-fallback-importer'
 
 /** Legacy DOC DocumentImporter — filename stub (T2.9); normalize / render → G6. */

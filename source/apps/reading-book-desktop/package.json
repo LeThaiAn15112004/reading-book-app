@@ -8,7 +8,6 @@
     "typecheck": "tsc --noEmit",
     "build": "tsc && vite build && electron-builder",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
-
     "preview": "vite preview",
     "postinstall": "electron-builder install-app-deps",
     "rebuild:native": "electron-builder install-app-deps",
@@ -25,8 +24,10 @@
     "foliate-js": "^1.0.1",
     "jszip": "^3.10.1",
     "react": "^18.2.0",
+    "react-colorful": "^5.8.1",
     "react-dom": "^18.2.0",
-    "react-router-dom": "^7.18.1"
+    "react-router-dom": "^7.18.1",
+    "zustand": "^5.0.15"
   },
   "devDependencies": {
     "@electron/rebuild": "^4.2.0",

@@ -14,8 +14,8 @@
 1. Import & đọc được **PDF, TXT, Markdown, DOCX, DOC** ngoài EPUB.
 2. Progress / highlight hoạt động theo location từng họ (page+rect / text offset / block range).
 3. SCR-06: Linked libraries (stub), Appearance, Language, Fullscreen, File scan (có thể stub một phần), Multi-document flag…
-4. Xóa sách → cascade progress, highlight, note, **comment**, **book_signatures**, file sandbox (**FR-12** / BR-06).
-5. (Tuỳ chọn / polish) Detect PDF chữ ký số → cập nhật `books.is_signed` + `book_signatures` (schema sẵn từ SDS 1.15).
+4. Xóa sách → cascade progress, `notes` (highlight/note/bookmark hợp nhất), file sandbox (**FR-12** / BR-06). Không còn entity **comment** riêng (đã xóa khỏi schema từ migration `010`, trước G6).
+5. (Tuỳ chọn / polish) Detect PDF chữ ký số → cập nhật `books.is_signed` / `signer_name` / `signature_status` / `signed_at` (cột trên `books`, gộp từ bảng con `book_signatures` ở migration `018`).
 6. Checklist MVP desktop ở [10_Checklist…](./10_Checklist_nghiem_thu.md) đạt.
 
 ## 2. Việc cần làm
@@ -25,7 +25,7 @@
 | Task | Chi tiết | FR |
 | :--- | :--- | :--- |
 | T6.1 | `PdfRenderer` + navigation trang + zoom/pan cơ bản | FR-02 |
-| T6.2 | `PdfCanvasOverlay` cho highlight/note (không chèn CSS vào PDF) | FR-06 |
+| T6.2 | `PdfPageRenderer` tự vẽ highlight/note lên canvas riêng (không chèn CSS vào PDF) — theo cùng nguyên tắc "renderer tự lo overlay mark của mình" đã áp dụng cho EPUB (SDS 1.22 — không có port `OverlayPainter` chung để implement) | FR-06 |
 | T6.3 | `PageRectCodec` persist progress PDF | FR-05 |
 | T6.4 | TXT renderer (reflow) + `TextOffsetCodec` | FR-02, FR-05 |
 | T6.5 | Markdown → HTML render + location block/range | FR-02 |
@@ -40,8 +40,8 @@
 | :--- | :--- | :--- |
 | T6.8 | SCR-06 full-page theo mockup (**Linked libraries** stub — không Account/Sign-in); persist prefs bằng **electron-store** (không SQLite `app_settings`) | SCR-06 |
 | T6.9 | Phân biệt rõ SCR-05 (per-book đọc, SQLite `reading_session_states`) vs SCR-06 (app-level, platform store) | SDS |
-| T6.10 | Xóa sách + cascade (**FR-12**, BR-06) — gồm `annotations`, `book_signatures` | FR-12 |
-| T6.10a | Detect chữ ký số (PDF) → `is_signed` + rows `book_signatures` | SDS §3 |
+| T6.10 | Xóa sách + cascade (**FR-12**, BR-06) — gồm `notes` (+ `note_tags`); chữ ký số nằm trên cột `books` nên tự dọn theo | FR-12 |
+| T6.10a | Detect chữ ký số (PDF) → cập nhật cột `is_signed`/`signer_name`/`signature_status`/`signed_at` trên `books` | SDS §3 |
 | T6.11 | Favorites / Completed / To read đủ dùng MVP | SCR-01 |
 | T6.11a | Collections CRUD + gắn/gỡ sách đủ dùng MVP (FR-14) — thay session stub | SCR-01, FR-14 |
 | T6.12 | Drag reorder shelf nếu chưa làm ở G1 | SCR-01 |

@@ -1,10 +1,9 @@
-export { NotesListPanel } from './NotesListPanel'
+export { NoteFloatingMenu } from './NoteFloatingMenu'
 export {
   PageLayoutPanel,
   PageLayoutZoomControls,
   usePageLayoutGrid,
 } from './PageLayoutPanel'
-export { RightSidebarPanel } from './RightSidebarPanel'
 export { SidebarEdgeRail } from './SidebarEdgeRail'
 export { TocEdgeButton } from './TocEdgeButton'
 export { TocSidebar } from './TocSidebar'

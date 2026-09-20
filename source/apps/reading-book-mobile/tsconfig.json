@@ -5,8 +5,8 @@
     "ignoreDeprecations": "6.0",
     "strict": true,
     "paths": {
-      "@reading-book/shared": ["../../packages/shared/index.ts"],
-      "@reading-book/shared/*": ["../../packages/shared/*"],
+      "@reading-book/book-reader-sdk": ["../book-reader-sdk/src/index.ts"],
+      "@reading-book/book-reader-sdk/*": ["../book-reader-sdk/src/*"],
       "@/*": [
         "./src/*"
       ],

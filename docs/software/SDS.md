@@ -23,6 +23,14 @@
 **Changelog 1.17:** **Bỏ bảng `app_settings`** khỏi SQLite overlay — app preferences theo platform (desktop: `electron-store`; mobile: MMKV / AsyncStorage); model `AppPreferences` vẫn dùng chung; migration `005_drop_app_settings.sql`.  
 **Changelog 1.18:** Library metadata — `books.description`, `books.page_count` (006); thể loại **n–n** qua **`GENRE` / `BOOK_GENRE`** (`genres`, `book_genres`) thay cột `books.genre` (007). **Không** khôi phục `app_settings`.
 **Changelog 1.19:** **`highlights` v2** (009) — gộp ghi chú vào highlight (`note`, `status`, `is_checked`, `updated_at`); một cột `location` (pack `start|end`); **bỏ bảng `notes`**; thêm **`tags`** + **`highlight_tags`** (N–N). **`reading_session_states` v2** (008). **Không** khôi phục `app_settings`.
+**Changelog 1.22:** Kiến trúc render/annotate EPUB đổi hẳn (migration `010`→`019`, dọn dẹp `docs/note/` cũ):
+- Bỏ layer overlay vẽ riêng (`DomCssOverlay`, `InkIframeLayer`, `TypewriterIframeLayer`) và port `OverlayPainter` — EPUB tự vẽ mark highlight/underline/strikethrough/textbox qua API annotation **có sẵn của epub.js** (`rendition.annotations`, xem `EpubjsHandle.applyHighlight/removeHighlight` trong `openEpubjs.ts`), tự tái gắn mark mỗi khi section re-render; không còn port riêng cho việc "vẽ lại overlay".
+- Bỏ hẳn tính năng **Typewriter** (rich-text box kéo-thả tự do) và **Freehand/Shape** (vẽ tay) khỏi UI đang dùng — cả hai chỉ còn là **giá trị enum lịch sử** trong `note_json.type` (`freehand`, `stamp`) chờ một PDF renderer (chưa tồn tại) triển khai lại theo hướng khác; xem `pdfAnnotationTools.ts`. `textbox` (sticky-note 📝, không tô màu) là type còn sống, thay thế phần "ghi chú rời" mà Typewriter từng đảm nhiệm.
+- Bảng `annotations` (011→012→016→017) rồi bị **gộp vào `notes`** (018, theo mô hình Readium/Thorium Reader): một cột JSON `note_json` duy nhất (`type`, `locatorExtended` hoặc `pdfAnnotation`, `style`, `textualValue`, `note`, `tags`, `status`, `isChecked`…) thay cho nhiều cột SQL cứng; `annotation_tags` → `note_tags`.
+- Bảng `bookmarks` (đứng riêng từ đầu) cũng bị **gộp vào `notes`** (019): `note_json.group` (`'annotation'` | `'bookmark'`) phân biệt 2 loại thay vì 2 bảng.
+- `book_signatures` (1 chữ ký/sách) gộp thẳng vào `books.signer_name` / `signature_status` / `signed_at` (018) — bảng con bị xóa.
+- `COMMENT`/`comments` (004) đã bị xóa từ trước đó (migration `010`, thay bằng `typewriter_notes`) và **không tồn tại** trong schema hiện tại — SDS bản cũ vẫn nhắc tới `COMMENT` do sót cập nhật; đã gỡ khỏi §3.
+- Xem chi tiết bảng vật lý cập nhật: `docs/software/schema.dbml`.
 
 ---
 
@@ -283,8 +291,7 @@ Ports & Adapters — Document / Overlay / Extensibility
 | `DocumentImporter`              | Epub / Pdf / Txt / Md / Docx / Doc Importers | Validate extension (6 format), copy sandbox, metadata  |
 | `UrlDocumentFetcher`            | `HttpUrlFetcher` (Main)                      | Download direct file URL → temp → cùng pipeline import |
 | `DocumentNormalizer`            | Doc/Docx extract (optional); pass-through khác | DOC/DOCX có thể ghi `normalized_path`; format khác thường null |
-| `DocumentRenderer`              | ReflowHtmlRenderer, PdfPageRenderer          | Reader shell chọn theo `Book.format`                   |
-| `OverlayPainter`                | DomCssOverlay, PdfCanvasOverlay              | Hai họ Overlay đã chốt ở §1.2                          |
+| `DocumentRenderer`              | ReflowHtmlRenderer (epub.js), PdfPageRenderer (chưa có) | Reader shell chọn theo `Book.format`         |
 | `LocationCodec`                 | CfiCodec, PageRectCodec, TextOffsetCodec…    | Resume location / highlight / jump             |
 | `LibraryStore` / `CollectionStore` / `OverlayStore` | SqliteStore (+ FTS5)              | Persistence (books + collections + overlays)           |
 | `AiProvider`                    | `NoOpAiProvider` (MVP)                       | Phase 2 thay Remote/Local                              |
@@ -292,6 +299,8 @@ Ports & Adapters — Document / Overlay / Extensibility
 
 
 Domain chỉ nói: “mở sách”, “lưu highlight tại `Location`” — không biết PDF canvas hay EPUB CFI.
+
+> **Không còn port `OverlayPainter` riêng** (đã có ở các bản SDS trước `1.22`). Việc "vẽ lại" một highlight/underline/strikethrough/textbox khi trang re-render nằm **bên trong** `DocumentRenderer` của từng format — với EPUB là API annotation có sẵn của epub.js (`rendition.annotations`, xem `EpubjsHandle.applyHighlight/removeHighlight/flashHighlight` trong `apps/reading-book-desktop/src/reader/renderers/epub/openEpubjs.ts`), không phải một lớp DOM/Canvas overlay tách biệt do app tự vẽ. PDF chưa có `DocumentRenderer` (chỉ có adapter import metadata) nên chưa có cơ chế vẽ overlay tương ứng.
 
 ### 2.7. Ánh xạ sang monorepo
 
@@ -327,7 +336,7 @@ Chi tiết cây thư mục mục tiêu: xem §2.11.
 1. Presentation: selection → “Highlight”.
 2. Application: lấy `Location` từ `LocationCodec` của format đang mở → tạo `Highlight` → lưu overlay.
 3. Domain: highlight thuộc `bookId`, không mutate file gốc.
-4. Infrastructure: ghi SQLite; `OverlayPainter` vẽ lại (DOM hoặc Canvas).
+4. Infrastructure: ghi SQLite (bảng `notes`, xem §3); renderer định dạng tự vẽ lại mark (EPUB: epub.js `rendition.annotations`, tự tái gắn mỗi lần section re-render) — không qua port `OverlayPainter` riêng (bỏ từ 1.22).
 
 
 
@@ -350,7 +359,7 @@ MVP giữ port trống (`NoOp*`) để UI/feature flag không phải đập lạ
 | Kiểu kiến trúc logic   | **Layered** + Ports & Adapters ở biên                  |
 | Desktop process        | Electron Main / Preload / Renderer                     |
 | Chia sẻ desktop–mobile | Domain + Application trong `packages/`                 |
-| Đa định dạng           | Pluggable Document Adapter / Renderer / OverlayPainter |
+| Đa định dạng           | Pluggable Document Adapter / Renderer (renderer tự vẽ overlay mark qua API riêng của engine, không có port `OverlayPainter` tách biệt) |
 | **EPUB engine (desktop)** | **`epubjs` (epub.js) ^0.3.93** — spike T3.1 xác nhận 2026-07-27 (xem §2.10.1) |
 | Persistence MVP        | SQLite (+ FTS5) overlay sách phía Main; **app prefs** = electron-store (desktop) / MMKV (mobile) |
 | AI / Sync MVP          | Interface + NoOp; chưa implement                       |
@@ -416,8 +425,9 @@ source/
 │   │   │   ├── features/                 # glue UI ↔ use cases (hooks mỏng)
 │   │   │   ├── reader/                   # Reader shell + chọn renderer
 │   │   │   │   ├── ReaderShell.tsx
-│   │   │   │   ├── overlays/             # DomCssOverlay | PdfCanvasOverlay
-│   │   │   │   └── renderers/            # epub | pdf | txt | md | docx | doc | html-reflow
+│   │   │   │   └── renderers/            # epub (MVP) | pdf | txt | md | docx | doc — mỗi renderer tự vẽ
+│   │   │   │       │                     #   overlay mark qua API riêng (không có `overlays/` port tách biệt)
+│   │   │   │       └── epub/             # openEpubjs.ts, cfi/, previews/, progress/, store/
 │   │   │   ├── bridge/                   # typed wrappers gọi window.api (IPC)
 │   │   │   ├── stores/                   # UI state (Zustand…) — không chứa SQL
 │   │   │   ├── styles/                   # theme tokens CSS variables
@@ -444,16 +454,14 @@ source/
     │   ├── collection.ts                 # Collection + CollectionBook
     │   ├── location.ts                   # CFI | page-rect | text-offset | …
     │   ├── reading-session-state.ts
-    │   ├── highlight.ts
-    │   ├── note.ts
-    │   ├── bookmark.ts
+    │   ├── annotation/                   # highlight.ts, bookmark.ts, note.ts (INoteState) — xem §3
     │   ├── book-chunk.ts
     │   ├── preferences.ts
     │   ├── document-format.ts            # epub | pdf | txt | md | docx | doc
     │   ├── ports/                        # interface Ports (§2.6)
     │   │   ├── document-importer.ts
     │   │   ├── document-renderer.ts
-    │   │   ├── overlay-painter.ts
+    │   │   ├── overlay-store.ts          # bookmarks/highlights CRUD — vẽ lại thuộc DocumentRenderer, không phải port riêng
     │   │   ├── location-codec.ts
     │   │   ├── library-store.ts
     │   │   ├── collection-store.ts
@@ -467,11 +475,12 @@ source/
     │   │   ├── import-book.ts
     │   │   ├── open-reader.ts
     │   │   ├── save-reading-session-state.ts
-    │   │   ├── add-highlight.ts
-    │   │   ├── add-note.ts
-    │   │   ├── list-annotations.ts
     │   │   ├── create-collection.ts
     │   │   └── manage-collection-books.ts
+    │   │   # Highlight/note/bookmark CRUD KHÔNG đi qua use case riêng ở đây — logic sống trong
+    │   │   # apps/reading-book-desktop/src/screens/Reader/logic/hooks/{useReaderHighlights,useReaderBookmarks}.ts,
+    │   │   # gọi thẳng `overlayApi` (bridge IPC) → `OverlayStore` (§2.6). `add-highlight.ts` /
+    │   │   # `add-note.ts` / `list-annotations.ts` từng có ở đây đã bị xóa cùng đợt refactor 1.22.
     │   ├── repositories/                 # interface-facing helpers (không SQLite cụ thể)
     │   ├── readers/                      # registry format → codec / normalized kind
     │   ├── storage/                      # abstractions path/key (inject từ app)
@@ -501,7 +510,7 @@ source/
 | `packages/domain/ports`                          | Ports (contracts)                                          |
 | `packages/shared/models`                         | Domain helpers / invariants (nếu cần)                      |
 | `apps/reading-book-desktop/electron/**`          | Infrastructure (desktop)                                   |
-| `apps/*/src/reader/renderers`, `overlays`        | Infrastructure phía UI (engine/overlay) — vẫn gọi qua port |
+| `apps/*/src/reader/renderers`                    | Infrastructure phía UI (engine + overlay mark của engine đó, không có port `overlays` tách biệt) |
 
 
 
@@ -510,7 +519,7 @@ source/
 
 1. **Không** import `electron` / `better-sqlite3` từ `packages/shared` hoặc `packages/domain`.
 2. **Không** viết SQL / `fs` trong `apps/*/src/screens`.
-3. Format mới = thêm file dưới `electron/adapters` (nếu cần native) + `src/reader/renderers|overlays` + đăng ký trong `shared/readers` + `config/formats`.
+3. Format mới = thêm file dưới `electron/adapters` (nếu cần native) + `src/reader/renderers/<fmt>` (renderer tự lo overlay mark của mình) + đăng ký trong `shared/readers` + `config/formats`.
 4. Mobile chỉ thay Infrastructure (Expo FS/SQLite); **không copy** use cases — dùng `packages/shared`.
 
 
@@ -536,9 +545,9 @@ source/
 ### 3.1. Nguyên tắc mô hình dữ liệu
 
 - File sách/tài liệu gốc **không** nằm trong DB — chỉ lưu `file_path` (và optional `normalized_path` nếu đã convert). Nội dung gốc Read-Only trên đĩa.
-- Highlight / Note / Comment / Bookmark / ReadingSessionState / Preferences-theo-sách là **Overlay** trong SQLite.
+- Highlight / Note / Bookmark / ReadingSessionState / Preferences-theo-sách là **Overlay** trong SQLite. Highlight, underline, strikethrough, textbox (sticky-note) và bookmark **dùng chung một bảng vật lý `notes`** — mỗi loại là một dòng JSON (`note_json`), phân biệt bằng `type` + `group` (`'annotation'` | `'bookmark'`), không phải 3-4 bảng SQL riêng (migration `018`/`019`; xem §3.10). `COMMENT` (đáp án/chú thích theo trang) đã bị loại khỏi schema từ trước (migration `010`) và **không tồn tại**.
 - `BOOK_CHUNK` phục vụ tìm kiếm nhanh + RAG (Phase 2); MVP có thể tạo chunk text cho FTS5, embedding để sau.
-- Xóa `BOOK` → **cascade** xóa `BOOK_AUTHOR`, `COLLECTION_BOOK` (membership), `BOOK_SIGNATURE`, ReadingSessionState, Highlight, Comment, Bookmark, Chunk, highlight_tags (SRS BR-06). `AUTHOR` / `COLLECTION` / `TAG` giữ lại nếu còn liên kết khác.
+- Xóa `BOOK` → **cascade** xóa `BOOK_AUTHOR`, `COLLECTION_BOOK` (membership), `notes` (annotation + bookmark) cùng `note_tags`, ReadingSessionState, Chunk (SRS BR-06). Chữ ký số (`signer_name`/`signature_status`/`signed_at`) là cột trên chính `BOOK` nên không cần cascade riêng. `AUTHOR` / `COLLECTION` / `TAG` giữ lại nếu còn liên kết khác.
 
 
 
@@ -562,12 +571,9 @@ Bảng đối chiếu khi implement: mỗi entity dùng để làm gì, gắn v�
 | `BOOK_AUTHOR`      | Bảng liên kết **n - n** giữa `BOOK` và `AUTHOR`; có `sort_order` để hiển thị thứ tự tên trên bìa/Library.                                                                                                                | Cho phép 1 sách nhiều tác giả và 1 tác giả nhiều sách.                                                                            | Sách A: author X (order 0), Y (order 1). Sách B cũng gắn author X.                                                                                               |
 | `GENRE`            | Thể loại / subject dùng chung (`name` unique). Một thể loại gắn được nhiều sách.                                                                                                                                         | Phân loại Library; lọc / search theo thể loại; tái sử dụng nhãn từ OPF `dc:subject`.                                              | Import EPUB có subject “Fiction”, “Adventure” → 2 `GENRE`, gắn qua `BOOK_GENRE`.                                                                                 |
 | `BOOK_GENRE`       | Bảng liên kết **n - n** giữa `BOOK` và `GENRE`.                                                                                                                                                                          | 1 sách nhiều thể loại; 1 thể loại nhiều sách.                                                                                    | Sách A: Fiction + Adventure. Sách B cũng Fiction.                                                                                                                |
-| `BOOK_SIGNATURE`   | Chi tiết chữ ký số trên tài liệu (`signer_name`, `signature_status`, `signed_at`). Quan hệ **1 - n** với `BOOK`. Cờ `BOOK.is_signed` = denormalized khi có ≥ 1 dòng chữ ký.                                              | Xác thực nguồn / tính toàn vẹn tài liệu đã ký (PDF signed, v.v.); lọc sách đã ký trong Library.                                   | Import PDF có chữ ký của “Acme Corp” → `is_signed = 1` + một dòng `BOOK_SIGNATURE` status `valid`.                                                              |
 | `READING_SESSION_STATE` | Lưu vị trí đọc cuối (`last_read_location`); lưu cấu hình đọc per-book (màu nền, màu chữ, font, landscape…). Quan hệ **1 - 1** với `BOOK`. Không hàm ý đã đọc hết hay đọc tuần tự. | “Mở xong đóng, mở lại đúng chỗ” — không mất đoạn đang đọc; không phải chỉnh lại theme chống mỏi mắt mỗi lần mở. | Bạn đọc tới Chương 3 (hoặc nhảy cóc sang đoạn khác), bật Sepia rồi tắt app. Hôm sau mở lại: nền Sepia + nhảy đúng vị trí lần trước. |
-| `HIGHLIGHT`        | Lưu đoạn bôi màu (`location` pack start\|end, `selected_text`, `color_hex`) + ghi chú inline (`note`, `status`, `is_checked`) như Overlay đè lên nội dung gốc (không sửa file). Optional gắn **`TAG`** qua `highlight_tags`. | Ghi nhớ thông tin cốt lõi — xem lại nhanh trích dẫn / kiến thức đã đánh dấu và ghi chú kèm theo.                            | Bôi câu *“Đi một ngày đàng, học một sàng khôn”*, chọn màu Vàng, ghi *“Cần tra thêm”* → hiện trong sidebar Note và jump lại đúng chỗ.                                            |
-| `TAG`              | Thẻ user-defined (`name`, optional `color_hex`) gắn highlight qua N–N.                                                                                                                                                   | Phân loại / lọc highlight theo chủ đề (Phase 3 auto-tag opt-in).                                                                  | Gắn tag `#marketing` cho highlight về chiến lược nội dung.                                                                                                      |
-| `COMMENT`          | Overlay ghi chú / đáp án gắn **trang + vị trí trên trang** (`page_number`, `position_data`, `content`); local theo `bookId` — **không** phải mạng xã hội. Tab Comment trên SCR-03.                                      | Gắn đáp án / chú thích lên đúng chỗ trên tài liệu (vd. bài tập PDF được gửi); xem lại & jump từ sidebar.                          | Mở file bài tập → comment chữ đỏ “đáp án: B” tại trang 3 → badge Comment trên sidebar; tap → nhảy đúng chỗ.                                                      |
-| `BOOKMARK`         | Lưu điểm đánh dấu trang (`location_ref`, `label` tùy chọn) để quay lại nhanh.                                                                                                                                            | Đánh dấu chỗ cần đọc tiếp / chỗ quan trọng mà không cần bôi cả đoạn.                                                              | Đang giữa chương, chọn Bookmark “Ôn lại phần này” → sau mở từ danh sách bookmark và nhảy đúng vị trí.                                                            |
+| `NOTE`             | Bảng **chung** cho mọi markup gắn vào nội dung sách: `highlight` / `underline` / `strikethrough` / `textbox` (sticky-note, không tô màu) và cả **`bookmark`** — một cột JSON `note_json` (kiểu `INoteState`, xem `packages/domain/models/annotation/note.ts`) gói `type`, vị trí nhảy (`locatorExtended.locator` cho EPUB/TXT/MD/DOCX hoặc `pdfAnnotation` cho PDF), payload vẽ lại (`locatorExtended.raw`), `textualValue`/`note`, `style` (màu, font…), `status`, `isChecked`, và `group` (`'annotation'` so với `'bookmark'`) để phân biệt 2 vai trò mà không cần 2 bảng. Optional gắn **`TAG`** qua `note_tags`. Freehand (vẽ tay) và stamp (icon) vẫn là giá trị `type` hợp lệ trong schema nhưng **chưa có UI tạo mới** — chờ một PDF renderer (chưa tồn tại) để anchor theo `pdfAnnotation`. | Ghi nhớ thông tin cốt lõi (highlight/note) và đánh dấu vị trí quay lại (bookmark) — xem lại nhanh và jump đúng chỗ, không sửa file gốc. | Bôi câu *“Đi một ngày đàng, học một sàng khôn”*, chọn màu Vàng, ghi *“Cần tra thêm”* → một dòng `notes` với `type: 'highlight'`, `group: 'annotation'`, hiện trong sidebar Note. Đang giữa chương, chọn Bookmark → một dòng `notes` khác với `type: 'bookmark'`, `group: 'bookmark'`. |
+| `TAG`              | Thẻ user-defined (`name`, optional `color_hex`) gắn note (annotation) qua N–N.                                                                                                                                           | Phân loại / lọc highlight theo chủ đề (Phase 3 auto-tag opt-in).                                                                  | Gắn tag `#marketing` cho highlight về chiến lược nội dung.                                                                                                      |
 | `BOOK_CHUNK`       | Chia nội dung extract thành đoạn (vd. ~1000–2000 từ) theo `chunk_index`; đầu vào FTS5, AI tóm tắt / RAG, và (khi cần) prefetch text theo đoạn.                                                                           | Hiệu năng & tìm trong sách — không phụ thuộc nạp cả file lớn một lần cho search/AI; lật/đọc mượt hơn khi kết hợp cache theo đoạn. | Sách dài: index chunk 0..n. User search hoặc AI chỉ lấy các chunk liên quan; khi đọc, có thể prefetch chunk kế tiếp thay vì load toàn bộ 1000 trang vào RAM.     |
 | `COLLECTION`       | Bộ sưu tập do user tự tạo (`name`, optional `description`) — nhóm sách theo chủ đề / mục đích riêng, **không** phải shelf trạng thái (Reading / Completed). Quan hệ **n - n** với `BOOK` qua `COLLECTION_BOOK`.           | Người sưu tầm muốn gom sách thành tập riêng (vd. “Work reading”, “Weekend fiction”) thay vì chỉ lọc theo tiến độ / favorite.      | Tạo collection “Architecture deep dive”, thêm 5 sách → mở từ nav Collections → list sách trong tập.                                                             |
 | `COLLECTION_BOOK`  | Bảng liên kết **n - n** giữa `COLLECTION` và `BOOK`; `sort_order` thứ tự trong tập; `added_at` khi gắn.                                                                                                                  | 1 sách thuộc nhiều collection; 1 collection nhiều sách; xóa sách chỉ gỡ membership, không xóa collection.                         | Sách A nằm trong “Work reading” và “Architecture deep dive” đồng thời.                                                                                          |
@@ -586,13 +592,10 @@ Bảng đối chiếu khi implement: mỗi entity dùng để làm gì, gắn v�
 | `BOOK` ↔ `GENRE`            | **n - n**   | Qua bảng liên kết `BOOK_GENRE`. 1 sách nhiều thể loại; 1 thể loại nhiều sách.               |
 | `BOOK` → `BOOK_GENRE`       | **1 - n**   | Cascade khi xóa sách.                                                                       |
 | `GENRE` → `BOOK_GENRE`      | **1 - n**   | Cascade khi xóa genre (gỡ membership).                                                      |
-| `BOOK` → `BOOK_SIGNATURE`   | **1 - n**   | Chi tiết chữ ký số; cascade khi xóa sách. Cờ `is_signed` trên `BOOK` đồng bộ khi có/không còn signature. |
 | `BOOK` → `READING_SESSION_STATE` | **1 - 1**   | Mỗi sách một bản ghi resume + setting đọc gần nhất. Tạo khi import hoặc lần mở đầu. |
-| `BOOK` → `HIGHLIGHT`        | **1 - n**   | Overlay; cascade khi xóa sách. Ghi chú inline trên `HIGHLIGHT.note` (không bảng NOTE riêng). |
-| `BOOK` → `COMMENT`          | **1 - n**   | Comment theo trang + vị trí; cascade khi xóa sách.                                          |
-| `BOOK` → `BOOKMARK`         | **1 - n**   | Đánh dấu trang (FR-11).                                                                     |
+| `BOOK` → `NOTE`             | **1 - n**   | Overlay chung cho highlight/underline/strikethrough/textbox **và** bookmark (`note_json.group` phân biệt); cascade khi xóa sách. |
 | `BOOK` → `BOOK_CHUNK`       | **1 - n**   | Chunk text cho FTS / AI; rebuild khi re-index.                                              |
-| `HIGHLIGHT` ↔ `TAG`         | **n - n**   | Qua `highlight_tags`; cascade khi xóa highlight hoặc tag.                                   |
+| `NOTE` ↔ `TAG`              | **n - n**   | Qua `note_tags`; cascade khi xóa note hoặc tag; chỉ áp dụng cho `group = 'annotation'` trong thực tế UI hiện tại. |
 | `BOOK` ↔ `COLLECTION`       | **n - n**   | Qua `COLLECTION_BOOK` (`sort_order`, `added_at`). User-curated; khác shelf trạng thái.      |
 | `COLLECTION` → `COLLECTION_BOOK` | **1 - n** | Cascade khi xóa collection (không xóa sách).                                           |
 | `BOOK` → `COLLECTION_BOOK`  | **1 - n**   | Cascade khi xóa sách (chỉ gỡ membership).                                                   |
@@ -622,13 +625,13 @@ Bảng đối chiếu khi implement: mỗi entity dùng để làm gì, gắn v�
 
 `normalized_path` — dùng khi DOC/DOCX (hoặc format khác) cần extract/convert nhẹ để đọc; format đọc trực tiếp thường null.
 
-`is_signed` — `INTEGER` 0/1 trên `books`: cờ nhanh “có chữ ký số”. Chi tiết từng chữ ký nằm ở `book_signatures` (một sách có thể nhiều signer).
+`is_signed` — `INTEGER` 0/1 trên `books`: cờ nhanh “có chữ ký số”. Chi tiết chữ ký (`signer_name`, `signature_status`, `signed_at`) nằm **trực tiếp trên `books`** — một sách chỉ giữ 1 chữ ký gần nhất (bảng con `book_signatures` đã gộp vào `books` từ migration `018`, không còn hỗ trợ nhiều signer/sách).
 
-`signature_status` — trên `book_signatures`: `valid` \| `invalid` \| `expired` \| `unknown`.
+`signature_status` — trên `books`: `valid` \| `invalid` \| `expired` \| `unknown`.
 
-`page_number` / `location_data` (trên `annotations`) — neo theo trang (1-based) + chuỗi vị trí trên trang (JSON tọa độ / bounding box hoặc CFI). Ưu tiên PDF; format khác map tương đương khi renderer hỗ trợ.
+`note_json` (trên `notes`) — JSON `INoteState`: `type`, `group` (`'annotation'` | `'bookmark'`), `locatorExtended.locator` (vị trí nhảy tới — EPUB/TXT/MD/DOCX) hoặc `pdfAnnotation` (PDF: `pageIndex` + `rects`), `locatorExtended.raw` (payload vẽ lại chính xác — thay cho `location_data` cột rời của các bản schema `011`–`017`), `style`, `textualValue`, `note`, `status`, `isChecked`. Không còn cột `page_number` riêng — trang chỉ còn ý nghĩa hiển thị, suy ra từ `chapterIndex` trong locator khi cần.
 
-`BOOK_CHUNK.embedding` — Phase 2; MVP có thể chỉ lưu `content` + FTS5 virtual table trên `content` / `selected_text` / `NOTE.content`.
+`BOOK_CHUNK.embedding` — Phase 2; MVP có thể chỉ lưu `content` + FTS5 virtual table trên `content` / `selected_text` / `notes.note_json`.
 
 ### 3.6. Thực thể không nằm trên ERD (nhưng liên quan)
 
@@ -636,7 +639,7 @@ Bảng đối chiếu khi implement: mỗi entity dùng để làm gì, gắn v�
 | Thành phần                         | Lý do                                                                             |
 | ---------------------------------- | --------------------------------------------------------------------------------- |
 | File `.epub` / `.pdf` / … trên đĩa | Binary ngoài DB; DB chỉ trỏ path                                                  |
-| FTS5 virtual tables                | Chỉ mục SQLite (vd. `books_fts`, `annotations_fts`) — không phải entity nghiệp vụ |
+| FTS5 virtual tables                | Chỉ mục SQLite (vd. `books_fts`, `notes_fts`) — không phải entity nghiệp vụ |
 | App preferences (key-value)        | Theme app, language, fullscreen, multi-doc, watch-folder flags — model `AppPreferences` (`preferences.ts`); **không** lưu trong SQLite overlay. Desktop: `electron-store` (JSON); Mobile: MMKV hoặc AsyncStorage. SCR-06 UI gọi adapter từng platform. |
 | Watched folders                    | Danh sách path thư mục theo dõi (File scan — SCR-06); lưu local; Main process watch FS |
 | `AiProvider` / linked libraries    | Phase 2–3; bổ sung bảng `AI_SESSION`, `EXTERNAL_LIBRARY_LINK` khi tới phase           |
@@ -656,11 +659,11 @@ Bảng đối chiếu khi implement: mỗi entity dùng để làm gì, gắn v�
 | Favorite         | Cột `BOOK.is_favorite`                                             |
 | Library blurb    | `BOOK.description` + `BOOK.page_count` + `file_size_bytes` (card G1-N7) |
 | App preferences  | **Không** SQLite `app_settings` — platform store (1.17)            |
-| Digital signature | Cột `BOOK.is_signed` + bảng `BOOK_SIGNATURE` / `book_signatures` (1–n) |
-| Bookmark         | Bảng riêng `BOOKMARK` (không gộp vào highlight)                    |
-| Annotations      | Bảng chung `ANNOTATION` / `annotations` cho highlight, typewriter, shape (kèm tags qua `annotation_tags`) |
+| Digital signature | Cột `BOOK.is_signed` / `signer_name` / `signature_status` / `signed_at` trực tiếp trên `books` (gộp từ `book_signatures`, migration `018`) |
+| Bookmark         | Không còn bảng riêng — 1 dòng `NOTE` / `notes` với `note_json.group = 'bookmark'` (migration `019`) |
+| Annotations      | Bảng chung `NOTE` / `notes` cho highlight, underline, strikethrough, textbox (kèm tags qua `note_tags`); `annotations` (011–017) và `bookmarks` (đứng riêng) đều đã bị gộp vào `notes` (018–019). Typewriter/shape (freehand) không còn tạo mới qua UI. |
 | Chunk            | Có trong schema sớm; embedding nullable đến Phase 2                |
-| Cascade xóa sách | book_authors + book_genres + collection_books + book_signatures + ReadingSessionState + Highlight + Comment + Bookmark + Chunk + highlight_tags |
+| Cascade xóa sách | book_authors + book_genres + collection_books + ReadingSessionState + notes (annotation + bookmark) + note_tags + Chunk |
 | Collections      | `COLLECTION` + `COLLECTION_BOOK` (n–n); xóa collection cascade membership, **không** xóa sách |
 | Nguồn import     | File máy **và** URL direct file; optional cột `books.source_url`   |
 
@@ -679,7 +682,7 @@ Class Diagram — Domain + Application (MVP)
 - `Book` ↔ `Author` là **n - n** (association class `BookAuthor` kèm `sortOrder`).
 - `Book` ↔ `Collection` là **n - n** (association class `CollectionBook` kèm `sortOrder` / `addedAt`).
 - Application services điều phối use case; chỉ phụ thuộc **Ports** (`LibraryStore`, `CollectionStore`, `OverlayStore`, …), không phụ thuộc SQLite/Electron.
-- Cardinality khác: `Book` **1 - 1** `ReadingSessionState`; **1 - n** Highlight / Comment / Bookmark / BookChunk / BookSignature; Highlight **n - n** Tag (optional qua `highlight_tags`).
+- Cardinality khác: `Book` **1 - 1** `ReadingSessionState`; **1 - n** `Note` (bao gồm cả annotation lẫn bookmark) / `BookChunk`; `Note` **n - n** `Tag` (optional qua `note_tags`). Không còn `Comment` hay `BookSignature` như entity riêng — chữ ký số là cột trên `Book`.
 
 
 
@@ -694,13 +697,13 @@ Database Diagram — SQLite Overlay Schema (MVP)
 - Tên bảng snake_case (`books`, `authors`, `book_authors`, …); datetime lưu `TEXT` ISO-8601; boolean lưu `INTEGER` 0/1.
 - **Author không nằm trên** `books` — quan hệ **n - n** qua `book_authors` (PK `book_id` + `author_id`, `sort_order`).
 - File sách **không** trong DB — chỉ `file_path` / `normalized_path`.
-- Xóa `books` → **CASCADE** `book_authors`, `collection_books`, `book_signatures`, progress, annotations, bookmarks, book_chunks, `annotation_tags`; xóa annotation → cascade `annotation_tags`.
+- Xóa `books` → **CASCADE** `book_authors`, `collection_books`, `reading_session_states`, `notes`, `book_chunks`; xóa `notes` row → cascade `note_tags`. Chữ ký số là cột trên `books` nên không có bảng con để cascade riêng.
 - Xóa `collections` → **CASCADE** `collection_books` (sách vẫn còn trong Library).
 - `sha256` **UNIQUE**; `book_chunks` **UNIQUE(book_id, chunk_index)**; FTS5 là virtual table riêng (không vẽ như entity nghiệp vụ).
 
 ### 3.10. Catalog bảng & thuộc tính (SQLite)
 
-Catalog vật lý khớp migration desktop [`001_initial.sql`](../../source/apps/reading-book-desktop/electron/persistence/migrations/001_initial.sql) (+ `002`…`009_highlights_v2`). **Mobile dùng cùng schema overlay** (adapter Expo SQLite riêng; không dùng `better-sqlite3`). **App settings không nằm trong catalog này** — xem §3.6.
+Catalog vật lý khớp migration desktop [`001_initial.sql`](../../source/apps/reading-book-desktop/electron/persistence/migrations/001_initial.sql) qua [`019_bookmarks_notes_merge.sql`](../../source/apps/reading-book-desktop/electron/persistence/migrations/019_bookmarks_notes_merge.sql) (mới nhất). **Mobile dùng cùng schema overlay** (adapter Expo SQLite riêng; không dùng `better-sqlite3`). **App settings không nằm trong catalog này** — xem §3.6.
 
 **Quy ước chung**
 
@@ -727,12 +730,19 @@ Catalog vật lý khớp migration desktop [`001_initial.sql`](../../source/apps
 | `description` | TEXT | NULL | Mô tả ngắn / OPF description (Library card · G1-N7) |
 | `page_count` | INTEGER | NULL | Tổng trang (PDF) hoặc số spine/section (EPUB) khi biết |
 | `is_favorite` | INTEGER | NOT NULL, DEFAULT `0` | Favorite (0/1) |
-| `is_signed` | INTEGER | NOT NULL, DEFAULT `0` | Có chữ ký số (0 = chưa ký, 1 = đã ký); chi tiết ở `book_signatures` |
+| `is_signed` | INTEGER | NOT NULL, DEFAULT `0` | Có chữ ký số (0 = chưa ký, 1 = đã ký) |
+| `signer_name` | TEXT | NULL | Tên cá nhân / tổ chức ký (gộp từ bảng con `book_signatures`, migration `018`) |
+| `signature_status` | TEXT | NOT NULL, DEFAULT `'unknown'`, CHECK | `valid` \| `invalid` \| `expired` \| `unknown` |
+| `signed_at` | TEXT | NULL | Thời điểm áp dụng chữ ký (ISO-8601), nếu biết |
+| `reading_status` | TEXT | NOT NULL, DEFAULT `'not-started'`, CHECK | `reading` \| `completed` \| `not-started` (user-marked, không suy từ %) |
+| `source_provider` / `external_id` | TEXT | NULL | Cloud provenance (Google Drive / Dropbox / OneDrive) khi sách đến từ liên kết cloud (migration `014`) |
 | `source_url` | TEXT | NULL | URL gốc nếu import từ mạng; null nếu từ máy |
 | `added_at` | TEXT | NOT NULL | Thời điểm import |
 | `updated_at` | TEXT | NOT NULL | Lần cập nhật metadata gần nhất |
 
-**Index:** `UNIQUE(sha256)`; `INDEX(is_favorite)`; `INDEX(is_signed)`; `INDEX(updated_at)`.
+**Index:** `UNIQUE(sha256)`; `INDEX(is_favorite)`; `INDEX(is_signed)`; `INDEX(updated_at)`; `INDEX(reading_status)`; `INDEX(source_provider, external_id)`.
+
+> Một sách chỉ giữ **1** chữ ký (gần nhất) — khác bản SDS trước `1.22`, vốn cho phép nhiều dòng `book_signatures` per sách qua bảng con riêng.
 
 > Thể loại **không** lưu cột trên `books` — dùng `genres` + `book_genres` (migration `007_genres_nn.sql`).
 
@@ -754,18 +764,6 @@ Catalog vật lý khớp migration desktop [`001_initial.sql`](../../source/apps
 | `genre_id` | TEXT | PK composite, FK → `genres.id` **ON DELETE CASCADE** | Thể loại |
 
 **Index:** `INDEX(genre_id)`.
-
-#### `book_signatures` — chi tiết chữ ký số trên tài liệu
-
-| Cột | Kiểu | Ràng buộc | Mô tả |
-| :--- | :--- | :--- | :--- |
-| `id` | TEXT | PK, NOT NULL | UUID signature |
-| `book_id` | TEXT | NOT NULL, FK → `books.id` **ON DELETE CASCADE** | Sách được ký |
-| `signer_name` | TEXT | NOT NULL | Tên cá nhân / tổ chức ký |
-| `signature_status` | TEXT | NOT NULL, DEFAULT `'unknown'`, CHECK | `valid` \| `invalid` \| `expired` \| `unknown` |
-| `signed_at` | TEXT | NULL | Thời điểm áp dụng chữ ký (ISO-8601), nếu biết |
-
-**Index:** `INDEX(book_id)`. Một sách có thể có nhiều dòng chữ ký.
 
 #### `authors` — hồ sơ tác giả dùng chung
 
@@ -830,24 +828,37 @@ Catalog vật lý khớp migration desktop [`001_initial.sql`](../../source/apps
 
 Theme Night / Sepia / Paper là preference toàn app ở localStorage và áp dụng bằng CSS preset; không lưu `bg_color`, `text_color` hoặc `theme_preset` trong bảng này.
 
-#### `highlights` — overlay bôi chọn + ghi chú inline
+#### `notes` — bảng chung cho highlight / underline / strikethrough / textbox **và** bookmark
+
+Thay cho `highlights` (009) → `annotations` (011–017) → tách riêng `bookmarks`: từ migration `018` (gộp `annotations`) và `019` (gộp thêm `bookmarks`), **mọi markup và bookmark của một sách là 1 dòng trong `notes`**, theo model Readium/Thorium Reader — payload linh hoạt nằm trong một cột JSON thay vì một cột SQL cứng cho từng thuộc tính.
 
 | Cột | Kiểu | Ràng buộc | Mô tả |
 | :--- | :--- | :--- | :--- |
-| `id` | TEXT | PK, NOT NULL | UUID highlight |
+| `id` | TEXT | PK, NOT NULL | UUID note/bookmark |
 | `book_id` | TEXT | NOT NULL, FK → `books.id` **ON DELETE CASCADE** | Sách sở hữu |
-| `location` | TEXT | NOT NULL | Phạm vi vị trí pack `start\|end` (Location.toString mỗi đầu) |
-| `selected_text` | TEXT | NOT NULL | Snapshot text đã chọn |
-| `color_hex` | TEXT | NOT NULL | Màu highlight (vd. `#F5D76E`) |
-| `note` | TEXT | NULL | Ghi chú inline (optional) |
-| `status` | TEXT | NOT NULL, DEFAULT `'None'`, CHECK | `None` \| `Accepted` \| `Rejected` \| `Cancelled` \| `Completed` \| `Deferred` \| `Future` |
-| `is_checked` | INTEGER | NOT NULL, DEFAULT `0` | Đánh dấu hoàn thành nhanh (0/1) |
+| `note_json` | TEXT | NOT NULL, DEFAULT `'{}'`, CHECK `json_valid` | Payload `INoteState` — xem cấu trúc bên dưới |
 | `created_at` | TEXT | NOT NULL | Thời điểm tạo |
-| `updated_at` | TEXT | NOT NULL | Sửa ghi chú / trạng thái gần nhất |
+| `updated_at` | TEXT | NOT NULL | Lần sửa gần nhất |
 
-**Index:** `INDEX(book_id)`; `INDEX(status)`.
+**Index:** `INDEX(book_id)`; `INDEX(updated_at)`; expression index trên `json_extract(note_json, '$.group')` (lọc annotation/bookmark không full-scan).
 
-#### `tags` — thẻ gắn highlight (optional, G5+)
+**Cấu trúc `note_json` (`INoteState`, `packages/domain/models/annotation/note.ts`):**
+
+| Field | Mô tả |
+| :--- | :--- |
+| `type` | `highlight` \| `underline` \| `strikethrough` \| `textbox` \| `bookmark` (còn `freehand` \| `stamp` là giá trị lịch sử, chưa có UI tạo mới) |
+| `group` | `'annotation'` (markup) hoặc `'bookmark'`; thiếu field này (dòng cũ trước `019`) → coi là `'annotation'` |
+| `locatorExtended.locator` | Vị trí **nhảy tới** (JSON `Location` + `chapterIndex`) — dùng cho EPUB/TXT/MD/DOCX; tương đương `location_ref` cột rời ở schema `017` |
+| `locatorExtended.raw` | Payload **vẽ lại chính xác** markup (packed CFI `start\|end`, hoặc JSON hình học) — tương đương `location_data` cột rời cũ; không dùng để jump |
+| `pdfAnnotation` | `{ pageIndex, rects[], contents? }` — anchor riêng cho PDF, thay `locatorExtended` khi sách là PDF (PDF renderer/annotation UI chưa triển khai) |
+| `textualValue` | Text hiển thị (đoạn được highlight, hoặc excerpt tại vị trí bookmark) |
+| `note` | Ghi chú tự do người dùng gõ thêm (khác `style.note` nếu có) |
+| `style` | `colorHex`, `fontFamily`, `fontSize`, `strokeWidth`, `opacity`… — mở, tùy `type` |
+| `label` | Chỉ dùng khi `group = 'bookmark'` — tên hiển thị do người dùng đặt |
+| `status` / `isChecked` | `None` \| `Review` \| `Done`; cờ hoàn thành nhanh — chỉ có ý nghĩa với `group = 'annotation'` |
+| `tags` | Danh sách tag (song song với bảng `note_tags` bên dưới) |
+
+#### `tags` — thẻ gắn note (optional, G5+)
 
 | Cột | Kiểu | Ràng buộc | Mô tả |
 | :--- | :--- | :--- | :--- |
@@ -855,39 +866,16 @@ Theme Night / Sepia / Paper là preference toàn app ở localStorage và áp d�
 | `name` | TEXT | NOT NULL, UNIQUE | Tên thẻ (vd. `#marketing`) |
 | `color_hex` | TEXT | NULL | Màu hiển thị UI |
 
-#### `highlight_tags` — N–N highlight ↔ tag
+#### `note_tags` — N–N note ↔ tag
 
 | Cột | Kiểu | Ràng buộc | Mô tả |
 | :--- | :--- | :--- | :--- |
-| `highlight_id` | TEXT | NOT NULL, FK → `highlights.id` **ON DELETE CASCADE** | Highlight |
+| `note_id` | TEXT | NOT NULL, FK → `notes.id` **ON DELETE CASCADE** | Note (thực tế chỉ dùng cho `group = 'annotation'`) |
 | `tag_id` | TEXT | NOT NULL, FK → `tags.id` **ON DELETE CASCADE** | Tag |
 
-**Index:** PK composite `(highlight_id, tag_id)`.
+**Index:** PK composite `(note_id, tag_id)`.
 
-#### `annotations` — bảng chung cho highlight, typewriter, shape
-
-| Cột | Kiểu | Ràng buộc | Mô tả |
-| :--- | :--- | :--- | :--- |
-| `id` | TEXT | PK, NOT NULL | UUID comment |
-| `book_id` | TEXT | NOT NULL, FK → `books.id` **ON DELETE CASCADE** | Sách sở hữu |
-| `page_number` | INTEGER | NOT NULL | Số trang (1-based) trong tài liệu |
-| `position_data` | TEXT | NOT NULL | Vị trí trên trang (JSON tọa độ / bounding box) |
-| `content` | TEXT | NOT NULL | Nội dung chữ viết / gõ (vd. đáp án, chú thích) |
-| `author_name` | TEXT | NULL | Tên người viết comment (nếu cần) |
-| `created_at` | TEXT | NOT NULL | Thời điểm tạo |
-| `updated_at` | TEXT | NOT NULL | Lần sửa gần nhất |
-
-**Index:** `INDEX(book_id)`. Khác `notes`: neo theo **page + position**, không gắn highlight.
-
-#### `bookmarks` — đánh dấu trang
-
-| Cột | Kiểu | Ràng buộc | Mô tả |
-| :--- | :--- | :--- | :--- |
-| `id` | TEXT | PK, NOT NULL | UUID bookmark |
-| `book_id` | TEXT | NOT NULL, FK → `books.id` **ON DELETE CASCADE** | Sách sở hữu |
-| `location_ref` | TEXT | NOT NULL | Vị trí nhảy tới |
-| `label` | TEXT | NULL | Nhãn tùy chọn |
-| `created_at` | TEXT | NOT NULL | Thời điểm tạo |
+> **Đã loại bỏ khỏi schema hiện tại:** `highlights` / `highlight_tags` (thay bằng `notes`/`note_tags`), `bookmarks` đứng riêng, `annotations`/`annotation_tags`, `book_signatures` (gộp vào `books`), và `comments` (bị xóa từ migration `010`, thay bằng `typewriter_notes` rồi cũng bị gộp/xóa — tính năng Comment không còn tồn tại trong app).
 
 #### `book_chunks` — đoạn text extract (FTS / Phase 2 AI)
 
@@ -924,11 +912,11 @@ Chỉ liệt kê **màn hình** (destination user “ở lại”). Hành độn
 | **SCR-00** | Splash             | Brand + chờ khởi tạo app                               | `[splash.html](../mockups/splash.html)`     | —               |
 | **SCR-01** | Library            | Duyệt file đã import / tiếp tục đọc / mở Add           | `[library.html](../mockups/library.html)`   | FR-08, WF-01    |
 | **SCR-01a**| Shelf detail       | List dọc một nhóm (Reading / Completed / Not started)  | Cùng `library.html` (view thứ hai)          | FR-08           |
-| **SCR-03** | Reader             | Đọc + highlight / note / bookmark / comment (Invisible UI); ôn dấu ấn **theo document** | `[reading.html](../mockups/reading.html)` | FR-02–07, FR-09, FR-11, WF-03, WF-04 |
+| **SCR-03** | Reader             | Đọc + highlight / note / bookmark (Invisible UI); ôn dấu ấn **theo document** | `[reading.html](../mockups/reading.html)` | FR-02–07, FR-09, FR-11, WF-03, WF-04 |
 | **SCR-05** | Reading Settings   | Theme, typography, page mode, margins (panel từ Reader)| Cùng `reading.html` (Settings panel)        | FR-04           |
 | **SCR-06** | App Settings       | Cài đặt toàn app: linked libraries, theme app, file scan, multi-doc, language, fullscreen | `[setting.html](../mockups/setting.html)` | NFR-06, NFR-11, FR-04 (app default); FR-30 stub |
 
-> **Không có SCR-04:** Highlights & Notes không phải màn toàn cục. Annotation gắn `bookId` — xem / jump trong **SCR-03** sidebar (Note · Comment · Bookmark).
+> **Không có SCR-04:** Highlights & Notes không phải màn toàn cục. Annotation/bookmark gắn `bookId` — xem / jump trong **SCR-03** sidebar (Note · Bookmark). Không còn tab **Comment** (tính năng đã bị loại khỏi schema từ migration `010`).
 
 
 #### Overlay / transient UI (không phải màn hình)

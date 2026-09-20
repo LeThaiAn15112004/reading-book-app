@@ -4,7 +4,7 @@ import {
   APP_DISPLAY_NAME,
   AppTitleProvider as SharedAppTitleProvider,
   useAppTitle,
-} from '@reading-book/shared/hooks/app'
+} from '../hooks/app/index.js'
 
 export { APP_DISPLAY_NAME, useAppTitle }
 

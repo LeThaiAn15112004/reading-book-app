@@ -1,0 +1,181 @@
+// ReadMate Reader — SQLite overlay schema (desktop app)
+// Generated to match electron/persistence/migrations/*.sql after 019_bookmarks_notes_merge.sql.
+// Conventions: snake_case; datetime TEXT ISO-8601; boolean INTEGER 0/1; PK UUID TEXT.
+//
+// Core invariant (SDS §3): the imported source file is never mutated. Everything below is
+// overlay data keyed by book_id, stored separately from the sandboxed read-only original.
+
+Table books {
+  id text [pk, not null, note: 'UUID']
+  title text [not null]
+  file_path text [not null, note: 'sandbox path; original file Read-Only']
+  normalized_path text [note: 'optional extract for DOC/DOCX']
+  file_format text [not null, note: "epub | pdf | txt | md | docx | doc"]
+  cover_path text
+  sha256 text [not null, unique, note: 'BR-03 dedup']
+  file_size_bytes integer
+
+  page_count integer [note: 'Tổng số trang của sách']
+  description text [note: 'Mô tả ngắn hoặc tóm tắt nội dung sách']
+
+  is_signed integer [not null, default: 0, note: '0: Unsigned, 1: Digitally signed']
+  signer_name text [note: 'Name of the individual or organization that signed']
+  signature_status text [not null, default: 'unknown', note: 'valid | invalid | expired | unknown']
+  signed_at text [note: 'Timestamp when the signature was applied']
+
+  is_favorite integer [not null, default: 0, note: '0/1']
+  source_url text [note: 'set when imported from URL']
+  reading_status text [not null, default: 'not-started', note: 'reading | completed | not-started']
+  source_provider text [note: 'cloud provenance: google-drive | dropbox | onedrive | null']
+  external_id text [note: 'cloud provenance: id on the source_provider']
+  added_at text [not null]
+  updated_at text [not null]
+
+  indexes {
+    sha256 [unique, name: 'idx_books_sha256']
+    is_favorite [name: 'idx_books_is_favorite']
+    is_signed [name: 'idx_books_is_signed']
+    updated_at [name: 'idx_books_updated_at']
+    reading_status [name: 'idx_books_reading_status']
+    (source_provider, external_id) [name: 'idx_books_cloud_provenance']
+  }
+}
+
+Table genres {
+  id text [pk, not null, note: 'UUID']
+  name text [not null, unique, note: 'Tên thể loại']
+  created_at text [not null]
+
+  indexes {
+    name [name: 'idx_genres_name']
+  }
+}
+
+Table book_genres {
+  book_id text [not null]
+  genre_id text [not null]
+
+  indexes {
+    (book_id, genre_id) [pk]
+    genre_id [name: 'idx_book_genres_genre_id']
+  }
+}
+
+Table authors {
+  id text [pk, not null]
+  name text [not null]
+  sort_name text
+  created_at text [not null]
+}
+
+Table book_authors {
+  book_id text [not null]
+  author_id text [not null]
+  sort_order integer [not null, default: 0]
+
+  indexes {
+    (book_id, author_id) [pk]
+    author_id [name: 'idx_book_authors_author_id']
+  }
+}
+
+Table collections {
+  id text [pk, not null]
+  name text [not null]
+  description text
+  created_at text [not null]
+  updated_at text [not null]
+
+  indexes {
+    updated_at [name: 'idx_collections_updated_at']
+  }
+}
+
+Table collection_books {
+  collection_id text [not null]
+  book_id text [not null]
+  sort_order integer [not null, default: 0]
+  added_at text [not null]
+
+  indexes {
+    (collection_id, book_id) [pk]
+    book_id [name: 'idx_collection_books_book_id']
+  }
+}
+
+Table reading_session_states {
+  book_id text [pk, not null, note: '1-1 with books']
+  last_read_location text [not null, note: 'CFI / page-rect / text-offset']
+  percent real [not null, default: 0]
+  font_family text
+  font_size real
+  font_weight text
+  line_height real
+  text_align text
+
+  layout_mode text
+  page_turn_mode text
+  margins_enabled integer
+  margin_preset text
+
+  is_landscape integer [not null, default: 0]
+  updated_at text [not null]
+}
+
+// Migration 019 folded the standalone `bookmarks` table into `notes` — a bookmark is now a row
+// with note_json.group = 'bookmark' (type = 'bookmark'), not its own table. See INoteState.
+Table notes {
+  id          text    [pk, not null, note: 'UUID']
+  book_id     text    [not null, note: 'FK -> books.id']
+  note_json   text    [not null, default: '{}', note: 'JSON chứa: type, group (annotation|bookmark), locatorExtended (locator + raw), pdfAnnotation, style, textualValue, note, tags, label, creator, status, isChecked... — xem INoteState (packages/domain)']
+  created_at  text    [not null]
+  updated_at  text    [not null]
+
+  indexes {
+    book_id
+    updated_at
+    (note_json) [note: "expression index on json_extract(note_json, '$.group')"]
+  }
+}
+
+Table tags {
+  id text [pk, not null, note: 'UUID']
+  name text [not null, unique, note: 'Tên thẻ, ví dụ: #quan-trong, #marketing']
+  color_hex text [note: 'Mã màu của tag']
+}
+
+Table note_tags {
+  note_id text [not null, note: 'Foreign key to notes.id']
+  tag_id text [not null, note: 'Foreign key to tags.id']
+
+  indexes {
+    (note_id, tag_id) [pk, name: 'pk_note_tags']
+  }
+}
+
+Table book_chunks {
+  id text [pk, not null]
+  book_id text [not null]
+  chunk_index integer [not null]
+  content text [not null]
+  location_start text
+  location_end text
+  embedding blob [note: 'nullable until Phase 2 AI']
+  created_at text [not null]
+
+  indexes {
+    (book_id, chunk_index) [unique, name: 'idx_book_chunks_book_index']
+  }
+}
+
+Ref: notes.book_id > books.id [delete: cascade]
+Ref: note_tags.note_id > notes.id [delete: cascade]
+Ref: note_tags.tag_id > tags.id [delete: cascade]
+Ref: book_authors.book_id > books.id [delete: cascade]
+Ref: book_authors.author_id > authors.id [delete: restrict]
+Ref: collection_books.collection_id > collections.id [delete: cascade]
+Ref: collection_books.book_id > books.id [delete: cascade]
+Ref: reading_session_states.book_id - books.id [delete: cascade]
+Ref: book_chunks.book_id > books.id [delete: cascade]
+Ref: book_genres.book_id > books.id [delete: cascade]
+Ref: book_genres.genre_id > genres.id [delete: cascade]

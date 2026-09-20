@@ -1,9 +1,9 @@
 export {
   AppNavProvider,
   useAppNav,
-} from '@reading-book/shared/hooks/app'
+} from '../hooks/app/index.js'
 export type {
   AppNavId,
   AppStubNavId,
   LibraryNavRegistration,
-} from '@reading-book/shared/hooks/app'
+} from '../hooks/app/index.js'
