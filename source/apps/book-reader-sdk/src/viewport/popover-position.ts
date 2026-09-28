@@ -1,4 +1,10 @@
-import type { ViewportRectLike } from '../../../../reader/renderers/epub'
+/** Anchor rect in the same coordinate space as `viewport` (DOM `getBoundingClientRect`, RN `measure`). */
+export type PopoverAnchorRect = {
+  top: number
+  left: number
+  right: number
+  bottom: number
+}
 
 const GAP_PX = 8
 const EDGE_MARGIN_PX = 8
@@ -9,7 +15,7 @@ const EDGE_MARGIN_PX = 8
  * the viewport.
  */
 export function highlightPopoverPosition(
-  anchorRect: ViewportRectLike,
+  anchorRect: PopoverAnchorRect,
   popoverSize: { width: number; height: number },
   viewport: { width: number; height: number },
 ): { top: number; left: number } {

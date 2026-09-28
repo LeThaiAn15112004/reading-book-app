@@ -15,7 +15,12 @@ import {
   UnsupportedFormatError,
 } from '../files/format-guard'
 import { hashFile } from '../files/file-hash'
-import { copyIntoBooksSandbox } from '../files/sandbox'
+import {
+  copyIntoBooksSandbox,
+  isPathInsideUserData,
+  removeCoverFile,
+  removeManagedBookDir,
+} from '../files/sandbox'
 import { getLibraryStore } from '../persistence/sqlite-library-store'
 import type { ImportResult } from './api-types'
 import { ImportChannels } from './channels'
@@ -60,12 +65,6 @@ function duplicateResult(bookId: string): ImportResult {
   }
 }
 
-/** Remove `{userData}/books/{uuid}/` folder after a failed persist (T2.8 / T2.10). */
-async function removeSandboxBookDir(destFilePath: string): Promise<void> {
-  const dir = path.dirname(destFilePath)
-  await fsp.rm(dir, { recursive: true, force: true }).catch(() => {})
-}
-
 function isUniqueConstraintError(err: unknown): boolean {
   if (!err || typeof err !== 'object') return false
   const code = 'code' in err ? String((err as { code: unknown }).code) : ''
@@ -78,7 +77,7 @@ function isUniqueConstraintError(err: unknown): boolean {
 
 /**
  * BR-03 / T2.7: hash local file; if sha256 already in DB, return duplicate
- * without copying into the sandbox.
+ * before anything is copied or registered.
  */
 export async function rejectIfDuplicate(localPath: string): Promise<ImportResult | null> {
   const { sha256 } = await hashFile(localPath)
@@ -87,12 +86,10 @@ export async function rejectIfDuplicate(localPath: string): Promise<ImportResult
   return duplicateResult(existing.id)
 }
 
-/** After sandbox copy: resolve format → extract metadata (T2.6). */
-async function extractMetadataAfterCopy(
-  destPath: string,
-): Promise<DomainImportResult> {
-  const format = assertSupportedExtension(destPath)
-  return getDocumentImporter(format).import(destPath)
+/** Resolve format → extract metadata (T2.6). Reads `filePath`; never writes next to it. */
+async function extractMetadata(filePath: string): Promise<DomainImportResult> {
+  const format = assertSupportedExtension(filePath)
+  return getDocumentImporter(format).import(filePath)
 }
 
 export type FinishImportOptions = {
@@ -104,7 +101,7 @@ export type FinishImportOptions = {
 
 /**
  * T2.8: write books (+ authors + default reading session); return new book id.
- * On failure, caller should remove the sandbox copy.
+ * On failure, the caller discards what the import itself created (see `finishImport`).
  */
 function persistImportedBook(
   meta: DomainImportResult,
@@ -135,18 +132,32 @@ function persistImportedBook(
   return book.id
 }
 
-/** Shared by import:fromFile/fromUrl and Cloud Sources download-and-import. */
-export async function finishImportAfterCopy(
-  destPath: string,
-  options: FinishImportOptions = {},
+/**
+ * Extract metadata and register the book.
+ *
+ * `ownsFile` says whether `filePath` is an app-owned sandbox copy this import just made. Only then
+ * may a failure delete it: a referenced book's file belongs to the user, and so does its folder.
+ * The extracted cover is always app-owned and always cleaned up.
+ */
+async function finishImport(
+  filePath: string,
+  options: FinishImportOptions,
+  ownsFile: boolean,
 ): Promise<ImportResult> {
+  let coverPath: string | undefined
+  const discardImportArtifacts = async (): Promise<void> => {
+    if (ownsFile) await removeManagedBookDir(filePath).catch(() => {})
+    await removeCoverFile(coverPath)
+  }
+
   try {
-    const meta = await extractMetadataAfterCopy(destPath)
+    const meta = await extractMetadata(filePath)
+    coverPath = meta.coverPath
     try {
       const bookId = persistImportedBook(meta, options)
       return { ok: true, bookId }
     } catch (err) {
-      await removeSandboxBookDir(destPath)
+      await discardImportArtifacts()
       if (isUniqueConstraintError(err)) {
         const existing = await getLibraryStore().findBySha256(meta.sha256)
         if (existing) return duplicateResult(existing.id)
@@ -159,7 +170,7 @@ export async function finishImportAfterCopy(
       }
     }
   } catch (err) {
-    await removeSandboxBookDir(destPath)
+    await discardImportArtifacts()
     if (err instanceof UnsupportedFormatError) {
       return unsupportedResult(err)
     }
@@ -170,6 +181,28 @@ export async function finishImportAfterCopy(
       errorMessage: 'Could not read book metadata.',
     }
   }
+}
+
+/**
+ * Register an app-owned sandbox copy (URL / cloud downloads — no lasting file on the user's disk).
+ * Shared by import:fromUrl and Cloud Sources download-and-import.
+ */
+export function finishImportAfterCopy(
+  destPath: string,
+  options: FinishImportOptions = {},
+): Promise<ImportResult> {
+  return finishImport(destPath, options, true)
+}
+
+/**
+ * Register a file the user picked from their own filesystem, in place: only its absolute path is
+ * stored (`books.file_path`). Nothing is copied, and nothing is ever deleted on failure.
+ */
+function finishImportByReference(
+  sourcePath: string,
+  options: FinishImportOptions = {},
+): Promise<ImportResult> {
+  return finishImport(sourcePath, options, false)
 }
 
 /** Handlers for import:* — fromFile / fromUrl + dedup + persist (T2.3–T2.8). */
@@ -191,15 +224,24 @@ export function registerImportIpc(): void {
       return { ok: false, bookId: null }
     }
 
-    const sourcePath = filePaths[0]
+    // The path comes from the native dialog above, never from the renderer.
+    const sourcePath = path.resolve(filePaths[0])
 
     try {
       assertSupportedExtension(sourcePath)
+      if (isPathInsideUserData(sourcePath)) {
+        // Would be mistaken for an app-owned copy (and could be deleted as one).
+        return {
+          ok: false,
+          bookId: null,
+          errorCode: 'copy_failed',
+          errorMessage: 'Choose a book file outside the app’s own data folder.',
+        }
+      }
       const conflict = await rejectIfDuplicate(sourcePath)
       if (conflict) return conflict
 
-      const destPath = await copyIntoBooksSandbox(sourcePath)
-      return finishImportAfterCopy(destPath)
+      return await finishImportByReference(sourcePath)
     } catch (err) {
       if (err instanceof UnsupportedFormatError) {
         return unsupportedResult(err)
@@ -208,7 +250,7 @@ export function registerImportIpc(): void {
         ok: false,
         bookId: null,
         errorCode: 'copy_failed',
-        errorMessage: 'Could not copy file into the library sandbox.',
+        errorMessage: 'Could not read the selected file.',
       }
     }
   })

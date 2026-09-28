@@ -2,10 +2,10 @@ import type { DocumentImporter, ImportResult } from '@reading-book/book-reader-s
 import { DocumentFormat } from '@reading-book/book-reader-sdk'
 import { resolveFormatFromExtension } from '@reading-book/config'
 import { XMLParser } from 'fast-xml-parser'
+import { randomUUID } from 'node:crypto'
 import fsp from 'node:fs/promises'
 import path from 'node:path'
 import JSZip from 'jszip'
-import { coverDirForBook } from '../files/metadata-filename'
 import { buildImportResult } from './filename-fallback-importer'
 
 const COVER_IMAGE_EXTS = new Set([
@@ -219,11 +219,15 @@ function parseContainerRootfile(containerXml: string): string | undefined {
   return undefined
 }
 
-async function extractCoverToSandbox(
+/**
+ * Write the cover image into an app-owned directory as `{uuid}{ext}`. Never next to the book file:
+ * a referenced book lives in the user's own folder, which the app must not write to.
+ */
+async function extractCover(
   zip: JSZip,
   opfPath: string,
   coverHref: string,
-  sandboxFilePath: string,
+  coversDir: string,
 ): Promise<string | undefined> {
   const opfDir = path.posix.dirname(opfPath)
   const zipEntryPath = resolveZipRelative(opfDir === '.' ? '' : opfDir, coverHref)
@@ -240,12 +244,16 @@ async function extractCoverToSandbox(
   if (!COVER_IMAGE_EXTS.has(ext)) return undefined
 
   const data = await entry.async('nodebuffer')
-  const dest = path.join(coverDirForBook(sandboxFilePath), `cover${ext}`)
+  const dest = path.join(coversDir, `${randomUUID()}${ext}`)
   await fsp.writeFile(dest, data)
   return dest
 }
 
-async function extractEpubMetadata(filePath: string): Promise<{
+/** `coversDir` is omitted for read-only metadata passes (Library backfill) — no cover is written. */
+async function extractEpubMetadata(
+  filePath: string,
+  coversDir?: () => string,
+): Promise<{
   title?: string
   authors: string[]
   description?: string
@@ -276,9 +284,9 @@ async function extractEpubMetadata(filePath: string): Promise<{
   const parsed = parseOpf(opfXml)
 
   let coverPath: string | undefined
-  if (parsed.coverHref) {
+  if (parsed.coverHref && coversDir) {
     try {
-      coverPath = await extractCoverToSandbox(zip, opfPath, parsed.coverHref, filePath)
+      coverPath = await extractCover(zip, opfPath, parsed.coverHref, coversDir())
     } catch {
       coverPath = undefined
     }
@@ -294,7 +302,7 @@ async function extractEpubMetadata(filePath: string): Promise<{
   }
 }
 
-/** Read OPF fields for Library backfill (no import / no hash). */
+/** Read OPF fields for Library backfill (no import / no hash / no cover written). */
 export async function readEpubLibraryMetadata(filePath: string): Promise<{
   title?: string
   authors: string[]
@@ -312,42 +320,52 @@ export async function readEpubLibraryMetadata(filePath: string): Promise<{
   }
 }
 
-/** EPUB DocumentImporter — OPF title/author + cover when present (T2.9). */
-export const epubAdapter: DocumentImporter = {
-  canHandle(filePath: string): boolean {
-    const ext = path.extname(path.basename(filePath)).toLowerCase()
-    return resolveFormatFromExtension(ext) === DocumentFormat.Epub
-  },
+/**
+ * EPUB DocumentImporter — OPF title/author + cover when present (T2.9).
+ * `coversDir` is injected (not imported) because this module also runs inside the chunking worker,
+ * where Electron's `app` isn't available.
+ */
+export function createEpubAdapter(options: { coversDir: () => string }): DocumentImporter {
+  return {
+    canHandle(filePath: string): boolean {
+      const ext = path.extname(path.basename(filePath)).toLowerCase()
+      return resolveFormatFromExtension(ext) === DocumentFormat.Epub
+    },
 
-  async import(filePath: string): Promise<ImportResult> {
-    let title: string | undefined
-    let authorNames: string[] | undefined
-    let coverPath: string | undefined
-    let description: string | undefined
-    let genreNames: string[] | undefined
-    let pageCount: number | undefined
+    async import(filePath: string): Promise<ImportResult> {
+      return importEpub(filePath, options.coversDir)
+    },
+  }
+}
 
-    try {
-      const meta = await extractEpubMetadata(filePath)
-      title = meta.title
-      authorNames = meta.authors.length > 0 ? meta.authors : undefined
-      coverPath = meta.coverPath
-      description = meta.description
-      genreNames = meta.genreNames.length > 0 ? meta.genreNames : undefined
-      pageCount = meta.pageCount
-    } catch {
-      // Corrupt / unreadable EPUB metadata → filename fallback; do not fail import.
-    }
+async function importEpub(filePath: string, coversDir: () => string): Promise<ImportResult> {
+  let title: string | undefined
+  let authorNames: string[] | undefined
+  let coverPath: string | undefined
+  let description: string | undefined
+  let genreNames: string[] | undefined
+  let pageCount: number | undefined
 
-    return buildImportResult(filePath, DocumentFormat.Epub, {
-      title,
-      authorNames,
-      coverPath,
-      description,
-      genreNames,
-      pageCount,
-    })
-  },
+  try {
+    const meta = await extractEpubMetadata(filePath, coversDir)
+    title = meta.title
+    authorNames = meta.authors.length > 0 ? meta.authors : undefined
+    coverPath = meta.coverPath
+    description = meta.description
+    genreNames = meta.genreNames.length > 0 ? meta.genreNames : undefined
+    pageCount = meta.pageCount
+  } catch {
+    // Corrupt / unreadable EPUB metadata → filename fallback; do not fail import.
+  }
+
+  return buildImportResult(filePath, DocumentFormat.Epub, {
+    title,
+    authorNames,
+    coverPath,
+    description,
+    genreNames,
+    pageCount,
+  })
 }
 
 export interface EpubSpineDocument {

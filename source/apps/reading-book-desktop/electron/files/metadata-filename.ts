@@ -31,8 +31,3 @@ export function titleFromFilename(filePath: string): string {
   const trimmed = name.trim()
   return trimmed || base || 'Untitled'
 }
-
-/** Directory that holds a sandboxed book file (`…/books/{uuid}/`). */
-export function coverDirForBook(sandboxFilePath: string): string {
-  return path.dirname(path.resolve(sandboxFilePath))
-}

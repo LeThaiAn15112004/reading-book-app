@@ -7,6 +7,7 @@ import {
   registerCoverSchemePrivileged,
 } from './files/cover-protocol'
 import { disposeBookChunkWorkers } from './chunking/book-chunk-service'
+import { disposeTranslationWorker } from './translation/translation-service'
 import { ensureBooksSandbox } from './files/sandbox'
 import { registerAllIpcHandlers } from './ipc'
 import { installFullscreenShortcuts } from './ipc/app.ipc'
@@ -307,6 +308,7 @@ app.on('before-quit', () => {
 // Close DB after flush handshake / window close (not before — T4.2).
 app.on('will-quit', () => {
   disposeBookChunkWorkers()
+  disposeTranslationWorker()
   closeDatabase()
 })
 

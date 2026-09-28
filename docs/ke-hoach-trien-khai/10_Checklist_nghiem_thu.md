@@ -40,7 +40,7 @@ Dùng file này để đánh dấu tiến độ. Chỉ sang giai đoạn sau khi
 
 - [x] **T3.0** UI SCR-03 theo mockup + nội dung fake; tap sách nào cũng vào đọc ngay
 - [x] **T3.1** Spike chọn EPUB engine — chốt `epubjs` ^0.3.93 (SDS §2.10.1; harness `#/spike/epub`)
-- [x] **T3.4** Mở sách qua IPC: `library:openBookContent` → bytes + sandbox allowlist (không path FS cho Renderer)
+- [x] **T3.4** Mở sách qua IPC: `library:openBookContent` → bytes + kiểm tra path đã đăng ký (bản copy app-owned hoặc file tham chiếu; không path FS cho Renderer)
 - [x] **T3.3** `EpubRenderer` — mở EPUB thật thay fake khi `format === epub`
 - [x] **T3.2** `ReaderShell` chung: vùng nội dung + chrome ẩn mặc định (reveal chevron)
 - [x] Invisible UI (chrome ẩn mặc định) — **T3.6** tap center toggle Tools / Settings / More

@@ -18,6 +18,7 @@
     "spike:theme:contrast": "node spikes/theme-presets/run-contrast.mjs"
   },
   "dependencies": {
+    "@huggingface/transformers": "^4.3.0",
     "better-sqlite3": "^12.11.1",
     "epubjs": "^0.3.93",
     "fast-xml-parser": "^5.10.1",

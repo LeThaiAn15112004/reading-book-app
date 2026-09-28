@@ -96,7 +96,7 @@ reading-book-app/
     │   │   │   ├── ipc/                # channels.ts + <feature>.ipc.ts (handler) theo từng nhóm
     │   │   │   ├── persistence/         # better-sqlite3 + migrations/001..017 + sqlite-*-store.ts
     │   │   │   ├── adapters/            # DocumentImporter theo format: epub/pdf/txt/md/docx/doc
-    │   │   │   ├── files/               # sandbox copy, path allowlist
+    │   │   │   ├── files/               # kiểm tra path sách (app-owned / tham chiếu), copy URL·cloud, relink
     │   │   │   ├── security/            # token-vault (OAuth cloud)
     │   │   │   └── config/, theme/
     │   │   └── src/                  # ── PRESENTATION: Renderer (React) ──

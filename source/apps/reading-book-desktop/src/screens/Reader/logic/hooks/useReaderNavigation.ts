@@ -166,6 +166,8 @@ export function useReaderNavigation({
       // Highlight/Underline tool armed: Escape drops back to Select instead of leaving the
       // reader — checked first since it should win over any other Escape-driven UI.
       if (e.key === 'Escape') {
+        // Already consumed by an open popover/menu (`consumeEscape`) — one level per keypress.
+        if (e.defaultPrevented) return
         if (highlightShortcutsRef.current.cancelAnnotationTool()) {
           e.preventDefault()
           e.stopPropagation()

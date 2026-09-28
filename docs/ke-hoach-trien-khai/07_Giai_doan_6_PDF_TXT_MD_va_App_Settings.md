@@ -14,7 +14,7 @@
 1. Import & đọc được **PDF, TXT, Markdown, DOCX, DOC** ngoài EPUB.
 2. Progress / highlight hoạt động theo location từng họ (page+rect / text offset / block range).
 3. SCR-06: Linked libraries (stub), Appearance, Language, Fullscreen, File scan (có thể stub một phần), Multi-document flag…
-4. Xóa sách → cascade progress, `notes` (highlight/note/bookmark hợp nhất), file sandbox (**FR-12** / BR-06). Không còn entity **comment** riêng (đã xóa khỏi schema từ migration `010`, trước G6).
+4. Xóa sách → cascade progress, `notes` (highlight/note/bookmark hợp nhất), chunk/FTS (**FR-12** / BR-06). File sách chỉ bị xóa khi là bản copy app-owned và user chọn "Delete file"; file gốc của user (import máy) không bao giờ bị xóa (BR-09). Không còn entity **comment** riêng (đã xóa khỏi schema từ migration `010`, trước G6).
 5. (Tuỳ chọn / polish) Detect PDF chữ ký số → cập nhật `books.is_signed` / `signer_name` / `signature_status` / `signed_at` (cột trên `books`, gộp từ bảng con `book_signatures` ở migration `018`).
 6. Checklist MVP desktop ở [10_Checklist…](./10_Checklist_nghiem_thu.md) đạt.
 

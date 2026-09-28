@@ -23,7 +23,7 @@ export type LibraryBook = {
   fileSizeBytes?: number
   /** Short blurb (OPF description / enrich). */
   description?: string
-  /** Genre / subject names (from book_genres). */
+  /** Genre / subject names (from books.genres_json). */
   genres?: string[]
   /** Joined genre label for list / search display. */
   genre?: string
@@ -32,7 +32,15 @@ export type LibraryBook = {
   /** Cloud Sources provenance — set only for books downloaded from a linked provider. */
   sourceProvider?: 'google_drive' | 'dropbox' | 'onedrive'
   externalId?: string
+  /**
+   * `managed`: an app-owned copy the app may delete. `referenced`: the user's own file, registered
+   * by path — never deleted by the app. Absent when the platform doesn't say.
+   */
+  fileStorage?: BookFileStorage
 }
+
+/** Who owns a book's file on disk (desktop reference-based library). */
+export type BookFileStorage = 'managed' | 'referenced'
 
 export type NavFilterId = 'favorites' | 'completed' | 'to-read' | 'reading'
 
@@ -59,6 +67,7 @@ export type BookSummaryInput = {
   noteCount?: number
   sourceProvider?: 'google_drive' | 'dropbox' | 'onedrive'
   externalId?: string
+  fileStorage?: BookFileStorage
 }
 
 export const NAV_FILTERS: Record<
@@ -134,6 +143,7 @@ export function mapBookSummary(dto: BookSummaryInput): LibraryBook {
     pageCount,
     sourceProvider: dto.sourceProvider,
     externalId: dto.externalId,
+    fileStorage: dto.fileStorage,
   }
 }
 

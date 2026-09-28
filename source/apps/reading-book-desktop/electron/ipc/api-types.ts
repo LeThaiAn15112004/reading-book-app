@@ -40,7 +40,7 @@ export interface BookSummaryDto {
   fileSizeBytes?: number
   /** Short blurb for Library list / Book info. */
   description?: string
-  /** Genre / subject names (from book_genres). */
+  /** Genre / subject names (from books.genres_json). */
   genres?: string[]
   /** Page or spine-section count when known. */
   pageCount?: number
@@ -53,10 +53,27 @@ export interface BookSummaryDto {
   /** Cloud Sources provenance — set only for books downloaded from a linked provider. */
   sourceProvider?: CloudProviderDto
   externalId?: string
+  /**
+   * `managed`: an app-owned copy the app may delete. `referenced`: the user's own file, registered
+   * by path — the app never deletes it, and it can go missing if the user moves it.
+   */
+  fileStorage: BookFileStorageDto
 }
+
+export type BookFileStorageDto = 'managed' | 'referenced'
 
 export interface OkResult {
   ok: boolean
+}
+
+/** Screen region for the Snapshot tool, in CSS px relative to the reader window's viewport
+ *  (same coordinate space as `PointerEvent.clientX/clientY`) — never a filesystem path or image
+ *  data, which never needs to cross into Main for this feature. */
+export interface SnapshotRegionDto {
+  x: number
+  y: number
+  width: number
+  height: number
 }
 
 // ─── Cloud Sources ──────────────────────────────────────────────────────────
@@ -69,7 +86,6 @@ export interface CloudCatalogEntryDto {
   title: string
   authorNames?: string[]
   formatHint?: string
-  localPath?: string
   downloadUrl?: string
   previewUrl?: string
   coverUrl?: string
@@ -127,7 +143,7 @@ export type OpenBookErrorCode =
 
 /**
  * Book file bytes for the renderer. Never includes a filesystem path —
- * Main resolves `books.file_path` under the sandbox allowlist.
+ * Main resolves and validates the registered `books.file_path` itself.
  */
 export interface OpenBookContentResult {
   ok: boolean
@@ -138,6 +154,24 @@ export interface OpenBookContentResult {
   byteLength?: number
   errorCode?: OpenBookErrorCode
   /** Short user-facing message when ok is false. */
+  errorMessage?: string
+}
+
+/** Stable codes for library.relinkBook outcomes other than success. */
+export type RelinkBookErrorCode =
+  /** User closed the file dialog — not an error to surface. */
+  | 'cancelled'
+  | 'not_found'
+  /** Chosen file isn't the book's format, or lives in the app's own data folder. */
+  | 'wrong_file'
+  /** Chosen file's SHA-256 differs from the one recorded for this book. */
+  | 'hash_mismatch'
+  | 'read_failed'
+
+export interface RelinkBookResult {
+  ok: boolean
+  errorCode?: RelinkBookErrorCode
+  /** Short user-facing message when ok is false and the user didn't cancel. */
   errorMessage?: string
 }
 
@@ -286,6 +320,77 @@ export interface BookIndexStatusDto {
   errorMessage?: string
 }
 
+/** Reading order (Foxit-style list) or FTS5 bm25 relevance of the containing chunk. */
+export type BookSearchOrderDto = 'position' | 'relevance'
+
+export interface BookSearchRequestDto {
+  bookId: string
+  /** Raw user input; split into words the same way the FTS5 index was (unicode61). */
+  query: string
+  matchCase?: boolean
+  matchDiacritics?: boolean
+  wholeWords?: boolean
+  order?: BookSearchOrderDto
+  /** Paging over the ordered matches — the total count is always exact. */
+  offset?: number
+  limit?: number
+}
+
+export interface BookSearchMatchDto {
+  /** 1-based rank in reading order ("occurrence 5 of 42"), whatever the requested order. */
+  occurrence: number
+  /** 1-based number of the first matched word within the whole book. */
+  wordIndex: number
+  chunkIndex: number
+  /** EPUB spine index (0 for single-flow formats) — from the chunk's `location_start`. */
+  chapterIndex: number
+  /** 0-based rank of this match among the matches of its chapter. */
+  chapterOccurrence: number
+  /** Matches in that chapter, so the renderer can verify its own count before trusting the rank. */
+  chapterMatchCount: number
+  /** Short context around the match, pre-split so the UI can emphasise it without HTML. */
+  snippet: { before: string; match: string; after: string }
+  /** FTS5 bm25() of the containing chunk — lower is more relevant. */
+  score: number
+}
+
+export type BookSearchResultDto =
+  | {
+      state: 'ok'
+      totalMatches: number
+      /** Words in the whole book (denominator for "word 1,250 of 98,400"). */
+      totalWords: number
+      offset: number
+      matches: BookSearchMatchDto[]
+      hasMore: boolean
+      elapsedMs: number
+    }
+  /** The book isn't chunked yet; a background worker was started — retry after `bookIndex:status` done. */
+  | { state: 'indexing' }
+  /** No text extractor for this format yet (PDF, DOCX…). */
+  | { state: 'unsupported' }
+  | { state: 'error'; message: string }
+
+/** Foxit-style Word Count statistics — see `word-count-service.ts` for how each is derived from
+ *  the `book_chunks` index. */
+export type WordCountStatsDto =
+  | {
+      state: 'ok'
+      words: number
+      charactersWithSpaces: number
+      charactersNoSpaces: number
+      /** Paragraph count — the stable, index-derived analog of "lines" for reflowable text. */
+      lines: number
+      nonAsianWords: number
+      /** CJK ideographs / Kana / Hangul, counted per character (those scripts have no spaces). */
+      asianCharacters: number
+    }
+  /** The book isn't chunked yet; a background worker was started — retry after `bookIndex:status` done. */
+  | { state: 'indexing' }
+  /** No text extractor for this format yet (PDF, DOCX…). */
+  | { state: 'unsupported' }
+  | { state: 'error'; message: string }
+
 export interface DesktopApi {
   ping(): Promise<'pong'>
   getAppInfo(): Promise<AppInfo>
@@ -310,6 +415,10 @@ export interface DesktopApi {
    * Returns unsubscribe.
    */
   onRequestFlushSession(handler: () => void | Promise<void>): () => void
+  /** Crops `region` from the reader window (via `webContents.capturePage`) and copies the result
+   *  to the OS clipboard as an image — the Snapshot tool. Works uniformly across formats since it
+   *  captures composited pixels, not the underlying DOM/canvas. */
+  captureSnapshot(region: SnapshotRegionDto): Promise<OkResult>
   library: {
     listBooks(): Promise<BookSummaryDto[]>
     getBook(id: string): Promise<BookSummaryDto | null>
@@ -321,10 +430,19 @@ export interface DesktopApi {
     updateMetadata(input: UpdateBookMetadataInput): Promise<OkResult>
     showInFolder(id: string): Promise<OkResult>
     copyFilePath(id: string): Promise<OkResult>
-    /** Remove the database record but keep the imported sandbox file. */
+    /** Remove the database record; the book file (sandbox copy or the user's own) is kept. */
     removeBook(id: string): Promise<OkResult>
-    /** Remove the database record and its imported sandbox file. */
+    /**
+     * Remove the database record and the app-owned sandbox copy. Refused (`ok: false`) for
+     * `referenced` books: the user's own file is never deleted by the app.
+     */
     deleteBookFile(id: string): Promise<OkResult>
+    /**
+     * "Locate file": Main opens a file dialog, and re-attaches the book to the chosen file only if
+     * its SHA-256 matches the one recorded for `id`. Annotations, progress and search data are keyed
+     * by book id, so they carry over untouched.
+     */
+    relinkBook(id: string): Promise<RelinkBookResult>
     listCollections(): Promise<CollectionSummaryDto[]>
     createCollection(input: {
       name: string
@@ -363,6 +481,15 @@ export interface DesktopApi {
     /** Subscribe to background chunking status pushes. Returns unsubscribe. */
     onStatus(handler: (status: BookIndexStatusDto) => void): () => void
   }
+  search: {
+    /** Full-text search inside one book (FTS5 + exact occurrence counting). */
+    searchBook(request: BookSearchRequestDto): Promise<BookSearchResultDto>
+  }
+  wordCount: {
+    /** Foxit-style Words/Characters/Lines/Asian-characters breakdown, reused straight from the
+     *  `book_chunks` index built for search — no separate re-scan of the book text. */
+    getStats(bookId: string): Promise<WordCountStatsDto>
+  }
   cloud: {
     /** Opens the provider's OAuth consent screen in a popup and stores tokens securely on success. */
     connect(provider: CloudProviderDto): Promise<CloudConnectResult>
@@ -378,4 +505,48 @@ export interface DesktopApi {
     /** Subscribe to byte progress for the in-flight cloud download(s). Returns unsubscribe. */
     onDownloadProgress(handler: (progress: CloudDownloadProgressDto) => void): () => void
   }
+  translation: {
+    /** Offline machine translation (worker thread in Main). The first use of a language pair
+     *  downloads its model; progress arrives through `onProgress` under the same `requestId`. */
+    translate(request: TranslateRequestDto): Promise<TranslateResultDto>
+    /** Best-effort: drops a queued request; one already inferring finishes but is discarded. */
+    cancel(requestId: string): Promise<void>
+    /** Subscribe to model download/load progress for this window's requests. Returns unsubscribe. */
+    onProgress(handler: (progress: TranslationProgressDto) => void): () => void
+  }
+}
+
+export interface TranslateRequestDto {
+  /** Caller-chosen id (UUID) — ties progress events and `cancel` to this request. */
+  requestId: string
+  text: string
+  /** Catalog codes from the SDK's `TRANSLATION_LANGUAGES` (e.g. `en`, `vi`, `zh-TW`). */
+  sourceLang: string
+  targetLang: string
+}
+
+export type TranslationErrorCode =
+  | 'NETWORK_UNAVAILABLE'
+  | 'MODEL_LOAD_FAILED'
+  | 'TRANSLATION_FAILED'
+  | 'INVALID_ARGUMENT'
+  | 'ABORTED'
+  | 'UNSUPPORTED_LANGUAGE'
+  | 'SAME_LANGUAGE'
+  | 'WORKER_FAILED'
+
+export type TranslateResultDto =
+  | { state: 'ok'; text: string; modelId: string; durationMs: number }
+  | { state: 'error'; code: TranslationErrorCode; message: string }
+
+export interface TranslationProgressDto {
+  requestId: string
+  modelId: string
+  /** `total` = aggregate over every model file (drive a single bar from it); `ready` = loaded. */
+  status: 'initiate' | 'download' | 'progress' | 'total' | 'done' | 'ready'
+  file?: string
+  /** 0–100. */
+  progress?: number
+  loadedBytes?: number
+  totalBytes?: number
 }

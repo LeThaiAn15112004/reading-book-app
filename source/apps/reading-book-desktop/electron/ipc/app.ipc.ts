@@ -1,8 +1,9 @@
-import { app, BrowserWindow, ipcMain } from 'electron'
+import { app, BrowserWindow, clipboard, ipcMain } from 'electron'
 import type {
   AppInfo,
   GoogleOAuthClientConfigDto,
   OkResult,
+  SnapshotRegionDto,
 } from './api-types'
 import { AppChannels } from './channels'
 import { applyChromeThemeToWindow } from '../theme/titlebar-overlay'
@@ -10,6 +11,24 @@ import { loadGoogleOAuthClientConfig } from '../config/google-oauth-config'
 
 function windowFromEvent(event: Electron.IpcMainInvokeEvent): BrowserWindow | null {
   return BrowserWindow.fromWebContents(event.sender)
+}
+
+/** Renderer input is untrusted: keep only a well-formed, positive-size rectangle. */
+function toSnapshotRegion(input: unknown): SnapshotRegionDto | null {
+  if (!input || typeof input !== 'object') return null
+  const { x, y, width, height } = input as Record<string, unknown>
+  if (
+    typeof x !== 'number' ||
+    typeof y !== 'number' ||
+    typeof width !== 'number' ||
+    typeof height !== 'number' ||
+    ![x, y, width, height].every(Number.isFinite) ||
+    width <= 0 ||
+    height <= 0
+  ) {
+    return null
+  }
+  return { x: Math.round(x), y: Math.round(y), width: Math.round(width), height: Math.round(height) }
 }
 
 function notifyFullscreen(win: BrowserWindow, fullscreen: boolean): void {
@@ -75,6 +94,24 @@ export function registerAppIpc(): void {
       const fullscreen = !win.isFullScreen()
       win.setFullScreen(fullscreen)
       return { ok: true, fullscreen }
+    },
+  )
+
+  ipcMain.removeHandler(AppChannels.captureSnapshot)
+  ipcMain.handle(
+    AppChannels.captureSnapshot,
+    async (event, input: unknown): Promise<OkResult> => {
+      const region = toSnapshotRegion(input)
+      const win = windowFromEvent(event)
+      if (!region || !win || win.isDestroyed()) return { ok: false }
+      try {
+        const image = await win.webContents.capturePage(region)
+        if (image.isEmpty()) return { ok: false }
+        clipboard.writeImage(image)
+        return { ok: true }
+      } catch {
+        return { ok: false }
+      }
     },
   )
 }

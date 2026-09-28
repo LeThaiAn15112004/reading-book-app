@@ -1,6 +1,7 @@
 import type { Database } from 'better-sqlite3'
 import { createHash } from 'node:crypto'
-import type { TextChunk } from './chunk-text'
+import { countSearchWords } from '@reading-book/book-reader-sdk'
+import type { TextChunk } from '@reading-book/book-reader-sdk'
 
 /** Deterministic id: the same book text always yields the same row ids (idempotent re-runs). */
 export function chunkId(bookId: string, chunk: TextChunk): string {
@@ -26,15 +27,22 @@ export function hasBookChunks(db: Database, bookId: string): boolean {
 export function insertBookChunks(db: Database, bookId: string, chunks: readonly TextChunk[]): number {
   const insert = db.prepare(
     `INSERT OR IGNORE INTO book_chunks
-       (id, book_id, chunk_index, content, location_start, location_end, embedding, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, NULL, ?)`,
+       (id, book_id, chunk_index, content, location_start, location_end,
+        word_start, word_count, embedding, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, ?)`,
   )
   const createdAt = new Date().toISOString()
+  // Counted before the write transaction so the lock is held only for the inserts.
+  const wordCounts = chunks.map((chunk) => countSearchWords(chunk.content))
 
+  // One transaction, ascending chunk_index: the book's `seq` values come out contiguous and in
+  // reading order, which the FTS5 search (electron/search/book-search-query.ts) relies on.
   const write = db.transaction((): number => {
     if (hasBookChunks(db, bookId)) return 0
     let written = 0
-    for (const chunk of chunks) {
+    let wordStart = 0
+    chunks.forEach((chunk, i) => {
+      const wordCount = wordCounts[i] ?? 0
       written += insert.run(
         chunkId(bookId, chunk),
         bookId,
@@ -42,9 +50,12 @@ export function insertBookChunks(db: Database, bookId: string, chunks: readonly 
         chunk.content,
         chunk.locationStart,
         chunk.locationEnd,
+        wordStart,
+        wordCount,
         createdAt,
       ).changes
-    }
+      wordStart += wordCount
+    })
     return written
   })
 

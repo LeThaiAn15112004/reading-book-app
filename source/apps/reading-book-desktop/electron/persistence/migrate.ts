@@ -18,6 +18,8 @@ import migration016 from './migrations/016_annotations_notes.sql?raw'
 import migration017 from './migrations/017_annotations_location_ref.sql?raw'
 import migration018 from './migrations/018_notes_thorium.sql?raw'
 import migration019 from './migrations/019_bookmarks_notes_merge.sql?raw'
+import migration020 from './migrations/020_optimized_books_schema.sql?raw'
+import migration021 from './migrations/021_book_chunks_fts.sql?raw'
 
 interface Migration {
   name: string
@@ -44,6 +46,8 @@ const MIGRATIONS: Migration[] = [
   { name: '017_annotations_location_ref.sql', sql: migration017 },
   { name: '018_notes_thorium.sql', sql: migration018 },
   { name: '019_bookmarks_notes_merge.sql', sql: migration019 },
+  { name: '020_optimized_books_schema.sql', sql: migration020 },
+  { name: '021_book_chunks_fts.sql', sql: migration021 },
 ]
 
 /**

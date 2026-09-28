@@ -61,6 +61,10 @@ export {
 } from './annotations/locator.js'
 export * from './epub/index.js'
 export * from './persistence/index.js'
+export * from './search/index.js'
+export * from './text/index.js'
+export * from './pagination/index.js'
+export * from './viewport/index.js'
 
 // Use cases
 export type {
@@ -72,6 +76,9 @@ export type {
 } from './services/annotation-service.js'
 export type { BookUpdate, ImportFileInput, ImportOutcome, LibraryService } from './services/library-service.js'
 export type { SessionService } from './services/session-service.js'
+// Offline translation. The engine (Transformers.js on desktop) is injected via `loadEngine`;
+// see `host-adapters/translation/` for the reference adapter.
+export * from './services/translation/index.js'
 
 // State
 export { createStoreHook, type LoadStatus, type ReadonlyStore, type UseSyncExternalStore } from './stores/store-types.js'

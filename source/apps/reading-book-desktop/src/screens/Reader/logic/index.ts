@@ -1,22 +1,42 @@
 export { parseResumeLocation } from './book/parseResumeLocation'
-export { highlightPopoverPosition } from './highlights/highlightPopoverPosition'
+export { highlightPopoverPosition } from '@reading-book/book-reader-sdk'
 export { useDismissOnOutsideOrEscape } from './highlights/useDismissOnOutsideOrEscape'
 export { FAKE_CHAPTERS, chapterLocationLabel, type FakeChapter } from './demo/fakeReaderContent'
 export { FAKE_SIGNATURES } from './demo/fakeSignatures'
 export {
   useBookIndexing,
+  useBookRelink,
   useReaderBookmarks,
   useReaderHighlights,
   useReaderBookOpen,
   useReaderChromeUi,
   useReaderNavigation,
+  useReaderSearch,
   useReaderSessionBridge,
   useReaderFullscreen,
   useImmersiveChromeReveal,
   useReaderZoomControls,
+  useSnapshotTool,
+  useWordCount,
+  useReadAloud,
+  useReaderTranslation,
   type HighlightShortcuts,
   type ReaderChromeEscapeUi,
+  type SnapshotRect,
 } from './hooks'
+export { type WordCountStats, type WordCountStatus } from './wordCount/wordCountStore'
+export { READ_ALOUD_RATES, type ReadAloudStatus } from './readAloud/readAloudStore'
+export { useDraggableWordCountPanel } from './wordCount/useDraggableWordCountPanel'
+export { useResizableWordCountPanel } from './wordCount/useResizableWordCountPanel'
+export {
+  useBookSearchStore,
+  type BookSearchStatus,
+  type SearchPanelPosition,
+} from './search/bookSearchStore'
+export { useDraggableSearchPanel } from './search/useDraggableSearchPanel'
+export { useResizableSearchPanel } from './search/useResizableSearchPanel'
+export { useDraggableTranslationPanel } from './translation/useDraggableTranslationPanel'
+export { useResizableTranslationPanel } from './translation/useResizableTranslationPanel'
 export { fromReadingPrefs, toReadingPrefs } from './prefs/toReadingPrefs'
 export {
   flushRegisteredSession,

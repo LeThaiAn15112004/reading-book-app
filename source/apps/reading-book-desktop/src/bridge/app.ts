@@ -13,4 +13,9 @@ export const appApi = {
   /** Main asks renderer to flush reading session before close (T4.2). */
   onRequestFlushSession: (handler: () => void | Promise<void>) =>
     window.api.onRequestFlushSession(handler),
+  /** Snapshot tool: crop `region` (viewport CSS px) and copy it to the clipboard. */
+  captureSnapshot: (region: Parameters<typeof window.api.captureSnapshot>[0]) =>
+    window.api.captureSnapshot(region),
 }
+
+export type SnapshotRegion = Parameters<typeof window.api.captureSnapshot>[0]

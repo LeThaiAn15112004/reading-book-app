@@ -7,6 +7,16 @@ export type { ArchiveAdapter, ArchiveReader } from './archive.js'
 export type { FileRef, FileSystemAdapter } from './file-system.js'
 export type { Clock, HashAdapter, IdGenerator, Logger, Scheduler, TimerHandle } from './platform.js'
 export type { ReaderSurface, ReaderMarkup } from './reader-surface.js'
+export type { TtsEngine, TtsSpeakHandlers, TtsSpeakRequest, TtsVoiceMatch } from './tts.js'
+export type {
+  AbortSignalLike,
+  TranslationEngine,
+  TranslationEngineLoader,
+  TranslationEngineLoadOptions,
+  TranslationEngineTranslateOptions,
+  TranslationLoadProgress,
+  TranslationLoadProgressListener,
+} from './translation.js'
 export type {
   LibraryStore,
   OverlayStore,

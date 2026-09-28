@@ -1,4 +1,4 @@
-import { Location } from '@reading-book/book-reader-sdk'
+import { Location } from '../domain/reading/location.js'
 
 /** Legacy shelf placeholder written by early markAsReading (G3). */
 export const STARTED_LOCATION_LABEL = 'Started'

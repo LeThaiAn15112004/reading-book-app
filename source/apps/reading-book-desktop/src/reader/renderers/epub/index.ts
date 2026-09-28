@@ -42,6 +42,9 @@ export {
   type EpubTocItem,
   type EpubSelectionInfo,
   type EpubHighlightClickInfo,
+  type EpubSearchTarget,
+  type ReadAloudMode,
+  type ReadAloudSection,
   type ViewportRectLike,
 } from './openEpubjs'
 export {

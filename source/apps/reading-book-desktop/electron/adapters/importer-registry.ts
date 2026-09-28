@@ -1,13 +1,14 @@
 import { DocumentFormat, type DocumentImporter } from '@reading-book/book-reader-sdk'
 import { docAdapter } from './doc.adapter'
 import { docxAdapter } from './docx.adapter'
-import { epubAdapter } from './epub.adapter'
+import { createEpubAdapter } from './epub.adapter'
 import { mdAdapter } from './md.adapter'
 import { pdfAdapter } from './pdf.adapter'
 import { txtAdapter } from './txt.adapter'
+import { ensureCoversDir } from '../files/sandbox'
 
 const REGISTRY: ReadonlyMap<DocumentFormat, DocumentImporter> = new Map([
-  [DocumentFormat.Epub, epubAdapter],
+  [DocumentFormat.Epub, createEpubAdapter({ coversDir: ensureCoversDir })],
   [DocumentFormat.Pdf, pdfAdapter],
   [DocumentFormat.Txt, txtAdapter],
   [DocumentFormat.Md, mdAdapter],

@@ -9,7 +9,7 @@ import Database from 'better-sqlite3'
 import { parentPort, workerData } from 'node:worker_threads'
 import { insertBookChunks } from './book-chunk-writer'
 import type { BookChunkJob, BookChunkWorkerMessage } from './book-chunk-job'
-import { chunkParagraphs, type TextParagraph } from './chunk-text'
+import { chunkParagraphs, type TextParagraph } from '@reading-book/book-reader-sdk'
 import { extractBookParagraphs } from './extract-book-text'
 
 async function run(job: BookChunkJob): Promise<number> {

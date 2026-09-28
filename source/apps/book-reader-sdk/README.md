@@ -30,7 +30,11 @@ book-reader-sdk/
 │   ├── cfi/                chuỗi CFI, parse step/offset, so sánh thứ tự tài liệu, codec
 │   ├── annotations/        locator pack/unpack, màu, citation, undo history, filter/sort/group
 │   ├── epub/               container.xml + OPF (metadata, manifest, spine, cover) — không cần DOMParser
-│   ├── persistence/        codec note_json + repository SQL cho bảng `notes` qua port SqlDatabase
+│   ├── persistence/        codec note_json + repository SQL cho bảng `notes` qua port SqlDatabase;
+│   │                       parser cột JSON của `books` + pack/unpack `last_read_location`
+│   ├── text/               HTML → đoạn văn, chunk 400–500 từ (FTS/RAG), thống kê Word Count, chia câu đọc to
+│   ├── pagination/         đếm trang cộng dồn EPUB (EpubPaginationTracker) + key/record cache phân trang
+│   ├── viewport/           toán zoom (preset, fit, focal zoom) + vị trí popover neo theo vùng chọn
 │   ├── services/           use case: library (import/dedupe/rollback), annotations, bookmarks, session
 │   ├── stores/             zustand vanilla: library, annotations, bookmarks, session
 │   └── testing/            adapter in-memory (spec thực thi được của các port)
@@ -75,6 +79,7 @@ Luồng phụ thuộc chỉ đi **vào trong**: stores → services → domain/p
 | `ids` | nếu nền tảng không có `crypto` | `crypto.randomUUID` | `expo-crypto` |
 | `clock`, `scheduler`, `logger` | không | `Date`, `setTimeout`, `console` | fake timers trong test |
 | `ReaderSurface` (gắn lúc runtime) | không | — | epub.js handle, WebView bridge |
+| `TtsEngine` (host tự dùng cho đọc to) | không | — | Web Speech (desktop), `expo-speech` |
 
 Adapter được **kiểm tra shape lúc runtime** (`ADAPTER_INVALID: storage.annotations is missing
 method(s): saveMarkup`) — cần thiết vì SDK cũng được gọi từ JS thuần qua relative path.
@@ -208,7 +213,7 @@ await sdk.dispose()     // mọi lời gọi sau đó ném SdkError('DISPOSED')
 
 File mẫu: `examples/electron-host/main/*`, `examples/electron-host/renderer/*` (typecheck bằng
 `npm run example:typecheck`). Repo `desktop-sqlite-storage.ts` đã được chạy thử trên DB dựng từ
-toàn bộ migrations 001–019 của app.
+toàn bộ migrations 001–020 của app.
 
 ## Lộ trình áp dụng vào desktop app
 

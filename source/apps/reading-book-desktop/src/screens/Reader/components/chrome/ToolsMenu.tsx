@@ -1,5 +1,3 @@
-import { ReaderSearchPanel } from './ReaderSearchPanel'
-
 /** Toolbar mode buttons. */
 export type ModeTool = 'hand' | 'select'
 
@@ -17,11 +15,23 @@ type ToolsStripProps = {
   onOpenSign: () => void
   onCompanionTool: (tool: CompanionTool) => void
   onAnnotationTool: (tool: AnnotationTool) => void
+  /** Search tool's pressed state — the results panel itself floats independently (see
+   *  `ReaderSearchPanel`, rendered by `ReaderScreen`), Foxit/Thorium-style, not anchored here. */
   searchOpen: boolean
-  searchQuery: string
-  onSearchQueryChange: (query: string) => void
-  onSearchSubmit: () => void
-  onCloseSearch: () => void
+  /** Translate mode armed — a finished selection opens the translation popover. It rides on
+   *  Select (text must be selectable), so Select itself isn't shown pressed meanwhile. */
+  translateActive: boolean
+  /** Audio (read aloud) menu open or reading in progress — the menu floats via `ReadAloudMenu`. */
+  audioActive: boolean
+  audioMenuOpen: boolean
+  audioButtonRef: React.Ref<HTMLButtonElement>
+  /** Snapshot tool's armed state — the crosshair overlay itself floats independently (see
+   *  `SnapshotOverlay`, rendered by `ReaderScreen`), same story as Search. */
+  snapshotActive: boolean
+  onSnapshot: () => void
+  onWordCount: () => void
+  /** Annotation tools to omit from the strip entirely — e.g. EPUB has no Freehand/Textbox. */
+  hiddenAnnotationTools?: AnnotationTool[]
 }
 
 const NAV_TOOLS: ModeTool[] = ['hand', 'select']
@@ -41,7 +51,7 @@ const MODE_LABELS: Record<ModeTool, string> = {
 
 const COMPANION_LABELS: Record<CompanionTool, string> = {
   search: 'Search',
-  speech: 'Speech',
+  speech: 'Audio',
   translate: 'Translate',
 }
 
@@ -116,8 +126,9 @@ function ToolIcon({ tool }: { tool: string }) {
           <path
             strokeLinecap="round"
             strokeLinejoin="round"
-            d="M12 4.5a3 3 0 0 0-3 3v4.5a3 3 0 1 0 6 0V7.5a3 3 0 0 0-3-3Zm-6.75 7.5a6.75 6.75 0 0 0 13.5 0M12 18.75v1.75m-3 0h6"
+            d="M4 9.75h3.4l4.2-3.6a.6.6 0 0 1 1 .46v10.78a.6.6 0 0 1-1 .46l-4.2-3.6H4a.75.75 0 0 1-.75-.75v-3a.75.75 0 0 1 .75-.75Z"
           />
+          <path strokeLinecap="round" strokeLinejoin="round" d="M16 9c1 .9 1 5.1 0 6M18.3 6.7c2.2 2.2 2.2 8.4 0 10.6" />
         </svg>
       )
     case 'translate':
@@ -180,6 +191,24 @@ function ToolIcon({ tool }: { tool: string }) {
           />
         </svg>
       )
+    case 'snapshot':
+      return (
+        <svg className={cls} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor" aria-hidden>
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            d="M4 8.25A1.75 1.75 0 0 1 5.75 6.5h1.19c.32 0 .62-.16.8-.43l.7-1.05c.32-.48.87-.77 1.45-.77h4.22c.58 0 1.13.29 1.45.77l.7 1.05c.18.27.48.43.8.43h1.19A1.75 1.75 0 0 1 20 8.25v8.5A1.75 1.75 0 0 1 18.25 18.5H5.75A1.75 1.75 0 0 1 4 16.75v-8.5Z"
+          />
+          <path strokeLinecap="round" strokeLinejoin="round" d="M15 12.25a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
+        </svg>
+      )
+    case 'wordCount':
+      return (
+        <svg className={cls} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor" aria-hidden>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M6 4v16M18 4v16M6 8h4M6 12h6M6 16h4" />
+          <path strokeLinecap="round" strokeLinejoin="round" d="M14 16.5V13a1.5 1.5 0 0 1 3 0v3.5M14 15h3" />
+        </svg>
+      )
     case 'sign':
       return (
         <svg className={cls} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor" aria-hidden>
@@ -210,13 +239,20 @@ export function ToolsStrip({
   onCompanionTool,
   onAnnotationTool,
   searchOpen,
-  searchQuery,
-  onSearchQueryChange,
-  onSearchSubmit,
-  onCloseSearch,
+  translateActive,
+  audioActive,
+  audioMenuOpen,
+  audioButtonRef,
+  snapshotActive,
+  onSnapshot,
+  onWordCount,
+  hiddenAnnotationTools,
 }: ToolsStripProps) {
+  const annotationTools = hiddenAnnotationTools?.length
+    ? ANNOTATION_TOOLS.filter((tool) => !hiddenAnnotationTools.includes(tool))
+    : ANNOTATION_TOOLS
   function renderModeButton(tool: ModeTool) {
-    const active = activeTool === tool
+    const active = activeTool === tool && !(tool === 'select' && translateActive)
     const label = MODE_LABELS[tool]
 
     return (
@@ -244,48 +280,37 @@ export function ToolsStrip({
     >
       <ToolGroup aria-label="Navigation and lookup">
         {NAV_TOOLS.map((tool) => renderModeButton(tool))}
-        {COMPANION_TOOLS.map((tool) =>
-          tool === 'search' ? (
-            <div key={tool} className="relative shrink-0">
-              <button
-                className={modeButtonClass(searchOpen)}
-                type="button"
-                title={COMPANION_LABELS[tool]}
-                aria-label={COMPANION_LABELS[tool]}
-                aria-pressed={searchOpen}
-                onClick={() => onCompanionTool(tool)}
-              >
-                <ToolIcon tool={tool} />
-                <span className={stripLabel}>{COMPANION_LABELS[tool]}</span>
-              </button>
-              <ReaderSearchPanel
-                open={searchOpen}
-                query={searchQuery}
-                onQueryChange={onSearchQueryChange}
-                onSubmit={onSearchSubmit}
-                onClose={onCloseSearch}
-              />
-            </div>
-          ) : (
-            <button
-              key={tool}
-              className={stripBtn}
-              type="button"
-              title={COMPANION_LABELS[tool]}
-              aria-label={COMPANION_LABELS[tool]}
-              onClick={() => onCompanionTool(tool)}
-            >
-              <ToolIcon tool={tool} />
-              <span className={stripLabel}>{COMPANION_LABELS[tool]}</span>
-            </button>
-          ),
-        )}
+        {COMPANION_TOOLS.map((tool) => (
+          <button
+            key={tool}
+            ref={tool === 'speech' ? audioButtonRef : undefined}
+            className={
+              tool === 'search'
+                ? modeButtonClass(searchOpen)
+                : tool === 'speech'
+                  ? modeButtonClass(audioActive)
+                  : modeButtonClass(translateActive)
+            }
+            type="button"
+            title={COMPANION_LABELS[tool]}
+            aria-label={COMPANION_LABELS[tool]}
+            aria-pressed={
+              tool === 'search' ? searchOpen : tool === 'translate' ? translateActive : undefined
+            }
+            aria-haspopup={tool === 'speech' ? 'menu' : undefined}
+            aria-expanded={tool === 'speech' ? audioMenuOpen : undefined}
+            onClick={() => onCompanionTool(tool)}
+          >
+            <ToolIcon tool={tool} />
+            <span className={stripLabel}>{COMPANION_LABELS[tool]}</span>
+          </button>
+        ))}
       </ToolGroup>
 
       <ToolSeparator />
 
       <ToolGroup aria-label="Annotation tools">
-        {ANNOTATION_TOOLS.map((tool) => {
+        {annotationTools.map((tool) => {
           const active = activeTool === tool
           return (
             <button
@@ -307,6 +332,27 @@ export function ToolsStrip({
       <ToolSeparator />
 
       <ToolGroup aria-label="Other tools">
+        <button
+          className={modeButtonClass(snapshotActive)}
+          type="button"
+          title="Snapshot"
+          aria-label="Snapshot"
+          aria-pressed={snapshotActive}
+          onClick={onSnapshot}
+        >
+          <ToolIcon tool="snapshot" />
+          <span className={stripLabel}>Snapshot</span>
+        </button>
+        <button
+          className={stripBtn}
+          type="button"
+          title="Word Count"
+          aria-label="Word Count"
+          onClick={onWordCount}
+        >
+          <ToolIcon tool="wordCount" />
+          <span className={stripLabel}>Word Count</span>
+        </button>
         <button
           className={stripBtn}
           type="button"

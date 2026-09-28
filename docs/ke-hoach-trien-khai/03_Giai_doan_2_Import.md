@@ -8,6 +8,8 @@
 
 **Điều kiện vào:** G1 có Library + CTA Add.
 
+> **Cập nhật kiến trúc (SDS 1.24 / SRS 1.7):** tài liệu này ghi lại kế hoạch G2 ban đầu (import file máy = *copy vào sandbox*). Hiện import file máy **tham chiếu file gốc** (không copy); chỉ **URL / cloud** tải về và lưu bản copy app-owned. Các dòng T2.3, T2.8 và nghiệm thu "File gốc không bị sửa" dưới đây đã được chú thích theo hành vi mới — mô tả đầy đủ: [`docs/implementation_plan/file_centric_import_architecture.md`](../implementation_plan/file_centric_import_architecture.md).
+
 ---
 
 ## 1. Outcome
@@ -23,12 +25,12 @@
 | :--- | :--- | :--- |
 | T2.1 | UI: split button Add + menu “From device” / “From URL” | FR-01, FR-13 |
 | T2.2 | Modal (desktop) / bottom sheet (mobile sau): nhập URL | FR-13 |
-| T2.3 | Main: OS file picker + copy vào sandbox | FR-01 |
+| T2.3 | Main: OS file picker + ~~copy vào sandbox~~ → *(từ SDS 1.24)* đăng ký tham chiếu file gốc, không copy | FR-01 |
 | T2.4 | Main: download URL (https, timeout, size limit, scheme allowlist) | FR-13 |
 | T2.5 | Validate extension: epub / pdf / txt / md / docx / doc — từ chối format khác rõ ràng | FR-01 |
 | T2.6 | Metadata tối thiểu (title, author nếu có, format, filename, cover nếu extract được) | FR-01 |
 | T2.7 | SHA-256 dedup (**BR-03**) + dialog conflict | FR-01, FR-13 |
-| T2.8 | Ghi `books` + path sandbox; optional `source_url` | FR-13 |
+| T2.8 | Ghi `books` + `file_path` (file gốc với import máy; path sandbox với URL / cloud); optional `source_url` | FR-13 |
 | T2.9 | Adapter EPUB trước (metadata); stub PDF/TXT/MD/DOCX/DOC nếu chưa render | — |
 | T2.10 | Progress UI khi copy/download; dọn temp khi lỗi | FR-13 |
 | T2.11 | Library refresh + toast thành công | FR-08 |
@@ -47,7 +49,7 @@ T2.3 → T2.5 → T2.6 → T2.7 → T2.8
 ## 4. Nghiệm thu
 
 - [x] Import EPUB từ máy → card hiện Library
-- [x] File gốc không bị sửa (copy sandbox)
+- [x] File gốc không bị sửa (ban đầu: copy sandbox; từ SDS 1.24: không copy, chỉ tham chiếu — app không ghi / di chuyển / xóa file gốc)
 - [x] Import trùng → thông báo, không 2 bản ghi
 - [x] URL hợp lệ → file nằm sandbox local (đọc nội dung → **G3**); không re-download mỗi lần mở
 - [x] URL lỗi / format sai → message rõ; không bản ghi rỗng

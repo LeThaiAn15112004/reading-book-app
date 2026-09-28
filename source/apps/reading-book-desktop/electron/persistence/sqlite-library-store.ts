@@ -2,19 +2,25 @@ import {
   Author,
   Book,
   BookAuthor,
-  BookGenre,
-  Genre,
   parseDocumentFormat,
   type LibraryStore,
 } from '@reading-book/book-reader-sdk'
 import type { Database as SqliteDatabase } from 'better-sqlite3'
 import { randomUUID } from 'node:crypto'
+import {
+  normalizeGenreNames,
+  parseGenres,
+  parseMetadata,
+  parseReadingState,
+  type BookMetadataJson,
+  type ReadingStateJson,
+} from '@reading-book/book-reader-sdk'
 import { getDatabase } from './db'
 import {
   STARTED_LOCATION_LABEL,
   displayLabelFromStoredLocation,
   isPersistedLocationJson,
-} from './reading-session-location'
+} from '@reading-book/book-reader-sdk'
 
 interface BookRow {
   id: string
@@ -24,15 +30,17 @@ interface BookRow {
   file_format: string
   cover_path: string | null
   sha256: string
-  file_size_bytes: number | null
-  description: string | null
-  page_count: number | null
   is_favorite: number
   reading_status: 'reading' | 'completed' | 'not-started'
-  is_signed: number
   source_url: string | null
   source_provider: string | null
   external_id: string | null
+  /** fileSizeBytes, pageCount, description, isSigned, … (see books-json.ts). */
+  metadata_json: string
+  /** string[] of genre names, sorted A→Z. */
+  genres_json: string
+  /** Last-read location + per-book display prefs (see books-json.ts). */
+  reading_state_json: string
   added_at: string
   updated_at: string
 }
@@ -40,7 +48,7 @@ interface BookRow {
 export type ReadingSessionSummary = {
   /** Human-readable last-read label for Library (never raw CFI JSON). */
   lastReadLocation?: string
-  /** Alias of reading_session_states.updated_at. */
+  /** `reading_state_json.updatedAt` — when the reading state last changed. */
   lastReadAt?: string
 }
 
@@ -64,13 +72,26 @@ export type CollectionListItem = {
 }
 
 const BOOK_COLUMNS = `
-  id, title, file_path, normalized_path, file_format, cover_path,
-  sha256, file_size_bytes, description, page_count,
-  is_favorite, reading_status, is_signed, source_url, source_provider, external_id,
+  id, title, file_path, normalized_path, file_format, cover_path, sha256,
+  is_favorite, reading_status, source_url, source_provider, external_id,
+  metadata_json, genres_json, reading_state_json,
   added_at, updated_at
 `
 
+const INSERT_BOOK_SQL = `
+  INSERT INTO books (
+    id, title, file_path, normalized_path, file_format, cover_path, sha256,
+    is_favorite, source_url, source_provider, external_id,
+    metadata_json, genres_json, added_at, updated_at
+  ) VALUES (
+    @id, @title, @file_path, @normalized_path, @file_format, @cover_path, @sha256,
+    @is_favorite, @source_url, @source_provider, @external_id,
+    @metadata_json, @genres_json, @added_at, @updated_at
+  )
+`
+
 function rowToBook(row: BookRow): Book {
+  const metadata = parseMetadata(row.metadata_json)
   return new Book({
     id: row.id,
     title: row.title,
@@ -79,11 +100,11 @@ function rowToBook(row: BookRow): Book {
     format: parseDocumentFormat(row.file_format),
     coverPath: row.cover_path ?? undefined,
     sha256: row.sha256,
-    fileSizeBytes: row.file_size_bytes ?? undefined,
-    description: row.description ?? undefined,
-    pageCount: row.page_count ?? undefined,
+    fileSizeBytes: metadata.fileSizeBytes ?? undefined,
+    description: metadata.description ?? undefined,
+    pageCount: metadata.pageCount ?? undefined,
     isFavorite: row.is_favorite === 1,
-    isSigned: row.is_signed === 1,
+    isSigned: metadata.isSigned === true,
     sourceUrl: row.source_url ?? undefined,
     sourceProvider: row.source_provider ?? undefined,
     externalId: row.external_id ?? undefined,
@@ -92,8 +113,44 @@ function rowToBook(row: BookRow): Book {
   })
 }
 
+/** Book → the `books` columns + JSON blobs. Parameterized (`@name`), never string-built. */
+function bookToRowParams(book: Book, genreNames: readonly string[]) {
+  // undefined members are dropped by JSON.stringify → "absent" in the stored JSON.
+  const metadata: BookMetadataJson = {
+    fileSizeBytes: book.fileSizeBytes,
+    pageCount: book.pageCount,
+    description: book.description,
+    isSigned: book.isSigned,
+  }
+  return {
+    id: book.id,
+    title: book.title,
+    file_path: book.filePath,
+    normalized_path: book.normalizedPath ?? null,
+    file_format: book.format,
+    cover_path: book.coverPath ?? null,
+    sha256: book.sha256,
+    is_favorite: book.isFavorite ? 1 : 0,
+    source_url: book.sourceUrl ?? null,
+    source_provider: book.sourceProvider ?? null,
+    external_id: book.externalId ?? null,
+    metadata_json: JSON.stringify(metadata),
+    genres_json: JSON.stringify(normalizeGenreNames(genreNames)),
+    added_at: book.addedAt,
+    updated_at: book.updatedAt,
+  }
+}
+
+function summaryFromState(state: ReadingStateJson): ReadingSessionSummary | undefined {
+  const label = displayLabelFromStoredLocation(state.lastReadLocation ?? '')
+  if (!label) return undefined
+  return { lastReadLocation: label, lastReadAt: state.updatedAt ?? undefined }
+}
+
 /**
- * SQLite LibraryStore — T2.7 find + T2.8 save / linkAuthors / linkGenres / listAll.
+ * SQLite LibraryStore — T2.7 find + T2.8 save / linkAuthors / listAll.
+ * Genres, reading state and the lesser book metadata live in JSON columns of `books`
+ * (migration 020) instead of separate tables.
  */
 export class SqliteLibraryStore implements LibraryStore {
   constructor(private readonly db: SqliteDatabase = getDatabase()) {}
@@ -130,37 +187,7 @@ export class SqliteLibraryStore implements LibraryStore {
   }
 
   async save(book: Book): Promise<void> {
-    this.db
-      .prepare(
-        `INSERT INTO books (
-          id, title, file_path, normalized_path, file_format, cover_path,
-          sha256, file_size_bytes, description, page_count,
-          is_favorite, is_signed, source_url, source_provider, external_id, added_at, updated_at
-        ) VALUES (
-          @id, @title, @file_path, @normalized_path, @file_format, @cover_path,
-          @sha256, @file_size_bytes, @description, @page_count,
-          @is_favorite, @is_signed, @source_url, @source_provider, @external_id, @added_at, @updated_at
-        )`,
-      )
-      .run({
-        id: book.id,
-        title: book.title,
-        file_path: book.filePath,
-        normalized_path: book.normalizedPath ?? null,
-        file_format: book.format,
-        cover_path: book.coverPath ?? null,
-        sha256: book.sha256,
-        file_size_bytes: book.fileSizeBytes ?? null,
-        description: book.description ?? null,
-        page_count: book.pageCount ?? null,
-        is_favorite: book.isFavorite ? 1 : 0,
-        is_signed: book.isSigned ? 1 : 0,
-        source_url: book.sourceUrl ?? null,
-        source_provider: book.sourceProvider ?? null,
-        external_id: book.externalId ?? null,
-        added_at: book.addedAt,
-        updated_at: book.updatedAt,
-      })
+    this.db.prepare(INSERT_BOOK_SQL).run(bookToRowParams(book, []))
   }
 
   /**
@@ -184,22 +211,13 @@ export class SqliteLibraryStore implements LibraryStore {
   }
 
   /**
-   * Link book ↔ genres. Caller must ensure each genreId already exists in `genres`.
+   * Port method kept for the SDK contract, but there is no `genres` table to link against any
+   * more (migration 020): genres are names stored in `books.genres_json`.
    */
-  async linkGenres(bookId: string, genres: BookGenre[]): Promise<void> {
-    const insert = this.db.prepare(
-      `INSERT OR IGNORE INTO book_genres (book_id, genre_id)
-       VALUES (@book_id, @genre_id)`,
+  async linkGenres(): Promise<void> {
+    throw new Error(
+      'SqliteLibraryStore.linkGenres is unsupported: genres live in books.genres_json — use persistImportedBook() or setGenres().',
     )
-    const run = this.db.transaction((links: BookGenre[]) => {
-      for (const link of links) {
-        insert.run({
-          book_id: bookId,
-          genre_id: link.genreId,
-        })
-      }
-    })
-    run(genres)
   }
 
   /**
@@ -244,68 +262,26 @@ export class SqliteLibraryStore implements LibraryStore {
     return author
   }
 
-  /** Find genre by case-insensitive name, or create a new row. */
-  findOrCreateGenreByName(name: string): Genre {
-    const trimmed = name.trim()
-    if (!trimmed) {
-      throw new Error('Genre name must not be empty')
-    }
-
-    const existing = this.db
-      .prepare(
-        `SELECT id, name, created_at FROM genres
-         WHERE LOWER(name) = LOWER(?) LIMIT 1`,
-      )
-      .get(trimmed) as
-      | { id: string; name: string; created_at: string }
-      | undefined
-
-    if (existing) {
-      return new Genre({
-        id: existing.id,
-        name: existing.name,
-        createdAt: existing.created_at,
-      })
-    }
-
-    const genre = Genre.create(randomUUID(), trimmed)
-    this.db
-      .prepare(
-        `INSERT INTO genres (id, name, created_at)
-         VALUES (@id, @name, @created_at)`,
-      )
-      .run({
-        id: genre.id,
-        name: genre.name,
-        created_at: genre.createdAt,
-      })
-    return genre
-  }
-
-  /** Default reading session row (WF-02 progress mặc định). */
-  insertDefaultReadingSession(bookId: string, now = new Date().toISOString()): void {
-    this.db
-      .prepare(
-        `INSERT INTO reading_session_states (
-          book_id, last_read_location, percent, is_landscape, updated_at
-        ) VALUES (?, '', 0, 0, ?)`,
-      )
-      .run(bookId, now)
-  }
-
   getReadingSessionSummary(bookId: string): ReadingSessionSummary | undefined {
     const row = this.db
-      .prepare(
-        `SELECT last_read_location, updated_at
-         FROM reading_session_states WHERE book_id = ?`,
-      )
-      .get(bookId) as
-      | { last_read_location: string; updated_at: string }
-      | undefined
+      .prepare(`SELECT reading_state_json FROM books WHERE id = ?`)
+      .get(bookId) as { reading_state_json: string } | undefined
     if (!row) return undefined
-    const label = displayLabelFromStoredLocation(row.last_read_location)
-    if (!label) return undefined
-    return { lastReadLocation: label, lastReadAt: row.updated_at }
+    return summaryFromState(parseReadingState(row.reading_state_json))
+  }
+
+  /**
+   * Merge `patch` into `reading_state_json` in one atomic statement. `json_patch` (RFC 7396)
+   * overwrites the keys present in `patch` and keeps every other key.
+   */
+  private patchReadingState(bookId: string, patch: ReadingStateJson): void {
+    this.db
+      .prepare(
+        `UPDATE books
+         SET reading_state_json = json_patch(reading_state_json, @patch)
+         WHERE id = @id`,
+      )
+      .run({ id: bookId, patch: JSON.stringify(patch) })
   }
 
   /**
@@ -314,42 +290,17 @@ export class SqliteLibraryStore implements LibraryStore {
    */
   markAsReading(bookId: string, now = new Date().toISOString()): void {
     this.setReadingStatus(bookId, 'reading', now)
-    const existing = this.db
-      .prepare(
-        `SELECT last_read_location FROM reading_session_states WHERE book_id = ?`,
-      )
-      .get(bookId) as { last_read_location: string } | undefined
+    const row = this.db
+      .prepare(`SELECT reading_state_json FROM books WHERE id = ?`)
+      .get(bookId) as { reading_state_json: string } | undefined
+    if (!row) return
 
-    if (!existing) {
-      this.db
-        .prepare(
-          `INSERT INTO reading_session_states (
-            book_id, last_read_location, percent, is_landscape, updated_at
-          ) VALUES (?, ?, 0, 0, ?)`,
-        )
-        .run(bookId, STARTED_LOCATION_LABEL, now)
-      return
+    const current = parseReadingState(row.reading_state_json).lastReadLocation ?? ''
+    const patch: ReadingStateJson = { updatedAt: now }
+    if (!isPersistedLocationJson(current)) {
+      patch.lastReadLocation = current.trim() || STARTED_LOCATION_LABEL
     }
-
-    if (isPersistedLocationJson(existing.last_read_location)) {
-      this.db
-        .prepare(
-          `UPDATE reading_session_states
-           SET updated_at = ?
-           WHERE book_id = ?`,
-        )
-        .run(now, bookId)
-      return
-    }
-
-    const loc = existing.last_read_location?.trim()
-    this.db
-      .prepare(
-        `UPDATE reading_session_states
-         SET last_read_location = ?, updated_at = ?
-         WHERE book_id = ?`,
-      )
-      .run(loc || STARTED_LOCATION_LABEL, now, bookId)
+    this.patchReadingState(bookId, patch)
   }
 
   setReadingStatus(
@@ -366,6 +317,16 @@ export class SqliteLibraryStore implements LibraryStore {
       .run(status, now, bookId)
   }
 
+  /**
+   * Point a book at a (moved) file. The caller must already have verified that the file's SHA-256
+   * equals `books.sha256`. Only the path moves — book id, annotations, chunks and progress stay.
+   */
+  updateFilePath(bookId: string, filePath: string): void {
+    this.db
+      .prepare(`UPDATE books SET file_path = ?, updated_at = ? WHERE id = ?`)
+      .run(filePath, new Date().toISOString(), bookId)
+  }
+
   setFavorite(bookId: string, value: boolean): void {
     this.db
       .prepare(
@@ -377,7 +338,8 @@ export class SqliteLibraryStore implements LibraryStore {
   }
 
   /**
-   * Persist book + authors + genres + default reading session atomically.
+   * Persist book + authors + genres atomically (genres and the default empty reading state are
+   * columns of the same `books` row).
    */
   persistImportedBook(
     book: Book,
@@ -385,37 +347,7 @@ export class SqliteLibraryStore implements LibraryStore {
     genreNames: string[] = [],
   ): void {
     const run = this.db.transaction(() => {
-      this.db
-        .prepare(
-          `INSERT INTO books (
-            id, title, file_path, normalized_path, file_format, cover_path,
-            sha256, file_size_bytes, description, page_count,
-            is_favorite, is_signed, source_url, source_provider, external_id, added_at, updated_at
-          ) VALUES (
-            @id, @title, @file_path, @normalized_path, @file_format, @cover_path,
-            @sha256, @file_size_bytes, @description, @page_count,
-            @is_favorite, @is_signed, @source_url, @source_provider, @external_id, @added_at, @updated_at
-          )`,
-        )
-        .run({
-          id: book.id,
-          title: book.title,
-          file_path: book.filePath,
-          normalized_path: book.normalizedPath ?? null,
-          file_format: book.format,
-          cover_path: book.coverPath ?? null,
-          sha256: book.sha256,
-          file_size_bytes: book.fileSizeBytes ?? null,
-          description: book.description ?? null,
-          page_count: book.pageCount ?? null,
-          is_favorite: book.isFavorite ? 1 : 0,
-          is_signed: book.isSigned ? 1 : 0,
-          source_url: book.sourceUrl ?? null,
-          source_provider: book.sourceProvider ?? null,
-          external_id: book.externalId ?? null,
-          added_at: book.addedAt,
-          updated_at: book.updatedAt,
-        })
+      this.db.prepare(INSERT_BOOK_SQL).run(bookToRowParams(book, genreNames))
 
       const authorLinks: BookAuthor[] = []
       authorNames.forEach((name, index) => {
@@ -444,43 +376,11 @@ export class SqliteLibraryStore implements LibraryStore {
           })
         }
       }
-
-      const seenGenres = new Set<string>()
-      const genreLinks: BookGenre[] = []
-      for (const name of genreNames) {
-        const trimmed = name.trim()
-        if (!trimmed) continue
-        const key = trimmed.toLowerCase()
-        if (seenGenres.has(key)) continue
-        seenGenres.add(key)
-        const genre = this.findOrCreateGenreByName(trimmed)
-        genreLinks.push(
-          new BookGenre({
-            bookId: book.id,
-            genreId: genre.id,
-          }),
-        )
-      }
-
-      if (genreLinks.length > 0) {
-        const insert = this.db.prepare(
-          `INSERT OR IGNORE INTO book_genres (book_id, genre_id)
-           VALUES (@book_id, @genre_id)`,
-        )
-        for (const link of genreLinks) {
-          insert.run({
-            book_id: book.id,
-            genre_id: link.genreId,
-          })
-        }
-      }
-
-      this.insertDefaultReadingSession(book.id, book.addedAt)
     })
     run()
   }
 
-  /** All books newest-first, with joined author / genre names + session. */
+  /** All books newest-first, with joined author names; genres + session come from the same row. */
   async listAll(): Promise<BookListItem[]> {
     const rows = this.db
       .prepare(
@@ -492,8 +392,8 @@ export class SqliteLibraryStore implements LibraryStore {
       book: rowToBook(row),
       readingStatus: row.reading_status,
       authorNames: this.authorNamesForBook(row.id),
-      genreNames: this.genreNamesForBook(row.id),
-      session: this.getReadingSessionSummary(row.id),
+      genreNames: parseGenres(row.genres_json),
+      session: summaryFromState(parseReadingState(row.reading_state_json)),
     }))
   }
 
@@ -638,19 +538,13 @@ export class SqliteLibraryStore implements LibraryStore {
   }
 
   genreNamesForBook(bookId: string): string[] {
-    const rows = this.db
-      .prepare(
-        `SELECT g.name AS name
-         FROM book_genres bg
-         JOIN genres g ON g.id = bg.genre_id
-         WHERE bg.book_id = ?
-         ORDER BY g.name ASC`,
-      )
-      .all(bookId) as { name: string }[]
-    return rows.map((r) => r.name)
+    const row = this.db
+      .prepare(`SELECT genres_json FROM books WHERE id = ?`)
+      .get(bookId) as { genres_json: string } | undefined
+    return row ? parseGenres(row.genres_json) : []
   }
 
-  /** Update description / page_count / optional title (Library metadata backfill). */
+  /** Update description / page_count / optional title (Library metadata backfill + edit dialog). */
   updateLibraryMetadata(
     bookId: string,
     fields: {
@@ -659,26 +553,23 @@ export class SqliteLibraryStore implements LibraryStore {
       title?: string
     },
   ): void {
-    const now = new Date().toISOString()
     const current = this.db
-      .prepare(
-        `SELECT description, page_count, title FROM books WHERE id = ?`,
-      )
-      .get(bookId) as
-      | { description: string | null; page_count: number | null; title: string }
-      | undefined
+      .prepare(`SELECT title FROM books WHERE id = ?`)
+      .get(bookId) as { title: string } | undefined
     if (!current) return
 
-    const description =
-      fields.description !== undefined
-        ? fields.description?.trim() || null
-        : current.description
-    const pageCount =
-      fields.pageCount !== undefined
-        ? fields.pageCount != null && fields.pageCount > 0
+    // Only the keys present in `patch` are touched; `null` deletes the key, so unrelated
+    // metadata (signerName, fileSizeBytes, …) survives.
+    const patch: BookMetadataJson = {}
+    if (fields.description !== undefined) {
+      patch.description = fields.description?.trim() || null
+    }
+    if (fields.pageCount !== undefined) {
+      patch.pageCount =
+        fields.pageCount != null && fields.pageCount > 0
           ? Math.floor(fields.pageCount)
           : null
-        : current.page_count
+    }
     const title =
       fields.title?.trim() && fields.title.trim().length > 0
         ? fields.title.trim()
@@ -687,18 +578,16 @@ export class SqliteLibraryStore implements LibraryStore {
     this.db
       .prepare(
         `UPDATE books
-         SET description = @description,
-             page_count = @page_count,
-             title = @title,
+         SET title = @title,
+             metadata_json = json_patch(metadata_json, @patch),
              updated_at = @updated_at
          WHERE id = @id`,
       )
       .run({
         id: bookId,
-        description,
-        page_count: pageCount,
         title,
-        updated_at: now,
+        patch: JSON.stringify(patch),
+        updated_at: new Date().toISOString(),
       })
   }
 
@@ -725,30 +614,11 @@ export class SqliteLibraryStore implements LibraryStore {
     run()
   }
 
-  /** Replace genre links for a book. */
-  replaceGenresByName(bookId: string, genreNames: string[]): void {
-    const run = this.db.transaction(() => {
-      this.db.prepare(`DELETE FROM book_genres WHERE book_id = ?`).run(bookId)
-      const seen = new Set<string>()
-      for (const name of genreNames) {
-        const trimmed = name.trim()
-        if (!trimmed) continue
-        const key = trimmed.toLowerCase()
-        if (seen.has(key)) continue
-        seen.add(key)
-        const genre = this.findOrCreateGenreByName(trimmed)
-        this.db
-          .prepare(
-            `INSERT OR IGNORE INTO book_genres (book_id, genre_id)
-             VALUES (@book_id, @genre_id)`,
-          )
-          .run({
-            book_id: bookId,
-            genre_id: genre.id,
-          })
-      }
-    })
-    run()
+  /** Replace a book's genres (trimmed, case-insensitively de-duplicated, sorted A→Z). */
+  setGenres(bookId: string, genreNames: string[]): void {
+    this.db
+      .prepare(`UPDATE books SET genres_json = @genres WHERE id = @id`)
+      .run({ id: bookId, genres: JSON.stringify(normalizeGenreNames(genreNames)) })
   }
 
   readingStatusForBook(
@@ -758,15 +628,6 @@ export class SqliteLibraryStore implements LibraryStore {
       .prepare(`SELECT reading_status FROM books WHERE id = ?`)
       .get(bookId) as { reading_status: BookRow['reading_status'] } | undefined
     return row?.reading_status ?? 'not-started'
-  }
-
-  /** Ensure a reading session row exists (restore after accidental cascade). */
-  ensureReadingSession(bookId: string): void {
-    const existing = this.db
-      .prepare(`SELECT book_id FROM reading_session_states WHERE book_id = ?`)
-      .get(bookId)
-    if (existing) return
-    this.insertDefaultReadingSession(bookId)
   }
 
   async deleteCascade(bookId: string): Promise<void> {

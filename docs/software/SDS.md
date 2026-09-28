@@ -1,8 +1,8 @@
 # Software Design Specification (SDS)
 
 **Sản phẩm:** Reading Book App — Trình đọc sách / tài liệu thông minh (Trợ lý tri thức cá nhân)  
-**Phiên bản tài liệu:** 1.19  
-**Ngày:** 2026-08-01  
+**Phiên bản tài liệu:** 1.24  
+**Ngày:** 2026-09-29  
 **Trạng thái:** Draft — căn cứ SRS + Design Plan (MVP Free Core) + mockups  
 **Tài liệu liên quan:** [SRS.md](./SRS.md), [docs/mockups/](../mockups/)  
 **Changelog 1.2:** Import từ URL (direct file → sandbox) đưa vào MVP — SDS §1.2, §2.6–2.8, §3.5–3.7; SRS FR-13 / UC-01 / WF-02.  
@@ -31,6 +31,22 @@
 - `book_signatures` (1 chữ ký/sách) gộp thẳng vào `books.signer_name` / `signature_status` / `signed_at` (018) — bảng con bị xóa.
 - `COMMENT`/`comments` (004) đã bị xóa từ trước đó (migration `010`, thay bằng `typewriter_notes`) và **không tồn tại** trong schema hiện tại — SDS bản cũ vẫn nhắc tới `COMMENT` do sót cập nhật; đã gỡ khỏi §3.
 - Xem chi tiết bảng vật lý cập nhật: `docs/software/schema.dbml`.
+
+**Changelog 1.23:** Gộp dữ liệu 1-1 / n-n của `books` vào **chính bảng `books`** dưới dạng 3 cột JSON (migration `020_optimized_books_schema.sql`):
+- `reading_session_states` (1-1) → `books.reading_state_json` (vị trí đọc + setting đọc per-book + `updatedAt`).
+- `genres` + `book_genres` (n-n) → `books.genres_json` (mảng tên thể loại, sắp A→Z, không trùng không phân biệt hoa/thường). Không còn thực thể `GENRE` / `BOOK_GENRE` ở tầng lưu trữ.
+- Các cột lẻ `file_size_bytes`, `page_count`, `description`, `is_signed`, `signer_name`, `signature_status`, `signed_at` → `books.metadata_json`.
+- Giữ nguyên là cột riêng: `normalized_path`, `file_path`, `cover_path`, `is_favorite`, `reading_status`, `source_*`, `external_id`. Index đổi tên: `idx_books_favorite`, `idx_books_reading_status`, `idx_books_source`; bỏ `idx_books_is_signed`.
+- Domain không đổi (`ReadingSessionState`, `Book.isSigned`…) — chỉ tầng Persistence map sang/từ JSON. Cập nhật một phần từng key bằng `json_patch` (RFC 7396).
+
+**Changelog 1.24:** **Import theo file (file-centric) — thư viện tham chiếu.** Không đổi schema (`books.file_path` vẫn `TEXT NOT NULL`); đổi **ngữ nghĩa sở hữu** của `file_path`:
+- **Local** (file trên máy) → **không còn copy vào sandbox**: `file_path` = path tuyệt đối file gốc của user (*referenced*, user sở hữu; app không ghi / di chuyển / xóa file và thư mục cha).
+- **URL / Cloud** → tải về temp → SHA-256 → chặn trùng → lưu bản copy app-owned `{userData}/books/{uuid}/…` (*managed*) → metadata → SQLite; `source_url` / `source_provider` / `external_id` giữ nguyên.
+- Loại sở hữu **suy ra từ path** (`bookFileStorage()` trong `electron/files/sandbox.ts`), không thêm cột. Sách import trước 1.24 (đã có bản copy trong sandbox) tiếp tục là *managed*, không migration phá hủy.
+- Cover luôn do app sở hữu, ghi vào `{userData}/covers/` (không bao giờ ghi cạnh file sách của user). Chunk / FTS / annotation / reading state vẫn khóa theo `books.id`.
+- File tham chiếu bị di chuyển / xóa → sách **không bị xóa**; Reader báo `missing_file` và đề nghị **Locate file** (`library:relinkBook`): Main mở dialog, chỉ cập nhật `file_path` khi SHA-256 khớp `books.sha256` (giữ nguyên `books.id`).
+- Xóa sách: "Remove from library" không bao giờ xóa file sách; "Delete file" chỉ khả dụng cho sách *managed* (`removeManagedBookDir` từ chối mọi thứ không đúng dạng `{sandbox}/{uuid}/file`).
+- Chi tiết triển khai: `docs/implementation_plan/file_centric_import_architecture.md`.
 
 ---
 
@@ -105,7 +121,7 @@ MVP **chấp nhận 6 định dạng**:
 | **PDF**        | `.pdf`       | Fixed-layout        | Trang + rect / offset         | Định dạng phổ biến nhất (học thuật, in ấn, tài liệu công việc). Overlay: annotation trên **lớp Canvas trong suốt**, không chèn CSS vào nội dung PDF. |
 | **Plain Text** | `.txt`       | Reflowable          | Offset ký tự / dòng           | Nhẹ nhất, không style/ảnh. Dễ extract cho FTS5 và AI (Phase 2). Overlay highlight theo range văn bản.                                               |
 | **Markdown**   | `.md`        | Reflowable (render) | Offset / block + range        | Văn bản markup đơn giản; ghi chú & tài liệu kỹ thuật. Render → HTML; Overlay trên DOM đã render.                                                    |
-| **DOCX**       | `.docx`      | Reflowable (render) | Offset / block + range        | Word Open XML. Import copy sandbox; đọc qua extract/render HTML (không mutate file gốc). Overlay DOM như Markdown.                                  |
+| **DOCX**       | `.docx`      | Reflowable (render) | Offset / block + range        | Word Open XML. Import theo tham chiếu (không copy); đọc qua extract/render HTML (không mutate file gốc). Overlay DOM như Markdown.                                  |
 | **DOC**        | `.doc`       | Reflowable (render) | Offset / block + range        | Word binary legacy. Import chấp nhận; normalize/extract sang dạng đọc được (có thể qua `normalized_path`); Overlay DOM.                             |
 
 
@@ -118,7 +134,7 @@ MVP **chấp nhận 6 định dạng**:
 - Hai họ Overlay:
   - **DOM/CSS Overlay** — EPUB, TXT, Markdown, DOCX, DOC.
   - **Canvas Overlay** — PDF (lớp trong suốt theo trang).
-- File gốc mọi định dạng đều **Read-Only**; annotation chỉ nằm ở Overlay (SQLite).
+- File sách mọi định dạng **không bao giờ bị sửa** (file gốc của user không bị ghi; bản copy app-owned để Read-Only); annotation chỉ nằm ở Overlay (SQLite).
 - Thứ tự ưu tiên triển khai: **EPUB → PDF → TXT → Markdown → DOCX → DOC**. Contract cần đủ cho **sáu** format trên.
 
 
@@ -128,7 +144,7 @@ MVP **chấp nhận 6 định dạng**:
 
 | Trong phạm vi thiết kế (MVP)                                                             | Ngoài phạm vi thiết kế chi tiết (MVP)                        |
 | ---------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
-| Import **EPUB, PDF, TXT, Markdown, DOCX, DOC** từ **file hệ thống** hoặc **URL** (download → sandbox local) | Marketplace / DRM store / Kindle store                     |
+| Import **EPUB, PDF, TXT, Markdown, DOCX, DOC** từ **file hệ thống** (tham chiếu file gốc, không copy) hoặc **URL / cloud** (download → bản copy app-owned) | Marketplace / DRM store / Kindle store                     |
 | Document Adapter + pluggable renderer (6 format)                                         | MOBI/AZW3, PPTX; convert pipeline nặng ngoài Word           |
 | Reader shell chung: Invisible UI, theme / typography (theo khả năng từng họ hiển thị)    | AI Chat, RAG, tóm tắt, semantic search (Phase 2)             |
 | Highlight, Note, Bookmark (Overlay SQLite); location theo format                         | Flashcards + spaced repetition (Phase 2)                     |
@@ -169,11 +185,12 @@ Nguyên tắc bất biến xuyên suốt thiết kế (theo SRS BR-01, BR-02):
 | **Chunking**         | (Phase 2 — AI) Chia nội dung đã extract thành các đoạn (chunk) để embedding và RAG — TXT/Markdown dễ nhất; EPUB/PDF sau khi extract text.                                                  |
 | **RAG**              | Retrieval-Augmented Generation — AI trả lời dựa trên chunk truy xuất từ tài liệu (Phase 2).                                                                                                |
 | **IPC**              | Inter-Process Communication — kênh giao tiếp hẹp giữa Electron main và renderer qua preload bridge.                                                                                        |
-| **Local-first**      | Dữ liệu ưu tiên lưu trên thiết bị; cloud chỉ là lớp bổ sung ở phase sau. Import từ URL cũng **tải về sandbox local** rồi đọc offline.             |
+| **Local-first**      | Dữ liệu ưu tiên lưu trên thiết bị; cloud chỉ là lớp bổ sung ở phase sau. Import từ URL / cloud **tải về bản copy app-owned** rồi đọc offline; import file trên máy chỉ **tham chiếu** file gốc (không nhân đôi dữ liệu của user).             |
 | **Invisible UI**     | Chrome (toolbar, menu) ẩn mặc định; chỉ hiện khi người dùng chủ động gọi.                                                                                                                  |
 | **Reflowable**       | Nội dung chảy lại theo font, size, cửa sổ (EPUB, TXT, Markdown).                                                                                                                           |
 | **Fixed-layout**     | Bố cục trang cố định (PDF); zoom/pan thay vì reflow chữ.                                                                                                                                   |
-| **URL Import**       | User dán / mở link trực tiếp tới file (vd. `https://…/book.epub`); Main tải file về sandbox — **không** phải bookstore hay scrape trang web tùy ý.                                         |
+| **URL Import**       | User dán / mở link trực tiếp tới file (vd. `https://…/book.epub`); Main tải file về temp rồi lưu bản copy app-owned — **không** phải bookstore hay scrape trang web tùy ý.                                         |
+| **Referenced / Managed** | **Referenced** = sách import từ file trên máy: `books.file_path` là path gốc của user (user sở hữu; app không ghi / di chuyển / xóa). **Managed** = bản copy app-owned trong `{userData}/books/{uuid}/` (URL / cloud, và sách import trước 1.24); app chỉ xóa khi user chọn "Delete file". Suy ra từ path, không có cột riêng. |
 
 
 ---
@@ -244,7 +261,7 @@ Layered Architecture — Reading Book App
 | Lớp                | Trách nhiệm                          | Ví dụ                                                                          |
 | ------------------ | ------------------------------------ | ------------------------------------------------------------------------------ |
 | **Presentation**   | Hiển thị, tương tác, state UI cục bộ | Library, Reader shell (+ Note/Comment sidebar scoped sách), Reading Settings, App Settings |
-| **Application**    | Use case, transaction nghiệp vụ ngắn | Import → copy sandbox → metadata → index FTS; Save overlay highlight           |
+| **Application**    | Use case, transaction nghiệp vụ ngắn | Import (tham chiếu file gốc; URL/cloud copy sandbox) → metadata → index FTS; Save overlay highlight           |
 | **Domain**         | Entity, value object, invariant      | `Book.format`, `Location` đa hình, BR-01/BR-02 (read-only + overlay)           |
 | **Infrastructure** | I/O, engine, IPC                     | `SqliteOverlayStore`, `EpubAdapter`, `PdfCanvasOverlay`, `ElectronFileSandbox` |
 
@@ -268,7 +285,7 @@ Layered mô tả **logic**; trên desktop còn tách **process**:
 | ------------ | --------------------------------------------- | --------------------------------------------------------------------------- | ----------------------------------------------- |
 | **Renderer** | Presentation (+ gọi Application qua API sạch) | UI, render document, thu gesture                                            | Đọc path tùy ý, ghi đè file sách, SQL trực tiếp |
 | **Preload**  | Infrastructure boundary                       | Expose API hẹp (`window.api.`*) đã contextBridge                            | Logic nghiệp vụ, mở rộng API tùy tiện           |
-| **Main**     | Infrastructure                                | Dialog import, copy vào app data, SQLite, path allowlist                    | Render UI React                                 |
+| **Main**     | Infrastructure                                | Dialog import; đăng ký file gốc (local) / copy vào app data (URL, cloud); SQLite; kiểm tra path sách theo `bookId`                    | Render UI React                                 |
 
 
 Electron Process Architecture — Desktop MVP
@@ -288,7 +305,7 @@ Ports & Adapters — Document / Overlay / Extensibility
 
 | Port (interface)                | Adapter MVP / gần MVP                        | Ghi chú                                                |
 | ------------------------------- | -------------------------------------------- | ------------------------------------------------------ |
-| `DocumentImporter`              | Epub / Pdf / Txt / Md / Docx / Doc Importers | Validate extension (6 format), copy sandbox, metadata  |
+| `DocumentImporter`              | Epub / Pdf / Txt / Md / Docx / Doc Importers | Validate extension (6 format), metadata đọc tại chỗ (cover ghi vào `{userData}/covers/`)  |
 | `UrlDocumentFetcher`            | `HttpUrlFetcher` (Main)                      | Download direct file URL → temp → cùng pipeline import |
 | `DocumentNormalizer`            | Doc/Docx extract (optional); pass-through khác | DOC/DOCX có thể ghi `normalized_path`; format khác thường null |
 | `DocumentRenderer`              | ReflowHtmlRenderer (epub.js), PdfPageRenderer (chưa có) | Reader shell chọn theo `Book.format`         |
@@ -326,9 +343,9 @@ Chi tiết cây thư mục mục tiêu: xem §2.11.
 **Import sách**
 
 1. Presentation: user mở **UX-IMP** trên Library (Add menu) → file picker hoặc URL sheet → gọi `ImportBook` / `ImportBookFromUrl`.
-2. Application: validate format thuộc **EPUB | PDF | TXT | MD** (và URL scheme nếu từ mạng) → yêu cầu sandbox copy **hoặc** download qua Main → tạo `Book` + metadata → index FTS.
-3. Domain: invariant Read-Only trên bản local; `format` hợp lệ; SHA-256 dedup (**BR-03**).
-4. Infrastructure: Main copy file **hoặc** fetch URL (timeout, size limit, allowlist scheme) → ghi SQLite.
+2. Application: validate format thuộc **EPUB | PDF | TXT | MD** (và URL scheme nếu từ mạng) → đăng ký tham chiếu file gốc (local) **hoặc** download qua Main rồi lưu bản copy app-owned (URL / cloud) → tạo `Book` + metadata; chunk / FTS được tạo nền khi mở sách.
+3. Domain: invariant file sách bất biến (**BR-01**); `format` hợp lệ; SHA-256 dedup (**BR-03**) — so sánh theo nội dung, không theo path.
+4. Infrastructure: Main hash + đọc metadata file gốc tại chỗ (local, **không copy**) **hoặc** fetch URL vào temp (timeout, size limit, allowlist scheme) rồi copy vào app data (dọn temp; dọn bản copy nếu ghi DB lỗi) → ghi SQLite.
 5. Presentation: đóng overlay → toast → refresh Library (không navigate sang màn Import).
 
 **Highlight khi đọc**
@@ -402,7 +419,7 @@ source/
 │   │   │   │   ├── db.ts
 │   │   │   │   ├── migrations/
 │   │   │   │   └── repositories/
-│   │   │   ├── files/                    # (MVP) sandbox copy, path allowlist
+│   │   │   ├── files/                    # (MVP) kiểm tra path sách (app-owned / tham chiếu), copy URL·cloud, relink
 │   │   │   │   └── sandbox.ts
 │   │   │   └── adapters/                 # (MVP) document importers theo format
 │   │   │       ├── epub.adapter.ts
@@ -566,12 +583,10 @@ Bảng đối chiếu khi implement: mỗi entity dùng để làm gì, gắn v�
 
 | Thực thể           | Tác dụng thực tế trong ứng dụng                                                                                                                                                                                          | Giải quyết nỗi đau / hành vi nào?                                                                                                 | Ví dụ thực tế (User Story)                                                                                                                                       |
 | ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `BOOK`             | Lưu metadata cuốn sách/tài liệu; quản lý đường dẫn file vật lý trong sandbox; định danh bằng SHA-256 để tránh import trùng; gắn `file_format` và (nếu có) `normalized_path`; cờ `is_signed` khi có chữ ký số; `description` / `page_count` cho Library card. Tác giả qua quan hệ **n - n** với `AUTHOR`; thể loại qua **n - n** với `GENRE`. | Tránh thất lạc và trùng lặp sách — thư viện ngăn nắp, biết chính xác file nằm đâu để mở đọc; biết tài liệu đã ký hay chưa; xem nhanh mô tả / dung lượng / số trang / thể loại trên list. | Bạn import `De-men-phieu-luu-ky.epub`. Hệ thống tính SHA-256, lưu `file_path`, liên kết tác giả + thể loại (có thể nhiều), hiện title + author + genre lên Library. |
+| `BOOK`             | Lưu metadata cuốn sách/tài liệu; quản lý đường dẫn tới file sách (file gốc của user với import local, hoặc bản copy app-owned với URL / cloud); định danh bằng SHA-256 để tránh import trùng; gắn `file_format` và (nếu có) `normalized_path`; cờ `is_signed` khi có chữ ký số; `description` / `page_count` cho Library card. Tác giả qua quan hệ **n - n** với `AUTHOR`; thể loại lưu dạng mảng tên trong `genres_json` (không còn bảng riêng, 1.23). | Tránh thất lạc và trùng lặp sách — thư viện ngăn nắp, biết chính xác file nằm đâu để mở đọc; biết tài liệu đã ký hay chưa; xem nhanh mô tả / dung lượng / số trang / thể loại trên list. | Bạn import `De-men-phieu-luu-ky.epub`. Hệ thống tính SHA-256, lưu `file_path`, liên kết tác giả + thể loại (có thể nhiều), hiện title + author + genre lên Library. |
 | `AUTHOR`           | Lưu hồ sơ tác giả dùng chung (`name`, `sort_name`). Một tác giả gắn được nhiều sách.                                                                                                                                     | Tìm / lọc theo tác giả; không nhân đôi chuỗi author trên từng sách; hỗ trợ sách nhiều đồng tác giả.                               | Import sách có 2 đồng tác giả → tạo/reuse 2 `AUTHOR`, gắn qua `BOOK_AUTHOR`. Sách khác cùng 1 tác giả tái sử dụng bản ghi author đó.                             |
 | `BOOK_AUTHOR`      | Bảng liên kết **n - n** giữa `BOOK` và `AUTHOR`; có `sort_order` để hiển thị thứ tự tên trên bìa/Library.                                                                                                                | Cho phép 1 sách nhiều tác giả và 1 tác giả nhiều sách.                                                                            | Sách A: author X (order 0), Y (order 1). Sách B cũng gắn author X.                                                                                               |
-| `GENRE`            | Thể loại / subject dùng chung (`name` unique). Một thể loại gắn được nhiều sách.                                                                                                                                         | Phân loại Library; lọc / search theo thể loại; tái sử dụng nhãn từ OPF `dc:subject`.                                              | Import EPUB có subject “Fiction”, “Adventure” → 2 `GENRE`, gắn qua `BOOK_GENRE`.                                                                                 |
-| `BOOK_GENRE`       | Bảng liên kết **n - n** giữa `BOOK` và `GENRE`.                                                                                                                                                                          | 1 sách nhiều thể loại; 1 thể loại nhiều sách.                                                                                    | Sách A: Fiction + Adventure. Sách B cũng Fiction.                                                                                                                |
-| `READING_SESSION_STATE` | Lưu vị trí đọc cuối (`last_read_location`); lưu cấu hình đọc per-book (màu nền, màu chữ, font, landscape…). Quan hệ **1 - 1** với `BOOK`. Không hàm ý đã đọc hết hay đọc tuần tự. | “Mở xong đóng, mở lại đúng chỗ” — không mất đoạn đang đọc; không phải chỉnh lại theme chống mỏi mắt mỗi lần mở. | Bạn đọc tới Chương 3 (hoặc nhảy cóc sang đoạn khác), bật Sepia rồi tắt app. Hôm sau mở lại: nền Sepia + nhảy đúng vị trí lần trước. |
+| `READING_SESSION_STATE` | Lưu vị trí đọc cuối (`last_read_location`); lưu cấu hình đọc per-book (màu nền, màu chữ, font, landscape…). Lưu **nhúng** trong `books.reading_state_json` (1.23; trước đó là bảng 1 - 1 `reading_session_states`). Không hàm ý đã đọc hết hay đọc tuần tự. | “Mở xong đóng, mở lại đúng chỗ” — không mất đoạn đang đọc; không phải chỉnh lại theme chống mỏi mắt mỗi lần mở. | Bạn đọc tới Chương 3 (hoặc nhảy cóc sang đoạn khác), bật Sepia rồi tắt app. Hôm sau mở lại: nền Sepia + nhảy đúng vị trí lần trước. |
 | `NOTE`             | Bảng **chung** cho mọi markup gắn vào nội dung sách: `highlight` / `underline` / `strikethrough` / `textbox` (sticky-note, không tô màu) và cả **`bookmark`** — một cột JSON `note_json` (kiểu `INoteState`, xem `packages/domain/models/annotation/note.ts`) gói `type`, vị trí nhảy (`locatorExtended.locator` cho EPUB/TXT/MD/DOCX hoặc `pdfAnnotation` cho PDF), payload vẽ lại (`locatorExtended.raw`), `textualValue`/`note`, `style` (màu, font…), `status`, `isChecked`, và `group` (`'annotation'` so với `'bookmark'`) để phân biệt 2 vai trò mà không cần 2 bảng. Optional gắn **`TAG`** qua `note_tags`. Freehand (vẽ tay) và stamp (icon) vẫn là giá trị `type` hợp lệ trong schema nhưng **chưa có UI tạo mới** — chờ một PDF renderer (chưa tồn tại) để anchor theo `pdfAnnotation`. | Ghi nhớ thông tin cốt lõi (highlight/note) và đánh dấu vị trí quay lại (bookmark) — xem lại nhanh và jump đúng chỗ, không sửa file gốc. | Bôi câu *“Đi một ngày đàng, học một sàng khôn”*, chọn màu Vàng, ghi *“Cần tra thêm”* → một dòng `notes` với `type: 'highlight'`, `group: 'annotation'`, hiện trong sidebar Note. Đang giữa chương, chọn Bookmark → một dòng `notes` khác với `type: 'bookmark'`, `group: 'bookmark'`. |
 | `TAG`              | Thẻ user-defined (`name`, optional `color_hex`) gắn note (annotation) qua N–N.                                                                                                                                           | Phân loại / lọc highlight theo chủ đề (Phase 3 auto-tag opt-in).                                                                  | Gắn tag `#marketing` cho highlight về chiến lược nội dung.                                                                                                      |
 | `BOOK_CHUNK`       | Chia nội dung extract thành đoạn (vd. ~1000–2000 từ) theo `chunk_index`; đầu vào FTS5, AI tóm tắt / RAG, và (khi cần) prefetch text theo đoạn.                                                                           | Hiệu năng & tìm trong sách — không phụ thuộc nạp cả file lớn một lần cho search/AI; lật/đọc mượt hơn khi kết hợp cache theo đoạn. | Sách dài: index chunk 0..n. User search hoặc AI chỉ lấy các chunk liên quan; khi đọc, có thể prefetch chunk kế tiếp thay vì load toàn bộ 1000 trang vào RAM.     |
@@ -589,10 +604,7 @@ Bảng đối chiếu khi implement: mỗi entity dùng để làm gì, gắn v�
 | `BOOK` ↔ `AUTHOR`           | **n - n**   | Qua bảng liên kết `BOOK_AUTHOR` (`sort_order`). 1 sách nhiều tác giả; 1 tác giả nhiều sách. |
 | `BOOK` → `BOOK_AUTHOR`      | **1 - n**   | Cascade khi xóa sách.                                                                       |
 | `AUTHOR` → `BOOK_AUTHOR`    | **1 - n**   | Xóa author: RESTRICT nếu còn sách gắn (hoặc cascade unlink tùy policy).                     |
-| `BOOK` ↔ `GENRE`            | **n - n**   | Qua bảng liên kết `BOOK_GENRE`. 1 sách nhiều thể loại; 1 thể loại nhiều sách.               |
-| `BOOK` → `BOOK_GENRE`       | **1 - n**   | Cascade khi xóa sách.                                                                       |
-| `GENRE` → `BOOK_GENRE`      | **1 - n**   | Cascade khi xóa genre (gỡ membership).                                                      |
-| `BOOK` → `READING_SESSION_STATE` | **1 - 1**   | Mỗi sách một bản ghi resume + setting đọc gần nhất. Tạo khi import hoặc lần mở đầu. |
+| `BOOK` → `READING_SESSION_STATE` | **1 - 1**   | Nhúng trong `books.reading_state_json`: mỗi sách một trạng thái resume + setting đọc gần nhất. Mặc định `{}` khi import; ghi khi mở / autosave. |
 | `BOOK` → `NOTE`             | **1 - n**   | Overlay chung cho highlight/underline/strikethrough/textbox **và** bookmark (`note_json.group` phân biệt); cascade khi xóa sách. |
 | `BOOK` → `BOOK_CHUNK`       | **1 - n**   | Chunk text cho FTS / AI; rebuild khi re-index.                                              |
 | `NOTE` ↔ `TAG`              | **n - n**   | Qua `note_tags`; cascade khi xóa note hoặc tag; chỉ áp dụng cho `group = 'annotation'` trong thực tế UI hiện tại. |
@@ -617,7 +629,9 @@ Bảng đối chiếu khi implement: mỗi entity dùng để làm gì, gắn v�
 | TXT / Markdown | `{ "offset": 1200 }` hoặc `{ "blockId", "offset" }`          |
 
 
-`sha256` — trước khi copy / sau khi download: nếu hash đã tồn tại → báo trùng / mở sách cũ (không nhân bản vô ích).
+`sha256` — tính trên file gốc (local) hoặc file tạm vừa tải (URL / cloud) **trước khi** lưu bất cứ thứ gì: nếu hash đã tồn tại → báo trùng / mở sách cũ (không nhân bản vô ích), bất kể path. Cũng là chứng cứ nhận diện khi **Locate file**: file mới chỉ được gắn lại khi SHA-256 khớp. (SHA-256 nhận diện / xác minh nội dung; **không** phải bản sao lưu.)
+
+`file_path` — path tuyệt đối của file mà Reader mở. **Quyền sở hữu phụ thuộc nguồn import:** local → file gốc của user (*referenced*); URL / cloud → bản copy trong `{userData}/books/{uuid}/` (*managed*). Không được giả định `file_path` luôn nằm trong sandbox; `bookFileStorage(file_path)` phân loại. Đổi `file_path` (Locate file) **không** đổi `books.id`.
 
 `percent` (trên `READING_SESSION_STATE`, optional) — ước lượng vị trí trên **bản đồ tài liệu** để đặt scrubber (0–100 map position). **Không** hiển thị như “% đã đọc / hoàn thành”; UI Library dùng nhãn `last_read_location` (chương/trang), Completed là trạng thái user đánh dấu.
 
@@ -625,7 +639,7 @@ Bảng đối chiếu khi implement: mỗi entity dùng để làm gì, gắn v�
 
 `normalized_path` — dùng khi DOC/DOCX (hoặc format khác) cần extract/convert nhẹ để đọc; format đọc trực tiếp thường null.
 
-`is_signed` — `INTEGER` 0/1 trên `books`: cờ nhanh “có chữ ký số”. Chi tiết chữ ký (`signer_name`, `signature_status`, `signed_at`) nằm **trực tiếp trên `books`** — một sách chỉ giữ 1 chữ ký gần nhất (bảng con `book_signatures` đã gộp vào `books` từ migration `018`, không còn hỗ trợ nhiều signer/sách).
+`isSigned` — cờ boolean trong `books.metadata_json`: “có chữ ký số”. Chi tiết chữ ký (`signerName`, `signatureStatus`, `signedAt`) nằm **trong cùng `metadata_json`** — một sách chỉ giữ 1 chữ ký gần nhất (bảng con `book_signatures` gộp vào `books` từ migration `018`, rồi vào JSON từ `020`; không hỗ trợ nhiều signer/sách).
 
 `signature_status` — trên `books`: `valid` \| `invalid` \| `expired` \| `unknown`.
 
@@ -654,16 +668,16 @@ Bảng đối chiếu khi implement: mỗi entity dùng để làm gì, gắn v�
 | ---------------- | ------------------------------------------------------------------ |
 | PK sách          | UUID (string)                                                      |
 | Book ↔ Author    | **n - n** qua `BOOK_AUTHOR` / `book_authors` (+ `sort_order`)      |
-| Book ↔ Genre     | **n - n** qua `BOOK_GENRE` / `book_genres` (migration `007`)       |
-| Resume / session | 1 - 1 với BOOK qua `READING_SESSION_STATE`; gộp cả setting đọc per-book (màu, font, landscape) |
+| Book ↔ Genre     | Mảng tên trong `books.genres_json` (migration `020`; trước đó n - n qua `book_genres`, `007`) |
+| Resume / session | Nhúng trong `books.reading_state_json` (`READING_SESSION_STATE`, migration `020`); gộp cả setting đọc per-book (font, layout, landscape) |
 | Favorite         | Cột `BOOK.is_favorite`                                             |
-| Library blurb    | `BOOK.description` + `BOOK.page_count` + `file_size_bytes` (card G1-N7) |
+| Library blurb    | `description` + `pageCount` + `fileSizeBytes` trong `books.metadata_json` (card G1-N7) |
 | App preferences  | **Không** SQLite `app_settings` — platform store (1.17)            |
-| Digital signature | Cột `BOOK.is_signed` / `signer_name` / `signature_status` / `signed_at` trực tiếp trên `books` (gộp từ `book_signatures`, migration `018`) |
+| Digital signature | `isSigned` / `signerName` / `signatureStatus` / `signedAt` trong `books.metadata_json` (từ `book_signatures` → cột `books` ở `018` → JSON ở `020`) |
 | Bookmark         | Không còn bảng riêng — 1 dòng `NOTE` / `notes` với `note_json.group = 'bookmark'` (migration `019`) |
 | Annotations      | Bảng chung `NOTE` / `notes` cho highlight, underline, strikethrough, textbox (kèm tags qua `note_tags`); `annotations` (011–017) và `bookmarks` (đứng riêng) đều đã bị gộp vào `notes` (018–019). Typewriter/shape (freehand) không còn tạo mới qua UI. |
 | Chunk            | Có trong schema sớm; embedding nullable đến Phase 2                |
-| Cascade xóa sách | book_authors + book_genres + collection_books + ReadingSessionState + notes (annotation + bookmark) + note_tags + Chunk |
+| Cascade xóa sách | book_authors + collection_books + notes (annotation + bookmark) + note_tags + Chunk (genres và reading state nằm trong chính dòng `books` nên đi theo) |
 | Collections      | `COLLECTION` + `COLLECTION_BOOK` (n–n); xóa collection cascade membership, **không** xóa sách |
 | Nguồn import     | File máy **và** URL direct file; optional cột `books.source_url`   |
 
@@ -697,7 +711,7 @@ Database Diagram — SQLite Overlay Schema (MVP)
 - Tên bảng snake_case (`books`, `authors`, `book_authors`, …); datetime lưu `TEXT` ISO-8601; boolean lưu `INTEGER` 0/1.
 - **Author không nằm trên** `books` — quan hệ **n - n** qua `book_authors` (PK `book_id` + `author_id`, `sort_order`).
 - File sách **không** trong DB — chỉ `file_path` / `normalized_path`.
-- Xóa `books` → **CASCADE** `book_authors`, `collection_books`, `reading_session_states`, `notes`, `book_chunks`; xóa `notes` row → cascade `note_tags`. Chữ ký số là cột trên `books` nên không có bảng con để cascade riêng.
+- Xóa `books` → **CASCADE** `book_authors`, `collection_books`, `notes`, `book_chunks`; xóa `notes` row → cascade `note_tags`. Genres, phiên đọc và chữ ký số là cột JSON trên `books` nên không có bảng con để cascade riêng.
 - Xóa `collections` → **CASCADE** `collection_books` (sách vẫn còn trong Library).
 - `sha256` **UNIQUE**; `book_chunks` **UNIQUE(book_id, chunk_index)**; FTS5 là virtual table riêng (không vẽ như entity nghiệp vụ).
 
@@ -713,7 +727,7 @@ Catalog vật lý khớp migration desktop [`001_initial.sql`](../../source/apps
 | PK sách / author / overlay | `TEXT` UUID |
 | Datetime | `TEXT` ISO-8601 |
 | Boolean | `INTEGER` `0` / `1` |
-| Nội dung file sách | **Không** trong DB — chỉ path sandbox |
+| Nội dung file sách | **Không** trong DB — chỉ `file_path` (file gốc của user, hoặc bản sandbox với URL/cloud) |
 
 #### `books` — metadata tài liệu trong thư viện
 
@@ -721,49 +735,26 @@ Catalog vật lý khớp migration desktop [`001_initial.sql`](../../source/apps
 | :--- | :--- | :--- | :--- |
 | `id` | TEXT | PK, NOT NULL | UUID sách |
 | `title` | TEXT | NOT NULL | Tiêu đề hiển thị |
-| `file_path` | TEXT | NOT NULL | Path file trong sandbox (Read-Only) |
+| `file_path` | TEXT | NOT NULL | Path tuyệt đối file sách. **Tham chiếu:** file gốc của user (app không ghi/di chuyển/xoá, kể cả thư mục cha). **Managed:** bản copy `{userData}/books/{uuid}/` (URL/cloud, và sách import trước v1.24). Loại được suy ra từ path, không có cột riêng |
 | `normalized_path` | TEXT | NULL | Path bản extract/convert (DOC/DOCX…); thường null với EPUB/PDF |
 | `file_format` | TEXT | NOT NULL, CHECK | `epub` \| `pdf` \| `txt` \| `md` \| `docx` \| `doc` |
-| `cover_path` | TEXT | NULL | Path cover đã extract (nếu có) |
+| `cover_path` | TEXT | NULL | Path cover đã extract (nếu có) — `{userData}/covers/` (sách cũ: cạnh file trong sandbox) |
 | `sha256` | TEXT | NOT NULL, **UNIQUE** | Hash nội dung — dedup import (**BR-03**) |
-| `file_size_bytes` | INTEGER | NULL | Kích thước file (byte) |
-| `description` | TEXT | NULL | Mô tả ngắn / OPF description (Library card · G1-N7) |
-| `page_count` | INTEGER | NULL | Tổng trang (PDF) hoặc số spine/section (EPUB) khi biết |
 | `is_favorite` | INTEGER | NOT NULL, DEFAULT `0` | Favorite (0/1) |
-| `is_signed` | INTEGER | NOT NULL, DEFAULT `0` | Có chữ ký số (0 = chưa ký, 1 = đã ký) |
-| `signer_name` | TEXT | NULL | Tên cá nhân / tổ chức ký (gộp từ bảng con `book_signatures`, migration `018`) |
-| `signature_status` | TEXT | NOT NULL, DEFAULT `'unknown'`, CHECK | `valid` \| `invalid` \| `expired` \| `unknown` |
-| `signed_at` | TEXT | NULL | Thời điểm áp dụng chữ ký (ISO-8601), nếu biết |
 | `reading_status` | TEXT | NOT NULL, DEFAULT `'not-started'`, CHECK | `reading` \| `completed` \| `not-started` (user-marked, không suy từ %) |
 | `source_provider` / `external_id` | TEXT | NULL | Cloud provenance (Google Drive / Dropbox / OneDrive) khi sách đến từ liên kết cloud (migration `014`) |
 | `source_url` | TEXT | NULL | URL gốc nếu import từ mạng; null nếu từ máy |
+| `metadata_json` | TEXT | NOT NULL, DEFAULT `'{}'`, CHECK `json_valid` | `{ fileSizeBytes, pageCount, description, isSigned, signerName, signatureStatus, signedAt }` — `description`: mô tả ngắn / OPF (Library card · G1-N7); `pageCount`: số trang (PDF) hoặc số spine/section (EPUB); `signatureStatus` ∈ `valid` \| `invalid` \| `expired` \| `unknown`. Key `null` ≡ vắng |
+| `genres_json` | TEXT | NOT NULL, DEFAULT `'[]'`, CHECK `json_valid` | Mảng tên thể loại / subject (vd. `["Adventure","Fiction"]`), sắp A→Z, không trùng (không phân biệt hoa/thường) |
+| `reading_state_json` | TEXT | NOT NULL, DEFAULT `'{}'`, CHECK `json_valid` | Resume + setting đọc per-book — xem bên dưới |
 | `added_at` | TEXT | NOT NULL | Thời điểm import |
 | `updated_at` | TEXT | NOT NULL | Lần cập nhật metadata gần nhất |
 
-**Index:** `UNIQUE(sha256)`; `INDEX(is_favorite)`; `INDEX(is_signed)`; `INDEX(updated_at)`; `INDEX(reading_status)`; `INDEX(source_provider, external_id)`.
+**Index:** `UNIQUE(sha256)` (`idx_books_sha256`); `INDEX(is_favorite)` (`idx_books_favorite`); `INDEX(reading_status)` (`idx_books_reading_status`); `INDEX(source_provider, external_id)` (`idx_books_source`); `INDEX(updated_at)` (`idx_books_updated_at`).
 
 > Một sách chỉ giữ **1** chữ ký (gần nhất) — khác bản SDS trước `1.22`, vốn cho phép nhiều dòng `book_signatures` per sách qua bảng con riêng.
 
-> Thể loại **không** lưu cột trên `books` — dùng `genres` + `book_genres` (migration `007_genres_nn.sql`).
-
-#### `genres` — thể loại / subject dùng chung
-
-| Cột | Kiểu | Ràng buộc | Mô tả |
-| :--- | :--- | :--- | :--- |
-| `id` | TEXT | PK, NOT NULL | UUID genre |
-| `name` | TEXT | NOT NULL, **UNIQUE** | Tên thể loại (vd. Fiction) |
-| `created_at` | TEXT | NOT NULL | Thời điểm tạo |
-
-**Index:** `INDEX(name)` (unique đã cover lookup).
-
-#### `book_genres` — liên kết n–n sách ↔ thể loại
-
-| Cột | Kiểu | Ràng buộc | Mô tả |
-| :--- | :--- | :--- | :--- |
-| `book_id` | TEXT | PK composite, FK → `books.id` **ON DELETE CASCADE** | Sách |
-| `genre_id` | TEXT | PK composite, FK → `genres.id` **ON DELETE CASCADE** | Thể loại |
-
-**Index:** `INDEX(genre_id)`.
+> **Quy ước JSON (migration `020`):** key camelCase; `null` ≡ vắng. Ghi từng phần bằng `json_patch(cột, patch)` (RFC 7396: key có trong patch ghi đè, `null` xóa key, key vắng giữ nguyên) nên cập nhật một key không làm mất key khác (vd. `signerName` khi sửa `description`). Thể loại **không** còn bảng `genres` / `book_genres`; đổi tên thể loại là sửa mảng của từng sách.
 
 #### `authors` — hồ sơ tác giả dùng chung
 
@@ -807,26 +798,22 @@ Catalog vật lý khớp migration desktop [`001_initial.sql`](../../source/apps
 
 **Index:** `INDEX(book_id)`. PK composite `(collection_id, book_id)`.
 
-#### `reading_session_states` — resume + setting đọc per-book (1–1 với `books`)
+#### `books.reading_state_json` — resume + setting đọc per-book
 
-| Cột | Kiểu | Ràng buộc | Mô tả |
-| :--- | :--- | :--- | :--- |
-| `book_id` | TEXT | PK, FK → `books.id` **ON DELETE CASCADE** | Một sách một session |
-| `last_read_location` | TEXT | NOT NULL | Vị trí ổn định theo format (CFI / page-rect / offset) |
-| `percent` | REAL | NOT NULL, DEFAULT `0` | Map vị trí scrubber (0–100); **không** dùng làm “% đã đọc xong” trên UI (FR-10) |
-| `font_family` | TEXT | NULL | Font |
-| `font_size` | REAL | NULL | Cỡ chữ |
-| `font_weight` | TEXT | NULL | Độ đậm chữ |
-| `line_height` | REAL | NULL | Giãn dòng |
-| `text_align` | TEXT | NULL | Căn chữ |
-| `layout_mode` | TEXT | NULL | Bố cục single / dual |
-| `page_turn_mode` | TEXT | NULL | Scroll / paginated |
-| `margins_enabled` | INTEGER | NULL | Bật lề (0/1) |
-| `margin_preset` | TEXT | NULL | Hẹp / vừa / rộng |
-| `is_landscape` | INTEGER | NOT NULL, DEFAULT `0` | Landscape (0/1) |
-| `updated_at` | TEXT | NOT NULL | Lần autosave gần nhất |
+Trước migration `020` là bảng 1–1 `reading_session_states`; nay là cột JSON của `books` (mặc định `{}` = chưa đọc / chưa có setting riêng).
 
-Theme Night / Sepia / Paper là preference toàn app ở localStorage và áp dụng bằng CSS preset; không lưu `bg_color`, `text_color` hoặc `theme_preset` trong bảng này.
+| Key | Kiểu | Mô tả |
+| :--- | :--- | :--- |
+| `lastReadLocation` | string | Vị trí ổn định theo format (CFI / page-rect / offset), đóng gói kèm label hiển thị; hoặc placeholder legacy `Started` |
+| `percent` | number | Map vị trí scrubber (0–100); **không** dùng làm “% đã đọc xong” trên UI (FR-10) |
+| `fontFamily` / `fontSize` / `fontWeight` / `lineHeight` / `textAlign` | string \| number | Typography per-book |
+| `layoutMode` | string | Bố cục single / dual |
+| `pageTurnMode` | string | Scroll / paginated |
+| `marginsEnabled` / `marginPreset` | boolean / string | Bật lề; hẹp / vừa / rộng |
+| `isLandscape` | boolean | Landscape |
+| `updatedAt` | string (ISO-8601) | Lần autosave gần nhất — đồng thời là mốc **chống ghi cũ đè mới** (`books.updated_at` không dùng được vì sửa metadata cũng làm nó tăng) |
+
+Theme Night / Sepia / Paper là preference toàn app ở localStorage và áp dụng bằng CSS preset; không lưu `bg_color`, `text_color` hoặc `theme_preset` ở đây.
 
 #### `notes` — bảng chung cho highlight / underline / strikethrough / textbox **và** bookmark
 
@@ -875,7 +862,7 @@ Thay cho `highlights` (009) → `annotations` (011–017) → tách riêng `book
 
 **Index:** PK composite `(note_id, tag_id)`.
 
-> **Đã loại bỏ khỏi schema hiện tại:** `highlights` / `highlight_tags` (thay bằng `notes`/`note_tags`), `bookmarks` đứng riêng, `annotations`/`annotation_tags`, `book_signatures` (gộp vào `books`), và `comments` (bị xóa từ migration `010`, thay bằng `typewriter_notes` rồi cũng bị gộp/xóa — tính năng Comment không còn tồn tại trong app).
+> **Đã loại bỏ khỏi schema hiện tại:** `highlights` / `highlight_tags` (thay bằng `notes`/`note_tags`), `bookmarks` đứng riêng, `annotations`/`annotation_tags`, `book_signatures` (gộp vào `books`, sau đó vào `books.metadata_json`), `reading_session_states` / `genres` / `book_genres` (gộp vào `books.reading_state_json` / `genres_json`, migration `020`), và `comments` (bị xóa từ migration `010`, thay bằng `typewriter_notes` rồi cũng bị gộp/xóa — tính năng Comment không còn tồn tại trong app).
 
 #### `book_chunks` — đoạn text extract (FTS / Phase 2 AI)
 
@@ -1168,9 +1155,10 @@ Sau khi xong: **đóng overlay** → user vẫn ở **SCR-01 Library** (toast + 
 | 1    | User chọn **From this device**.                                                                  |
 | 2    | Main mở native file picker; filter: `.epub`, `.pdf`, `.txt`, `.md`, `.docx`, `.doc`. |
 | 3a   | User hủy → đóng; Library không đổi DB.                                                           |
-| 3b   | File hợp lệ → (optional) progress dialog nhỏ → copy sandbox → metadata → FTS → toast + refresh.  |
+| 3b   | File hợp lệ → hash + chặn trùng → metadata → lưu bản ghi với `file_path` = path gốc (**không copy**) → toast + refresh; chunk / FTS tạo nền khi mở sách. |
 | 3c   | Extension / file hỏng → dialog lỗi ngắn (vẫn overlay), không tạo bản ghi rỗng.                   |
-| 3d   | SHA-256 trùng (**BR-03**) → dialog conflict; đề xuất mở sách cũ; không nhân bản.                 |
+| 3d   | SHA-256 trùng (**BR-03**), kể cả file ở path khác → dialog conflict; đề xuất mở sách cũ; không nhân bản. |
+| 3e   | Sau này file gốc bị User di chuyển / xóa → sách **vẫn ở Library** (không mất note / highlight / vị trí đọc); mở Reader báo không tìm thấy file + **Locate file…** (chỉ nhận file có SHA-256 khớp). |
 
 
 #### Flow B — From URL
@@ -1184,7 +1172,7 @@ Sau khi xong: **đóng overlay** → user vẫn ở **SCR-01 Library** (toast + 
 | 4    | Suy ra format từ `Content-Disposition` / `Content-Type` / path extension.                              |
 | 5a   | Format không hỗ trợ / không phải file tài liệu → lỗi rõ; xóa temp.                                     |
 | 5b   | Download lỗi (404, mạng, SSL, quá dung lượng) → lỗi rõ; không bản ghi rỗng.                            |
-| 5c   | File OK → ghi sandbox → **cùng pipeline** như Flow A.                                                  |
+| 5c   | File OK → hash + chặn trùng → lưu bản copy app-owned → metadata → persist (khác Flow A: file được **copy** vào app data; `source_url` được giữ).                                                  |
 | 5d   | SHA trùng → dialog conflict; không nhân bản.                                                           |
 | 6    | Optional lưu `source_url` trên `BOOK`. Đóng overlay → toast → Library refresh.                         |
 
@@ -1428,12 +1416,12 @@ Thay nhóm **Account** cũ. App **không** đăng nhập email/password và **kh
 | --- | --- |
 | Local-only badge | Nhấn mạnh MVP offline (**NFR-06**); dữ liệu trên thiết bị này |
 | Google Drive | MVP: stub “Coming in Special”. Phase 3: chọn thư mục Drive đã sync trên máy → pull danh sách file hỗ trợ vào Library |
-| Google Books | MVP: stub. Phase 3: liên kết thư viện / export catalog Books → hiện list tài liệu; chọn để import vào sandbox |
+| Google Books | MVP: stub. Phase 3: liên kết thư viện / export catalog Books → hiện list tài liệu; chọn để tải về và lưu bản copy app-owned |
 | Apple Books | MVP: stub. Phase 3: liên kết thư mục / thư viện Apple Books trên máy → pull danh mục |
 | Sync now (per source) | Phase 3: refresh catalog từ nguồn đã link; dedup theo SHA-256 (**BR-03**) khi import file |
 | Unlink | Gỡ liên kết nguồn; **không** xóa sách / highlight đã import local |
 
-Cơ chế kết nối ưu tiên **folder / library path** đã có trên máy (Drive Desktop, Books library folder) — không dùng OAuth2 Sign-in app. File gốc vẫn Read-Only khi copy vào sandbox (**BR-01**).
+Cơ chế kết nối ưu tiên **folder / library path** đã có trên máy (Drive Desktop, Books library folder) — không dùng OAuth2 Sign-in app. File gốc không bị sửa (**BR-01**); file kéo từ nguồn ngoài (tải về) được lưu bản copy app-owned (**BR-09**).
 
 ##### Appearance
 
@@ -1450,7 +1438,7 @@ Theme app có thể làm **default** khi mở sách mới; preference per-book (
 | Control | Hành vi |
 | --- | --- |
 | Watch folders | Bật theo dõi FS (Main process) trên các path đã thêm |
-| Auto-import on detect | Copy vào sandbox khi phát hiện file mới (gốc Read-Only — **BR-01**) |
+| Auto-import on detect | Đăng ký **tham chiếu** file mới phát hiện — không copy (gốc không bị sửa — **BR-01**, **BR-09**) |
 | Watched folder list | Add / remove path; hiện số file ước lượng |
 | Formats | Chip `.epub` · `.pdf` · `.txt` · `.md` · `.docx` · `.doc` |
 | Scan now | Quét thủ công + progress; kết quả → toast / sẵn sàng import |

@@ -27,7 +27,14 @@ const DEFAULT_PREFS: ResolvedReadingPrefs = {
 export type ReaderBookOpenClient = {
   getBook: (bookId: string) => Promise<{ title?: string; coverUrl?: string; author?: string } | null>
   getSessionState: (bookId: string) => Promise<any>
-  openBookContent: (bookId: string) => Promise<{ ok: boolean; data?: any; format?: string | null; errorMessage?: string | null }>
+  openBookContent: (bookId: string) => Promise<{
+    ok: boolean
+    data?: any
+    format?: string | null
+    /** Stable failure code, e.g. `missing_file` when the book's file was moved or deleted. */
+    errorCode?: string | null
+    errorMessage?: string | null
+  }>
   markAsReading: (bookId: string) => Promise<any>
 }
 
@@ -86,6 +93,7 @@ export function useReaderBookOpen({
     'idle' | 'loading' | 'ready' | 'error'
   >('idle')
   const [openErrorMessage, setOpenErrorMessage] = useState<string | null>(null)
+  const [openErrorCode, setOpenErrorCode] = useState<string | null>(null)
   const [openAttempt, setOpenAttempt] = useState(0)
   const [bookBytes, setBookBytes] = useState<ArrayBuffer | null>(null)
   const [bookFormat, setBookFormat] = useState<string | null>(null)
@@ -108,6 +116,7 @@ export function useReaderBookOpen({
     setPrefs(readingPrefsFromGlobal(globalPrefsRef.current))
     setSessionLoadStatus('loading')
     setOpenErrorMessage(null)
+    setOpenErrorCode(null)
     setCoverUrl(undefined)
     setContentStatus('idle')
   }, [bookId, globalPrefsRef])
@@ -127,6 +136,7 @@ export function useReaderBookOpen({
       setResumeLocation(undefined)
       setSessionLoadStatus('ready')
       setOpenErrorMessage(null)
+      setOpenErrorCode(null)
       setContentStatus('idle')
       return
     }
@@ -134,6 +144,7 @@ export function useReaderBookOpen({
     let cancelled = false
     setContentStatus('loading')
     setOpenErrorMessage(null)
+    setOpenErrorCode(null)
     setBookBytes(null)
     setBookFormat(null)
     setResumeLocation(undefined)
@@ -198,6 +209,7 @@ export function useReaderBookOpen({
         setBookBytes(null)
         setBookFormat(null)
         setContentStatus('error')
+        setOpenErrorCode(result.errorCode ?? null)
         setOpenErrorMessage(
           result.errorMessage ?? 'Could not open this book file.',
         )
@@ -207,6 +219,7 @@ export function useReaderBookOpen({
         setBookBytes(null)
         setBookFormat(null)
         setContentStatus('error')
+        setOpenErrorCode(null)
         setOpenErrorMessage('Could not open this book file.')
       })
 
@@ -237,6 +250,7 @@ export function useReaderBookOpen({
     author,
     contentStatus,
     openErrorMessage,
+    openErrorCode,
     bookBytes,
     bookFormat,
     resumeLocation,

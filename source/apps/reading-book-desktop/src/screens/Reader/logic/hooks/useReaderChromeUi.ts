@@ -14,6 +14,7 @@ import {
   scheduleEpubResizeAfterChromeTransition,
 } from '../../../../reader/chrome'
 import type { SidebarTab } from '../../components'
+import { useReadAloudStore } from '../readAloud/readAloudStore'
 
 /** Live UI snapshot for Escape / center-tap (filled by ReaderScreen each render). */
 export type ReaderChromeEscapeUi = {
@@ -30,8 +31,6 @@ type UseReaderChromeUiOptions = {
   } | null) => void
   epubApiRef: RefObject<EpubRendererApi | null>
   escapeUiRef: MutableRefObject<ReaderChromeEscapeUi>
-  readerSearchQuery: string
-  readerSearchRequestId: number
   /** OS fullscreen on Reader — collapse all chrome until edge-reveal. */
   immersive?: boolean
 }
@@ -41,8 +40,6 @@ export function useReaderChromeUi({
   registerReaderChrome,
   epubApiRef,
   escapeUiRef,
-  readerSearchQuery,
-  readerSearchRequestId,
   immersive = false,
 }: UseReaderChromeUiOptions) {
   const [chromeHidden, setChromeHidden] = useState(true)
@@ -56,6 +53,7 @@ export function useReaderChromeUi({
   const [signOpen, setSignOpen] = useState(false)
   const [bookInfoOpen, setBookInfoOpen] = useState(false)
   const [trashOpen, setTrashOpen] = useState(false)
+  const [wordCountOpen, setWordCountOpen] = useState(false)
 
   // Reset chrome UI when switching books.
   useEffect(() => {
@@ -67,6 +65,7 @@ export function useReaderChromeUi({
     setSignOpen(false)
     setBookInfoOpen(false)
     setTrashOpen(false)
+    setWordCountOpen(false)
     setChromeHidden(true)
     setToast(null)
   }, [bookId])
@@ -82,16 +81,6 @@ export function useReaderChromeUi({
   }, [immersive])
 
   useEffect(() => {
-    if (readerSearchRequestId === 0) return
-    const q = readerSearchQuery.trim()
-    if (!q) {
-      setToast('Type something to search in this book.')
-      return
-    }
-    setToast(`Search “${q}” — coming soon.`)
-  }, [readerSearchRequestId, readerSearchQuery])
-
-  useEffect(() => {
     if (!toast) return
     const t = window.setTimeout(() => setToast(null), 2200)
     return () => window.clearTimeout(t)
@@ -101,6 +90,7 @@ export function useReaderChromeUi({
     setMoreOpen(false)
     setSettingsOpen(false)
     setSearchOpen(false)
+    useReadAloudStore.getState().closeMenu()
   }, [])
 
   const toggleSearch = useCallback(() => {
@@ -168,6 +158,7 @@ export function useReaderChromeUi({
     setMoreOpen(false)
     setSettingsOpen(false)
     setSearchOpen(false)
+    useReadAloudStore.getState().closeMenu()
   }, [chromeHidden])
 
   // After tools/sidebar/immersive layout animates, refresh EPUB metrics and clear stuck hover.
@@ -209,7 +200,7 @@ export function useReaderChromeUi({
 
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
-      if (e.key !== 'Escape') return
+      if (e.key !== 'Escape' || e.defaultPrevented) return
       const tag = (e.target as HTMLElement | null)?.tagName
       if (
         tag === 'INPUT' ||
@@ -236,7 +227,7 @@ export function useReaderChromeUi({
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [chromeHidden, moreOpen, settingsOpen, searchOpen])
 
-  // Ctrl+F / Cmd+F: reveal chrome if hidden and open the (UI-only) in-book search panel.
+  // Ctrl+F / Cmd+F: reveal chrome if hidden and open the in-book search panel.
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
       if (e.key.toLowerCase() !== 'f' || !(e.ctrlKey || e.metaKey)) return
@@ -275,6 +266,8 @@ export function useReaderChromeUi({
     setBookInfoOpen,
     trashOpen,
     setTrashOpen,
+    wordCountOpen,
+    setWordCountOpen,
     closeFloating,
     openSidebarTab,
     toggleSidebar,

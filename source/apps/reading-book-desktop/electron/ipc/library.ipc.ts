@@ -1,10 +1,16 @@
 import path from 'node:path'
-import fsp from 'node:fs/promises'
-import { clipboard, ipcMain, shell } from 'electron'
+import { SUPPORTED_FORMATS } from '@reading-book/config'
+import { BrowserWindow, clipboard, dialog, ipcMain, shell } from 'electron'
 import type { Book } from '@reading-book/book-reader-sdk'
 import { coverUrlForBookId } from '../files/cover-protocol'
 import { openBookContent } from '../files/open-book-content'
-import { assertPathAllowed, getBooksSandboxPath } from '../files/sandbox'
+import { relinkBookToFile } from '../files/relink-book'
+import {
+  bookFileStorage,
+  checkRegisteredBookPath,
+  removeCoverFile,
+  removeManagedBookDir,
+} from '../files/sandbox'
 import { getLibraryStore } from '../persistence/sqlite-library-store'
 import type {
   BookSummaryDto,
@@ -13,6 +19,7 @@ import type {
   OkResult,
   OpenBookContentResult,
   ReadingStatusDto,
+  RelinkBookResult,
   UpdateBookMetadataInput,
 } from './api-types'
 import { LibraryChannels } from './channels'
@@ -34,6 +41,7 @@ function toSummaryDto(
     fileName,
     isFavorite: book.isFavorite,
     readingStatus,
+    fileStorage: bookFileStorage(book.filePath),
   }
   if (book.coverPath) dto.coverUrl = coverUrlForBookId(book.id)
   if (authorNames.trim()) dto.author = authorNames
@@ -165,7 +173,7 @@ export function registerLibraryIpc(): void {
         id,
         typeof value.author === 'string' ? [value.author] : [],
       )
-      store.replaceGenresByName(
+      store.setGenres(
         id,
         Array.isArray(value.genres)
           ? value.genres.filter((genre): genre is string => typeof genre === 'string')
@@ -182,7 +190,10 @@ export function registerLibraryIpc(): void {
       if (typeof id !== 'string' || !id.trim()) return { ok: false }
       const book = await getLibraryStore().findById(id.trim())
       if (!book) return { ok: false }
-      shell.showItemInFolder(assertPathAllowed(book.filePath))
+      // Path check only (no disk access): for a moved file this still opens the last known folder.
+      const checked = checkRegisteredBookPath(book.filePath, book.format)
+      if (!checked.ok) return { ok: false }
+      shell.showItemInFolder(checked.path)
       return { ok: true }
     },
   )
@@ -194,7 +205,9 @@ export function registerLibraryIpc(): void {
       if (typeof id !== 'string' || !id.trim()) return { ok: false }
       const book = await getLibraryStore().findById(id.trim())
       if (!book) return { ok: false }
-      clipboard.writeText(assertPathAllowed(book.filePath))
+      const checked = checkRegisteredBookPath(book.filePath, book.format)
+      if (!checked.ok) return { ok: false }
+      clipboard.writeText(checked.path)
       return { ok: true }
     },
   )
@@ -205,8 +218,11 @@ export function registerLibraryIpc(): void {
     async (_event, id: unknown): Promise<OkResult> => {
       if (typeof id !== 'string' || !id.trim()) return { ok: false }
       const store = getLibraryStore()
-      if (!(await store.findById(id.trim()))) return { ok: false }
-      await store.deleteCascade(id.trim())
+      const book = await store.findById(id.trim())
+      if (!book) return { ok: false }
+      await store.deleteCascade(book.id)
+      // The book file is kept (sandbox copy or the user's own); only the app-owned cover goes.
+      await removeCoverFile(book.coverPath)
       return { ok: true }
     },
   )
@@ -219,15 +235,51 @@ export function registerLibraryIpc(): void {
       const store = getLibraryStore()
       const book = await store.findById(id.trim())
       if (!book) return { ok: false }
-      const filePath = assertPathAllowed(book.filePath)
-      const bookDir = path.dirname(filePath)
-      if (path.resolve(bookDir) === path.resolve(getBooksSandboxPath())) {
-        return { ok: false }
-      }
-      await fsp.chmod(filePath, 0o666).catch(() => {})
-      await fsp.rm(bookDir, { recursive: true, force: true })
+      // Only app-owned copies are ever deleted. A referenced book's file — and its parent
+      // folder — belong to the user; removeManagedBookDir enforces that a second time.
+      if (bookFileStorage(book.filePath) !== 'managed') return { ok: false }
+      if (!(await removeManagedBookDir(book.filePath))) return { ok: false }
       await store.deleteCascade(book.id)
+      await removeCoverFile(book.coverPath)
       return { ok: true }
+    },
+  )
+
+  ipcMain.removeHandler(LibraryChannels.relinkBook)
+  ipcMain.handle(
+    LibraryChannels.relinkBook,
+    async (event, id: unknown): Promise<RelinkBookResult> => {
+      const notFound: RelinkBookResult = {
+        ok: false,
+        errorCode: 'not_found',
+        errorMessage: 'Book not found.',
+      }
+      if (typeof id !== 'string' || !id.trim()) return notFound
+      const book = await getLibraryStore().findById(id.trim())
+      if (!book) return notFound
+
+      // The renderer only ever names a book id — the path comes from this native dialog.
+      const descriptor = SUPPORTED_FORMATS.find((d) => d.format === book.format)
+      const dialogOptions: Electron.OpenDialogOptions = {
+        title: `Locate “${book.title}”`,
+        properties: ['openFile'],
+        filters: descriptor
+          ? [
+              {
+                name: descriptor.displayName,
+                extensions: descriptor.extensions.map((ext) => ext.replace(/^\./, '')),
+              },
+            ]
+          : [],
+      }
+      const parent = BrowserWindow.fromWebContents(event.sender)
+      const { canceled, filePaths } = parent
+        ? await dialog.showOpenDialog(parent, dialogOptions)
+        : await dialog.showOpenDialog(dialogOptions)
+      if (canceled || filePaths.length === 0) {
+        return { ok: false, errorCode: 'cancelled' }
+      }
+      return relinkBookToFile(book.id, filePaths[0])
     },
   )
 

@@ -374,7 +374,11 @@ export function LibraryScreen() {
           }
           message={
             pendingRemoval.kind === 'remove'
-              ? `“${pendingRemovalBook.title}” will disappear from the library. Its imported file will be kept.`
+              ? `“${pendingRemovalBook.title}” will disappear from the library. ${
+                  pendingRemovalBook.fileStorage === 'referenced'
+                    ? 'Your original file will not be touched.'
+                    : 'Its imported file will be kept.'
+                }`
               : `“${pendingRemovalBook.title}” and its imported file will be permanently deleted. This cannot be undone.`
           }
           confirmLabel={

@@ -225,13 +225,16 @@ export function BookItemMenu({
       <button className={itemClass} role="menuitem" onClick={() => run(() => onRemove(book.id))}>
         Remove from library
       </button>
-      <button
-        className={`${itemClass} text-red-400 hover:text-red-300`}
-        role="menuitem"
-        onClick={() => run(() => onDeleteFile(book.id))}
-      >
-        Delete file…
-      </button>
+      {/* Only app-owned copies can be deleted; a referenced book's file is the user's own. */}
+      {book.fileStorage === 'managed' ? (
+        <button
+          className={`${itemClass} text-red-400 hover:text-red-300`}
+          role="menuitem"
+          onClick={() => run(() => onDeleteFile(book.id))}
+        >
+          Delete file…
+        </button>
+      ) : null}
     </div>
   )
 }

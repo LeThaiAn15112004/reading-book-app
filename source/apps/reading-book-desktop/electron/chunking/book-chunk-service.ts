@@ -2,7 +2,7 @@ import { BrowserWindow } from 'electron'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { Worker } from 'node:worker_threads'
-import { assertPathAllowed } from '../files/sandbox'
+import { resolveBookFile } from '../files/sandbox'
 import { BookIndexChannels } from '../ipc/channels'
 import type { BookIndexStatusDto, EnsureBookIndexResult } from '../ipc/api-types'
 import { getDatabase } from '../persistence/db'
@@ -104,16 +104,14 @@ export async function ensureBookChunks(bookId: string): Promise<EnsureBookIndexR
     if (!book) return { state: 'error' }
     if (!isChunkableFormat(book.format)) return { state: 'unsupported' }
 
-    let filePath: string
-    try {
-      filePath = assertPathAllowed(book.filePath)
-    } catch {
-      return { state: 'error' }
-    }
+    // Existing chunks keep serving search / word count when the file is gone (checked above), so
+    // a missing or moved book file only blocks *creating* chunks.
+    const file = await resolveBookFile(book)
+    if (!file.ok) return { state: 'error' }
 
     const started = spawnWorker({
       bookId: id,
-      filePath,
+      filePath: file.path,
       format: book.format,
       dbPath: getDatabase().name,
     })

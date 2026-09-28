@@ -10,6 +10,10 @@ export type SdkErrorCode =
   | 'STORAGE_FAILED'
   | 'EPUB_MALFORMED'
   | 'DISPOSED'
+  | 'ABORTED'
+  | 'NETWORK_UNAVAILABLE'
+  | 'MODEL_LOAD_FAILED'
+  | 'TRANSLATION_FAILED'
 
 /**
  * The only error type the SDK throws on purpose. Hosts should branch on `code`, never on

@@ -24,7 +24,8 @@ if (Source?) then (Device)
       :Show error;
       stop
     else (Yes)
-      :4. Copy into App Data;
+      :4. Register original file
+(reference - no copy);
     endif
   endif
 else (URL)

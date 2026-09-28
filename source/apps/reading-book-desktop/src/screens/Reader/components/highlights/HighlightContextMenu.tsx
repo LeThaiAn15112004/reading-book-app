@@ -14,10 +14,11 @@ type HighlightContextMenuProps = {
   onBookmarkHere: () => void
   onCopy: () => void
   onCopyWithCitation: () => void
+  onTranslate: () => void
   onDismiss: () => void
 }
 
-const FALLBACK_SIZE = { width: 190, height: 260 }
+const FALLBACK_SIZE = { width: 190, height: 292 }
 
 const itemClass =
   'flex h-8 w-full cursor-pointer items-center rounded-md border-none bg-transparent px-2.5 text-left text-[12px] font-semibold text-lib-text hover:bg-lib-bg-mid/50 focus-visible:bg-lib-bg-mid/50 focus-visible:outline-none disabled:cursor-default disabled:opacity-40'
@@ -33,6 +34,7 @@ export function HighlightContextMenu({
   onBookmarkHere,
   onCopy,
   onCopyWithCitation,
+  onTranslate,
   onDismiss,
 }: HighlightContextMenuProps) {
   const containerRef = useRef<HTMLDivElement | null>(null)
@@ -99,6 +101,16 @@ export function HighlightContextMenu({
 
       <div className="my-0.5 border-t border-lib-border-soft" />
 
+      <button
+        type="button"
+        role="menuitem"
+        className={itemClass}
+        disabled={!selectedText}
+        onClick={() => run(onTranslate)}
+      >
+        <span aria-hidden className="mr-1.5">🌐</span>
+        Translate
+      </button>
       <button type="button" role="menuitem" className={itemClass} onClick={() => run(onAddNote)}>
         <span aria-hidden className="mr-1.5">📝</span>
         Add note

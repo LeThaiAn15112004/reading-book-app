@@ -1,14 +1,15 @@
 # Software Requirements Specification (SRS)
 
 **Sản phẩm:** Reading Book App — Trình đọc sách / tài liệu thông minh (Trợ lý tri thức cá nhân)  
-**Phiên bản tài liệu:** 1.6  
-**Ngày:** 2026-07-22  
+**Phiên bản tài liệu:** 1.7  
+**Ngày:** 2026-09-29  
 **Changelog 1.1:** FR-13 Import từ URL (MVP); cập nhật UC-01, WF-02; FR-36 chuyển thành FR-13.  
 **Changelog 1.2:** Phạm vi định dạng MVP = **EPUB, PDF, TXT, Markdown** (4 format; bỏ MOBI/AZW3/DOCX tạm thời).  
 **Changelog 1.3:** **FR-14 Collections** — bộ sưu tập user-curated (`COLLECTION` / `COLLECTION_BOOK`); cập nhật BR-06 cascade membership.  
 **Changelog 1.4:** **Không tài khoản app** (không email/password, không OAuth2 đăng nhập). Phase 3 **FR-30** = liên kết thư viện ngoài (Google Drive, Google Books, Apple Books) để kéo danh sách tài liệu vào Library local — thay sync account đa thiết bị.  
 **Changelog 1.5:** **FR-10** đổi từ % / progress bar hoàn thành → **last-read location** (hỗ trợ đọc nhảy cóc); không hiện % trên Library/Reader.  
 **Changelog 1.6:** Phạm vi định dạng MVP = **6 format**: EPUB, PDF, TXT, Markdown, **DOCX**, **DOC** (bỏ MOBI/AZW3/PPTX).  
+**Changelog 1.7:** **Import theo file (file-centric):** import từ **file trên máy** không còn copy vào app data — thư viện **tham chiếu** file gốc của user (`books.file_path` = path gốc); chỉ **URL / cloud** tải về và lưu bản copy do app sở hữu. Cập nhật UC-01, UC-02 (E1), BR-01, BR-06; thêm **BR-09** (sở hữu file) và **FR-15** (Locate file). Chi tiết: `docs/implementation_plan/file_centric_import_architecture.md`.  
 **Trạng thái:** Draft — căn cứ research + plan MVP Free Core
 
 ---
@@ -191,7 +192,7 @@ Sản phẩm triển khai trên monorepo hiện có:
 | Loại                        | Ràng buộc                                                                                                                       |
 | --------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
 | **Phạm vi MVP**             | Không AI, không connector thư viện ngoài, không social; 6 định dạng: EPUB, PDF, TXT, Markdown, DOCX, DOC.                       |
-| **Kỹ thuật**                | Local-first; path file sandbox qua Electron main process; không remote code tùy ý.                                              |
+| **Kỹ thuật**                | Local-first; mọi truy cập file sách đi qua Electron main process theo `bookId` (Renderer không truyền path); không remote code tùy ý. |
 | **UX**                      | Không popup giữa phiên đọc; không animation gây xao nhãng; tuân Design System don'ts.                                           |
 | **Thời gian**               | Phase 1 hoàn thành khi DoD ở mục 6.1 đạt — trước khi mở Phase 2 AI.                                                             |
 | **Ngân sách / vận hành AI** | Chi phí LLM và embedding thuộc Premium; MVP không phụ thuộc API trả phí.                                                        |
@@ -238,10 +239,10 @@ Use Case Diagram — Reading Book App (MVP)
 | ------------------------------ | ------------------------------------------------------------------------------------------------- |
 | **ID / Tên**                   | UC-01 Import sách                                                                                 |
 | **Actor**                      | User                                                                                              |
-| **Mục đích**                   | Thêm tài liệu vào thư viện cá nhân local từ **file trên máy** hoặc **URL** (download → sandbox)   |
+| **Mục đích**                   | Thêm tài liệu vào thư viện cá nhân từ **file trên máy** (tham chiếu file gốc, không copy) hoặc **URL** (download → bản copy do app sở hữu) |
 | **Độ ưu tiên**                 | P0 (MVP)                                                                                          |
 | **Tiền điều kiện**             | App đã mở; User ở Library (hoặc màn có nút Import / Add)                                          |
-| **Hậu điều kiện (thành công)** | File nằm trong app data; metadata + bản ghi thư viện đã lưu; sách hiện trong Library; đọc offline |
+| **Hậu điều kiện (thành công)** | Metadata + bản ghi thư viện đã lưu; sách hiện trong Library. File máy: `file_path` trỏ file gốc của user. URL: file nằm trong app data → đọc offline |
 | **Hậu điều kiện (thất bại)**   | Không tạo bản ghi rỗng; User nhận thông báo lỗi rõ                                                |
 
 
@@ -250,15 +251,15 @@ Use Case Diagram — Reading Book App (MVP)
 1. User chọn **Add** → **From this device** (hoặc **Import** / **Add file**).
 2. Hệ thống mở File Picker (định dạng hỗ trợ: EPUB, PDF, TXT, Markdown, DOCX, DOC).
 3. User chọn file hợp lệ.
-4. Hệ thống kiểm tra file, copy vào app data, trích metadata, lưu SQLite (SHA-256).
+4. Hệ thống kiểm tra file, tính SHA-256 và chặn trùng, trích metadata, rồi lưu SQLite với **path tuyệt đối của file gốc** (**không copy** file vào app data; cover trích ra thư mục của app).
 5. Hệ thống hiển thị sách mới trong Library.
 
 **Luồng chính — From URL**
 
 1. User chọn **Add** → **From link**.
 2. User dán URL trực tiếp tới file (ưu tiên `https://`).
-3. Hệ thống (Main) download file về temp/sandbox, suy ra format, kiểm tra hợp lệ.
-4. Hệ thống chạy cùng bước metadata + SHA + SQLite như import file.
+3. Hệ thống (Main) download file về temp, suy ra format, kiểm tra hợp lệ.
+4. Hệ thống tính SHA + chặn trùng, chuyển file vào app data (bản copy do app sở hữu), trích metadata và lưu SQLite với path của bản copy đó; file temp được xóa.
 5. Hệ thống hiển thị sách mới trong Library; optional lưu `source_url`.
 
 **Ngoại lệ**
@@ -268,6 +269,7 @@ Use Case Diagram — Reading Book App (MVP)
 - **E3 — Trùng sách (SHA-256):** Thông báo; không nhân đôi (chi tiết SDS).
 - **E4 — Lỗi mạng / timeout / quá dung lượng (URL):** Báo lỗi; xóa temp; không bản ghi rỗng.
 - **E5 — URL không phải direct file (HTML trang web):** Từ chối với thông báo rõ — không scrape bookstore.
+- **E6 — Lỗi khi lưu thư viện (URL):** Bản copy app data vừa tạo được dọn; file gốc của user (import file máy) **không bao giờ** bị xóa khi import lỗi.
 
 ---
 
@@ -297,7 +299,7 @@ Use Case Diagram — Reading Book App (MVP)
 
 **Ngoại lệ**
 
-- **E1 — File sách mất / hỏng:** Báo lỗi; không crash.
+- **E1 — File sách mất / hỏng:** Báo lỗi; không crash. Với sách tham chiếu file gốc bị User di chuyển / xóa: bản ghi và toàn bộ dữ liệu của sách (highlight, note, bookmark, vị trí đọc, collection, index tìm kiếm) được **giữ nguyên**; Reader đề nghị **Locate file** (FR-15).
 - **E2 — Crash giữa phiên:** Giữ vị trí autosave gần nhất.
 
 ---
@@ -564,14 +566,15 @@ Các quy tắc dưới đây **bắt buộc** với mọi UC / WF liên quan. SD
 
 | ID        | Quy tắc nghiệp vụ                                                                                                                                                                                                                                 | Phạm vi áp dụng                  | Phase              |
 | --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------- | ------------------ |
-| **BR-01** | **Bất biến dữ liệu:** Mọi file sách gốc (EPUB/PDF/TXT/MD/DOCX/DOC) được lưu ở trạng thái **Read-Only**. Hệ thống cấm mọi thao tác ghi đè lên file gốc.                                                                                            | Import, Reader, AI/Audio         | MVP →              |
+| **BR-01** | **Bất biến dữ liệu:** File sách (EPUB/PDF/TXT/MD/DOCX/DOC) **không bao giờ bị sửa**. Hệ thống cấm ghi đè / di chuyển / xóa **file gốc của user** (và thư mục chứa nó); bản copy do app sở hữu (URL / cloud) được lưu **Read-Only**. Mọi thay đổi khác nằm ở lớp Overlay (**BR-02**). | Import, Reader, AI/Audio         | MVP →              |
 | **BR-02** | **Cơ chế Overlay:** Mọi thay đổi (Theme, Highlight, Note) được xử lý qua lớp phủ (Overlay) lưu trong **SQLite** và áp dụng ở **runtime**.                                                                                                         | UC-02–UC-06, WF-03, WF-04        | MVP                |
 | **BR-03** | **Tính duy nhất:** Sử dụng **Hash (SHA-256)** để ngăn chặn việc import trùng lặp file sách.                                                                                                                                                       | UC-01, WF-02                     | MVP                |
 | **BR-04** | **Chuẩn hóa hiển thị:** EPUB/TXT/Markdown/DOCX/DOC render **Reflowable**; PDF render **Fixed-layout Overlay**.                                                                                                                                    | Reader (FR-02)                   | MVP                |
 | **BR-05** | **Tính tương phản:** Khi thay đổi Background, hệ thống **tự động điều chỉnh màu Text** theo bảng màu định sẵn để đảm bảo độ đọc (Accessibility).                                                                                                  | UC-02 theme, NFR contrast        | MVP                |
-| **BR-06** | **Tính toàn vẹn (Cascade):** Khi xóa một cuốn sách, hệ thống phải **tự động xóa sạch** Note, Highlight, Bookmark, membership collection (`COLLECTION_BOOK`) và dữ liệu liên quan trong DB. Xóa collection chỉ gỡ membership — **không** xóa sách. | Library / Collections / xóa sách | MVP                |
+| **BR-06** | **Tính toàn vẹn (Cascade):** Khi xóa một cuốn sách, hệ thống phải **tự động xóa sạch** Note, Highlight, Bookmark, membership collection (`COLLECTION_BOOK`) và dữ liệu liên quan trong DB. Xóa collection chỉ gỡ membership — **không** xóa sách. Xóa sách khỏi thư viện **không** xóa file gốc của user (**BR-09**). | Library / Collections / xóa sách | MVP                |
 | **BR-07** | **Xử lý AI/Audio:** AI tóm tắt và Text-to-Speech chỉ thực hiện trên **nội dung văn bản đã bóc tách**, không làm ảnh hưởng đến tệp gốc.                                                                                                            | AI / TTS                         | Premium+ (sau MVP) |
 | **BR-08** | **Không identity app:** Ứng dụng **không** tạo / yêu cầu tài khoản Reading Book App — cấm đăng nhập email/password và cấm OAuth2 (Sign in with Google/Apple/…) làm identity. Phase 3 chỉ **liên kết thư viện ngoài** (FR-30).                     | Settings / FR-30 / NFR-11        | MVP →              |
+| **BR-09** | **Sở hữu file sách:** Import từ **file trên máy** → thư viện chỉ **tham chiếu** file gốc (user sở hữu; không copy, không xóa khi gỡ sách). Import từ **URL / cloud** → app tải về và **sở hữu** bản copy (được xóa khi user chọn "Delete file"). Danh tính sách là `id` + SHA-256, **không** phải path; đổi vị trí file không tạo sách mới. | Import, Library (xóa), Reader (mở), Locate file | MVP                |
 
 
 **Ghi chú triển khai**
@@ -579,8 +582,9 @@ Các quy tắc dưới đây **bắt buộc** với mọi UC / WF liên quan. SD
 - **BR-01 + BR-02 + BR-07:** File gốc bất biến; mọi annotation / theme / AI output là dữ liệu phụ (SQLite / cache), không mutate EPUB/PDF trên đĩa.
 - **BR-03:** Khi hash trùng → thông báo User; không tạo bản ghi thư viện thứ hai (khớp ngoại lệ WF-02).
 - **BR-05:** Không cho User chọn tổ hợp nền/chữ phá contrast tối thiểu (Design System / NFR-07).
-- **BR-06:** Xóa sách = transaction cascade (file app-data + metadata + note/highlight/bookmark + `collection_books`); không để orphan records. Xóa collection cascade `collection_books` nhưng giữ `books`.
+- **BR-06:** Xóa sách = transaction cascade (metadata + note/highlight/bookmark + `collection_books` + chunk/FTS); không để orphan records. "Remove from library" giữ file sách (bản copy app-data nếu có; file gốc của user luôn giữ). Chỉ bản copy do app sở hữu mới có thể bị xóa, và chỉ qua thao tác "Delete file" tường minh. Xóa collection cascade `collection_books` nhưng giữ `books`.
 - **BR-08:** Không màn Sign in / Log out identity; unlink connector thư viện ngoài **không** xóa thư viện / overlay local đã import.
+- **BR-09:** Loại sở hữu (tham chiếu / app-owned) được suy ra từ chính `file_path` (nằm trong `{userData}/books/` ⇒ app-owned), không có cột riêng. Sách import trước v1.7 (đã có bản copy trong `{userData}/books/`) vẫn là app-owned và hoạt động như cũ — không có migration phá hủy.
 
 ---
 
@@ -600,7 +604,7 @@ Mỗi FR P0 có acceptance criteria kiểm thử được; map tới UC / WF / B
 
 | ID        | Tên                                                    | UC / WF      | BR           | Pain / Habit |
 | --------- | ------------------------------------------------------ | ------------ | ------------ | ------------ |
-| **FR-01** | Import từ file máy vào thư viện local                  | UC-01, WF-02 | BR-01, BR-03 | P04, P06     |
+| **FR-01** | Import từ file máy vào thư viện (tham chiếu file gốc)  | UC-01, WF-02 | BR-01, BR-03, BR-09 | P04, P06     |
 | **FR-02** | Mở sách và render nội dung                             | UC-02, WF-03 | BR-04        | P01, P02     |
 | **FR-03** | Lật trang / cuộn mượt, UI ẩn mặc định                  | UC-02, WF-03 | —            | P01, P02     |
 | **FR-04** | Theme light / sepia / dark + font / size / line-height | UC-02, WF-03 | BR-02, BR-05 | Habit #7     |
@@ -612,19 +616,21 @@ Mỗi FR P0 có acceptance criteria kiểm thử được; map tới UC / WF / B
 | **FR-10** | Last-read location (không dùng % hoàn thành)           | WF-01, WF-03 | —            | Habit #8     |
 | **FR-11** | Đánh dấu trang (bookmark)                              | UC-05        | BR-02        | note.txt     |
 | **FR-12** | Xóa sách kèm cascade dữ liệu liên quan                 | WF-01        | BR-06        | P04          |
-| **FR-13** | Import từ URL (direct file → sandbox local)            | UC-01, WF-02 | BR-01, BR-03 | note.txt     |
+| **FR-13** | Import từ URL (direct file → bản copy do app sở hữu)   | UC-01, WF-02 | BR-01, BR-03, BR-09 | note.txt     |
 | **FR-14** | Collections — tạo tập sách do user gom                 | WF-01        | BR-06        | Collector    |
+| **FR-15** | Locate file — gắn lại sách khi file tham chiếu bị di chuyển / xóa | UC-02, WF-01 | BR-03, BR-09 | Import redesign |
 
 
 
 
-##### FR-01 — Import từ file máy vào thư viện local
+##### FR-01 — Import từ file máy vào thư viện (tham chiếu file gốc)
 
-- **Story:** As a User, I want to import a supported document from my device, so that it appears in my personal library.
+- **Story:** As a User, I want to import a supported document from my device, so that it appears in my personal library without the app duplicating my file.
 - **Acceptance:**
-  - Given User ở Library, When chọn Import from device và file hợp lệ (EPUB/PDF/TXT/MD/DOCX/DOC), Then sách xuất hiện sau khi copy + metadata + lưu DB.
+  - Given User ở Library, When chọn Import from device và file hợp lệ (EPUB/PDF/TXT/MD/DOCX/DOC), Then sách xuất hiện sau khi trích metadata + lưu DB; `file_path` = path tuyệt đối của file gốc và **không** có bản copy nào được tạo trong app data (**BR-09**).
   - Given file không hợp lệ hoặc User hủy, Then không tạo bản ghi rỗng.
-  - Given file có SHA-256 trùng sách đã có (**BR-03**), Then hệ thống báo trùng và không nhân đôi.
+  - Given file có SHA-256 trùng sách đã có (**BR-03**) — kể cả ở path khác — Then hệ thống báo trùng và không nhân đôi.
+  - Given import (thành công hoặc lỗi), Then file gốc và thư mục chứa nó không bị ghi, di chuyển hay xóa (**BR-01**).
 - **Priority / Phase:** Must / 1
 
 
@@ -633,12 +639,23 @@ Mỗi FR P0 có acceptance criteria kiểm thử được; map tới UC / WF / B
 
 - **Story:** As a User, I want to paste a direct link to a book/document file, so that the app downloads it into my local library and I can read offline.
 - **Acceptance:**
-  - Given User nhập URL `https` trỏ tới file hỗ trợ, When import, Then file được tải về sandbox (Main), metadata lưu DB, sách hiện Library; đọc offline không cần mạng.
+  - Given User nhập URL `https` trỏ tới file hỗ trợ, When import, Then file được tải về temp rồi lưu thành bản copy do app sở hữu trong app data (Main), `file_path` trỏ bản copy đó, metadata lưu DB, sách hiện Library; đọc offline không cần mạng.
   - Given URL lỗi / không phải direct file / format không hỗ trợ / timeout, Then thông báo rõ; không tạo bản ghi rỗng; temp được dọn.
   - Given nội dung tải về có SHA trùng sách đã có (**BR-03**), Then báo trùng; không nhân đôi.
   - Given import từ URL thành công, Then có thể lưu `source_url` tham chiếu; **không** tự re-download mỗi lần mở Reader.
   - Given UI Import, When quan sát, Then **không** có bookstore / mua sách / browse catalog.
 - **Priority / Phase:** Must / 1
+
+
+
+##### FR-15 — Locate file (gắn lại sách khi file tham chiếu bị di chuyển / xóa)
+
+- **Story:** As a User, I want to point the app at a book file I moved, so that my highlights, notes and reading position are not lost.
+- **Acceptance:**
+  - Given sách tham chiếu file gốc đã bị di chuyển / đổi tên / xóa, When User mở sách, Then Reader báo file không tìm thấy (không crash), sách **vẫn ở trong Library** với toàn bộ note / highlight / bookmark / vị trí đọc / collection / index tìm kiếm còn nguyên, và có hành động **Locate file…**.
+  - Given User chọn file trong hộp thoại **Locate file…**, When SHA-256 của file khớp `books.sha256`, Then chỉ `file_path` được cập nhật (giữ nguyên `books.id` và mọi dữ liệu liên quan) và sách mở lại được.
+  - Given file được chọn có SHA-256 khác, sai định dạng, hoặc nằm trong thư mục dữ liệu của app, Then bị từ chối với thông báo rõ; `file_path` không đổi.
+- **Priority / Phase:** Should / 1
 
 
 

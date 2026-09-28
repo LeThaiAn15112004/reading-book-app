@@ -41,5 +41,5 @@ export {
   resolveCumulativeTarget,
   type CumulativePageMetrics,
   type TargetPageLocation,
-} from './epub-pagination'
+} from '@reading-book/book-reader-sdk'
 

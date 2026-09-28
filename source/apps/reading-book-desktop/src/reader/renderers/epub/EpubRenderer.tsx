@@ -18,6 +18,7 @@ import {
   type EpubjsHandle,
   type EpubNavState,
   type EpubPageLayout,
+  type EpubSelectionInfo,
   type EpubTocItem,
   type EpubViewMode,
 } from './openEpubjs'
@@ -69,8 +70,19 @@ export type EpubRendererApi = Pick<
   | 'flashHighlight'
   | 'getHighlightAtPoint'
   | 'setFocusedHighlight'
+  | 'setSearchHighlights'
+  | 'goToSearchMatch'
   | 'onTextSelected'
->
+  | 'getCurrentSelectionInfo'
+  | 'getReadAloudSegments'
+  | 'setReadAloudCursor'
+> & {
+  /**
+   * Section labels indexed by REAL spine index. Search hits come from the extracted text, which
+   * knows nothing of the synthetic cover that shifts `getSectionLabels()` by one.
+   */
+  getSpineSectionLabels: () => string[]
+}
 
 type EpubRendererProps = {
   data: ArrayBuffer
@@ -102,6 +114,25 @@ type EpubRendererProps = {
    * selection's bounds — see `onHighlightContextMenu` for that case.
    */
   onSelectionContextMenu?: (x: number, y: number) => void
+  /**
+   * Highlight/Underline/Strikethrough tool armed and the mouse button that was drag-selecting text
+   * just came up over a non-empty selection — the exact moment (and only moment) such a drag
+   * should turn into a saved mark. Fires with a fresh, synchronous read of the selection (not the
+   * ~250ms-debounced `onTextSelected`), so a fast click-drag-release is captured correctly and a
+   * drag that merely *pauses* mid-gesture (mouse still down) never fires this early.
+   */
+  onAnnotationDragEnd?: (info: EpubSelectionInfo) => void
+  /**
+   * Toolbar Translate mode armed (rides on the Select tool — see `ReaderScreen`). While set, a
+   * drag-select on the Select tool that ends over a non-empty selection fires
+   * `onTranslateDragEnd` the instant the pointer comes up, same mechanism as
+   * `onAnnotationDragEnd` for the markup tools, instead of the old debounced `onTextSelected`
+   * settle event (which could fire before the drag actually finished, or fire twice).
+   */
+  translateModeActive?: boolean
+  /** Fires once, on pointerup, with a fresh synchronous read of the selection — see
+   *  `translateModeActive`. */
+  onTranslateDragEnd?: (info: EpubSelectionInfo) => void
   /**
    * Right-click landed on an existing highlight/underline mark with no live text selection under
    * the cursor (the `onSelectionContextMenu` case above takes priority when both are true). Fires
@@ -352,7 +383,27 @@ function toApi(
     flashHighlight: (cfiRange, styleKind) => handle.flashHighlight(cfiRange, styleKind),
     getHighlightAtPoint: (outerX, outerY) => handle.getHighlightAtPoint(outerX, outerY),
     setFocusedHighlight: (id) => handle.setFocusedHighlight(id),
+    setSearchHighlights: (matcher) => handle.setSearchHighlights(matcher),
+    goToSearchMatch: async (target) => {
+      cover.hide()
+      return handle.goToSearchMatch(target)
+    },
+    getSpineSectionLabels: () => handle.getSectionLabels(),
     onTextSelected: (cb) => handle.onTextSelected(cb),
+    getCurrentSelectionInfo: () => handle.getCurrentSelectionInfo(),
+    getReadAloudSegments: (mode) => {
+      if (cover.isShown()) {
+        // The synthetic cover has no text; "from here" starts at the first real section.
+        if (mode === 'viewport') return null
+        cover.hide()
+        return handle.getReadAloudSegments('section')
+      }
+      return handle.getReadAloudSegments(mode)
+    },
+    setReadAloudCursor: async (cursor) => {
+      if (cursor) cover.hide()
+      await handle.setReadAloudCursor(cursor)
+    },
   }
 }
 
@@ -414,6 +465,9 @@ export function EpubRenderer({
   className,
   onCenterTap,
   onSelectionContextMenu,
+  onAnnotationDragEnd,
+  translateModeActive = false,
+  onTranslateDragEnd,
   onHighlightContextMenu,
   onHighlightClick,
   onSurfaceClick,
@@ -457,6 +511,18 @@ export function EpubRenderer({
     doc: Document
   }
   const panGestureRef = useRef<HandPanGesture | null>(null)
+  /** True from pointerdown to pointerup/cancel of a Highlight/Underline/Strikethrough drag-select
+   *  gesture — the mark is committed only when this transitions back to false with a live
+   *  selection under it (see `onAnnotationDragEnd`), never while it's still true (mouse still
+   *  down, however long the drag pauses). */
+  const annotationDragActiveRef = useRef(false)
+  /** Set for exactly one `click` event right after a drag-to-mark commits — see `endAnnotationDrag`. */
+  const justCommittedAnnotationRef = useRef(false)
+  /** True from pointerdown to pointerup/cancel of a Select-tool drag made while Translate mode is
+   *  armed — mirrors `annotationDragActiveRef` but for `onTranslateDragEnd` instead of a markup
+   *  mark, and deliberately kept separate so it never triggers the highlight-drag click-swallow
+   *  (`justCommittedAnnotationRef`) below. */
+  const translateDragActiveRef = useRef(false)
 
   const releasePanPointerCapture = (
     captureEl: HTMLElement | null,
@@ -543,6 +609,43 @@ export function EpubRenderer({
   onCenterTapRef.current = onCenterTap
   const onSelectionContextMenuRef = useRef(onSelectionContextMenu)
   onSelectionContextMenuRef.current = onSelectionContextMenu
+  const onAnnotationDragEndRef = useRef(onAnnotationDragEnd)
+  onAnnotationDragEndRef.current = onAnnotationDragEnd
+  const translateModeActiveRef = useRef(translateModeActive)
+  translateModeActiveRef.current = translateModeActive
+  const onTranslateDragEndRef = useRef(onTranslateDragEnd)
+  onTranslateDragEndRef.current = onTranslateDragEnd
+
+  /**
+   * Commits a Highlight/Underline/Strikethrough drag, or a Translate-mode Select-tool drag, the
+   * instant its pointer comes up — reads the selection fresh via `getCurrentSelectionInfo` (see
+   * that method's doc comment for why, not `onTextSelected`'s debounce). Deliberately NOT scoped
+   * to any one iframe document: called both from that document's own `pointerup` (the common
+   * case) and from `window`'s capture-phase `pointerup` further below, which is what still
+   * catches the release when the drag carried the cursor out past the iframe's own rectangle
+   * before the button came up.
+   */
+  const commitAnnotationDrag = () => {
+    const isAnnotationDrag = annotationDragActiveRef.current
+    const isTranslateDrag = translateDragActiveRef.current
+    if (!isAnnotationDrag && !isTranslateDrag) return
+    annotationDragActiveRef.current = false
+    translateDragActiveRef.current = false
+    const info = handleRef.current?.getCurrentSelectionInfo()
+    if (!info) return
+    if (isTranslateDrag) {
+      onTranslateDragEndRef.current?.(info)
+      return
+    }
+    onAnnotationDragEndRef.current?.(info)
+    // The commit above clears the native selection synchronously, but the trailing `click` this
+    // same gesture dispatches right after `pointerup` fires before React has re-rendered/painted
+    // the new mark — `getHighlightAtPoint` in `onClick` below would find nothing yet and treat it
+    // as an empty-surface click, dismissing the very outline `createHighlight` just focused.
+    // Swallow exactly that one click.
+    justCommittedAnnotationRef.current = true
+  }
+
   const onHighlightContextMenuRef = useRef(onHighlightContextMenu)
   onHighlightContextMenuRef.current = onHighlightContextMenu
   const onHighlightClickRef = useRef(onHighlightClick)
@@ -846,14 +949,23 @@ export function EpubRenderer({
             const tool = interactionToolRef.current
 
             // Select / Highlight / Underline / Strikethrough: native text selection only — no
-            // margin pan. (Instant-apply on mouseup is handled by the 'selected' rendition event,
-            // in `useReaderHighlights`'s `onTextSelected` — not here.)
+            // margin pan. For the three markup tools, the drag's *end* (pointerup, below) is what
+            // decides whether it becomes a saved mark — not any mid-drag pause.
             if (
               tool === 'select' ||
               tool === 'highlight' ||
               tool === 'underline' ||
               tool === 'strikethrough'
             ) {
+              // Deliberately NOT `setPointerCapture` here (unlike Hand's pan gesture below) — it
+              // would redirect this pointer's events to a single captured element, which in
+              // Chromium can itself interrupt the browser's own native text-selection drag
+              // instead of just this doc's JS listeners. `commitAnnotationDrag` below covers a
+              // release outside this iframe another way — via `window`'s own capture-phase
+              // pointerup in the effect further down (`onGlobalPointerEnd`), which fires no matter
+              // which document the release actually lands in.
+              if (tool !== 'select') annotationDragActiveRef.current = true
+              else if (translateModeActiveRef.current) translateDragActiveRef.current = true
               return
             }
 
@@ -943,10 +1055,14 @@ export function EpubRenderer({
 
           const onPointerUp = (event: PointerEvent) => {
             if (event.button !== 0) return
+            commitAnnotationDrag()
             endGesture(event)
           }
 
           const onPointerCancel = (event: PointerEvent) => {
+            // Gesture aborted (e.g. window lost focus mid-drag) — never commit here.
+            annotationDragActiveRef.current = false
+            translateDragActiveRef.current = false
             endGesture(event)
           }
 
@@ -959,15 +1075,25 @@ export function EpubRenderer({
               return
             }
 
-            // Text hit starts without a pan gesture — handle chrome toggle here
-            // when the click did not produce a selection.
-            if (!hasFrameTextSelection(doc)) {
-              if (isTextNodeAtPoint(doc, event.clientX, event.clientY)) {
-                // Empty click on text: keep tool; optional chrome toggle in center.
-                if (isCenterClick(event, doc)) onCenterTapRef.current?.()
-              }
-              // Margin clicks without a pan gesture are handled in pointerup.
+            // Tail end of a drag that `endAnnotationDrag` just turned into a saved mark — see the
+            // comment there.
+            if (justCommittedAnnotationRef.current) {
+              justCommittedAnnotationRef.current = false
+              return
             }
+
+            // A click that leaves a live text selection behind is the tail end of a drag-to-
+            // select, not a real click on the surface or a mark — ignore it entirely (mirrors
+            // `onContextMenu`'s identical check above) so it can't dismiss the very selection the
+            // user just made, via `onSurfaceClick` -> `dismissAnnotationUi()` -> `clearSelection()`,
+            // which would leave nothing for a follow-up right-click to act on.
+            if (hasFrameTextSelection(doc)) return
+
+            if (isTextNodeAtPoint(doc, event.clientX, event.clientY)) {
+              // Empty click on text: keep tool; optional chrome toggle in center.
+              if (isCenterClick(event, doc)) onCenterTapRef.current?.()
+            }
+            // Margin clicks without a pan gesture are handled in pointerup.
 
             // A single hit-test decides both `onHighlightClick` (focus) and `onSurfaceClick`
             // (dismiss) — marks-pane's own `click` listener on a mark used to drive focusing
@@ -1126,6 +1252,19 @@ export function EpubRenderer({
 
     const onGlobalPointerEnd = (event: PointerEvent) => {
       clearHandPanGesture(event)
+      // A markup-tool or Translate-mode drag started inside the iframe but ended with the button
+      // coming up outside its rectangle — that `pointerup`/`pointercancel` lands here, on the
+      // outer window, instead of the iframe's own document (cross-document events don't bubble
+      // the other way). This is the fallback that still commits the drag in that case; the iframe
+      // doc's own `pointerup` (in `attachFrameListeners` above) already handles the common
+      // in-bounds release and will have reset `annotationDragActiveRef`/`translateDragActiveRef`
+      // by the time this ever runs for the same gesture.
+      if (event.type === 'pointerup') {
+        commitAnnotationDrag()
+      } else {
+        annotationDragActiveRef.current = false
+        translateDragActiveRef.current = false
+      }
     }
 
     window.addEventListener('pointerup', onGlobalPointerEnd, true)

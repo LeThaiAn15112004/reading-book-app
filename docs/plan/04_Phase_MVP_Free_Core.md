@@ -50,7 +50,7 @@ Người dùng có thể:
 | :--- | :--- | :--- |
 | B1 | Màn Library: list sách (title, cover nếu có, last-read location) | FR-08 |
 | B2 | Continue Reading (sách cập nhật gần nhất có progress) | FR-08 |
-| B3 | Flow Import (chọn file → copy vào app data → metadata) | FR-01 |
+| B3 | Flow Import (chọn file → tham chiếu file gốc, không copy → metadata; URL/cloud → copy vào app data) | FR-01 |
 | B4 | Book detail tối giản: mở đọc / xem highlights | FR-09 |
 | B5 | Collections: tạo tập, gắn/gỡ sách, mở list sách trong tập | FR-14 |
 

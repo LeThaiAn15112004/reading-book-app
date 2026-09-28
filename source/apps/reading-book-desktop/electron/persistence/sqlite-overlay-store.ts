@@ -13,28 +13,15 @@ import {
 } from '@reading-book/book-reader-sdk'
 import type { Database as SqliteDatabase } from 'better-sqlite3'
 import { randomUUID } from 'node:crypto'
+import {
+  parseReadingState,
+  type ReadingStateJson,
+} from '@reading-book/book-reader-sdk'
 import { getDatabase } from './db'
 import {
   packSessionLocation,
   unpackSessionLocation,
-} from './reading-session-location'
-
-interface SessionRow {
-  book_id: string
-  last_read_location: string
-  percent: number
-  font_family: string | null
-  font_size: number | null
-  font_weight: string | null
-  line_height: number | null
-  text_align: string | null
-  layout_mode: string | null
-  page_turn_mode: string | null
-  margins_enabled: number | null
-  margin_preset: string | null
-  is_landscape: number
-  updated_at: string
-}
+} from '@reading-book/book-reader-sdk'
 
 export type SessionRecord = {
   bookId: string
@@ -54,63 +41,73 @@ export type SessionRecord = {
   updatedAt: string
 }
 
-const SESSION_COLUMNS = `
-  book_id, last_read_location, percent,
-  font_family, font_size, font_weight, line_height, text_align,
-  layout_mode, page_turn_mode, margins_enabled, margin_preset,
-  is_landscape, updated_at
-`
-
-function rowToSessionState(row: SessionRow): ReadingSessionState | undefined {
-  const unpacked = unpackSessionLocation(row.last_read_location)
-  if (!unpacked) return undefined
-
-  return new ReadingSessionState({
-    bookId: row.book_id,
-    lastReadLocation: unpacked.location,
-    lastReadLabel: unpacked.label,
-    percent: row.percent,
-    fontFamily: row.font_family?.trim() || undefined,
-    fontSize: row.font_size != null && Number.isFinite(row.font_size)
-      ? row.font_size
-      : undefined,
-    fontWeight: row.font_weight?.trim() || undefined,
-    lineHeight: row.line_height != null && Number.isFinite(row.line_height)
-      ? row.line_height
-      : undefined,
-    textAlign: row.text_align?.trim() || undefined,
-    layoutMode: row.layout_mode?.trim() || undefined,
-    pageTurnMode: row.page_turn_mode?.trim() || undefined,
-    marginsEnabled: row.margins_enabled != null ? row.margins_enabled === 1 : undefined,
-    marginPreset: row.margin_preset?.trim() || undefined,
-    isLandscape: row.is_landscape === 1,
-    updatedAt: row.updated_at,
-  })
+interface ReadingStateRow {
+  reading_state_json: string
+  /** The parent `books` row's own timestamp — fallback when the state has no `updatedAt` yet. */
+  updated_at: string
 }
 
-function rowToSessionRecord(row: SessionRow): SessionRecord {
-  const unpacked = unpackSessionLocation(row.last_read_location)
+function finiteOrUndefined(value: number | null | undefined): number | undefined {
+  return value != null && Number.isFinite(value) ? value : undefined
+}
+
+function trimmedOrUndefined(value: string | null | undefined): string | undefined {
+  return value?.trim() || undefined
+}
+
+/** `books.reading_state_json` → SessionRecord (same normalisation the old table columns got). */
+function recordFromState(
+  bookId: string,
+  state: ReadingStateJson,
+  fallbackUpdatedAt: string,
+): SessionRecord {
+  const unpacked = unpackSessionLocation(state.lastReadLocation ?? '')
   return {
-    bookId: row.book_id,
+    bookId,
     lastReadLocation: unpacked?.location.toString(),
     lastReadLabel: unpacked?.label,
-    percent: row.percent,
-    fontFamily: row.font_family?.trim() || undefined,
-    fontSize: row.font_size != null && Number.isFinite(row.font_size)
-      ? row.font_size
-      : undefined,
-    fontWeight: row.font_weight?.trim() || undefined,
-    lineHeight: row.line_height != null && Number.isFinite(row.line_height)
-      ? row.line_height
-      : undefined,
-    textAlign: row.text_align?.trim() || undefined,
-    layoutMode: row.layout_mode?.trim() || undefined,
-    pageTurnMode: row.page_turn_mode?.trim() || undefined,
-    marginsEnabled: row.margins_enabled != null ? row.margins_enabled === 1 : undefined,
-    marginPreset: row.margin_preset?.trim() || undefined,
-    isLandscape: row.is_landscape === 1,
-    updatedAt: row.updated_at,
+    percent: finiteOrUndefined(state.percent) ?? 0,
+    fontFamily: trimmedOrUndefined(state.fontFamily),
+    fontSize: finiteOrUndefined(state.fontSize),
+    fontWeight: trimmedOrUndefined(state.fontWeight),
+    lineHeight: finiteOrUndefined(state.lineHeight),
+    textAlign: trimmedOrUndefined(state.textAlign),
+    layoutMode: trimmedOrUndefined(state.layoutMode),
+    pageTurnMode: trimmedOrUndefined(state.pageTurnMode),
+    marginsEnabled: state.marginsEnabled ?? undefined,
+    marginPreset: trimmedOrUndefined(state.marginPreset),
+    isLandscape: state.isLandscape === true,
+    updatedAt: state.updatedAt || fallbackUpdatedAt,
   }
+}
+
+/** Domain state — only exists once a valid Location has been stored. */
+function sessionStateFromJson(
+  bookId: string,
+  state: ReadingStateJson,
+  fallbackUpdatedAt: string,
+): ReadingSessionState | undefined {
+  const unpacked = unpackSessionLocation(state.lastReadLocation ?? '')
+  if (!unpacked) return undefined
+
+  const record = recordFromState(bookId, state, fallbackUpdatedAt)
+  return new ReadingSessionState({
+    bookId,
+    lastReadLocation: unpacked.location,
+    lastReadLabel: unpacked.label,
+    percent: record.percent,
+    fontFamily: record.fontFamily,
+    fontSize: record.fontSize,
+    fontWeight: record.fontWeight,
+    lineHeight: record.lineHeight,
+    textAlign: record.textAlign,
+    layoutMode: record.layoutMode,
+    pageTurnMode: record.pageTurnMode,
+    marginsEnabled: record.marginsEnabled,
+    marginPreset: record.marginPreset,
+    isLandscape: record.isLandscape,
+    updatedAt: record.updatedAt,
+  })
 }
 
 interface NoteRow {
@@ -257,166 +254,129 @@ function buildHighlightNoteJson(input: {
 export class SqliteOverlayStore implements OverlayStore {
   constructor(private readonly db: SqliteDatabase = getDatabase()) {}
 
+  /** Reading state lives in `books.reading_state_json` (migration 020) — no separate session table. */
+  private readState(
+    bookId: string,
+  ): { state: ReadingStateJson; bookUpdatedAt: string } | undefined {
+    const row = this.db
+      .prepare(`SELECT reading_state_json, updated_at FROM books WHERE id = ?`)
+      .get(bookId) as ReadingStateRow | undefined
+    if (!row) return undefined
+    return {
+      state: parseReadingState(row.reading_state_json),
+      bookUpdatedAt: row.updated_at,
+    }
+  }
+
   async getSessionState(bookId: string): Promise<ReadingSessionState | undefined> {
     const id = bookId.trim()
     if (!id) return undefined
 
-    const row = this.db
-      .prepare(
-        `SELECT ${SESSION_COLUMNS}
-         FROM reading_session_states WHERE book_id = ?`,
-      )
-      .get(id) as SessionRow | undefined
-
-    if (!row) return undefined
-    return rowToSessionState(row)
+    const found = this.readState(id)
+    if (!found) return undefined
+    return sessionStateFromJson(id, found.state, found.bookUpdatedAt)
   }
 
   async getSessionRecord(bookId: string): Promise<SessionRecord | undefined> {
     const id = bookId.trim()
     if (!id) return undefined
-    const row = this.db
-      .prepare(
-        `SELECT ${SESSION_COLUMNS}
-         FROM reading_session_states WHERE book_id = ?`,
-      )
-      .get(id) as SessionRow | undefined
-    return row ? rowToSessionRecord(row) : undefined
+
+    const found = this.readState(id)
+    if (!found) return undefined
+    return recordFromState(id, found.state, found.bookUpdatedAt)
   }
 
+  /**
+   * Partial save (settings-only saves must not disturb the location): merge into the stored
+   * state with `json_patch` (RFC 7396) — keys present in the patch overwrite, absent keys keep
+   * their value. `undefined` members vanish in JSON.stringify, so they mean "keep".
+   */
   async saveSessionPreferences(record: SessionRecord): Promise<void> {
-    let locationText = 'Started'
-    let hasLocation = false
+    let packedLocation: string | undefined
     if (record.lastReadLocation?.trim()) {
       try {
-        locationText = packSessionLocation(
+        packedLocation = packSessionLocation(
           Location.parse(record.lastReadLocation.trim()),
           record.lastReadLabel,
         )
-        hasLocation = true
       } catch {
         // A settings-only save must preserve the existing location.
       }
     }
+
+    const patch: ReadingStateJson = {
+      updatedAt: record.updatedAt || new Date().toISOString(),
+      // Location and percent move together: percent is meaningless without the location it measures.
+      lastReadLocation: packedLocation,
+      percent:
+        packedLocation !== undefined
+          ? ReadingSessionState.clampPercent(record.percent)
+          : undefined,
+      fontFamily: record.fontFamily,
+      fontSize: record.fontSize,
+      fontWeight: record.fontWeight,
+      lineHeight: record.lineHeight,
+      textAlign: record.textAlign,
+      layoutMode: record.layoutMode,
+      pageTurnMode: record.pageTurnMode,
+      marginsEnabled: record.marginsEnabled,
+      marginPreset: record.marginPreset,
+      isLandscape: record.isLandscape,
+    }
+
     this.db
       .prepare(
-        `INSERT INTO reading_session_states (
-          book_id, last_read_location, percent,
-          font_family, font_size, font_weight, line_height, text_align,
-          layout_mode, page_turn_mode, margins_enabled, margin_preset,
-          is_landscape, updated_at
-        ) VALUES (
-          @book_id, @last_read_location, @percent,
-          @font_family, @font_size, @font_weight, @line_height, @text_align,
-          @layout_mode, @page_turn_mode, @margins_enabled, @margin_preset,
-          @is_landscape, @updated_at
-        )
-        ON CONFLICT(book_id) DO UPDATE SET
-          last_read_location = CASE
-            WHEN @has_location = 1 THEN @last_read_location
-            ELSE reading_session_states.last_read_location
-          END,
-          percent = CASE
-            WHEN @has_location = 1 THEN @percent
-            ELSE reading_session_states.percent
-          END,
-          font_family = COALESCE(@font_family, reading_session_states.font_family),
-          font_size = COALESCE(@font_size, reading_session_states.font_size),
-          font_weight = COALESCE(@font_weight, reading_session_states.font_weight),
-          line_height = COALESCE(@line_height, reading_session_states.line_height),
-          text_align = COALESCE(@text_align, reading_session_states.text_align),
-          layout_mode = COALESCE(@layout_mode, reading_session_states.layout_mode),
-          page_turn_mode = COALESCE(@page_turn_mode, reading_session_states.page_turn_mode),
-          margins_enabled = COALESCE(@margins_enabled, reading_session_states.margins_enabled),
-          margin_preset = COALESCE(@margin_preset, reading_session_states.margin_preset),
-          is_landscape = CASE
-            WHEN @has_landscape = 1 THEN @is_landscape
-            ELSE reading_session_states.is_landscape
-          END,
-          updated_at = @updated_at`,
+        `UPDATE books
+         SET reading_state_json = json_patch(reading_state_json, @patch),
+             updated_at = @now
+         WHERE id = @id`,
       )
       .run({
-        book_id: record.bookId,
-        last_read_location: locationText,
-        percent: ReadingSessionState.clampPercent(record.percent),
-        font_family: record.fontFamily ?? null,
-        font_size: record.fontSize ?? null,
-        font_weight: record.fontWeight ?? null,
-        line_height: record.lineHeight ?? null,
-        text_align: record.textAlign ?? null,
-        layout_mode: record.layoutMode ?? null,
-        page_turn_mode: record.pageTurnMode ?? null,
-        margins_enabled:
-          record.marginsEnabled === undefined
-            ? null
-            : record.marginsEnabled
-              ? 1
-              : 0,
-        margin_preset: record.marginPreset ?? null,
-        is_landscape: record.isLandscape ? 1 : 0,
-        has_location: hasLocation ? 1 : 0,
-        has_landscape: record.isLandscape === undefined ? 0 : 1,
-        updated_at: record.updatedAt || new Date().toISOString(),
+        id: record.bookId,
+        patch: JSON.stringify(patch),
+        now: new Date().toISOString(),
       })
   }
 
+  /** Full overwrite of the reading state, guarded against out-of-order writes. */
   async saveSessionState(s: ReadingSessionState): Promise<void> {
-    const locationText = packSessionLocation(s.lastReadLocation, s.lastReadLabel)
-    const percent = ReadingSessionState.clampPercent(s.percent)
     const updatedAt = s.updatedAt || new Date().toISOString()
+    const state: ReadingStateJson = {
+      lastReadLocation: packSessionLocation(s.lastReadLocation, s.lastReadLabel),
+      percent: ReadingSessionState.clampPercent(s.percent),
+      fontFamily: s.fontFamily,
+      fontSize: s.fontSize,
+      fontWeight: s.fontWeight,
+      lineHeight: s.lineHeight,
+      textAlign: s.textAlign,
+      layoutMode: s.layoutMode,
+      pageTurnMode: s.pageTurnMode,
+      marginsEnabled: s.marginsEnabled,
+      marginPreset: s.marginPreset,
+      isLandscape: s.isLandscape === true,
+      updatedAt,
+    }
 
+    // Renderer-side autosave already serializes writes to a single in-flight IPC call (see
+    // useReadingSessionAutosave's inFlightRef chain), so the `AND …` guard below is
+    // defense-in-depth, not the primary ordering mechanism: it protects against any future
+    // caller that bypasses that hook (a second window, a sync engine) firing two
+    // saveSessionState calls whose IPC responses resolve out of send order. updatedAt is an
+    // ISO-8601 string (fixed-width, so plain text comparison is chronological); a write older
+    // than the state already on disk is silently dropped instead of clobbering it. It compares
+    // the state's own updatedAt, not books.updated_at, which metadata edits also bump.
     this.db
       .prepare(
-        `INSERT INTO reading_session_states (
-          book_id, last_read_location, percent,
-          font_family, font_size, font_weight, line_height, text_align,
-          layout_mode, page_turn_mode, margins_enabled, margin_preset,
-          is_landscape, updated_at
-        ) VALUES (
-          @book_id, @last_read_location, @percent,
-          @font_family, @font_size, @font_weight, @line_height, @text_align,
-          @layout_mode, @page_turn_mode, @margins_enabled, @margin_preset,
-          @is_landscape, @updated_at
-        )
-        ON CONFLICT(book_id) DO UPDATE SET
-          last_read_location = excluded.last_read_location,
-          percent = excluded.percent,
-          font_family = excluded.font_family,
-          font_size = excluded.font_size,
-          font_weight = excluded.font_weight,
-          line_height = excluded.line_height,
-          text_align = excluded.text_align,
-          layout_mode = excluded.layout_mode,
-          page_turn_mode = excluded.page_turn_mode,
-          margins_enabled = excluded.margins_enabled,
-          margin_preset = excluded.margin_preset,
-          is_landscape = excluded.is_landscape,
-          updated_at = excluded.updated_at
-        -- Renderer-side autosave already serializes writes to a single
-        -- in-flight IPC call (see useReadingSessionAutosave's inFlightRef
-        -- chain), so this is a defense-in-depth guard, not the primary
-        -- ordering mechanism: it protects against any future caller that
-        -- bypasses that hook (a second window, a sync engine) firing two
-        -- saveSessionState calls whose IPC responses resolve out of send
-        -- order. @updated_at is an ISO-8601 string (fixed-width, so plain
-        -- text comparison is chronological); a write older than the row
-        -- already on disk is silently dropped instead of clobbering it.
-        WHERE excluded.updated_at >= reading_session_states.updated_at`,
+        `UPDATE books
+         SET reading_state_json = @json,
+             updated_at = @now
+         WHERE id = @id
+           AND COALESCE(json_extract(reading_state_json, '$.updatedAt'), '') <= @updated_at`,
       )
       .run({
-        book_id: s.bookId,
-        last_read_location: locationText,
-        percent,
-        font_family: s.fontFamily ?? null,
-        font_size: s.fontSize ?? null,
-        font_weight: s.fontWeight ?? null,
-        line_height: s.lineHeight ?? null,
-        text_align: s.textAlign ?? null,
-        layout_mode: s.layoutMode ?? null,
-        page_turn_mode: s.pageTurnMode ?? null,
-        margins_enabled: s.marginsEnabled != null ? (s.marginsEnabled ? 1 : 0) : null,
-        margin_preset: s.marginPreset ?? null,
-        is_landscape: s.isLandscape ? 1 : 0,
+        id: s.bookId,
+        json: JSON.stringify(state),
+        now: new Date().toISOString(),
         updated_at: updatedAt,
       })
   }

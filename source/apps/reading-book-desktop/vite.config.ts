@@ -27,6 +27,7 @@ export default defineConfig({
         entry: {
           main: 'electron/main.ts',
           'book-chunk.worker': 'electron/chunking/book-chunk.worker.ts',
+          'translation.worker': 'electron/translation/translation.worker.ts',
         },
         vite: {
           resolve: {
@@ -37,7 +38,9 @@ export default defineConfig({
           },
           build: {
             rollupOptions: {
-              external: ['better-sqlite3'],
+              // Native / huge packages load from node_modules at runtime instead of being bundled
+              // (ONNX Runtime ships .node binaries that Rollup can't inline).
+              external: ['better-sqlite3', '@huggingface/transformers', 'onnxruntime-node', 'sharp'],
             },
           },
         },

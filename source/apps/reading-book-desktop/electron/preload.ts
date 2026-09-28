@@ -7,6 +7,9 @@ import {
   ImportChannels,
   LibraryChannels,
   OverlayChannels,
+  SearchChannels,
+  TranslationChannels,
+  WordCountChannels,
 } from './ipc/channels'
 
 const api: DesktopApi = {
@@ -43,6 +46,7 @@ const api: DesktopApi = {
       ipcRenderer.removeListener(AppChannels.requestFlushSession, listener)
     }
   },
+  captureSnapshot: (region) => ipcRenderer.invoke(AppChannels.captureSnapshot, region),
   library: {
     listBooks: () => ipcRenderer.invoke(LibraryChannels.listBooks),
     getBook: (id) => ipcRenderer.invoke(LibraryChannels.getBook, id),
@@ -59,6 +63,7 @@ const api: DesktopApi = {
     removeBook: (id) => ipcRenderer.invoke(LibraryChannels.removeBook, id),
     deleteBookFile: (id) =>
       ipcRenderer.invoke(LibraryChannels.deleteBookFile, id),
+    relinkBook: (id) => ipcRenderer.invoke(LibraryChannels.relinkBook, id),
     listCollections: () => ipcRenderer.invoke(LibraryChannels.listCollections),
     createCollection: (input) =>
       ipcRenderer.invoke(LibraryChannels.createCollection, input),
@@ -113,6 +118,28 @@ const api: DesktopApi = {
       ipcRenderer.on(BookIndexChannels.status, listener)
       return () => {
         ipcRenderer.removeListener(BookIndexChannels.status, listener)
+      }
+    },
+  },
+  search: {
+    searchBook: (request) => ipcRenderer.invoke(SearchChannels.searchBook, request),
+  },
+  wordCount: {
+    getStats: (bookId) => ipcRenderer.invoke(WordCountChannels.getStats, bookId),
+  },
+  translation: {
+    translate: (request) => ipcRenderer.invoke(TranslationChannels.translate, request),
+    cancel: (requestId) => ipcRenderer.invoke(TranslationChannels.cancel, requestId),
+    onProgress: (handler) => {
+      const listener = (
+        _event: Electron.IpcRendererEvent,
+        progress: Parameters<typeof handler>[0],
+      ) => {
+        handler(progress)
+      }
+      ipcRenderer.on(TranslationChannels.progress, listener)
+      return () => {
+        ipcRenderer.removeListener(TranslationChannels.progress, listener)
       }
     },
   },

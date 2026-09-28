@@ -1,6 +1,6 @@
 /**
  * Pure paragraph → chunk packer for the `book_chunks` table (FTS / RAG input).
- * No I/O and no Electron imports so it can run inside a worker thread.
+ * No I/O, so it runs anywhere (Electron worker thread, React Native, Node).
  */
 
 /** A chunk closes as soon as it reaches this many words. */
@@ -68,8 +68,8 @@ function splitOversized(text: string): Unit[] {
     const wordMatches = [...match[0].matchAll(/\S+/g)]
     if (wordMatches.length > 1) {
       for (let i = 0; i < wordMatches.length; i += CHUNK_TARGET_WORDS) {
-        const first = wordMatches[i]
-        const last = wordMatches[Math.min(i + CHUNK_TARGET_WORDS, wordMatches.length) - 1]
+        const first = wordMatches[i]!
+        const last = wordMatches[Math.min(i + CHUNK_TARGET_WORDS, wordMatches.length) - 1]!
         const s = start + (first.index ?? 0)
         const e = start + (last.index ?? 0) + last[0].length
         units.push({ start: s, end: e, words: Math.min(CHUNK_TARGET_WORDS, wordMatches.length - i) })
@@ -127,8 +127,8 @@ export function* chunkParagraphs(paragraphs: Iterable<TextParagraph>): Generator
 
   const flush = (): TextChunk | null => {
     if (parts.length === 0) return null
-    const first = parts[0]
-    const last = parts[parts.length - 1]
+    const first = parts[0]!
+    const last = parts[parts.length - 1]!
     const chunk: TextChunk = {
       chunkIndex: chunkIndex++,
       content: parts.map((p) => p.text).join('\n\n'),
@@ -154,7 +154,7 @@ export function* chunkParagraphs(paragraphs: Iterable<TextParagraph>): Generator
     for (const candidate of candidates) {
       const candidateWords = countWords(candidate.text)
       const chapterChanged =
-        parts.length > 0 && parts[0].chapterIndex !== candidate.chapterIndex
+        parts.length > 0 && parts[0]!.chapterIndex !== candidate.chapterIndex
 
       if (chapterChanged || (parts.length > 0 && words + candidateWords > CHUNK_MAX_WORDS)) {
         const chunk = flush()

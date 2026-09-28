@@ -4,7 +4,7 @@ import {
   resolveCumulativeTarget,
   estimatePagesFromChars,
   EpubPaginationTracker,
-} from '../../src/reader/renderers/epub/progress/epub-pagination.ts'
+} from '../../../book-reader-sdk/src/pagination/epub-pagination.ts'
 
 console.log('--- Running EPUB CSS-Driven Pagination Tests ---')
 

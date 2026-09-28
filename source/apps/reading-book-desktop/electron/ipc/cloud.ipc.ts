@@ -22,7 +22,11 @@ import {
   type OneDriveStoredTokens,
 } from '../../../book-reader-sdk/host-adapters/services/onedrive/index.js'
 import type { DownloadProgressListener } from '../../../book-reader-sdk/host-adapters/services/download-progress.js'
-import { GOOGLE_OAUTH_LOOPBACK_REDIRECT_URI, OAUTH_REDIRECT_URI } from '@reading-book/config'
+import {
+  GOOGLE_OAUTH_LOOPBACK_REDIRECT_URI,
+  OAUTH_REDIRECT_URI,
+  isSupportedExtension,
+} from '@reading-book/config'
 import { loadDropboxOAuthCredentials, loadOneDriveOAuthCredentials } from '../config/cloud-oauth-config'
 import { loadGoogleOAuthCredentials } from '../config/google-oauth-config'
 import { assertSupportedExtension, UnsupportedFormatError } from '../files/format-guard'
@@ -343,30 +347,9 @@ async function downloadAndImport(
     return { ok: true, bookId: existing.id }
   }
 
-  // Folder-scan / sample-mode entries already point at a real file on disk.
-  if (entry.localPath) {
-    try {
-      assertSupportedExtension(entry.localPath)
-      const conflict = await rejectIfDuplicate(entry.localPath)
-      if (conflict) return conflict
-      const destPath = await copyIntoBooksSandbox(entry.localPath)
-      return await finishImportAfterCopy(destPath, {
-        sourceProvider: provider,
-        externalId: entry.externalId,
-      })
-    } catch (err) {
-      if (err instanceof UnsupportedFormatError) {
-        return { ok: false, bookId: null, errorCode: err.code, errorMessage: err.message }
-      }
-      return {
-        ok: false,
-        bookId: null,
-        errorCode: 'copy_failed',
-        errorMessage: 'Could not read the linked local file. It may not exist on disk.',
-      }
-    }
-  }
-
+  // `entry` comes from the renderer, so it is never trusted for anything path-like: the DTO carries
+  // no local path, Main only fetches through the provider's authenticated API into its own temp
+  // dir, and the extension is checked before it becomes part of a file name.
   const kit = getKits()[provider]
   const accessToken = await kit.getValidAccessToken()
   if (!accessToken) {
@@ -377,8 +360,8 @@ async function downloadAndImport(
     }
   }
 
-  const ext = entry.formatHint?.replace(/^\./, '')
-  if (!ext) {
+  const ext = entry.formatHint?.replace(/^\./, '').toLowerCase()
+  if (!ext || !isSupportedExtension(`.${ext}`)) {
     return {
       ok: false,
       bookId: null,
@@ -452,7 +435,15 @@ export function registerCloudIpc(): void {
       if (!isCloudProvider(provider) || !entry || typeof entry !== 'object') {
         return Promise.resolve({ ok: false, bookId: null, errorMessage: 'Invalid request.' })
       }
-      return downloadAndImport(provider, entry as CloudCatalogEntryDto, event.sender)
+      const value = entry as Partial<CloudCatalogEntryDto>
+      if (
+        typeof value.externalId !== 'string' ||
+        !value.externalId ||
+        typeof value.title !== 'string'
+      ) {
+        return Promise.resolve({ ok: false, bookId: null, errorMessage: 'Invalid request.' })
+      }
+      return downloadAndImport(provider, value as CloudCatalogEntryDto, event.sender)
     },
   )
 }

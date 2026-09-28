@@ -15,7 +15,7 @@ export interface ImportResult {
   authorNames?: string[];
   /** Short description / blurb when extractable. */
   description?: string;
-  /** Genre / subject names (linked via book_genres). */
+  /** Genre / subject names (stored in books.genres_json). */
   genreNames?: string[];
   /** Page or spine-section count when known. */
   pageCount?: number;

@@ -4,6 +4,9 @@ import { registerCloudIpc } from './cloud.ipc'
 import { registerImportIpc } from './import.ipc'
 import { registerLibraryIpc } from './library.ipc'
 import { registerOverlayIpc } from './overlay.ipc'
+import { registerSearchIpc } from './search.ipc'
+import { registerTranslationIpc } from './translation.ipc'
+import { registerWordCountIpc } from './word-count.ipc'
 
 /** Register all Main-process IPC channel handlers. */
 export function registerAllIpcHandlers(): void {
@@ -13,4 +16,7 @@ export function registerAllIpcHandlers(): void {
   registerOverlayIpc()
   registerCloudIpc()
   registerBookIndexIpc()
+  registerSearchIpc()
+  registerWordCountIpc()
+  registerTranslationIpc()
 }

@@ -1,5 +1,9 @@
 import { useEffect, type MutableRefObject } from 'react'
-import type { EpubNavState, EpubRendererApi } from '../../../../reader/renderers/epub'
+import type {
+  EpubNavState,
+  EpubRendererApi,
+  EpubSelectionInfo,
+} from '../../../../reader/renderers/epub'
 import { useHighlightsStore, type AnnotationMarkTool } from '../highlights/highlightsStore'
 
 export type { AnnotationMarkTool }
@@ -32,6 +36,8 @@ type UseReaderHighlightsOptions = {
    * immediately (last-used color, no context menu) instead of only opening the right-click menu.
    */
   activeAnnotationTool?: AnnotationMarkTool | null
+  /** Called with a finished selection when no markup tool consumed it (translate mode). */
+  onSelectionSettled?: (info: EpubSelectionInfo) => void
 }
 
 const noop = () => {}
@@ -54,6 +60,7 @@ export function useReaderHighlights({
   setToast,
   setChromeHidden,
   activeAnnotationTool = null,
+  onSelectionSettled = noop,
 }: UseReaderHighlightsOptions) {
   const highlights = useHighlightsStore((s) => s.highlights)
   const pendingSelection = useHighlightsStore((s) => s.pendingSelection)
@@ -83,6 +90,7 @@ export function useReaderHighlights({
       activeAnnotationTool,
       onToast: setToast,
       onChromeHidden: setChromeHidden ?? noop,
+      onSelectionSettled,
     })
   })
 
@@ -135,6 +143,7 @@ export function useReaderHighlights({
     focusedHighlightId,
     lastUsedColorHex,
     createHighlight: useHighlightsStore((s) => s.createHighlight),
+    commitDraggedMark: useHighlightsStore((s) => s.commitDraggedMark),
     updateHighlightColor: useHighlightsStore((s) => s.updateHighlightColor),
     updateHighlightStyleKind: useHighlightsStore((s) => s.updateHighlightStyleKind),
     updateHighlightNote: useHighlightsStore((s) => s.updateHighlightNote),

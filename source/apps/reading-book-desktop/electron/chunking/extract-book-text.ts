@@ -1,8 +1,7 @@
 import fsp from 'node:fs/promises'
 import type { DocumentFormatDto } from '../ipc/api-types'
 import { readEpubSpineDocuments } from '../adapters/epub.adapter'
-import type { TextParagraph } from './chunk-text'
-import { htmlToParagraphs } from './html-to-text'
+import { htmlToParagraphs, type TextParagraph } from '@reading-book/book-reader-sdk'
 
 /**
  * Formats whose text we can pull out today. PDF / DOCX / DOC need a parser that is not a

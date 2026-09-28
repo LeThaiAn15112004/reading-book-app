@@ -1,5 +1,9 @@
-import ePubImport, { type Book, type Rendition } from 'epubjs'
-import { CfiLocation, type HighlightStyleKind } from '@reading-book/book-reader-sdk'
+import ePubImport, { EpubCFI, type Book, type Rendition } from 'epubjs'
+import {
+  CfiLocation,
+  type HighlightStyleKind,
+  type TextMatcher,
+} from '@reading-book/book-reader-sdk'
 import {
   READER_THEME_PRESETS,
   fontFamilyCss,
@@ -37,6 +41,19 @@ import {
   EXCERPT_MAX_CHARS,
   type SpineExcerpt,
 } from './previews/spineExcerptCache'
+import {
+  clearSearchHighlights,
+  findSectionMatches,
+  paintSearchHighlights,
+  pickSectionMatch,
+  rangeForMatch,
+} from './search/epubSearchDom'
+import {
+  paintReadAloudHighlight,
+  rangeForSegment,
+  readAloudDataFor,
+  textOffsetOfBoundary,
+} from './readAloud/epubReadAloudDom'
 
 type EpubjsManagerLike = Record<string, unknown>
 
@@ -149,6 +166,9 @@ export type EpubSelectionInfo = {
   cfiRange: string
   text: string
   rect: ViewportRectLike
+  /** BCP-47 language of the selected text: nearest `lang`/`xml:lang`, else the book's
+   *  `dc:language`; empty when neither is declared. */
+  lang: string
 }
 
 /** An existing highlight/underline mark was clicked. */
@@ -263,11 +283,55 @@ export interface EpubjsHandle {
    *  since epub.js recreates marks per view; a class set once would vanish the moment the section
    *  re-renders. */
   setFocusedHighlight: (id: string | null) => void
+  /**
+   * Paint every match of `matcher` in the mounted section(s), re-applied on each `rendered`
+   * view; `null` clears. Either way the current match is forgotten until the next jump.
+   */
+  setSearchHighlights: (matcher: TextMatcher | null) => void
+  /**
+   * Jump to one search match (real spine index — no synthetic-cover offset) and mark it as the
+   * current hit. Resolves false when only its chapter could be opened.
+   */
+  goToSearchMatch: (target: EpubSearchTarget) => Promise<boolean>
   /** Fires ~250ms after a selection settles; null when the selection is cleared/collapsed. */
   onTextSelected: (cb: (info: EpubSelectionInfo | null) => void) => () => void
+  /** Synchronous snapshot of whatever selection is live right now — for committing a drag-to-mark
+   *  gesture exactly on pointerup instead of waiting on `onTextSelected`'s debounce. Null when
+   *  there's no non-collapsed selection in any mounted section. */
+  getCurrentSelectionInfo: () => EpubSelectionInfo | null
+  /** Speakable segments of the displayed section, bounded by `mode`; null when nothing is mounted. */
+  getReadAloudSegments: (mode: ReadAloudMode) => ReadAloudSection | null
+  /**
+   * Highlight segment `index` of spine section `spineIndex` and turn pages until it is on screen
+   * (or jump back to it when the reader paged past it). `null` clears the highlight.
+   */
+  setReadAloudCursor: (cursor: { spineIndex: number; index: number } | null) => Promise<void>
+}
+
+/**
+ * `viewport`: segments visible now. `fromPosition`: from the first visible segment to the end of
+ * the section. `section`: the whole section.
+ */
+export type ReadAloudMode = 'viewport' | 'fromPosition' | 'section'
+
+export type ReadAloudSection = {
+  /** Real spine index (no synthetic-cover offset). */
+  spineIndex: number
+  lang: string
+  /** Every segment of the section; `startIndex`..`endIndex` (exclusive) is the requested span. */
+  segments: string[]
+  startIndex: number
+  endIndex: number
 }
 
 export type { SpineExcerpt } from './previews/spineExcerptCache'
+
+/** A match as Main counted it: the `occurrence`-th (0-based) of `count` in spine section `spineIndex`. */
+export type EpubSearchTarget = {
+  spineIndex: number
+  occurrence: number
+  count: number
+}
 
 /** Runtime shape of an `EpubCFI` instance, covering both the string-input and Range-input forms. */
 type EpubCFIHandle = { toRange(doc: Document): Range | null; toString(): string }
@@ -280,14 +344,11 @@ type EpubCFIHandle = { toRange(doc: Document): Range | null; toString(): string 
 function getEpubCFIConstructor():
   | (new (cfiFrom: string | Range, base?: string, ignoreClass?: string) => EpubCFIHandle)
   | null {
-  const mod = ePubImport as {
-    EpubCFI?: unknown
-    default?: { EpubCFI?: unknown }
-  }
-  const C = mod.EpubCFI ?? mod.default?.EpubCFI
-  return typeof C === 'function'
-    ? (C as new (cfiFrom: string | Range, base?: string, ignoreClass?: string) => EpubCFIHandle)
-    : null
+  return EpubCFI as unknown as new (
+    cfiFrom: string | Range,
+    base?: string,
+    ignoreClass?: string,
+  ) => EpubCFIHandle
 }
 
 /** Default Aa panel size — zoom % is relative to this. */
@@ -1967,13 +2028,71 @@ export async function openEpubjs(
       selectionCb(null)
       return
     }
-    const localRect = sel.getRangeAt(0).getBoundingClientRect()
+    const range = sel.getRangeAt(0)
+    const localRect = range.getBoundingClientRect()
     if (localRect.width === 0 && localRect.height === 0) {
       selectionCb(null)
       return
     }
-    selectionCb({ cfiRange, text, rect: toOuterRect(localRect, iframe, win) })
+    selectionCb({ cfiRange, text, rect: toOuterRect(localRect, iframe, win), lang: selectionLang(range) })
   }
+
+  const selectionLang = (range: Range): string => {
+    const container = range.commonAncestorContainer
+    const start = container.nodeType === Node.ELEMENT_NODE ? (container as Element) : container.parentElement
+    for (let el: Element | null = start; el; el = el.parentElement) {
+      const lang = el.getAttribute('lang') || el.getAttribute('xml:lang')
+      if (lang) return lang.trim()
+    }
+    const metadata = (book as unknown as { packaging?: { metadata?: { language?: unknown } } })
+      .packaging?.metadata
+    return typeof metadata?.language === 'string' ? metadata.language.trim() : ''
+  }
+
+  /**
+   * Synchronous read of whatever text selection is live right now, bypassing epub.js's own
+   * `selected` event entirely — that event only fires ~250ms after the selection *stops
+   * changing*, which is fine for the right-click-menu/translate bookkeeping (`pendingSelection`)
+   * but wrong for "commit the highlight the instant the mouse button comes up": at that exact
+   * moment the debounced event may not have fired yet (a fast drag-release), or may be about to
+   * fire again for a stale mid-drag extent. `EpubRenderer`'s pointerup handler calls this directly
+   * instead of trusting whatever `onTextSelected` last delivered.
+   */
+  const getCurrentSelectionInfo = (): EpubSelectionInfo | null => {
+    const contents = activeRendition.getContents() as unknown as
+      | Array<{ document?: Document; window?: Window; sectionIndex?: number }>
+      | undefined
+    const EpubCFI = getEpubCFIConstructor()
+    if (!EpubCFI) return null
+    for (const content of contents ?? []) {
+      const doc = content.document
+      const win = content.window ?? doc?.defaultView ?? null
+      if (!doc || !win) continue
+      const sel = win.getSelection()
+      if (!sel || sel.isCollapsed || sel.rangeCount === 0) continue
+      const text = sel.toString().trim()
+      if (!text) continue
+      const range = sel.getRangeAt(0)
+      const localRect = range.getBoundingClientRect()
+      if (localRect.width === 0 && localRect.height === 0) continue
+      const iframe = (win.frameElement as HTMLIFrameElement | null) ?? host.querySelector('iframe')
+      if (!iframe) continue
+      const section =
+        typeof content.sectionIndex === 'number'
+          ? (book.spine.get(content.sectionIndex) as unknown as { cfiBase?: string } | undefined)
+          : undefined
+      if (typeof section?.cfiBase !== 'string') continue
+      let cfiRange: string
+      try {
+        cfiRange = new EpubCFI(range, section.cfiBase).toString()
+      } catch {
+        continue
+      }
+      return { cfiRange, text, rect: toOuterRect(localRect, iframe, win), lang: selectionLang(range) }
+    }
+    return null
+  }
+
   activeRendition.on('selected', handleSelected)
   activeRendition.on('rendered', applyFocusedMarkClass)
   activeRendition.on('rendered', repositionStrikethroughLines)
@@ -2267,6 +2386,276 @@ export async function openEpubjs(
     })
   }
 
+  // --- In-book search (see search/epubSearchDom.ts) -------------------------------------------
+
+  let searchMatcher: TextMatcher | null = null
+  /** The match last jumped to; `spineIndex` because a CFI's in-document path resolves in ANY doc. */
+  let searchCurrent: { spineIndex: number; cfi: string } | null = null
+
+  /**
+   * Repaint hits in every mounted section view. Cheap: re-matches ~one chapter of text.
+   *
+   * Wrapped in try/catch per section: this runs on epub.js's `rendered` event, on the SAME
+   * rendition `EpubRenderer.tsx` later registers its own `rendered` listener on (the one that
+   * calls `attachFrameListeners` to wire up `contextmenu`/`pointerdown` for the new section's
+   * iframe — see `attachOnRendered` there). epub.js's emitter runs listeners for one event in
+   * registration order with no isolation between them, and this one is registered first (inside
+   * `openEpubjs`, before the handle is even returned to the caller). An uncaught throw here — a
+   * malformed section's text/CFI, a document mid-teardown — would propagate out of `emit()` and
+   * skip every listener registered after it for that same event, silently leaving the new
+   * section's right-click/drag-to-select handlers never attached with no error visible at the
+   * call site that looks broken.
+   */
+  const applySearchHighlights = () => {
+    const contents = activeRendition.getContents() as unknown as
+      | Array<{ document?: Document; sectionIndex?: number }>
+      | undefined
+    const EpubCFI = getEpubCFIConstructor()
+    for (const content of contents ?? []) {
+      const doc = content.document
+      if (!doc) continue
+      try {
+        if (!searchMatcher) {
+          clearSearchHighlights(doc)
+          continue
+        }
+        const { index, matches } = findSectionMatches(doc, searchMatcher)
+        const ranges = matches
+          .map((match) => rangeForMatch(doc, index, match))
+          .filter((range): range is Range => range !== null)
+        let current: Range | null = null
+        if (searchCurrent && EpubCFI && searchCurrent.spineIndex === content.sectionIndex) {
+          try {
+            current = new EpubCFI(searchCurrent.cfi).toRange(doc)
+          } catch {
+            current = null
+          }
+        }
+        paintSearchHighlights(doc, ranges, current)
+      } catch (err) {
+        console.error('[epub] applySearchHighlights failed for a section', err)
+      }
+    }
+  }
+  activeRendition.on('rendered', applySearchHighlights)
+
+  /** Run `read` on the section's document: the live one when mounted, else an off-DOM load. */
+  const withSectionDocument = async <T,>(
+    spineIndex: number,
+    read: (doc: Document, cfiBase: string) => T,
+  ): Promise<T | null> => {
+    const section = book.spine.get(spineIndex) as unknown as
+      | {
+          cfiBase?: string
+          document?: Document
+          load: (request?: (url: string) => Promise<unknown>) => Promise<unknown>
+          unload: () => void
+        }
+      | undefined
+    if (!section || typeof section.cfiBase !== 'string') return null
+
+    const contents = activeRendition.getContents() as unknown as
+      | Array<{ document?: Document; sectionIndex?: number }>
+      | undefined
+    const live = contents?.find((c) => c.sectionIndex === spineIndex)?.document
+    if (live) return read(live, section.cfiBase)
+
+    try {
+      await section.load(book.load.bind(book))
+      return section.document ? read(section.document, section.cfiBase) : null
+    } catch {
+      return null
+    } finally {
+      // Same rule as the excerpt cache: never unload a section that became the displayed one.
+      if (currentSpineIndex() !== spineIndex) {
+        try {
+          section.unload()
+        } catch {
+          /* best-effort cleanup only */
+        }
+      }
+    }
+  }
+
+  const setSearchHighlights = (matcher: TextMatcher | null) => {
+    searchMatcher = matcher
+    // A new hit set never inherits the previous query's "current" hit; goToSearchMatch sets it.
+    searchCurrent = null
+    applySearchHighlights()
+  }
+
+  const goToSearchMatch = async (target: EpubSearchTarget): Promise<boolean> => {
+    const matcher = searchMatcher
+    const EpubCFI = getEpubCFIConstructor()
+    const cfi =
+      matcher && EpubCFI
+        ? await withSectionDocument(target.spineIndex, (doc, cfiBase) => {
+            const { index, matches } = findSectionMatches(doc, matcher)
+            const match = pickSectionMatch(matches, target.occurrence, target.count)
+            const range = match ? rangeForMatch(doc, index, match) : null
+            return range ? new EpubCFI(range, cfiBase).toString() : null
+          })
+        : null
+
+    if (!cfi) {
+      // Text not found in the rendered markup — at least open the right chapter.
+      searchCurrent = null
+      await goToSpineIndex(target.spineIndex)
+      applySearchHighlights()
+      return false
+    }
+    searchCurrent = { spineIndex: target.spineIndex, cfi }
+    await goToLocation(new CfiLocation(cfi))
+    applySearchHighlights()
+    return true
+  }
+
+  // --- Read aloud (see readAloud/epubReadAloudDom.ts) -----------------------------------------
+
+  let readAloudCursor: { spineIndex: number; index: number } | null = null
+
+  const liveSectionDocument = (spineIndex: number): Document | null => {
+    const contents = activeRendition.getContents() as unknown as
+      | Array<{ document?: Document; sectionIndex?: number }>
+      | undefined
+    return contents?.find((c) => c.sectionIndex === spineIndex)?.document ?? null
+  }
+
+  const readAloudLang = (doc: Document): string => {
+    const metadata = (book as unknown as { packaging?: { metadata?: { language?: unknown } } })
+      .packaging?.metadata
+    const bookLang = typeof metadata?.language === 'string' ? metadata.language : ''
+    return (
+      doc.documentElement.getAttribute('lang') ||
+      doc.documentElement.getAttribute('xml:lang') ||
+      bookLang ||
+      navigator.language
+    ).trim()
+  }
+
+  /** Text offsets of the visible range's start/end in `doc`, from epub.js's located CFIs. */
+  const visibleTextBounds = (
+    doc: Document,
+    index: Parameters<typeof textOffsetOfBoundary>[1],
+  ): { start: number; end: number } | null => {
+    const EpubCFI = getEpubCFIConstructor()
+    const location = readRenditionLocation() as
+      | { start?: { cfi?: string }; end?: { cfi?: string } }
+      | undefined
+    const startCfi = location?.start?.cfi
+    const endCfi = location?.end?.cfi
+    if (!EpubCFI || !startCfi || !endCfi) return null
+    const toRange = (cfi: string): Range | null => {
+      try {
+        return new EpubCFI(cfi).toRange(doc) ?? resolveCfiRange(doc, cfi)
+      } catch {
+        return resolveCfiRange(doc, cfi)
+      }
+    }
+    const startRange = toRange(startCfi)
+    const endRange = toRange(endCfi)
+    if (!startRange || !endRange) return null
+    return {
+      start: textOffsetOfBoundary(doc, index, startRange.startContainer, startRange.startOffset),
+      end: textOffsetOfBoundary(doc, index, endRange.endContainer, endRange.endOffset),
+    }
+  }
+
+  /** Same isolation rationale as `applySearchHighlights` above — never let a bad section block
+   *  `EpubRenderer.tsx`'s own `rendered` listener (`attachOnRendered`) that wires up
+   *  right-click/drag-to-select for the newly rendered section. */
+  const applyReadAloudHighlight = () => {
+    const contents = activeRendition.getContents() as unknown as
+      | Array<{ document?: Document; sectionIndex?: number }>
+      | undefined
+    for (const content of contents ?? []) {
+      const doc = content.document
+      if (!doc) continue
+      try {
+        if (!readAloudCursor || readAloudCursor.spineIndex !== content.sectionIndex) {
+          paintReadAloudHighlight(doc, null)
+          continue
+        }
+        const data = readAloudDataFor(doc, readAloudLang(doc))
+        paintReadAloudHighlight(doc, rangeForSegment(doc, data, readAloudCursor.index))
+      } catch (err) {
+        console.error('[epub] applyReadAloudHighlight failed for a section', err)
+      }
+    }
+  }
+  activeRendition.on('rendered', applyReadAloudHighlight)
+
+  const getReadAloudSegments = (mode: ReadAloudMode): ReadAloudSection | null => {
+    const spineIndex = currentSpineIndex()
+    const doc = liveSectionDocument(spineIndex)
+    if (!doc) return null
+    const lang = readAloudLang(doc)
+    const data = readAloudDataFor(doc, lang)
+    const segments = data.segments.map((s) => s.text)
+    let startIndex = 0
+    let endIndex = segments.length
+    if (mode !== 'section') {
+      const bounds = visibleTextBounds(doc, data.index)
+      if (bounds) {
+        const first = data.segments.findIndex((s) => s.end > bounds.start)
+        startIndex = first < 0 ? segments.length : first
+        if (mode === 'viewport') {
+          const after = data.segments.findIndex((s) => s.start >= bounds.end)
+          endIndex = Math.max(startIndex, after < 0 ? segments.length : after)
+        }
+      }
+    }
+    return { spineIndex, lang, segments, startIndex, endIndex }
+  }
+
+  /** 'elsewhere' = another section is displayed, or the reader paged away from the segment. */
+  const readAloudSegmentPlacement = (
+    spineIndex: number,
+    index: number,
+  ): 'visible' | 'after' | 'elsewhere' => {
+    if (currentSpineIndex() !== spineIndex) return 'elsewhere'
+    const doc = liveSectionDocument(spineIndex)
+    if (!doc) return 'elsewhere'
+    const data = readAloudDataFor(doc, readAloudLang(doc))
+    const segment = data.segments[index]
+    const bounds = visibleTextBounds(doc, data.index)
+    // Can't tell where the view is — leave it alone rather than jump around.
+    if (!segment || !bounds) return 'visible'
+    if (segment.start < bounds.end && segment.end > bounds.start) return 'visible'
+    return segment.start >= bounds.end ? 'after' : 'elsewhere'
+  }
+
+  const jumpToReadAloudSegment = async (spineIndex: number, index: number) => {
+    if (currentSpineIndex() !== spineIndex) await goToSpineIndex(spineIndex)
+    const doc = liveSectionDocument(spineIndex)
+    const section = book.spine.get(spineIndex) as unknown as { cfiBase?: string } | undefined
+    const EpubCFI = getEpubCFIConstructor()
+    if (!doc || !EpubCFI || typeof section?.cfiBase !== 'string') return
+    const range = rangeForSegment(doc, readAloudDataFor(doc, readAloudLang(doc)), index)
+    if (range) await goToLocation(new CfiLocation(new EpubCFI(range, section.cfiBase).toString()))
+  }
+
+  /** Normal follow is one page turn; anything further (reader navigated away) is a direct jump. */
+  const revealReadAloudSegment = async (spineIndex: number, index: number) => {
+    let placement = readAloudSegmentPlacement(spineIndex, index)
+    if (placement === 'visible') return
+    if (placement === 'after') {
+      await nextPage()
+      placement = readAloudSegmentPlacement(spineIndex, index)
+      if (placement === 'visible') return
+    }
+    await jumpToReadAloudSegment(spineIndex, index)
+  }
+
+  const setReadAloudCursor = async (cursor: { spineIndex: number; index: number } | null) => {
+    readAloudCursor = cursor
+    applyReadAloudHighlight()
+    if (!cursor) return
+    await revealReadAloudSegment(cursor.spineIndex, cursor.index)
+    // A page turn into a freshly rendered view needs the highlight re-applied.
+    if (readAloudCursor === cursor) applyReadAloudHighlight()
+  }
+
   // Keep teardown on abort: this runs after `settled`, so onAbort no longer destroys.
   try {
     if (initialLocation) {
@@ -2352,7 +2741,14 @@ export async function openEpubjs(
     // never designed for.
     if (viewMode === 'scroll') return
     paginationTracker.invalidate()
-    publishLocationsReady()
+    // `applySettings` can reach this synchronously from EpubRenderer's render
+    // body (`syncEpubAppearance` is a plain function call in render, not an
+    // effect) — publishing straight through would call the parent's
+    // `onNavState` setState while EpubRenderer is still rendering. Deferring
+    // one microtask moves it just past the current render without changing
+    // when the caller perceives "locations ready" (still well before the
+    // async hidden-measurement below can possibly resolve).
+    queueMicrotask(publishLocationsReady)
     startHiddenPaginationMeasure()
   }
 
@@ -2435,6 +2831,8 @@ export async function openEpubjs(
         activeRendition.off('rendered', applyFocusedMarkClass)
         activeRendition.off('rendered', repositionStrikethroughLines)
         activeRendition.off('resized', repositionStrikethroughLines)
+        activeRendition.off('rendered', applySearchHighlights)
+        activeRendition.off('rendered', applyReadAloudHighlight)
         trackSelectionChangeDoc(null)
       } catch {
         /* ignore */
@@ -2698,11 +3096,16 @@ export async function openEpubjs(
     flashHighlight,
     getHighlightAtPoint,
     setFocusedHighlight,
+    setSearchHighlights,
+    goToSearchMatch,
+    getReadAloudSegments,
+    setReadAloudCursor,
     onTextSelected: (cb) => {
       selectionCb = cb
       return () => {
         if (selectionCb === cb) selectionCb = null
       }
     },
+    getCurrentSelectionInfo,
   }
 }

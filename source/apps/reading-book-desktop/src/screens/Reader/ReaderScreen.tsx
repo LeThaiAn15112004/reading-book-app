@@ -26,14 +26,19 @@ import {
   NoteTextboxPopup,
   ReaderFooter,
   ReaderOpenStatus,
+  ReaderSearchPanel,
+  ReadAloudMenu,
   ReaderTopbar,
   ReaderZoomViewport,
   ImmersiveExitButton,
   ReadingCanvas,
   SidebarEdgeRail,
+  SnapshotOverlay,
+  WordCountPanel,
   sidebarContentInsetLeft,
   SignInfoPanel,
   TocSidebar,
+  TranslationPopover,
   TrashConfirmDialog,
   useSidebarPanelResize,
   type AnnotationTool,
@@ -43,21 +48,27 @@ import {
   FAKE_CHAPTERS,
   FAKE_SIGNATURES,
   useBookIndexing,
+  useBookRelink,
   useReaderBookmarks,
   useReaderHighlights,
   useReaderBookOpen,
   useReaderChromeUi,
   useReaderNavigation,
+  useReaderSearch,
   useReaderSessionBridge,
   useImmersiveChromeReveal,
   useReaderZoomControls,
+  useSnapshotTool,
+  useWordCount,
+  useReadAloud,
+  useReaderTranslation,
   type HighlightShortcuts,
   type ReaderChromeEscapeUi,
 } from './logic'
 
 const COMPANION_LABELS: Record<CompanionTool, string> = {
   search: 'Search',
-  speech: 'Speech',
+  speech: 'Audio',
   translate: 'Translate',
 }
 
@@ -105,11 +116,11 @@ export function ReaderScreen() {
     registerReaderChrome,
     epubApiRef,
     escapeUiRef,
-    readerSearchQuery,
-    readerSearchRequestId,
     immersive,
   })
   const sidebarResize = useSidebarPanelResize('left')
+  const snapshot = useSnapshotTool({ bookId, setToast: chrome.setToast })
+  const wordCount = useWordCount({ bookId, open: chrome.wordCountOpen })
 
   /**
    * Toolbar mode — a single value drives both groups of buttons: Hand/Select (navigation) and
@@ -133,11 +144,42 @@ export function ReaderScreen() {
     globalPrefsRef,
   })
 
+  // "Locate file…" when the book's file was moved or deleted (verified by SHA-256 in Main).
+  const relink = useBookRelink({ bookId, onRelinked: book.retryOpen })
+
   // Silent background chunking for search — starts only after the book is already on screen.
   const searchIndexing = useBookIndexing({
     bookId,
     ready: book.contentStatus === 'ready',
   })
+
+  // Full-text search over the chunks above (FTS5 in Main); jumps through the EPUB handle.
+  useReaderSearch({
+    bookId,
+    isEpubSurface: book.isEpubSurface,
+    epubApiRef,
+    searchOpen: chrome.searchOpen,
+    readerSearchQuery,
+    readerSearchRequestId,
+  })
+
+  const readAloud = useReadAloud({
+    bookId,
+    isEpubSurface: book.isEpubSurface,
+    epubApiRef,
+    setToast: chrome.setToast,
+  })
+  const audioButtonRef = useRef<HTMLButtonElement>(null)
+
+  // Translate: a mode layered on Select (text must be selectable) — every finished selection
+  // opens the popover. The selection context menu's "Translate" opens the same popover in any mode.
+  const translation = useReaderTranslation({ bookId, setToast: chrome.setToast })
+  const translateModeRef = useRef(translation.mode)
+  translateModeRef.current = translation.mode
+  const selectTool = (tool: InteractionTool | ((current: InteractionTool) => InteractionTool)) => {
+    if (translateModeRef.current) translation.setMode(false)
+    setActiveTool(tool)
+  }
 
   const session = useReaderSessionBridge({
     bookId,
@@ -228,6 +270,10 @@ export function ReaderScreen() {
     // Escape while Highlight/Underline/Strikethrough is armed: drop back to Select instead of
     // leaving the reader (matches Foxit/Adobe — Escape backs a modal tool out one level at a time).
     cancelAnnotationTool: () => {
+      if (translateModeRef.current) {
+        translation.setMode(false)
+        return true
+      }
       if (
         activeToolRef.current !== 'highlight' &&
         activeToolRef.current !== 'underline' &&
@@ -322,21 +368,52 @@ export function ReaderScreen() {
             chrome.setMoreOpen(false)
             chrome.setSettingsOpen((v) => !v)
           }}
-          onSelectTool={setActiveTool}
+          hiddenAnnotationTools={
+            book.bookFormat === 'epub' ? ['textarea', 'freehand'] : undefined
+          }
+          onSelectTool={selectTool}
           onCompanionTool={(tool) => {
             if (tool === 'search') {
               chrome.toggleSearch()
               return
             }
+            if (tool === 'speech') {
+              if (readAloud.menuOpen) {
+                readAloud.closeMenu()
+              } else {
+                chrome.closeFloating()
+                readAloud.openMenu()
+              }
+              return
+            }
+            if (tool === 'translate') {
+              if (translation.mode) {
+                translation.setMode(false)
+              } else {
+                chrome.closeFloating()
+                highlights.dismissAnnotationUi()
+                setActiveTool('select')
+                translation.setMode(true)
+                chrome.setToast('Translate: select text to translate it — Esc to exit.')
+              }
+              return
+            }
             chrome.setToast(`${COMPANION_LABELS[tool]} — coming soon.`)
           }}
           searchOpen={chrome.searchOpen}
-          searchQuery={readerSearchQuery}
-          onSearchQueryChange={setReaderSearchQuery}
-          onSearchSubmit={() => {
-            requestReaderSearch()
+          translateActive={translation.mode}
+          audioActive={readAloud.active}
+          audioMenuOpen={readAloud.menuOpen}
+          audioButtonRef={audioButtonRef}
+          snapshotActive={snapshot.active}
+          onSnapshot={() => {
+            chrome.closeFloating()
+            snapshot.toggle()
           }}
-          onCloseSearch={() => chrome.setSearchOpen(false)}
+          onWordCount={() => {
+            chrome.closeFloating()
+            chrome.setWordCountOpen(true)
+          }}
           onAnnotationTool={(tool) => {
             if (tool !== 'highlight' && tool !== 'underline' && tool !== 'strikethrough') {
               // Textbox / Freehand: no drag-to-select instant-apply story yet (see
@@ -347,7 +424,7 @@ export function ReaderScreen() {
             // Click the armed tool again to disarm it (back to Select); otherwise arm it —
             // sticky across multiple highlights/underlines/strikethroughs until toggled off,
             // Escape, or Hand/Select.
-            setActiveTool((current) => (current === tool ? 'select' : tool))
+            selectTool((current) => (current === tool ? 'select' : tool))
           }}
           onOpenSign={() => {
             chrome.setSignOpen(true)
@@ -404,6 +481,38 @@ export function ReaderScreen() {
       }
       overlays={
         <>
+          <SnapshotOverlay
+            active={snapshot.active}
+            selectionRect={snapshot.selectionRect}
+            onPointerDown={snapshot.onOverlayPointerDown}
+            onPointerMove={snapshot.onOverlayPointerMove}
+            onPointerUp={snapshot.onOverlayPointerUp}
+          />
+
+          <ReaderSearchPanel
+            open={chrome.searchOpen}
+            query={readerSearchQuery}
+            onQueryChange={setReaderSearchQuery}
+            onSubmit={requestReaderSearch}
+            onClose={() => chrome.setSearchOpen(false)}
+          />
+
+          <ReadAloudMenu
+            open={readAloud.menuOpen}
+            anchorRef={audioButtonRef}
+            status={readAloud.status}
+            rate={readAloud.rate}
+            volume={readAloud.volume}
+            available={readAloud.available}
+            onClose={readAloud.closeMenu}
+            onReadViewport={readAloud.readViewport}
+            onReadFromPosition={readAloud.readFromPosition}
+            onTogglePlayPause={readAloud.togglePlayPause}
+            onStop={readAloud.stop}
+            onRateChange={readAloud.setRate}
+            onVolumeChange={readAloud.setVolume}
+          />
+
           <TocSidebar
             immersive={immersive}
             open={!immersive && chrome.sidebarOpen}
@@ -461,6 +570,15 @@ export function ReaderScreen() {
             onClose={() => chrome.setSignOpen(false)}
           />
 
+          <WordCountPanel
+            open={chrome.wordCountOpen}
+            status={wordCount.status}
+            stats={wordCount.stats}
+            errorMessage={wordCount.errorMessage}
+            pageTotal={pageTotal}
+            onClose={() => chrome.setWordCountOpen(false)}
+          />
+
           <BookInfoDialog
             open={chrome.bookInfoOpen}
             bookId={bookId ?? 'unknown'}
@@ -507,6 +625,10 @@ export function ReaderScreen() {
               }
               onBookmarkHere={bookmarks.toggleBookmark}
               onCopy={() => copyHighlightText(highlights.selectionMenu?.selection.text)}
+              onTranslate={() => {
+                const menu = highlights.selectionMenu
+                if (menu) translation.openForSelection(menu.selection)
+              }}
               onCopyWithCitation={() => {
                 const menu = highlights.selectionMenu
                 if (!menu) return
@@ -596,6 +718,8 @@ export function ReaderScreen() {
             />
           ) : null}
 
+          {translation.popoverOpen ? <TranslationPopover /> : null}
+
           {chrome.isChromeResizeSettling ? (
             <div
               aria-hidden
@@ -626,6 +750,15 @@ export function ReaderScreen() {
           status="error"
           message={book.openErrorMessage}
           onRetry={book.retryOpen}
+          onLocate={
+            book.openErrorCode === 'missing_file'
+              ? () => {
+                  void relink.locateFile()
+                }
+              : undefined
+          }
+          locating={relink.locating}
+          locateMessage={relink.message}
           onBack={() => {
             void session.leaveToLibrary()
           }}
@@ -659,6 +792,9 @@ export function ReaderScreen() {
                 highlights.dismissAnnotationUi()
               }}
               onSelectionContextMenu={(x, y) => highlights.openSelectionMenuAtPoint(x, y)}
+              onAnnotationDragEnd={(info) => highlights.commitDraggedMark(info)}
+              translateModeActive={translation.mode}
+              onTranslateDragEnd={(info) => translation.openForSelection(info)}
               onHighlightContextMenu={(info) => highlights.openHighlightContextMenu(info)}
               onHighlightClick={(info) => highlights.focusHighlightFromClick(info)}
               onSurfaceClick={() => {

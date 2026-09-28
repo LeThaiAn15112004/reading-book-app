@@ -1,16 +1,30 @@
 import { useEffect, type RefObject } from 'react'
 
+type DismissOptions = {
+  /** Pointerdowns inside this element don't dismiss (e.g. the button that toggles the popup). */
+  ignoreRef?: RefObject<HTMLElement | null>
+  /** Mark the Escape event handled so the reader's own Escape (hide chrome) skips it. */
+  consumeEscape?: boolean
+}
+
+export type DismissReason = 'escape' | 'outside'
+
 /** Calls `onDismiss` on Escape or a pointerdown outside `ref`'s element. */
 export function useDismissOnOutsideOrEscape(
   ref: RefObject<HTMLElement | null>,
-  onDismiss: () => void,
+  onDismiss: (reason: DismissReason) => void,
+  { ignoreRef, consumeEscape = false }: DismissOptions = {},
 ): void {
   useEffect(() => {
     function handlePointerDown(event: PointerEvent) {
-      if (ref.current && !ref.current.contains(event.target as Node)) onDismiss()
+      const target = event.target as Node
+      if (ignoreRef?.current?.contains(target)) return
+      if (ref.current && !ref.current.contains(target)) onDismiss('outside')
     }
     function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === 'Escape') onDismiss()
+      if (event.key !== 'Escape') return
+      if (consumeEscape) event.preventDefault()
+      onDismiss('escape')
     }
     document.addEventListener('pointerdown', handlePointerDown, true)
     document.addEventListener('keydown', handleKeyDown, true)
@@ -61,5 +75,5 @@ export function useDismissOnOutsideOrEscape(
       })
       observer.disconnect()
     }
-  }, [ref, onDismiss])
+  }, [ref, onDismiss, ignoreRef, consumeEscape])
 }

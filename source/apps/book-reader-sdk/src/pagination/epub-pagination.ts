@@ -229,7 +229,7 @@ export class EpubPaginationTracker {
    * and never re-estimate unvisited sections from a new ratio.
    */
   private calibrateFromSection(spineIndex: number, displayedTotal: number): void {
-    const charCount = this.sectionCharCounts[spineIndex]
+    const charCount = this.sectionCharCounts[spineIndex] ?? 0
     if (charCount <= 200 || displayedTotal <= 0) return
 
     this.charsPerPage = Math.min(3500, Math.max(300, Math.round(charCount / displayedTotal)))
@@ -241,7 +241,7 @@ export class EpubPaginationTracker {
     for (let i = 0; i < this.spineLength; i += 1) {
       if (this.sectionExact[i]) continue
       this.sectionPages[i] = estimatePagesFromChars(
-        this.sectionCharCounts[i],
+        this.sectionCharCounts[i] ?? 0,
         this.charsPerPage,
       )
     }

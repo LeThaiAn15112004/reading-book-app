@@ -30,7 +30,7 @@ electron/            # Infrastructure — Main + Preload processes
 ├── ipc/              # channel constants + per-feature handlers (registered in ipc/index.ts)
 ├── persistence/      # better-sqlite3 db + numbered .sql migrations + sqlite-*-store.ts
 ├── adapters/          # DocumentImporter implementations per file format
-├── files/             # sandbox copy / path allowlist
+├── files/             # book-path validation (managed/referenced), URL·cloud copy, relink, cover:// protocol
 ├── security/          # token-vault.ts (cloud OAuth token storage)
 └── config/ theme/     # google-oauth-config.ts, native titlebar theming
 
@@ -106,9 +106,22 @@ Domain/port code only ever deals with `DocumentImporter` / `DocumentRenderer` / 
 annotations, reading status, cloud provenance), run through `migrate.ts`. `sqlite-library-store.ts` and
 `sqlite-overlay-store.ts` implement the domain's `LibraryStore`/`CollectionStore`/`OverlayStore` ports.
 
-Core invariant: **the imported source file is never mutated.** All highlights/notes/bookmarks/session state are
-written to separate SQLite "overlay" tables keyed by `bookId`; the sandboxed copy of the original file stays
-read-only.
+Core invariant: **the book file is never mutated.** All highlights/notes/bookmarks/session state are
+written to separate SQLite "overlay" tables keyed by `bookId`.
+
+**Reference-based library:** a book picked from the user's filesystem is *not* copied — `books.file_path` is the
+user's own absolute path (`referenced`). Only URL/cloud downloads (no lasting file on disk) and books imported
+before this change live as app-owned copies under `{userData}/books/{uuid}/` (`managed`). The kind is derived from
+the path (`bookFileStorage` in `electron/files/sandbox.ts`), not stored. Rules that follow:
+- Never delete a referenced book's file or its folder; `removeManagedBookDir` refuses anything that isn't
+  `{sandbox}/{uuid}/file`. "Delete file" is only offered for `managed` books.
+- Read book files through `resolveBookFile` (validates path + format extension, follows symlinks, distinguishes
+  `missing_file` from `path_denied`); never write next to a book file. Covers go to `{userData}/covers/`.
+- A moved file is recoverable: `library:relinkBook` opens a native dialog in Main and re-attaches the book only if
+  the file's SHA-256 equals `books.sha256`. The renderer only ever passes a `bookId`, never a path.
+- Import sources: local file → reference in place (hash → duplicate check → metadata → persist, never copied);
+  URL / cloud → temp download → hash → duplicate check → `copyIntoBooksSandbox` → metadata → persist → temp removed.
+  Full write-up: `docs/implementation_plan/file_centric_import_architecture.md`.
 
 ### Location model
 

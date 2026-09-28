@@ -13,9 +13,11 @@
 - **MVP hiện tại:** desktop app (Electron + Vite + React + TypeScript). Mobile (Expo + React Native)
   mới chỉ là scaffold ban đầu (Expo Router), **chưa** nối vào các package dùng chung.
 - **Định dạng sách hỗ trợ:** epub, pdf, txt, md, docx, doc (qua adapter riêng từng định dạng).
-- **Nguyên tắc cốt lõi:** file gốc import vào **không bao giờ bị chỉnh sửa** — mọi highlight/note/
-  bookmark/tiến độ đọc được lưu tách biệt trong SQLite ("overlay"), file gốc luôn ở bản sao sandbox
-  read-only.
+- **Nguyên tắc cốt lõi:** file sách **không bao giờ bị chỉnh sửa** — mọi highlight/note/
+  bookmark/tiến độ đọc được lưu tách biệt trong SQLite ("overlay"). Import từ file trên máy chỉ
+  **tham chiếu** file gốc của user (không copy, không bao giờ bị app xóa); chỉ file tải về từ URL /
+  cloud được lưu thành bản copy app-owned trong `{userData}/books/` (read-only). Xem
+  `docs/implementation_plan/file_centric_import_architecture.md`.
 - **Có nguồn cloud:** liên kết OAuth với Google Drive / Dropbox / OneDrive để import sách từ cloud.
 - **Tài liệu bối cảnh sản phẩm:** `docs/reading-habbit/` (persona, nỗi đau người đọc, UX rationale).
 - **Tài liệu kiến trúc & schema chính thức:** `docs/software/SDS.md` (tiếng Việt) — đọc trước khi
@@ -70,7 +72,7 @@ electron/                # Infrastructure — Main + Preload
 ├── ipc/                  # channels.ts + <feature>.ipc.ts, đăng ký qua registerAllIpcHandlers()
 ├── persistence/          # better-sqlite3, migrations/001..019, sqlite-*-store.ts
 ├── adapters/             # DocumentImporter theo format: epub/pdf/txt/md/docx/doc.adapter.ts
-├── files/                # sandbox copy, path allowlist, cover:// protocol
+├── files/                # kiểm tra path sách (app-owned / tham chiếu), copy URL·cloud, relink, cover:// protocol
 ├── security/             # token-vault.ts (OAuth token, không lộ ra renderer)
 └── config/, theme/       # OAuth config, native titlebar theming
 

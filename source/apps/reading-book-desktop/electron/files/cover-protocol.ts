@@ -2,10 +2,10 @@ import { net, protocol } from 'electron'
 import fs from 'node:fs'
 import path from 'node:path'
 import { pathToFileURL } from 'node:url'
-import { assertPathAllowed } from './sandbox'
+import { assertCoverPathAllowed } from './sandbox'
 import { getLibraryStore } from '../persistence/sqlite-library-store'
 
-/** Custom scheme for sandboxed book covers (renderer never sees absolute paths). */
+/** Custom scheme for app-owned book covers (renderer never sees absolute paths). */
 export const COVER_PROTOCOL = 'rb-cover'
 
 const MIME_BY_EXT: Record<string, string> = {
@@ -51,7 +51,7 @@ function bookIdFromCoverRequest(requestUrl: string): string | null {
 }
 
 /**
- * Serve `{userData}/books/.../cover.*` by book id.
+ * Serve `{userData}/covers/*` (or a legacy `{userData}/books/{uuid}/cover.*`) by book id.
  * Call after DB is open (`app.whenReady`).
  */
 export function registerCoverProtocol(): void {
@@ -68,7 +68,7 @@ export function registerCoverProtocol(): void {
         return new Response('Not found', { status: 404 })
       }
 
-      const resolved = assertPathAllowed(coverPath)
+      const resolved = assertCoverPathAllowed(coverPath)
       await fs.promises.access(resolved, fs.constants.R_OK)
 
       const ext = path.extname(resolved).toLowerCase()

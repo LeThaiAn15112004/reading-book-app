@@ -52,6 +52,8 @@ type HighlightsContext = {
   activeAnnotationTool: AnnotationMarkTool | null
   onToast: (message: string | null) => void
   onChromeHidden: (hidden: boolean) => void
+  /** A finished drag-to-select that no armed markup tool consumed (e.g. translate mode). */
+  onSelectionSettled: (info: EpubSelectionInfo) => void
 }
 
 const emptyContext: HighlightsContext = {
@@ -62,6 +64,7 @@ const emptyContext: HighlightsContext = {
   activeAnnotationTool: null,
   onToast: () => {},
   onChromeHidden: () => {},
+  onSelectionSettled: () => {},
 }
 
 type HighlightsStoreState = HighlightsContext & {
@@ -100,10 +103,21 @@ type HighlightsStoreState = HighlightsContext & {
   /** (Re)paints every stored highlight via the epub.js imperative API — idempotent, safe to call
    *  repeatedly (e.g. once per `highlights`/`renditionReady` change). */
   applyAllHighlights: () => void
-  /** epub.js's 'selected' event handler — routes a fresh drag-to-select into either an
-   *  instant-apply mark (Highlight/Underline/Strikethrough tool armed) or just tracked selection
-   *  state for the right-click menu to pick up later. */
+  /** epub.js's 'selected' event handler — pure bookkeeping of the live selection for the
+   *  right-click menu / translate-on-select to pick up later. Never creates a mark itself (even
+   *  with Highlight/Underline/Strikethrough armed) — that only happens on `commitDraggedMark`,
+   *  fired once the drag's mouse button actually comes up (see `EpubRenderer`'s
+   *  `onAnnotationDragEnd`). This event fires ~250ms after the selection merely *stops changing*,
+   *  which includes a drag that's paused mid-gesture with the button still held — committing here
+   *  used to save a mark the instant the user paused to read the selection, before they'd even
+   *  finished choosing it. */
   handleTextSelected: (info: EpubSelectionInfo | null) => void
+  /** Fired from `EpubRenderer`'s pointerup the instant a Highlight/Underline/Strikethrough
+   *  drag-select gesture ends over a non-empty selection — the only place such a drag turns into a
+   *  saved mark. `info` is a fresh synchronous read of the selection at that exact moment, not
+   *  whatever `handleTextSelected` last recorded (which may be stale or, on a fast drag-release,
+   *  may not have fired at all yet). No-op if no markup tool is armed. */
+  commitDraggedMark: (info: EpubSelectionInfo) => void
   /** Keeps `focusedHighlightId` and the mark's `.rb-hl-focused` outline (painted by
    *  epub.js/marks-pane, outside React's tree) in lockstep. */
   focusHighlight: (id: string | null) => void
@@ -212,11 +226,19 @@ export const useHighlightsStore = create<HighlightsStoreState>()((set, get) => (
     if (!info) return
     set({ activeHighlight: null })
     get().focusHighlight(null)
-    // Highlight/Underline/Strikethrough tool armed: the drag that just produced this selection
-    // *is* the mark-it gesture — apply immediately (last-used color) instead of waiting for a
-    // right-click.
+    // Highlight/Underline/Strikethrough tool armed: bookkeeping only — the drag becomes a saved
+    // mark via `commitDraggedMark` on pointerup, not here (this event also fires mid-drag, the
+    // instant the selection pauses with the mouse button still down).
+    if (!get().activeAnnotationTool) {
+      get().onSelectionSettled(info)
+    }
+  },
+
+  commitDraggedMark: (info) => {
     const tool = get().activeAnnotationTool
     if (!tool) return
+    set({ pendingSelection: info, selectionMenu: null, activeHighlight: null })
+    get().focusHighlight(null)
     get().createHighlight(get().lastUsedColorHex, tool)
     const toastMessage =
       tool === 'highlight'

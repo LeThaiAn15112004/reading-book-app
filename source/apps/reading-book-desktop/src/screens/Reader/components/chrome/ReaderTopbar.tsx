@@ -21,11 +21,18 @@ type ReaderTopbarProps = {
   onFavorites: () => void
   onBookInfo: () => void
   onTrash: () => void
+  /** Search tool's pressed state — the panel itself floats independently (see `ReaderScreen`). */
   searchOpen: boolean
-  searchQuery: string
-  onSearchQueryChange: (query: string) => void
-  onSearchSubmit: () => void
-  onCloseSearch: () => void
+  translateActive: boolean
+  audioActive: boolean
+  audioMenuOpen: boolean
+  audioButtonRef: React.Ref<HTMLButtonElement>
+  /** Snapshot tool's armed state — the overlay itself floats independently (see `ReaderScreen`). */
+  snapshotActive: boolean
+  onSnapshot: () => void
+  onWordCount: () => void
+  /** Annotation tools to omit from the strip entirely — e.g. EPUB has no Freehand/Textbox. */
+  hiddenAnnotationTools?: AnnotationTool[]
 }
 
 const chromeBtn =
@@ -47,10 +54,14 @@ export function ReaderTopbar({
   onBookInfo,
   onTrash,
   searchOpen,
-  searchQuery,
-  onSearchQueryChange,
-  onSearchSubmit,
-  onCloseSearch,
+  translateActive,
+  audioActive,
+  audioMenuOpen,
+  audioButtonRef,
+  snapshotActive,
+  onSnapshot,
+  onWordCount,
+  hiddenAnnotationTools,
 }: ReaderTopbarProps) {
   return (
     <header
@@ -70,10 +81,14 @@ export function ReaderTopbar({
         onAnnotationTool={onAnnotationTool}
         onOpenSign={onOpenSign}
         searchOpen={searchOpen}
-        searchQuery={searchQuery}
-        onSearchQueryChange={onSearchQueryChange}
-        onSearchSubmit={onSearchSubmit}
-        onCloseSearch={onCloseSearch}
+        translateActive={translateActive}
+        audioActive={audioActive}
+        audioMenuOpen={audioMenuOpen}
+        audioButtonRef={audioButtonRef}
+        snapshotActive={snapshotActive}
+        onSnapshot={onSnapshot}
+        onWordCount={onWordCount}
+        hiddenAnnotationTools={hiddenAnnotationTools}
       />
 
       <div className="relative flex shrink-0 items-center gap-1.5 sm:gap-2">
