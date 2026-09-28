@@ -1,0 +1,22 @@
+export {
+  ZOOM_DEFAULT,
+  ZOOM_LAYOUT_PRESETS,
+  ZOOM_MAX,
+  ZOOM_MIN,
+  ZOOM_PERCENT_PRESETS,
+  ZOOM_STEP_FACTOR,
+  clampZoom,
+  focalZoomScroll,
+  formatZoomPercent,
+  parseZoomPercentInput,
+  stepZoom,
+  zoomFactorFromWheelDelta,
+  zoomForLayoutPreset,
+  zoomFromPercent,
+  zoomToPercent,
+  type FitMetrics,
+  type ScrollOffset,
+  type ZoomFocalPoint,
+  type ZoomLayoutPreset,
+} from './zoom.js'
+export { highlightPopoverPosition, type PopoverAnchorRect } from './popover-position.js'
