@@ -424,9 +424,6 @@ export function ReaderScreen() {
             // Escape, or Hand/Select.
             selectTool((current) => (current === tool ? 'select' : tool))
           }}
-          onOpenSign={() => {
-            chrome.setSignOpen(true)
-          }}
           onShare={() => {
             chrome.closeFloating()
             chrome.setToast('Share — not available yet.')

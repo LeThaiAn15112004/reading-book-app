@@ -12,7 +12,6 @@ type ToolsStripProps = {
    *  own active state — only one of the toolbar tools is ever "on" at a time (see `ReaderScreen`). */
   activeTool: ModeTool | 'highlight' | 'underline' | 'strikethrough'
   onSelectTool: (tool: ModeTool) => void
-  onOpenSign: () => void
   onCompanionTool: (tool: CompanionTool) => void
   onAnnotationTool: (tool: AnnotationTool) => void
   /** Search tool's pressed state — the results panel itself floats independently (see
@@ -235,7 +234,6 @@ function modeButtonClass(active: boolean): string {
 export function ToolsStrip({
   activeTool,
   onSelectTool,
-  onOpenSign,
   onCompanionTool,
   onAnnotationTool,
   searchOpen,
@@ -352,16 +350,6 @@ export function ToolsStrip({
         >
           <ToolIcon tool="wordCount" />
           <span className={stripLabel}>Word Count</span>
-        </button>
-        <button
-          className={stripBtn}
-          type="button"
-          title="Sign"
-          aria-label="Sign"
-          onClick={onOpenSign}
-        >
-          <ToolIcon tool="sign" />
-          <span className={stripLabel}>Sign</span>
         </button>
       </ToolGroup>
     </div>

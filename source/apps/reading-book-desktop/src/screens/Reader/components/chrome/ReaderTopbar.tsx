@@ -16,7 +16,6 @@ type ReaderTopbarProps = {
   onSelectTool: (tool: ModeTool) => void
   onCompanionTool: (tool: CompanionTool) => void
   onAnnotationTool: (tool: AnnotationTool) => void
-  onOpenSign: () => void
   onShare: () => void
   onFavorites: () => void
   onBookInfo: () => void
@@ -48,7 +47,6 @@ export function ReaderTopbar({
   onSelectTool,
   onCompanionTool,
   onAnnotationTool,
-  onOpenSign,
   onShare,
   onFavorites,
   onBookInfo,
@@ -79,7 +77,6 @@ export function ReaderTopbar({
         onSelectTool={onSelectTool}
         onCompanionTool={onCompanionTool}
         onAnnotationTool={onAnnotationTool}
-        onOpenSign={onOpenSign}
         searchOpen={searchOpen}
         translateActive={translateActive}
         audioActive={audioActive}
