@@ -46,7 +46,6 @@ import {
 } from './components'
 import {
   FAKE_CHAPTERS,
-  FAKE_SIGNATURES,
   useBookIndexing,
   useBookRelink,
   useReaderBookmarks,
@@ -238,7 +237,6 @@ export function ReaderScreen() {
     ? nav.epubSections
     : FAKE_CHAPTERS.map((c) => c.title)
   const effectiveMargin = book.prefs.marginEnabled ? book.prefs.margin : 'off'
-  const isSigned = FAKE_SIGNATURES.length > 0
 
   const bookmarks = useReaderBookmarks({
     bookId,
@@ -565,8 +563,7 @@ export function ReaderScreen() {
 
           <SignInfoPanel
             open={chrome.signOpen}
-            isSigned={isSigned}
-            signatures={FAKE_SIGNATURES}
+            bookId={bookId}
             onClose={() => chrome.setSignOpen(false)}
           />
 
@@ -586,7 +583,6 @@ export function ReaderScreen() {
             chapterLabel={chapterLabel}
             formatLabel={book.bookFormat?.toUpperCase() || 'EPUB'}
             coverUrl={book.coverUrl}
-            isSigned={isSigned}
             onClose={() => chrome.setBookInfoOpen(false)}
           />
 

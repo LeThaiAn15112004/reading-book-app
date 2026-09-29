@@ -5,6 +5,7 @@ import type { Book } from '@reading-book/book-reader-sdk'
 import { coverUrlForBookId } from '../files/cover-protocol'
 import { openBookContent } from '../files/open-book-content'
 import { relinkBookToFile } from '../files/relink-book'
+import { checkBookSignature, toSignatureDto } from '../signature/book-signature'
 import {
   bookFileStorage,
   checkRegisteredBookPath,
@@ -14,6 +15,7 @@ import {
 import { getLibraryStore } from '../persistence/sqlite-library-store'
 import type {
   BookSummaryDto,
+  CheckSignatureResult,
   CollectionSummaryDto,
   DocumentFormatDto,
   OkResult,
@@ -49,6 +51,7 @@ function toSummaryDto(
   if (book.description) dto.description = book.description
   if (genreNames.length > 0) dto.genres = genreNames
   if (book.pageCount != null) dto.pageCount = book.pageCount
+  if (book.signature) dto.signature = toSignatureDto(book.signature)
   if (session?.lastReadLocation) {
     dto.lastReadLocation = session.lastReadLocation
     if (session.lastReadAt) dto.lastReadAt = session.lastReadAt
@@ -99,6 +102,15 @@ export function registerLibraryIpc(): void {
         }
       }
       return openBookContent(id.trim())
+    },
+  )
+
+  ipcMain.removeHandler(LibraryChannels.checkSignature)
+  ipcMain.handle(
+    LibraryChannels.checkSignature,
+    async (_event, id: unknown): Promise<CheckSignatureResult> => {
+      if (typeof id !== 'string' || !id.trim()) return { ok: false, errorCode: 'not_found' }
+      return checkBookSignature(id.trim())
     },
   )
 

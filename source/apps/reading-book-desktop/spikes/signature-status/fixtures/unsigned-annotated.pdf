@@ -1,0 +1,16 @@
+%PDF-1.7
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 200 200] /Annots [5 0 R] >>
+endobj
+5 0 obj
+<< /Type /Annot /Subtype /Highlight /Rect [10 10 100 30] /QuadPoints [10 30 100 30 10 10 100 10] /C [1 1 0] /Contents (a highlight) >>
+endobj
+trailer
+<< /Root 1 0 R >>
+%%EOF

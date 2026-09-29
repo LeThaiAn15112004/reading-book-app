@@ -7,3 +7,15 @@ export { Book } from './book.js';
 export type { BookProps } from './book.js';
 export { BookChunk } from './book-chunk.js';
 export type { BookChunkProps } from './book-chunk.js';
+export {
+  SIGNATURE_STATUSES,
+  isSignatureInfoCurrent,
+  isSignatureStatus,
+  signatureInfoFromMetadata,
+  signatureMetadataPatch,
+} from './book-signature.js';
+export type {
+  BookSignatureInfo,
+  SignatureMetadataFields,
+  SignatureStatus,
+} from './book-signature.js';

@@ -12,7 +12,10 @@ import {
   parseGenres,
   parseMetadata,
   parseReadingState,
+  signatureInfoFromMetadata,
+  signatureMetadataPatch,
   type BookMetadataJson,
+  type BookSignatureInfo,
   type ReadingStateJson,
 } from '@reading-book/book-reader-sdk'
 import { getDatabase } from './db'
@@ -35,7 +38,7 @@ interface BookRow {
   source_url: string | null
   source_provider: string | null
   external_id: string | null
-  /** fileSizeBytes, pageCount, description, isSigned, … (see books-json.ts). */
+  /** fileSizeBytes, pageCount, description, signatureStatus, … (see books-json.ts). */
   metadata_json: string
   /** string[] of genre names, sorted A→Z. */
   genres_json: string
@@ -104,7 +107,7 @@ function rowToBook(row: BookRow): Book {
     description: metadata.description ?? undefined,
     pageCount: metadata.pageCount ?? undefined,
     isFavorite: row.is_favorite === 1,
-    isSigned: metadata.isSigned === true,
+    signature: signatureInfoFromMetadata(metadata),
     sourceUrl: row.source_url ?? undefined,
     sourceProvider: row.source_provider ?? undefined,
     externalId: row.external_id ?? undefined,
@@ -120,7 +123,11 @@ function bookToRowParams(book: Book, genreNames: readonly string[]) {
     fileSizeBytes: book.fileSizeBytes,
     pageCount: book.pageCount,
     description: book.description,
-    isSigned: book.isSigned,
+    signatureStatus: book.signature?.status,
+    signerName: book.signature?.signerName,
+    signedAt: book.signature?.signedAt,
+    signatureCheckedAt: book.signature?.checkedAt,
+    signatureCheckedSha256: book.signature?.checkedSha256,
   }
   return {
     id: book.id,
@@ -589,6 +596,21 @@ export class SqliteLibraryStore implements LibraryStore {
         patch: JSON.stringify(patch),
         updated_at: new Date().toISOString(),
       })
+  }
+
+  /**
+   * Store a signature-verification result, replacing the previous one member by member
+   * (`signatureMetadataPatch` nulls anything the new result lacks, so no stale signer name
+   * survives). `updated_at` is left alone: this is derived data, not a user edit.
+   */
+  saveSignature(bookId: string, info: BookSignatureInfo | undefined): void {
+    this.db
+      .prepare(
+        `UPDATE books
+         SET metadata_json = json_patch(metadata_json, @patch)
+         WHERE id = @id`,
+      )
+      .run({ id: bookId, patch: JSON.stringify(signatureMetadataPatch(info)) })
   }
 
   /** Replace author links for a book (used by metadata backfill after cascade wipe). */

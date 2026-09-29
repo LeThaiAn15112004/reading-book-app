@@ -1,4 +1,10 @@
 import { BookCover } from '../../../Library/components/book/BookCover'
+import {
+  SIGNATURE_CHECKING,
+  SIGNATURE_LABELS,
+  SIGNATURE_UNAVAILABLE,
+} from '../../logic/bookSignature/signatureLabels'
+import { useBookSignature } from '../../logic/hooks/useBookSignature'
 
 type BookInfoDialogProps = {
   open: boolean
@@ -7,7 +13,6 @@ type BookInfoDialogProps = {
   chapterLabel: string
   formatLabel?: string
   coverUrl?: string
-  isSigned?: boolean
   onClose: () => void
 }
 
@@ -18,10 +23,16 @@ export function BookInfoDialog({
   chapterLabel,
   formatLabel = 'EPUB',
   coverUrl,
-  isSigned = false,
   onClose,
 }: BookInfoDialogProps) {
+  const { signature, loading } = useBookSignature(bookId, open)
   if (!open) return null
+
+  const signatureText = signature
+    ? SIGNATURE_LABELS[signature.status].label
+    : loading
+      ? SIGNATURE_CHECKING
+      : SIGNATURE_UNAVAILABLE
 
   const formatBadge = formatLabel.trim().toUpperCase()
 
@@ -58,7 +69,7 @@ export function BookInfoDialog({
                 ['Title', title],
                 ['Location', chapterLabel],
                 ['Format', formatBadge],
-                ['Signed', isSigned ? 'Yes' : 'No'],
+                ['Signature', signatureText],
               ] as const
             ).map(([k, v]) => (
               <div key={k} className="grid grid-cols-[72px_1fr] gap-2 text-[13px]">

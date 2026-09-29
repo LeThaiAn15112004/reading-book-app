@@ -2,7 +2,6 @@ export { parseResumeLocation } from './book/parseResumeLocation'
 export { highlightPopoverPosition } from '@reading-book/book-reader-sdk'
 export { useDismissOnOutsideOrEscape } from './highlights/useDismissOnOutsideOrEscape'
 export { FAKE_CHAPTERS, chapterLocationLabel, type FakeChapter } from './demo/fakeReaderContent'
-export { FAKE_SIGNATURES } from './demo/fakeSignatures'
 export {
   useBookIndexing,
   useBookRelink,

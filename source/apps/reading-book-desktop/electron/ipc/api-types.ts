@@ -44,6 +44,11 @@ export interface BookSummaryDto {
   genres?: string[]
   /** Page or spine-section count when known. */
   pageCount?: number
+  /**
+   * Last stored signature check; absent = not checked yet. May predate an edit of the file — call
+   * `library.checkSignature` for a status that is guaranteed to match the file on disk.
+   */
+  signature?: BookSignatureDto
   isFavorite?: boolean
   readingStatus?: ReadingStatusDto
   /** Human-readable last-read location; when set, enables Continue Reading. */
@@ -61,6 +66,29 @@ export interface BookSummaryDto {
 }
 
 export type BookFileStorageDto = 'managed' | 'referenced'
+
+/**
+ * Digital-signature verification status of a book file (never a statement about annotations):
+ * `unsigned` — no signature found · `valid` — signature intact (signer's certificate is NOT
+ * checked against a trust store) · `invalid` — signature present but does not verify ·
+ * `unsupported` — this format / signature type cannot be verified, so nothing is claimed.
+ */
+export type SignatureStatusDto = 'unsigned' | 'valid' | 'invalid' | 'unsupported'
+
+export interface BookSignatureDto {
+  status: SignatureStatusDto
+  signerName?: string
+  /** ISO-8601 signing time claimed by the signature. */
+  signedAt?: string
+  /** ISO-8601 time the verification ran. */
+  checkedAt?: string
+}
+
+export interface CheckSignatureResult {
+  ok: boolean
+  signature?: BookSignatureDto
+  errorCode?: OpenBookErrorCode
+}
 
 export interface OkResult {
   ok: boolean
@@ -443,6 +471,12 @@ export interface DesktopApi {
      * by book id, so they carry over untouched.
      */
     relinkBook(id: string): Promise<RelinkBookResult>
+    /**
+     * Digital-signature status of the book file. Main re-hashes the file and re-verifies whenever
+     * it differs from what the stored result was computed for. Verification only — the app cannot
+     * sign documents.
+     */
+    checkSignature(id: string): Promise<CheckSignatureResult>
     listCollections(): Promise<CollectionSummaryDto[]>
     createCollection(input: {
       name: string

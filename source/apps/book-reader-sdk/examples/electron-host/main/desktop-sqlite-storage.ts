@@ -34,7 +34,7 @@ interface BookRow {
   source_url: string | null
   source_provider: string | null
   external_id: string | null
-  /** `{ fileSizeBytes, pageCount, description, isSigned, … }` */
+  /** `{ fileSizeBytes, pageCount, description, signatureStatus, … }` */
   metadata_json: string
   /** `["Fantasy", "Classics", …]` */
   genres_json: string

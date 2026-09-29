@@ -64,6 +64,7 @@ const api: DesktopApi = {
     deleteBookFile: (id) =>
       ipcRenderer.invoke(LibraryChannels.deleteBookFile, id),
     relinkBook: (id) => ipcRenderer.invoke(LibraryChannels.relinkBook, id),
+    checkSignature: (id) => ipcRenderer.invoke(LibraryChannels.checkSignature, id),
     listCollections: () => ipcRenderer.invoke(LibraryChannels.listCollections),
     createCollection: (input) =>
       ipcRenderer.invoke(LibraryChannels.createCollection, input),

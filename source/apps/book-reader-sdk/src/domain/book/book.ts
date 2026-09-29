@@ -1,4 +1,5 @@
 import { Author } from './author.js';
+import type { BookSignatureInfo } from './book-signature.js';
 import { DocumentFormat } from './document-format.js';
 
 export interface BookProps {
@@ -15,8 +16,11 @@ export interface BookProps {
   /** Page or spine-section count when known. */
   pageCount?: number;
   isFavorite?: boolean;
-  /** Denormalized flag: book has ≥ 1 digital signature row. */
-  isSigned?: boolean;
+  /**
+   * Cached signature-verification result (`metadata_json.signatureStatus` & co). Absent = the file
+   * has not been checked yet. Only trust it after `isSignatureInfoCurrent(…, hashOfFileNow)`.
+   */
+  signature?: BookSignatureInfo;
   sourceUrl?: string;
   /** Cloud Sources provenance: provider this file was downloaded from, if any. */
   sourceProvider?: string;
@@ -44,7 +48,7 @@ export class Book {
   description?: string;
   pageCount?: number;
   isFavorite: boolean;
-  isSigned: boolean;
+  signature?: BookSignatureInfo;
   sourceUrl?: string;
   sourceProvider?: string;
   externalId?: string;
@@ -72,7 +76,7 @@ export class Book {
         ? Math.floor(props.pageCount)
         : undefined;
     this.isFavorite = props.isFavorite ?? false;
-    this.isSigned = props.isSigned ?? false;
+    this.signature = props.signature ? { ...props.signature } : undefined;
     this.sourceUrl = props.sourceUrl;
     this.sourceProvider = props.sourceProvider;
     this.externalId = props.externalId;
@@ -94,8 +98,9 @@ export class Book {
     this.touch();
   }
 
-  setSigned(value: boolean): void {
-    this.isSigned = value;
+  /** Replace the cached signature result (`undefined` clears it, e.g. before a re-check). */
+  setSignature(info: BookSignatureInfo | undefined): void {
+    this.signature = info ? { ...info } : undefined;
     this.touch();
   }
 

@@ -25,10 +25,3 @@ export type ViewportRect = {
   width: number
   height: number
 }
-
-export type ReaderSignature = {
-  id: string
-  signerName: string
-  signatureStatus: 'valid' | 'invalid' | 'expired' | 'unknown'
-  signedAt?: string
-}

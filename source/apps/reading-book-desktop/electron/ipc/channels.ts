@@ -38,6 +38,8 @@ export const LibraryChannels = {
   deleteBookFile: 'library:deleteBookFile',
   /** "Locate file": re-attach a book to a moved file, verified by SHA-256. */
   relinkBook: 'library:relinkBook',
+  /** Verify (or re-use a still-current cached) digital-signature status of a book file. */
+  checkSignature: 'library:checkSignature',
   listCollections: 'library:listCollections',
   createCollection: 'library:createCollection',
   updateCollection: 'library:updateCollection',

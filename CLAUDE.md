@@ -50,7 +50,8 @@ Desktop app (`cd source/apps/reading-book-desktop`):
 - `npm run build` — `tsc && vite build && electron-builder`
 - `npm run preview` — preview built renderer
 - Spikes (standalone node scripts under `spikes/`, not part of the app build):
-  `spike:epub:fixture`, `spike:epub:eval`, `spike:overlay:cfi`, `spike:session:roundtrip`, `spike:theme:contrast`
+  `spike:epub:fixture`, `spike:epub:eval`, `spike:overlay:cfi`, `spike:session:roundtrip`, `spike:theme:contrast`,
+  `spike:signature:status` (signature-status checks; fixtures via `spike:signature:fixtures`, needs `openssl`)
 
 Mobile app (`cd source/apps/reading-book-mobile`): `npm run start`, `android`, `ios`, `web`, `lint`.
 
@@ -102,9 +103,15 @@ Domain/port code only ever deals with `DocumentImporter` / `DocumentRenderer` / 
 ### Persistence & the read-only/overlay invariant
 
 `better-sqlite3`, schema versioned as numbered SQL files in `electron/persistence/migrations/` (currently
-001–014: books, genres, signatures, comments, collections, reading sessions, highlights, typewriter notes,
-annotations, reading status, cloud provenance), run through `migrate.ts`. `sqlite-library-store.ts` and
+001–022: books, genres, comments, collections, reading sessions, notes/annotations, reading status, cloud
+provenance, FTS chunks, signature status), run through `migrate.ts`. `sqlite-library-store.ts` and
 `sqlite-overlay-store.ts` implement the domain's `LibraryStore`/`CollectionStore`/`OverlayStore` ports.
+
+**Signature status (verification only):** `books.metadata_json.signatureStatus` (`unsigned|valid|invalid|unsupported`;
+absent = not checked) is the single source of truth — the app detects whether a book is signed, it never signs.
+PDF signatures are verified in `electron/signature/`; EPUB and other formats report `unsupported`. A cached result
+is reused only while the file's current SHA-256 equals `signatureCheckedSha256`. Annotations are not signatures and
+`books.sha256` is a fingerprint, not a signature. See `docs/implementation_plan/book_signature_status.md`.
 
 Core invariant: **the book file is never mutated.** All highlights/notes/bookmarks/session state are
 written to separate SQLite "overlay" tables keyed by `bookId`.

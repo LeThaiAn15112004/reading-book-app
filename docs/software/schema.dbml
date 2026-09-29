@@ -23,7 +23,7 @@ Table books {
 
   // Migration 020: the JSON columns below replace book_signatures/genres/book_genres/reading_session_states
   // and the loose metadata columns. camelCase keys; a null member is treated as absent.
-  metadata_json text [not null, default: '{}', note: 'CHECK json_valid. { fileSizeBytes, pageCount, description, isSigned, signerName, signatureStatus (valid|invalid|expired|unknown), signedAt }']
+  metadata_json text [not null, default: '{}', note: 'CHECK json_valid. { fileSizeBytes, pageCount, description, signatureStatus (unsigned|valid|invalid|unsupported; absent = not checked), signerName, signedAt, signatureCheckedAt, signatureCheckedSha256 }']
   genres_json text [not null, default: '[]', note: 'CHECK json_valid. ["Fantasy","Classics"] — sorted A→Z, no case-insensitive duplicates']
   reading_state_json text [not null, default: '{}', note: 'CHECK json_valid. { lastReadLocation (CFI / page-rect / text-offset, packed with label), percent, fontFamily, fontSize, fontWeight, lineHeight, textAlign, layoutMode, pageTurnMode, marginsEnabled, marginPreset, isLandscape, updatedAt }']
 

@@ -6,16 +6,17 @@
  * `json_patch` (RFC 7396) treats a `null` member as "delete this key".
  */
 
-export interface BookMetadataJson {
+import type { SignatureMetadataFields } from '../domain/book/book-signature.js'
+
+/**
+ * `signatureStatus`, `signerName`, `signedAt`, `signatureCheckedAt` and `signatureCheckedSha256`
+ * (from SignatureMetadataFields) cache the latest signature *verification* result; they are
+ * preserved on every partial update because updates go through json_patch.
+ */
+export interface BookMetadataJson extends SignatureMetadataFields {
   fileSizeBytes?: number | null
   pageCount?: number | null
   description?: string | null
-  isSigned?: boolean | null
-  // Kept for the future digital-signature feature; not read by the domain `Book` yet,
-  // but preserved on every partial update because updates go through json_patch.
-  signerName?: string | null
-  signatureStatus?: string | null
-  signedAt?: string | null
 }
 
 export interface ReadingStateJson {

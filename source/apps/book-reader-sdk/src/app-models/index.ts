@@ -59,7 +59,6 @@ export {
 export {
   type InteractionTool,
   type PageLayout,
-  type ReaderSignature,
   type ViewportRect,
 } from './reader-session.js'
 export {

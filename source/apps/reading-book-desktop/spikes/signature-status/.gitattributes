@@ -1,0 +1,2 @@
+# Signed PDF fixtures must stay byte-exact: a CRLF conversion would break their signatures.
+fixtures/*.pdf binary

@@ -1,6 +1,7 @@
 import { SUPPORTED_EXTENSIONS, SUPPORTED_FORMATS } from '@reading-book/config'
 import {
   Book,
+  type BookSignatureInfo,
   type ImportResult as DomainImportResult,
 } from '@reading-book/book-reader-sdk'
 import { BrowserWindow, dialog, ipcMain } from 'electron'
@@ -22,6 +23,7 @@ import {
   removeManagedBookDir,
 } from '../files/sandbox'
 import { getLibraryStore } from '../persistence/sqlite-library-store'
+import { verifyOnImport } from '../signature/book-signature'
 import type { ImportResult } from './api-types'
 import { ImportChannels } from './channels'
 
@@ -106,6 +108,7 @@ export type FinishImportOptions = {
 function persistImportedBook(
   meta: DomainImportResult,
   options: FinishImportOptions = {},
+  signature?: BookSignatureInfo,
 ): string {
   const now = new Date().toISOString()
   const book = new Book({
@@ -118,6 +121,7 @@ function persistImportedBook(
     fileSizeBytes: meta.fileSizeBytes,
     description: meta.description,
     pageCount: meta.pageCount,
+    signature,
     sourceUrl: options.sourceUrl,
     sourceProvider: options.sourceProvider,
     externalId: options.externalId,
@@ -153,8 +157,14 @@ async function finishImport(
   try {
     const meta = await extractMetadata(filePath)
     coverPath = meta.coverPath
+    // Signature status is detected (never created) while the file is at hand; a failure here only
+    // leaves the book "not checked yet" and never fails the import.
+    const signature = await verifyOnImport(meta.format, filePath, {
+      sha256: meta.sha256,
+      fileSizeBytes: meta.fileSizeBytes,
+    })
     try {
-      const bookId = persistImportedBook(meta, options)
+      const bookId = persistImportedBook(meta, options, signature)
       return { ok: true, bookId }
     } catch (err) {
       await discardImportArtifacts()

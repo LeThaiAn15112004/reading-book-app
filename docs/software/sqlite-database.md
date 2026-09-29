@@ -49,7 +49,7 @@ Thư viện sách. Từ migration 020, genres / phiên đọc / metadata lẻ n�
 | `source_url` | TEXT | khi import từ URL |
 | `reading_status` | TEXT | `reading` \| `completed` \| `not-started` (mặc định) |
 | `source_provider`, `external_id` | TEXT | nguồn cloud: `google-drive` / `dropbox` / `onedrive` |
-| `metadata_json` | TEXT NOT NULL `'{}'` | `{ fileSizeBytes, pageCount, description, isSigned, signerName, signatureStatus, signedAt }`; `signatureStatus` ∈ `valid/invalid/expired/unknown` |
+| `metadata_json` | TEXT NOT NULL `'{}'` | `{ fileSizeBytes, pageCount, description, signatureStatus, signerName, signedAt, signatureCheckedAt, signatureCheckedSha256 }`; `signatureStatus` ∈ `unsigned/valid/invalid/unsupported` (vắng = chưa kiểm tra; migration `022`) |
 | `genres_json` | TEXT NOT NULL `'[]'` | mảng tên genre, sắp A→Z, không trùng (không phân biệt hoa/thường) |
 | `reading_state_json` | TEXT NOT NULL `'{}'` | vị trí đọc + tuỳ chọn hiển thị: `{ lastReadLocation, percent, fontFamily, fontSize, fontWeight, lineHeight, textAlign, layoutMode, pageTurnMode, marginsEnabled, marginPreset, isLandscape, updatedAt }` — `lastReadLocation` là CFI / page-rect / text-offset (đóng gói kèm label) hoặc placeholder `Started` |
 | `added_at`, `updated_at` | TEXT NOT NULL | |

@@ -1,7 +1,7 @@
 # Software Design Specification (SDS)
 
 **Sản phẩm:** Reading Book App — Trình đọc sách / tài liệu thông minh (Trợ lý tri thức cá nhân)  
-**Phiên bản tài liệu:** 1.24  
+**Phiên bản tài liệu:** 1.25  
 **Ngày:** 2026-09-29  
 **Trạng thái:** Draft — căn cứ SRS + Design Plan (MVP Free Core) + mockups  
 **Tài liệu liên quan:** [SRS.md](./SRS.md), [docs/mockups/](../mockups/)  
@@ -47,6 +47,8 @@
 - File tham chiếu bị di chuyển / xóa → sách **không bị xóa**; Reader báo `missing_file` và đề nghị **Locate file** (`library:relinkBook`): Main mở dialog, chỉ cập nhật `file_path` khi SHA-256 khớp `books.sha256` (giữ nguyên `books.id`).
 - Xóa sách: "Remove from library" không bao giờ xóa file sách; "Delete file" chỉ khả dụng cho sách *managed* (`removeManagedBookDir` từ chối mọi thứ không đúng dạng `{sandbox}/{uuid}/file`).
 - Chi tiết triển khai: `docs/implementation_plan/file_centric_import_architecture.md`.
+
+**Changelog 1.25:** **Trạng thái chữ ký số của sách (chỉ xác minh, không ký)** — migration `022_book_signature_status.sql`. `books.metadata_json.signatureStatus` ∈ `unsigned|valid|invalid|unsupported` là nguồn sự thật; bỏ `isSigned`, bỏ `expired|unknown`; thêm `signatureCheckedAt`, `signatureCheckedSha256` (cache theo SHA-256 file hiện tại). Domain: `Book.isSigned` → `Book.signature?: BookSignatureInfo`. PDF: xác minh CMS trong chữ ký `/ByteRange`; EPUB & các format khác: `unsupported`. Không thêm bảng, không quy trình eSign. Chi tiết: `docs/implementation_plan/book_signature_status.md`.
 
 ---
 
@@ -639,9 +641,7 @@ Bảng đối chiếu khi implement: mỗi entity dùng để làm gì, gắn v�
 
 `normalized_path` — dùng khi DOC/DOCX (hoặc format khác) cần extract/convert nhẹ để đọc; format đọc trực tiếp thường null.
 
-`isSigned` — cờ boolean trong `books.metadata_json`: “có chữ ký số”. Chi tiết chữ ký (`signerName`, `signatureStatus`, `signedAt`) nằm **trong cùng `metadata_json`** — một sách chỉ giữ 1 chữ ký gần nhất (bảng con `book_signatures` gộp vào `books` từ migration `018`, rồi vào JSON từ `020`; không hỗ trợ nhiều signer/sách).
-
-`signature_status` — trên `books`: `valid` \| `invalid` \| `expired` \| `unknown`.
+`signatureStatus` — trong `books.metadata_json`, **nguồn sự thật duy nhất** cho chữ ký số của file sách (không còn cờ `isSigned` dư thừa, bỏ ở migration `022`). App **chỉ xác minh, không ký**: giá trị ∈ `unsigned` \| `valid` \| `invalid` \| `unsupported`; **vắng key = chưa kiểm tra**. `valid` = chữ ký còn nguyên vẹn và khớp chứng thư của người ký nhúng trong file (chưa xác thực chuỗi tin cậy / thu hồi). `unsupported` = format hoặc loại chữ ký chưa có cơ chế xác minh (hiện: mọi EPUB/TXT/MD/DOCX/DOC) — **không** có nghĩa đã ký hay chưa ký. Chi tiết đi kèm: `signerName`, `signedAt` (chỉ khi `valid`/`invalid` và đọc được), `signatureCheckedAt`, và `signatureCheckedSha256` = SHA-256 của đúng file đã xác minh (khoá cache: file đổi → xác minh lại). Một sách giữ 1 kết quả gần nhất. SHA-256 chỉ là dấu vân tay file, **không** phải chữ ký; highlight/underline/note là annotation, **không** phải chữ ký số. Chi tiết: `docs/implementation_plan/book_signature_status.md`.
 
 `note_json` (trên `notes`) — JSON `INoteState`: `type`, `group` (`'annotation'` | `'bookmark'`), `locatorExtended.locator` (vị trí nhảy tới — EPUB/TXT/MD/DOCX) hoặc `pdfAnnotation` (PDF: `pageIndex` + `rects`), `locatorExtended.raw` (payload vẽ lại chính xác — thay cho `location_data` cột rời của các bản schema `011`–`017`), `style`, `textualValue`, `note`, `status`, `isChecked`. Không còn cột `page_number` riêng — trang chỉ còn ý nghĩa hiển thị, suy ra từ `chapterIndex` trong locator khi cần.
 
@@ -673,7 +673,7 @@ Bảng đối chiếu khi implement: mỗi entity dùng để làm gì, gắn v�
 | Favorite         | Cột `BOOK.is_favorite`                                             |
 | Library blurb    | `description` + `pageCount` + `fileSizeBytes` trong `books.metadata_json` (card G1-N7) |
 | App preferences  | **Không** SQLite `app_settings` — platform store (1.17)            |
-| Digital signature | `isSigned` / `signerName` / `signatureStatus` / `signedAt` trong `books.metadata_json` (từ `book_signatures` → cột `books` ở `018` → JSON ở `020`) |
+| Digital signature | `signatureStatus` / `signerName` / `signedAt` / `signatureCheckedAt` / `signatureCheckedSha256` trong `books.metadata_json` (từ `book_signatures` → cột `books` ở `018` → JSON ở `020`; bỏ `isSigned` ở `022`) |
 | Bookmark         | Không còn bảng riêng — 1 dòng `NOTE` / `notes` với `note_json.group = 'bookmark'` (migration `019`) |
 | Annotations      | Bảng chung `NOTE` / `notes` cho highlight, underline, strikethrough, textbox (kèm tags qua `note_tags`); `annotations` (011–017) và `bookmarks` (đứng riêng) đều đã bị gộp vào `notes` (018–019). Typewriter/shape (freehand) không còn tạo mới qua UI. |
 | Chunk            | Có trong schema sớm; embedding nullable đến Phase 2                |
@@ -744,7 +744,7 @@ Catalog vật lý khớp migration desktop [`001_initial.sql`](../../source/apps
 | `reading_status` | TEXT | NOT NULL, DEFAULT `'not-started'`, CHECK | `reading` \| `completed` \| `not-started` (user-marked, không suy từ %) |
 | `source_provider` / `external_id` | TEXT | NULL | Cloud provenance (Google Drive / Dropbox / OneDrive) khi sách đến từ liên kết cloud (migration `014`) |
 | `source_url` | TEXT | NULL | URL gốc nếu import từ mạng; null nếu từ máy |
-| `metadata_json` | TEXT | NOT NULL, DEFAULT `'{}'`, CHECK `json_valid` | `{ fileSizeBytes, pageCount, description, isSigned, signerName, signatureStatus, signedAt }` — `description`: mô tả ngắn / OPF (Library card · G1-N7); `pageCount`: số trang (PDF) hoặc số spine/section (EPUB); `signatureStatus` ∈ `valid` \| `invalid` \| `expired` \| `unknown`. Key `null` ≡ vắng |
+| `metadata_json` | TEXT | NOT NULL, DEFAULT `'{}'`, CHECK `json_valid` | `{ fileSizeBytes, pageCount, description, signatureStatus, signerName, signedAt, signatureCheckedAt, signatureCheckedSha256 }` — `description`: mô tả ngắn / OPF (Library card · G1-N7); `pageCount`: số trang (PDF) hoặc số spine/section (EPUB); `signatureStatus` ∈ `unsigned` \| `valid` \| `invalid` \| `unsupported` (vắng = chưa kiểm tra; xem §`signatureStatus`). Key `null` ≡ vắng |
 | `genres_json` | TEXT | NOT NULL, DEFAULT `'[]'`, CHECK `json_valid` | Mảng tên thể loại / subject (vd. `["Adventure","Fiction"]`), sắp A→Z, không trùng (không phân biệt hoa/thường) |
 | `reading_state_json` | TEXT | NOT NULL, DEFAULT `'{}'`, CHECK `json_valid` | Resume + setting đọc per-book — xem bên dưới |
 | `added_at` | TEXT | NOT NULL | Thời điểm import |
