@@ -428,23 +428,26 @@ export function useLibraryScreen() {
     )
   }
 
+  /** Hub rails show only the top N books; the section arrow opens the full list. */
+  const SHELF_RAIL_LIMIT = 7
+
   const shelfRailBooks = {
     favorites: orderShelf(
       'favorites',
       sortByRecency(searchedBooks.filter((b) => b.isFavorite)),
-    ),
+    ).slice(0, SHELF_RAIL_LIMIT),
     reading: orderShelf(
       'reading',
       sortByRecency(filterByShelf(searchedBooks, 'reading')),
-    ),
+    ).slice(0, SHELF_RAIL_LIMIT),
     completed: orderShelf(
       'completed',
       sortByRecency(filterByShelf(searchedBooks, 'completed')),
-    ),
+    ).slice(0, SHELF_RAIL_LIMIT),
     'not-started': orderShelf(
       'not-started',
       sortByRecency(filterByShelf(searchedBooks, 'not-started')),
-    ),
+    ).slice(0, SHELF_RAIL_LIMIT),
   }
 
   const visibleShelfIds =
