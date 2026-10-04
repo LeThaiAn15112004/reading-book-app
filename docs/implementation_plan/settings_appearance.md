@@ -1,6 +1,7 @@
 # Settings — sidebar navigation & Appearance (SCR-06)
 
-Status: implemented (Appearance only). Other sections are navigation placeholders.
+Status: implemented (Appearance only, including App Language). Other sections are navigation
+placeholders.
 
 ## Layout
 
@@ -9,11 +10,10 @@ Status: implemented (Appearance only). Other sections are navigation placeholder
 │ Settings      [<] │  Appearance                              │
 │                   │  Theme, accent color and density…        │
 │ ▌Appearance       ├──────────────────────────────────────────┤
-│  Language         │  App Theme     [Light][Dark][Sepia][Sys] │
-│  Library          │  Accent Color  ● ● ● ● ● ● ●             │
-│  Storage          │  UI Density    [Comfortable][Balanced]…  │
-│  Notifications    │                                          │
-│  Keyboard …       │                                          │
+│  Library          │  App Theme     [Light][Dark][Sepia][Sys] │
+│  Storage          │  Accent Color  ● ● ● ● ● ● ●             │
+│  Notifications    │  UI Density    [Comfortable][Balanced]…  │
+│  Keyboard …       │  Language      [System][Tiếng Việt][En]  │
 │  Privacy          │                                          │
 │  Advanced         │                                          │
 │  About            │                                          │
@@ -31,8 +31,7 @@ Status: implemented (Appearance only). Other sections are navigation placeholder
 
 | Id | Label | Content |
 |---|---|---|
-| `appearance` | Appearance | `AppearanceSettings` |
-| `language` | Language | placeholder |
+| `appearance` | Appearance | `AppearanceSettings` (incl. App Language) |
 | `library` | Library | placeholder |
 | `storage` | Storage | placeholder |
 | `notifications` | Notifications | placeholder |
@@ -44,6 +43,9 @@ Status: implemented (Appearance only). Other sections are navigation placeholder
 Placeholder sections keep their active state and show *"This settings section is not implemented
 yet."* (`SettingsPlaceholder`). To add a section: add the id + label to `SETTINGS_SECTIONS`, an icon
 path in `SettingsSectionIcon`, and render its component in `SettingsScreen`.
+
+**Language was merged into Appearance.** The former `language` sidebar item (and its placeholder)
+was removed — there is no Language section id, route or icon any more.
 
 ### Collapsed / expanded
 
@@ -67,6 +69,7 @@ State: zustand `useAppAppearanceStore` (`src/theme/appAppearanceStore.ts`), mode
 | App Theme | Light · Dark · Sepia · System | Resolved to the existing theme ids (Light→`paper`, Dark→`night`, Sepia→`sepia`, System→`paper`/`night` from `prefers-color-scheme`) and written to `GlobalReadingPrefs.theme`, which already drives `html[data-theme]` + the Electron caption buttons + the reading page. |
 | Accent Color | Blue · Purple · Green · Cyan · Orange · Red · Slate | `html[data-accent]`; `styles/appearance.css` overrides `--accent` / `--lib-accent*` (darker shades on Paper for contrast). Orange = the built-in amber of every theme (no override, default). |
 | UI Density | Comfortable · Balanced · Compact | `html[data-density]`; `styles/appearance.css` defines `--ui-density-row/gap/pad/content-x/content-y`. Default Balanced. |
+| Language → App Language | System Default · Tiếng Việt · English | Stored as `language: 'system' \| 'vi' \| 'en'` (default `system`). Sets `<html lang>` (System → `vi` when `navigator.language` starts with `vi`, else `en`). See *App Language* below. |
 
 - `AppAppearanceBridge` (`src/chrome/AppAppearanceBridge.tsx`, mounted inside
   `GlobalReadingPrefsProvider`) keeps the resolved theme in sync, follows OS light/dark changes
@@ -82,6 +85,19 @@ State: zustand `useAppAppearanceStore` (`src/theme/appAppearanceStore.ts`), mode
 - Density is consumed only by the Settings screen for now (sidebar row height, card padding,
   content padding/gaps). Other screens do not read the `--ui-density-*` variables yet.
 
+## App Language
+
+- Lives in the **Language** card at the end of Appearance (after UI Density). It is the only
+  language setting in global Settings.
+- Scope: the language of the app interface (menus, Settings, Library, dialogs, toasts, tooltips).
+  It never changes book content.
+- **Not here:** translation source/target language and book language. Translate already lets the
+  user pick source and target languages in the Reader's Translate panel, so they stay there.
+- **Current limitation:** the app has no i18n/translation layer yet. Choosing a language is
+  persisted and sets `<html lang>`, but all UI strings are still hard-coded in English — switching
+  to Tiếng Việt does not translate the interface yet. Wiring UI strings to this setting is a
+  separate task.
+
 ## Deliberately not in global Settings
 
 Per-book / reader settings stay in the Reader (Aa panel in the right sidebar) and are **not** part
@@ -95,5 +111,5 @@ currently no UI to edit them. They belong in a future Reader/Book defaults secti
 
 ## Not implemented (placeholders)
 
-Language, Library, Storage, Notifications, Keyboard Shortcuts, Privacy, Advanced, About — plus
+Library, Storage, Notifications, Keyboard Shortcuts, Privacy, Advanced, About — plus
 EPUB/PDF reading settings, annotation settings and cloud settings.

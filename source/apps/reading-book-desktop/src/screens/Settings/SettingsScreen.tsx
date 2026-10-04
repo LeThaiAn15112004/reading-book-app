@@ -6,7 +6,7 @@ import {
 } from './logic/settingsNavStore'
 
 const SECTION_DESCRIPTIONS: Partial<Record<SettingsSectionId, string>> = {
-  appearance: 'Theme, accent color and density for the whole app.',
+  appearance: 'Theme, accent color, density and language for the whole app.',
 }
 
 /** SCR-06 — App Settings: section sidebar (collapsible) + content panel. */

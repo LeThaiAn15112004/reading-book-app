@@ -9,6 +9,7 @@ import {
   saveAppAppearance,
   type AccentColorId,
   type AppAppearance,
+  type AppLanguage,
   type AppThemeMode,
   type UiDensity,
 } from './appAppearance'
@@ -17,6 +18,7 @@ type AppAppearanceState = AppAppearance & {
   setThemeMode: (themeMode: AppThemeMode) => void
   setAccent: (accent: AccentColorId) => void
   setDensity: (density: UiDensity) => void
+  setLanguage: (language: AppLanguage) => void
 }
 
 function initialAppearance(): AppAppearance {
@@ -31,16 +33,16 @@ function initialAppearance(): AppAppearance {
 }
 
 /**
- * Global app appearance (theme mode, accent, density), persisted in localStorage. The resolved
+ * Global app appearance (theme mode, accent, density, UI language), persisted in localStorage. The resolved
  * theme is pushed into the shared GlobalReadingPrefs by `AppAppearanceBridge`, which keeps using
  * the existing `html[data-theme]` theme engine.
  */
 export const useAppAppearanceStore = create<AppAppearanceState>()((set, get) => {
   const commit = (patch: Partial<AppAppearance>) => {
     set(patch)
-    const { themeMode, accent, density } = get()
-    saveAppAppearance({ themeMode, accent, density })
-    applyAppearanceAttributes({ accent, density })
+    const { themeMode, accent, density, language } = get()
+    saveAppAppearance({ themeMode, accent, density, language })
+    applyAppearanceAttributes({ accent, density, language })
   }
 
   return {
@@ -48,5 +50,6 @@ export const useAppAppearanceStore = create<AppAppearanceState>()((set, get) => 
     setThemeMode: (themeMode) => commit({ themeMode }),
     setAccent: (accent) => commit({ accent }),
     setDensity: (density) => commit({ density }),
+    setLanguage: (language) => commit({ language }),
   }
 })

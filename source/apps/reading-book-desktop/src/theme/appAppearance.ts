@@ -12,10 +12,17 @@ export type AccentColorId = 'blue' | 'purple' | 'green' | 'cyan' | 'orange' | 'r
 
 export type UiDensity = 'comfortable' | 'balanced' | 'compact'
 
+/**
+ * App UI language. `system` follows the OS/browser locale (Vietnamese when it starts with `vi`,
+ * otherwise English). Book content and the Reader's Translate source/target are not affected.
+ */
+export type AppLanguage = 'system' | 'vi' | 'en'
+
 export type AppAppearance = {
   themeMode: AppThemeMode
   accent: AccentColorId
   density: UiDensity
+  language: AppLanguage
 }
 
 export const APP_APPEARANCE_STORAGE_KEY = 'reading-book.app-appearance.v1'
@@ -25,6 +32,7 @@ export const DEFAULT_APP_APPEARANCE: AppAppearance = {
   themeMode: 'dark',
   accent: 'orange',
   density: 'balanced',
+  language: 'system',
 }
 
 export const APP_THEME_MODES: readonly AppThemeMode[] = ['light', 'dark', 'sepia', 'system']
@@ -40,6 +48,22 @@ export const ACCENT_COLORS: readonly { id: AccentColorId; label: string; swatch:
 ]
 
 export const UI_DENSITIES: readonly UiDensity[] = ['comfortable', 'balanced', 'compact']
+
+export const APP_LANGUAGES: readonly { id: AppLanguage; label: string }[] = [
+  { id: 'system', label: 'System Default' },
+  { id: 'vi', label: 'Tiếng Việt' },
+  { id: 'en', label: 'English' },
+]
+
+/** Concrete UI language for `system` (OS/browser locale), as a BCP 47 tag for `<html lang>`. */
+export function resolveAppLanguage(language: AppLanguage): 'vi' | 'en' {
+  if (language !== 'system') return language
+  try {
+    return navigator.language.toLowerCase().startsWith('vi') ? 'vi' : 'en'
+  } catch {
+    return 'en'
+  }
+}
 
 const SYSTEM_DARK_QUERY = '(prefers-color-scheme: dark)'
 
@@ -107,6 +131,12 @@ export function loadAppAppearance(legacyTheme?: ReaderTheme): AppAppearance {
         ? parsed.accent
         : fallback.accent,
       density: isOneOf(UI_DENSITIES, parsed?.density) ? parsed.density : fallback.density,
+      language: isOneOf(
+        APP_LANGUAGES.map((l) => l.id),
+        parsed?.language,
+      )
+        ? parsed.language
+        : fallback.language,
     }
   } catch {
     return fallback
@@ -121,12 +151,17 @@ export function saveAppAppearance(appearance: AppAppearance): void {
   }
 }
 
-/** Accent + density are plain `<html>` attributes consumed by styles/appearance.css. */
+/**
+ * Accent + density are plain `<html>` attributes consumed by styles/appearance.css; the language
+ * sets `<html lang>` (UI strings themselves are not translated yet).
+ */
 export function applyAppearanceAttributes({
   accent,
   density,
-}: Pick<AppAppearance, 'accent' | 'density'>): void {
+  language,
+}: Pick<AppAppearance, 'accent' | 'density' | 'language'>): void {
   const root = document.documentElement
   root.dataset.accent = accent
   root.dataset.density = density
+  root.lang = resolveAppLanguage(language)
 }

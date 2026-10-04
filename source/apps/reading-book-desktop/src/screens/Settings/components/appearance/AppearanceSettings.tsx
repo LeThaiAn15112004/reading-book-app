@@ -2,6 +2,7 @@ import type { ReactNode } from 'react'
 import { READER_THEME_PRESETS } from '../../../../chrome'
 import {
   ACCENT_COLORS,
+  APP_LANGUAGES,
   APP_THEME_MODES,
   UI_DENSITIES,
   type AppThemeMode,
@@ -109,6 +110,8 @@ export function AppearanceSettings() {
   const setThemeMode = useAppAppearanceStore((s) => s.setThemeMode)
   const setAccent = useAppAppearanceStore((s) => s.setAccent)
   const setDensity = useAppAppearanceStore((s) => s.setDensity)
+  const language = useAppAppearanceStore((s) => s.language)
+  const setLanguage = useAppAppearanceStore((s) => s.setLanguage)
 
   return (
     <div className="@container flex flex-col gap-[var(--ui-density-gap)]">
@@ -243,6 +246,59 @@ export function AppearanceSettings() {
               </button>
             )
           })}
+        </div>
+      </SettingsCard>
+
+      <SettingsCard
+        title="Language"
+        description="Language of the app interface (menus, Settings, Library, dialogs). Book content is not changed; translation languages are chosen in the Reader's Translate panel."
+      >
+        <div className="flex flex-col gap-2">
+          <span id="app-language-label" className="text-[12px] font-semibold text-lib-text-strong">
+            App Language
+          </span>
+          <div
+            className="grid grid-cols-1 gap-2 @lg:grid-cols-3"
+            role="radiogroup"
+            aria-labelledby="app-language-label"
+          >
+            {APP_LANGUAGES.map((option) => {
+              const selected = language === option.id
+              return (
+                <button
+                  key={option.id}
+                  type="button"
+                  role="radio"
+                  aria-checked={selected}
+                  lang={option.id === 'system' ? undefined : option.id}
+                  className={`flex cursor-pointer items-center justify-between gap-3 rounded-lg border px-3 py-2.5 text-left transition-colors ${focusRing} ${
+                    selected
+                      ? 'border-lib-accent bg-lib-accent-soft'
+                      : 'border-lib-border-soft bg-transparent hover:border-lib-border'
+                  }`}
+                  onClick={() => setLanguage(option.id)}
+                >
+                  <span
+                    className={`text-[13px] font-semibold ${
+                      selected ? 'text-lib-accent' : 'text-lib-text-strong'
+                    }`}
+                  >
+                    {option.label}
+                  </span>
+                  <span
+                    className={`inline-flex size-[18px] shrink-0 items-center justify-center rounded-full border ${
+                      selected
+                        ? 'border-lib-accent bg-lib-accent text-lib-bg-deep'
+                        : 'border-lib-border bg-transparent text-transparent'
+                    }`}
+                    aria-hidden
+                  >
+                    <CheckIcon />
+                  </span>
+                </button>
+              )
+            })}
+          </div>
         </div>
       </SettingsCard>
     </div>

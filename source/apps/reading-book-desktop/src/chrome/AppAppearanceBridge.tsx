@@ -11,12 +11,13 @@ import { useGlobalReadingPrefs } from './GlobalReadingPrefsContext'
 /**
  * Applies the global app appearance: resolves the theme mode (incl. System → OS light/dark) into
  * GlobalReadingPrefs.theme — the existing `html[data-theme]` engine — and sets the accent /
- * density attributes. Mounted once inside `GlobalReadingPrefsProvider`.
+ * density attributes and `<html lang>`. Mounted once inside `GlobalReadingPrefsProvider`.
  */
 export function AppAppearanceBridge() {
   const themeMode = useAppAppearanceStore((s) => s.themeMode)
   const accent = useAppAppearanceStore((s) => s.accent)
   const density = useAppAppearanceStore((s) => s.density)
+  const language = useAppAppearanceStore((s) => s.language)
   const { prefs, setPrefs } = useGlobalReadingPrefs()
   const [prefersDark, setPrefersDark] = useState(systemPrefersDark)
 
@@ -36,8 +37,8 @@ export function AppAppearanceBridge() {
   }, [prefs.theme, resolvedTheme, setPrefs])
 
   useEffect(() => {
-    applyAppearanceAttributes({ accent, density })
-  }, [accent, density])
+    applyAppearanceAttributes({ accent, density, language })
+  }, [accent, density, language])
 
   return null
 }
