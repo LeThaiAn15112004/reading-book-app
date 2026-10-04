@@ -10,10 +10,10 @@ navigation placeholders.
 │ Settings      [<] │  Appearance                              │
 │                   │  Theme, accent color and density…        │
 │ ▌Appearance       ├──────────────────────────────────────────┤
-│  Library          │  App Theme     [Light][Dark][Sepia][Sys] │
-│  Storage          │  Accent Color  ● ● ● ● ● ● ●             │
-│  Notifications    │  UI Density    [Comfortable][Balanced]…  │
-│  Keyboard …       │  Language      [System][Tiếng Việt][En]  │
+│  Storage          │  App Theme     [Light][Dark][Sepia][Sys] │
+│  Notifications    │  Accent Color  ● ● ● ● ● ● ●             │
+│  Keyboard …       │  UI Density    [Comfortable][Balanced]…  │
+│                   │  Language      [System][Tiếng Việt][En]  │
 │  Privacy          │                                          │
 │  Advanced         │                                          │
 │  About            │                                          │
@@ -32,11 +32,10 @@ navigation placeholders.
 | Id | Label | Content |
 |---|---|---|
 | `appearance` | Appearance | `AppearanceSettings` (incl. App Language) |
-| `library` | Library | placeholder |
 | `storage` | Storage | `StorageSettings` — see `settings_storage.md` |
 | `notifications` | Notifications | placeholder |
 | `keyboard` | Keyboard Shortcuts | placeholder |
-| `privacy` | Privacy | placeholder |
+| `privacy` | Privacy | `PrivacySettings` — see `settings_privacy.md` |
 | `advanced` | Advanced | placeholder |
 | `about` | About | `AboutSettings` (see *About* below) |
 
@@ -44,20 +43,25 @@ Placeholder sections keep their active state and show *"This settings section is
 yet."* (`SettingsPlaceholder`). To add a section: add the id + label to `SETTINGS_SECTIONS`, an icon
 path in `SettingsSectionIcon`, and render its component in `SettingsScreen`.
 
+**Library section removed:** sort and Grid ⇄ Table are chosen (and remembered) on the Library
+screen itself — see `library_layout_redesign.md`.
+
 **Language was merged into Appearance.** The former `language` sidebar item (and its placeholder)
 was removed — there is no Language section id, route or icon any more.
 
 ### Collapsed / expanded
 
-- Toggle button (chevron) in the sidebar header; `aria-expanded` + label "Collapse/Expand settings
-  sidebar".
+- Toggle = full-height edge handle on the sidebar's right edge (20px tab, rounded right, chevron
+  `‹` / `›`) — same pattern as the Reader's left sidebar handle (`SidebarEdgeRail`);
+  `aria-expanded` + label "Collapse/Expand settings sidebar". Collapsed, the "Settings" title is
+  kept for screen readers only.
 - Expanded `232px` (icon + label); collapsed `60px` (icon only). Width animates (`transition-[width]`,
   200 ms); the content panel is `flex-1 min-w-0`, so it takes the freed space without overflow.
 - Collapsed items keep `aria-label` and get a native tooltip (`title`); the active item keeps its
   accent background + left indicator bar. All items are `<button>`s with a visible
   `focus-visible` outline and `aria-current="page"` on the active one.
 - The collapsed state is persisted in `localStorage` (`reading-book.settings.sidebar-collapsed`),
-  like other panel preferences in the app (Reader sidebar width, Library shelf order).
+  like other panel preferences in the app (Reader sidebar width, Library sort / layout).
 
 ## Appearance (global app appearance)
 
@@ -138,5 +142,5 @@ currently no UI to edit them. They belong in a future Reader/Book defaults secti
 
 ## Not implemented (placeholders)
 
-Library, Notifications, Keyboard Shortcuts, Privacy, Advanced — plus
+Notifications, Keyboard Shortcuts, Advanced — plus
 EPUB/PDF reading settings, annotation settings and cloud settings.
