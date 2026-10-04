@@ -91,6 +91,11 @@ export const SearchChannels = {
   searchBook: 'search:searchBook',
 } as const
 
+export const UpdateChannels = {
+  /** Renderer → main: check for a newer version via this channel's update provider. */
+  check: 'updates:check',
+} as const
+
 export const StorageChannels = {
   /** Renderer → main: usage figures for Settings → Storage. */
   getUsage: 'storage:getUsage',

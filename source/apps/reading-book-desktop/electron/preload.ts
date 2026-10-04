@@ -10,6 +10,7 @@ import {
   SearchChannels,
   StorageChannels,
   TranslationChannels,
+  UpdateChannels,
   WordCountChannels,
 } from './ipc/channels'
 
@@ -141,6 +142,9 @@ const api: DesktopApi = {
   },
   wordCount: {
     getStats: (bookId) => ipcRenderer.invoke(WordCountChannels.getStats, bookId),
+  },
+  updates: {
+    check: () => ipcRenderer.invoke(UpdateChannels.check),
   },
   storage: {
     getUsage: () => ipcRenderer.invoke(StorageChannels.getUsage),

@@ -26,3 +26,4 @@ export {
   type StorageUsage,
   type TranslationModel,
 } from './storage'
+export { updatesApi, type UpdateChannel, type UpdateCheckResult } from './updates'

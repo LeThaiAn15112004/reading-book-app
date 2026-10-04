@@ -7,6 +7,7 @@ import { registerOverlayIpc } from './overlay.ipc'
 import { registerSearchIpc } from './search.ipc'
 import { registerStorageIpc } from './storage.ipc'
 import { registerTranslationIpc } from './translation.ipc'
+import { registerUpdatesIpc } from './updates.ipc'
 import { registerWordCountIpc } from './word-count.ipc'
 
 /** Register all Main-process IPC channel handlers. */
@@ -21,4 +22,5 @@ export function registerAllIpcHandlers(): void {
   registerWordCountIpc()
   registerTranslationIpc()
   registerStorageIpc()
+  registerUpdatesIpc()
 }

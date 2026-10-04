@@ -1,5 +1,6 @@
 import {
   AboutSettings,
+  AdvancedSettings,
   AppearanceSettings,
   PrivacySettings,
   SettingsPlaceholder,
@@ -16,6 +17,7 @@ const SECTION_DESCRIPTIONS: Partial<Record<SettingsSectionId, string>> = {
   appearance: 'Theme, accent color, density and language for the whole app.',
   storage: 'Where Readmate Reader keeps its data and how much space it uses.',
   privacy: 'History Readmate Reader saves about your use — not your books.',
+  advanced: 'Updates for Readmate Reader.',
   about: 'Information about Readmate Reader.',
 }
 
@@ -50,6 +52,8 @@ export function SettingsScreen() {
               <StorageSettings />
             ) : section.id === 'privacy' ? (
               <PrivacySettings />
+            ) : section.id === 'advanced' ? (
+              <AdvancedSettings />
             ) : section.id === 'about' ? (
               <AboutSettings />
             ) : (

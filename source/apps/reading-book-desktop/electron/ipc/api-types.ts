@@ -8,6 +8,29 @@ export interface AppInfo {
   platform: NodeJS.Platform
 }
 
+/** How this copy of the app is distributed (Electron `process.mas` / `process.windowsStore`). */
+export type UpdateChannelDto = 'mac-app-store' | 'microsoft-store' | 'direct'
+
+/**
+ * Settings → Advanced → Updates result. `unavailable` = no update provider exists for this
+ * channel yet (nothing was checked); `failed` = a provider exists but the check errored.
+ */
+export type UpdateCheckResultDto =
+  | { status: 'up-to-date'; currentVersion: string; channel: UpdateChannelDto }
+  | {
+      status: 'update-available'
+      currentVersion: string
+      latestVersion?: string
+      channel: UpdateChannelDto
+    }
+  | {
+      status: 'unavailable'
+      reason: 'no-provider'
+      currentVersion: string
+      channel: UpdateChannelDto
+    }
+  | { status: 'failed'; currentVersion: string; channel: UpdateChannelDto }
+
 export interface GoogleOAuthClientConfigDto {
   clientType: 'installed' | 'web'
   clientId: string
@@ -613,6 +636,10 @@ export interface DesktopApi {
     cancelDownload(externalId: string): Promise<OkResult>
     /** Subscribe to byte progress for the in-flight cloud download(s). Returns unsubscribe. */
     onDownloadProgress(handler: (progress: CloudDownloadProgressDto) => void): () => void
+  }
+  updates: {
+    /** Ask the update provider for this distribution channel (none implemented yet). */
+    check(): Promise<UpdateCheckResultDto>
   }
   storage: {
     getUsage(): Promise<StorageUsageDto>
