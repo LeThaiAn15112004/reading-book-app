@@ -160,6 +160,8 @@ export type CloudSourcesHubProps = {
   onDisconnect: () => void
   onSync: () => void
   onDownload: (entry: ExternalCatalogEntry) => void
+  /** Abort the in-flight download of `entry`. */
+  onCancelDownload: (entry: ExternalCatalogEntry) => void
   /** Local library, used to tell which catalog entries are already downloaded. */
   books: LibraryBook[]
   onOpenBook: (bookId: string) => void
@@ -180,6 +182,7 @@ export function CloudSourcesHub({
   onDisconnect,
   onSync,
   onDownload,
+  onCancelDownload,
   books,
   onOpenBook,
 }: CloudSourcesHubProps) {
@@ -360,24 +363,36 @@ export function CloudSourcesHub({
                         Read
                       </button>
                     ) : (
-                      <button
-                        type="button"
-                        className="inline-flex h-7 shrink-0 cursor-pointer items-center gap-1.5 rounded-md border border-lib-border bg-transparent px-2.5 text-[11px] font-semibold text-lib-muted transition-colors hover:bg-white/5 hover:text-lib-text-strong disabled:cursor-not-allowed disabled:opacity-60"
-                        disabled={isDownloading}
-                        onClick={() => onDownload(entry)}
-                      >
+                      <div className="flex shrink-0 items-center gap-1.5">
+                        <button
+                          type="button"
+                          className="inline-flex h-7 shrink-0 cursor-pointer items-center gap-1.5 rounded-md border border-lib-border bg-transparent px-2.5 text-[11px] font-semibold text-lib-muted transition-colors hover:bg-white/5 hover:text-lib-text-strong disabled:cursor-not-allowed disabled:opacity-60"
+                          disabled={isDownloading || downloadingId !== null}
+                          onClick={() => onDownload(entry)}
+                        >
+                          {isDownloading ? (
+                            <>
+                              <DownloadRing percent={progressPercent} />
+                              {receivedLabel ? `Downloading... (${receivedLabel})` : 'Downloading...'}
+                            </>
+                          ) : (
+                            <>
+                              <CloudIcon className="size-3.5" />
+                              Download
+                            </>
+                          )}
+                        </button>
                         {isDownloading ? (
-                          <>
-                            <DownloadRing percent={progressPercent} />
-                            {receivedLabel ? `Downloading... (${receivedLabel})` : 'Downloading...'}
-                          </>
-                        ) : (
-                          <>
-                            <CloudIcon className="size-3.5" />
-                            Download
-                          </>
-                        )}
-                      </button>
+                          <button
+                            type="button"
+                            className="inline-flex h-7 shrink-0 cursor-pointer items-center rounded-md border-none bg-transparent px-2 text-[11px] font-semibold text-lib-faint transition-colors hover:bg-white/5 hover:text-lib-text-strong"
+                            aria-label={`Cancel downloading ${entry.title}`}
+                            onClick={() => onCancelDownload(entry)}
+                          >
+                            Cancel
+                          </button>
+                        ) : null}
+                      </div>
                     )}
                   </li>
                 )

@@ -18,10 +18,17 @@ const DEFAULT_FOLDER_PATH: Record<ExternalLibraryProvider, string> = {
 
 export type CloudToastVariant = 'success' | 'error' | 'info'
 
+/** Optional one-click follow-up on a toast (Open / Retry / Connect). */
+export type CloudToastAction = { label: string; run: () => void }
+
 export type UseCloudSourcesOptions = {
-  showToast: (message: string, variant: CloudToastVariant) => void
+  showToast: (message: string, variant: CloudToastVariant, action?: CloudToastAction) => void
   /** Called after a successful download so the Library grid refreshes. */
   onDownloaded: () => void
+  /** The entry is already in the library (same provider file or same SHA-256): raise the conflict dialog. */
+  onDuplicate: (bookId: string, message?: string) => void
+  /** Open a book in the reader (success toast "Open" action). */
+  onOpenBook: (bookId: string) => void
 }
 
 /** Cloud Sources tab controller: connect/disconnect, folder-scoped sync, lazy download. */
@@ -124,19 +131,45 @@ export function useCloudSources(options: UseCloudSourcesOptions) {
   )
 
   const download = useCallback(
-    async (provider: ExternalLibraryProvider, entry: ExternalCatalogEntry) => {
+    async (provider: ExternalLibraryProvider, entry: ExternalCatalogEntry): Promise<void> => {
       setDownloadingId(entry.externalId)
       try {
         const result = await cloudApi.downloadAndImport(provider, entry)
-        if (result.ok) {
-          options.showToast(`Downloaded "${entry.title}".`, 'success')
-          options.onDownloaded()
-        } else {
-          options.showToast(
-            result.errorMessage ?? `Could not download "${entry.title}".`,
-            'error',
-          )
+        const message = result.errorMessage ?? `Could not download "${entry.title}".`
+        const retry: CloudToastAction = {
+          label: 'Retry',
+          run: () => void download(provider, entry),
         }
+        if (result.ok && result.bookId) {
+          const bookId = result.bookId
+          options.showToast(`Downloaded "${entry.title}".`, 'success', {
+            label: 'Open',
+            run: () => options.onOpenBook(bookId),
+          })
+          options.onDownloaded()
+        } else if (result.errorCode === 'duplicate' && result.bookId) {
+          options.onDuplicate(result.bookId, result.errorMessage)
+        } else if (result.errorCode === 'cancelled') {
+          options.showToast('Download cancelled.', 'info')
+        } else if (result.errorCode === 'not_connected') {
+          options.showToast(message, 'error', {
+            label: 'Connect',
+            run: () => void connect(provider),
+          })
+        } else if (
+          result.errorCode === 'network' ||
+          result.errorCode === 'timeout' ||
+          result.errorCode === 'save_failed'
+        ) {
+          options.showToast(message, 'error', retry)
+        } else {
+          options.showToast(message, 'error')
+        }
+      } catch {
+        options.showToast(`Could not download "${entry.title}".`, 'error', {
+          label: 'Retry',
+          run: () => void download(provider, entry),
+        })
       } finally {
         setDownloadingId(null)
         setProgressByExternalId((prev) => {
@@ -146,8 +179,14 @@ export function useCloudSources(options: UseCloudSourcesOptions) {
         })
       }
     },
-    [options],
+    [options, connect],
   )
+
+  const cancelDownload = useCallback((entry: ExternalCatalogEntry) => {
+    cloudApi.cancelDownload(entry.externalId).catch(() => {
+      // Already finished — the download result reports the outcome.
+    })
+  }, [])
 
   return {
     providers,
@@ -163,5 +202,6 @@ export function useCloudSources(options: UseCloudSourcesOptions) {
     disconnect,
     sync,
     download,
+    cancelDownload,
   }
 }

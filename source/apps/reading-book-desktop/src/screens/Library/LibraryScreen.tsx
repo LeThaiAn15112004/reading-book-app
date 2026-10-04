@@ -58,12 +58,14 @@ export function LibraryScreen() {
     toast,
     clearToast,
     progress,
+    canCancel,
     conflict,
-    urlDialogOpen,
-    setUrlDialogOpen,
+    urlDialog,
+    closeUrlDialog,
     handleFromDevice,
     handleFromUrl,
     handleUrlSubmit,
+    handleCancelImport,
     handleConflictDiscard,
     handleConflictOpenExisting,
     view,
@@ -199,7 +201,8 @@ export function LibraryScreen() {
             onConnect={() => cloudSources.connect(view.provider)}
             onDisconnect={() => cloudSources.disconnect(view.provider)}
             onSync={() => cloudSources.sync(view.provider)}
-            onDownload={(entry) => cloudSources.download(view.provider, entry)}
+            onDownload={(entry) => void cloudSources.download(view.provider, entry)}
+            onCancelDownload={cloudSources.cancelDownload}
             books={bookList}
             onOpenBook={openReader}
           />
@@ -282,6 +285,7 @@ export function LibraryScreen() {
         open={toast !== null}
         message={toast?.message ?? ''}
         variant={toast?.variant ?? 'info'}
+        action={toast?.action}
         onClose={clearToast}
       />
 
@@ -293,15 +297,20 @@ export function LibraryScreen() {
       />
 
       <ImportUrlDialog
-        open={urlDialogOpen}
-        onClose={() => setUrlDialogOpen(false)}
-        onSubmit={handleUrlSubmit}
+        open={urlDialog.open}
+        initialUrl={urlDialog.initialUrl}
+        submitError={urlDialog.error}
+        onClose={closeUrlDialog}
+        onSubmit={(url) => void handleUrlSubmit(url)}
       />
 
       <ImportProgressDialog
         open={progress !== null}
-        status={progress?.status ?? 'Importing…'}
+        status={progress?.stage === 'downloading' ? 'Downloading…' : 'Importing…'}
         filename={progress?.filename}
+        receivedBytes={progress?.receivedBytes}
+        totalBytes={progress?.totalBytes}
+        onCancel={canCancel ? handleCancelImport : undefined}
       />
 
       <ImportConflictDialog

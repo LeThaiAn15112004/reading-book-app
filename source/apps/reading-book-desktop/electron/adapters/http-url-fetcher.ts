@@ -1,4 +1,8 @@
-import type { UrlDocumentFetcher, UrlFetchResult } from '@reading-book/book-reader-sdk'
+import type {
+  UrlDocumentFetcher,
+  UrlFetchOptions,
+  UrlFetchResult,
+} from '@reading-book/book-reader-sdk'
 import { app } from 'electron'
 import { randomUUID } from 'node:crypto'
 import fs from 'node:fs'
@@ -16,6 +20,8 @@ export type UrlFetchErrorCode =
   | 'network'
   | 'not_direct_file'
   | 'http_status'
+  /** The caller aborted `options.signal`. */
+  | 'cancelled'
 
 export class UrlFetchError extends Error {
   readonly code: UrlFetchErrorCode
@@ -27,7 +33,11 @@ export class UrlFetchError extends Error {
   }
 }
 
-export const DOWNLOAD_TIMEOUT_MS = 60_000
+/**
+ * Idle timeout: the download fails only when no response / no bytes arrive for this long, so a
+ * large file on a slow but steady connection is not cut off.
+ */
+export const DOWNLOAD_IDLE_TIMEOUT_MS = 30_000
 export const MAX_DOWNLOAD_BYTES = 100 * 1024 * 1024
 export const MAX_REDIRECTS = 5
 
@@ -85,7 +95,14 @@ function basenameFromUrl(url: URL): string | undefined {
   }
 }
 
-function createByteLimitTransform(maxBytes: number): Transform {
+/**
+ * Counts bytes (enforcing `maxBytes`) and reports each chunk — used to re-arm the idle timeout
+ * and to emit progress.
+ */
+function createByteCountTransform(
+  maxBytes: number,
+  onChunk: (receivedBytes: number) => void,
+): Transform {
   let total = 0
   return new Transform({
     transform(chunk, _enc, cb) {
@@ -94,6 +111,7 @@ function createByteLimitTransform(maxBytes: number): Transform {
         cb(new UrlFetchError('too_large', 'File exceeds the maximum download size (100 MB).'))
         return
       }
+      onChunk(total)
       cb(null, chunk)
     },
   })
@@ -104,21 +122,54 @@ async function removeQuietly(filePath: string | undefined): Promise<void> {
   await fsp.rm(filePath, { force: true }).catch(() => {})
 }
 
+const TIMEOUT_MESSAGE = 'The download stalled and timed out. Check your connection and try again.'
+const CANCELLED_MESSAGE = 'Download cancelled.'
+
 /**
  * Main-process HTTPS direct-file downloader (SDS §2.6 / FR-13 / T2.4).
- * Streams to a temp path with scheme allowlist, timeout, size limit, and bounded redirects.
+ * Streams to a temp path with scheme allowlist, idle timeout, size limit, bounded redirects,
+ * caller cancel (`options.signal`) and byte progress (`options.onProgress`).
  * T2.10: on failure after a partial write, removeQuietly deletes the temp file.
  */
 export class HttpUrlFetcher implements UrlDocumentFetcher {
-  async fetch(url: string): Promise<UrlFetchResult> {
+  async fetch(url: string, options: UrlFetchOptions = {}): Promise<UrlFetchResult> {
     let current = assertHttpsUrl(url.trim())
+    if (options.signal?.aborted) {
+      throw new UrlFetchError('cancelled', CANCELLED_MESSAGE)
+    }
     const tempRoot = app.getPath('temp')
     let tempPath: string | undefined
     let wroteFile = false
 
     const controller = new AbortController()
-    const timer = setTimeout(() => controller.abort(), DOWNLOAD_TIMEOUT_MS)
+    /** Why `controller` was aborted — decides between `timeout` and `cancelled`. */
+    let abortCause: 'timeout' | 'cancelled' | null = null
+    const abortWith = (cause: 'timeout' | 'cancelled') => {
+      if (abortCause) return
+      abortCause = cause
+      controller.abort()
+    }
 
+    let timer: ReturnType<typeof setTimeout> | undefined
+    const armIdleTimeout = () => {
+      if (timer) clearTimeout(timer)
+      timer = setTimeout(() => abortWith('timeout'), DOWNLOAD_IDLE_TIMEOUT_MS)
+    }
+
+    const onExternalAbort = () => abortWith('cancelled')
+    options.signal?.addEventListener('abort', onExternalAbort, { once: true })
+
+    /** Map an abort (ours or the caller's) to its stable error; null when `err` is not an abort. */
+    const abortError = (err: unknown): UrlFetchError | null => {
+      const isAbort =
+        controller.signal.aborted || (err instanceof Error && err.name === 'AbortError')
+      if (!isAbort) return null
+      return abortCause === 'cancelled'
+        ? new UrlFetchError('cancelled', CANCELLED_MESSAGE)
+        : new UrlFetchError('timeout', TIMEOUT_MESSAGE)
+    }
+
+    armIdleTimeout()
     try {
       let redirects = 0
       let response: Response | undefined
@@ -132,14 +183,15 @@ export class HttpUrlFetcher implements UrlDocumentFetcher {
             headers: { Accept: '*/*' },
           })
         } catch (err) {
-          if (controller.signal.aborted || (err instanceof Error && err.name === 'AbortError')) {
-            throw new UrlFetchError('timeout', 'Download timed out. Please try again.')
-          }
-          throw new UrlFetchError(
-            'network',
-            err instanceof Error ? err.message : 'Network error while downloading.',
+          throw (
+            abortError(err) ??
+            new UrlFetchError(
+              'network',
+              err instanceof Error ? err.message : 'Network error while downloading.',
+            )
           )
         }
+        armIdleTimeout()
 
         if (response.status >= 300 && response.status < 400) {
           const location = response.headers.get('location')
@@ -177,11 +229,15 @@ export class HttpUrlFetcher implements UrlDocumentFetcher {
         )
       }
 
+      let totalBytes: number | null = null
       const contentLengthHeader = response.headers.get('content-length')
       if (contentLengthHeader) {
         const len = Number(contentLengthHeader)
-        if (Number.isFinite(len) && len > MAX_DOWNLOAD_BYTES) {
-          throw new UrlFetchError('too_large', 'File exceeds the maximum download size (100 MB).')
+        if (Number.isFinite(len)) {
+          if (len > MAX_DOWNLOAD_BYTES) {
+            throw new UrlFetchError('too_large', 'File exceeds the maximum download size (100 MB).')
+          }
+          totalBytes = len
         }
       }
 
@@ -199,20 +255,27 @@ export class HttpUrlFetcher implements UrlDocumentFetcher {
       const nodeStream = Readable.fromWeb(
         response.body as unknown as NodeWebReadableStream,
       )
-      const limit = createByteLimitTransform(MAX_DOWNLOAD_BYTES)
+      const counter = createByteCountTransform(MAX_DOWNLOAD_BYTES, (received) => {
+        armIdleTimeout()
+        try {
+          options.onProgress?.(received, totalBytes)
+        } catch {
+          // A failing progress listener must never break the download.
+        }
+      })
       const out = fs.createWriteStream(tempPath)
       wroteFile = true
 
       try {
-        await pipeline(nodeStream, limit, out)
+        await pipeline(nodeStream, counter, out)
       } catch (err) {
         if (err instanceof UrlFetchError) throw err
-        if (controller.signal.aborted || (err instanceof Error && err.name === 'AbortError')) {
-          throw new UrlFetchError('timeout', 'Download timed out. Please try again.')
-        }
-        throw new UrlFetchError(
-          'network',
-          err instanceof Error ? err.message : 'Failed to write downloaded file.',
+        throw (
+          abortError(err) ??
+          new UrlFetchError(
+            'network',
+            err instanceof Error ? err.message : 'Failed to write downloaded file.',
+          )
         )
       }
 
@@ -224,15 +287,13 @@ export class HttpUrlFetcher implements UrlDocumentFetcher {
     } catch (err) {
       if (wroteFile) await removeQuietly(tempPath)
       if (err instanceof UrlFetchError) throw err
-      if (err instanceof Error && err.name === 'AbortError') {
-        throw new UrlFetchError('timeout', 'Download timed out. Please try again.')
-      }
-      throw new UrlFetchError(
-        'network',
-        err instanceof Error ? err.message : 'Download failed.',
+      throw (
+        abortError(err) ??
+        new UrlFetchError('network', err instanceof Error ? err.message : 'Download failed.')
       )
     } finally {
-      clearTimeout(timer)
+      if (timer) clearTimeout(timer)
+      options.signal?.removeEventListener('abort', onExternalAbort)
     }
   }
 }

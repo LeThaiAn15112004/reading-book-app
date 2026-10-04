@@ -51,6 +51,10 @@ export const LibraryChannels = {
 export const ImportChannels = {
   fromFile: 'import:fromFile',
   fromUrl: 'import:fromUrl',
+  /** Renderer → main: abort the in-flight URL download. */
+  cancel: 'import:cancel',
+  /** Main → renderer: step / byte progress, sent only once a file has been picked. */
+  progress: 'import:progress',
 } as const
 
 export const CloudChannels = {
@@ -58,6 +62,8 @@ export const CloudChannels = {
   disconnect: 'cloud:disconnect',
   getAccessToken: 'cloud:getAccessToken',
   downloadAndImport: 'cloud:downloadAndImport',
+  /** Renderer → main: abort the in-flight download of one catalog entry. */
+  cancelDownload: 'cloud:cancelDownload',
   /** Main → renderer: streamed byte progress while a cloud download is in flight. */
   downloadProgress: 'cloud:downloadProgress',
 } as const

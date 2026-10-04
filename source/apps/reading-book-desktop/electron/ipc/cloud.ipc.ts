@@ -29,13 +29,18 @@ import {
 } from '@reading-book/config'
 import { loadDropboxOAuthCredentials, loadOneDriveOAuthCredentials } from '../config/cloud-oauth-config'
 import { loadGoogleOAuthCredentials } from '../config/google-oauth-config'
-import { assertSupportedExtension, UnsupportedFormatError } from '../files/format-guard'
 import { sanitizeFilename } from '../files/metadata-filename'
-import { copyIntoBooksSandbox } from '../files/sandbox'
 import { openGoogleOAuthViaLoopback } from '../oauth/google-loopback-server'
 import { getLibraryStore } from '../persistence/sqlite-library-store'
 import { SafeStorageTokenStore } from '../security/token-vault'
-import { finishImportAfterCopy, rejectIfDuplicate } from './import.ipc'
+import { DOWNLOAD_IDLE_TIMEOUT_MS } from '../adapters/http-url-fetcher'
+import { beginCancellable, cancelInFlight, endCancellable } from './import-cancel'
+import {
+  cancelledResult,
+  duplicateResult,
+  importDownloadedFile,
+  importFailure,
+} from './import.ipc'
 import type {
   CloudCatalogEntryDto,
   CloudConnectResult,
@@ -336,6 +341,72 @@ function progressSenderFor(
   }
 }
 
+type DownloadOutcome = 'done' | 'cancelled' | 'timeout'
+
+/**
+ * Runs a provider download and settles early on user cancel (`signal`) or when no bytes arrive
+ * for the idle window. Provider SDK downloads cannot be aborted, so an abandoned one keeps running
+ * in the background: `settled` resolves once it really finishes, so its temp dir can go then.
+ */
+function raceDownload(
+  start: (onProgress: DownloadProgressListener) => Promise<unknown>,
+  onProgress: DownloadProgressListener,
+  signal: AbortSignal,
+): { outcome: Promise<DownloadOutcome>; settled: Promise<void> } {
+  let decided = false
+  let timer: ReturnType<typeof setTimeout> | undefined
+  let resolveOutcome!: (value: DownloadOutcome) => void
+  let rejectOutcome!: (err: unknown) => void
+  const outcome = new Promise<DownloadOutcome>((resolve, reject) => {
+    resolveOutcome = resolve
+    rejectOutcome = reject
+  })
+
+  const decide = (apply: () => void) => {
+    if (decided) return
+    decided = true
+    if (timer) clearTimeout(timer)
+    signal.removeEventListener('abort', onAbort)
+    apply()
+  }
+  const armIdleTimeout = () => {
+    if (timer) clearTimeout(timer)
+    timer = setTimeout(() => decide(() => resolveOutcome('timeout')), DOWNLOAD_IDLE_TIMEOUT_MS)
+  }
+  const onAbort = () => decide(() => resolveOutcome('cancelled'))
+
+  if (signal.aborted) {
+    decide(() => resolveOutcome('cancelled'))
+    return { outcome, settled: Promise.resolve() }
+  }
+  signal.addEventListener('abort', onAbort, { once: true })
+  armIdleTimeout()
+
+  let download: Promise<unknown>
+  try {
+    download = start((receivedBytes, totalBytes) => {
+      if (decided) return
+      armIdleTimeout()
+      try {
+        onProgress(receivedBytes, totalBytes)
+      } catch {
+        // A failing progress listener must never break the download.
+      }
+    })
+  } catch (err) {
+    download = Promise.reject(err)
+  }
+  const settled = download.then(
+    () => decide(() => resolveOutcome('done')),
+    (err: unknown) => decide(() => rejectOutcome(err)),
+  )
+  return { outcome, settled }
+}
+
+function cloudCancelKey(externalId: string): string {
+  return `cloud:${externalId}`
+}
+
 async function downloadAndImport(
   provider: CloudProviderDto,
   entry: CloudCatalogEntryDto,
@@ -344,62 +415,87 @@ async function downloadAndImport(
   const store = getLibraryStore()
   const existing = await store.findByProviderAndExternalId(provider, entry.externalId)
   if (existing) {
-    return { ok: true, bookId: existing.id }
+    // Same file already downloaded from this provider: same conflict UX as a SHA-256 duplicate.
+    return duplicateResult(existing.id)
   }
 
   // `entry` comes from the renderer, so it is never trusted for anything path-like: the DTO carries
   // no local path, Main only fetches through the provider's authenticated API into its own temp
   // dir, and the extension is checked before it becomes part of a file name.
   const kit = getKits()[provider]
-  const accessToken = await kit.getValidAccessToken()
-  if (!accessToken) {
-    return {
-      ok: false,
-      bookId: null,
-      errorMessage: 'Not connected to this cloud source. Connect it first.',
-    }
+  let accessToken: string | null
+  try {
+    accessToken = await kit.getValidAccessToken()
+  } catch (err) {
+    console.warn('[cloud] could not get an access token', err)
+    accessToken = null
   }
+  if (!accessToken) {
+    return importFailure(
+      'not_connected',
+      'Not connected to this cloud source. Connect it first.',
+    )
+  }
+  const token = accessToken
 
   const ext = entry.formatHint?.replace(/^\./, '').toLowerCase()
   if (!ext || !isSupportedExtension(`.${ext}`)) {
-    return {
-      ok: false,
-      bookId: null,
-      errorCode: 'unsupported_format',
-      errorMessage: 'Unknown file format.',
-    }
+    return importFailure('unsupported_format', 'Unknown file format.')
   }
 
-  const tempDir = await fsp.mkdtemp(path.join(os.tmpdir(), 'reading-book-cloud-'))
+  let tempDir: string
+  try {
+    tempDir = await fsp.mkdtemp(path.join(os.tmpdir(), 'reading-book-cloud-'))
+  } catch (err) {
+    console.warn('[cloud] could not create a temp folder', err)
+    return importFailure('save_failed', 'Could not prepare the download.')
+  }
+  const removeTempDir = () => fsp.rm(tempDir, { recursive: true, force: true }).catch(() => {})
   const safeName = sanitizeFilename(entry.title)
   const tempPath = path.join(tempDir, `${safeName}.${ext}`)
+  const cancelKey = cloudCancelKey(entry.externalId)
+  const controller = beginCancellable(cancelKey)
+  let abandoned = false
+
   try {
-    await kit.downloadToFile(
-      accessToken,
-      remoteIdFor(provider, entry),
-      tempPath,
+    const { outcome, settled } = raceDownload(
+      (onProgress) =>
+        kit.downloadToFile(token, remoteIdFor(provider, entry), tempPath, onProgress),
       progressSenderFor(sender, provider, entry),
+      controller.signal,
     )
-    assertSupportedExtension(tempPath)
-    const conflict = await rejectIfDuplicate(tempPath)
-    if (conflict) return conflict
-    const destPath = await copyIntoBooksSandbox(tempPath)
-    return await finishImportAfterCopy(destPath, {
+
+    let result: DownloadOutcome
+    try {
+      result = await outcome
+    } catch (err) {
+      console.warn('[cloud] download failed', err)
+      return importFailure(
+        'network',
+        err instanceof Error && err.message ? err.message : `Could not download "${entry.title}".`,
+      )
+    }
+
+    if (result !== 'done') {
+      // The provider call is still running: clean its temp dir up once it finishes.
+      abandoned = true
+      void settled.finally(removeTempDir)
+      return result === 'cancelled'
+        ? cancelledResult()
+        : importFailure(
+            'timeout',
+            'The download stalled and timed out. Check your connection and try again.',
+          )
+    }
+
+    endCancellable(cancelKey, controller)
+    return await importDownloadedFile(tempPath, {
       sourceProvider: provider,
       externalId: entry.externalId,
     })
-  } catch (err) {
-    if (err instanceof UnsupportedFormatError) {
-      return { ok: false, bookId: null, errorCode: err.code, errorMessage: err.message }
-    }
-    return {
-      ok: false,
-      bookId: null,
-      errorCode: 'network',
-      errorMessage: err instanceof Error ? err.message : String(err),
-    }
   } finally {
-    await fsp.rm(tempDir, { recursive: true, force: true }).catch(() => {})
+    endCancellable(cancelKey, controller)
+    if (!abandoned) await removeTempDir()
   }
 }
 
@@ -443,7 +539,20 @@ export function registerCloudIpc(): void {
       ) {
         return Promise.resolve({ ok: false, bookId: null, errorMessage: 'Invalid request.' })
       }
-      return downloadAndImport(provider, value as CloudCatalogEntryDto, event.sender)
+      return downloadAndImport(provider, value as CloudCatalogEntryDto, event.sender).catch(
+        (err: unknown): CloudDownloadResult => {
+          console.warn('[cloud] download-and-import failed', err)
+          return importFailure('save_failed', `Could not import "${value.title}".`)
+        },
+      )
     },
+  )
+
+  ipcMain.removeHandler(CloudChannels.cancelDownload)
+  ipcMain.handle(
+    CloudChannels.cancelDownload,
+    (_event, externalId: unknown): OkResult => ({
+      ok: typeof externalId === 'string' && cancelInFlight(cloudCancelKey(externalId)),
+    }),
   )
 }

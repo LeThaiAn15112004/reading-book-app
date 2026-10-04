@@ -7,6 +7,10 @@ export type ImportUrlDialogProps = {
   onClose: () => void
   /** Called with a validated https URL; parent owns IPC / download. */
   onSubmit: (url: string) => void
+  /** Pre-filled URL (kept after a failed download). */
+  initialUrl?: string
+  /** Error from the last download attempt; `retryable` turns the submit button into Retry. */
+  submitError?: { message: string; retryable: boolean } | null
 }
 
 function LinkIcon({ className }: { className?: string }) {
@@ -34,6 +38,8 @@ export function ImportUrlDialog({
   open,
   onClose,
   onSubmit,
+  initialUrl = '',
+  submitError = null,
 }: ImportUrlDialogProps) {
   const titleId = useId()
   const errorId = useId()
@@ -43,11 +49,11 @@ export function ImportUrlDialog({
 
   useEffect(() => {
     if (!open) return
-    setUrl('')
-    setError(null)
+    setUrl(initialUrl)
+    setError(submitError?.message ?? null)
     const t = window.setTimeout(() => inputRef.current?.focus(), 0)
     return () => window.clearTimeout(t)
-  }, [open])
+  }, [open, initialUrl, submitError])
 
   useEffect(() => {
     if (!open) return
@@ -63,6 +69,10 @@ export function ImportUrlDialog({
 
   if (!open) return null
 
+  // Retry only while the failed URL is still in the box and the error is still shown.
+  const isRetry =
+    submitError?.retryable === true && error !== null && url.trim() === initialUrl.trim()
+
   function handleSubmit(e: FormEvent) {
     e.preventDefault()
     const trimmed = url.trim()
@@ -73,7 +83,6 @@ export function ImportUrlDialog({
     }
     setError(null)
     onSubmit(trimmed)
-    onClose()
   }
 
   return (
@@ -167,7 +176,7 @@ export function ImportUrlDialog({
               className="inline-flex h-[38px] cursor-pointer items-center rounded-lg border-none bg-lib-accent px-4 text-[13px] font-semibold text-lib-bg-deep transition-colors hover:bg-lib-accent-hover disabled:cursor-not-allowed disabled:opacity-50"
               disabled={!url.trim()}
             >
-              Download
+              {isRetry ? 'Retry' : 'Download'}
             </button>
           </div>
         </form>

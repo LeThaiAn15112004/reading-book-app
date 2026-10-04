@@ -11,6 +11,7 @@ export const cloudApi = {
     provider: Parameters<typeof window.api.cloud.downloadAndImport>[0],
     entry: Parameters<typeof window.api.cloud.downloadAndImport>[1],
   ) => window.api.cloud.downloadAndImport(provider, entry),
+  cancelDownload: (externalId: string) => window.api.cloud.cancelDownload(externalId),
   onDownloadProgress: (
     handler: Parameters<typeof window.api.cloud.onDownloadProgress>[0],
   ) => window.api.cloud.onDownloadProgress(handler),

@@ -13,6 +13,14 @@ export interface UrlFetchResult {
  * Download a direct document URL via Main process (SDS §2.6).
  * Adapter MVP: HttpUrlFetcher (timeout, size limit, scheme allowlist).
  */
+/** Optional controls for one download: user cancel and byte progress. */
+export interface UrlFetchOptions {
+  /** Aborting it cancels the download (the fetcher reports a `cancelled` failure). */
+  signal?: AbortSignal;
+  /** Cumulative bytes written; `totalBytes` is null when the server sent no Content-Length. */
+  onProgress?: (receivedBytes: number, totalBytes: number | null) => void;
+}
+
 export interface UrlDocumentFetcher {
-  fetch(url: string): Promise<UrlFetchResult>;
+  fetch(url: string, options?: UrlFetchOptions): Promise<UrlFetchResult>;
 }

@@ -6,8 +6,10 @@ export type ImportToastProps = {
   open: boolean
   message: string
   variant?: ImportToastVariant
-  /** Auto-hide delay in ms; default 2800. */
+  /** Auto-hide delay in ms; default 2800 (6000 when an action is shown). */
   durationMs?: number
+  /** Optional follow-up button (Open / Retry / Connect). Clicking it also closes the toast. */
+  action?: { label: string; run: () => void }
   onClose: () => void
 }
 
@@ -38,14 +40,16 @@ export function ImportToast({
   open,
   message,
   variant = 'info',
-  durationMs = 2800,
+  durationMs,
+  action,
   onClose,
 }: ImportToastProps) {
+  const hideAfterMs = durationMs ?? (action ? 6000 : 2800)
   useEffect(() => {
     if (!open) return
-    const id = window.setTimeout(onClose, durationMs)
+    const id = window.setTimeout(onClose, hideAfterMs)
     return () => window.clearTimeout(id)
-  }, [open, durationMs, onClose, message])
+  }, [open, hideAfterMs, onClose, message])
 
   if (!open) return null
 
@@ -73,6 +77,18 @@ export function ImportToast({
         />
       )}
       <p className="m-0 text-[13px] font-medium text-lib-text-strong">{message}</p>
+      {action ? (
+        <button
+          type="button"
+          className="pointer-events-auto ml-1 inline-flex h-7 shrink-0 cursor-pointer items-center rounded-md border-none bg-lib-accent-soft px-2.5 text-[12px] font-semibold text-lib-accent transition-colors hover:bg-lib-accent hover:text-lib-bg-deep"
+          onClick={() => {
+            onClose()
+            action.run()
+          }}
+        >
+          {action.label}
+        </button>
+      ) : null}
     </div>
   )
 }

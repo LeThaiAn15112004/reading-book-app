@@ -102,18 +102,21 @@ export function useLibraryScreen() {
     clearToast,
     showToast,
     progress,
+    canCancel,
     conflict,
-    urlDialogOpen,
-    setUrlDialogOpen,
+    showConflict,
+    urlDialog,
+    closeUrlDialog,
     handleFromDevice,
     handleFromUrl,
     handleUrlSubmit,
+    handleCancelImport,
     handleConflictDiscard,
     handleConflictOpenExisting,
   } = useLibraryImport({
     client: importApi,
     onImported: refreshLibrary,
-    onOpenExisting: openReader,
+    onOpenBook: openReader,
   })
 
   const {
@@ -132,6 +135,8 @@ export function useLibraryScreen() {
   const cloudSources = useCloudSources({
     showToast,
     onDownloaded: refreshLibrary,
+    onDuplicate: showConflict,
+    onOpenBook: openReader,
   })
 
   function handleFilterChange(filter: LibraryFilterId) {
@@ -522,12 +527,14 @@ export function useLibraryScreen() {
     toast,
     clearToast,
     progress,
+    canCancel,
     conflict,
-    urlDialogOpen,
-    setUrlDialogOpen,
+    urlDialog,
+    closeUrlDialog,
     handleFromDevice,
     handleFromUrl,
     handleUrlSubmit,
+    handleCancelImport,
     handleConflictDiscard,
     handleConflictOpenExisting,
     view,

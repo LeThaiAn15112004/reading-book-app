@@ -203,18 +203,48 @@ export interface RelinkBookResult {
   errorMessage?: string
 }
 
-/** Stable codes for import failures (URL download / copy / format / dedup). */
+/**
+ * Stable codes for import failures (URL / cloud download, format, dedup, file access, persist).
+ * Mirrors `ImportErrorCode` in book-reader-sdk; the Library UX (docs/ui-ux-flows.md §9) maps each
+ * code to a toast, an inline error or a dialog.
+ */
 export type ImportErrorCode =
   | 'scheme'
+  /** No bytes received for the idle-timeout window. Retryable. */
   | 'timeout'
   | 'too_large'
+  /** Transport failure (DNS, reset, too many redirects, cloud API error). Retryable. */
   | 'network'
   | 'not_direct_file'
   | 'http_status'
-  | 'copy_failed'
   | 'unsupported_format'
-  /** SHA-256 already in library (BR-03); bookId is the existing row. */
+  /** SHA-256 (or cloud provider + externalId) already in library (BR-03); bookId is the existing row. */
   | 'duplicate'
+  /** File was read but its content/metadata could not be parsed. */
+  | 'corrupted'
+  /** OS refused to read the file (EACCES / EPERM). */
+  | 'access_denied'
+  /** File vanished between being picked and being read (ENOENT). */
+  | 'missing_file'
+  /** Picked file lives inside the app's own data folder. */
+  | 'inside_app_data'
+  /** Copying into the library sandbox or writing the database row failed. Retryable. */
+  | 'save_failed'
+  /** Cloud provider is not linked, or its token could not be refreshed. */
+  | 'not_connected'
+  /** User cancelled an in-flight download. */
+  | 'cancelled'
+
+/** Main → renderer: which step a Library import is on (sent only after a file was picked). */
+export interface ImportProgressDto {
+  stage: 'downloading' | 'importing'
+  /** Display name only (basename) — never a full path. */
+  filename?: string
+  /** Bytes received so far while downloading. */
+  receivedBytes?: number
+  /** Content-Length when known. */
+  totalBytes?: number | null
+}
 
 export interface ImportResult {
   ok: boolean
@@ -496,6 +526,10 @@ export interface DesktopApi {
   import: {
     fromFile(): Promise<ImportResult>
     fromUrl(url: string): Promise<ImportResult>
+    /** Cancel the in-flight URL download (no-op when none). */
+    cancel(): Promise<OkResult>
+    /** Subscribe to step / byte progress of the running import. Returns unsubscribe. */
+    onProgress(handler: (progress: ImportProgressDto) => void): () => void
   }
   overlay: {
     getSessionState(bookId: string): Promise<ReadingSessionStateDto | null>
@@ -536,6 +570,8 @@ export interface DesktopApi {
       provider: CloudProviderDto,
       entry: CloudCatalogEntryDto,
     ): Promise<CloudDownloadResult>
+    /** Cancel the in-flight download of one catalog entry (no-op when none). */
+    cancelDownload(externalId: string): Promise<OkResult>
     /** Subscribe to byte progress for the in-flight cloud download(s). Returns unsubscribe. */
     onDownloadProgress(handler: (progress: CloudDownloadProgressDto) => void): () => void
   }

@@ -88,6 +88,19 @@ const api: DesktopApi = {
   import: {
     fromFile: () => ipcRenderer.invoke(ImportChannels.fromFile),
     fromUrl: (url) => ipcRenderer.invoke(ImportChannels.fromUrl, url),
+    cancel: () => ipcRenderer.invoke(ImportChannels.cancel),
+    onProgress: (handler) => {
+      const listener = (
+        _event: Electron.IpcRendererEvent,
+        progress: Parameters<typeof handler>[0],
+      ) => {
+        handler(progress)
+      }
+      ipcRenderer.on(ImportChannels.progress, listener)
+      return () => {
+        ipcRenderer.removeListener(ImportChannels.progress, listener)
+      }
+    },
   },
   overlay: {
     getSessionState: (bookId) =>
@@ -151,6 +164,8 @@ const api: DesktopApi = {
       ipcRenderer.invoke(CloudChannels.getAccessToken, provider),
     downloadAndImport: (provider, entry) =>
       ipcRenderer.invoke(CloudChannels.downloadAndImport, provider, entry),
+    cancelDownload: (externalId) =>
+      ipcRenderer.invoke(CloudChannels.cancelDownload, externalId),
     onDownloadProgress: (handler) => {
       const listener = (
         _event: Electron.IpcRendererEvent,

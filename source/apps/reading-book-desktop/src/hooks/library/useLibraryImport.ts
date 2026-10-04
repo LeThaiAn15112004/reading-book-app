@@ -1,34 +1,50 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect } from 'react'
 import type {
   ImportClientResult,
-  ImportToastVariant,
+  ImportErrorCode,
 } from '@reading-book/book-reader-sdk'
+import {
+  useLibraryImportStore,
+  type ImportToastAction,
+} from './libraryImportStore.js'
 
-type ProgressState = {
-  status: string
+/** Step / byte progress pushed by the platform while an import runs. */
+export type LibraryImportProgress = {
+  stage: 'downloading' | 'importing'
   filename?: string
-} | null
-
-type ToastState = {
-  message: string
-  variant: ImportToastVariant
-} | null
-
-type ConflictState = {
-  bookId: string
-  message?: string
-} | null
+  receivedBytes?: number
+  totalBytes?: number | null
+}
 
 export type LibraryImportClient = {
   fromFile: () => Promise<ImportClientResult>
   fromUrl: (url: string) => Promise<ImportClientResult>
+  /** Abort the in-flight URL download, when the platform supports it. */
+  cancel?: () => Promise<unknown>
+  /** Subscribe to progress; returns unsubscribe. */
+  onProgress?: (handler: (progress: LibraryImportProgress) => void) => () => void
 }
 
 export type UseLibraryImportOptions = {
   client: LibraryImportClient
   onImported: () => Promise<void>
-  onOpenExisting: (bookId: string) => void
+  /** Open a book in the reader (success "Open" action and duplicate "Open existing"). */
+  onOpenBook: (bookId: string) => void
 }
+
+/** URL failures the user can fix only by changing the link — shown inline, no Retry. */
+const URL_INPUT_ERRORS: ReadonlySet<ImportErrorCode> = new Set([
+  'scheme',
+  'not_direct_file',
+  'too_large',
+])
+
+/** Transient URL failures — shown inline with a Retry button. */
+const URL_RETRYABLE_ERRORS: ReadonlySet<ImportErrorCode> = new Set([
+  'network',
+  'timeout',
+  'http_status',
+])
 
 function filenameFromUrl(url: string): string | undefined {
   try {
@@ -41,109 +57,179 @@ function filenameFromUrl(url: string): string | undefined {
 }
 
 /**
- * Import UX state machine (progress / toast / conflict / URL dialog).
- * Platform injects `client` (Electron IPC / Expo picker+download).
+ * Library import flow (docs/ui-ux-flows.md §9 — Import state machine):
+ * Idle → Picking / UrlInput → Downloading → Importing → Success | Duplicate | Failed.
+ * Platform injects `client` (Electron IPC / Expo picker+download); UI state lives in
+ * `useLibraryImportStore`.
  */
 export function useLibraryImport({
   client,
   onImported,
-  onOpenExisting,
+  onOpenBook,
 }: UseLibraryImportOptions) {
-  const [toast, setToast] = useState<ToastState>(null)
-  const [progress, setProgress] = useState<ProgressState>(null)
-  const [urlDialogOpen, setUrlDialogOpen] = useState(false)
-  const [conflict, setConflict] = useState<ConflictState>(null)
+  const toast = useLibraryImportStore((s) => s.toast)
+  const progress = useLibraryImportStore((s) => s.progress)
+  const conflict = useLibraryImportStore((s) => s.conflict)
+  const urlDialog = useLibraryImportStore((s) => s.urlDialog)
+  const showToast = useLibraryImportStore((s) => s.showToast)
+  const clearToast = useLibraryImportStore((s) => s.clearToast)
 
-  const clearToast = useCallback(() => setToast(null), [])
+  // Progress arrives from the platform only after a file is picked / a URL submitted.
+  useEffect(() => {
+    if (!client.onProgress) return
+    return client.onProgress((update) => {
+      const store = useLibraryImportStore.getState()
+      if (!store.busy) return
+      store.setProgress({
+        source: store.progress?.source ?? 'file',
+        ...store.progress,
+        ...update,
+      })
+    })
+  }, [client])
 
-  function showToast(message: string, variant: ImportToastVariant = 'info') {
-    setToast({ message, variant })
-  }
+  const openBookAction = useCallback(
+    (bookId: string): ImportToastAction => ({
+      label: 'Open',
+      run: () => onOpenBook(bookId),
+    }),
+    [onOpenBook],
+  )
 
-  async function handleFromDevice() {
-    setProgress({ status: 'Importing…' })
+  /** Shared outcome handling for file and URL imports. Returns true when fully handled. */
+  const handleCommonResult = useCallback(
+    async (result: ImportClientResult): Promise<boolean> => {
+      const store = useLibraryImportStore.getState()
+      if (result.ok && result.bookId) {
+        try {
+          await onImported()
+        } catch {
+          // The book is saved; a failed list refresh must not turn success into an error.
+        }
+        store.showToast('Book added to your library.', 'success', openBookAction(result.bookId))
+        return true
+      }
+      if (result.errorCode === 'duplicate' && result.bookId) {
+        store.setConflict({ bookId: result.bookId, message: result.errorMessage })
+        return true
+      }
+      return false
+    },
+    [onImported, openBookAction],
+  )
+
+  const handleFromDevice = useCallback(async () => {
+    const store = useLibraryImportStore.getState()
+    if (store.busy) return
+    // No overlay yet: the native picker is open. Main reports `importing` once a file is picked.
+    store.setBusy(true)
     try {
       const result = await client.fromFile()
-      if (result.ok && result.bookId) {
-        await onImported()
-        setToast({
-          message: 'Successfully imported to local library',
-          variant: 'success',
-        })
-      } else if (result.errorCode === 'duplicate' && result.bookId) {
-        setConflict({
-          bookId: result.bookId,
-          message: result.errorMessage,
-        })
-      } else if (result.errorMessage) {
-        setToast({ message: result.errorMessage, variant: 'error' })
+      if (await handleCommonResult(result)) return
+      if (result.errorCode === 'cancelled') return // picker dismissed — silent
+      if (result.errorMessage) {
+        useLibraryImportStore.getState().showToast(result.errorMessage, 'error')
       }
-      // Cancel: no errorCode / errorMessage — silent.
     } catch {
-      setToast({ message: 'Could not import file.', variant: 'error' })
+      useLibraryImportStore.getState().showToast('Could not import file.', 'error')
     } finally {
-      setProgress(null)
+      const after = useLibraryImportStore.getState()
+      after.setBusy(false)
+      after.setProgress(null)
     }
-  }
+  }, [client, handleCommonResult])
 
-  function handleFromUrl() {
-    setUrlDialogOpen(true)
-  }
+  const handleFromUrl = useCallback(() => {
+    useLibraryImportStore.getState().openUrlDialog()
+  }, [])
 
-  async function handleUrlSubmit(url: string) {
-    setUrlDialogOpen(false)
-    setProgress({
-      status: 'Downloading…',
-      filename: filenameFromUrl(url),
+  const handleUrlSubmit = useCallback(
+    async (url: string) => {
+      async function run(target: string): Promise<void> {
+        const store = useLibraryImportStore.getState()
+        if (store.busy) return
+        store.closeUrlDialog()
+        store.setBusy(true)
+        store.setProgress({
+          source: 'url',
+          stage: 'downloading',
+          filename: filenameFromUrl(target),
+        })
+        try {
+          const result = await client.fromUrl(target)
+          if (await handleCommonResult(result)) return
+          const after = useLibraryImportStore.getState()
+          const code = result.errorCode
+          const message = result.errorMessage ?? 'Could not download from URL.'
+          if (code === 'cancelled') {
+            after.showToast('Download cancelled.', 'info')
+          } else if (code && URL_RETRYABLE_ERRORS.has(code)) {
+            after.openUrlDialog(target, { message, retryable: true })
+          } else if (code && URL_INPUT_ERRORS.has(code)) {
+            after.openUrlDialog(target, { message, retryable: false })
+          } else if (code === 'save_failed') {
+            after.showToast(message, 'error', { label: 'Retry', run: () => void run(target) })
+          } else {
+            after.showToast(message, 'error')
+          }
+        } catch {
+          useLibraryImportStore
+            .getState()
+            .openUrlDialog(target, { message: 'Could not start URL import.', retryable: true })
+        } finally {
+          const after = useLibraryImportStore.getState()
+          after.setBusy(false)
+          after.setProgress(null)
+        }
+      }
+      await run(url)
+    },
+    [client, handleCommonResult],
+  )
+
+  const handleCancelImport = useCallback(() => {
+    if (!client.cancel) return
+    client.cancel().catch(() => {
+      // Nothing to cancel any more (already finished) — the result handler reports the outcome.
     })
-    try {
-      const result = await client.fromUrl(url)
-      if (result.ok && result.bookId) {
-        await onImported()
-        setToast({
-          message: 'Successfully imported to local library',
-          variant: 'success',
-        })
-      } else if (result.errorCode === 'duplicate' && result.bookId) {
-        setConflict({
-          bookId: result.bookId,
-          message: result.errorMessage,
-        })
-      } else {
-        setToast({
-          message: result.errorMessage ?? 'Could not download from URL.',
-          variant: 'error',
-        })
-      }
-    } catch {
-      setToast({ message: 'Could not start URL import.', variant: 'error' })
-    } finally {
-      setProgress(null)
-    }
-  }
+  }, [client])
 
-  function handleConflictDiscard() {
-    setConflict(null)
-  }
+  const closeUrlDialog = useCallback(() => {
+    useLibraryImportStore.getState().closeUrlDialog()
+  }, [])
 
-  function handleConflictOpenExisting() {
-    const bookId = conflict?.bookId
-    setConflict(null)
-    if (bookId) onOpenExisting(bookId)
-  }
+  const handleConflictDiscard = useCallback(() => {
+    useLibraryImportStore.getState().setConflict(null)
+  }, [])
+
+  const handleConflictOpenExisting = useCallback(() => {
+    const store = useLibraryImportStore.getState()
+    const bookId = store.conflict?.bookId
+    store.setConflict(null)
+    if (bookId) onOpenBook(bookId)
+  }, [onOpenBook])
+
+  /** Raise the duplicate dialog from another import source (Cloud Sources). */
+  const showConflict = useCallback((bookId: string, message?: string) => {
+    useLibraryImportStore.getState().setConflict({ bookId, message })
+  }, [])
 
   return {
     toast,
     clearToast,
     showToast,
     progress,
+    canCancel: Boolean(client.cancel) && progress?.stage === 'downloading',
     conflict,
-    urlDialogOpen,
-    setUrlDialogOpen,
+    showConflict,
+    urlDialog,
+    closeUrlDialog,
     handleFromDevice,
     handleFromUrl,
     handleUrlSubmit,
+    handleCancelImport,
     handleConflictDiscard,
     handleConflictOpenExisting,
   }
 }
+

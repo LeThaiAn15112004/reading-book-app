@@ -3,7 +3,7 @@ export type { CollectionStore } from './collection-store.js';
 export type { OverlayStore, SaveBookmarkInput, SaveHighlightInput } from './overlay-store.js';
 
 export type { DocumentImporter, ImportResult } from './document-importer.js';
-export type { UrlDocumentFetcher, UrlFetchResult } from './url-document-fetcher.js';
+export type { UrlDocumentFetcher, UrlFetchOptions, UrlFetchResult } from './url-document-fetcher.js';
 export type { DocumentNormalizer, NormalizeResult } from './document-normalizer.js';
 
 export type { DocumentRenderer } from './document-renderer.js';
