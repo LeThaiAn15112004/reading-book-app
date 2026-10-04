@@ -1,4 +1,6 @@
 export { BootErrorBanner } from './BootErrorBanner'
 export { LibraryEmptyState } from './LibraryEmptyState'
 export { LibraryHint } from './LibraryHint'
+export { LibrarySearchBox } from './LibrarySearchBox'
+export type { LibrarySearchBoxProps } from './LibrarySearchBox'
 export { LibraryTopBar } from './LibraryTopBar'

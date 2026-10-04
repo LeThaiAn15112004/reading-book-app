@@ -28,3 +28,4 @@ export type {
 } from './libraryImportStore.js'
 export { useLibraryView } from './useLibraryView.js'
 export type { UseLibraryViewOptions } from './useLibraryView.js'
+export { SEARCH_HISTORY_LIMIT, useSearchHistoryStore } from './searchHistoryStore.js'

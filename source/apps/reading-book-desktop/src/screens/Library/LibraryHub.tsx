@@ -1,4 +1,5 @@
 import type { LibraryBook } from '@reading-book/book-reader-sdk'
+import { useSearchHistoryStore } from '../../hooks/library/index.js'
 import {
   BootErrorBanner,
   ContinueReading,
@@ -55,6 +56,10 @@ export function LibraryHub({
   const setSort = useLibraryBrowseStore((s) => s.setSort)
   const setLayout = useLibraryBrowseStore((s) => s.setLayout)
   const selectBook = useLibraryBrowseStore((s) => s.selectBook)
+  const historyEnabled = useSearchHistoryStore((s) => s.enabled)
+  const historyEntries = useSearchHistoryStore((s) => s.entries)
+  const recordSearch = useSearchHistoryStore((s) => s.record)
+  const removeRecentSearch = useSearchHistoryStore((s) => s.remove)
 
   const isEmpty = books !== null && books.length === 0
   const filterLabel = LIBRARY_BROWSE_FILTERS.find((f) => f.id === filter)?.label ?? 'All books'
@@ -67,6 +72,9 @@ export function LibraryHub({
         <LibraryTopBar
           searchQuery={searchQuery}
           onSearchChange={onSearchChange}
+          recentSearches={historyEnabled ? historyEntries : []}
+          onCommitSearch={recordSearch}
+          onRemoveRecentSearch={removeRecentSearch}
           onFromDevice={onFromDevice}
           onFromUrl={onFromUrl}
         />

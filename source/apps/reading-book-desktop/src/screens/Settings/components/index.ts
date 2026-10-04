@@ -1,4 +1,5 @@
 export * from './about'
 export * from './appearance'
 export * from './layout'
+export * from './privacy'
 export * from './storage'
