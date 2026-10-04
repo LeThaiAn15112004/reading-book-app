@@ -1,12 +1,11 @@
 import { create } from 'zustand'
 
 /**
- * Settings sidebar sections, in display order. Only `appearance` has content so far (App Language
- * lives inside Appearance — there is no separate Language section).
+ * Settings sidebar sections, in display order. App Language lives inside Appearance; Library view
+ * preferences (sort, Grid ⇄ Table) live on the Library screen itself — no Language / Library sections.
  */
 export type SettingsSectionId =
   | 'appearance'
-  | 'library'
   | 'storage'
   | 'notifications'
   | 'keyboard'
@@ -16,7 +15,6 @@ export type SettingsSectionId =
 
 export const SETTINGS_SECTIONS: readonly { id: SettingsSectionId; label: string }[] = [
   { id: 'appearance', label: 'Appearance' },
-  { id: 'library', label: 'Library' },
   { id: 'storage', label: 'Storage' },
   { id: 'notifications', label: 'Notifications' },
   { id: 'keyboard', label: 'Keyboard Shortcuts' },

@@ -1,4 +1,5 @@
 export * from './book'
+export * from './browse'
 export * from './cloud'
 export * from './collections'
 export * from './continue'

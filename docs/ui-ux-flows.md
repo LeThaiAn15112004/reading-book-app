@@ -64,7 +64,7 @@ Electron Main Process
 / (root)
 ├── /splash (SCR-00)
 ├── /library (SCR-01)
-│   ├── /shelf/:shelfId (SCR-01a — detail view)
+│   ├── (sidebar filters: All / Reading / Not started / Completed / Favorites — state, not routes)
 │   └── /collection/:collectionId (SCR-01b — collection view)
 ├── /reader/:bookId (SCR-03)
 │   ├── /reader/:bookId/settings (SCR-05 — inline panel)
@@ -186,21 +186,23 @@ flowchart TD
 **Nơi:** `src/screens/Library/`  
 **Components chính:**
 
+> Bố cục Library (sidebar + Grid ⇄ Table + Continue Reading) — chi tiết: `docs/change_plan/library_layout_redesign.md`.
+
 #### Layout & Top-level
-- `LibraryScreen` (main container + state wiring)
+- `LibraryScreen` (shell: hub ↔ Collections ↔ Cloud Sources + dialogs)
+- `LibraryHub` (home: sidebar + browse area)
+- `LibrarySidebar` (All books / Reading / Not started / Completed / Favorites + counts)
 - `LibraryTopBar` (search + import buttons)
-- `LibraryFilterToolbar` (filter & view mode)
+- `ContinueReading` (≤ 3 sách đang đọc, chỉ ở All books, không search)
+- `LibraryBrowseToolbar` (tiêu đề filter + số sách, Sort, Grid ⇄ Table — được nhớ)
+- `LibraryBookGrid` (lưới tự xuống dòng, cuộn dọc) → `ShelfRailCard`
+- `LibraryBookTable` (bảng, chọn dòng) + `LibraryBookDetailPanel` (panel bên phải)
 - `LibraryEmptyState` (empty library message)
 - `BootErrorBanner` (boot error, nếu có)
 
-#### Shelf Views
-- `LibraryShelves` (default: grid của shelves)
-  - `ShelfRailCard` (mỗi shelf card)
-  - `ShelfSection` (shelf header + books preview)
-- `ShelfDetailView` (detail view của 1 shelf)
-  - `ShelfDetailItem` (individual book item)
-  - `FilteredListView` (filtered/searched list)
-- `ViewModeToggle` (grid ↔ list)
+#### Collection detail (tab Collections)
+- `ShelfDetailView` (Back · tên collection · Grid/List) → `ShelfRailCard` / `ShelfDetailItem`
+- `ViewModeToggle` (grid ↔ list, chỉ cho collection detail)
 
 #### Dialogs & Popups
 - `LibraryBookInfoDialog` (book info + reading status)
@@ -1060,36 +1062,19 @@ sequenceDiagram
 ### LibraryScreen
 ```
 LibraryScreen
-├── BootErrorBanner (if bootError)
-├── LibraryTopBar
-│   ├── Search input
-│   ├── "Import from Device" button
-│   └── "Import from URL" button
-├── LibraryFilterToolbar
-│   ├── Filter dropdown
-│   ├── Sort dropdown
-│   └── ViewModeToggle (grid/list)
-├── Main content (based on view)
-│   ├── [view === 'shelves']
-│   │   └── LibraryShelves
-│   │       ├── ShelfRailCard x N
-│   │       │   └── ShelfSection
-│   │       │       └── ShelfRailBooks
-│   │       └── ContinueReading (sticky)
-│   │
-│   ├── [view === 'shelf-detail']
-│   │   └── ShelfDetailView
-│   │       ├── ShelfHeader
-│   │       └── FilteredListView
-│   │           └── ShelfDetailItem x N
-│   │
-│   ├── [view === 'collection']
-│   │   └── CollectionDetailView
-│   │       └── FilteredListView
-│   │           └── ShelfDetailItem x N
-│   │
-│   └── [isEmpty]
-│       └── LibraryEmptyState
+├── [view === 'hub'] LibraryHub
+│   ├── LibrarySidebar (status filters + Favorites)
+│   └── Browse column
+│       ├── LibraryTopBar (search + Add file / Import URL)
+│       ├── BootErrorBanner (if bootError)
+│       ├── LibraryEmptyState (if no books)
+│       ├── ContinueReading (All books, no search)
+│       ├── LibraryBrowseToolbar (title · count · Sort · Grid/Table)
+│       ├── LibraryBookGrid → ShelfRailCard x N      (layout = grid)
+│       └── LibraryBookTable + LibraryBookDetailPanel (layout = table)
+├── [view === 'collections'] CollectionsHub
+├── [view === 'collection'] ShelfDetailView → ShelfRailCard / ShelfDetailItem
+├── [view === 'cloud-sources'] CloudSourcesHub
 │
 ├── Dialogs
 │   ├── LibraryBookInfoDialog

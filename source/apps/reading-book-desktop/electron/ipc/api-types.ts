@@ -54,6 +54,8 @@ export interface BookSummaryDto {
   /** Human-readable last-read location; when set, enables Continue Reading. */
   lastReadLocation?: string
   lastReadAt?: string
+  /** Reading progress 0–100 stored by the Reader; set only with `lastReadLocation`. */
+  progressPercent?: number
   noteCount?: number
   /** Cloud Sources provenance — set only for books downloaded from a linked provider. */
   sourceProvider?: CloudProviderDto

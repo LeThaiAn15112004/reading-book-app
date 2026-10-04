@@ -30,7 +30,7 @@ function toSummaryDto(
   book: Book,
   authorNames: string,
   genreNames: string[] = [],
-  session?: { lastReadLocation?: string; lastReadAt?: string },
+  session?: { lastReadLocation?: string; lastReadAt?: string; progressPercent?: number },
   readingStatus: ReadingStatusDto = 'not-started',
 ): BookSummaryDto {
   const fileName = path.basename(book.filePath)
@@ -55,6 +55,7 @@ function toSummaryDto(
   if (session?.lastReadLocation) {
     dto.lastReadLocation = session.lastReadLocation
     if (session.lastReadAt) dto.lastReadAt = session.lastReadAt
+    if (session.progressPercent != null) dto.progressPercent = session.progressPercent
   }
   if (book.sourceProvider === 'google_drive' || book.sourceProvider === 'dropbox' || book.sourceProvider === 'onedrive') {
     dto.sourceProvider = book.sourceProvider

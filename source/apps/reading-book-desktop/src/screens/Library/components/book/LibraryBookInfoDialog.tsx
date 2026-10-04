@@ -15,6 +15,76 @@ export type LibraryBookInfoFields = {
   description?: string
 }
 
+/** Rows shown for a book (dialog + Library table detail panel share them). */
+function bookInfoRows(book: LibraryBookInfoFields): Array<[string, string]> {
+  const sizeLabel = formatFileSizeMb(book.fileSizeBytes) ?? '—'
+  const pagesLabel =
+    book.pageCount != null && book.pageCount > 0
+      ? `${book.pageCount} ${book.pageCount === 1 ? 'page' : 'pages'}`
+      : '—'
+  const formatLabel = book.format?.trim().toUpperCase() || '—'
+  const genreLabel =
+    book.genre?.trim() ||
+    (book.genres && book.genres.length > 0 ? book.genres.join(', ') : undefined) ||
+    '—'
+  return [
+    ['Title', book.title],
+    ['Author', book.author?.trim() || '—'],
+    ['Format', formatLabel],
+    ['Genre', genreLabel],
+    ['Size', sizeLabel],
+    ['Pages', pagesLabel],
+    ['File', book.fileName?.trim() || '—'],
+  ]
+}
+
+export type LibraryBookInfoContentProps = {
+  book: LibraryBookInfoFields
+  /** `dialog`: cover beside the fields; `panel`: narrow column, cover on top. */
+  variant?: 'dialog' | 'panel'
+}
+
+/** Cover + metadata + description — body of the Book info dialog and the table detail panel. */
+export function LibraryBookInfoContent({ book, variant = 'dialog' }: LibraryBookInfoContentProps) {
+  const formatLabel = book.format?.trim().toUpperCase()
+  const isPanel = variant === 'panel'
+  const rows = bookInfoRows(book).filter(([k]) => !(isPanel && k === 'Title'))
+
+  return (
+    <>
+      <div className={isPanel ? 'flex flex-col gap-4' : 'flex gap-4'}>
+        <BookCover
+          bookId={book.id}
+          title={book.title}
+          coverUrl={book.coverUrl}
+          format={formatLabel || undefined}
+          className={
+            isPanel
+              ? 'mx-auto h-[180px] w-[128px] shrink-0 rounded-md shadow-md'
+              : 'h-[140px] w-[100px] shrink-0 rounded-md shadow-md'
+          }
+          titleClassName="line-clamp-5 text-[10px] leading-snug font-semibold text-white [text-shadow:0_2px_4px_rgba(0,0,0,0.5)]"
+        />
+        <dl className="m-0 flex min-w-0 flex-1 flex-col gap-2.5">
+          {rows.map(([k, v]) => (
+            <div key={k} className="grid grid-cols-[72px_1fr] gap-2 text-[13px]">
+              <dt className="m-0 font-semibold text-lib-faint">{k}</dt>
+              <dd className="m-0 break-words text-lib-text-strong select-text">{v}</dd>
+            </div>
+          ))}
+        </dl>
+      </div>
+
+      <div className="text-[13px]">
+        <div className="mb-1 font-semibold text-lib-faint">Description</div>
+        <p className="m-0 whitespace-pre-wrap break-words text-lib-text-strong select-text">
+          {book.description?.trim() || '—'}
+        </p>
+      </div>
+    </>
+  )
+}
+
 export type LibraryBookInfoDialogProps = {
   open: boolean
   book: LibraryBookInfoFields | null
@@ -28,28 +98,6 @@ export function LibraryBookInfoDialog({
   onClose,
 }: LibraryBookInfoDialogProps) {
   if (!open || !book) return null
-
-  const sizeLabel = formatFileSizeMb(book.fileSizeBytes) ?? '—'
-  const pagesLabel =
-    book.pageCount != null && book.pageCount > 0
-      ? `${book.pageCount} ${book.pageCount === 1 ? 'page' : 'pages'}`
-      : '—'
-  const formatLabel = book.format?.trim().toUpperCase() || '—'
-  const genreLabel =
-    book.genre?.trim() ||
-    (book.genres && book.genres.length > 0 ? book.genres.join(', ') : undefined) ||
-    '—'
-
-  const rows: Array<[string, string]> = [
-    ['Title', book.title],
-    ['Author', book.author?.trim() || '—'],
-    ['Format', formatLabel],
-    ['Genre', genreLabel],
-    ['Size', sizeLabel],
-    ['Pages', pagesLabel],
-    ['File', book.fileName?.trim() || '—'],
-    ['Description', book.description?.trim() || '—'],
-  ]
 
   return (
     <div
@@ -69,33 +117,7 @@ export function LibraryBookInfoDialog({
           Book info
         </div>
 
-        <div className="flex gap-4">
-          <BookCover
-            bookId={book.id}
-            title={book.title}
-            coverUrl={book.coverUrl}
-            format={formatLabel !== '—' ? formatLabel : undefined}
-            className="h-[140px] w-[100px] shrink-0 rounded-md shadow-md"
-            titleClassName="line-clamp-5 text-[10px] leading-snug font-semibold text-white [text-shadow:0_2px_4px_rgba(0,0,0,0.5)]"
-          />
-          <dl className="m-0 flex min-w-0 flex-1 flex-col gap-2.5">
-            {rows
-              .filter(([k]) => k !== 'Description')
-              .map(([k, v]) => (
-                <div key={k} className="grid grid-cols-[72px_1fr] gap-2 text-[13px]">
-                  <dt className="m-0 font-semibold text-lib-faint">{k}</dt>
-                  <dd className="m-0 break-words text-lib-text-strong">{v}</dd>
-                </div>
-              ))}
-          </dl>
-        </div>
-
-        <div className="text-[13px]">
-          <div className="mb-1 font-semibold text-lib-faint">Description</div>
-          <p className="m-0 whitespace-pre-wrap break-words text-lib-text-strong">
-            {book.description?.trim() || '—'}
-          </p>
-        </div>
+        <LibraryBookInfoContent book={book} />
 
         <div className="flex justify-end">
           <button

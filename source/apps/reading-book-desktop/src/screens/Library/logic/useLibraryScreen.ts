@@ -7,28 +7,18 @@ import {
   useLibraryImport,
   useLibraryView,
 } from '../../../hooks/library/index.js'
-import {
-  NAV_FILTERS,
-  filterByNav,
-  filterByShelf,
-  matchesSearch,
-  pickContinueReading,
-  type LibraryBook,
-  type NavFilterId,
-} from '@reading-book/book-reader-sdk'
+import { type LibraryBook } from '@reading-book/book-reader-sdk'
 import { importApi, libraryApi } from '../../../bridge'
 import { useAppNav, useOpenReading, type AppStubNavId } from '../../../chrome'
 import type { BootLocationState } from '../../boot'
-import { LIBRARY_SHELVES } from '../components'
 import type {
   BookMenuPoint,
   BookMetadataValues,
   ShelfDetailItemData,
 } from '../components'
 import { toShelfDetailItem } from './toShelfDetailItem'
+import { useLibraryBrowseStore } from './libraryBrowseStore'
 import { useCloudSources } from './useCloudSources'
-import { useSectionOrder } from './useSectionOrder'
-import { useShelfOrder } from './useShelfOrder'
 
 type LibraryLocationState = BootLocationState & {
   openNav?: AppStubNavId
@@ -39,9 +29,11 @@ export type PendingBookRemoval = {
   kind: 'remove' | 'delete-file'
 }
 
-type LibraryFilterId = 'all' | NavFilterId
-
-/** Desktop Library screen controller — shared hooks + IPC clients + derived lists. */
+/**
+ * Desktop Library screen controller — book data, import, mutations, collections and top-level
+ * view. Browse concerns (sidebar filter, sort, Grid ⇄ Table, selection) live in
+ * `useLibraryBrowse` / `useLibraryBrowseStore`, not here.
+ */
 export function useLibraryScreen() {
   const navigate = useNavigate()
   const location = useLocation()
@@ -67,9 +59,8 @@ export function useLibraryScreen() {
   const [pendingCollectionBookId, setPendingCollectionBookId] = useState<
     string | null
   >(null)
-  const [activeFilter, setActiveFilter] = useState<LibraryFilterId>('all')
-
-  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
+  /** Grid / list toggle of the collection detail view (top-nav Collections). */
+  const [collectionViewMode, setCollectionViewMode] = useState<'grid' | 'list'>('grid')
 
   const { books, refreshLibrary } = useLibraryBooks({
     client: libraryApi,
@@ -122,14 +113,14 @@ export function useLibraryScreen() {
   const {
     view,
     sidebarActive,
-    handleOpenShelf: openShelfDetail,
-    handleCloseShelf,
     handleStubNav,
     goHub,
     goCollections,
     openCollection,
   } = useLibraryView({
     onComingSoon: () => showToast('Coming soon.', 'info'),
+    onFilterNav: (filter) =>
+      useLibraryBrowseStore.getState().setFilter(filter === 'to-read' ? 'not-started' : filter),
   })
 
   const cloudSources = useCloudSources({
@@ -138,23 +129,6 @@ export function useLibraryScreen() {
     onDuplicate: showConflict,
     onOpenBook: openReader,
   })
-
-  function handleFilterChange(filter: LibraryFilterId) {
-    setActiveFilter(filter)
-  }
-
-  /** Section arrow/header click → dedicated full-page view for that section. */
-  function handleOpenShelf(shelfId: string) {
-    if (shelfId === 'favorites') {
-      handleStubNav('favorites')
-    } else if (
-      shelfId === 'reading' ||
-      shelfId === 'completed' ||
-      shelfId === 'not-started'
-    ) {
-      openShelfDetail(shelfId)
-    }
-  }
 
   const libraryNavRef = useRef({
     activeId: sidebarActive,
@@ -395,86 +369,6 @@ export function useLibraryScreen() {
     }
   }
   const isEmpty = books !== null && books.length === 0
-  const showHubChrome = view.kind === 'hub'
-  const continueBook = pickContinueReading(bookList)
-  const searchedBooks = bookList.filter((b) => matchesSearch(b, searchQuery))
-  const searchActive = searchQuery.trim().length > 0
-  const noSearchMatches =
-    showHubChrome && searchActive && !isEmpty && searchedBooks.length === 0
-  const showShelves =
-    showHubChrome && books !== null && books.length > 0 && !noSearchMatches
-  const shelfCounts = {
-    favorites: searchedBooks.filter((b) => b.isFavorite).length,
-    reading: searchedBooks.filter((b) => b.status === 'reading').length,
-    completed: searchedBooks.filter((b) => b.status === 'completed').length,
-    'not-started': searchedBooks.filter((b) => b.status === 'not-started')
-      .length,
-  }
-
-  const activeShelf =
-    view.kind === 'shelf'
-      ? LIBRARY_SHELVES.find((s) => s.id === view.shelfId)
-      : undefined
-
-  const shelfItems: ShelfDetailItemData[] =
-    view.kind === 'shelf'
-      ? filterByShelf(searchedBooks, view.shelfId).map((b) =>
-        toShelfDetailItem(b),
-      )
-      : []
-
-  const { orderShelf, reorderShelf } = useShelfOrder()
-  const { sectionOrder, reorderSections } = useSectionOrder()
-
-  /** Default rail order: most recently opened first (falls back below any saved drag order). */
-  function sortByRecency(list: LibraryBook[]): LibraryBook[] {
-    return [...list].sort((a, b) =>
-      (b.lastReadAt ?? '').localeCompare(a.lastReadAt ?? ''),
-    )
-  }
-
-  /** Hub rails show only the top N books; the section arrow opens the full list. */
-  const SHELF_RAIL_LIMIT = 7
-
-  const shelfRailBooks = {
-    favorites: orderShelf(
-      'favorites',
-      sortByRecency(searchedBooks.filter((b) => b.isFavorite)),
-    ).slice(0, SHELF_RAIL_LIMIT),
-    reading: orderShelf(
-      'reading',
-      sortByRecency(filterByShelf(searchedBooks, 'reading')),
-    ).slice(0, SHELF_RAIL_LIMIT),
-    completed: orderShelf(
-      'completed',
-      sortByRecency(filterByShelf(searchedBooks, 'completed')),
-    ).slice(0, SHELF_RAIL_LIMIT),
-    'not-started': orderShelf(
-      'not-started',
-      sortByRecency(filterByShelf(searchedBooks, 'not-started')),
-    ).slice(0, SHELF_RAIL_LIMIT),
-  }
-
-  const visibleShelfIds =
-    activeFilter === 'all'
-      ? sectionOrder
-      : activeFilter === 'favorites'
-        ? (['favorites'] as const)
-        : activeFilter === 'to-read'
-          ? (['not-started'] as const)
-          : ([activeFilter] as const)
-  const hideEmptyShelves = searchActive || activeFilter !== 'all'
-
-  const filterConfig =
-    view.kind === 'filter' ? NAV_FILTERS[view.filterId] : undefined
-  const filterItems =
-    view.kind === 'filter'
-      ? filterByNav(bookList, view.filterId).map((b) =>
-        toShelfDetailItem(b, {
-          forceFavoriteStar: filterConfig?.showStar,
-        }),
-      )
-      : []
 
   const activeCollection =
     view.kind === 'collection'
@@ -538,8 +432,6 @@ export function useLibraryScreen() {
     handleConflictDiscard,
     handleConflictOpenExisting,
     view,
-    handleOpenShelf,
-    handleCloseShelf,
     goCollections,
     openCollection,
     collections,
@@ -553,27 +445,12 @@ export function useLibraryScreen() {
     setPendingCollectionDeleteId,
     confirmCollectionDelete,
     isEmpty,
-    continueBook,
-    searchActive,
-    noSearchMatches,
-    showShelves,
-    shelfCounts,
-    activeShelf,
-    shelfItems,
-    shelfRailBooks,
-    reorderShelf,
-    reorderSections,
-    visibleShelfIds,
-    hideEmptyShelves,
-    filterConfig,
-    filterItems,
     activeCollection,
     collectionItems,
-    viewMode,
-    setViewMode,
-    activeFilter,
-    handleFilterChange,
+    collectionViewMode,
+    setCollectionViewMode,
     cloudSources,
+    books,
     bookList,
   }
 }

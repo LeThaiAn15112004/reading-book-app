@@ -1,5 +1,4 @@
 // @refresh reset
-import { useState } from 'react'
 import {
   ImportConflictDialog,
   ImportProgressDialog,
@@ -7,26 +6,22 @@ import {
   ImportUrlDialog,
 } from '../../components/import'
 import {
-  BootErrorBanner,
   BookItemMenu,
   CloudSourcesHub,
   CollectionsHub,
   ConfirmBookActionDialog,
   EditBookMetadataDialog,
-  FilteredListView,
   LibraryBookInfoDialog,
-  LibraryEmptyState,
-  LibraryShelves,
-  LibraryTopBar,
-  LibraryFilterToolbar,
   NewCollectionDialog,
   ShelfDetailView,
-  ShelfRailCard,
 } from './components'
-import type { ShelfRailContent } from './components'
+import { LibraryHub } from './LibraryHub'
 import { useLibraryScreen } from './logic'
 
-/** SCR-01 — Library hub shell (menubar + top bar + format hint). */
+/**
+ * SCR-01 — Library shell. `hub` = the browse home (sidebar + grid/table, `LibraryHub`); the top
+ * navigation's Collections / Cloud Sources replace it with their own views.
+ */
 export function LibraryScreen() {
   const {
     navigate,
@@ -69,8 +64,6 @@ export function LibraryScreen() {
     handleConflictDiscard,
     handleConflictOpenExisting,
     view,
-    handleOpenShelf,
-    handleCloseShelf,
     goCollections,
     openCollection,
     collections,
@@ -83,102 +76,19 @@ export function LibraryScreen() {
     pendingCollectionDelete,
     setPendingCollectionDeleteId,
     confirmCollectionDelete,
-    isEmpty,
-    noSearchMatches,
-    showShelves,
-    shelfCounts,
-    activeShelf,
-    shelfItems,
-    shelfRailBooks,
-    reorderShelf,
-    reorderSections,
-    visibleShelfIds,
-    hideEmptyShelves,
-    filterConfig,
-    filterItems,
     activeCollection,
     collectionItems,
-    viewMode,
-    setViewMode,
-    activeFilter,
-    handleFilterChange,
+    collectionViewMode,
+    setCollectionViewMode,
     cloudSources,
+    books,
     bookList,
   } = useLibraryScreen()
-
-  const [draggedBook, setDraggedBook] = useState<{
-    shelfId: string
-    bookId: string
-  } | null>(null)
-
-  const shelfRailContent: ShelfRailContent = {}
-  for (const shelfId of ['favorites', 'reading', 'completed', 'not-started'] as const) {
-    const rows = shelfRailBooks[shelfId]
-    if (rows.length === 0) continue
-    shelfRailContent[shelfId] = rows.map((b, index) => (
-      <div
-        key={b.id}
-        className="shrink-0 cursor-grab active:cursor-grabbing"
-        draggable
-        onDragStart={(event) => {
-          setDraggedBook({ shelfId, bookId: b.id })
-          event.dataTransfer.effectAllowed = 'move'
-        }}
-        onDragOver={(event) => {
-          if (draggedBook?.shelfId === shelfId) event.preventDefault()
-        }}
-        onDrop={(event) => {
-          event.preventDefault()
-          if (
-            !draggedBook ||
-            draggedBook.shelfId !== shelfId ||
-            draggedBook.bookId === b.id
-          ) {
-            return
-          }
-          const fromIndex = rows.findIndex((r) => r.id === draggedBook.bookId)
-          if (fromIndex === -1) return
-          const reordered = [...rows]
-          const [moved] = reordered.splice(fromIndex, 1)
-          reordered.splice(index, 0, moved)
-          reorderShelf(shelfId, reordered)
-          setDraggedBook(null)
-        }}
-        onDragEnd={() => setDraggedBook(null)}
-      >
-        <ShelfRailCard
-          book={b}
-          onOpen={openReader}
-          onBookMenu={handleOpenBookMenu}
-        />
-      </div>
-    ))
-  }
 
   return (
     <div className="lib-chrome relative flex h-full w-full select-none overflow-hidden font-[system-ui,'Segoe_UI',sans-serif] text-lib-text antialiased">
       <main className="flex min-w-0 flex-1 flex-col overflow-hidden">
-        {activeShelf ? (
-          <ShelfDetailView
-            title={activeShelf.title}
-            items={shelfItems}
-            onBack={handleCloseShelf}
-            onOpenItem={openReader}
-            onBookMenu={handleOpenBookMenu}
-            viewMode={viewMode}
-            onViewModeChange={setViewMode}
-          />
-        ) : view.kind === 'filter' && filterConfig ? (
-          <FilteredListView
-            title={filterConfig.title}
-            emptyMessage={filterConfig.empty}
-            items={filterItems}
-            onOpenItem={openReader}
-            onBookMenu={handleOpenBookMenu}
-            viewMode={viewMode}
-            onViewModeChange={setViewMode}
-          />
-        ) : view.kind === 'collections' ? (
+        {view.kind === 'collections' ? (
           <CollectionsHub
             collections={collections}
             onNewCollection={() => openNewCollection()}
@@ -220,64 +130,22 @@ export function LibraryScreen() {
             }
             emptyMessage="No books in this collection yet."
             backAriaLabel="Back to collections"
-            viewMode={viewMode}
-            onViewModeChange={setViewMode}
+            viewMode={collectionViewMode}
+            onViewModeChange={setCollectionViewMode}
           />
         ) : (
-          <>
-            <LibraryTopBar
-              searchQuery={searchQuery}
-              onSearchChange={setSearchQuery}
-              onFromDevice={handleFromDevice}
-              onFromUrl={handleFromUrl}
-            />
-
-            <LibraryFilterToolbar
-              activeFilter={activeFilter}
-              onFilterChange={handleFilterChange}
-            />
-
-            <div className="flex-1 overflow-x-hidden overflow-y-auto py-7">
-              <div className="mx-auto w-full max-w-[1180px] px-7">
-                {bootError ? (
-                  <BootErrorBanner
-                    message={bootError}
-                    onRetry={() => navigate('/', { replace: true })}
-                  />
-                ) : null}
-
-                {isEmpty ? (
-                  <LibraryEmptyState
-                    onFromDevice={handleFromDevice}
-                    onFromUrl={handleFromUrl}
-                  />
-                ) : null}
-
-                {showShelves ? (
-                  <LibraryShelves
-                    onOpenShelf={handleOpenShelf}
-                    counts={shelfCounts}
-                    shelfIds={visibleShelfIds}
-                    railContent={shelfRailContent}
-                    hideEmpty={hideEmptyShelves}
-                    viewMode={viewMode}
-                    onReorderShelves={
-                      activeFilter === 'all' ? reorderSections : undefined
-                    }
-                  />
-                ) : null}
-
-                {noSearchMatches ? (
-                  <p
-                    className="mt-6 text-center text-sm text-lib-faint"
-                    role="status"
-                  >
-                    No matching imported files found.
-                  </p>
-                ) : null}
-              </div>
-            </div>
-          </>
+          <LibraryHub
+            books={books}
+            searchQuery={searchQuery}
+            onSearchChange={setSearchQuery}
+            onFromDevice={handleFromDevice}
+            onFromUrl={handleFromUrl}
+            bootError={bootError}
+            onRetryBoot={() => navigate('/', { replace: true })}
+            onOpenBook={openReader}
+            onBookMenu={handleOpenBookMenu}
+            onToggleFavorite={handleToggleFavorite}
+          />
         )}
       </main>
 

@@ -31,19 +31,30 @@ export type ShelfRailCardProps = {
   book: LibraryBook
   onOpen: (bookId: string) => void
   onBookMenu: (bookId: string, point: BookMenuPoint) => void
+  /** Width classes; default fixed 132px (collection grid). Library grid passes `w-full`. */
+  className?: string
 }
 
-/** SCR-01 hub — one cover card in a shelf horizontal rail. */
-export function ShelfRailCard({ book, onOpen, onBookMenu }: ShelfRailCardProps) {
+/** One cover card — Library grid cell and collection grid. */
+export function ShelfRailCard({
+  book,
+  onOpen,
+  onBookMenu,
+  className = 'w-[132px] shrink-0',
+}: ShelfRailCardProps) {
+  const progress =
+    book.status === 'reading' && book.progressPercent != null
+      ? Math.round(book.progressPercent)
+      : undefined
   const lastReadLine =
-    book.status === 'reading' && book.lastReadLocation
+    progress === undefined && book.status === 'reading' && book.lastReadLocation
       ? formatLastReadLine(book.lastReadLocation)
       : undefined
 
   return (
     <div
       role="listitem"
-      className="group relative flex w-[132px] shrink-0 flex-col gap-2"
+      className={`group relative flex min-w-0 flex-col gap-2 ${className}`}
       onContextMenu={(event) => {
         event.preventDefault()
         onBookMenu(book.id, { x: event.clientX, y: event.clientY })
@@ -60,7 +71,7 @@ export function ShelfRailCard({ book, onOpen, onBookMenu }: ShelfRailCardProps) 
           title={book.title}
           coverUrl={book.coverUrl}
           isFavorite={book.isFavorite}
-          className="h-[180px] w-full rounded-md shadow-[0_10px_28px_rgba(0,0,0,0.35)] transition-[border-color,transform] group-hover:-translate-y-0.5 group-hover:border-lib-accent-ring group-focus-visible:-translate-y-0.5 group-focus-visible:border-lib-accent-ring"
+          className="aspect-[2/3] h-auto w-full rounded-md shadow-[0_10px_28px_rgba(0,0,0,0.35)] transition-[border-color,transform] group-hover:-translate-y-0.5 group-hover:border-lib-accent-ring group-focus-visible:-translate-y-0.5 group-focus-visible:border-lib-accent-ring"
         />
         <div className="min-w-0 px-0.5">
           <p className="m-0 truncate text-[12px] font-semibold text-lib-text-strong">
@@ -71,6 +82,21 @@ export function ShelfRailCard({ book, onOpen, onBookMenu }: ShelfRailCardProps) 
             <p className="m-0 truncate text-[11px] text-lib-muted" aria-label={lastReadLine}>
               Last at · <strong className="font-semibold text-lib-text-strong">{book.lastReadLocation}</strong>
             </p>
+          ) : null}
+          {progress !== undefined ? (
+            <div
+              className="mt-1.5 flex items-center gap-1.5"
+              role="progressbar"
+              aria-label={`${progress}% read`}
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-valuenow={progress}
+            >
+              <span className="h-1 flex-1 overflow-hidden rounded-full bg-lib-chip">
+                <span className="block h-full rounded-full bg-lib-accent" style={{ width: `${progress}%` }} />
+              </span>
+              <span className="text-[10px] text-lib-faint tabular-nums">{progress}%</span>
+            </div>
           ) : null}
         </div>
       </button>

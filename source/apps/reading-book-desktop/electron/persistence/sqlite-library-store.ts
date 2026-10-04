@@ -53,6 +53,8 @@ export type ReadingSessionSummary = {
   lastReadLocation?: string
   /** `reading_state_json.updatedAt` — when the reading state last changed. */
   lastReadAt?: string
+  /** `reading_state_json.percent` (0–100) — reading progress stored by the Reader. */
+  progressPercent?: number
 }
 
 export type BookListItem = {
@@ -151,7 +153,15 @@ function bookToRowParams(book: Book, genreNames: readonly string[]) {
 function summaryFromState(state: ReadingStateJson): ReadingSessionSummary | undefined {
   const label = displayLabelFromStoredLocation(state.lastReadLocation ?? '')
   if (!label) return undefined
-  return { lastReadLocation: label, lastReadAt: state.updatedAt ?? undefined }
+  const percent =
+    typeof state.percent === 'number' && Number.isFinite(state.percent)
+      ? Math.min(100, Math.max(0, state.percent))
+      : undefined
+  return {
+    lastReadLocation: label,
+    lastReadAt: state.updatedAt ?? undefined,
+    progressPercent: percent,
+  }
 }
 
 /**

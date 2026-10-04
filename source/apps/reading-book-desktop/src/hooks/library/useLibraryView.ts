@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import type { ShelfId } from '@reading-book/book-reader-sdk'
+import type { NavFilterId } from '@reading-book/book-reader-sdk'
 import {
   CLOUD_STUB_NAV_PROVIDER,
   navIdForView,
@@ -15,20 +15,14 @@ function isCloudStubNavId(id: LibraryStubNavId): id is LibraryCloudStubNavId {
 export type UseLibraryViewOptions = {
   /** Called for sidebar stubs not yet wired (e.g. tags). */
   onComingSoon?: () => void
+  /** A status-filter stub id arrived (e.g. via `openNav`): show the hub with that filter. */
+  onFilterNav?: (filter: NavFilterId) => void
 }
 
-/** SCR-01 / SCR-01a view machine: hub ↔ shelf ↔ filter ↔ collections. */
+/** SCR-01 view machine: hub (browse with sidebar filters) ↔ collections ↔ cloud sources. */
 export function useLibraryView(options: UseLibraryViewOptions = {}) {
-  const { onComingSoon } = options
+  const { onComingSoon, onFilterNav } = options
   const [view, setView] = useState<LibraryView>({ kind: 'hub' })
-
-  function handleOpenShelf(id: ShelfId) {
-    setView({ kind: 'shelf', shelfId: id })
-  }
-
-  function handleCloseShelf() {
-    setView({ kind: 'hub' })
-  }
 
   function goHub() {
     setView({ kind: 'hub' })
@@ -44,7 +38,8 @@ export function useLibraryView(options: UseLibraryViewOptions = {}) {
 
   function handleStubNav(id: LibraryStubNavId) {
     if (id === 'favorites' || id === 'completed' || id === 'to-read' || id === 'reading') {
-      setView({ kind: 'filter', filterId: id })
+      setView({ kind: 'hub' })
+      onFilterNav?.(id)
       return
     }
     if (id === 'collections') {
@@ -61,7 +56,7 @@ export function useLibraryView(options: UseLibraryViewOptions = {}) {
   // SDS SCR-01a: Esc → Library hub (also closes collection detail).
   useEffect(() => {
     if (typeof window === 'undefined') return
-    if (view.kind !== 'shelf' && view.kind !== 'collection' && view.kind !== 'cloud-sources') return
+    if (view.kind !== 'collection' && view.kind !== 'cloud-sources') return
     function onKeyDown(e: KeyboardEvent) {
       if (e.key === 'Escape') {
         e.preventDefault()
@@ -76,8 +71,6 @@ export function useLibraryView(options: UseLibraryViewOptions = {}) {
   return {
     view,
     sidebarActive: navIdForView(view),
-    handleOpenShelf,
-    handleCloseShelf,
     handleStubNav,
     goHub,
     goCollections,

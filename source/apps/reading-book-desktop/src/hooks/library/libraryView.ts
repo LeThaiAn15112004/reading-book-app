@@ -1,5 +1,5 @@
 import type { ExternalLibraryProvider } from '@reading-book/book-reader-sdk'
-import type { NavFilterId, ShelfId } from '@reading-book/book-reader-sdk'
+import type { NavFilterId } from '@reading-book/book-reader-sdk'
 
 /** Sidebar ids that Library view can highlight / navigate. */
 export type LibraryNavId =
@@ -35,10 +35,12 @@ export const CLOUD_STUB_NAV_PROVIDER: Record<LibraryCloudStubNavId, ExternalLibr
   'cloud-onedrive': 'onedrive',
 }
 
+/**
+ * Top-level Library destinations. Status filters (Reading, Favorites…) are not views: they are the
+ * sidebar filter of the `hub` browse area (`libraryBrowseStore`).
+ */
 export type LibraryView =
   | { kind: 'hub' }
-  | { kind: 'shelf'; shelfId: ShelfId }
-  | { kind: 'filter'; filterId: NavFilterId }
   | { kind: 'collections' }
   | { kind: 'collection'; collectionId: string }
   | { kind: 'cloud-sources'; provider: ExternalLibraryProvider }
@@ -46,10 +48,7 @@ export type LibraryView =
 export function navIdForView(view: LibraryView): LibraryNavId {
   switch (view.kind) {
     case 'hub':
-    case 'shelf':
       return 'library'
-    case 'filter':
-      return view.filterId
     case 'collections':
     case 'collection':
       return 'collections'

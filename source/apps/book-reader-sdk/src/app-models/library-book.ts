@@ -37,6 +37,10 @@ export type LibraryBook = {
    * by path — never deleted by the app. Absent when the platform doesn't say.
    */
   fileStorage?: BookFileStorage
+  /** Reading progress 0–100 when known (Continue Reading / table progress). */
+  progressPercent?: number
+  /** ISO-8601 import time when known. */
+  addedAt?: string
 }
 
 /** Who owns a book's file on disk (desktop reference-based library). */
@@ -64,6 +68,10 @@ export type BookSummaryInput = {
   readingStatus?: LibraryReadingStatus
   lastReadLocation?: string
   lastReadAt?: string
+  /** Stored reading progress 0–100 (only while a last-read location exists). */
+  progressPercent?: number
+  /** ISO-8601 import time (Library "Recently added" sort). */
+  addedAt?: string
   noteCount?: number
   sourceProvider?: 'google_drive' | 'dropbox' | 'onedrive'
   externalId?: string
@@ -144,6 +152,11 @@ export function mapBookSummary(dto: BookSummaryInput): LibraryBook {
     sourceProvider: dto.sourceProvider,
     externalId: dto.externalId,
     fileStorage: dto.fileStorage,
+    progressPercent:
+      dto.progressPercent != null && Number.isFinite(dto.progressPercent)
+        ? Math.min(100, Math.max(0, dto.progressPercent))
+        : undefined,
+    addedAt: dto.addedAt,
   }
 }
 
