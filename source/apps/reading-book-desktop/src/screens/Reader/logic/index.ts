@@ -25,6 +25,7 @@ export {
 } from './hooks'
 export { type WordCountStats, type WordCountStatus } from './wordCount/wordCountStore'
 export { READ_ALOUD_RATES, type ReadAloudStatus } from './readAloud/readAloudStore'
+export { useRightPanelStore, type RightPanelId } from './rightPanel/rightPanelStore'
 export { useDraggableWordCountPanel } from './wordCount/useDraggableWordCountPanel'
 export { useResizableWordCountPanel } from './wordCount/useResizableWordCountPanel'
 export {

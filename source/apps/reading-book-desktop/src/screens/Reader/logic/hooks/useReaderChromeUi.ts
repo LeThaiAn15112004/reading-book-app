@@ -15,6 +15,7 @@ import {
 } from '../../../../reader/chrome'
 import type { SidebarTab } from '../../components'
 import { useReadAloudStore } from '../readAloud/readAloudStore'
+import { useRightPanelStore } from '../rightPanel/rightPanelStore'
 
 /** Live UI snapshot for Escape / center-tap (filled by ReaderScreen each render). */
 export type ReaderChromeEscapeUi = {
@@ -46,7 +47,16 @@ export function useReaderChromeUi({
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [sidebarTab, setSidebarTab] = useState<SidebarTab>('chapters')
   const [isChromeResizeSettling, setIsChromeResizeSettling] = useState(false)
-  const [settingsOpen, setSettingsOpen] = useState(false)
+  // Reading settings live in the docked right sidebar (shared store, one panel at a time).
+  const rightPanel = useRightPanelStore((s) => s.panel)
+  const settingsOpen = rightPanel === 'settings'
+  const setSettingsOpen = useCallback((next: boolean | ((open: boolean) => boolean)) => {
+    const store = useRightPanelStore.getState()
+    const isOpen = store.panel === 'settings'
+    const want = typeof next === 'function' ? next(isOpen) : next
+    if (want) store.open('settings')
+    else if (isOpen) store.close()
+  }, [])
   const [moreOpen, setMoreOpen] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
   const [toast, setToast] = useState<string | null>(null)
@@ -59,7 +69,7 @@ export function useReaderChromeUi({
   useEffect(() => {
     setSidebarOpen(false)
     setSidebarTab('chapters')
-    setSettingsOpen(false)
+    useRightPanelStore.getState().close()
     setMoreOpen(false)
     setSearchOpen(false)
     setSignOpen(false)
@@ -76,7 +86,7 @@ export function useReaderChromeUi({
     setChromeHidden(true)
     setSidebarOpen(false)
     setMoreOpen(false)
-    setSettingsOpen(false)
+    useRightPanelStore.getState().close()
     setSearchOpen(false)
   }, [immersive])
 
@@ -88,7 +98,6 @@ export function useReaderChromeUi({
 
   const closeFloating = useCallback(() => {
     setMoreOpen(false)
-    setSettingsOpen(false)
     setSearchOpen(false)
     useReadAloudStore.getState().closeMenu()
   }, [])
@@ -96,7 +105,6 @@ export function useReaderChromeUi({
   const toggleSearch = useCallback(() => {
     if (immersive) return
     setMoreOpen(false)
-    setSettingsOpen(false)
     setSearchOpen((open) => !open)
   }, [immersive])
 
@@ -152,11 +160,11 @@ export function useReaderChromeUi({
     return () => registerReaderChrome(null)
   }, [chromeHidden, closeFloating, registerReaderChrome, toggleChrome])
 
-  // When chrome hides, drop Settings / More / Search so panels cannot linger off-screen.
+  // When chrome hides, drop More / Search so popovers cannot linger off-screen. The docked right
+  // sidebar stays (like the left sidebar) and just moves up to the top of the reader.
   useEffect(() => {
     if (!chromeHidden) return
     setMoreOpen(false)
-    setSettingsOpen(false)
     setSearchOpen(false)
     useReadAloudStore.getState().closeMenu()
   }, [chromeHidden])
@@ -168,10 +176,10 @@ export function useReaderChromeUi({
       epubApiRef,
       escapeUiRef.current.isEpubSurface,
     )
-  }, [chromeHidden, sidebarOpen, immersive, epubApiRef, escapeUiRef])
+  }, [chromeHidden, sidebarOpen, rightPanel, immersive, epubApiRef, escapeUiRef])
 
   /**
-   * Left sidebar and immersive toggles resize the EPUB host's *width*
+   * Left/right sidebar and immersive toggles resize the EPUB host's *width*
    * (via contentInsetLeft), not just its top padding. The CSS padding
    * transition above animates instantly, but epub.js only re-paginates to
    * the new width once that transition settles — so for a window of a few
@@ -196,7 +204,7 @@ export function useReaderChromeUi({
       window.clearTimeout(id)
       setIsChromeResizeSettling(false)
     }
-  }, [sidebarOpen, immersive, escapeUiRef])
+  }, [sidebarOpen, rightPanel, immersive, escapeUiRef])
 
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
@@ -225,7 +233,7 @@ export function useReaderChromeUi({
 
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [chromeHidden, moreOpen, settingsOpen, searchOpen])
+  }, [chromeHidden, moreOpen, settingsOpen, setSettingsOpen, searchOpen])
 
   // Ctrl+F / Cmd+F: reveal chrome if hidden and open the in-book search panel.
   useEffect(() => {
@@ -235,7 +243,6 @@ export function useReaderChromeUi({
       e.preventDefault()
       setChromeHidden(false)
       setMoreOpen(false)
-      setSettingsOpen(false)
       setSearchOpen(true)
     }
 

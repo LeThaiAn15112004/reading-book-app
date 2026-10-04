@@ -26,6 +26,7 @@ import {
   NoteTextboxPopup,
   ReaderFooter,
   ReaderOpenStatus,
+  ReaderRightSidebar,
   ReaderSearchPanel,
   ReadAloudMenu,
   ReaderTopbar,
@@ -35,11 +36,13 @@ import {
   SidebarEdgeRail,
   SnapshotOverlay,
   WordCountPanel,
+  rightSidebarContentInset,
   sidebarContentInsetLeft,
   SignInfoPanel,
   TocSidebar,
   TranslationPopover,
   TrashConfirmDialog,
+  useRightSidebarDocked,
   useSidebarPanelResize,
   type AnnotationTool,
   type CompanionTool,
@@ -61,6 +64,7 @@ import {
   useWordCount,
   useReadAloud,
   useReaderTranslation,
+  useRightPanelStore,
   type HighlightShortcuts,
   type ReaderChromeEscapeUi,
 } from './logic'
@@ -213,6 +217,12 @@ export function ReaderScreen() {
   const contentInsetLeft = immersive
     ? 0
     : sidebarContentInsetLeft(chrome.sidebarOpen, sidebarResize.panelWidth)
+  const rightPanel = useRightPanelStore((s) => s.panel)
+  const closeRightPanel = useRightPanelStore((s) => s.close)
+  const rightSidebarDocked = useRightSidebarDocked()
+  const contentInsetRight = immersive
+    ? 0
+    : rightSidebarContentInset(rightPanel !== null, rightSidebarDocked)
 
   const chapter = FAKE_CHAPTERS[nav.chapterIndex] ?? FAKE_CHAPTERS[0]
   const chapterLabel = chapter.title
@@ -320,7 +330,7 @@ export function ReaderScreen() {
       style={readingStyle}
       chromeHidden={toolsHidden}
       contentInsetLeft={contentInsetLeft}
-      contentInsetRight={0}
+      contentInsetRight={contentInsetRight}
       contentInsetBottom={readerChromeBottomInset(book.prefs.viewMode, footerImmersiveHidden)}
       contentInsetResizing={sidebarResize.isResizing}
       dataAttrs={{
@@ -546,17 +556,25 @@ export function ReaderScreen() {
             onAskAiHighlight={() => chrome.setToast('AI Ask — coming soon.')}
           />
 
-          <AaSettingsPanel
-            open={chrome.settingsOpen}
-            prefs={book.prefs}
-            theme={globalPrefs.theme}
-            onClose={() => chrome.setSettingsOpen(false)}
-            onChange={(patch) => {
-              book.prefsDirtyRef.current = true
-              book.setPrefs((p) => ({ ...p, ...patch }))
-            }}
-            onThemeChange={(theme) => setGlobalPrefs({ theme })}
-          />
+          <ReaderRightSidebar
+            open={!immersive && rightPanel !== null}
+            title={rightPanel === 'settings' ? 'Reading settings' : ''}
+            onClose={closeRightPanel}
+            chromeHidden={toolsHidden}
+            docked={rightSidebarDocked}
+          >
+            {rightPanel === 'settings' ? (
+              <AaSettingsPanel
+                prefs={book.prefs}
+                theme={globalPrefs.theme}
+                onChange={(patch) => {
+                  book.prefsDirtyRef.current = true
+                  book.setPrefs((p) => ({ ...p, ...patch }))
+                }}
+                onThemeChange={(theme) => setGlobalPrefs({ theme })}
+              />
+            ) : null}
+          </ReaderRightSidebar>
 
           <SignInfoPanel
             open={chrome.signOpen}
@@ -719,7 +737,7 @@ export function ReaderScreen() {
               className="pointer-events-none absolute z-[150] bg-lib-bg-deep"
               style={{
                 left: contentInsetLeft,
-                right: 0,
+                right: contentInsetRight,
                 top: readerChromeTopInset(toolsHidden),
                 bottom: 0,
               }}
