@@ -1,7 +1,7 @@
 # Settings — sidebar navigation & Appearance (SCR-06)
 
-Status: implemented (Appearance only, including App Language). Other sections are navigation
-placeholders.
+Status: implemented — Appearance (including App Language) and About. Other sections are
+navigation placeholders.
 
 ## Layout
 
@@ -38,7 +38,7 @@ placeholders.
 | `keyboard` | Keyboard Shortcuts | placeholder |
 | `privacy` | Privacy | placeholder |
 | `advanced` | Advanced | placeholder |
-| `about` | About | placeholder |
+| `about` | About | `AboutSettings` (see *About* below) |
 
 Placeholder sections keep their active state and show *"This settings section is not implemented
 yet."* (`SettingsPlaceholder`). To add a section: add the id + label to `SETTINGS_SECTIONS`, an icon
@@ -98,6 +98,32 @@ State: zustand `useAppAppearanceStore` (`src/theme/appAppearanceStore.ts`), mode
   to Tiếng Việt does not translate the interface yet. Wiring UI strings to this setting is a
   separate task.
 
+## About (Readmate Reader)
+
+`src/screens/Settings/components/about/AboutSettings.tsx`, header subtitle *"Information about
+Readmate Reader."* Five cards, all built on the shared `SettingsCard` (also used by Appearance):
+
+| Card | Content | State |
+|---|---|---|
+| App Information | App Name **Readmate Reader**, Version **0.0.0** | Static text |
+| Updates | Current Version 0.0.0 + **Check for Updates** button | Button disabled, note *"Update checking is not available in this build yet."* |
+| Legal | Privacy Policy · Terms of Service · Open Source Licenses · Third-Party Notices | Rows disabled — *Not available yet* |
+| Support | Help / Documentation · Report a Problem · Contact Support | Rows disabled — *Not available yet* |
+| Links | Official Website · Store Page | Rows disabled — *Not available yet* |
+
+- Version is a fixed constant (`0.0.0`) on purpose: the renderer has no display-version source
+  yet (no IPC exposes `app.getVersion()` for this), so it is not read from package.json/Electron.
+- List rows use the Settings list style (label + chevron, hover/focus states). Each row has a
+  `destination` that is `null` today; a row without a destination renders as a disabled button
+  with a *Not available yet* badge and tooltip. No URLs, emails or store links were invented —
+  rows become active once official destinations exist.
+- Not built (no backend/infrastructure in the project yet): app icon, update service /
+  auto-update, Privacy Policy and Terms content, license viewer / license data, support or
+  bug-report backend, support email, official website and Store page URLs.
+- Naming note: `electron-builder.json5` `productName` is `ReadMate Reader` (capital M) and the
+  title bar uses `APP_DISPLAY_NAME = 'Readmate'`; the About page shows the official
+  `Readmate Reader`. Those other strings were not changed in this task.
+
 ## Deliberately not in global Settings
 
 Per-book / reader settings stay in the Reader (Aa panel in the right sidebar) and are **not** part
@@ -111,5 +137,5 @@ currently no UI to edit them. They belong in a future Reader/Book defaults secti
 
 ## Not implemented (placeholders)
 
-Library, Storage, Notifications, Keyboard Shortcuts, Privacy, Advanced, About — plus
+Library, Storage, Notifications, Keyboard Shortcuts, Privacy, Advanced — plus
 EPUB/PDF reading settings, annotation settings and cloud settings.

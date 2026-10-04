@@ -1,4 +1,5 @@
 export { SettingsBackLink } from './SettingsBackLink'
+export { SettingsCard } from './SettingsCard'
 export { SettingsPlaceholder } from './SettingsPlaceholder'
 export { SettingsSectionIcon } from './SettingsSectionIcon'
 export { SettingsSidebar } from './SettingsSidebar'

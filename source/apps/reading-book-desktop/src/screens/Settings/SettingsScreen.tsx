@@ -1,4 +1,9 @@
-import { AppearanceSettings, SettingsPlaceholder, SettingsSidebar } from './components'
+import {
+  AboutSettings,
+  AppearanceSettings,
+  SettingsPlaceholder,
+  SettingsSidebar,
+} from './components'
 import {
   SETTINGS_SECTIONS,
   useSettingsNavStore,
@@ -7,6 +12,7 @@ import {
 
 const SECTION_DESCRIPTIONS: Partial<Record<SettingsSectionId, string>> = {
   appearance: 'Theme, accent color, density and language for the whole app.',
+  about: 'Information about Readmate Reader.',
 }
 
 /** SCR-06 — App Settings: section sidebar (collapsible) + content panel. */
@@ -34,7 +40,13 @@ export function SettingsScreen() {
         </header>
         <div className="app-scroll flex-1 overflow-x-hidden overflow-y-auto px-[var(--ui-density-content-x)] py-[var(--ui-density-content-y)]">
           <div className="mx-auto w-full max-w-3xl">
-            {section.id === 'appearance' ? <AppearanceSettings /> : <SettingsPlaceholder />}
+            {section.id === 'appearance' ? (
+              <AppearanceSettings />
+            ) : section.id === 'about' ? (
+              <AboutSettings />
+            ) : (
+              <SettingsPlaceholder />
+            )}
           </div>
         </div>
       </main>

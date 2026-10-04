@@ -1,4 +1,3 @@
-import type { ReactNode } from 'react'
 import { READER_THEME_PRESETS } from '../../../../chrome'
 import {
   ACCENT_COLORS,
@@ -9,6 +8,7 @@ import {
   type UiDensity,
 } from '../../../../theme/appAppearance'
 import { useAppAppearanceStore } from '../../../../theme/appAppearanceStore'
+import { SettingsCard } from '../layout/SettingsCard'
 
 const THEME_LABELS: Record<AppThemeMode, { label: string; hint: string }> = {
   light: { label: 'Light', hint: 'Bright surfaces' },
@@ -39,27 +39,6 @@ function CheckIcon({ className = 'size-3' }: { className?: string }) {
     >
       <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
     </svg>
-  )
-}
-
-function SettingsCard({
-  title,
-  description,
-  children,
-}: {
-  title: string
-  description: string
-  children: ReactNode
-}) {
-  return (
-    <section
-      className="rounded-xl border border-lib-border-soft bg-lib-surface-strong/60 p-[var(--ui-density-pad)]"
-      aria-label={title}
-    >
-      <h3 className="m-0 text-[15px] font-semibold text-lib-text-strong">{title}</h3>
-      <p className="m-0 mt-1 mb-4 text-[13px] leading-relaxed text-lib-muted">{description}</p>
-      {children}
-    </section>
   )
 }
 
