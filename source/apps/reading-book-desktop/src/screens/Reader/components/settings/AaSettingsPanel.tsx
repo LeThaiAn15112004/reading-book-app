@@ -2,11 +2,9 @@ import type { PageLayout } from '@reading-book/book-reader-sdk'
 import type {
   FontFamily,
   FontWeight,
-  ReaderTheme,
   ReadingViewMode,
   TextAlign,
 } from '@reading-book/book-reader-sdk'
-import { READER_THEME_PRESETS } from '@reading-book/book-reader-sdk'
 
 export type MarginMode = 'narrow' | 'normal' | 'wide' | 'off'
 
@@ -25,9 +23,7 @@ export type ReadingPrefs = {
 
 type AaSettingsPanelProps = {
   prefs: ReadingPrefs
-  theme: ReaderTheme
   onChange: (patch: Partial<ReadingPrefs>) => void
-  onThemeChange: (theme: ReaderTheme) => void
 }
 
 const sectionTitle =
@@ -37,49 +33,20 @@ const toggleItem =
   'h-9 flex-1 cursor-pointer rounded-md border-none text-xs font-semibold transition-colors'
 const toggleActive = 'bg-lib-bg-mid text-lib-accent'
 const toggleIdle = 'bg-transparent text-lib-muted hover:text-lib-text-strong'
-const themeIds: ReaderTheme[] = ['night', 'sepia', 'paper']
 
 /**
- * Reading settings (SCR-05 Aa) — body only; `ReaderScreen` hosts it in the docked
+ * Per-book reading settings (SCR-05 Aa) — body only. The app theme (Night/Sepia/Paper) is a
+ * global preference and lives in the app Settings screen, not here; `ReaderScreen` hosts it in the docked
  * `ReaderRightSidebar`, which owns the title, close button and scrolling.
  */
 export function AaSettingsPanel({
   prefs,
-  theme,
   onChange,
-  onThemeChange,
 }: AaSettingsPanelProps) {
   const effectiveMargin = prefs.marginEnabled ? prefs.margin : 'off'
 
   return (
     <div>
-      <div className="mb-5">
-        <div className={sectionTitle}>Theme</div>
-        <div className="grid grid-cols-3 gap-2">
-          {themeIds.map((id) => {
-            const preset = READER_THEME_PRESETS[id]
-            return (
-            <button
-              key={id}
-              className={`h-[42px] cursor-pointer rounded-lg border text-[13px] font-semibold ${
-                theme === id
-                  ? 'border-lib-accent ring-2 ring-lib-accent-ring'
-                  : 'border-lib-border-soft'
-              }`}
-              type="button"
-              style={{
-                background: preset.swatchBackground,
-                color: preset.color,
-              }}
-              onClick={() => onThemeChange(id)}
-            >
-              {preset.label}
-            </button>
-            )
-          })}
-        </div>
-      </div>
-
       <div className="mb-5">
         <div className={sectionTitle}>Font family</div>
         <div className={toggleGroup}>

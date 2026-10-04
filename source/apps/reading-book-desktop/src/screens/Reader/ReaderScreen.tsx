@@ -95,7 +95,7 @@ export function ReaderScreen() {
   } = useAppTitle()
   const { ensureTab, updateBookTitle } = useOpenReading()
   const { registerReaderChrome } = useReaderChromeMenu()
-  const { prefs: globalPrefs, setPrefs: setGlobalPrefs } = useGlobalReadingPrefs()
+  const { prefs: globalPrefs } = useGlobalReadingPrefs()
   const { immersive, fullscreen, toggleFullscreen, exitFullscreen } =
     useImmersiveReading()
   const immersiveReveal = useImmersiveChromeReveal({ enabled: immersive })
@@ -566,12 +566,10 @@ export function ReaderScreen() {
             {rightPanel === 'settings' ? (
               <AaSettingsPanel
                 prefs={book.prefs}
-                theme={globalPrefs.theme}
                 onChange={(patch) => {
                   book.prefsDirtyRef.current = true
                   book.setPrefs((p) => ({ ...p, ...patch }))
                 }}
-                onThemeChange={(theme) => setGlobalPrefs({ theme })}
               />
             ) : null}
           </ReaderRightSidebar>
