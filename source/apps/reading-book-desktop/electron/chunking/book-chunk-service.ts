@@ -122,6 +122,26 @@ export async function ensureBookChunks(bookId: string): Promise<EnsureBookIndexR
   }
 }
 
+/** Whether any book is being chunked right now (Clear Cache must wait for it). */
+export function isBookChunkingActive(): boolean {
+  return running.size > 0 || pending.size > 0
+}
+
+/**
+ * Settings → Storage → Clear Cache: drop every derived chunk / FTS5 row. They are rebuilt from the
+ * book file the next time a book is opened (`ensureBookChunks`). Only `book_chunks` is touched —
+ * the FTS5 index follows through its delete trigger; books, notes, sessions, collections and
+ * metadata are untouched. Returns false (and deletes nothing) while chunking is in progress.
+ */
+export function clearBookChunkCache(): boolean {
+  if (isBookChunkingActive()) return false
+  const db = getDatabase()
+  db.prepare('DELETE FROM book_chunks').run()
+  db.prepare("INSERT INTO book_chunks_fts(book_chunks_fts) VALUES ('optimize')").run()
+  yieldedNoText.clear()
+  return true
+}
+
 /** Stop in-flight workers on app quit so they can't outlive the DB / process. */
 export function disposeBookChunkWorkers(): void {
   for (const worker of running.values()) {

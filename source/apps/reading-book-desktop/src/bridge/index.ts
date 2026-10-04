@@ -19,3 +19,10 @@ export {
   type TranslationErrorCode,
   type TranslationProgress,
 } from './translation'
+export {
+  storageApi,
+  type ClearCacheResult,
+  type RemoveTranslationModelResult,
+  type StorageUsage,
+  type TranslationModel,
+} from './storage'

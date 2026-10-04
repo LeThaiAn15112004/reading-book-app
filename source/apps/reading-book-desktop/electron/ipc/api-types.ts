@@ -123,6 +123,43 @@ export interface CloudCatalogEntryDto {
   mimeType?: string
 }
 
+/** One downloaded translation model on disk (`{userData}/models/<org>/<name>`). */
+export interface TranslationModelDto {
+  /** e.g. `Xenova/opus-mt-en-vi`. */
+  id: string
+  bytes: number
+}
+
+/** Settings → Storage usage. Sizes in bytes; computed in Main. */
+export interface StorageUsageDto {
+  /** Managed-books folder, for display only (Open Folder goes through Main, not this string). */
+  booksFolderPath: string
+  /** App-owned book copies (URL / cloud downloads). Referenced books are not counted. */
+  booksBytes: number
+  /** browserCacheBytes + searchIndexBytes — what Clear Cache removes. */
+  cacheBytes: number
+  browserCacheBytes: number
+  /** book_chunks + FTS5 inside the database; null when it could not be measured. */
+  searchIndexBytes: number | null
+  translationModelsBytes: number
+  /** Everything else in the app data folder (database, covers, settings…). */
+  otherBytes: number
+  totalBytes: number
+  translationModels: TranslationModelDto[]
+}
+
+export interface ClearCacheResult {
+  ok: boolean
+  errorCode?: 'busy' | 'failed'
+  errorMessage?: string
+}
+
+export interface RemoveTranslationModelResult {
+  ok: boolean
+  errorCode?: 'busy' | 'not_found' | 'failed'
+  errorMessage?: string
+}
+
 export interface CloudConnectResult {
   ok: boolean
   errorMessage?: string
@@ -574,6 +611,13 @@ export interface DesktopApi {
     cancelDownload(externalId: string): Promise<OkResult>
     /** Subscribe to byte progress for the in-flight cloud download(s). Returns unsubscribe. */
     onDownloadProgress(handler: (progress: CloudDownloadProgressDto) => void): () => void
+  }
+  storage: {
+    getUsage(): Promise<StorageUsageDto>
+    /** Clears Chromium's cache and the rebuildable search index — never books, notes or models. */
+    clearCache(): Promise<ClearCacheResult>
+    removeTranslationModel(modelId: string): Promise<RemoveTranslationModelResult>
+    openBooksFolder(): Promise<OkResult>
   }
   translation: {
     /** Offline machine translation (worker thread in Main). The first use of a language pair

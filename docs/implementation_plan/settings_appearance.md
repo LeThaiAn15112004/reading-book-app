@@ -1,6 +1,6 @@
 # Settings — sidebar navigation & Appearance (SCR-06)
 
-Status: implemented — Appearance (including App Language) and About. Other sections are
+Status: implemented — Appearance (including App Language), Storage and About. Other sections are
 navigation placeholders.
 
 ## Layout
@@ -33,7 +33,7 @@ navigation placeholders.
 |---|---|---|
 | `appearance` | Appearance | `AppearanceSettings` (incl. App Language) |
 | `library` | Library | placeholder |
-| `storage` | Storage | placeholder |
+| `storage` | Storage | `StorageSettings` — see `settings_storage.md` |
 | `notifications` | Notifications | placeholder |
 | `keyboard` | Keyboard Shortcuts | placeholder |
 | `privacy` | Privacy | placeholder |
@@ -138,5 +138,5 @@ currently no UI to edit them. They belong in a future Reader/Book defaults secti
 
 ## Not implemented (placeholders)
 
-Library, Storage, Notifications, Keyboard Shortcuts, Privacy, Advanced — plus
+Library, Notifications, Keyboard Shortcuts, Privacy, Advanced — plus
 EPUB/PDF reading settings, annotation settings and cloud settings.

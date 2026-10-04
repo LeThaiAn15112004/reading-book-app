@@ -54,10 +54,27 @@ function handleWorkerMessage(message: TranslationWorkerMessage): void {
   )
 }
 
+/** Directory where downloaded translation models persist (`<org>/<model>` sub-folders). */
+export function getTranslationModelsDir(): string {
+  return path.join(app.getPath('userData'), 'models')
+}
+
+/**
+ * Stop the idle worker so no loaded model keeps its files in use (before removing a model). The
+ * next translation respawns it. Returns false while a translation is pending.
+ */
+export function releaseTranslationWorker(): boolean {
+  if (pending.size > 0) return false
+  const current = worker
+  worker = null
+  if (current) void current.terminate()
+  return true
+}
+
 /** Started on the first translation, never at app launch. */
 function ensureWorker(): Worker {
   if (worker) return worker
-  const data: TranslationWorkerData = { cacheDir: path.join(app.getPath('userData'), 'models') }
+  const data: TranslationWorkerData = { cacheDir: getTranslationModelsDir() }
   const created = new Worker(WORKER_PATH, {
     workerData: data,
     resourceLimits: { maxOldGenerationSizeMb: WORKER_HEAP_LIMIT_MB },

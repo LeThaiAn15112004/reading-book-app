@@ -8,6 +8,7 @@ import {
   LibraryChannels,
   OverlayChannels,
   SearchChannels,
+  StorageChannels,
   TranslationChannels,
   WordCountChannels,
 } from './ipc/channels'
@@ -140,6 +141,13 @@ const api: DesktopApi = {
   },
   wordCount: {
     getStats: (bookId) => ipcRenderer.invoke(WordCountChannels.getStats, bookId),
+  },
+  storage: {
+    getUsage: () => ipcRenderer.invoke(StorageChannels.getUsage),
+    clearCache: () => ipcRenderer.invoke(StorageChannels.clearCache),
+    removeTranslationModel: (modelId) =>
+      ipcRenderer.invoke(StorageChannels.removeTranslationModel, modelId),
+    openBooksFolder: () => ipcRenderer.invoke(StorageChannels.openBooksFolder),
   },
   translation: {
     translate: (request) => ipcRenderer.invoke(TranslationChannels.translate, request),

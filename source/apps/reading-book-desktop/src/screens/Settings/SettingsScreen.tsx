@@ -3,6 +3,7 @@ import {
   AppearanceSettings,
   SettingsPlaceholder,
   SettingsSidebar,
+  StorageSettings,
 } from './components'
 import {
   SETTINGS_SECTIONS,
@@ -12,6 +13,7 @@ import {
 
 const SECTION_DESCRIPTIONS: Partial<Record<SettingsSectionId, string>> = {
   appearance: 'Theme, accent color, density and language for the whole app.',
+  storage: 'Where Readmate Reader keeps its data and how much space it uses.',
   about: 'Information about Readmate Reader.',
 }
 
@@ -42,6 +44,8 @@ export function SettingsScreen() {
           <div className="mx-auto w-full max-w-3xl">
             {section.id === 'appearance' ? (
               <AppearanceSettings />
+            ) : section.id === 'storage' ? (
+              <StorageSettings />
             ) : section.id === 'about' ? (
               <AboutSettings />
             ) : (

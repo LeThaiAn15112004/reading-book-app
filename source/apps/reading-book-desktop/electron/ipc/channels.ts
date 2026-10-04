@@ -91,6 +91,17 @@ export const SearchChannels = {
   searchBook: 'search:searchBook',
 } as const
 
+export const StorageChannels = {
+  /** Renderer → main: usage figures for Settings → Storage. */
+  getUsage: 'storage:getUsage',
+  /** Renderer → main: clear Chromium cache + rebuildable search index (never books/notes). */
+  clearCache: 'storage:clearCache',
+  /** Renderer → main: delete one downloaded translation model by id. */
+  removeTranslationModel: 'storage:removeTranslationModel',
+  /** Renderer → main: open the managed-books folder in the OS file manager. */
+  openBooksFolder: 'storage:openBooksFolder',
+} as const
+
 export const TranslationChannels = {
   /** Renderer → main: translate a text selection offline (worker thread). */
   translate: 'translation:translate',
