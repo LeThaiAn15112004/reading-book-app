@@ -120,9 +120,10 @@ Readmate Reader."* Five cards, all built on the shared `SettingsCard` (also used
 - Not built (no backend/infrastructure in the project yet): app icon, update service /
   auto-update, Privacy Policy and Terms content, license viewer / license data, support or
   bug-report backend, support email, official website and Store page URLs.
-- Naming note: `electron-builder.json5` `productName` is `ReadMate Reader` (capital M) and the
-  title bar uses `APP_DISPLAY_NAME = 'Readmate'`; the About page shows the official
-  `Readmate Reader`. Those other strings were not changed in this task.
+- Naming: the official name **Readmate Reader** is used everywhere user-facing — About page,
+  `APP_DISPLAY_NAME` (window/titlebar title), `index.html` `<title>`, and `electron-builder.json5`
+  `productName` / protocol name. Internal identifiers keep their old spelling on purpose
+  (`readmate-reader://` OAuth scheme, `readmate.*` localStorage keys, drag MIME types).
 
 ## Deliberately not in global Settings
 

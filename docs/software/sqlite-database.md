@@ -1,4 +1,4 @@
-# Tài liệu database SQLite — ReadMate Reader (desktop)
+# Tài liệu database SQLite — Readmate Reader (desktop)
 
 > Nguồn: `docs/software/schema.dbml`, `electron/persistence/{db,migrate,sqlite-library-store,sqlite-overlay-store}.ts`
 > và `electron/persistence/migrations/001…019`. Schema khớp trạng thái sau migration `020_optimized_books_schema.sql`.

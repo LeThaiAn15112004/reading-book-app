@@ -6,7 +6,7 @@ import {
   type ReactNode,
 } from 'react'
 
-export const APP_DISPLAY_NAME = 'Readmate'
+export const APP_DISPLAY_NAME = 'Readmate Reader'
 
 type AppTitleContextValue = {
   isReaderRoute: boolean

@@ -20,7 +20,7 @@ function SplashBookIcon() {
   )
 }
 
-/** Brand mark: book icon + Readmate / Reader. */
+/** Brand mark: book icon + "Readmate" / "Reader" — together the app name Readmate Reader. */
 export function SplashBrand() {
   return (
     <div className="flex flex-col items-center text-center">
