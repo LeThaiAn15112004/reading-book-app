@@ -1,6 +1,7 @@
 import { HashRouter, Navigate, Route, Routes } from 'react-router-dom'
 import type { ReactNode } from 'react'
 import {
+  AppAppearanceBridge,
   AppMenubar,
   AppNavProvider,
   AppTitlebar,
@@ -50,6 +51,7 @@ function App() {
       <AppTitleProvider>
         <AppNavProvider>
           <GlobalReadingPrefsProvider>
+            <AppAppearanceBridge />
             <OpenReadingProvider>
               <ReaderChromeMenuProvider>
                 <ImmersiveReadingProvider>

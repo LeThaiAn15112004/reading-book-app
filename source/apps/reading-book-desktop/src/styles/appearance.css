@@ -1,0 +1,131 @@
+/**
+ * Global app appearance (SCR-06 Settings → Appearance): accent color + UI density.
+ *
+ * Accent: `<html data-accent>` overrides the theme's --accent / --lib-accent* tokens. `orange` is
+ * the built-in amber of every theme (theme.css), so it needs no override. Dark variants apply to
+ * Night/Sepia; Paper gets a darker shade so accent text/buttons keep contrast on light surfaces.
+ *
+ * Density: `<html data-density>` sets spacing tokens. Only the Settings screen consumes them for
+ * now; other screens can adopt the --ui-density-* variables later.
+ */
+
+:root[data-accent='blue'] {
+  --accent: #60a5fa;
+  --lib-accent: #60a5fa;
+  --lib-accent-hover: #3b82f6;
+  --lib-accent-soft: rgb(96 165 250 / 0.14);
+  --lib-accent-ring: rgb(96 165 250 / 0.3);
+}
+
+:root[data-theme='paper'][data-accent='blue'] {
+  --accent: #2563eb;
+  --lib-accent: #2563eb;
+  --lib-accent-hover: #1d4ed8;
+  --lib-accent-soft: rgb(37 99 235 / 0.12);
+  --lib-accent-ring: rgb(37 99 235 / 0.3);
+}
+
+:root[data-accent='purple'] {
+  --accent: #a78bfa;
+  --lib-accent: #a78bfa;
+  --lib-accent-hover: #8b5cf6;
+  --lib-accent-soft: rgb(167 139 250 / 0.14);
+  --lib-accent-ring: rgb(167 139 250 / 0.3);
+}
+
+:root[data-theme='paper'][data-accent='purple'] {
+  --accent: #7c3aed;
+  --lib-accent: #7c3aed;
+  --lib-accent-hover: #6d28d9;
+  --lib-accent-soft: rgb(124 58 237 / 0.12);
+  --lib-accent-ring: rgb(124 58 237 / 0.3);
+}
+
+:root[data-accent='green'] {
+  --accent: #4ade80;
+  --lib-accent: #4ade80;
+  --lib-accent-hover: #22c55e;
+  --lib-accent-soft: rgb(74 222 128 / 0.14);
+  --lib-accent-ring: rgb(74 222 128 / 0.3);
+}
+
+:root[data-theme='paper'][data-accent='green'] {
+  --accent: #16a34a;
+  --lib-accent: #16a34a;
+  --lib-accent-hover: #15803d;
+  --lib-accent-soft: rgb(22 163 74 / 0.12);
+  --lib-accent-ring: rgb(22 163 74 / 0.3);
+}
+
+:root[data-accent='cyan'] {
+  --accent: #22d3ee;
+  --lib-accent: #22d3ee;
+  --lib-accent-hover: #06b6d4;
+  --lib-accent-soft: rgb(34 211 238 / 0.14);
+  --lib-accent-ring: rgb(34 211 238 / 0.3);
+}
+
+:root[data-theme='paper'][data-accent='cyan'] {
+  --accent: #0891b2;
+  --lib-accent: #0891b2;
+  --lib-accent-hover: #0e7490;
+  --lib-accent-soft: rgb(8 145 178 / 0.12);
+  --lib-accent-ring: rgb(8 145 178 / 0.3);
+}
+
+:root[data-accent='red'] {
+  --accent: #f87171;
+  --lib-accent: #f87171;
+  --lib-accent-hover: #ef4444;
+  --lib-accent-soft: rgb(248 113 113 / 0.14);
+  --lib-accent-ring: rgb(248 113 113 / 0.3);
+}
+
+:root[data-theme='paper'][data-accent='red'] {
+  --accent: #dc2626;
+  --lib-accent: #dc2626;
+  --lib-accent-hover: #b91c1c;
+  --lib-accent-soft: rgb(220 38 38 / 0.12);
+  --lib-accent-ring: rgb(220 38 38 / 0.3);
+}
+
+:root[data-accent='slate'] {
+  --accent: #cbd5e1;
+  --lib-accent: #cbd5e1;
+  --lib-accent-hover: #94a3b8;
+  --lib-accent-soft: rgb(203 213 225 / 0.14);
+  --lib-accent-ring: rgb(203 213 225 / 0.3);
+}
+
+:root[data-theme='paper'][data-accent='slate'] {
+  --accent: #475569;
+  --lib-accent: #475569;
+  --lib-accent-hover: #334155;
+  --lib-accent-soft: rgb(71 85 105 / 0.12);
+  --lib-accent-ring: rgb(71 85 105 / 0.3);
+}
+
+:root,
+:root[data-density='balanced'] {
+  --ui-density-row: 2.5rem;
+  --ui-density-gap: 1.5rem;
+  --ui-density-pad: 1.25rem;
+  --ui-density-content-x: 1.75rem;
+  --ui-density-content-y: 2rem;
+}
+
+:root[data-density='comfortable'] {
+  --ui-density-row: 2.875rem;
+  --ui-density-gap: 2rem;
+  --ui-density-pad: 1.5rem;
+  --ui-density-content-x: 2.25rem;
+  --ui-density-content-y: 2.5rem;
+}
+
+:root[data-density='compact'] {
+  --ui-density-row: 2.125rem;
+  --ui-density-gap: 1rem;
+  --ui-density-pad: 1rem;
+  --ui-density-content-x: 1.25rem;
+  --ui-density-content-y: 1.25rem;
+}

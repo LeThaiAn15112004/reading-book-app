@@ -1,3 +1,4 @@
+export { AppAppearanceBridge } from './AppAppearanceBridge'
 export {
   APP_DISPLAY_NAME,
   AppTitleProvider,

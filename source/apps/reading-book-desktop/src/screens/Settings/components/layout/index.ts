@@ -1,2 +1,4 @@
 export { SettingsBackLink } from './SettingsBackLink'
-export { SettingsHeader } from './SettingsHeader'
+export { SettingsPlaceholder } from './SettingsPlaceholder'
+export { SettingsSectionIcon } from './SettingsSectionIcon'
+export { SettingsSidebar } from './SettingsSidebar'

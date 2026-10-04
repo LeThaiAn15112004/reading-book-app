@@ -1,20 +1,40 @@
-import { GlobalReadingAppearance, SettingsHeader } from './components'
+import { AppearanceSettings, SettingsPlaceholder, SettingsSidebar } from './components'
+import {
+  SETTINGS_SECTIONS,
+  useSettingsNavStore,
+  type SettingsSectionId,
+} from './logic/settingsNavStore'
 
-/** SCR-06 — App Settings (global reading appearance now; more sections in G6). */
+const SECTION_DESCRIPTIONS: Partial<Record<SettingsSectionId, string>> = {
+  appearance: 'Theme, accent color and density for the whole app.',
+}
+
+/** SCR-06 — App Settings: section sidebar (collapsible) + content panel. */
 export function SettingsScreen() {
+  const activeSection = useSettingsNavStore((s) => s.activeSection)
+  const section = SETTINGS_SECTIONS.find((s) => s.id === activeSection) ?? SETTINGS_SECTIONS[0]
+  const description = SECTION_DESCRIPTIONS[section.id]
+
   return (
     <div className="lib-chrome flex h-full w-full select-none overflow-hidden font-[system-ui,'Segoe_UI',sans-serif] text-lib-text antialiased">
-      <main className="flex min-w-0 flex-1 flex-col overflow-hidden">
-        <header className="app-titlebar flex h-16 shrink-0 items-center border-b border-lib-border-soft bg-lib-topbar pl-7 backdrop-blur-sm">
-          <SettingsHeader />
+      <SettingsSidebar />
+      <main className="flex min-w-0 flex-1 flex-col overflow-hidden" aria-labelledby="settings-section-title">
+        <header className="app-titlebar flex h-16 shrink-0 items-center border-b border-lib-border-soft bg-lib-topbar px-[var(--ui-density-content-x)] backdrop-blur-sm">
+          <div className="min-w-0">
+            <h2
+              id="settings-section-title"
+              className="m-0 truncate text-lg font-semibold tracking-tight text-lib-text-strong"
+            >
+              {section.label}
+            </h2>
+            {description ? (
+              <p className="m-0 mt-0.5 truncate text-xs text-lib-faint">{description}</p>
+            ) : null}
+          </div>
         </header>
-        <div className="app-scroll flex-1 overflow-y-auto px-7 py-8">
-          <div className="mx-auto flex w-full max-w-xl flex-col gap-6">
-            <GlobalReadingAppearance />
-            <p className="m-0 text-sm leading-relaxed text-lib-muted">
-              Other app settings (language, file scan, multi-document, linked
-              libraries) land in a later phase.
-            </p>
+        <div className="app-scroll flex-1 overflow-x-hidden overflow-y-auto px-[var(--ui-density-content-x)] py-[var(--ui-density-content-y)]">
+          <div className="mx-auto w-full max-w-3xl">
+            {section.id === 'appearance' ? <AppearanceSettings /> : <SettingsPlaceholder />}
           </div>
         </div>
       </main>

@@ -1,0 +1,99 @@
+# Settings — sidebar navigation & Appearance (SCR-06)
+
+Status: implemented (Appearance only). Other sections are navigation placeholders.
+
+## Layout
+
+```
+┌───────────────────┬──────────────────────────────────────────┐
+│ Settings      [<] │  Appearance                              │
+│                   │  Theme, accent color and density…        │
+│ ▌Appearance       ├──────────────────────────────────────────┤
+│  Language         │  App Theme     [Light][Dark][Sepia][Sys] │
+│  Library          │  Accent Color  ● ● ● ● ● ● ●             │
+│  Storage          │  UI Density    [Comfortable][Balanced]…  │
+│  Notifications    │                                          │
+│  Keyboard …       │                                          │
+│  Privacy          │                                          │
+│  Advanced         │                                          │
+│  About            │                                          │
+└───────────────────┴──────────────────────────────────────────┘
+```
+
+- Route stays `/settings` (`src/screens/Settings/SettingsScreen.tsx`); the global menubar and Library
+  navigation are unchanged.
+- `SettingsSidebar` (left) + content panel (`<main>`: section header + scrollable body, max width 3xl).
+- The active section lives in the zustand store `useSettingsNavStore`
+  (`src/screens/Settings/logic/settingsNavStore.ts`); `appearance` is the default. It is not put in
+  the URL (single route, no deep-linking need yet).
+
+## Sidebar navigation
+
+| Id | Label | Content |
+|---|---|---|
+| `appearance` | Appearance | `AppearanceSettings` |
+| `language` | Language | placeholder |
+| `library` | Library | placeholder |
+| `storage` | Storage | placeholder |
+| `notifications` | Notifications | placeholder |
+| `keyboard` | Keyboard Shortcuts | placeholder |
+| `privacy` | Privacy | placeholder |
+| `advanced` | Advanced | placeholder |
+| `about` | About | placeholder |
+
+Placeholder sections keep their active state and show *"This settings section is not implemented
+yet."* (`SettingsPlaceholder`). To add a section: add the id + label to `SETTINGS_SECTIONS`, an icon
+path in `SettingsSectionIcon`, and render its component in `SettingsScreen`.
+
+### Collapsed / expanded
+
+- Toggle button (chevron) in the sidebar header; `aria-expanded` + label "Collapse/Expand settings
+  sidebar".
+- Expanded `232px` (icon + label); collapsed `60px` (icon only). Width animates (`transition-[width]`,
+  200 ms); the content panel is `flex-1 min-w-0`, so it takes the freed space without overflow.
+- Collapsed items keep `aria-label` and get a native tooltip (`title`); the active item keeps its
+  accent background + left indicator bar. All items are `<button>`s with a visible
+  `focus-visible` outline and `aria-current="page"` on the active one.
+- The collapsed state is persisted in `localStorage` (`reading-book.settings.sidebar-collapsed`),
+  like other panel preferences in the app (Reader sidebar width, Library shelf order).
+
+## Appearance (global app appearance)
+
+State: zustand `useAppAppearanceStore` (`src/theme/appAppearanceStore.ts`), model and helpers in
+`src/theme/appAppearance.ts`, persisted to `localStorage` key `reading-book.app-appearance.v1`.
+
+| Setting | Values | How it is applied |
+|---|---|---|
+| App Theme | Light · Dark · Sepia · System | Resolved to the existing theme ids (Light→`paper`, Dark→`night`, Sepia→`sepia`, System→`paper`/`night` from `prefers-color-scheme`) and written to `GlobalReadingPrefs.theme`, which already drives `html[data-theme]` + the Electron caption buttons + the reading page. |
+| Accent Color | Blue · Purple · Green · Cyan · Orange · Red · Slate | `html[data-accent]`; `styles/appearance.css` overrides `--accent` / `--lib-accent*` (darker shades on Paper for contrast). Orange = the built-in amber of every theme (no override, default). |
+| UI Density | Comfortable · Balanced · Compact | `html[data-density]`; `styles/appearance.css` defines `--ui-density-row/gap/pad/content-x/content-y`. Default Balanced. |
+
+- `AppAppearanceBridge` (`src/chrome/AppAppearanceBridge.tsx`, mounted inside
+  `GlobalReadingPrefsProvider`) keeps the resolved theme in sync, follows OS light/dark changes
+  while in System mode, and applies the accent/density attributes.
+- `main.tsx` applies theme/accent/density before React mounts (no flash).
+- First run: when no appearance is stored, the theme mode is derived from the existing
+  `GlobalReadingPrefs.theme` (night→Dark, paper→Light, sepia→Sepia), so users keep their theme.
+- Sepia is kept as a fourth theme card because the app already shipped it (Night/Sepia/Paper);
+  dropping it would remove an existing option.
+- Selected state: theme cards get accent border + ring + filled check; swatches get a ring + check;
+  density options get accent border/background. Each group is a `radiogroup` of `radio` buttons
+  with `aria-checked`.
+- Density is consumed only by the Settings screen for now (sidebar row height, card padding,
+  content padding/gaps). Other screens do not read the `--ui-density-*` variables yet.
+
+## Deliberately not in global Settings
+
+Per-book / reader settings stay in the Reader (Aa panel in the right sidebar) and are **not** part
+of Appearance: EPUB font family/size/weight/line height, text align, margins, page layout, view
+mode, PDF zoom/page layout, reading position, book-specific theme, annotation settings.
+
+The old Settings card *"Appearance"* also contained **reading defaults** (font, size, weight, line
+height, page layout, text align for books without overrides). That card was removed with this
+change; the defaults themselves still exist in `GlobalReadingPrefs` and still apply, but there is
+currently no UI to edit them. They belong in a future Reader/Book defaults section.
+
+## Not implemented (placeholders)
+
+Language, Library, Storage, Notifications, Keyboard Shortcuts, Privacy, Advanced, About — plus
+EPUB/PDF reading settings, annotation settings and cloud settings.

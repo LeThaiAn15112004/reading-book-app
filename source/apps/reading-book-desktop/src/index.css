@@ -1,5 +1,6 @@
 @import "tailwindcss";
 @import "./styles/theme.css";
+@import "./styles/appearance.css";
 
 /* Design tokens → Tailwind utilities: bg-bg, text-fg, bg-accent, text-accent */
 @theme {

@@ -7,16 +7,24 @@ import {
   GLOBAL_READING_PREFS_STORAGE_KEY,
   parseGlobalReadingPrefsJson,
 } from '@reading-book/book-reader-sdk'
+import {
+  applyAppearanceAttributes,
+  loadAppAppearance,
+  resolveThemeMode,
+  systemPrefersDark,
+} from './theme/appAppearance'
 import { applyTheme } from './theme/applyTheme'
 import { syncWindowControlsInset } from './theme/syncWindowControlsInset'
 
-/** Boot theme from stored prefs before React mounts (avoid flash). */
+/** Boot theme / accent / density from stored prefs before React mounts (avoid flash). */
 try {
-  applyTheme(
+  const appearance = loadAppAppearance(
     parseGlobalReadingPrefsJson(
       localStorage.getItem(GLOBAL_READING_PREFS_STORAGE_KEY),
     ).theme,
   )
+  applyTheme(resolveThemeMode(appearance.themeMode, systemPrefersDark()))
+  applyAppearanceAttributes(appearance)
 } catch {
   applyTheme(DEFAULT_GLOBAL_READING_PREFS.theme)
 }
