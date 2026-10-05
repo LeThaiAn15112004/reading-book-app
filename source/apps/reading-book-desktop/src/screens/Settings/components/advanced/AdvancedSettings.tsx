@@ -1,7 +1,14 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import type { UpdateChannel } from '../../../../bridge'
+import { ConfirmBookActionDialog } from '../../../Library/components/book/ConfirmBookActionDialog'
+import { resetAppSettings } from '../../logic/resetAppSettings'
 import { useUpdatesStore, type UpdateCheckState } from '../../logic/updatesStore'
 import { SettingsCard } from '../layout/SettingsCard'
+
+const RESET_APP_SETTINGS_COPY =
+  'Your books, reading progress, annotations, and other personal data will not be affected.'
+
+type ResetNotice = { tone: 'success' | 'error'; text: string }
 
 const CHANNEL_NOTE: Record<UpdateChannel, string> = {
   'mac-app-store':
@@ -66,7 +73,7 @@ const TONE_CLASS: Record<StatusView['tone'], string> = {
   error: 'border-red-400/40 bg-red-500/10 text-red-400',
 }
 
-/** SCR-06 Settings → Advanced. This phase: Updates only (current version + check). */
+/** SCR-06 Settings → Advanced: Updates (current version + check) and Reset App Settings. */
 export function AdvancedSettings() {
   const version = useUpdatesStore((s) => s.version)
   const check = useUpdatesStore((s) => s.check)
@@ -74,6 +81,23 @@ export function AdvancedSettings() {
   const checkForUpdates = useUpdatesStore((s) => s.checkForUpdates)
   const checking = check.kind === 'checking'
   const status = statusFor(check)
+  const [resetDialogOpen, setResetDialogOpen] = useState(false)
+  const [resetNotice, setResetNotice] = useState<ResetNotice | null>(null)
+
+  function confirmReset() {
+    const { failed } = resetAppSettings()
+    setResetDialogOpen(false)
+    setResetNotice(
+      failed.length === 0
+        ? { tone: 'success', text: 'Settings have been reset to their defaults.' }
+        : {
+            tone: 'error',
+            text: `Some settings couldn’t be saved and may revert after restarting: ${failed
+              .map((group) => group.label)
+              .join(', ')}.`,
+          },
+    )
+  }
 
   useEffect(() => {
     void loadVersion()
@@ -117,6 +141,45 @@ export function AdvancedSettings() {
           </div>
         ) : null}
       </SettingsCard>
+
+      <SettingsCard
+        title="Reset App Settings"
+        description={`Restore your application preferences to their default values. ${RESET_APP_SETTINGS_COPY}`}
+      >
+        <button
+          type="button"
+          className="inline-flex h-9 cursor-pointer items-center rounded-lg border border-lib-border bg-transparent px-4 text-[13px] font-semibold text-lib-text-strong transition-colors hover:border-red-400 hover:text-red-400 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-lib-accent"
+          onClick={() => {
+            setResetNotice(null)
+            setResetDialogOpen(true)
+          }}
+        >
+          Reset App Settings
+        </button>
+
+        {resetNotice ? (
+          <p
+            role="status"
+            aria-live="polite"
+            className={`m-0 mt-4 rounded-lg border px-3 py-2.5 text-[13px] ${
+              TONE_CLASS[resetNotice.tone]
+            }`}
+          >
+            {resetNotice.text}
+          </p>
+        ) : null}
+      </SettingsCard>
+
+      {resetDialogOpen ? (
+        <ConfirmBookActionDialog
+          title="Reset App Settings?"
+          message={`This will restore your application preferences to their default values. ${RESET_APP_SETTINGS_COPY}`}
+          confirmLabel="Reset Settings"
+          destructive
+          onCancel={() => setResetDialogOpen(false)}
+          onConfirm={confirmReset}
+        />
+      ) : null}
     </div>
   )
 }

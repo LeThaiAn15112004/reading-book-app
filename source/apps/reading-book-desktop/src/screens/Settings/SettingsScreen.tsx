@@ -17,7 +17,7 @@ const SECTION_DESCRIPTIONS: Partial<Record<SettingsSectionId, string>> = {
   appearance: 'Theme, accent color, density and language for the whole app.',
   storage: 'Where Readmate Reader keeps its data and how much space it uses.',
   privacy: 'History Readmate Reader saves about your use — not your books.',
-  advanced: 'Updates for Readmate Reader.',
+  advanced: 'Updates and app preferences for Readmate Reader.',
   about: 'Information about Readmate Reader.',
 }
 

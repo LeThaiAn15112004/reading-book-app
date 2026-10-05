@@ -143,11 +143,13 @@ export function loadAppAppearance(legacyTheme?: ReaderTheme): AppAppearance {
   }
 }
 
-export function saveAppAppearance(appearance: AppAppearance): void {
+/** Returns false when the write failed (quota / private mode) — the choice just won't persist. */
+export function saveAppAppearance(appearance: AppAppearance): boolean {
   try {
     localStorage.setItem(APP_APPEARANCE_STORAGE_KEY, JSON.stringify(appearance))
+    return true
   } catch {
-    // ignore quota / private mode
+    return false
   }
 }
 

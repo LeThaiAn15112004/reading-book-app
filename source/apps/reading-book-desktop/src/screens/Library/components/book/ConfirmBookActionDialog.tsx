@@ -1,3 +1,5 @@
+import { useEffect } from 'react'
+
 export type ConfirmBookActionDialogProps = {
   title: string
   message: string
@@ -15,6 +17,17 @@ export function ConfirmBookActionDialog({
   onCancel,
   onConfirm,
 }: ConfirmBookActionDialogProps) {
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape') {
+        e.preventDefault()
+        onCancel()
+      }
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [onCancel])
+
   return (
     <div
       className="fixed inset-0 z-[310] flex items-center justify-center bg-lib-bg-deep/65 p-4 backdrop-blur-sm"

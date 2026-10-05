@@ -5,6 +5,7 @@ import {
 } from '@reading-book/book-reader-sdk'
 import {
   applyAppearanceAttributes,
+  DEFAULT_APP_APPEARANCE,
   loadAppAppearance,
   saveAppAppearance,
   type AccentColorId,
@@ -19,6 +20,12 @@ type AppAppearanceState = AppAppearance & {
   setAccent: (accent: AccentColorId) => void
   setDensity: (density: UiDensity) => void
   setLanguage: (language: AppLanguage) => void
+  /**
+   * Settings → Advanced → Reset App Settings: back to `DEFAULT_APP_APPEARANCE`. Writes the defaults
+   * rather than removing the key — a missing key falls back to the legacy reading-prefs theme.
+   * Returns false when the write failed (state is still reset for this session).
+   */
+  reset: () => boolean
 }
 
 function initialAppearance(): AppAppearance {
@@ -38,11 +45,12 @@ function initialAppearance(): AppAppearance {
  * the existing `html[data-theme]` theme engine.
  */
 export const useAppAppearanceStore = create<AppAppearanceState>()((set, get) => {
-  const commit = (patch: Partial<AppAppearance>) => {
+  const commit = (patch: Partial<AppAppearance>): boolean => {
     set(patch)
     const { themeMode, accent, density, language } = get()
-    saveAppAppearance({ themeMode, accent, density, language })
+    const saved = saveAppAppearance({ themeMode, accent, density, language })
     applyAppearanceAttributes({ accent, density, language })
+    return saved
   }
 
   return {
@@ -51,5 +59,6 @@ export const useAppAppearanceStore = create<AppAppearanceState>()((set, get) => 
     setAccent: (accent) => commit({ accent }),
     setDensity: (density) => commit({ density }),
     setLanguage: (language) => commit({ language }),
+    reset: () => commit(DEFAULT_APP_APPEARANCE),
   }
 })

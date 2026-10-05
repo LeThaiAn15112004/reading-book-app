@@ -10,7 +10,8 @@ const PREFS_STORAGE_KEY = 'reading-book.library.browse-prefs.v1'
 
 type BrowsePrefs = { sort: LibrarySortId; layout: LibraryLayout }
 
-const DEFAULT_PREFS: BrowsePrefs = { sort: 'recently-added', layout: 'grid' }
+/** Single source of the Library view defaults (first run and Settings → Reset App Settings). */
+export const DEFAULT_LIBRARY_BROWSE_PREFS: Readonly<BrowsePrefs> = { sort: 'recently-added', layout: 'grid' }
 
 function loadPrefs(): BrowsePrefs {
   try {
@@ -20,19 +21,21 @@ function loadPrefs(): BrowsePrefs {
     return {
       sort: LIBRARY_SORTS.some((s) => s.id === parsed?.sort)
         ? (parsed?.sort as LibrarySortId)
-        : DEFAULT_PREFS.sort,
-      layout: parsed?.layout === 'table' || parsed?.layout === 'grid' ? parsed.layout : DEFAULT_PREFS.layout,
+        : DEFAULT_LIBRARY_BROWSE_PREFS.sort,
+      layout: parsed?.layout === 'table' || parsed?.layout === 'grid' ? parsed.layout : DEFAULT_LIBRARY_BROWSE_PREFS.layout,
     }
   } catch {
-    return DEFAULT_PREFS
+    return { ...DEFAULT_LIBRARY_BROWSE_PREFS }
   }
 }
 
-function savePrefs(prefs: BrowsePrefs): void {
+/** Returns false when the write failed (quota / private mode) — the choice just won't persist. */
+function savePrefs(prefs: BrowsePrefs): boolean {
   try {
     localStorage.setItem(PREFS_STORAGE_KEY, JSON.stringify(prefs))
+    return true
   } catch {
-    // ignore quota / private mode — the choice just won't persist
+    return false
   }
 }
 
@@ -45,6 +48,11 @@ type LibraryBrowseState = BrowsePrefs & {
   setSort: (sort: LibrarySortId) => void
   setLayout: (layout: LibraryLayout) => void
   selectBook: (bookId: string | null) => void
+  /**
+   * Settings → Advanced → Reset App Settings: sort + layout back to `DEFAULT_LIBRARY_BROWSE_PREFS`.
+   * Returns false when the write failed (state is still reset for this session).
+   */
+  reset: () => boolean
 }
 
 /**
@@ -65,4 +73,9 @@ export const useLibraryBrowseStore = create<LibraryBrowseState>()((set, get) => 
     savePrefs({ sort: get().sort, layout })
   },
   selectBook: (selectedBookId) => set({ selectedBookId }),
+  reset: () => {
+    const { sort, layout } = DEFAULT_LIBRARY_BROWSE_PREFS
+    set({ sort, layout, selectedBookId: null })
+    return savePrefs({ sort, layout })
+  },
 }))
