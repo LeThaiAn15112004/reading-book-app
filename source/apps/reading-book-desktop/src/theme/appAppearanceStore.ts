@@ -8,7 +8,7 @@ import {
   DEFAULT_APP_APPEARANCE,
   loadAppAppearance,
   saveAppAppearance,
-  type AccentColorId,
+  type AppAccent,
   type AppAppearance,
   type AppLanguage,
   type AppThemeMode,
@@ -17,7 +17,9 @@ import {
 
 type AppAppearanceState = AppAppearance & {
   setThemeMode: (themeMode: AppThemeMode) => void
-  setAccent: (accent: AccentColorId) => void
+  setAccent: (accent: AppAccent) => void
+  /** Select Custom with this hex (`#rrggbb`). */
+  setCustomAccent: (hex: string) => void
   setDensity: (density: UiDensity) => void
   setLanguage: (language: AppLanguage) => void
   /**
@@ -47,9 +49,9 @@ function initialAppearance(): AppAppearance {
 export const useAppAppearanceStore = create<AppAppearanceState>()((set, get) => {
   const commit = (patch: Partial<AppAppearance>): boolean => {
     set(patch)
-    const { themeMode, accent, density, language } = get()
-    const saved = saveAppAppearance({ themeMode, accent, density, language })
-    applyAppearanceAttributes({ accent, density, language })
+    const { themeMode, accent, customAccent, density, language } = get()
+    const saved = saveAppAppearance({ themeMode, accent, customAccent, density, language })
+    applyAppearanceAttributes({ accent, customAccent, density, language })
     return saved
   }
 
@@ -57,6 +59,7 @@ export const useAppAppearanceStore = create<AppAppearanceState>()((set, get) => 
     ...initialAppearance(),
     setThemeMode: (themeMode) => commit({ themeMode }),
     setAccent: (accent) => commit({ accent }),
+    setCustomAccent: (customAccent) => commit({ accent: 'custom', customAccent }),
     setDensity: (density) => commit({ density }),
     setLanguage: (language) => commit({ language }),
     reset: () => commit(DEFAULT_APP_APPEARANCE),

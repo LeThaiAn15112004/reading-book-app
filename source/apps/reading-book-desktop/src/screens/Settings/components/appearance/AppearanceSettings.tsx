@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { READER_THEME_PRESETS } from '../../../../chrome'
 import {
   ACCENT_COLORS,
@@ -9,6 +10,7 @@ import {
 } from '../../../../theme/appAppearance'
 import { useAppAppearanceStore } from '../../../../theme/appAppearanceStore'
 import { SettingsCard } from '../layout/SettingsCard'
+import { AccentColorPicker } from './AccentColorPicker'
 
 const THEME_LABELS: Record<AppThemeMode, { label: string; hint: string }> = {
   light: { label: 'Light', hint: 'Bright surfaces' },
@@ -91,6 +93,10 @@ export function AppearanceSettings() {
   const setDensity = useAppAppearanceStore((s) => s.setDensity)
   const language = useAppAppearanceStore((s) => s.language)
   const setLanguage = useAppAppearanceStore((s) => s.setLanguage)
+  const customAccent = useAppAppearanceStore((s) => s.customAccent)
+  const setCustomAccent = useAppAppearanceStore((s) => s.setCustomAccent)
+  const [customPickerOpen, setCustomPickerOpen] = useState(false)
+  const customSelected = accent === 'custom'
 
   return (
     <div className="@container flex flex-col gap-[var(--ui-density-gap)]">
@@ -182,6 +188,57 @@ export function AppearanceSettings() {
               </button>
             )
           })}
+          <div className="relative">
+            <button
+              type="button"
+              role="radio"
+              aria-checked={customSelected}
+              aria-haspopup="dialog"
+              aria-expanded={customPickerOpen}
+              aria-label={`Custom color ${customAccent.toUpperCase()}`}
+              title={`Custom (${customAccent.toUpperCase()})`}
+              className={`flex w-16 cursor-pointer flex-col items-center gap-1.5 rounded-lg border-none bg-transparent p-1 ${focusRing}`}
+              onClick={() => setCustomPickerOpen((open) => !open)}
+            >
+              <span
+                className={`inline-flex size-9 items-center justify-center rounded-full ring-offset-2 ring-offset-lib-bg-deep transition-shadow ${
+                  customSelected ? 'ring-2 ring-lib-text-strong' : 'ring-0'
+                }`}
+                style={{
+                  background: customSelected
+                    ? customAccent
+                    : 'conic-gradient(#ef4444, #f59e0b, #eab308, #22c55e, #06b6d4, #3b82f6, #8b5cf6, #ec4899, #ef4444)',
+                  color: customSelected ? 'var(--lib-on-accent)' : '#fff',
+                }}
+                aria-hidden
+              >
+                {customSelected ? (
+                  <CheckIcon className="size-4 drop-shadow" />
+                ) : (
+                  <span className="inline-flex size-4 items-center justify-center rounded-full bg-black/35 text-[13px] leading-none font-semibold">
+                    +
+                  </span>
+                )}
+              </span>
+              <span
+                className={`text-[11px] font-medium ${
+                  customSelected ? 'text-lib-text-strong' : 'text-lib-muted'
+                }`}
+              >
+                Custom
+              </span>
+            </button>
+            {customPickerOpen ? (
+              <AccentColorPicker
+                value={customAccent}
+                onCancel={() => setCustomPickerOpen(false)}
+                onApply={(hex) => {
+                  setCustomAccent(hex)
+                  setCustomPickerOpen(false)
+                }}
+              />
+            ) : null}
+          </div>
         </div>
       </SettingsCard>
 

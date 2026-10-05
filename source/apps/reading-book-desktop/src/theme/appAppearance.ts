@@ -1,4 +1,5 @@
 import type { ReaderTheme } from '@reading-book/book-reader-sdk'
+import { customAccentTokens, normalizeHex } from './accentColor'
 
 /**
  * Global app appearance (SCR-06 Settings → Appearance). App-wide only — per-book reading settings
@@ -10,6 +11,9 @@ export type AppThemeMode = 'light' | 'dark' | 'sepia' | 'system'
 
 export type AccentColorId = 'blue' | 'purple' | 'green' | 'cyan' | 'orange' | 'red' | 'slate'
 
+/** A preset, or `custom` = the user's own hex in `customAccent`. */
+export type AppAccent = AccentColorId | 'custom'
+
 export type UiDensity = 'comfortable' | 'balanced' | 'compact'
 
 /**
@@ -20,7 +24,9 @@ export type AppLanguage = 'system' | 'vi' | 'en'
 
 export type AppAppearance = {
   themeMode: AppThemeMode
-  accent: AccentColorId
+  accent: AppAccent
+  /** Last custom hex (`#rrggbb`); kept while a preset is selected so Custom reopens on it. */
+  customAccent: string
   density: UiDensity
   language: AppLanguage
 }
@@ -31,6 +37,7 @@ export const APP_APPEARANCE_STORAGE_KEY = 'reading-book.app-appearance.v1'
 export const DEFAULT_APP_APPEARANCE: AppAppearance = {
   themeMode: 'dark',
   accent: 'orange',
+  customAccent: '#ec4899',
   density: 'balanced',
   language: 'system',
 }
@@ -124,12 +131,15 @@ export function loadAppAppearance(legacyTheme?: ReaderTheme): AppAppearance {
     const parsed = JSON.parse(raw) as Partial<Record<keyof AppAppearance, unknown>> | null
     return {
       themeMode: isOneOf(APP_THEME_MODES, parsed?.themeMode) ? parsed.themeMode : fallback.themeMode,
-      accent: isOneOf(
-        ACCENT_COLORS.map((c) => c.id),
+      accent: isOneOf<AppAccent>(
+        [...ACCENT_COLORS.map((c) => c.id), 'custom'],
         parsed?.accent,
       )
         ? parsed.accent
         : fallback.accent,
+      customAccent:
+        (typeof parsed?.customAccent === 'string' && normalizeHex(parsed.customAccent)) ||
+        fallback.customAccent,
       density: isOneOf(UI_DENSITIES, parsed?.density) ? parsed.density : fallback.density,
       language: isOneOf(
         APP_LANGUAGES.map((l) => l.id),
@@ -154,16 +164,23 @@ export function saveAppAppearance(appearance: AppAppearance): boolean {
 }
 
 /**
- * Accent + density are plain `<html>` attributes consumed by styles/appearance.css; the language
- * sets `<html lang>` (UI strings themselves are not translated yet).
+ * Accent + density are plain `<html>` attributes consumed by styles/appearance.css; a custom accent
+ * sets the same accent tokens inline on `<html>` instead. The language sets `<html lang>` (UI
+ * strings themselves are not translated yet).
  */
 export function applyAppearanceAttributes({
   accent,
+  customAccent,
   density,
   language,
-}: Pick<AppAppearance, 'accent' | 'density' | 'language'>): void {
+}: Pick<AppAppearance, 'accent' | 'customAccent' | 'density' | 'language'>): void {
   const root = document.documentElement
   root.dataset.accent = accent
+  const tokens = customAccentTokens(normalizeHex(customAccent) ?? DEFAULT_APP_APPEARANCE.customAccent)
+  for (const [name, value] of Object.entries(tokens)) {
+    if (accent === 'custom') root.style.setProperty(name, value)
+    else root.style.removeProperty(name)
+  }
   root.dataset.density = density
   root.lang = resolveAppLanguage(language)
 }

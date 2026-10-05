@@ -32,7 +32,17 @@ globalThis.localStorage = {
   },
 }
 Object.defineProperty(globalThis, 'navigator', { value: { language: 'en-US' }, configurable: true })
-globalThis.document = { documentElement: { dataset: {}, lang: '' } }
+const inlineStyle = new Map()
+globalThis.document = {
+  documentElement: {
+    dataset: {},
+    lang: '',
+    style: {
+      setProperty: (name, value) => inlineStyle.set(name, value),
+      removeProperty: (name) => inlineStyle.delete(name),
+    },
+  },
+}
 const ipcCalls = []
 globalThis.window = {
   matchMedia: () => ({ matches: true, addEventListener() {}, removeEventListener() {} }),
@@ -66,7 +76,9 @@ const OUT_OF_SCOPE = {
   'reading-book.settings.sidebar-collapsed': '1',
 }
 
-const NON_DEFAULT_APPEARANCE = { themeMode: 'light', accent: 'red', density: 'compact', language: 'vi' }
+const NON_DEFAULT_APPEARANCE = {
+  themeMode: 'light', accent: 'custom', customAccent: '#123456', density: 'compact', language: 'vi',
+}
 const NON_DEFAULT_LIBRARY = { sort: 'title', layout: 'table' }
 
 for (const [key, value] of Object.entries(OUT_OF_SCOPE)) storage.set(key, value)
@@ -87,8 +99,8 @@ const { APP_SETTINGS_RESETTERS, resetAppSettings } = await import(
 // ---------------------------------------------------------------------------
 
 const appearance = () => {
-  const { themeMode, accent, density, language } = useAppAppearanceStore.getState()
-  return { themeMode, accent, density, language }
+  const { themeMode, accent, customAccent, density, language } = useAppAppearanceStore.getState()
+  return { themeMode, accent, customAccent, density, language }
 }
 const library = () => {
   const { sort, layout } = useLibraryBrowseStore.getState()
@@ -100,7 +112,7 @@ const stored = (key) => JSON.parse(storage.get(key))
 function customize() {
   const a = useAppAppearanceStore.getState()
   a.setThemeMode(NON_DEFAULT_APPEARANCE.themeMode)
-  a.setAccent(NON_DEFAULT_APPEARANCE.accent)
+  a.setCustomAccent(NON_DEFAULT_APPEARANCE.customAccent)
   a.setDensity(NON_DEFAULT_APPEARANCE.density)
   a.setLanguage(NON_DEFAULT_APPEARANCE.language)
   const l = useLibraryBrowseStore.getState()
@@ -130,7 +142,7 @@ console.log('Reset App Settings')
 
 check('defaults: single source of truth holds the documented values', () => {
   assert.deepEqual(DEFAULT_APP_APPEARANCE, {
-    themeMode: 'dark', accent: 'orange', density: 'balanced', language: 'system',
+    themeMode: 'dark', accent: 'orange', customAccent: '#ec4899', density: 'balanced', language: 'system',
   })
   assert.deepEqual(DEFAULT_LIBRARY_BROWSE_PREFS, { sort: 'recently-added', layout: 'grid' })
   assert.deepEqual(APP_SETTINGS_RESETTERS.map((r) => r.id), ['appearance', 'library'])
@@ -194,6 +206,7 @@ check('full reset: every group back to defaults, store + storage + <html> attrs'
   const root = globalThis.document.documentElement
   assert.equal(root.dataset.accent, 'orange')
   assert.equal(root.dataset.density, 'balanced')
+  assert.equal(inlineStyle.size, 0, 'custom accent tokens are cleared when back on a preset')
   assert.equal(root.lang, 'en', '`system` language resolves from navigator.language')
 })
 

@@ -16,6 +16,7 @@ import { useGlobalReadingPrefs } from './GlobalReadingPrefsContext'
 export function AppAppearanceBridge() {
   const themeMode = useAppAppearanceStore((s) => s.themeMode)
   const accent = useAppAppearanceStore((s) => s.accent)
+  const customAccent = useAppAppearanceStore((s) => s.customAccent)
   const density = useAppAppearanceStore((s) => s.density)
   const language = useAppAppearanceStore((s) => s.language)
   const { prefs, setPrefs } = useGlobalReadingPrefs()
@@ -37,8 +38,8 @@ export function AppAppearanceBridge() {
   }, [prefs.theme, resolvedTheme, setPrefs])
 
   useEffect(() => {
-    applyAppearanceAttributes({ accent, density, language })
-  }, [accent, density, language])
+    applyAppearanceAttributes({ accent, customAccent, density, language })
+  }, [accent, customAccent, density, language])
 
   return null
 }

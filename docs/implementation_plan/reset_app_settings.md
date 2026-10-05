@@ -13,7 +13,7 @@ tên nhóm không lưu được.
 
 | Nhóm | Field | Default | Lưu ở (renderer `localStorage`) |
 |---|---|---|---|
-| Appearance | `themeMode`, `accent`, `density`, `language` | `dark`, `orange`, `balanced`, `system` | `reading-book.app-appearance.v1` |
+| Appearance | `themeMode`, `accent`, `customAccent`, `density`, `language` | `dark`, `orange`, `#ec4899`, `balanced`, `system` | `reading-book.app-appearance.v1` |
 | Library | `sort`, `layout` | `recently-added`, `grid` | `reading-book.library.browse-prefs.v1` |
 
 Hệ quả kèm theo (không phải do reset ghi trực tiếp): `AppAppearanceBridge` thấy `themeMode` đổi nên patch
@@ -71,13 +71,16 @@ component đang subscribe store re-render ngay — không cần restart.
 
 1. **Không có clear chung:** không `localStorage.clear()`, không xoá theo prefix `reading-book.*`, không
    DELETE SQL. Mỗi nhóm chỉ ghi đè đúng một key của nó.
-2. **Ghi đè, không `removeItem`:** thiếu key appearance thì `loadAppAppearance` lấy theme cũ từ
+2. **Accent tùy chỉnh:** `accent: 'custom'` áp màu qua CSS variable inline trên `<html>`
+   (`customAccentTokens` trong `src/theme/accentColor.ts`); khi reset về preset, `applyAppearanceAttributes` xoá
+   các biến inline đó.
+3. **Ghi đè, không `removeItem`:** thiếu key appearance thì `loadAppAppearance` lấy theme cũ từ
    `globalReadingPrefs.theme` (là theme đang dùng) → sau restart theme sẽ không về `dark`.
-3. **Record dùng chung được patch theo field:** `globalReadingPrefs` chứa cả theme lẫn reading defaults; reset
+4. **Record dùng chung được patch theo field:** `globalReadingPrefs` chứa cả theme lẫn reading defaults; reset
    không ghi record này, chỉ bridge patch `theme`.
-4. **Không chạm `window.api`:** đường reset không gọi IPC nên không thể tới SQLite hay file sách. Renderer
+5. **Không chạm `window.api`:** đường reset không gọi IPC nên không thể tới SQLite hay file sách. Renderer
    không có thêm quyền nào.
-5. **Lỗi theo nhóm:** ghi thất bại (quota / storage bị chặn) hoặc exception ở một nhóm → nhóm đó vào
+6. **Lỗi theo nhóm:** ghi thất bại (quota / storage bị chặn) hoặc exception ở một nhóm → nhóm đó vào
    `failed`, các nhóm khác vẫn chạy; state trong bộ nhớ vẫn về default cho phiên hiện tại và UI báo nhóm có
    thể quay lại giá trị cũ sau restart. Không có rollback (chỉ ghi default, không có trạng thái dở dang).
 
