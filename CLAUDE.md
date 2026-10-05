@@ -5,22 +5,29 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Project overview
 
 Local-first reading app ("reading-book-app"). MVP focus is the **desktop app** (Electron + Vite + React +
-TypeScript); a mobile app (Expo + React Native) exists only as an early scaffold and is not yet built out.
+TypeScript); shared platform-agnostic logic lives in `book-reader-sdk`; a mobile app (Expo + React Native) exists only
+as an early scaffold and is not yet built out.
 Product/UX rationale lives in `docs/reading-habbit/`; the authoritative architecture and data-model spec is
 `docs/software/SDS.md` (Vietnamese) — read it before making structural changes, since this file only summarizes it.
+Feature write-ups live in `docs/change_plan/` and `docs/implementation_plan/`.
 
 ## Repository structure
 
 ```
 source/                          # npm workspaces root (workspaces: apps/*, packages/*)
 ├── apps/
+│   ├── book-reader-sdk/         # @reading-book/book-reader-sdk — platform-agnostic core (see its README.md)
+│   │   ├── src/                 # domain, domain-ports, ports, services (use cases), stores, cfi, epub,
+│   │   │                        #   annotations, persistence codecs, text, pagination, app-models…
+│   │   ├── host-adapters/       # Node-side adapters outside the core (cloud providers, translation engine)
+│   │   └── examples/ dist/      # sample hosts; built self-contained bundle
 │   ├── reading-book-desktop/    # MVP app — Electron main/preload + React renderer
-│   └── reading-book-mobile/     # Expo Router scaffold, not yet wired to shared packages
+│   └── reading-book-mobile/     # Expo Router scaffold, not yet built out
 └── packages/
-    ├── domain/                  # Domain models + port interfaces (no I/O, no framework deps)
-    ├── shared/                  # Domain helpers + application use cases (platform-agnostic)
-    └── config/                  # Shared config (theme/formats/feature flags)
+    └── config/                  # @reading-book/config — formats, theme tokens, feature flags, OAuth config
 ```
+
+There is **no** `packages/domain` or `packages/shared` any more — both were folded into `book-reader-sdk`.
 
 Inside `reading-book-desktop`:
 
@@ -29,16 +36,22 @@ electron/            # Infrastructure — Main + Preload processes
 ├── main.ts / preload.ts
 ├── ipc/              # channel constants + per-feature handlers (registered in ipc/index.ts)
 ├── persistence/      # better-sqlite3 db + numbered .sql migrations + sqlite-*-store.ts
-├── adapters/          # DocumentImporter implementations per file format
-├── files/             # book-path validation (managed/referenced), URL·cloud copy, relink, cover:// protocol
-├── security/          # token-vault.ts (cloud OAuth token storage)
-└── config/ theme/     # google-oauth-config.ts, native titlebar theming
+├── adapters/         # DocumentImporter implementations per file format + URL fetcher
+├── files/            # book-path validation (managed/referenced), URL·cloud copy, relink, cover:// protocol
+├── signature/        # PDF signature verification (status only)
+├── chunking/ search/ # book text → FTS chunks; full-text search queries
+├── storage/ updates/ # Settings → Storage (sizes, cleanup); update checks
+├── translation/ wordcount/  # on-device translation worker + models; word-count stats
+├── security/ oauth/  # token-vault.ts (cloud OAuth token storage); OAuth flow
+└── config/ theme/    # OAuth config, native titlebar theming
 
 src/                 # Presentation — Renderer (React)
-├── bridge/            # thin typed wrappers around window.api (one per IPC feature)
-├── screens/           # Library, Reader, Settings, Splash
-├── reader/            # reader shell, renderers/ (per format), overlays/, annotations/, typewriter/
-├── components/, chrome/, theme/, styles/, utils/
+├── bridge/           # thin typed wrappers around window.api (one per IPC feature)
+├── screens/          # Library, Reader, Settings, Splash — each with components/ + logic/ (zustand stores, hooks)
+├── hooks/            # app/ library/ reader/ — hooks + stores shared across screens
+├── reader/           # renderers/ (per format), chrome/, interaction/, pageturn/, tts/
+├── theme/            # app appearance (theme mode, accent, density, language) + applyTheme
+├── components/, chrome/, styles/, utils/
 ```
 
 ## Commands
@@ -47,16 +60,20 @@ Desktop app (`cd source/apps/reading-book-desktop`):
 - `npm run dev` — Vite + Electron dev server
 - `npm run typecheck` — `tsc --noEmit`
 - `npm run lint` — ESLint (`--max-warnings 0`, fails on unused eslint-disable directives)
-- `npm run build` — `tsc && vite build && electron-builder`
+- `npm run build` — `tsc && vite build && electron-builder` (`npx vite build` alone checks the bundle without packaging)
 - `npm run preview` — preview built renderer
 - Spikes (standalone node scripts under `spikes/`, not part of the app build):
   `spike:epub:fixture`, `spike:epub:eval`, `spike:overlay:cfi`, `spike:session:roundtrip`, `spike:theme:contrast`,
-  `spike:signature:status` (signature-status checks; fixtures via `spike:signature:fixtures`, needs `openssl`)
+  `spike:signature:status` (signature-status checks; fixtures via `spike:signature:fixtures`, needs `openssl`),
+  `spike:settings:reset` (Reset App Settings checks against the real renderer stores)
+
+SDK (`cd source/apps/book-reader-sdk`): `npm run typecheck`, `npm run build`, `npm run verify` (typecheck + build +
+example-host typecheck + Node example run).
 
 Mobile app (`cd source/apps/reading-book-mobile`): `npm run start`, `android`, `ios`, `web`, `lint`.
 
 **There is no test runner configured anywhere in the repo** (no `*.test.*` files, no vitest/jest config, no `test`
-script) — don't assume a test suite exists or try to run one.
+script) — don't assume a test suite exists or try to run one. Checks are the standalone spike scripts above.
 
 ## Architecture
 
@@ -64,25 +81,27 @@ The system is **Layered** (Presentation → Application → Domain → Infrastru
 format/AI/sync boundaries, running across Electron's Main/Preload/Renderer processes. Full rationale, layer diagrams,
 and the ERD are in `docs/software/SDS.md` §2–3.
 
-Dependency rule (enforced by convention, not tooling): `packages/domain` and `packages/shared` must never import
-`electron`, `better-sqlite3`, or any format engine (`epubjs`, PDF libs, etc.) — those only exist inside
-`apps/reading-book-desktop/electron/**` and `src/reader/renderers|overlays`. Screens/components never touch SQL or
-`fs` directly; they call a use case or the IPC bridge.
+Dependency rule: `book-reader-sdk/src` must never import `electron`, `better-sqlite3`, Node/DOM APIs, React or any
+format engine (`epubjs`, PDF libs, etc.) — its tsconfig (`lib: ES2022`, `types: []`) makes a violation a compile
+error. Those only exist inside `apps/reading-book-desktop/electron/**`, `src/reader/renderers`, and
+`book-reader-sdk/host-adapters` (Node-side, imported by the desktop Main process). Screens/components never touch
+SQL or `fs` directly; they call a use case or the IPC bridge.
 
 | Layer | Where |
 |---|---|
-| Presentation | `apps/*/src/screens`, `components`, `reader/**` |
-| Application (use cases) | `packages/shared/services/*` |
-| Domain (models + ports) | `packages/domain/models/*`, `packages/domain/ports/*` |
-| Infrastructure (desktop) | `apps/reading-book-desktop/electron/**` |
+| Presentation | `apps/reading-book-desktop/src/screens`, `components`, `reader/**`, `hooks/**` |
+| Application (use cases + stores) | `book-reader-sdk/src/services/*`, `book-reader-sdk/src/stores/*` |
+| Domain (models + ports) | `book-reader-sdk/src/domain/*`, `src/domain-ports/*` (domain ports), `src/ports/*` (host I/O ports) |
+| Infrastructure (desktop) | `apps/reading-book-desktop/electron/**`, `book-reader-sdk/host-adapters/**` |
 
 ### IPC (Main ↔ Renderer)
 
 The renderer never gets raw filesystem paths or talks to SQLite directly — everything crosses through
-`window.api`, assembled in three places that must stay in sync:
+`window.api`, assembled in four places that must stay in sync:
 
 1. `electron/ipc/channels.ts` — channel name constants grouped by feature (`AppChannels`, `LibraryChannels`,
-   `ImportChannels`, `CloudChannels`, `OverlayChannels`). Preload may only invoke channels listed here.
+   `ImportChannels`, `CloudChannels`, `OverlayChannels`, `BookIndexChannels`, `SearchChannels`, `UpdateChannels`,
+   `StorageChannels`, `TranslationChannels`, `WordCountChannels`). Preload may only invoke channels listed here.
 2. `electron/ipc/<feature>.ipc.ts` — the Main-side handler, registered via `registerAllIpcHandlers()` in
    `electron/ipc/index.ts`.
 3. `electron/preload.ts` — exposes the channel through `contextBridge`, typed by the `DesktopApi` interface in
@@ -90,14 +109,14 @@ The renderer never gets raw filesystem paths or talks to SQLite directly — eve
 4. `src/bridge/<feature>.ts` — thin typed wrapper the renderer actually imports (re-exported from `src/bridge/index.ts`).
 
 DTOs in `api-types.ts` (suffixed `Dto`) are separate, structured-clone-safe plain objects — domain model instances
-(`packages/domain/models`) never cross the IPC boundary directly.
+(`book-reader-sdk/src/domain`) never cross the IPC boundary directly.
 
 ### Document format adapters
 
 Each supported format (epub, pdf, txt, md, docx, doc) is a `DocumentImporter` implementation in
 `electron/adapters/<fmt>.adapter.ts`, registered by `DocumentFormat` enum key in
 `electron/adapters/importer-registry.ts`. Adding a format means: new adapter file + registry entry, a matching
-renderer under `src/reader/renderers/<fmt>/`, and registration in `packages/shared/readers` / `packages/config`.
+renderer under `src/reader/renderers/<fmt>/`, and a `SUPPORTED_FORMATS` entry in `packages/config/formats.ts`.
 Domain/port code only ever deals with `DocumentImporter` / `DocumentRenderer` / `Location` — never format specifics.
 
 ### Persistence & the read-only/overlay invariant
@@ -111,10 +130,13 @@ provenance, FTS chunks, signature status), run through `migrate.ts`. `sqlite-lib
 absent = not checked) is the single source of truth — the app detects whether a book is signed, it never signs.
 PDF signatures are verified in `electron/signature/`; EPUB and other formats report `unsupported`. A cached result
 is reused only while the file's current SHA-256 equals `signatureCheckedSha256`. Annotations are not signatures and
-`books.sha256` is a fingerprint, not a signature. See `docs/implementation_plan/book_signature_status.md`.
+`books.sha256` is a fingerprint, not a signature. See `docs/change_plan/book_signature_status.md`.
+
+Per-book reading state (position, percent, and that book's font/size/line-height/align/layout/margin overrides)
+lives in `books.reading_state_json`, written via `overlay:saveSessionState`.
 
 Core invariant: **the book file is never mutated.** All highlights/notes/bookmarks/session state are
-written to separate SQLite "overlay" tables keyed by `bookId`.
+written to separate SQLite "overlay" tables / columns keyed by `bookId`.
 
 **Reference-based library:** a book picked from the user's filesystem is *not* copied — `books.file_path` is the
 user's own absolute path (`referenced`). Only URL/cloud downloads (no lasting file on disk) and books imported
@@ -128,7 +150,17 @@ the path (`bookFileStorage` in `electron/files/sandbox.ts`), not stored. Rules t
   the file's SHA-256 equals `books.sha256`. The renderer only ever passes a `bookId`, never a path.
 - Import sources: local file → reference in place (hash → duplicate check → metadata → persist, never copied);
   URL / cloud → temp download → hash → duplicate check → `copyIntoBooksSandbox` → metadata → persist → temp removed.
-  Full write-up: `docs/implementation_plan/file_centric_import_architecture.md`.
+  Full write-up: `docs/change_plan/file_centric_import_architecture.md`.
+
+### App preferences (renderer localStorage)
+
+Application-level preferences are **not** in SQLite (migration 005 dropped `app_settings`) and do not cross IPC:
+each renderer zustand store owns its own `localStorage` key and defaults — e.g. Appearance
+(`src/theme/appAppearance.ts`, `DEFAULT_APP_APPEARANCE`), Library sort/layout
+(`screens/Library/logic/libraryBrowseStore.ts`, `DEFAULT_LIBRARY_BROWSE_PREFS`), global reading defaults
+(`readmate.globalReadingPrefs.v1`, `DEFAULT_GLOBAL_READING_PREFS` in the SDK). Settings → Advanced → Reset App
+Settings calls each store's `reset()` via `screens/Settings/logic/resetAppSettings.ts`; a new resettable group adds a
+line to `APP_SETTINGS_RESETTERS`. See `docs/implementation_plan/reset_app_settings.md`.
 
 ### Location model
 
@@ -139,18 +171,19 @@ concrete location representation.
 ### Cloud sources
 
 `electron/ipc/cloud.ipc.ts` handles OAuth-based linking for Google Drive / Dropbox / OneDrive
-(`CloudProviderDto`). Tokens are stored via `electron/security/token-vault.ts`, never exposed to the renderer;
-the renderer only receives short-lived access tokens, opaque `rb-cover://` cover URLs, and binary payloads
-(`OpenBookContentResult`) — never real filesystem paths.
+(`CloudProviderDto`), using the provider clients in `book-reader-sdk/host-adapters/services/*`. Tokens are stored
+via `electron/security/token-vault.ts`, never exposed to the renderer; the renderer only receives short-lived access
+tokens, opaque `rb-cover://` cover URLs, and binary payloads (`OpenBookContentResult`) — never real filesystem paths.
 
 ### Path aliases
 
-`@reading-book/shared`, `@reading-book/domain`, `@reading-book/config` resolve to `../../packages/*` — defined in
-both `tsconfig.json` (`compilerOptions.paths`) and `vite.config.ts` (`resolve.alias`, and duplicated for the
-Electron main-process build). Keep both in sync when adding a new shared package.
+`@reading-book/config` → `../../packages/config` and `@reading-book/book-reader-sdk` → `../book-reader-sdk/src/index.ts`
+(the desktop consumes SDK source, not `dist/`) — defined in both `tsconfig.json` (`compilerOptions.paths`) and
+`vite.config.ts` (`resolve.alias`, duplicated for the Electron main-process build). Keep both in sync. The mobile
+app maps the SDK in its `tsconfig.json`, but its `babel.config.js` still aliases the removed `@reading-book/shared`.
 
-### AI / external-library sync
+### AI port
 
-Both are designed as ports (`AiProvider`, `ExternalLibraryConnector`, `SyncService` in `packages/domain/ports`) with
-only `NoOp*` implementations currently wired — they are intentionally unimplemented stubs for a later phase, not
-missing code.
+`AiProvider` is a port in `book-reader-sdk/src/domain-ports`; only `NoOpAiProvider` exists — an intentionally
+unimplemented stub for a later phase, not missing code. (`ExternalLibraryConnector` also ships a
+`NoOpExternalLibraryConnector` default; real cloud access goes through the host adapters above.)
