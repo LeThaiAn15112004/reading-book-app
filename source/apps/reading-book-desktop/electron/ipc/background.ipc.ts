@@ -5,7 +5,8 @@ import {
   resetBackgroundPrefs,
   updateBackgroundPrefs,
 } from '../background/background-mode'
-import type { BackgroundPrefsDto, BackgroundPrefsResult, OkResult } from './api-types'
+import { getStartAtLogin, setStartAtLogin } from '../background/login-item'
+import type { BackgroundPrefsDto, BackgroundPrefsResult, OkResult, StartAtLoginDto } from './api-types'
 import { BackgroundChannels } from './channels'
 
 /** Only the two known boolean switches are accepted from the renderer. */
@@ -37,10 +38,25 @@ export function registerBackgroundIpc(): void {
     (_event, patch: unknown): BackgroundPrefsResult =>
       persist(() => updateBackgroundPrefs(patchFrom(patch))),
   )
-  ipcMain.handle(
-    BackgroundChannels.resetPrefs,
-    (): BackgroundPrefsResult => persist(() => resetBackgroundPrefs()),
-  )
+  ipcMain.handle(BackgroundChannels.resetPrefs, (): BackgroundPrefsResult => {
+    // Start at Login defaults to off; it lives in the OS login items, not in the prefs file.
+    try {
+      setStartAtLogin(false)
+    } catch (err) {
+      console.error('Start at Login could not be turned off:', err)
+    }
+    return persist(() => resetBackgroundPrefs())
+  })
+  ipcMain.handle(BackgroundChannels.getStartAtLogin, (): StartAtLoginDto => getStartAtLogin())
+  ipcMain.handle(BackgroundChannels.setStartAtLogin, (_event, enabled: unknown): StartAtLoginDto => {
+    if (typeof enabled !== 'boolean') return getStartAtLogin()
+    try {
+      return setStartAtLogin(enabled)
+    } catch (err) {
+      console.error('Start at Login could not be changed:', err)
+      return getStartAtLogin()
+    }
+  })
   ipcMain.handle(BackgroundChannels.quit, (): OkResult => {
     // Reply first; quitting tears down the renderer this call came from.
     setImmediate(quitApp)

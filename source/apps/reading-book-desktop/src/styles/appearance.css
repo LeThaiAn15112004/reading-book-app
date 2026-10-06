@@ -129,3 +129,12 @@
   --ui-density-content-x: 1.25rem;
   --ui-density-content-y: 1.25rem;
 }
+
+/* Native time picker (Settings → Notifications → Reminder Time): match the theme so its icon and popup are readable. */
+.settings-time-input {
+  color-scheme: dark;
+}
+
+:root[data-theme='paper'] .settings-time-input {
+  color-scheme: light;
+}

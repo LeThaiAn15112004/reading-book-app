@@ -20,7 +20,8 @@
     "spike:signature:status": "node --experimental-strip-types --import ./spikes/signature-status/register-alias.mjs spikes/signature-status/run-signature-status.mjs",
     "spike:settings:reset": "node --experimental-strip-types --import ./spikes/reset-app-settings/register-alias.mjs spikes/reset-app-settings/run-reset-app-settings.mjs",
     "spike:settings:notifications": "node --experimental-strip-types --import ./spikes/reset-app-settings/register-alias.mjs spikes/notifications/run-notifications.mjs",
-    "spike:settings:background": "node --experimental-strip-types --import ./spikes/background/register-alias.mjs spikes/background/run-background.mjs"
+    "spike:settings:background": "node --experimental-strip-types --import ./spikes/background/register-alias.mjs spikes/background/run-background.mjs",
+    "spike:settings:reminders": "node --experimental-strip-types --import ./spikes/background/register-alias.mjs spikes/reminders/run-reminders.mjs"
   },
   "dependencies": {
     "@huggingface/transformers": "^4.3.0",

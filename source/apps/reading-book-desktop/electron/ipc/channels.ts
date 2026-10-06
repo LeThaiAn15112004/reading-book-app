@@ -98,6 +98,9 @@ export const BackgroundChannels = {
   setPrefs: 'background:setPrefs',
   /** Renderer → main: Settings → Reset App Settings — Main writes its own defaults. */
   resetPrefs: 'background:resetPrefs',
+  /** Renderer → main: Start at Login (OS login item; launched hidden in the tray). */
+  getStartAtLogin: 'background:getStartAtLogin',
+  setStartAtLogin: 'background:setStartAtLogin',
   /** Renderer → main: quit for real (raises the quitting flag first, like the tray's Quit). */
   quit: 'background:quit',
 } as const
@@ -105,6 +108,16 @@ export const BackgroundChannels = {
 export const NotificationChannels = {
   /** Renderer → main: whether the OS lets this app show notifications (Settings → Notifications). */
   getSupport: 'notifications:getSupport',
+  /** Renderer → main: master switch + Reading Reminders (owned by Main — the reminder worker runs there). */
+  getPrefs: 'notifications:getPrefs',
+  setEnabled: 'notifications:setEnabled',
+  setReminder: 'notifications:setReminder',
+  /** Renderer → main: Settings → Reset App Settings — Main writes its own defaults. */
+  resetPrefs: 'notifications:resetPrefs',
+  /** Renderer → main: show the reading reminder now (Settings preview). */
+  sendTestReminder: 'notifications:sendTestReminder',
+  /** Main → renderer: a reading-reminder notification was clicked — open this book. */
+  openBook: 'notifications:openBook',
 } as const
 
 export const UpdateChannels = {

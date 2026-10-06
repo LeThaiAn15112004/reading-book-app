@@ -1,7 +1,5 @@
-import { app } from 'electron'
-import fs from 'node:fs'
-import path from 'node:path'
 import type { BackgroundPrefsDto } from '../ipc/api-types'
+import { readJsonPrefsFile, writeJsonPrefsFile } from '../prefs/json-prefs-file'
 
 /**
  * Settings → Background & System Tray. Owned by Main (unlike the renderer's localStorage prefs)
@@ -15,9 +13,7 @@ export const DEFAULT_BACKGROUND_PREFS: Readonly<BackgroundPrefsDto> = {
   runInBackground: false,
 }
 
-function prefsPath(): string {
-  return path.join(app.getPath('userData'), 'background-prefs.json')
-}
+const FILE = 'background-prefs.json'
 
 /**
  * Validate any stored / incoming value. Running in the background needs the tray: without it a
@@ -32,17 +28,10 @@ export function normalizeBackgroundPrefs(raw: unknown): BackgroundPrefsDto {
 }
 
 export function loadBackgroundPrefs(): BackgroundPrefsDto {
-  try {
-    return normalizeBackgroundPrefs(JSON.parse(fs.readFileSync(prefsPath(), 'utf8')))
-  } catch {
-    return { ...DEFAULT_BACKGROUND_PREFS }
-  }
+  return normalizeBackgroundPrefs(readJsonPrefsFile(FILE))
 }
 
-/** Atomic write (temp file + rename). Throws when the file can't be written. */
+/** Atomic write. Throws when the file can't be written. */
 export function saveBackgroundPrefs(prefs: BackgroundPrefsDto): void {
-  const file = prefsPath()
-  const tmp = `${file}.tmp`
-  fs.writeFileSync(tmp, JSON.stringify(prefs), 'utf8')
-  fs.renameSync(tmp, file)
+  writeJsonPrefsFile(FILE, prefs)
 }

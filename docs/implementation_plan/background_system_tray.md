@@ -9,6 +9,7 @@ Notifications
 └── Background / System Tray
     ├── Run in Background
     ├── System Tray
+    ├── Start at Login     (xem reading_reminders_start_at_login.md)
     └── Quit from Tray
 ```
 

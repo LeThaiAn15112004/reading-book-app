@@ -10,6 +10,7 @@ import {
   ImmersiveReadingProvider,
   OpenReadingProvider,
   ReaderChromeMenuProvider,
+  ReminderNavigationBridge,
   SessionFlushBridge,
   useImmersiveReading,
 } from './chrome'
@@ -56,6 +57,7 @@ function App() {
               <ReaderChromeMenuProvider>
                 <ImmersiveReadingProvider>
                   <SessionFlushBridge />
+                  <ReminderNavigationBridge />
                   <AppChromeFrame>
                     <Routes>
                       <Route path="/" element={<SplashScreen />} />

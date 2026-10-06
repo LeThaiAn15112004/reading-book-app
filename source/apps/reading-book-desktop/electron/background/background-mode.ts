@@ -45,6 +45,11 @@ export function quitApp(): void {
   app.quit()
 }
 
+/** The tray icon exists right now (it is the way back to a hidden window). */
+export function hasTray(): boolean {
+  return tray !== null
+}
+
 export function getBackgroundPrefs(): BackgroundPrefsDto {
   return { ...prefs }
 }

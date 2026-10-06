@@ -39,7 +39,9 @@ electron/            # Infrastructure — Main + Preload processes
 ├── adapters/         # DocumentImporter implementations per file format + URL fetcher
 ├── files/            # book-path validation (managed/referenced), URL·cloud copy, relink, cover:// protocol
 ├── signature/        # PDF signature verification (status only)
-├── background/       # System Tray + Run in Background prefs, isQuitting flag, close/hide decision
+├── background/       # System Tray + Run in Background prefs, isQuitting flag, close/hide decision, Start at Login
+├── notifications/ reminders/  # Main-owned notification prefs; Reading Reminder worker (local time, SQLite)
+├── prefs/            # atomic JSON prefs files under {userData} (Main-owned preferences)
 ├── chunking/ search/ # book text → FTS chunks; full-text search queries
 ├── storage/ updates/ # Settings → Storage (sizes, cleanup); update checks
 ├── translation/ wordcount/  # on-device translation worker + models; word-count stats
@@ -68,7 +70,8 @@ Desktop app (`cd source/apps/reading-book-desktop`):
   `spike:signature:status` (signature-status checks; fixtures via `spike:signature:fixtures`, needs `openssl`),
   `spike:settings:reset` (Reset App Settings checks against the real renderer stores),
   `spike:settings:notifications` (Enable Notifications toggle + permission flow),
-  `spike:settings:background` (tray / close-to-hide / quit flag, Main modules with a stubbed `electron`)
+  `spike:settings:background` (tray / close-to-hide / quit flag / login item, Main modules with a stubbed `electron`),
+  `spike:settings:reminders` (Reading Reminder rules at UTC+7, SQLite on the real schema, minute-aligned worker)
 
 SDK (`cd source/apps/book-reader-sdk`): `npm run typecheck`, `npm run build`, `npm run verify` (typecheck + build +
 example-host typecheck + Node example run).
@@ -104,7 +107,7 @@ The renderer never gets raw filesystem paths or talks to SQLite directly — eve
 
 1. `electron/ipc/channels.ts` — channel name constants grouped by feature (`AppChannels`, `LibraryChannels`,
    `ImportChannels`, `CloudChannels`, `OverlayChannels`, `BookIndexChannels`, `SearchChannels`, `UpdateChannels`,
-   `StorageChannels`, `TranslationChannels`, `WordCountChannels`, `NotificationChannels`,
+   `StorageChannels`, `TranslationChannels`, `WordCountChannels`, `NotificationChannels` (incl. reminders),
    `BackgroundChannels`). Preload may only invoke channels listed here.
 2. `electron/ipc/<feature>.ipc.ts` — the Main-side handler, registered via `registerAllIpcHandlers()` in
    `electron/ipc/index.ts`.
@@ -161,16 +164,18 @@ the path (`bookFileStorage` in `electron/files/sandbox.ts`), not stored. Rules t
 Application-level preferences are **not** in SQLite (migration 005 dropped `app_settings`) and do not cross IPC:
 each renderer zustand store owns its own `localStorage` key and defaults — e.g. Appearance
 (`src/theme/appAppearance.ts`, `DEFAULT_APP_APPEARANCE`), Library sort/layout
-(`screens/Library/logic/libraryBrowseStore.ts`, `DEFAULT_LIBRARY_BROWSE_PREFS`), Notifications
-(`screens/Settings/logic/notificationsStore.ts` — enabling first checks `notifications:getSupport` in Main and the
-Web Notification permission), global reading defaults
+(`screens/Library/logic/libraryBrowseStore.ts`, `DEFAULT_LIBRARY_BROWSE_PREFS`), global reading defaults
 (`readmate.globalReadingPrefs.v1`, `DEFAULT_GLOBAL_READING_PREFS` in the SDK). Settings → Advanced → Reset App
 Settings calls each store's `reset()` via `screens/Settings/logic/resetAppSettings.ts`; a new resettable group adds a
 line to `APP_SETTINGS_RESETTERS` (resetters may be async). See `docs/implementation_plan/reset_app_settings.md`.
 
-Exception — **Background / System Tray** prefs (Settings → Notifications) are owned by Main (`{userData}/background-prefs.json`, defaults in
+Exceptions owned by **Main** (JSON files under `{userData}` via `electron/prefs/json-prefs-file.ts`; the renderer
+stores only mirror them over IPC): **Background / System Tray** (`background-prefs.json`, defaults in
 `electron/background/background-prefs.ts`) because the tray and the window's close button need them before / without
-the renderer. Every quit path must go through the `isQuitting` flag (`electron/background/background-mode.ts`, raised by
+the renderer; **Notifications + Reading Reminders** (`notification-prefs.json`, `DEFAULT_NOTIFICATION_PREFS` in
+`electron/notifications/notification-prefs.ts`) because the reminder worker runs in Main; **Start at Login** is the OS
+login item itself. Reminder rules use LOCAL time only and query SQLite through the shared connection; see
+`docs/implementation_plan/reading_reminders_start_at_login.md`. Every quit path must go through the `isQuitting` flag (`electron/background/background-mode.ts`, raised by
 `before-quit`, `quitApp()` and OS shutdown hooks); the close handler in `main.ts` follows `decideWindowClose()` and
 always flushes the reading session before closing *or* hiding. See `docs/implementation_plan/background_system_tray.md`.
 

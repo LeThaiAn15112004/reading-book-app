@@ -147,11 +147,27 @@ const api: DesktopApi = {
   },
   notifications: {
     getSupport: () => ipcRenderer.invoke(NotificationChannels.getSupport),
+    getPrefs: () => ipcRenderer.invoke(NotificationChannels.getPrefs),
+    setEnabled: (enabled) => ipcRenderer.invoke(NotificationChannels.setEnabled, enabled),
+    setReminder: (patch) => ipcRenderer.invoke(NotificationChannels.setReminder, patch),
+    resetPrefs: () => ipcRenderer.invoke(NotificationChannels.resetPrefs),
+    sendTestReminder: () => ipcRenderer.invoke(NotificationChannels.sendTestReminder),
+    onOpenBook: (handler) => {
+      const listener = (_event: Electron.IpcRendererEvent, target: Parameters<typeof handler>[0]) => {
+        handler(target)
+      }
+      ipcRenderer.on(NotificationChannels.openBook, listener)
+      return () => {
+        ipcRenderer.removeListener(NotificationChannels.openBook, listener)
+      }
+    },
   },
   background: {
     getPrefs: () => ipcRenderer.invoke(BackgroundChannels.getPrefs),
     setPrefs: (patch) => ipcRenderer.invoke(BackgroundChannels.setPrefs, patch),
     resetPrefs: () => ipcRenderer.invoke(BackgroundChannels.resetPrefs),
+    getStartAtLogin: () => ipcRenderer.invoke(BackgroundChannels.getStartAtLogin),
+    setStartAtLogin: (enabled) => ipcRenderer.invoke(BackgroundChannels.setStartAtLogin, enabled),
     quit: () => ipcRenderer.invoke(BackgroundChannels.quit),
   },
   updates: {

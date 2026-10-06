@@ -8,18 +8,24 @@ import {
 } from './files/cover-protocol'
 import {
   disposeTray,
+  hasTray,
   initBackgroundMode,
   isQuitting,
   markQuitting,
   shouldHideOnClose,
 } from './background/background-mode'
+import { HIDDEN_AT_STARTUP_ARG, wasLaunchedAtLogin } from './background/login-item'
 import { afterHideFlush, decideWindowClose } from './background/close-decision'
 import { disposeBookChunkWorkers } from './chunking/book-chunk-service'
 import { disposeTranslationWorker } from './translation/translation-service'
 import { ensureBooksSandbox } from './files/sandbox'
 import { registerAllIpcHandlers } from './ipc'
 import { installFullscreenShortcuts } from './ipc/app.ipc'
-import { AppChannels } from './ipc/channels'
+import { AppChannels, NotificationChannels } from './ipc/channels'
+import type { ReminderOpenBookDto } from './ipc/api-types'
+import { initNotificationSettings } from './notifications/notification-settings'
+import type { BookInProgress } from './reminders/reading-activity'
+import { startReadingReminders, stopReadingReminders } from './reminders/reading-reminders'
 import { handleOAuthCallbackUrl } from './ipc/cloud.ipc'
 import { closeDatabase, openDatabase } from './persistence/db'
 import { backfillLibraryMetadataFromFiles } from './persistence/backfill-library-metadata'
@@ -31,6 +37,12 @@ import {
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 const DEFAULT_OVERLAY = titleBarOverlayOptions('night')
+
+/**
+ * Windows shows notifications under an AppUserModelID. Packaged builds must use the installer's
+ * `appId` (electron-builder.json5 — keep in sync); unpackaged dev runs use the exe path.
+ */
+const APP_USER_MODEL_ID = 'YourAppID'
 
 /** Max wait for renderer session flush before closing the window (T4.2). */
 const FLUSH_BEFORE_CLOSE_TIMEOUT_MS = 2000
@@ -171,6 +183,22 @@ function showMainWindow(): void {
   win.focus()
 }
 
+/**
+ * Reading-reminder notification clicked: bring the window back and tell the renderer which book to
+ * open (after it has loaded, if the window had to be created).
+ */
+function openBookFromReminder(book: BookInProgress | null): void {
+  showMainWindow()
+  const target = win
+  if (!book || !target || target.isDestroyed()) return
+  const payload: ReminderOpenBookDto = { bookId: book.bookId, title: book.title }
+  const send = () => {
+    if (!target.isDestroyed()) target.webContents.send(NotificationChannels.openBook, payload)
+  }
+  if (target.webContents.isLoadingMainFrame()) target.webContents.once('did-finish-load', send)
+  else send()
+}
+
 /** Hands a `readmate-reader://` URL to its consumer(s) and brings the app window to the front. */
 function routeDeepLink(url: string): void {
   handleOAuthCallbackUrl(url)
@@ -205,7 +233,8 @@ function installDevToolsShortcuts(target: BrowserWindow): void {
   })
 }
 
-function createWindow() {
+/** `showOnReady: false` = Start at Login launch: the window loads but stays hidden in the tray. */
+function createWindow({ showOnReady = true }: { showOnReady?: boolean } = {}) {
   const isMac = process.platform === 'darwin'
   sessionFlushDone = false
   flushingClose = false
@@ -303,6 +332,11 @@ function createWindow() {
   })
 
   win.once('ready-to-show', () => {
+    if (!showOnReady) {
+      // Loaded (so session flush / reminders' open-book work) but not shown until the tray opens it.
+      hiddenInBackground = true
+      return
+    }
     win?.show()
     // Detached DevTools window on every launch while running against the
     // Vite dev server — F12 / Ctrl+Shift+I (installDevToolsShortcuts below)
@@ -356,6 +390,8 @@ app.on('second-instance', (_event, argv) => {
   const url = findDeepLinkArg(argv)
   if (url) {
     routeDeepLink(url)
+  } else if (argv.includes(HIDDEN_AT_STARTUP_ARG)) {
+    // A login launch while already running: stay as we are.
   } else if (win && !win.isDestroyed()) {
     // Launching the app again also reopens a window hidden by Run in Background.
     showMainWindow()
@@ -370,6 +406,8 @@ app.on('before-quit', () => {
 
 // Close DB after flush handshake / window close (not before — T4.2).
 app.on('will-quit', () => {
+  // Reminder worker queries the DB — stop it before closeDatabase() below.
+  stopReadingReminders()
   disposeTray()
   disposeBookChunkWorkers()
   disposeTranslationWorker()
@@ -377,6 +415,9 @@ app.on('will-quit', () => {
 })
 
 app.whenReady().then(async () => {
+  if (process.platform === 'win32') {
+    app.setAppUserModelId(app.isPackaged ? APP_USER_MODEL_ID : process.execPath)
+  }
   installApplicationMenu()
   ensureBooksSandbox()
   openDatabase()
@@ -389,11 +430,15 @@ app.whenReady().then(async () => {
   registerAllIpcHandlers()
   // Tray + Run in Background prefs (Main-owned) before the window, so its close button knows them.
   initBackgroundMode({ showWindow: showMainWindow, publicDir: process.env.VITE_PUBLIC })
+  initNotificationSettings()
   // macOS / Linux shutdown or reboot: quit instead of hiding.
   powerMonitor.on('shutdown', () => {
     markQuitting()
   })
-  createWindow()
+  // Start at Login: stay hidden in the tray — only when the tray exists, so there is a way back.
+  const startHidden = wasLaunchedAtLogin(process.argv) && hasTray()
+  createWindow({ showOnReady: !startHidden })
+  startReadingReminders({ openBook: openBookFromReminder })
 
   // Cold start via a readmate-reader:// link (Windows/Linux first instance) — Cloud Sources
   // connect() only starts listening after this, so this is a defensive no-op today, not a live path.

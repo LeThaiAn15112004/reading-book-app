@@ -42,4 +42,5 @@ export type {
   FontWeight,
   TextAlign,
 } from './GlobalReadingPrefsContext'
+export { ReminderNavigationBridge } from './ReminderNavigationBridge'
 export { SessionFlushBridge } from './SessionFlushBridge'

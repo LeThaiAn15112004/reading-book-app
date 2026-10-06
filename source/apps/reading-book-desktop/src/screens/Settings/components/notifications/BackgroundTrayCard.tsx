@@ -38,8 +38,8 @@ function Row({
 }
 
 /**
- * Settings → Notifications → Background / System Tray: Run in Background, System Tray, Quit from
- * Tray. The switches live in Main (tray + close button); this card loads them on open and every
+ * Settings → Notifications → Background / System Tray: Run in Background, System Tray, Start at
+ * Login, Quit from Tray. The switches live in Main (tray + close button); this card loads them on open and every
  * change is saved by Main before it shows here.
  */
 export function BackgroundTrayCard() {
@@ -52,6 +52,10 @@ export function BackgroundTrayCard() {
   const setShowTray = useBackgroundStore((s) => s.setShowTray)
   const setRunInBackground = useBackgroundStore((s) => s.setRunInBackground)
   const quit = useBackgroundStore((s) => s.quit)
+  const startAtLogin = useBackgroundStore((s) => s.startAtLogin)
+  const savingStartAtLogin = useBackgroundStore((s) => s.savingStartAtLogin)
+  const startAtLoginFailed = useBackgroundStore((s) => s.startAtLoginFailed)
+  const setStartAtLogin = useBackgroundStore((s) => s.setStartAtLogin)
 
   useEffect(() => {
     void load()
@@ -126,6 +130,30 @@ export function BackgroundTrayCard() {
               labelledBy="background-tray-label"
               describedBy="background-tray-desc"
               disabled={saving}
+            />
+          }
+        />
+
+        <Row
+          labelId="background-login-label"
+          descId="background-login-desc"
+          label="Start at Login"
+          description={
+            !startAtLogin?.supported
+              ? 'Not available on this system.'
+              : startAtLoginFailed
+                ? 'Your system didn’t accept this change. Check your startup apps settings.'
+                : prefs.showTray
+                  ? `Tự động chạy ứng dụng ngầm khi bật máy tính để các tính năng nhắc nhở hoạt động chính xác. Starts hidden in the ${TRAY_NAME}.`
+                  : `Tự động chạy ứng dụng ngầm khi bật máy tính để các tính năng nhắc nhở hoạt động chính xác. Without the ${TRAY_NAME} icon the window opens at login instead of staying hidden.`
+          }
+          control={
+            <SettingsSwitch
+              checked={startAtLogin?.enabled ?? false}
+              onChange={(next) => void setStartAtLogin(next)}
+              labelledBy="background-login-label"
+              describedBy="background-login-desc"
+              disabled={!startAtLogin?.supported || savingStartAtLogin}
             />
           }
         />

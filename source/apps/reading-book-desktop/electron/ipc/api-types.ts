@@ -15,6 +15,30 @@ export interface AppInfo {
  */
 export type NotificationSupportDto = { supported: boolean }
 
+/** Settings → Notifications → Reading Reminders. `time` is local wall-clock `HH:MM` (24h). */
+export type ReadingReminderPrefsDto = { enabled: boolean; time: string }
+
+/**
+ * Settings → Notifications, owned by Main (the reading-reminder worker runs there):
+ * `enabled` is the master "Enable Notifications" switch; reminders only fire while it is on.
+ */
+export type NotificationPrefsDto = { enabled: boolean; reminder: ReadingReminderPrefsDto }
+
+/** `ok: false` = the prefs file couldn't be written; `prefs` is then the unchanged current value. */
+export type NotificationPrefsResult = { ok: boolean; prefs: NotificationPrefsDto }
+
+/** Main → renderer when a reading-reminder notification is clicked: open this book in the Reader. */
+export type ReminderOpenBookDto = { bookId: string; title: string }
+
+/** Settings → Notifications → "Send test reminder". `blocked` = notifications are off / unsupported. */
+export type TestReminderResult = { status: 'sent' | 'blocked' | 'failed' }
+
+/**
+ * Settings → Background / System Tray → Start at Login. The OS login-item list is the source of
+ * truth (`app.getLoginItemSettings()`); `supported: false` on Linux, where Electron can't set it.
+ */
+export type StartAtLoginDto = { supported: boolean; enabled: boolean }
+
 /**
  * Settings → Background & System Tray. `runInBackground` (close button hides the window) only
  * applies while `showTray` is on — Main forces it off otherwise.
@@ -655,11 +679,21 @@ export interface DesktopApi {
   }
   notifications: {
     getSupport(): Promise<NotificationSupportDto>
+    getPrefs(): Promise<NotificationPrefsDto>
+    setEnabled(enabled: boolean): Promise<NotificationPrefsResult>
+    setReminder(patch: Partial<ReadingReminderPrefsDto>): Promise<NotificationPrefsResult>
+    resetPrefs(): Promise<NotificationPrefsResult>
+    sendTestReminder(): Promise<TestReminderResult>
+    /** Subscribe to reminder-notification clicks. Returns unsubscribe. */
+    onOpenBook(handler: (target: ReminderOpenBookDto) => void): () => void
   }
   background: {
     getPrefs(): Promise<BackgroundPrefsDto>
     setPrefs(patch: Partial<BackgroundPrefsDto>): Promise<BackgroundPrefsResult>
+    /** Also turns Start at Login off (its default). */
     resetPrefs(): Promise<BackgroundPrefsResult>
+    getStartAtLogin(): Promise<StartAtLoginDto>
+    setStartAtLogin(enabled: boolean): Promise<StartAtLoginDto>
     quit(): Promise<OkResult>
   }
   updates: {

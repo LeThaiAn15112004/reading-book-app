@@ -44,12 +44,25 @@ globalThis.document = {
   },
 }
 const ipcCalls = []
-/** Background & System Tray prefs are owned by Main: its reset is the one IPC call allowed. */
-const background = { calls: 0, ok: true }
+/**
+ * Background / System Tray and Notifications prefs are owned by Main: their resets (and reading back
+ * Start at Login) are the only IPC calls allowed.
+ */
+const background = { calls: 0, ok: true, startAtLogin: true }
 const fakeBackgroundApi = {
   resetPrefs: async () => {
     background.calls += 1
+    if (background.ok) background.startAtLogin = false
     return { ok: background.ok, prefs: { showTray: true, runInBackground: false } }
+  },
+  getStartAtLogin: async () => ({ supported: true, enabled: background.startAtLogin }),
+}
+const NOTIFICATION_DEFAULTS = { enabled: false, reminder: { enabled: false, time: '20:00' } }
+const notificationsMain = { calls: 0, ok: true }
+const fakeNotificationsApi = {
+  resetPrefs: async () => {
+    notificationsMain.calls += 1
+    return { ok: notificationsMain.ok, prefs: structuredClone(NOTIFICATION_DEFAULTS) }
   },
 }
 globalThis.window = {
@@ -61,7 +74,9 @@ globalThis.window = {
       get: (_t, prop) =>
         prop === 'background'
           ? fakeBackgroundApi
-          : (ipcCalls.push(String(prop)), () => Promise.reject(new Error('no IPC'))),
+          : prop === 'notifications'
+            ? fakeNotificationsApi
+            : (ipcCalls.push(String(prop)), () => Promise.reject(new Error('no IPC'))),
     },
   ),
 }
@@ -69,7 +84,6 @@ globalThis.window = {
 const KEYS = {
   appearance: 'reading-book.app-appearance.v1',
   library: 'reading-book.library.browse-prefs.v1',
-  notifications: 'reading-book.notifications.v1',
   globalReadingPrefs: 'readmate.globalReadingPrefs.v1',
 }
 
@@ -101,14 +115,13 @@ const NON_DEFAULT_LIBRARY = { sort: 'title', layout: 'table' }
 for (const [key, value] of Object.entries(OUT_OF_SCOPE)) storage.set(key, value)
 storage.set(KEYS.appearance, JSON.stringify(NON_DEFAULT_APPEARANCE))
 storage.set(KEYS.library, JSON.stringify(NON_DEFAULT_LIBRARY))
-storage.set(KEYS.notifications, JSON.stringify({ enabled: true }))
 
 const { DEFAULT_APP_APPEARANCE, loadAppAppearance } = await import('../../src/theme/appAppearance.ts')
 const { useAppAppearanceStore } = await import('../../src/theme/appAppearanceStore.ts')
 const { DEFAULT_LIBRARY_BROWSE_PREFS, useLibraryBrowseStore } = await import(
   '../../src/screens/Library/logic/libraryBrowseStore.ts'
 )
-const { DEFAULT_NOTIFICATION_PREFS, useNotificationsStore } = await import(
+const { useNotificationsStore } = await import(
   '../../src/screens/Settings/logic/notificationsStore.ts'
 )
 const { useBackgroundStore } = await import('../../src/screens/Settings/logic/backgroundStore.ts')
@@ -128,7 +141,7 @@ const library = () => {
   const { sort, layout } = useLibraryBrowseStore.getState()
   return { sort, layout }
 }
-const notifications = () => useNotificationsStore.getState().notifications
+const notifications = () => useNotificationsStore.getState().prefs
 const stored = (key) => JSON.parse(storage.get(key))
 
 /** Put every in-scope group back to a non-default value through the real setters. */
@@ -144,9 +157,12 @@ function customize() {
   l.setFilter('favorites')
   l.selectBook('book-1')
   // Enabling goes through the OS permission check (IPC) — seed the granted state directly instead.
-  useNotificationsStore.setState({ notifications: { enabled: true }, blocked: 'denied' })
+  useNotificationsStore.setState({
+    prefs: { enabled: true, reminder: { enabled: true, time: '06:15' } },
+    blocked: 'denied',
+  })
+  background.startAtLogin = true
   useBackgroundStore.setState({ prefs: { showTray: false, runInBackground: false } })
-  storage.set(KEYS.notifications, JSON.stringify({ enabled: true }))
 }
 
 function assertOutOfScopeUntouched() {
@@ -172,14 +188,12 @@ await check('defaults: single source of truth holds the documented values', asyn
     themeMode: 'dark', accent: 'orange', customAccent: '#ec4899', density: 'balanced', language: 'system',
   })
   assert.deepEqual(DEFAULT_LIBRARY_BROWSE_PREFS, { sort: 'recently-added', layout: 'grid' })
-  assert.deepEqual(DEFAULT_NOTIFICATION_PREFS, { enabled: false })
   assert.deepEqual(APP_SETTINGS_RESETTERS.map((r) => r.id), ['appearance', 'library', 'notifications', 'background'])
 })
 
 await check('stores loaded the persisted non-default values', async () => {
   assert.deepEqual(appearance(), NON_DEFAULT_APPEARANCE)
   assert.deepEqual(library(), NON_DEFAULT_LIBRARY)
-  assert.deepEqual(notifications(), { enabled: true })
 })
 
 // 5. Cancel (dialog closed without confirming = reset never runs) ---------------
@@ -226,10 +240,11 @@ await check('Notifications group resets only Notifications', async () => {
   customize()
   const appearanceRaw = storage.get(KEYS.appearance)
   const libraryRaw = storage.get(KEYS.library)
+  const calls = notificationsMain.calls
   const { failed } = await resetAppSettings([APP_SETTINGS_RESETTERS.find((r) => r.id === 'notifications')])
   assert.deepEqual(failed, [])
-  assert.deepEqual(notifications(), DEFAULT_NOTIFICATION_PREFS)
-  assert.deepEqual(stored(KEYS.notifications), DEFAULT_NOTIFICATION_PREFS)
+  assert.equal(notificationsMain.calls, calls + 1, 'Main writes its own defaults (master switch + reminder)')
+  assert.deepEqual(notifications(), NOTIFICATION_DEFAULTS)
   assert.equal(useNotificationsStore.getState().blocked, null)
   assert.equal(storage.get(KEYS.appearance), appearanceRaw)
   assert.equal(storage.get(KEYS.library), libraryRaw)
@@ -244,6 +259,7 @@ await check('Background group: Main writes its defaults over IPC, store mirrors 
   assert.deepEqual(failed, [])
   assert.equal(background.calls, calls + 1)
   assert.deepEqual(useBackgroundStore.getState().prefs, { showTray: true, runInBackground: false })
+  assert.deepEqual(useBackgroundStore.getState().startAtLogin, { supported: true, enabled: false }, 'Start at Login off')
   assert.equal(storage.get(KEYS.appearance), appearanceRaw)
   assertOutOfScopeUntouched()
 })
@@ -258,7 +274,7 @@ await check('full reset: every group back to defaults, store + storage + <html> 
   assert.deepEqual(library(), DEFAULT_LIBRARY_BROWSE_PREFS)
   assert.deepEqual(stored(KEYS.appearance), DEFAULT_APP_APPEARANCE)
   assert.deepEqual(stored(KEYS.library), DEFAULT_LIBRARY_BROWSE_PREFS)
-  assert.deepEqual(stored(KEYS.notifications), DEFAULT_NOTIFICATION_PREFS)
+  assert.deepEqual(notifications(), NOTIFICATION_DEFAULTS)
   const root = globalThis.document.documentElement
   assert.equal(root.dataset.accent, 'orange')
   assert.equal(root.dataset.density, 'balanced')
@@ -285,7 +301,7 @@ await check('per-book + global reading settings, history and layout keys are unt
   await resetAppSettings()
   assertOutOfScopeUntouched()
   const keys = [...storage.keys()].sort()
-  assert.deepEqual(keys, [...Object.keys(OUT_OF_SCOPE), KEYS.appearance, KEYS.library, KEYS.notifications].sort())
+  assert.deepEqual(keys, [...Object.keys(OUT_OF_SCOPE), KEYS.appearance, KEYS.library].sort())
 })
 
 // 6. Errors ---------------------------------------------------------------
@@ -296,13 +312,13 @@ await check('storage write failure: groups reported, in-memory state still reset
   failWrites = true
   try {
     const { failed } = await resetAppSettings()
-    assert.deepEqual(failed.map((r) => r.label), ['Appearance', 'Library', 'Notifications'], 'Main-owned background prefs are unaffected')
+    assert.deepEqual(failed.map((r) => r.label), ['Appearance', 'Library'], 'Main-owned prefs are unaffected by localStorage')
   } finally {
     failWrites = false
   }
   assert.deepEqual(appearance(), DEFAULT_APP_APPEARANCE)
   assert.deepEqual(library(), DEFAULT_LIBRARY_BROWSE_PREFS)
-  assert.deepEqual(notifications(), DEFAULT_NOTIFICATION_PREFS)
+  assert.deepEqual(notifications(), NOTIFICATION_DEFAULTS)
   assert.deepEqual(new Map(storage), before, 'nothing was written')
 })
 

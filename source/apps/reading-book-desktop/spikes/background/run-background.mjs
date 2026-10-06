@@ -6,6 +6,7 @@
  *   3. close decision  -> close button hides only in background mode; quitting always closes
  *   4. quitting flag   -> tray Quit / quitApp() raise it before app.quit(); a hidden window then closes
  *   5. failures        -> unwritable prefs leave everything unchanged; a failed tray never hides
+ *   6. start at login  -> OS login item with --hidden-at-startup; a login launch is recognised
  *
  * Run: npm run spike:settings:background
  */
@@ -24,6 +25,7 @@ const PREFS_FILE = path.join(userData, 'background-prefs.json')
 const prefsModule = await import('../../electron/background/background-prefs.ts')
 const mode = await import('../../electron/background/background-mode.ts')
 const { decideWindowClose, afterHideFlush } = await import('../../electron/background/close-decision.ts')
+const loginItem = await import('../../electron/background/login-item.ts')
 const { DEFAULT_BACKGROUND_PREFS, normalizeBackgroundPrefs } = prefsModule
 
 let shown = 0
@@ -152,6 +154,25 @@ await check('Reset App Settings: defaults written, tray kept, close quits again'
   assert.equal(liveTrays().length, 1)
   assert.equal(mode.shouldHideOnClose(), false)
   mode.updateBackgroundPrefs({ runInBackground: true })
+})
+
+// 6. Start at Login ----------------------------------------------------------
+
+await check('start at login (Windows): registers exe + --hidden-at-startup, read back from the OS', () => {
+  if (process.platform !== 'win32') return
+  assert.deepEqual(loginItem.getStartAtLogin(), { supported: true, enabled: false })
+  assert.deepEqual(loginItem.setStartAtLogin(true), { supported: true, enabled: true })
+  const call = stub.loginCalls.at(-1)
+  assert.equal(call.openAtLogin, true)
+  assert.equal(call.path, process.execPath)
+  assert.ok(call.args.includes(loginItem.HIDDEN_AT_STARTUP_ARG))
+  assert.deepEqual(loginItem.setStartAtLogin(false), { supported: true, enabled: false })
+  assert.equal(stub.loginItem, null)
+})
+
+await check('a login launch is recognised by its argument; a normal launch is not', () => {
+  assert.equal(loginItem.wasLaunchedAtLogin(['electron.exe', '.', '--hidden-at-startup']), true)
+  assert.equal(loginItem.wasLaunchedAtLogin(['electron.exe', '.']), false)
 })
 
 // 3. Close decision -----------------------------------------------------------

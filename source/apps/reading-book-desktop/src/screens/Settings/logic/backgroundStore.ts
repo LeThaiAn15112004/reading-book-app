@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { backgroundApi, type BackgroundPrefs } from '../../../bridge/background'
+import { backgroundApi, type BackgroundPrefs, type StartAtLogin } from '../../../bridge/background'
 
 type BackgroundState = {
   /** Main's current switches; null until the first load answers. */
@@ -10,9 +10,15 @@ type BackgroundState = {
   /** The last change couldn't be saved; the switches show Main's unchanged value. */
   saveFailed: boolean
   quitting: boolean
+  /** OS login item (Start at Login); null until loaded. */
+  startAtLogin: StartAtLogin | null
+  savingStartAtLogin: boolean
+  /** The OS refused the change; the switch shows what the OS reports. */
+  startAtLoginFailed: boolean
   load: () => Promise<void>
   setShowTray: (showTray: boolean) => Promise<void>
   setRunInBackground: (runInBackground: boolean) => Promise<void>
+  setStartAtLogin: (enabled: boolean) => Promise<void>
   /** Quit for real (same as the tray's "Quit Readmate"). */
   quit: () => Promise<void>
   /** Settings → Advanced → Reset App Settings: Main writes its own defaults. */
@@ -46,10 +52,17 @@ export const useBackgroundStore = create<BackgroundState>()((set, get) => {
     saving: false,
     saveFailed: false,
     quitting: false,
+    startAtLogin: null,
+    savingStartAtLogin: false,
+    startAtLoginFailed: false,
 
     load: async () => {
       try {
-        set({ prefs: await backgroundApi.getPrefs(), loadFailed: false })
+        const [prefs, startAtLogin] = await Promise.all([
+          backgroundApi.getPrefs(),
+          backgroundApi.getStartAtLogin(),
+        ])
+        set({ prefs, startAtLogin, loadFailed: false })
       } catch {
         set({ loadFailed: true })
       }
@@ -57,6 +70,20 @@ export const useBackgroundStore = create<BackgroundState>()((set, get) => {
 
     setShowTray: (showTray) => save({ showTray }),
     setRunInBackground: (runInBackground) => save({ runInBackground }),
+
+    setStartAtLogin: async (enabled) => {
+      const previous = get().startAtLogin
+      if (!previous?.supported || get().savingStartAtLogin) return
+      set({ startAtLogin: { ...previous, enabled }, savingStartAtLogin: true, startAtLoginFailed: false })
+      try {
+        const actual = await backgroundApi.setStartAtLogin(enabled)
+        set({ startAtLogin: actual, startAtLoginFailed: actual.enabled !== enabled })
+      } catch {
+        set({ startAtLogin: previous, startAtLoginFailed: true })
+      } finally {
+        set({ savingStartAtLogin: false })
+      }
+    },
 
     quit: async () => {
       if (get().quitting) return
@@ -71,8 +98,10 @@ export const useBackgroundStore = create<BackgroundState>()((set, get) => {
     reset: async () => {
       try {
         const result = await backgroundApi.resetPrefs()
-        set({ prefs: result.prefs, saveFailed: false, loadFailed: false })
-        return result.ok
+        // Main also turned Start at Login off — read back what the OS now reports.
+        const startAtLogin = await backgroundApi.getStartAtLogin()
+        set({ prefs: result.prefs, startAtLogin, saveFailed: false, loadFailed: false, startAtLoginFailed: false })
+        return result.ok && !startAtLogin.enabled
       } catch {
         return false
       }
