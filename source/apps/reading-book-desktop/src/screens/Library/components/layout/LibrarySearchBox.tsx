@@ -1,4 +1,5 @@
 import { useId, useRef, useState, type KeyboardEvent } from 'react'
+import { useShortcutAction } from '../../../../shortcuts'
 
 export type LibrarySearchBoxProps = {
   value: string
@@ -39,6 +40,10 @@ export function LibrarySearchBox({
 }: LibrarySearchBoxProps) {
   const listId = useId()
   const inputRef = useRef<HTMLInputElement>(null)
+  useShortcutAction('general.searchLibrary', () => {
+    inputRef.current?.focus()
+    inputRef.current?.select()
+  })
   const [focused, setFocused] = useState(false)
   const [dismissed, setDismissed] = useState(false)
   const [activeIndex, setActiveIndex] = useState(-1)

@@ -1,3 +1,4 @@
+import { useShortcutsStore } from '../../../shortcuts/shortcutsStore'
 import { useAppAppearanceStore } from '../../../theme/appAppearanceStore'
 import { useLibraryBrowseStore } from '../../Library/logic/libraryBrowseStore'
 import { useBackgroundStore } from './backgroundStore'
@@ -16,8 +17,7 @@ export type AppSettingsResetter = {
 }
 
 /**
- * Everything Settings → Advanced → Reset App Settings restores. Keyboard Shortcuts / Library
- * grouping add a line here once they exist.
+ * Everything Settings → Advanced → Reset App Settings restores. A new resettable group adds a line here.
  *
  * Never listed: books, book files, collections, annotations, reading progress, book metadata,
  * reading or search history, per-book reading settings (SQLite `books.reading_state_json`) and the
@@ -36,6 +36,11 @@ export const APP_SETTINGS_RESETTERS: readonly AppSettingsResetter[] = [
     id: 'background',
     label: 'Background & System Tray',
     reset: () => useBackgroundStore.getState().reset(),
+  },
+  {
+    id: 'keyboard-shortcuts',
+    label: 'Keyboard Shortcuts',
+    reset: () => useShortcutsStore.getState().reset(),
   },
 ]
 

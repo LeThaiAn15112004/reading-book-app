@@ -15,6 +15,7 @@ import {
   NewCollectionDialog,
   ShelfDetailView,
 } from './components'
+import { useShortcutAction } from '../../shortcuts'
 import { LibraryHub } from './LibraryHub'
 import { useLibraryScreen } from './logic'
 
@@ -84,6 +85,7 @@ export function LibraryScreen() {
     books,
     bookList,
   } = useLibraryScreen()
+  useShortcutAction('general.openBook', () => void handleFromDevice())
 
   return (
     <div className="lib-chrome relative flex h-full w-full select-none overflow-hidden font-[system-ui,'Segoe_UI',sans-serif] text-lib-text antialiased">

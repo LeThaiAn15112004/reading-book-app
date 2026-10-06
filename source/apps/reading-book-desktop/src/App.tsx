@@ -18,6 +18,7 @@ import { LibraryScreen } from './screens/Library/LibraryScreen'
 import { ReaderScreen } from './screens/Reader/ReaderScreen'
 import { SettingsScreen } from './screens/Settings/SettingsScreen'
 import { SplashScreen } from './screens/Splash/SplashScreen'
+import { ShortcutsBridge } from './shortcuts'
 import { SpikeEpubScreen } from './spikes/epub-engine/SpikeEpubScreen'
 
 function AppChromeFrame({ children }: { children: ReactNode }) {
@@ -58,6 +59,7 @@ function App() {
                 <ImmersiveReadingProvider>
                   <SessionFlushBridge />
                   <ReminderNavigationBridge />
+                  <ShortcutsBridge />
                   <AppChromeFrame>
                     <Routes>
                       <Route path="/" element={<SplashScreen />} />

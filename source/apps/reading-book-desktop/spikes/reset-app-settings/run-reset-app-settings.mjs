@@ -188,7 +188,7 @@ await check('defaults: single source of truth holds the documented values', asyn
     themeMode: 'dark', accent: 'orange', customAccent: '#ec4899', density: 'balanced', language: 'system',
   })
   assert.deepEqual(DEFAULT_LIBRARY_BROWSE_PREFS, { sort: 'recently-added', layout: 'grid' })
-  assert.deepEqual(APP_SETTINGS_RESETTERS.map((r) => r.id), ['appearance', 'library', 'notifications', 'background'])
+  assert.deepEqual(APP_SETTINGS_RESETTERS.map((r) => r.id), ['appearance', 'library', 'notifications', 'background', 'keyboard-shortcuts'])
 })
 
 await check('stores loaded the persisted non-default values', async () => {

@@ -21,9 +21,10 @@ tên nhóm không lưu được.
 Hệ quả kèm theo (không phải do reset ghi trực tiếp): `AppAppearanceBridge` thấy `themeMode` đổi nên patch
 **chỉ field `theme`** trong `readmate.globalReadingPrefs.v1` (`dark` → `night`), như mọi lần đổi theme.
 
-Chưa tồn tại nên chưa có gì để reset: Keyboard Shortcuts (đang hard-code), Library grouping. Reset Notifications
-chỉ tắt công tắc của app; không đổi quyền thông báo ở cấp OS.
-Khi xây, thêm một dòng vào `APP_SETTINGS_RESETTERS`.
+Keyboard Shortcuts đã có group `keyboard-shortcuts` (xoá các phím đã đổi, xem `keyboard_shortcuts.md`). Chưa tồn tại
+nên chưa có gì để reset: Library grouping. Reset Notifications chỉ tắt công tắc của app; không đổi quyền thông báo
+ở cấp OS.
+Khi xây group mới, thêm một dòng vào `APP_SETTINGS_RESETTERS`.
 
 ## Không được reset
 

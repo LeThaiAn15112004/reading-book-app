@@ -7,6 +7,7 @@ import {
   type RefObject,
 } from 'react'
 import type { EpubRendererApi } from '../../../../reader/renderers/epub'
+import { useShortcutAction } from '../../../../shortcuts'
 import {
   READER_CHROME_RESIZE_SETTLE_MS,
   blurReaderSidebarFocus,
@@ -235,20 +236,14 @@ export function useReaderChromeUi({
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [chromeHidden, moreOpen, settingsOpen, setSettingsOpen, searchOpen])
 
-  // Ctrl+F / Cmd+F: reveal chrome if hidden and open the in-book search panel.
-  useEffect(() => {
-    function onKeyDown(e: KeyboardEvent) {
-      if (e.key.toLowerCase() !== 'f' || !(e.ctrlKey || e.metaKey)) return
-      if (immersive) return
-      e.preventDefault()
-      setChromeHidden(false)
-      setMoreOpen(false)
-      setSearchOpen(true)
-    }
-
-    window.addEventListener('keydown', onKeyDown)
-    return () => window.removeEventListener('keydown', onKeyDown)
-  }, [immersive])
+  // "Search in Book" shortcut (Settings → Keyboard Shortcuts, Ctrl/Cmd+F by default): reveal chrome
+  // if hidden and open the in-book search panel.
+  useShortcutAction('general.searchBook', () => {
+    if (immersive) return
+    setChromeHidden(false)
+    setMoreOpen(false)
+    setSearchOpen(true)
+  })
 
   return {
     chromeHidden,
