@@ -1,1 +1,0 @@
-export { BackgroundSettings } from './BackgroundSettings'

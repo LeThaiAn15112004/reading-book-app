@@ -1,6 +1,7 @@
 import { useNotificationsStore, type NotificationBlockedReason } from '../../logic/notificationsStore'
 import { SettingsCard } from '../layout/SettingsCard'
 import { SettingsSwitch } from '../layout/SettingsSwitch'
+import { BackgroundTrayCard } from './BackgroundTrayCard'
 
 const BLOCKED_COPY: Record<NotificationBlockedReason, { title: string; body: string }> = {
   unsupported: {
@@ -17,7 +18,10 @@ const BLOCKED_COPY: Record<NotificationBlockedReason, { title: string; body: str
   },
 }
 
-/** SCR-06 Settings → Notifications: the master "Enable Notifications" switch. */
+/**
+ * SCR-06 Settings → Notifications: Notification Permission (the master "Enable Notifications"
+ * switch) and Background / System Tray.
+ */
 export function NotificationsSettings() {
   const enabled = useNotificationsStore((s) => s.notifications.enabled)
   const checking = useNotificationsStore((s) => s.checking)
@@ -28,11 +32,11 @@ export function NotificationsSettings() {
 
   return (
     <div className="flex flex-col gap-[var(--ui-density-gap)]">
-      <SettingsCard title="System Notifications">
+      <SettingsCard title="Notification Permission">
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0">
             <p id="notifications-enable-label" className="m-0 text-[13px] text-lib-text-strong">
-              Notification Permission
+              Enable Notifications
             </p>
             <p id="notifications-enable-desc" className="m-0 mt-1 text-[12px] text-lib-faint">
               Cho phép ứng dụng hiển thị thông báo trên hệ thống.
@@ -67,6 +71,8 @@ export function NotificationsSettings() {
           </div>
         ) : null}
       </SettingsCard>
+
+      <BackgroundTrayCard />
     </div>
   )
 }

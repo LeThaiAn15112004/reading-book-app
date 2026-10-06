@@ -168,7 +168,7 @@ Web Notification permission), global reading defaults
 Settings calls each store's `reset()` via `screens/Settings/logic/resetAppSettings.ts`; a new resettable group adds a
 line to `APP_SETTINGS_RESETTERS` (resetters may be async). See `docs/implementation_plan/reset_app_settings.md`.
 
-Exception — **Background & System Tray** prefs are owned by Main (`{userData}/background-prefs.json`, defaults in
+Exception — **Background / System Tray** prefs (Settings → Notifications) are owned by Main (`{userData}/background-prefs.json`, defaults in
 `electron/background/background-prefs.ts`) because the tray and the window's close button need them before / without
 the renderer. Every quit path must go through the `isQuitting` flag (`electron/background/background-mode.ts`, raised by
 `before-quit`, `quitApp()` and OS shutdown hooks); the close handler in `main.ts` follows `decideWindowClose()` and

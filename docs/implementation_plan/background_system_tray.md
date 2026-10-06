@@ -1,4 +1,16 @@
-# Background & System Tray (Settings → Background & System Tray)
+# Background / System Tray (Settings → Notifications)
+
+Nằm trong trang **Notifications**, card thứ hai sau *Notification Permission*:
+
+```
+Notifications
+├── Notification Permission
+│   └── Enable Notifications
+└── Background / System Tray
+    ├── Run in Background
+    ├── System Tray
+    └── Quit from Tray
+```
 
 ## Chức năng
 
@@ -6,7 +18,7 @@
 |---|---|---|
 | System Tray (`showTray`) | Icon Readmate ở khay hệ thống (macOS: menu bar). Menu: **Open Readmate**, **Quit Readmate**. Windows/Linux: click trái mở cửa sổ. | bật |
 | Run in Background (`runInBackground`) | Bấm [X] thì **ẩn** cửa sổ (`hide()`), app vẫn chạy. Chỉ có hiệu lực khi tray bật — tắt tray thì Main tự tắt luôn tuỳ chọn này. | tắt |
-| Quit Readmate (nút trong Settings) | Thoát hẳn, giống mục Quit của tray. | — |
+| Quit from Tray | Mục **Quit Readmate** trong menu tray thoát hẳn app (kể cả khi đang chạy ngầm). Dòng này trong Settings giải thích điều đó và có nút **Quit Readmate** làm cùng việc. | — |
 
 Hiện chưa có tác vụ nền nào (ví dụ nhắc đọc sách); chế độ này giữ tiến trình sống để các tác vụ đó gắn vào sau.
 
@@ -20,7 +32,7 @@ tray lúc khởi động) và **đồng bộ trong `close` event** của cửa s
 ## Kiến trúc
 
 ```
-Settings UI (BackgroundSettings) → useBackgroundStore → bridge/background → preload
+Settings UI (NotificationsSettings → BackgroundTrayCard) → useBackgroundStore → bridge/background → preload
   → background:getPrefs | setPrefs | resetPrefs | quit      (electron/ipc/background.ipc.ts)
   → electron/background/background-mode.ts  (prefs trong bộ nhớ, Tray, cờ isQuitting, quitApp)
   → electron/background/background-prefs.ts (validate + file JSON)
