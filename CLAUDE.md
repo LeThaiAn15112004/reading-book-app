@@ -59,6 +59,9 @@ src/                 # Presentation — Renderer (React)
 
 ## Commands
 
+From the repo root (after `npm install` there once): `npm run dev` runs desktop + mobile together via `concurrently`;
+`npm run dev:desktop` / `npm run dev:mobile` run one platform.
+
 Desktop app (`cd source/apps/reading-book-desktop`):
 - `npm run dev` — Vite + Electron dev server
 - `npm run typecheck` — `tsc --noEmit`

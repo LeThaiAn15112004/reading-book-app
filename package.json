@@ -1,0 +1,12 @@
+{
+  "name": "reading-book-app",
+  "private": true,
+  "scripts": {
+    "dev": "concurrently -n desktop,mobile -c blue,green \"npm run dev:desktop\" \"npm run dev:mobile\"",
+    "dev:desktop": "npm --prefix source/apps/reading-book-desktop run dev",
+    "dev:mobile": "npm --prefix source/apps/reading-book-mobile run start"
+  },
+  "devDependencies": {
+    "concurrently": "^9.0.0"
+  }
+}
