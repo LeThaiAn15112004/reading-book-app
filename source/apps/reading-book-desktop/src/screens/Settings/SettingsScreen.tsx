@@ -2,6 +2,7 @@ import {
   AboutSettings,
   AdvancedSettings,
   AppearanceSettings,
+  KeyboardShortcutsSettings,
   NotificationsSettings,
   PrivacySettings,
   SettingsPlaceholder,
@@ -16,6 +17,7 @@ import {
 
 const SECTION_DESCRIPTIONS: Partial<Record<SettingsSectionId, string>> = {
   appearance: 'Theme, accent color, density and language for the whole app.',
+  keyboard: 'Keyboard shortcuts for common actions.',
   notifications: 'System notifications, running in the background and the tray icon.',
   storage: 'Where Readmate Reader keeps its data and how much space it uses.',
   privacy: 'History Readmate Reader saves about your use — not your books.',
@@ -54,6 +56,8 @@ export function SettingsScreen() {
               <StorageSettings />
             ) : section.id === 'notifications' ? (
               <NotificationsSettings />
+            ) : section.id === 'keyboard' ? (
+              <KeyboardShortcutsSettings />
             ) : section.id === 'privacy' ? (
               <PrivacySettings />
             ) : section.id === 'advanced' ? (

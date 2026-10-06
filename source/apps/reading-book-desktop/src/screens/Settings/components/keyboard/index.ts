@@ -1,0 +1,1 @@
+export { KeyboardShortcutsSettings } from './KeyboardShortcutsSettings'
