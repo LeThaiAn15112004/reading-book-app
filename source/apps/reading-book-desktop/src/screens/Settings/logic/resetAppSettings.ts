@@ -1,16 +1,18 @@
 import { useAppAppearanceStore } from '../../../theme/appAppearanceStore'
 import { useLibraryBrowseStore } from '../../Library/logic/libraryBrowseStore'
+import { useBackgroundStore } from './backgroundStore'
 import { useNotificationsStore } from './notificationsStore'
 
 /**
  * One group of application-level preferences that Reset App Settings restores. Each group's store
  * owns its defaults and persistence; `reset` writes those defaults back (selectively — only that
- * group's own keys/fields) and returns false when the write failed.
+ * group's own keys/fields) and returns false when the write failed. Groups owned by Main (Background &
+ * System Tray) answer asynchronously over IPC.
  */
 export type AppSettingsResetter = {
   id: string
   label: string
-  reset: () => boolean
+  reset: () => boolean | Promise<boolean>
 }
 
 /**
@@ -30,6 +32,11 @@ export const APP_SETTINGS_RESETTERS: readonly AppSettingsResetter[] = [
     label: 'Notifications',
     reset: () => useNotificationsStore.getState().reset(),
   },
+  {
+    id: 'background',
+    label: 'Background & System Tray',
+    reset: () => useBackgroundStore.getState().reset(),
+  },
 ]
 
 export type ResetAppSettingsResult = {
@@ -41,13 +48,13 @@ export type ResetAppSettingsResult = {
  * Restore every application preference group to its defaults. Each group runs on its own so one
  * failure does not stop the rest. Stores update in place, so the UI reflects the defaults at once.
  */
-export function resetAppSettings(
+export async function resetAppSettings(
   resetters: readonly AppSettingsResetter[] = APP_SETTINGS_RESETTERS,
-): ResetAppSettingsResult {
+): Promise<ResetAppSettingsResult> {
   const failed: AppSettingsResetter[] = []
   for (const resetter of resetters) {
     try {
-      if (!resetter.reset()) failed.push(resetter)
+      if (!(await resetter.reset())) failed.push(resetter)
     } catch {
       failed.push(resetter)
     }

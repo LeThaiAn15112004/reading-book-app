@@ -91,6 +91,17 @@ export const SearchChannels = {
   searchBook: 'search:searchBook',
 } as const
 
+export const BackgroundChannels = {
+  /** Renderer → main: Settings → Background & System Tray switches (owned by Main). */
+  getPrefs: 'background:getPrefs',
+  /** Renderer → main: change one or both switches; Main persists, then shows / removes the tray. */
+  setPrefs: 'background:setPrefs',
+  /** Renderer → main: Settings → Reset App Settings — Main writes its own defaults. */
+  resetPrefs: 'background:resetPrefs',
+  /** Renderer → main: quit for real (raises the quitting flag first, like the tray's Quit). */
+  quit: 'background:quit',
+} as const
+
 export const NotificationChannels = {
   /** Renderer → main: whether the OS lets this app show notifications (Settings → Notifications). */
   getSupport: 'notifications:getSupport',

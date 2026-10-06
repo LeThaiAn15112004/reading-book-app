@@ -83,10 +83,13 @@ export function AdvancedSettings() {
   const status = statusFor(check)
   const [resetDialogOpen, setResetDialogOpen] = useState(false)
   const [resetNotice, setResetNotice] = useState<ResetNotice | null>(null)
+  const [resetting, setResetting] = useState(false)
 
-  function confirmReset() {
-    const { failed } = resetAppSettings()
+  async function confirmReset() {
     setResetDialogOpen(false)
+    setResetting(true)
+    const { failed } = await resetAppSettings()
+    setResetting(false)
     setResetNotice(
       failed.length === 0
         ? { tone: 'success', text: 'Settings have been reset to their defaults.' }
@@ -148,13 +151,21 @@ export function AdvancedSettings() {
       >
         <button
           type="button"
-          className="inline-flex h-9 cursor-pointer items-center rounded-lg border border-lib-border bg-transparent px-4 text-[13px] font-semibold text-lib-text-strong transition-colors hover:border-red-400 hover:text-red-400 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-lib-accent"
+          className="inline-flex h-9 cursor-pointer items-center gap-2 rounded-lg border border-lib-border bg-transparent px-4 text-[13px] font-semibold text-lib-text-strong transition-colors hover:border-red-400 hover:text-red-400 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-lib-accent disabled:cursor-wait disabled:opacity-60 disabled:hover:border-lib-border disabled:hover:text-lib-text-strong"
+          disabled={resetting}
+          aria-busy={resetting}
           onClick={() => {
             setResetNotice(null)
             setResetDialogOpen(true)
           }}
         >
-          Reset App Settings
+          {resetting ? (
+            <span
+              className="size-3.5 animate-spin rounded-full border-2 border-lib-border border-t-lib-accent"
+              aria-hidden
+            />
+          ) : null}
+          {resetting ? 'Resetting…' : 'Reset App Settings'}
         </button>
 
         {resetNotice ? (

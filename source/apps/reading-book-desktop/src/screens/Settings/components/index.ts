@@ -1,6 +1,7 @@
 export * from './about'
 export * from './advanced'
 export * from './appearance'
+export * from './background'
 export * from './layout'
 export * from './notifications'
 export * from './privacy'

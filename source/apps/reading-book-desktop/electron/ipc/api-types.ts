@@ -15,6 +15,15 @@ export interface AppInfo {
  */
 export type NotificationSupportDto = { supported: boolean }
 
+/**
+ * Settings → Background & System Tray. `runInBackground` (close button hides the window) only
+ * applies while `showTray` is on — Main forces it off otherwise.
+ */
+export type BackgroundPrefsDto = { showTray: boolean; runInBackground: boolean }
+
+/** `ok: false` = the prefs file couldn't be written; `prefs` is then the unchanged current value. */
+export type BackgroundPrefsResult = { ok: boolean; prefs: BackgroundPrefsDto }
+
 /** How this copy of the app is distributed (Electron `process.mas` / `process.windowsStore`). */
 export type UpdateChannelDto = 'mac-app-store' | 'microsoft-store' | 'direct'
 
@@ -646,6 +655,12 @@ export interface DesktopApi {
   }
   notifications: {
     getSupport(): Promise<NotificationSupportDto>
+  }
+  background: {
+    getPrefs(): Promise<BackgroundPrefsDto>
+    setPrefs(patch: Partial<BackgroundPrefsDto>): Promise<BackgroundPrefsResult>
+    resetPrefs(): Promise<BackgroundPrefsResult>
+    quit(): Promise<OkResult>
   }
   updates: {
     /** Ask the update provider for this distribution channel (none implemented yet). */

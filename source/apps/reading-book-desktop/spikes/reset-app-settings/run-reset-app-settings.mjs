@@ -3,7 +3,7 @@
  * localStorage, see docs/implementation_plan/reset_app_settings.md).
  *
  *   1. defaults               -> the single source of truth holds the documented values
- *   2. each group on its own  -> Appearance / Library / Notifications reset only their own key + state
+ *   2. each group on its own  -> Appearance / Library / Notifications / Background reset only their own state
  *   3. full reset             -> every group back to defaults, written (not removed), UI attrs applied
  *   4. out-of-scope state     -> per-book / global reading defaults / history / layout keys untouched,
  *                                and the reset never reaches `window.api` (IPC → SQLite / files)
@@ -44,10 +44,26 @@ globalThis.document = {
   },
 }
 const ipcCalls = []
+/** Background & System Tray prefs are owned by Main: its reset is the one IPC call allowed. */
+const background = { calls: 0, ok: true }
+const fakeBackgroundApi = {
+  resetPrefs: async () => {
+    background.calls += 1
+    return { ok: background.ok, prefs: { showTray: true, runInBackground: false } }
+  },
+}
 globalThis.window = {
   matchMedia: () => ({ matches: true, addEventListener() {}, removeEventListener() {} }),
-  // Any IPC access (library, overlay, storage…) would mean the reset reached user data.
-  api: new Proxy({}, { get: (_t, prop) => (ipcCalls.push(String(prop)), () => Promise.reject(new Error('no IPC'))) }),
+  // Any other IPC access (library, overlay, storage…) would mean the reset reached user data.
+  api: new Proxy(
+    {},
+    {
+      get: (_t, prop) =>
+        prop === 'background'
+          ? fakeBackgroundApi
+          : (ipcCalls.push(String(prop)), () => Promise.reject(new Error('no IPC'))),
+    },
+  ),
 }
 
 const KEYS = {
@@ -95,6 +111,7 @@ const { DEFAULT_LIBRARY_BROWSE_PREFS, useLibraryBrowseStore } = await import(
 const { DEFAULT_NOTIFICATION_PREFS, useNotificationsStore } = await import(
   '../../src/screens/Settings/logic/notificationsStore.ts'
 )
+const { useBackgroundStore } = await import('../../src/screens/Settings/logic/backgroundStore.ts')
 const { APP_SETTINGS_RESETTERS, resetAppSettings } = await import(
   '../../src/screens/Settings/logic/resetAppSettings.ts'
 )
@@ -128,6 +145,7 @@ function customize() {
   l.selectBook('book-1')
   // Enabling goes through the OS permission check (IPC) — seed the granted state directly instead.
   useNotificationsStore.setState({ notifications: { enabled: true }, blocked: 'denied' })
+  useBackgroundStore.setState({ prefs: { showTray: false, runInBackground: false } })
   storage.set(KEYS.notifications, JSON.stringify({ enabled: true }))
 }
 
@@ -139,8 +157,8 @@ function assertOutOfScopeUntouched() {
 }
 
 let passed = 0
-function check(name, fn) {
-  fn()
+async function check(name, fn) {
+  await fn()
   passed += 1
   console.log(`  ✓ ${name}`)
 }
@@ -149,16 +167,16 @@ console.log('Reset App Settings')
 
 // 1. Defaults ---------------------------------------------------------------
 
-check('defaults: single source of truth holds the documented values', () => {
+await check('defaults: single source of truth holds the documented values', async () => {
   assert.deepEqual(DEFAULT_APP_APPEARANCE, {
     themeMode: 'dark', accent: 'orange', customAccent: '#ec4899', density: 'balanced', language: 'system',
   })
   assert.deepEqual(DEFAULT_LIBRARY_BROWSE_PREFS, { sort: 'recently-added', layout: 'grid' })
   assert.deepEqual(DEFAULT_NOTIFICATION_PREFS, { enabled: false })
-  assert.deepEqual(APP_SETTINGS_RESETTERS.map((r) => r.id), ['appearance', 'library', 'notifications'])
+  assert.deepEqual(APP_SETTINGS_RESETTERS.map((r) => r.id), ['appearance', 'library', 'notifications', 'background'])
 })
 
-check('stores loaded the persisted non-default values', () => {
+await check('stores loaded the persisted non-default values', async () => {
   assert.deepEqual(appearance(), NON_DEFAULT_APPEARANCE)
   assert.deepEqual(library(), NON_DEFAULT_LIBRARY)
   assert.deepEqual(notifications(), { enabled: true })
@@ -166,7 +184,7 @@ check('stores loaded the persisted non-default values', () => {
 
 // 5. Cancel (dialog closed without confirming = reset never runs) ---------------
 
-check('cancel: nothing changes when the reset is not confirmed', () => {
+await check('cancel: nothing changes when the reset is not confirmed', async () => {
   customize()
   const before = new Map(storage)
   // AdvancedSettings only calls resetAppSettings() from the dialog's confirm button.
@@ -178,10 +196,10 @@ check('cancel: nothing changes when the reset is not confirmed', () => {
 
 // 2. Each group on its own ---------------------------------------------------
 
-check('Appearance group resets only Appearance', () => {
+await check('Appearance group resets only Appearance', async () => {
   customize()
   const libraryRaw = storage.get(KEYS.library)
-  const { failed } = resetAppSettings([APP_SETTINGS_RESETTERS.find((r) => r.id === 'appearance')])
+  const { failed } = await resetAppSettings([APP_SETTINGS_RESETTERS.find((r) => r.id === 'appearance')])
   assert.deepEqual(failed, [])
   assert.deepEqual(appearance(), DEFAULT_APP_APPEARANCE)
   assert.deepEqual(stored(KEYS.appearance), DEFAULT_APP_APPEARANCE)
@@ -190,10 +208,10 @@ check('Appearance group resets only Appearance', () => {
   assertOutOfScopeUntouched()
 })
 
-check('Library group resets only Library view prefs', () => {
+await check('Library group resets only Library view prefs', async () => {
   customize()
   const appearanceRaw = storage.get(KEYS.appearance)
-  const { failed } = resetAppSettings([APP_SETTINGS_RESETTERS.find((r) => r.id === 'library')])
+  const { failed } = await resetAppSettings([APP_SETTINGS_RESETTERS.find((r) => r.id === 'library')])
   assert.deepEqual(failed, [])
   assert.deepEqual(library(), DEFAULT_LIBRARY_BROWSE_PREFS)
   assert.deepEqual(stored(KEYS.library), DEFAULT_LIBRARY_BROWSE_PREFS)
@@ -204,11 +222,11 @@ check('Library group resets only Library view prefs', () => {
   assertOutOfScopeUntouched()
 })
 
-check('Notifications group resets only Notifications', () => {
+await check('Notifications group resets only Notifications', async () => {
   customize()
   const appearanceRaw = storage.get(KEYS.appearance)
   const libraryRaw = storage.get(KEYS.library)
-  const { failed } = resetAppSettings([APP_SETTINGS_RESETTERS.find((r) => r.id === 'notifications')])
+  const { failed } = await resetAppSettings([APP_SETTINGS_RESETTERS.find((r) => r.id === 'notifications')])
   assert.deepEqual(failed, [])
   assert.deepEqual(notifications(), DEFAULT_NOTIFICATION_PREFS)
   assert.deepEqual(stored(KEYS.notifications), DEFAULT_NOTIFICATION_PREFS)
@@ -218,11 +236,23 @@ check('Notifications group resets only Notifications', () => {
   assertOutOfScopeUntouched()
 })
 
+await check('Background group: Main writes its defaults over IPC, store mirrors them', async () => {
+  customize()
+  const calls = background.calls
+  const appearanceRaw = storage.get(KEYS.appearance)
+  const { failed } = await resetAppSettings([APP_SETTINGS_RESETTERS.find((r) => r.id === 'background')])
+  assert.deepEqual(failed, [])
+  assert.equal(background.calls, calls + 1)
+  assert.deepEqual(useBackgroundStore.getState().prefs, { showTray: true, runInBackground: false })
+  assert.equal(storage.get(KEYS.appearance), appearanceRaw)
+  assertOutOfScopeUntouched()
+})
+
 // 3. Full reset ------------------------------------------------------------
 
-check('full reset: every group back to defaults, store + storage + <html> attrs', () => {
+await check('full reset: every group back to defaults, store + storage + <html> attrs', async () => {
   customize()
-  const { failed } = resetAppSettings()
+  const { failed } = await resetAppSettings()
   assert.deepEqual(failed, [])
   assert.deepEqual(appearance(), DEFAULT_APP_APPEARANCE)
   assert.deepEqual(library(), DEFAULT_LIBRARY_BROWSE_PREFS)
@@ -236,23 +266,23 @@ check('full reset: every group back to defaults, store + storage + <html> attrs'
   assert.equal(root.lang, 'en', '`system` language resolves from navigator.language')
 })
 
-check('full reset survives a restart (defaults written, not removed → no legacy-theme fallback)', () => {
+await check('full reset survives a restart (defaults written, not removed → no legacy-theme fallback)', async () => {
   assert.ok(storage.has(KEYS.appearance), 'appearance key must be written, not removed')
   // Global reading prefs still say `paper`; a removed key would bring back the Light theme.
   assert.deepEqual(loadAppAppearance('paper'), DEFAULT_APP_APPEARANCE)
 })
 
-check('full reset is idempotent', () => {
-  assert.deepEqual(resetAppSettings().failed, [])
+await check('full reset is idempotent', async () => {
+  assert.deepEqual((await resetAppSettings()).failed, [])
   assert.deepEqual(appearance(), DEFAULT_APP_APPEARANCE)
   assert.deepEqual(library(), DEFAULT_LIBRARY_BROWSE_PREFS)
 })
 
 // 4. Out-of-scope state -------------------------------------------------------
 
-check('per-book + global reading settings, history and layout keys are untouched; no IPC', () => {
+await check('per-book + global reading settings, history and layout keys are untouched; no IPC', async () => {
   customize()
-  resetAppSettings()
+  await resetAppSettings()
   assertOutOfScopeUntouched()
   const keys = [...storage.keys()].sort()
   assert.deepEqual(keys, [...Object.keys(OUT_OF_SCOPE), KEYS.appearance, KEYS.library, KEYS.notifications].sort())
@@ -260,13 +290,13 @@ check('per-book + global reading settings, history and layout keys are untouched
 
 // 6. Errors ---------------------------------------------------------------
 
-check('storage write failure: groups reported, in-memory state still reset', () => {
+await check('storage write failure: groups reported, in-memory state still reset', async () => {
   customize()
   const before = new Map(storage)
   failWrites = true
   try {
-    const { failed } = resetAppSettings()
-    assert.deepEqual(failed.map((r) => r.label), ['Appearance', 'Library', 'Notifications'])
+    const { failed } = await resetAppSettings()
+    assert.deepEqual(failed.map((r) => r.label), ['Appearance', 'Library', 'Notifications'], 'Main-owned background prefs are unaffected')
   } finally {
     failWrites = false
   }
@@ -276,10 +306,22 @@ check('storage write failure: groups reported, in-memory state still reset', () 
   assert.deepEqual(new Map(storage), before, 'nothing was written')
 })
 
-check('a throwing group is reported and does not stop the others', () => {
+await check('Main could not save the background defaults: that group is reported', async () => {
+  customize()
+  background.ok = false
+  try {
+    const { failed } = await resetAppSettings()
+    assert.deepEqual(failed.map((r) => r.id), ['background'])
+  } finally {
+    background.ok = true
+  }
+  assert.deepEqual(appearance(), DEFAULT_APP_APPEARANCE)
+})
+
+await check('a throwing group is reported and does not stop the others', async () => {
   customize()
   const boom = { id: 'boom', label: 'Boom', reset: () => { throw new Error('boom') } }
-  const { failed } = resetAppSettings([boom, ...APP_SETTINGS_RESETTERS])
+  const { failed } = await resetAppSettings([boom, ...APP_SETTINGS_RESETTERS])
   assert.deepEqual(failed.map((r) => r.id), ['boom'])
   assert.deepEqual(appearance(), DEFAULT_APP_APPEARANCE)
   assert.deepEqual(library(), DEFAULT_LIBRARY_BROWSE_PREFS)

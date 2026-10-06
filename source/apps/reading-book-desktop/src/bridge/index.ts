@@ -26,5 +26,6 @@ export {
   type StorageUsage,
   type TranslationModel,
 } from './storage'
+export { backgroundApi, type BackgroundPrefs, type BackgroundPrefsResult } from './background'
 export { notificationsApi, type NotificationSupport } from './notifications'
 export { updatesApi, type UpdateChannel, type UpdateCheckResult } from './updates'

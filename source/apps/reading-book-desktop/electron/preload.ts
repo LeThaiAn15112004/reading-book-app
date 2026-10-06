@@ -2,6 +2,7 @@ import { contextBridge, ipcRenderer } from 'electron'
 import type { DesktopApi } from './ipc/api-types'
 import {
   AppChannels,
+  BackgroundChannels,
   BookIndexChannels,
   CloudChannels,
   ImportChannels,
@@ -146,6 +147,12 @@ const api: DesktopApi = {
   },
   notifications: {
     getSupport: () => ipcRenderer.invoke(NotificationChannels.getSupport),
+  },
+  background: {
+    getPrefs: () => ipcRenderer.invoke(BackgroundChannels.getPrefs),
+    setPrefs: (patch) => ipcRenderer.invoke(BackgroundChannels.setPrefs, patch),
+    resetPrefs: () => ipcRenderer.invoke(BackgroundChannels.resetPrefs),
+    quit: () => ipcRenderer.invoke(BackgroundChannels.quit),
   },
   updates: {
     check: () => ipcRenderer.invoke(UpdateChannels.check),

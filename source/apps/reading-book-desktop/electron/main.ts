@@ -1,4 +1,4 @@
-import { app, BrowserWindow, Menu, ipcMain } from 'electron'
+import { app, BrowserWindow, Menu, ipcMain, powerMonitor } from 'electron'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
 import { OAUTH_CUSTOM_SCHEME } from '@reading-book/config'
@@ -6,6 +6,14 @@ import {
   registerCoverProtocol,
   registerCoverSchemePrivileged,
 } from './files/cover-protocol'
+import {
+  disposeTray,
+  initBackgroundMode,
+  isQuitting,
+  markQuitting,
+  shouldHideOnClose,
+} from './background/background-mode'
+import { afterHideFlush, decideWindowClose } from './background/close-decision'
 import { disposeBookChunkWorkers } from './chunking/book-chunk-service'
 import { disposeTranslationWorker } from './translation/translation-service'
 import { ensureBooksSandbox } from './files/sandbox'
@@ -76,8 +84,8 @@ let win: BrowserWindow | null
 /** First close intercepted until renderer flush acks (or times out). */
 let sessionFlushDone = false
 let flushingClose = false
-/** Set when app.quit / Cmd+Q started — re-quit after deferred window close. */
-let quitAfterFlush = false
+/** The close button hid the window (Run in Background) — the app is still running. */
+let hiddenInBackground = false
 
 /**
  * Ask renderer to flush reading session; resolve on ack or timeout.
@@ -151,13 +159,24 @@ function findDeepLinkArg(argv: readonly string[]): string | undefined {
   return argv.find((arg) => arg.startsWith(`${OAUTH_CUSTOM_SCHEME}://`))
 }
 
+/** Bring the main window back: un-hide (Run in Background), restore, focus — or recreate it. */
+function showMainWindow(): void {
+  if (!win || win.isDestroyed()) {
+    createWindow()
+    return
+  }
+  hiddenInBackground = false
+  if (win.isMinimized()) win.restore()
+  win.show()
+  win.focus()
+}
+
 /** Hands a `readmate-reader://` URL to its consumer(s) and brings the app window to the front. */
 function routeDeepLink(url: string): void {
   handleOAuthCallbackUrl(url)
 
   if (!win || win.isDestroyed()) return
-  if (win.isMinimized()) win.restore()
-  win.focus()
+  showMainWindow()
 }
 
 /** F12 / Ctrl+Shift+I toggle DevTools while running against Vite dev server. */
@@ -190,6 +209,7 @@ function createWindow() {
   const isMac = process.platform === 'darwin'
   sessionFlushDone = false
   flushingClose = false
+  hiddenInBackground = false
 
   win = new BrowserWindow({
     icon: path.join(process.env.VITE_PUBLIC, 'electron-vite.svg'),
@@ -219,11 +239,40 @@ function createWindow() {
     },
   })
 
-  // T4.2: intercept first close → flush session → close again (safe for Cmd+Q).
+  // Close button:
+  //  - Run in Background (tray on, not quitting): flush session → hide; the app keeps running.
+  //  - Otherwise (T4.2): intercept first close → flush session → close again (safe for Cmd+Q).
+  //    A quit (`isQuitting()`, raised by before-quit / tray Quit / OS shutdown) always takes this
+  //    path, so the window can never refuse to close while the app is quitting.
   win.on('close', (event) => {
     const target = win
     if (!target || target.isDestroyed()) return
-    if (sessionFlushDone || flushingClose) return
+
+    const decision = decideWindowClose({
+      flushing: flushingClose,
+      sessionFlushed: sessionFlushDone,
+      hideOnClose: shouldHideOnClose(),
+    })
+    if (decision === 'close') return
+
+    if (decision === 'flush-then-hide') {
+      event.preventDefault()
+      flushingClose = true
+      void requestSessionFlush(target).finally(() => {
+        flushingClose = false
+        if (target.isDestroyed()) return
+        if (afterHideFlush(isQuitting()) === 'close-and-quit') {
+          // A quit started while saving — close for real now (session is already flushed).
+          sessionFlushDone = true
+          target.close()
+          app.quit()
+          return
+        }
+        hiddenInBackground = true
+        target.hide()
+      })
+      return
+    }
 
     event.preventDefault()
     flushingClose = true
@@ -233,10 +282,20 @@ function createWindow() {
       if (!target.isDestroyed()) {
         target.close()
       }
-      if (quitAfterFlush) {
+      if (isQuitting()) {
         app.quit()
       }
     })
+  })
+
+  // Windows shutdown / restart / log-off closes windows without before-quit: treat it as a quit
+  // so a background-mode window doesn't block the session from ending. `query-session-end` comes
+  // first (before the windows get `close`); `session-end` is the backstop.
+  win.on('query-session-end', () => {
+    markQuitting()
+  })
+  win.on('session-end', () => {
+    markQuitting()
   })
 
   win.on('closed', () => {
@@ -279,6 +338,9 @@ app.on('activate', () => {
   // dock icon is clicked and there are no other windows open.
   if (BrowserWindow.getAllWindows().length === 0) {
     createWindow()
+  } else if (hiddenInBackground) {
+    // Dock click while the window was hidden by Run in Background.
+    showMainWindow()
   }
 })
 
@@ -295,18 +357,20 @@ app.on('second-instance', (_event, argv) => {
   if (url) {
     routeDeepLink(url)
   } else if (win && !win.isDestroyed()) {
-    if (win.isMinimized()) win.restore()
-    win.focus()
+    // Launching the app again also reopens a window hidden by Run in Background.
+    showMainWindow()
   }
 })
 
-// Mark quit intent so deferred window close can re-enter app.quit() (macOS Cmd+Q).
+// Every quit path (Cmd+Q, tray / Settings Quit, app.quit()) passes here: mark it so the close
+// handler closes instead of hiding, and the deferred window close can re-enter app.quit().
 app.on('before-quit', () => {
-  quitAfterFlush = true
+  markQuitting()
 })
 
 // Close DB after flush handshake / window close (not before — T4.2).
 app.on('will-quit', () => {
+  disposeTray()
   disposeBookChunkWorkers()
   disposeTranslationWorker()
   closeDatabase()
@@ -323,6 +387,12 @@ app.whenReady().then(async () => {
   }
   registerCoverProtocol()
   registerAllIpcHandlers()
+  // Tray + Run in Background prefs (Main-owned) before the window, so its close button knows them.
+  initBackgroundMode({ showWindow: showMainWindow, publicDir: process.env.VITE_PUBLIC })
+  // macOS / Linux shutdown or reboot: quit instead of hiding.
+  powerMonitor.on('shutdown', () => {
+    markQuitting()
+  })
   createWindow()
 
   // Cold start via a readmate-reader:// link (Windows/Linux first instance) — Cloud Sources

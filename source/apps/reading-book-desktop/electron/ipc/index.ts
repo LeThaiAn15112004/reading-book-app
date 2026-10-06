@@ -1,4 +1,5 @@
 import { registerAppIpc } from './app.ipc'
+import { registerBackgroundIpc } from './background.ipc'
 import { registerBookIndexIpc } from './book-index.ipc'
 import { registerCloudIpc } from './cloud.ipc'
 import { registerImportIpc } from './import.ipc'
@@ -25,4 +26,5 @@ export function registerAllIpcHandlers(): void {
   registerStorageIpc()
   registerUpdatesIpc()
   registerNotificationsIpc()
+  registerBackgroundIpc()
 }

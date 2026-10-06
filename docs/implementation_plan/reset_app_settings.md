@@ -16,6 +16,7 @@ tên nhóm không lưu được.
 | Appearance | `themeMode`, `accent`, `customAccent`, `density`, `language` | `dark`, `orange`, `#ec4899`, `balanced`, `system` | `reading-book.app-appearance.v1` |
 | Library | `sort`, `layout` | `recently-added`, `grid` | `reading-book.library.browse-prefs.v1` |
 | Notifications | `enabled` (Enable Notifications) | `false` | `reading-book.notifications.v1` |
+| Background & System Tray | `showTray`, `runInBackground` | `true`, `false` | **Main**: `{userData}/background-prefs.json` qua IPC `background:resetPrefs` |
 
 Hệ quả kèm theo (không phải do reset ghi trực tiếp): `AppAppearanceBridge` thấy `themeMode` đổi nên patch
 **chỉ field `theme`** trong `readmate.globalReadingPrefs.v1` (`dark` → `night`), như mọi lần đổi theme.
@@ -45,15 +46,17 @@ Khi xây, thêm một dòng vào `APP_SETTINGS_RESETTERS`.
 | Appearance | `DEFAULT_APP_APPEARANCE` | `src/theme/appAppearance.ts` |
 | Library | `DEFAULT_LIBRARY_BROWSE_PREFS` | `src/screens/Library/logic/libraryBrowseStore.ts` |
 | Notifications | `DEFAULT_NOTIFICATION_PREFS` | `src/screens/Settings/logic/notificationsStore.ts` |
+| Background & System Tray | `DEFAULT_BACKGROUND_PREFS` | `electron/background/background-prefs.ts` (Main) |
 
 Cùng một hằng được dùng cho lần chạy đầu / giá trị hỏng khi load **và** cho `reset()`. Hàm điều phối không
 chứa giá trị cụ thể nào.
 
 ## Kiến trúc & data flow
 
-App preferences không đi qua IPC và không nằm trong SQLite (migration `005_drop_app_settings.sql`): mỗi
-zustand store ở renderer sở hữu persistence của nó. Vì vậy reset nằm hoàn toàn trong renderer, tái dùng
-pattern store sẵn có — **không thêm IPC channel, preload API, handler Main hay migration**.
+App preferences không nằm trong SQLite (migration `005_drop_app_settings.sql`): mỗi zustand store ở renderer
+sở hữu persistence của nó (localStorage), reset tái dùng pattern store sẵn có. Ngoại lệ duy nhất là Background &
+System Tray — Main làm chủ (xem `background_system_tray.md`), nên nhóm này reset qua đúng một IPC
+`background:resetPrefs`; Main tự ghi default của nó. Không có migration hay thao tác SQL nào.
 
 ```
 AdvancedSettings  ──(confirm)──▶  resetAppSettings()                  src/screens/Settings/logic/resetAppSettings.ts
@@ -61,14 +64,17 @@ AdvancedSettings  ──(confirm)──▶  resetAppSettings()                  
                                     ├─ useAppAppearanceStore.reset()  → commit(DEFAULT_APP_APPEARANCE)
                                     │     → ghi đè app-appearance.v1 → applyAppearanceAttributes (<html> accent/density/lang)
                                     │     → AppAppearanceBridge → setPrefs({ theme }) → applyTheme → titlebar (app:setChromeTheme sẵn có)
-                                    └─ useLibraryBrowseStore.reset()  → set(DEFAULT_LIBRARY_BROWSE_PREFS, selectedBookId: null)
-                                          → ghi đè browse-prefs.v1
+                                    ├─ useLibraryBrowseStore.reset()  → set(DEFAULT_LIBRARY_BROWSE_PREFS, selectedBookId: null)
+                                    │     → ghi đè browse-prefs.v1
+                                    ├─ useNotificationsStore.reset()  → DEFAULT_NOTIFICATION_PREFS → notifications.v1
+                                    └─ useBackgroundStore.reset()     → IPC background:resetPrefs → Main ghi
+                                          DEFAULT_BACKGROUND_PREFS (giữ tray, tắt Run in Background)
                                   ◀── { failed: AppSettingsResetter[] }
 AdvancedSettings  → notice success / error
 ```
 
-Thao tác đồng bộ (localStorage), nên không có trạng thái loading; hộp thoại đóng ngay sau khi chạy. Các
-component đang subscribe store re-render ngay — không cần restart.
+`resetAppSettings()` là async (nhóm Background chờ Main): hộp thoại đóng ngay, nút Reset chuyển sang
+"Resetting…" và bị khoá đến khi xong. Các component đang subscribe store re-render ngay — không cần restart.
 
 ## Safety boundaries
 
@@ -81,8 +87,8 @@ component đang subscribe store re-render ngay — không cần restart.
    `globalReadingPrefs.theme` (là theme đang dùng) → sau restart theme sẽ không về `dark`.
 4. **Record dùng chung được patch theo field:** `globalReadingPrefs` chứa cả theme lẫn reading defaults; reset
    không ghi record này, chỉ bridge patch `theme`.
-5. **Không chạm `window.api`:** đường reset không gọi IPC nên không thể tới SQLite hay file sách. Renderer
-   không có thêm quyền nào.
+5. **IPC tối thiểu:** đường reset chỉ gọi `background:resetPrefs` (Main chỉ ghi `background-prefs.json`); không
+   gọi channel nào tới SQLite hay file sách.
 6. **Lỗi theo nhóm:** ghi thất bại (quota / storage bị chặn) hoặc exception ở một nhóm → nhóm đó vào
    `failed`, các nhóm khác vẫn chạy; state trong bộ nhớ vẫn về default cho phiên hiện tại và UI báo nhóm có
    thể quay lại giá trị cũ sau restart. Không có rollback (chỉ ghi default, không có trạng thái dở dang).

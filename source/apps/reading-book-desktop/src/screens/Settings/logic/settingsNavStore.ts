@@ -8,6 +8,7 @@ export type SettingsSectionId =
   | 'appearance'
   | 'storage'
   | 'notifications'
+  | 'background'
   | 'keyboard'
   | 'privacy'
   | 'advanced'
@@ -17,6 +18,7 @@ export const SETTINGS_SECTIONS: readonly { id: SettingsSectionId; label: string 
   { id: 'appearance', label: 'Appearance' },
   { id: 'storage', label: 'Storage' },
   { id: 'notifications', label: 'Notifications' },
+  { id: 'background', label: 'Background & System Tray' },
   { id: 'keyboard', label: 'Keyboard Shortcuts' },
   { id: 'privacy', label: 'Privacy' },
   { id: 'advanced', label: 'Advanced' },
