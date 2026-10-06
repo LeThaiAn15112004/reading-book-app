@@ -65,7 +65,8 @@ Desktop app (`cd source/apps/reading-book-desktop`):
 - Spikes (standalone node scripts under `spikes/`, not part of the app build):
   `spike:epub:fixture`, `spike:epub:eval`, `spike:overlay:cfi`, `spike:session:roundtrip`, `spike:theme:contrast`,
   `spike:signature:status` (signature-status checks; fixtures via `spike:signature:fixtures`, needs `openssl`),
-  `spike:settings:reset` (Reset App Settings checks against the real renderer stores)
+  `spike:settings:reset` (Reset App Settings checks against the real renderer stores),
+  `spike:settings:notifications` (Enable Notifications toggle + permission flow)
 
 SDK (`cd source/apps/book-reader-sdk`): `npm run typecheck`, `npm run build`, `npm run verify` (typecheck + build +
 example-host typecheck + Node example run).
@@ -101,7 +102,7 @@ The renderer never gets raw filesystem paths or talks to SQLite directly — eve
 
 1. `electron/ipc/channels.ts` — channel name constants grouped by feature (`AppChannels`, `LibraryChannels`,
    `ImportChannels`, `CloudChannels`, `OverlayChannels`, `BookIndexChannels`, `SearchChannels`, `UpdateChannels`,
-   `StorageChannels`, `TranslationChannels`, `WordCountChannels`). Preload may only invoke channels listed here.
+   `StorageChannels`, `TranslationChannels`, `WordCountChannels`, `NotificationChannels`). Preload may only invoke channels listed here.
 2. `electron/ipc/<feature>.ipc.ts` — the Main-side handler, registered via `registerAllIpcHandlers()` in
    `electron/ipc/index.ts`.
 3. `electron/preload.ts` — exposes the channel through `contextBridge`, typed by the `DesktopApi` interface in
@@ -157,7 +158,9 @@ the path (`bookFileStorage` in `electron/files/sandbox.ts`), not stored. Rules t
 Application-level preferences are **not** in SQLite (migration 005 dropped `app_settings`) and do not cross IPC:
 each renderer zustand store owns its own `localStorage` key and defaults — e.g. Appearance
 (`src/theme/appAppearance.ts`, `DEFAULT_APP_APPEARANCE`), Library sort/layout
-(`screens/Library/logic/libraryBrowseStore.ts`, `DEFAULT_LIBRARY_BROWSE_PREFS`), global reading defaults
+(`screens/Library/logic/libraryBrowseStore.ts`, `DEFAULT_LIBRARY_BROWSE_PREFS`), Notifications
+(`screens/Settings/logic/notificationsStore.ts` — enabling first checks `notifications:getSupport` in Main and the
+Web Notification permission), global reading defaults
 (`readmate.globalReadingPrefs.v1`, `DEFAULT_GLOBAL_READING_PREFS` in the SDK). Settings → Advanced → Reset App
 Settings calls each store's `reset()` via `screens/Settings/logic/resetAppSettings.ts`; a new resettable group adds a
 line to `APP_SETTINGS_RESETTERS`. See `docs/implementation_plan/reset_app_settings.md`.

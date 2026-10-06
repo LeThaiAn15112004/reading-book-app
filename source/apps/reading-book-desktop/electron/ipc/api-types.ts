@@ -8,6 +8,13 @@ export interface AppInfo {
   platform: NodeJS.Platform
 }
 
+/**
+ * Settings → Notifications: OS-level notification support from Electron's `Notification.isSupported()`.
+ * Electron cannot read per-app OS settings (Windows Focus Assist / "notifications off for this app"),
+ * so `supported: true` means the platform can show them, not that the user will see every one.
+ */
+export type NotificationSupportDto = { supported: boolean }
+
 /** How this copy of the app is distributed (Electron `process.mas` / `process.windowsStore`). */
 export type UpdateChannelDto = 'mac-app-store' | 'microsoft-store' | 'direct'
 
@@ -636,6 +643,9 @@ export interface DesktopApi {
     cancelDownload(externalId: string): Promise<OkResult>
     /** Subscribe to byte progress for the in-flight cloud download(s). Returns unsubscribe. */
     onDownloadProgress(handler: (progress: CloudDownloadProgressDto) => void): () => void
+  }
+  notifications: {
+    getSupport(): Promise<NotificationSupportDto>
   }
   updates: {
     /** Ask the update provider for this distribution channel (none implemented yet). */

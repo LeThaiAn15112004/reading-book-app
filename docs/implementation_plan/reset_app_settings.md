@@ -15,11 +15,13 @@ tên nhóm không lưu được.
 |---|---|---|---|
 | Appearance | `themeMode`, `accent`, `customAccent`, `density`, `language` | `dark`, `orange`, `#ec4899`, `balanced`, `system` | `reading-book.app-appearance.v1` |
 | Library | `sort`, `layout` | `recently-added`, `grid` | `reading-book.library.browse-prefs.v1` |
+| Notifications | `enabled` (Enable Notifications) | `false` | `reading-book.notifications.v1` |
 
 Hệ quả kèm theo (không phải do reset ghi trực tiếp): `AppAppearanceBridge` thấy `themeMode` đổi nên patch
 **chỉ field `theme`** trong `readmate.globalReadingPrefs.v1` (`dark` → `night`), như mọi lần đổi theme.
 
-Chưa tồn tại nên chưa có gì để reset: Notifications, Keyboard Shortcuts (đang hard-code), Library grouping.
+Chưa tồn tại nên chưa có gì để reset: Keyboard Shortcuts (đang hard-code), Library grouping. Reset Notifications
+chỉ tắt công tắc của app; không đổi quyền thông báo ở cấp OS.
 Khi xây, thêm một dòng vào `APP_SETTINGS_RESETTERS`.
 
 ## Không được reset
@@ -42,6 +44,7 @@ Khi xây, thêm một dòng vào `APP_SETTINGS_RESETTERS`.
 |---|---|---|
 | Appearance | `DEFAULT_APP_APPEARANCE` | `src/theme/appAppearance.ts` |
 | Library | `DEFAULT_LIBRARY_BROWSE_PREFS` | `src/screens/Library/logic/libraryBrowseStore.ts` |
+| Notifications | `DEFAULT_NOTIFICATION_PREFS` | `src/screens/Settings/logic/notificationsStore.ts` |
 
 Cùng một hằng được dùng cho lần chạy đầu / giá trị hỏng khi load **và** cho `reset()`. Hàm điều phối không
 chứa giá trị cụ thể nào.

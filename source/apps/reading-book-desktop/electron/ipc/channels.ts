@@ -91,6 +91,11 @@ export const SearchChannels = {
   searchBook: 'search:searchBook',
 } as const
 
+export const NotificationChannels = {
+  /** Renderer → main: whether the OS lets this app show notifications (Settings → Notifications). */
+  getSupport: 'notifications:getSupport',
+} as const
+
 export const UpdateChannels = {
   /** Renderer → main: check for a newer version via this channel's update provider. */
   check: 'updates:check',

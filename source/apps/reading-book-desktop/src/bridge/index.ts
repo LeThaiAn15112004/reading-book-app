@@ -26,4 +26,5 @@ export {
   type StorageUsage,
   type TranslationModel,
 } from './storage'
+export { notificationsApi, type NotificationSupport } from './notifications'
 export { updatesApi, type UpdateChannel, type UpdateCheckResult } from './updates'

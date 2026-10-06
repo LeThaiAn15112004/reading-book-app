@@ -1,40 +1,8 @@
 import { useState } from 'react'
 import { useSearchHistoryStore } from '../../../../hooks/library/index.js'
 import { SettingsCard } from '../layout/SettingsCard'
+import { SettingsSwitch } from '../layout/SettingsSwitch'
 import { ClearDataDialog, type ClearDataOption } from './ClearDataDialog'
-
-function Switch({
-  checked,
-  onChange,
-  labelledBy,
-  describedBy,
-}: {
-  checked: boolean
-  onChange: (checked: boolean) => void
-  labelledBy: string
-  describedBy?: string
-}) {
-  return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={checked}
-      aria-labelledby={labelledBy}
-      aria-describedby={describedBy}
-      className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full border-none transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-lib-accent ${
-        checked ? 'bg-lib-accent' : 'bg-lib-chip'
-      }`}
-      onClick={() => onChange(!checked)}
-    >
-      <span
-        className={`inline-block size-5 rounded-full bg-white shadow transition-transform ${
-          checked ? 'translate-x-[22px]' : 'translate-x-0.5'
-        }`}
-        aria-hidden
-      />
-    </button>
-  )
-}
 
 /**
  * SCR-06 Settings → Privacy: history Readmate Reader creates about your use (not book data).
@@ -87,7 +55,7 @@ export function PrivacySettings() {
               existing history — use Clear Data for that. {savedLabel}
             </p>
           </div>
-          <Switch
+          <SettingsSwitch
             checked={enabled}
             onChange={(next) => {
               setEnabled(next)

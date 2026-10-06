@@ -3,7 +3,7 @@
  * localStorage, see docs/implementation_plan/reset_app_settings.md).
  *
  *   1. defaults               -> the single source of truth holds the documented values
- *   2. each group on its own  -> Appearance / Library reset only their own key + store state
+ *   2. each group on its own  -> Appearance / Library / Notifications reset only their own key + state
  *   3. full reset             -> every group back to defaults, written (not removed), UI attrs applied
  *   4. out-of-scope state     -> per-book / global reading defaults / history / layout keys untouched,
  *                                and the reset never reaches `window.api` (IPC → SQLite / files)
@@ -53,6 +53,7 @@ globalThis.window = {
 const KEYS = {
   appearance: 'reading-book.app-appearance.v1',
   library: 'reading-book.library.browse-prefs.v1',
+  notifications: 'reading-book.notifications.v1',
   globalReadingPrefs: 'readmate.globalReadingPrefs.v1',
 }
 
@@ -84,11 +85,15 @@ const NON_DEFAULT_LIBRARY = { sort: 'title', layout: 'table' }
 for (const [key, value] of Object.entries(OUT_OF_SCOPE)) storage.set(key, value)
 storage.set(KEYS.appearance, JSON.stringify(NON_DEFAULT_APPEARANCE))
 storage.set(KEYS.library, JSON.stringify(NON_DEFAULT_LIBRARY))
+storage.set(KEYS.notifications, JSON.stringify({ enabled: true }))
 
 const { DEFAULT_APP_APPEARANCE, loadAppAppearance } = await import('../../src/theme/appAppearance.ts')
 const { useAppAppearanceStore } = await import('../../src/theme/appAppearanceStore.ts')
 const { DEFAULT_LIBRARY_BROWSE_PREFS, useLibraryBrowseStore } = await import(
   '../../src/screens/Library/logic/libraryBrowseStore.ts'
+)
+const { DEFAULT_NOTIFICATION_PREFS, useNotificationsStore } = await import(
+  '../../src/screens/Settings/logic/notificationsStore.ts'
 )
 const { APP_SETTINGS_RESETTERS, resetAppSettings } = await import(
   '../../src/screens/Settings/logic/resetAppSettings.ts'
@@ -106,6 +111,7 @@ const library = () => {
   const { sort, layout } = useLibraryBrowseStore.getState()
   return { sort, layout }
 }
+const notifications = () => useNotificationsStore.getState().notifications
 const stored = (key) => JSON.parse(storage.get(key))
 
 /** Put every in-scope group back to a non-default value through the real setters. */
@@ -120,6 +126,9 @@ function customize() {
   l.setLayout(NON_DEFAULT_LIBRARY.layout)
   l.setFilter('favorites')
   l.selectBook('book-1')
+  // Enabling goes through the OS permission check (IPC) — seed the granted state directly instead.
+  useNotificationsStore.setState({ notifications: { enabled: true }, blocked: 'denied' })
+  storage.set(KEYS.notifications, JSON.stringify({ enabled: true }))
 }
 
 function assertOutOfScopeUntouched() {
@@ -145,12 +154,14 @@ check('defaults: single source of truth holds the documented values', () => {
     themeMode: 'dark', accent: 'orange', customAccent: '#ec4899', density: 'balanced', language: 'system',
   })
   assert.deepEqual(DEFAULT_LIBRARY_BROWSE_PREFS, { sort: 'recently-added', layout: 'grid' })
-  assert.deepEqual(APP_SETTINGS_RESETTERS.map((r) => r.id), ['appearance', 'library'])
+  assert.deepEqual(DEFAULT_NOTIFICATION_PREFS, { enabled: false })
+  assert.deepEqual(APP_SETTINGS_RESETTERS.map((r) => r.id), ['appearance', 'library', 'notifications'])
 })
 
 check('stores loaded the persisted non-default values', () => {
   assert.deepEqual(appearance(), NON_DEFAULT_APPEARANCE)
   assert.deepEqual(library(), NON_DEFAULT_LIBRARY)
+  assert.deepEqual(notifications(), { enabled: true })
 })
 
 // 5. Cancel (dialog closed without confirming = reset never runs) ---------------
@@ -193,6 +204,20 @@ check('Library group resets only Library view prefs', () => {
   assertOutOfScopeUntouched()
 })
 
+check('Notifications group resets only Notifications', () => {
+  customize()
+  const appearanceRaw = storage.get(KEYS.appearance)
+  const libraryRaw = storage.get(KEYS.library)
+  const { failed } = resetAppSettings([APP_SETTINGS_RESETTERS.find((r) => r.id === 'notifications')])
+  assert.deepEqual(failed, [])
+  assert.deepEqual(notifications(), DEFAULT_NOTIFICATION_PREFS)
+  assert.deepEqual(stored(KEYS.notifications), DEFAULT_NOTIFICATION_PREFS)
+  assert.equal(useNotificationsStore.getState().blocked, null)
+  assert.equal(storage.get(KEYS.appearance), appearanceRaw)
+  assert.equal(storage.get(KEYS.library), libraryRaw)
+  assertOutOfScopeUntouched()
+})
+
 // 3. Full reset ------------------------------------------------------------
 
 check('full reset: every group back to defaults, store + storage + <html> attrs', () => {
@@ -203,6 +228,7 @@ check('full reset: every group back to defaults, store + storage + <html> attrs'
   assert.deepEqual(library(), DEFAULT_LIBRARY_BROWSE_PREFS)
   assert.deepEqual(stored(KEYS.appearance), DEFAULT_APP_APPEARANCE)
   assert.deepEqual(stored(KEYS.library), DEFAULT_LIBRARY_BROWSE_PREFS)
+  assert.deepEqual(stored(KEYS.notifications), DEFAULT_NOTIFICATION_PREFS)
   const root = globalThis.document.documentElement
   assert.equal(root.dataset.accent, 'orange')
   assert.equal(root.dataset.density, 'balanced')
@@ -229,7 +255,7 @@ check('per-book + global reading settings, history and layout keys are untouched
   resetAppSettings()
   assertOutOfScopeUntouched()
   const keys = [...storage.keys()].sort()
-  assert.deepEqual(keys, [...Object.keys(OUT_OF_SCOPE), KEYS.appearance, KEYS.library].sort())
+  assert.deepEqual(keys, [...Object.keys(OUT_OF_SCOPE), KEYS.appearance, KEYS.library, KEYS.notifications].sort())
 })
 
 // 6. Errors ---------------------------------------------------------------
@@ -240,12 +266,13 @@ check('storage write failure: groups reported, in-memory state still reset', () 
   failWrites = true
   try {
     const { failed } = resetAppSettings()
-    assert.deepEqual(failed.map((r) => r.label), ['Appearance', 'Library'])
+    assert.deepEqual(failed.map((r) => r.label), ['Appearance', 'Library', 'Notifications'])
   } finally {
     failWrites = false
   }
   assert.deepEqual(appearance(), DEFAULT_APP_APPEARANCE)
   assert.deepEqual(library(), DEFAULT_LIBRARY_BROWSE_PREFS)
+  assert.deepEqual(notifications(), DEFAULT_NOTIFICATION_PREFS)
   assert.deepEqual(new Map(storage), before, 'nothing was written')
 })
 

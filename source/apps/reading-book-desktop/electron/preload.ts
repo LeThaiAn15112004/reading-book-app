@@ -6,6 +6,7 @@ import {
   CloudChannels,
   ImportChannels,
   LibraryChannels,
+  NotificationChannels,
   OverlayChannels,
   SearchChannels,
   StorageChannels,
@@ -142,6 +143,9 @@ const api: DesktopApi = {
   },
   wordCount: {
     getStats: (bookId) => ipcRenderer.invoke(WordCountChannels.getStats, bookId),
+  },
+  notifications: {
+    getSupport: () => ipcRenderer.invoke(NotificationChannels.getSupport),
   },
   updates: {
     check: () => ipcRenderer.invoke(UpdateChannels.check),

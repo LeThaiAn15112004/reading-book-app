@@ -3,6 +3,7 @@ import { registerBookIndexIpc } from './book-index.ipc'
 import { registerCloudIpc } from './cloud.ipc'
 import { registerImportIpc } from './import.ipc'
 import { registerLibraryIpc } from './library.ipc'
+import { registerNotificationsIpc } from './notifications.ipc'
 import { registerOverlayIpc } from './overlay.ipc'
 import { registerSearchIpc } from './search.ipc'
 import { registerStorageIpc } from './storage.ipc'
@@ -23,4 +24,5 @@ export function registerAllIpcHandlers(): void {
   registerTranslationIpc()
   registerStorageIpc()
   registerUpdatesIpc()
+  registerNotificationsIpc()
 }
