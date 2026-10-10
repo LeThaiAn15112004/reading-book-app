@@ -92,8 +92,9 @@ Go to page, shortcuts, restore, zoom and EPUB regression still need a pass with 
 
 ## Remaining limitations / follow-ups
 
-- Bookmarks and highlights still use the placeholder chapter model for PDF (no PDF annotations —
-  out of scope); the footer bookmark button is therefore not meaningful for PDF yet.
+- Bookmarks are page-based for PDF: `PageRectLocation(page)` packed with `chapterIndex = page - 1`
+  (`useReaderBookmarks`), jump via `PdfRendererApi.goToPage`; older `fake:` PDF locators fall back to
+  their stored chapter index as a page. Highlights still have no PDF anchoring (out of scope).
 - Footer single/double page layout buttons have no effect on PDF (single column only).
 - Hand-tool drag panning is not wired for PDF (scrollbars, wheel and keys work); text selection works
   in both tools.

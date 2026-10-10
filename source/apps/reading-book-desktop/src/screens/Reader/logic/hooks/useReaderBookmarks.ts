@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type MutableRefObject } from 'react'
-import { CfiLocation } from '@reading-book/book-reader-sdk'
+import { CfiLocation, PageRectLocation } from '@reading-book/book-reader-sdk'
 import {
   bookmarkDtoToReaderBookmark,
   findReaderBookmarksAtLocation,
@@ -14,6 +14,7 @@ import {
   type EpubNavState,
   type EpubRendererApi,
 } from '../../../../reader/renderers/epub'
+import type { PdfRendererApi } from '../../../../reader/renderers/pdf'
 
 /**
  * Hold the just-jumped bookmark as "here" while epub.js settles: in continuous/scroll mode it
@@ -28,6 +29,10 @@ type UseReaderBookmarksOptions = {
   epubApiRef: MutableRefObject<EpubRendererApi | null>
   /** Drives recomputation of the current place — a fresh object on every EPUB nav update. */
   epubNav: EpubNavState | null
+  isPdfSurface: boolean
+  pdfApiRef: MutableRefObject<PdfRendererApi | null>
+  /** 1-based PDF page being read (0 until the document reports it). */
+  pdfPage: number
   /** Fake-surface chapter index (formats without a real renderer yet). */
   chapterIndex: number
   /** Fallback bookmark name when the EPUB reports no section label. */
@@ -48,6 +53,9 @@ export function useReaderBookmarks({
   isEpubSurface,
   epubApiRef,
   epubNav,
+  isPdfSurface,
+  pdfApiRef,
+  pdfPage,
   chapterIndex,
   chapterLabel,
   goChapter,
@@ -103,6 +111,13 @@ export function useReaderBookmarks({
    * the renderer hands back a fresh nav object on every location update.
    */
   const { currentLocation, bookmarkChapterIndex } = useMemo(() => {
+    // PDF anchors to the page itself; the stored chapter fallback is the 0-based page index.
+    if (isPdfSurface) {
+      return {
+        bookmarkChapterIndex: Math.max(0, pdfPage - 1),
+        currentLocation: pdfPage > 0 ? new PageRectLocation(pdfPage) : undefined,
+      }
+    }
     // Chapter fallback stored alongside the exact location — EPUB spine, else fake chapter.
     const index = isEpubSurface ? (epubNav?.spineIndex ?? 0) : chapterIndex
     return {
@@ -113,7 +128,7 @@ export function useReaderBookmarks({
         epubLocation: epubApiRef.current?.getCurrentLocation(),
       }),
     }
-  }, [isEpubSurface, chapterIndex, epubNav, epubApiRef])
+  }, [isEpubSurface, isPdfSurface, pdfPage, chapterIndex, epubNav, epubApiRef])
 
   const bookmarksHere = currentLocation
     ? findReaderBookmarksAtLocation(bookmarks, currentLocation)
@@ -216,6 +231,17 @@ export function useReaderBookmarks({
           justJumpedTimerRef.current = null
           setJustJumpedId((current) => (current === bookmark.id ? null : current))
         }, JUST_JUMPED_HERE_MS)
+        return
+      }
+      if (isPdfSurface) {
+        const api = pdfApiRef.current
+        if (!api) return
+        // Page bookmarks jump to their page; anything older (pre-page `fake:` locators) falls
+        // back to the stored chapter index, which is the 0-based page for PDF.
+        api.goToPage(
+          location instanceof PageRectLocation ? location.page : bookmark.chapterIndex + 1,
+        )
+        setChromeHidden(true)
         return
       }
       setChromeHidden(true)
