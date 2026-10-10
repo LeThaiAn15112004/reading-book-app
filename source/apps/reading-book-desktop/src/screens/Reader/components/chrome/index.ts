@@ -14,6 +14,8 @@ export {
   type AnnotationTool,
   type CompanionTool,
   type ModeTool,
+  type ToolId,
+  type ToolStates,
 } from './ToolsMenu'
 export { FullscreenButton } from './FullscreenButton'
 export { ImmersiveExitButton } from './ImmersiveExitButton'

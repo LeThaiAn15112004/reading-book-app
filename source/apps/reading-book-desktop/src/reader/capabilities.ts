@@ -1,28 +1,51 @@
 /**
- * What a format's reader can actually do. The toolbar shows a tool only when the active reader has
- * every capability the tool `requires` (hidden, never disabled) — so a new format declares its
- * capabilities here instead of adding "hide these tools" lists to the toolbar.
+ * What the reader surface for the open book can actually do. The toolbar shows a tool only when the
+ * surface has every capability the tool `requires` (hidden, never disabled) — a new renderer declares
+ * its capabilities here instead of the toolbar growing "if format" checks.
+ * See docs/implementation_plan/reader_toolbar.md.
  */
 export type ReaderCapability =
+  /** Hand / Select interaction tools on the reading surface. */
+  | 'interaction'
+  /** Full-text search that can jump to and paint hits in the rendered book. */
+  | 'search'
+  /** Read aloud (TTS) following the rendered text. */
+  | 'readAloud'
+  /** Translate a text selection. */
+  | 'translate'
   /** Highlight / underline / strikethrough over selected text. */
   | 'markupAnnotations'
-  /** Free-form annotations that are not tied to a text selection (textbox, freehand drawing). */
-  | 'freeformAnnotations'
-  /** Page-level view zoom (Zoom In / Out / Reset). */
-  | 'viewZoom'
+  /** Copy an area of the window as an image (Main `capturePage`; renderer-independent). */
+  | 'snapshot'
+  /** Word statistics from the book's indexed chunks (Main; renderer-independent). */
+  | 'wordCount'
+  /** Reading settings panel (Aa). */
+  | 'readingSettings'
 
-const ALL_CAPABILITIES: readonly ReaderCapability[] = [
-  'markupAnnotations',
-  'freeformAnnotations',
-  'viewZoom',
-]
+/**
+ * Which surface renders a format. Only EPUB has a real renderer today; every other format shows the
+ * placeholder `ReadingCanvas`. A future `renderers/pdf` adds `'pdf'` here with its own set.
+ */
+export type ReaderSurface = 'epub' | 'placeholder'
 
-/** Per-format overrides; a format absent here keeps the full set (the pre-registry behaviour). */
-const CAPABILITIES_BY_FORMAT: Record<string, readonly ReaderCapability[]> = {
-  epub: ['markupAnnotations', 'viewZoom'],
+const SURFACE_CAPABILITIES: Record<ReaderSurface, readonly ReaderCapability[]> = {
+  epub: [
+    'interaction',
+    'search',
+    'readAloud',
+    'translate',
+    'markupAnnotations',
+    'snapshot',
+    'wordCount',
+    'readingSettings',
+  ],
+  placeholder: ['interaction', 'snapshot', 'wordCount', 'readingSettings'],
+}
+
+export function readerSurfaceForFormat(format: string | null | undefined): ReaderSurface {
+  return format === 'epub' ? 'epub' : 'placeholder'
 }
 
 export function getReaderCapabilities(format: string | null | undefined): ReadonlySet<ReaderCapability> {
-  const caps = (format ? CAPABILITIES_BY_FORMAT[format] : undefined) ?? ALL_CAPABILITIES
-  return new Set(caps)
+  return new Set(SURFACE_CAPABILITIES[readerSurfaceForFormat(format)])
 }

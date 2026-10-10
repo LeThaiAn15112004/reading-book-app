@@ -74,7 +74,8 @@ Desktop app (`cd source/apps/reading-book-desktop`):
   `spike:settings:reset` (Reset App Settings checks against the real renderer stores),
   `spike:settings:notifications` (Enable Notifications toggle + permission flow),
   `spike:settings:background` (tray / close-to-hide / quit flag / login item, Main modules with a stubbed `electron`),
-  `spike:settings:reminders` (Reading Reminder rules at UTC+7, SQLite on the real schema, minute-aligned worker)
+  `spike:settings:reminders` (Reading Reminder rules at UTC+7, SQLite on the real schema, minute-aligned worker),
+  `spike:reader:toolbar` (capability-driven Reader toolbar: per-surface tools, fold order, handler wiring)
 
 SDK (`cd source/apps/book-reader-sdk`): `npm run typecheck`, `npm run build`, `npm run verify` (typecheck + build +
 example-host typecheck + Node example run).

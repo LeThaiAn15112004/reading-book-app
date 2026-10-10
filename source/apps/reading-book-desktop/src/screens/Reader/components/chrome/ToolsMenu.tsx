@@ -1,60 +1,41 @@
-import { useRef } from 'react'
+import { useRef, type ReactNode, type Ref } from 'react'
 import type { ReaderCapability } from '../../../../reader/capabilities'
+import { effectiveShortcutKeys, useShortcutsStore } from '../../../../shortcuts/shortcutsStore'
+import { formatShortcutKey } from '../../../../shortcuts/shortcutKeys'
 import { ToolGroupMenu } from './ToolGroupMenu'
-import {
-  TOOL_REGISTRY,
-  toolsForGroup,
-  type AnnotationTool,
-  type CompanionTool,
-  type MiscTool,
-  type ModeTool,
-  type ToolId,
-  type ViewTool,
+import { resolveToolbarLayout, foldableGroups, type ResolvedToolGroup } from './toolbarLayout'
+import type {
+  AnnotationTool,
+  CompanionTool,
+  ModeTool,
+  ToolDef,
+  ToolIconId,
+  ToolId,
 } from './toolRegistry'
 import { useToolbarOverflow } from './useToolbarOverflow'
 
-export type { AnnotationTool, CompanionTool, ModeTool, ViewTool }
+export type { AnnotationTool, CompanionTool, ModeTool, ToolId }
 
-type ToolsStripProps = {
-  /** Widened beyond `ModeTool` so the Highlight/Underline/Strikethrough buttons can show their
-   *  own active state — only one of the toolbar tools is ever "on" at a time (see `ReaderScreen`). */
-  activeTool: ModeTool | 'highlight' | 'underline' | 'strikethrough'
-  onSelectTool: (tool: ModeTool) => void
-  onCompanionTool: (tool: CompanionTool) => void
-  onAnnotationTool: (tool: AnnotationTool) => void
-  /** Search tool's pressed state — the results panel itself floats independently (see
-   *  `ReaderSearchPanel`, rendered by `ReaderScreen`), Foxit/Thorium-style, not anchored here. */
-  searchOpen: boolean
-  /** Translate mode armed — a finished selection opens the translation popover. It rides on
-   *  Select (text must be selectable), so Select itself isn't shown pressed meanwhile. */
-  translateActive: boolean
-  /** Audio (read aloud) menu open or reading in progress — the menu floats via `ReadAloudMenu`. */
-  audioActive: boolean
-  audioMenuOpen: boolean
-  audioButtonRef: React.Ref<HTMLButtonElement>
-  /** Snapshot tool's armed state — the crosshair overlay itself floats independently (see
-   *  `SnapshotOverlay`, rendered by `ReaderScreen`), same story as Search. */
-  snapshotActive: boolean
-  onSnapshot: () => void
-  onWordCount: () => void
-  /** Reading settings (Aa) panel open — the panel itself floats independently (see `AaSettingsPanel`). */
-  settingsOpen: boolean
-  onToggleSettings: () => void
-  /** View dropdown actions (zoom, fullscreen). */
-  onViewTool: (tool: ViewTool) => void
-  fullscreen: boolean
-  /** What the open book's reader supports — tools requiring more than this are not rendered. */
-  capabilities: ReadonlySet<ReaderCapability>
+/** Per-tool UI state supplied by the screen; tools without an entry are plain, inactive buttons. */
+export type ToolState = {
+  /** Armed / on — accent style, `aria-pressed`. */
+  active?: boolean
+  /** Its menu / panel is open (`aria-expanded`, for tools with `popup`). */
+  expanded?: boolean
 }
 
-const TOOL_LABELS = Object.fromEntries(TOOL_REGISTRY.map((t) => [t.id, t.label])) as Record<
-  ToolId,
-  string
->
+export type ToolStates = Partial<Record<ToolId, ToolState>>
 
-/** Dropdown trigger: same look as a strip button but sized to its label + chevron. */
-const menuTriggerBtn =
-  'inline-flex h-[52px] min-w-[52px] shrink-0 cursor-pointer flex-col items-center justify-center gap-0.5 rounded-lg border border-transparent px-2 text-lib-muted transition-colors hover:border-lib-accent-ring hover:bg-lib-accent-soft hover:text-lib-text-strong sm:h-[56px] sm:min-w-[58px]'
+type ToolsStripProps = {
+  /** What the open book's reader surface supports — other tools are not rendered. */
+  capabilities: ReadonlySet<ReaderCapability>
+  toolStates: ToolStates
+  onTool: (tool: ToolId) => void
+  /** Buttons something else anchors to (the read-aloud menu floats under Audio). */
+  toolRefs?: Partial<Record<ToolId, Ref<HTMLButtonElement>>>
+  /** Toolbar is hidden — open dropdowns close. */
+  hidden?: boolean
+}
 
 const stripBtn =
   'inline-flex h-[52px] w-[52px] shrink-0 cursor-pointer flex-col items-center justify-center gap-0.5 rounded-lg border border-transparent px-0.5 text-lib-muted transition-colors hover:border-lib-accent-ring hover:bg-lib-accent-soft hover:text-lib-text-strong sm:h-[56px] sm:w-[58px]'
@@ -78,7 +59,7 @@ function ToolGroup({
   children,
   'aria-label': ariaLabel,
 }: {
-  children: React.ReactNode
+  children: ReactNode
   'aria-label'?: string
 }) {
   return (
@@ -88,7 +69,7 @@ function ToolGroup({
   )
 }
 
-function ToolIcon({ tool }: { tool: string }) {
+function ToolIcon({ tool }: { tool: ToolIconId }) {
   const cls = 'size-[18px] shrink-0'
   switch (tool) {
     case 'hand':
@@ -164,26 +145,6 @@ function ToolIcon({ tool }: { tool: string }) {
           />
         </svg>
       )
-    case 'textarea':
-      return (
-        <svg className={cls} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor" aria-hidden>
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            d="M4 6.5A1.5 1.5 0 0 1 5.5 5h13A1.5 1.5 0 0 1 20 6.5v11a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 17.5v-11ZM7.5 9.5h9M7.5 13h6"
-          />
-        </svg>
-      )
-    case 'freehand':
-      return (
-        <svg className={cls} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor" aria-hidden>
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            d="M4 17.5c1.5-4.5 2.5-9 4.5-9s1.5 6 3.5 6 1.5-8 4-8 2 7.5 4 7.5M4 20.5h16"
-          />
-        </svg>
-      )
     case 'snapshot':
       return (
         <svg className={cls} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor" aria-hidden>
@@ -211,29 +172,6 @@ function ToolIcon({ tool }: { tool: string }) {
             d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.325.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 0 1 1.37.49l1.296 2.247a1.125 1.125 0 0 1-.26 1.431l-1.003.827c-.293.241-.438.613-.43.992a7.723 7.723 0 0 1 0 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.955.26 1.43l-1.298 2.247a1.125 1.125 0 0 1-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.47 6.47 0 0 1-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.94-1.11.94h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 0 1-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 0 1-1.369-.49l-1.297-2.247a1.125 1.125 0 0 1 .26-1.431l1.004-.827c.292-.24.437-.613.43-.991a6.932 6.932 0 0 1 0-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 0 1-.26-1.43l1.297-2.247a1.125 1.125 0 0 1 1.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.087.22-.128.332-.183.582-.495.644-.869l.214-1.28Z"
           />
           <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
-        </svg>
-      )
-    case 'sign':
-      return (
-        <svg className={cls} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor" aria-hidden>
-          <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487 19.5 7.125M7.5 16.5l2.25.75L16.5 10.5a1.5 1.5 0 0 0-2.121-2.121L7.629 15.129 7.5 16.5Zm-3.75 3h15" />
-        </svg>
-      )
-    case 'zoomIn':
-    case 'zoomOut':
-    case 'resetZoom':
-      return (
-        <svg className={cls} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor" aria-hidden>
-          <path strokeLinecap="round" strokeLinejoin="round" d="m21 21-4.35-4.35M17 10.5a6.5 6.5 0 1 1-13 0 6.5 6.5 0 0 1 13 0Z" />
-          {tool === 'zoomIn' ? <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 8v5M8 10.5h5" /> : null}
-          {tool === 'zoomOut' ? <path strokeLinecap="round" strokeLinejoin="round" d="M8 10.5h5" /> : null}
-          {tool === 'resetZoom' ? <path strokeLinecap="round" strokeLinejoin="round" d="M8.5 9.5 10 8.5v4.5" /> : null}
-        </svg>
-      )
-    case 'fullscreen':
-      return (
-        <svg className={cls} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor" aria-hidden>
-          <path strokeLinecap="round" strokeLinejoin="round" d="M4 9V5h4M20 9V5h-4M4 15v4h4M20 15v4h-4" />
         </svg>
       )
     case 'view':
@@ -265,65 +203,79 @@ function modeButtonClass(active: boolean): string {
   return stripBtn
 }
 
-/** Compact tools strip: icon above, label below — grouped sections. */
-export function ToolsStrip({
-  activeTool,
-  onSelectTool,
-  onCompanionTool,
-  onAnnotationTool,
-  searchOpen,
-  translateActive,
-  audioActive,
-  audioMenuOpen,
-  audioButtonRef,
-  snapshotActive,
-  onSnapshot,
-  onWordCount,
-  settingsOpen,
-  onToggleSettings,
-  onViewTool,
-  fullscreen,
-  capabilities,
-}: ToolsStripProps) {
-  const stripRef = useRef<HTMLDivElement | null>(null)
-  const navTools = toolsForGroup('navigate', capabilities).map((t) => t.id)
-  const annotationTools = toolsForGroup('annotation', capabilities).map(
-    (t) => t.id as AnnotationTool,
-  )
-  const viewDefs = toolsForGroup('view', capabilities)
-  const miscTools = toolsForGroup('tools', capabilities).map((t) => t.id as MiscTool)
+/** Dropdown trigger: same look as a strip button but sized to its label + chevron. */
+const menuTriggerBtn =
+  'inline-flex h-[52px] min-w-[52px] shrink-0 cursor-pointer flex-col items-center justify-center gap-0.5 rounded-lg border border-transparent px-2 text-lib-muted transition-colors hover:border-lib-accent-ring hover:bg-lib-accent-soft hover:text-lib-text-strong sm:h-[56px] sm:min-w-[58px]'
 
-  // Groups that fold into a dropdown when the strip runs out of room, in the order they fold.
-  const collapsible = [
-    annotationTools.length > 0 ? 'annotation' : null,
-    miscTools.length > 0 ? 'tools' : null,
-  ].filter((g): g is 'annotation' | 'tools' => g !== null)
-  const overflowLevel = useToolbarOverflow(stripRef, collapsible.length)
-  const folded = new Set<string>(collapsible.slice(0, overflowLevel))
+function menuTriggerClass(active: boolean): string {
+  return active ? `${menuTriggerBtn} border-lib-accent bg-lib-accent-soft text-lib-accent` : menuTriggerBtn
+}
 
-  const activeAnnotation = annotationTools.find((t) => t === activeTool)
-  const miscActive: Record<MiscTool, boolean> = { snapshot: snapshotActive, wordCount: false }
-  function runMisc(tool: MiscTool) {
-    if (tool === 'snapshot') onSnapshot()
-    else onWordCount()
+/** Tooltip: description (or label) plus the tool's current shortcut, e.g. `Search in book (Ctrl+F)`. */
+function useToolTitle(): (tool: ToolDef) => string {
+  const overrides = useShortcutsStore((s) => s.overrides)
+  const keys = effectiveShortcutKeys(overrides)
+  return (tool) => {
+    const text = tool.description ?? tool.label
+    if (!tool.shortcutId) return text
+    const shortcut = keys[tool.shortcutId].map((key) => formatShortcutKey(key)).join('+')
+    return shortcut ? `${text} (${shortcut})` : text
   }
-  function renderModeButton(tool: ModeTool) {
-    const active = activeTool === tool && !(tool === 'select' && translateActive)
-    const label = TOOL_LABELS[tool]
+}
 
+/**
+ * Reader tools strip: icon above, label below, grouped sections. Built from `TOOL_REGISTRY` for the
+ * open surface's capabilities; `auto` groups fold into dropdowns when the strip runs out of room.
+ * See docs/implementation_plan/reader_toolbar.md.
+ */
+export function ToolsStrip({ capabilities, toolStates, onTool, toolRefs, hidden = false }: ToolsStripProps) {
+  const stripRef = useRef<HTMLDivElement | null>(null)
+  const foldLevel = useToolbarOverflow(stripRef, foldableGroups(capabilities).length)
+  const layout = resolveToolbarLayout(capabilities, foldLevel)
+  const toolTitle = useToolTitle()
+
+  function renderButton(tool: ToolDef) {
+    const state = toolStates[tool.id]
+    const active = state?.active ?? false
     return (
       <button
-        key={tool}
+        key={tool.id}
+        ref={toolRefs?.[tool.id]}
         className={`relative ${modeButtonClass(active)}`}
         type="button"
-        title={label}
-        aria-label={label}
-        aria-pressed={active}
-        onClick={() => onSelectTool(tool)}
+        title={toolTitle(tool)}
+        aria-label={tool.label}
+        aria-pressed={tool.popup ? undefined : active}
+        aria-haspopup={tool.popup}
+        aria-expanded={tool.popup ? (state?.expanded ?? false) : undefined}
+        onClick={() => onTool(tool.id)}
       >
-        <ToolIcon tool={tool} />
-        <span className={stripLabel}>{label}</span>
+        <ToolIcon tool={tool.id} />
+        <span className={stripLabel}>{tool.label}</span>
       </button>
+    )
+  }
+
+  function renderMenu({ group, tools }: ResolvedToolGroup) {
+    const armed = tools.find((tool) => toolStates[tool.id]?.active)
+    return (
+      <ToolGroupMenu
+        label={armed ? armed.label : group.label}
+        icon={<ToolIcon tool={armed ? armed.id : group.icon} />}
+        title={armed ? `${group.label}: ${armed.label}` : group.label}
+        active={armed !== undefined}
+        hidden={hidden}
+        buttonClassName={menuTriggerClass(armed !== undefined)}
+        labelClassName={stripLabel}
+        items={tools.map((tool) => ({
+          id: tool.id,
+          label: tool.label,
+          icon: <ToolIcon tool={tool.id} />,
+          active: toolStates[tool.id]?.active,
+          shortcutId: tool.shortcutId,
+          onSelect: () => onTool(tool.id),
+        }))}
+      />
     )
   }
 
@@ -335,166 +287,14 @@ export function ToolsStrip({
       aria-label="Reading tools"
       onClick={(e) => e.stopPropagation()}
     >
-      <ToolGroup aria-label="Navigation and lookup">
-        {navTools.map((tool) =>
-          tool === 'hand' || tool === 'select' ? (
-            renderModeButton(tool)
-          ) : (
-            <button
-              key={tool}
-              ref={tool === 'speech' ? audioButtonRef : undefined}
-              className={
-                tool === 'search'
-                  ? modeButtonClass(searchOpen)
-                  : tool === 'speech'
-                    ? modeButtonClass(audioActive)
-                    : modeButtonClass(translateActive)
-              }
-              type="button"
-              title={TOOL_LABELS[tool]}
-              aria-label={TOOL_LABELS[tool]}
-              aria-pressed={
-                tool === 'search' ? searchOpen : tool === 'translate' ? translateActive : undefined
-              }
-              aria-haspopup={tool === 'speech' ? 'menu' : undefined}
-              aria-expanded={tool === 'speech' ? audioMenuOpen : undefined}
-              onClick={() => onCompanionTool(tool as CompanionTool)}
-            >
-              <ToolIcon tool={tool} />
-              <span className={stripLabel}>{TOOL_LABELS[tool]}</span>
-            </button>
-          ),
-        )}
-      </ToolGroup>
-
-      {annotationTools.length > 0 ? (
-        <>
-          <ToolSeparator />
-          <ToolGroup aria-label="Annotation tools">
-            {folded.has('annotation') ? (
-              <ToolGroupMenu
-                label={activeAnnotation ? TOOL_LABELS[activeAnnotation] : 'Annotation'}
-                icon={<ToolIcon tool={activeAnnotation ?? 'highlight'} />}
-                active={activeAnnotation !== undefined}
-                buttonClassName={
-                  activeAnnotation
-                    ? `${menuTriggerBtn} border-lib-accent bg-lib-accent-soft text-lib-accent`
-                    : menuTriggerBtn
-                }
-                labelClassName={stripLabel}
-                items={annotationTools.map((tool) => ({
-                  id: tool,
-                  label: TOOL_LABELS[tool],
-                  icon: <ToolIcon tool={tool} />,
-                  active: activeTool === tool,
-                  onSelect: () => onAnnotationTool(tool),
-                }))}
-              />
-            ) : (
-              annotationTools.map((tool) => {
-                const active = activeTool === tool
-                return (
-                  <button
-                    key={tool}
-                    className={`relative ${modeButtonClass(active)}`}
-                    type="button"
-                    title={TOOL_LABELS[tool]}
-                    aria-label={TOOL_LABELS[tool]}
-                    aria-pressed={active}
-                    onClick={() => onAnnotationTool(tool)}
-                  >
-                    <ToolIcon tool={tool} />
-                    <span className={stripLabel}>{TOOL_LABELS[tool]}</span>
-                  </button>
-                )
-              })
-            )}
+      {layout.map((resolved, index) => (
+        <div key={resolved.group.id} className="contents">
+          {index > 0 ? <ToolSeparator /> : null}
+          <ToolGroup aria-label={resolved.group.label}>
+            {resolved.mode === 'menu' ? renderMenu(resolved) : resolved.tools.map(renderButton)}
           </ToolGroup>
-        </>
-      ) : null}
-
-      {viewDefs.length > 0 ? (
-        <>
-          <ToolSeparator />
-          <ToolGroup aria-label="View">
-            <ToolGroupMenu
-              label="View"
-              icon={<ToolIcon tool="view" />}
-              buttonClassName={menuTriggerBtn}
-              labelClassName={stripLabel}
-              items={viewDefs.map((def) => {
-                const tool = def.id as ViewTool
-                return {
-                  id: tool,
-                  label: tool === 'fullscreen' && fullscreen ? 'Exit Fullscreen' : def.label,
-                  icon: <ToolIcon tool={tool} />,
-                  shortcutId: def.shortcutId,
-                  onSelect: () => onViewTool(tool),
-                }
-              })}
-            />
-          </ToolGroup>
-        </>
-      ) : null}
-
-      {miscTools.length > 0 ? (
-        <>
-          <ToolSeparator />
-          <ToolGroup aria-label="Other tools">
-            {folded.has('tools') ? (
-              <ToolGroupMenu
-                label="Tools"
-                icon={<ToolIcon tool="tools" />}
-                active={snapshotActive}
-                buttonClassName={
-                  snapshotActive
-                    ? `${menuTriggerBtn} border-lib-accent bg-lib-accent-soft text-lib-accent`
-                    : menuTriggerBtn
-                }
-                labelClassName={stripLabel}
-                items={miscTools.map((tool) => ({
-                  id: tool,
-                  label: TOOL_LABELS[tool],
-                  icon: <ToolIcon tool={tool} />,
-                  active: miscActive[tool],
-                  onSelect: () => runMisc(tool),
-                }))}
-              />
-            ) : (
-              miscTools.map((tool) => (
-                <button
-                  key={tool}
-                  className={modeButtonClass(miscActive[tool])}
-                  type="button"
-                  title={TOOL_LABELS[tool]}
-                  aria-label={TOOL_LABELS[tool]}
-                  aria-pressed={tool === 'snapshot' ? miscActive[tool] : undefined}
-                  onClick={() => runMisc(tool)}
-                >
-                  <ToolIcon tool={tool} />
-                  <span className={stripLabel}>{TOOL_LABELS[tool]}</span>
-                </button>
-              ))
-            )}
-          </ToolGroup>
-        </>
-      ) : null}
-
-      <ToolSeparator />
-
-      <ToolGroup aria-label="Reading settings">
-        <button
-          className={modeButtonClass(settingsOpen)}
-          type="button"
-          title="Reading settings"
-          aria-label="Reading settings"
-          aria-expanded={settingsOpen}
-          onClick={onToggleSettings}
-        >
-          <ToolIcon tool="settings" />
-          <span className={stripLabel}>Settings</span>
-        </button>
-      </ToolGroup>
+        </div>
+      ))}
     </div>
   )
 }

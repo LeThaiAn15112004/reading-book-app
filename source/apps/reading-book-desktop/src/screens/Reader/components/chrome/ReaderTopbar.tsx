@@ -1,41 +1,23 @@
+import type { Ref } from 'react'
 import type { ReaderCapability } from '../../../../reader/capabilities'
 import { MoreMenu } from './MoreMenu'
-import {
-  ToolsStrip,
-  type AnnotationTool,
-  type CompanionTool,
-  type ModeTool,
-  type ViewTool,
-} from './ToolsMenu'
+import { ToolsStrip, type ToolId, type ToolStates } from './ToolsMenu'
 
 type ReaderTopbarProps = {
   chromeHidden: boolean
   moreOpen: boolean
-  settingsOpen: boolean
-  activeTool: ModeTool | 'highlight' | 'underline' | 'strikethrough'
   onToggleMore: () => void
-  onToggleSettings: () => void
-  onSelectTool: (tool: ModeTool) => void
-  onCompanionTool: (tool: CompanionTool) => void
-  onAnnotationTool: (tool: AnnotationTool) => void
-  onViewTool: (tool: ViewTool) => void
-  fullscreen: boolean
   onShare: () => void
   onFavorites: () => void
   onBookInfo: () => void
   onTrash: () => void
-  /** Search tool's pressed state — the panel itself floats independently (see `ReaderScreen`). */
-  searchOpen: boolean
-  translateActive: boolean
-  audioActive: boolean
-  audioMenuOpen: boolean
-  audioButtonRef: React.Ref<HTMLButtonElement>
-  /** Snapshot tool's armed state — the overlay itself floats independently (see `ReaderScreen`). */
-  snapshotActive: boolean
-  onSnapshot: () => void
-  onWordCount: () => void
-  /** What the open book's reader supports; unsupported tools are not rendered. */
+  /** What the open book's reader surface supports; unsupported tools are not rendered. */
   capabilities: ReadonlySet<ReaderCapability>
+  /** Active / expanded state per tool (see `ToolsStrip`). */
+  toolStates: ToolStates
+  onTool: (tool: ToolId) => void
+  /** The read-aloud menu floats under the Audio button. */
+  audioButtonRef: Ref<HTMLButtonElement>
 }
 
 const chromeBtn =
@@ -44,28 +26,15 @@ const chromeBtn =
 export function ReaderTopbar({
   chromeHidden,
   moreOpen,
-  settingsOpen,
-  activeTool,
   onToggleMore,
-  onToggleSettings,
-  onSelectTool,
-  onCompanionTool,
-  onAnnotationTool,
   onShare,
   onFavorites,
   onBookInfo,
   onTrash,
-  searchOpen,
-  translateActive,
-  audioActive,
-  audioMenuOpen,
-  audioButtonRef,
-  snapshotActive,
-  onSnapshot,
-  onWordCount,
-  onViewTool,
-  fullscreen,
   capabilities,
+  toolStates,
+  onTool,
+  audioButtonRef,
 }: ReaderTopbarProps) {
   return (
     <header
@@ -79,23 +48,11 @@ export function ReaderTopbar({
       onClick={(e) => e.stopPropagation()}
     >
       <ToolsStrip
-        activeTool={activeTool}
-        onSelectTool={onSelectTool}
-        onCompanionTool={onCompanionTool}
-        onAnnotationTool={onAnnotationTool}
-        searchOpen={searchOpen}
-        translateActive={translateActive}
-        audioActive={audioActive}
-        audioMenuOpen={audioMenuOpen}
-        audioButtonRef={audioButtonRef}
-        snapshotActive={snapshotActive}
-        onSnapshot={onSnapshot}
-        onWordCount={onWordCount}
-        settingsOpen={settingsOpen}
-        onToggleSettings={onToggleSettings}
-        onViewTool={onViewTool}
-        fullscreen={fullscreen}
         capabilities={capabilities}
+        toolStates={toolStates}
+        onTool={onTool}
+        toolRefs={{ speech: audioButtonRef }}
+        hidden={chromeHidden}
       />
 
       <div className="relative flex shrink-0 items-center gap-1.5 sm:gap-2">

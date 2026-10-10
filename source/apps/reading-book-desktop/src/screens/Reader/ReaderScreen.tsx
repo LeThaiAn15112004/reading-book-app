@@ -45,8 +45,8 @@ import {
   TrashConfirmDialog,
   useRightSidebarDocked,
   useSidebarPanelResize,
-  type AnnotationTool,
-  type CompanionTool,
+  type ToolId,
+  type ToolStates,
 } from './components'
 import {
   FAKE_CHAPTERS,
@@ -67,24 +67,9 @@ import {
   useReadAloud,
   useReaderTranslation,
   useRightPanelStore,
-  ZOOM_DEFAULT,
   type HighlightShortcuts,
   type ReaderChromeEscapeUi,
 } from './logic'
-
-const COMPANION_LABELS: Record<CompanionTool, string> = {
-  search: 'Search',
-  speech: 'Audio',
-  translate: 'Translate',
-}
-
-const ANNOTATION_LABELS: Record<AnnotationTool, string> = {
-  highlight: 'Highlight',
-  underline: 'Underline',
-  strikethrough: 'Strikethrough',
-  textarea: 'Textbox',
-  freehand: 'Freehand',
-}
 
 /** SCR-03 — session wiring; layout/chrome live in ReaderShell (T3.2). */
 export function ReaderScreen() {
@@ -353,6 +338,72 @@ export function ReaderScreen() {
     chrome.setToast('Copied.')
   }
 
+  /** Toolbar state per tool — which tools exist for this book comes from `readerCapabilities`. */
+  const toolStates: ToolStates = {
+    hand: { active: activeTool === 'hand' },
+    // Translate rides on Select (text must be selectable), so Select isn't shown pressed meanwhile.
+    select: { active: activeTool === 'select' && !translation.mode },
+    search: { active: chrome.searchOpen },
+    speech: { active: readAloud.active, expanded: readAloud.menuOpen },
+    translate: { active: translation.mode },
+    highlight: { active: activeTool === 'highlight' },
+    underline: { active: activeTool === 'underline' },
+    strikethrough: { active: activeTool === 'strikethrough' },
+    snapshot: { active: snapshot.active },
+    settings: { active: chrome.settingsOpen, expanded: chrome.settingsOpen },
+  }
+
+  function handleTool(tool: ToolId) {
+    switch (tool) {
+      case 'hand':
+      case 'select':
+        selectTool(tool)
+        return
+      case 'search':
+        chrome.toggleSearch()
+        return
+      case 'speech':
+        if (readAloud.menuOpen) {
+          readAloud.closeMenu()
+        } else {
+          chrome.closeFloating()
+          readAloud.openMenu()
+        }
+        return
+      case 'translate':
+        if (translation.mode) {
+          translation.setMode(false)
+        } else {
+          chrome.closeFloating()
+          highlights.dismissAnnotationUi()
+          setActiveTool('select')
+          translation.setMode(true)
+          chrome.setToast('Translate: select text to translate it — Esc to exit.')
+        }
+        return
+      case 'highlight':
+      case 'underline':
+      case 'strikethrough':
+        // Click the armed tool again to disarm it (back to Select); otherwise arm it — sticky across
+        // multiple highlights/underlines/strikethroughs until toggled off, Escape, or Hand/Select.
+        selectTool((current) => (current === tool ? 'select' : tool))
+        return
+      case 'snapshot':
+        chrome.closeFloating()
+        snapshot.toggle()
+        return
+      case 'wordCount':
+        chrome.closeFloating()
+        chrome.setWordCountOpen(true)
+        return
+      case 'settings':
+        if (toolsHidden) return
+        chrome.setMoreOpen(false)
+        chrome.setSettingsOpen((v) => !v)
+        return
+    }
+  }
+
   return (
     <ReaderShell
       themeClassName={themeShell}
@@ -393,81 +444,15 @@ export function ReaderScreen() {
         <ReaderTopbar
           chromeHidden={toolsHidden}
           moreOpen={chrome.moreOpen}
-          settingsOpen={chrome.settingsOpen}
-          activeTool={activeTool}
           onToggleMore={() => {
             if (toolsHidden) return
             chrome.setSettingsOpen(false)
             chrome.setMoreOpen((v) => !v)
           }}
-          onToggleSettings={() => {
-            if (toolsHidden) return
-            chrome.setMoreOpen(false)
-            chrome.setSettingsOpen((v) => !v)
-          }}
           capabilities={readerCapabilities}
-          fullscreen={fullscreen}
-          onViewTool={(tool) => {
-            if (tool === 'zoomIn') zoom.handleZoomStep(1)
-            else if (tool === 'zoomOut') zoom.handleZoomStep(-1)
-            else if (tool === 'resetZoom') zoom.handleZoomChange(ZOOM_DEFAULT)
-            else toggleFullscreen()
-          }}
-          onSelectTool={selectTool}
-          onCompanionTool={(tool) => {
-            if (tool === 'search') {
-              chrome.toggleSearch()
-              return
-            }
-            if (tool === 'speech') {
-              if (readAloud.menuOpen) {
-                readAloud.closeMenu()
-              } else {
-                chrome.closeFloating()
-                readAloud.openMenu()
-              }
-              return
-            }
-            if (tool === 'translate') {
-              if (translation.mode) {
-                translation.setMode(false)
-              } else {
-                chrome.closeFloating()
-                highlights.dismissAnnotationUi()
-                setActiveTool('select')
-                translation.setMode(true)
-                chrome.setToast('Translate: select text to translate it — Esc to exit.')
-              }
-              return
-            }
-            chrome.setToast(`${COMPANION_LABELS[tool]} — coming soon.`)
-          }}
-          searchOpen={chrome.searchOpen}
-          translateActive={translation.mode}
-          audioActive={readAloud.active}
-          audioMenuOpen={readAloud.menuOpen}
+          toolStates={toolStates}
+          onTool={handleTool}
           audioButtonRef={audioButtonRef}
-          snapshotActive={snapshot.active}
-          onSnapshot={() => {
-            chrome.closeFloating()
-            snapshot.toggle()
-          }}
-          onWordCount={() => {
-            chrome.closeFloating()
-            chrome.setWordCountOpen(true)
-          }}
-          onAnnotationTool={(tool) => {
-            if (tool !== 'highlight' && tool !== 'underline' && tool !== 'strikethrough') {
-              // Textbox / Freehand: no drag-to-select instant-apply story yet (see
-              // `pdfAnnotationTools.ts`) — unchanged "coming soon" stub.
-              chrome.setToast(`${ANNOTATION_LABELS[tool]} — coming soon.`)
-              return
-            }
-            // Click the armed tool again to disarm it (back to Select); otherwise arm it —
-            // sticky across multiple highlights/underlines/strikethroughs until toggled off,
-            // Escape, or Hand/Select.
-            selectTool((current) => (current === tool ? 'select' : tool))
-          }}
           onShare={() => {
             chrome.closeFloating()
             chrome.setToast('Share — not available yet.')
