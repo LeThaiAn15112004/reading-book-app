@@ -116,16 +116,15 @@ export function registerAppIpc(): void {
   )
 }
 
-/** F11 toggle + Esc exit; works even when focus is inside an EPUB iframe. */
+/**
+ * Esc exits fullscreen (works even when focus is inside an EPUB iframe) and fullscreen changes are
+ * pushed to the renderer. The *toggle* key is no longer handled here: Toggle Fullscreen is a
+ * customizable renderer shortcut (`view.toggleFullscreen`, F11 by default) that calls
+ * `AppChannels.toggleFullscreen`, so a second F11 handler would toggle twice.
+ */
 export function installFullscreenShortcuts(target: BrowserWindow): void {
   target.webContents.on('before-input-event', (event, input) => {
     if (input.type !== 'keyDown') return
-
-    if (input.key === 'F11') {
-      target.setFullScreen(!target.isFullScreen())
-      event.preventDefault()
-      return
-    }
 
     if (input.key === 'Escape' && target.isFullScreen()) {
       target.setFullScreen(false)

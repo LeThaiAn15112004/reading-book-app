@@ -7,7 +7,7 @@
  * the handler a screen registers with `useShortcutAction` (see `shortcutActions.ts`).
  */
 
-export type ShortcutGroupId = 'general' | 'navigation' | 'search'
+export type ShortcutGroupId = 'general' | 'navigation' | 'search' | 'view'
 
 /**
  * Screens a shortcut can be active on. They are routes, so exactly one is current at a time: two
@@ -32,6 +32,10 @@ export type ShortcutId =
   | 'search.nextResult'
   | 'search.previousResult'
   | 'search.close'
+  | 'view.zoomIn'
+  | 'view.zoomOut'
+  | 'view.resetZoom'
+  | 'view.toggleFullscreen'
 
 /**
  * Platform-neutral key tokens pressed together: `Mod` (Ctrl on Windows/Linux, ⌘ on macOS), `Alt`
@@ -61,12 +65,15 @@ export type ShortcutDefinition = {
   displayOnly?: boolean
   /** Fire again while the key is held (page turning); other shortcuts ignore auto-repeat. */
   allowRepeat?: boolean
+  /** Leave the key to a focused text field even with Ctrl/⌘ held (view zoom keeps text editing intact). */
+  ignoreInTextFields?: boolean
 }
 
 export const SHORTCUT_GROUPS: readonly { id: ShortcutGroupId; label: string }[] = [
   { id: 'general', label: 'General' },
   { id: 'navigation', label: 'Navigation' },
   { id: 'search', label: 'Search' },
+  { id: 'view', label: 'View' },
 ]
 
 export const SHORTCUTS: readonly ShortcutDefinition[] = [
@@ -187,6 +194,41 @@ export const SHORTCUTS: readonly ShortcutDefinition[] = [
     defaultKeys: ['Escape'],
     locked: true,
     displayOnly: true,
+  },
+  {
+    id: 'view.zoomIn',
+    group: 'view',
+    label: 'Zoom In',
+    contexts: ['reader'],
+    defaultKeys: ['Mod', '='],
+    // Ctrl/⌘ + "+" (Shift held on layouts where + shares the = key) has always zoomed in too.
+    aliases: [['Mod', 'Shift', '=']],
+    ignoreInTextFields: true,
+  },
+  {
+    id: 'view.zoomOut',
+    group: 'view',
+    label: 'Zoom Out',
+    contexts: ['reader'],
+    defaultKeys: ['Mod', '-'],
+    aliases: [['Mod', 'Shift', '-']],
+    ignoreInTextFields: true,
+  },
+  {
+    id: 'view.resetZoom',
+    group: 'view',
+    label: 'Reset Zoom',
+    contexts: ['reader'],
+    defaultKeys: ['Mod', '0'],
+    ignoreInTextFields: true,
+  },
+  {
+    id: 'view.toggleFullscreen',
+    group: 'view',
+    label: 'Toggle Fullscreen',
+    // Window-level, so it works on every screen (it used to be handled by the Main process).
+    contexts: ['library', 'reader', 'settings'],
+    defaultKeys: ['F11'],
   },
 ]
 

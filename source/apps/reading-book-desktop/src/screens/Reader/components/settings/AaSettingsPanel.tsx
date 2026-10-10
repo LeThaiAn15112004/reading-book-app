@@ -1,4 +1,5 @@
 import type { PageLayout } from '@reading-book/book-reader-sdk'
+import { useShortcutLabel } from '../../../../shortcuts/useShortcutLabel'
 import type {
   FontFamily,
   FontWeight,
@@ -43,6 +44,9 @@ export function AaSettingsPanel({
   prefs,
   onChange,
 }: AaSettingsPanelProps) {
+  const zoomIn = useShortcutLabel('view.zoomIn')
+  const zoomOut = useShortcutLabel('view.zoomOut')
+  const resetZoom = useShortcutLabel('view.resetZoom')
   const effectiveMargin = prefs.marginEnabled ? prefs.margin : 'off'
 
   return (
@@ -95,7 +99,7 @@ export function AaSettingsPanel({
           </button>
         </div>
         <p className="mt-2 mb-0 text-[11px] leading-snug text-lib-faint">
-          Also on the footer (− / +) or Ctrl/Cmd − + 0.
+          Also on the footer (− / +) or {zoomOut} / {zoomIn} / {resetZoom}.
         </p>
       </div>
 

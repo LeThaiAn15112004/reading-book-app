@@ -123,9 +123,11 @@ export type ValidateShortcutOptions = {
 
 /**
  * True when no Ctrl/⌘ or Alt/⌥ is held — such a key (Shift aside) is also what the user types, so the
- * bridge ignores it while a text field has focus.
+ * bridge ignores it while a text field has focus. Function keys type nothing, so they never count.
  */
 export function isPlainShortcut(keys: ShortcutKeys): boolean {
+  const main = keys[keys.length - 1]
+  if (/^F\d+$/.test(main)) return false
   return !keys.includes('Mod') && !keys.includes('Alt')
 }
 

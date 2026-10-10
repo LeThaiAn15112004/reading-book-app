@@ -28,8 +28,9 @@ function hasOpenModal(): boolean {
  * (returns false) leaves the key press alone.
  *
  * Guards: keys without Ctrl/Alt are ignored while typing in a field, over a modal dialog or during
- * IME composition; Enter / Space are left to a focused button or link; auto-repeat only repeats
- * actions flagged `allowRepeat`.
+ * IME composition (function keys type nothing, so they skip these); Enter / Space are left to a
+ * focused button or link; auto-repeat only repeats actions flagged `allowRepeat`; actions flagged
+ * `ignoreInTextFields` also stay out of text fields when Ctrl/⌘ is held.
  */
 export function ShortcutsBridge() {
   const navigate = useNavigate()
@@ -82,6 +83,7 @@ export function ShortcutsBridge() {
           !s.displayOnly &&
           s.contexts.includes(context!) &&
           (!event.repeat || s.allowRepeat) &&
+          !(s.ignoreInTextFields && isTypingTarget(event.target)) &&
           shortcutComboIds(s, keys).includes(combo),
       )
       for (const match of matches) {

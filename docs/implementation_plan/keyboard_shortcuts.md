@@ -224,3 +224,24 @@ PDF / TXT / DOCX… **chưa có renderer Reader thật**, nên chưa có hành v
   ShortcutsBridge,index}`, `KeyboardShortcutsSettings.tsx`, `useReaderNavigation.ts`, `hooks/index.ts`,
   `logic/index.ts`, `ReaderScreen.tsx`, `ReaderFooter.tsx`, `EpubRenderer.tsx`, `openEpubjs.ts`,
   `spikes/shortcuts/run-shortcuts.mjs`.
+
+## 17. View — Zoom & Fullscreen
+
+Chi tiết + kết quả: `view_keyboard_shortcuts.md`. Bốn action đã chạy sẵn được đưa vào registry:
+
+| Action | Mặc định | Alias |
+|---|---|---|
+| Zoom In (`view.zoomIn`) | `Ctrl/Cmd + =` | `Ctrl/Cmd + Shift + =` |
+| Zoom Out (`view.zoomOut`) | `Ctrl/Cmd + -` | `Ctrl/Cmd + Shift + -` |
+| Reset Zoom (`view.resetZoom`) | `Ctrl/Cmd + 0` | — |
+| Toggle Fullscreen (`view.toggleFullscreen`) | `F11` | — |
+
+- Handler dùng lại: `handleZoomStep`, `setViewZoomCentered(ZOOM_DEFAULT)`, `toggleFullscreen` của
+  `ImmersiveReadingContext`.
+- Listener cũ: keydown `window` trong `useReaderZoomControls` đã xoá; nhánh F11 của Main
+  (`installFullscreenShortcuts`) đã xoá (giữ `Esc`). Mỗi phím chỉ còn `ShortcutsBridge` xử lý.
+- Hạ tầng thêm: cờ `ignoreInTextFields`, phím F không bị guard "phím trần", `useShortcutLabel`.
+- Kiểm tra: `typecheck`, `spike:settings:shortcuts` (35 check), `spike:settings:reset` (14), `npx vite build`
+  đều pass; ESLint sạch trên file sửa (1 warning có sẵn ở `ImmersiveReadingContext.tsx`).
+- Hạn chế: chưa kiểm trong app thật; F11 không chạy ở Splash; khớp theo phím vật lý; không có hành vi PDF
+  (chưa có PDF renderer). Nhóm Annotation vẫn để sau.

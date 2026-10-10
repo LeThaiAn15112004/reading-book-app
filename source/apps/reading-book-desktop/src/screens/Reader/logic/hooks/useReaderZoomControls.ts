@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type RefObject } from 'react'
+import { useShortcutAction } from '../../../../shortcuts'
 import type { InteractionTool } from '@reading-book/book-reader-sdk'
 import type { ReaderZoomViewportHandle } from '../../components'
 import {
@@ -100,36 +101,12 @@ export function useReaderZoomControls({
     [activeToolRef],
   )
 
-  // View zoom: Ctrl/Cmd + / − / 0 (Aa font-size stays on the settings panel).
-  useEffect(() => {
-    function onKeyDown(e: KeyboardEvent) {
-      if (!(e.ctrlKey || e.metaKey) || e.altKey) return
-      const tag = (e.target as HTMLElement | null)?.tagName
-      if (
-        tag === 'INPUT' ||
-        tag === 'TEXTAREA' ||
-        (e.target as HTMLElement)?.isContentEditable
-      ) {
-        return
-      }
-      if (e.key === '=' || e.key === '+') {
-        e.preventDefault()
-        handleZoomStep(1)
-        return
-      }
-      if (e.key === '-' || e.key === '_') {
-        e.preventDefault()
-        handleZoomStep(-1)
-        return
-      }
-      if (e.key === '0') {
-        e.preventDefault()
-        setViewZoomCentered(ZOOM_DEFAULT)
-      }
-    }
-    window.addEventListener('keydown', onKeyDown)
-    return () => window.removeEventListener('keydown', onKeyDown)
-  }, [handleZoomStep])
+  // View zoom keys (Settings → Keyboard Shortcuts → View; Ctrl/Cmd + = / - / 0 by default). The
+  // central `ShortcutsBridge` dispatches them — there is no window keydown listener here any more.
+  // Aa font-size stays on the settings panel.
+  useShortcutAction('view.zoomIn', () => handleZoomStep(1))
+  useShortcutAction('view.zoomOut', () => handleZoomStep(-1))
+  useShortcutAction('view.resetZoom', () => setViewZoomCentered(ZOOM_DEFAULT))
 
   return {
     zoomViewportRef,

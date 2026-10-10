@@ -9,6 +9,7 @@ import {
 } from 'react'
 import { useLocation } from 'react-router-dom'
 import { appApi } from '../bridge'
+import { useShortcutAction } from '../shortcuts/shortcutActions'
 
 type ImmersiveReadingContextValue = {
   /** OS window is fullscreen. */
@@ -57,6 +58,10 @@ export function ImmersiveReadingProvider({ children }: { children: ReactNode }) 
     })
   }, [])
 
+  // Toggle Fullscreen shortcut (Settings → Keyboard Shortcuts → View, F11 by default). The Main
+  // process used to toggle on F11 itself; it now only handles Esc, so this is the single F11 path.
+  useShortcutAction('view.toggleFullscreen', toggleFullscreen)
+
   const value = useMemo(
     () => ({
       fullscreen,
@@ -74,6 +79,7 @@ export function ImmersiveReadingProvider({ children }: { children: ReactNode }) 
   )
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function useImmersiveReading(): ImmersiveReadingContextValue {
   const context = useContext(ImmersiveReadingContext)
   if (!context) {

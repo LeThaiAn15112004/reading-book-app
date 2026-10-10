@@ -13,6 +13,8 @@
  *                          (Page Down / Page Up) match at runtime and take part in conflict detection
  *   8. wiring (static)  -> Enter submits instead of stepping, End uses goToEnd, Add Bookmark has one
  *                          registration that calls the existing toggle once, guards are in the bridge
+ *   9. view keys        -> Zoom In/Out/Reset + Toggle Fullscreen: defaults, rebinding, conflicts (incl.
+ *                          aliases), restart persistence, reset, one dispatcher per key (no legacy listener)
  *
  * Not covered here (needs the real renderer): Escape cancelling the recording chip, the hover /
  * conflict styling, and that the existing handlers still fire after customizing.
@@ -341,6 +343,138 @@ await check('Add Bookmark has one registration that calls the existing toggle on
   assert.deepEqual(hits, ['useReaderShortcuts.ts'])
   const source = read('screens/Reader/logic/hooks/useReaderShortcuts.ts')
   assert.equal(source.match(/toggleBookmark\(\)/g)?.length, 1)
+})
+
+const VIEW = ['view.zoomIn', 'view.zoomOut', 'view.resetZoom', 'view.toggleFullscreen']
+const matchingIds = (event, context, overrides = {}) => {
+  const effective = effectiveShortcutKeys(overrides)
+  const pressed = keys.shortcutKeysFromEvent(event, false) ?? []
+  return defs.SHORTCUTS.filter(
+    (s) =>
+      !s.displayOnly &&
+      s.contexts.includes(context) &&
+      conflicts.shortcutComboIds(s, effective).includes(keys.shortcutKeysId(pressed)),
+  ).map((s) => s.id)
+}
+
+await check('View group lists the four actions with their default shortcuts', () => {
+  assert.ok(defs.SHORTCUT_GROUPS.some((g) => g.id === 'view' && g.label === 'View'))
+  const view = defs.SHORTCUTS.filter((s) => s.group === 'view')
+  assert.deepEqual(view.map((s) => s.id), VIEW)
+  const d = effectiveShortcutKeys({})
+  assert.deepEqual(d['view.zoomIn'], ['Mod', '='])
+  assert.deepEqual(d['view.zoomOut'], ['Mod', '-'])
+  assert.deepEqual(d['view.resetZoom'], ['Mod', '0'])
+  assert.deepEqual(d['view.toggleFullscreen'], ['F11'])
+  assert.deepEqual(defs.getShortcut('view.toggleFullscreen').contexts, ['library', 'reader', 'settings'])
+  for (const id of ['view.zoomIn', 'view.zoomOut', 'view.resetZoom']) {
+    assert.deepEqual(defs.getShortcut(id).contexts, ['reader'], id)
+    assert.equal(defs.getShortcut(id).ignoreInTextFields, true, id)
+  }
+})
+
+await check('default keys match the physical keys the old handlers accepted', () => {
+  assert.deepEqual(matchingIds(press('Equal', { ctrlKey: true }), 'reader'), ['view.zoomIn'])
+  assert.deepEqual(matchingIds(press('NumpadAdd', { ctrlKey: true }), 'reader'), ['view.zoomIn'])
+  assert.deepEqual(matchingIds(press('Equal', { ctrlKey: true, shiftKey: true }), 'reader'), ['view.zoomIn']) // Ctrl + "+"
+  assert.deepEqual(matchingIds(press('Minus', { ctrlKey: true }), 'reader'), ['view.zoomOut'])
+  assert.deepEqual(matchingIds(press('NumpadSubtract', { ctrlKey: true }), 'reader'), ['view.zoomOut'])
+  assert.deepEqual(matchingIds(press('Minus', { ctrlKey: true, shiftKey: true }), 'reader'), ['view.zoomOut']) // Ctrl + "_"
+  assert.deepEqual(matchingIds(press('Digit0', { ctrlKey: true }), 'reader'), ['view.resetZoom'])
+  assert.deepEqual(matchingIds(press('Numpad0', { ctrlKey: true }), 'reader'), ['view.resetZoom'])
+  for (const context of ['library', 'reader', 'settings']) {
+    assert.deepEqual(matchingIds(press('F11'), context), ['view.toggleFullscreen'], context)
+  }
+  // Zoom is a Reader action; Alt variants never zoomed.
+  assert.deepEqual(matchingIds(press('Equal', { ctrlKey: true }), 'library'), [])
+  assert.deepEqual(matchingIds(press('Equal', { ctrlKey: true, altKey: true }), 'reader'), [])
+})
+
+await check('function keys are not "plain": they pass the typing / modal guard', () => {
+  assert.equal(keys.isPlainShortcut(['F11']), false)
+  assert.equal(keys.isPlainShortcut(['T']), true)
+  assert.equal(keys.isPlainShortcut(['Shift', 'Enter']), true)
+  assert.equal(keys.isPlainShortcut(['Mod', '=']), false)
+})
+
+await check('changing a View hotkey changes what fires; the old key stops', () => {
+  assert.deepEqual(store().tryAssign('view.toggleFullscreen', ['Mod', 'Shift', 'F']), { ok: true })
+  assert.deepEqual(matchingIds(press('KeyF', { ctrlKey: true, shiftKey: true }), 'reader', store().overrides), ['view.toggleFullscreen'])
+  assert.deepEqual(matchingIds(press('F11'), 'reader', store().overrides), [])
+  assert.deepEqual(store().tryAssign('view.zoomIn', ['Mod', 'Shift', 'K']), { ok: true })
+  assert.deepEqual(matchingIds(press('Equal', { ctrlKey: true }), 'reader', store().overrides), [])
+})
+
+await check('View conflicts are context-aware and alias-aware', () => {
+  assert.equal(store().tryAssign('view.zoomIn', ['Mod', '0']).conflictWith, 'view.resetZoom')
+  assert.equal(store().tryAssign('view.zoomIn', ['Mod', 'G']).conflictWith, 'navigation.goToPage')
+  assert.equal(store().tryAssign('view.zoomOut', ['Mod', 'Shift', '=']).conflictWith, 'view.zoomIn') // zoom-in alias
+  assert.equal(store().tryAssign('view.zoomIn', ['Mod', 'Shift', '=']).conflictWith, 'view.zoomIn') // own alias
+  // Toggle Fullscreen is active everywhere, so Ctrl+F (Search Library / Search in Book) is taken.
+  assert.ok(store().tryAssign('view.toggleFullscreen', ['Mod', 'F']).conflictWith)
+  // Zoom is Reader-only: a Library-only action may reuse its key.
+  assert.deepEqual(store().tryAssign('general.searchLibrary', ['Mod', '=']), { ok: true })
+  assert.deepEqual(store().overrides, { 'general.searchLibrary': ['Mod', '='] })
+  // F11 is claimed in every context, and it is not rebindable to a typing key.
+  assert.ok(store().tryAssign('navigation.toggleToc', ['F11']).conflictWith === 'view.toggleFullscreen')
+})
+
+await check('View shortcuts persist across a restart; reset one / all restores the defaults', async () => {
+  store().tryAssign('view.zoomIn', ['Mod', 'Shift', 'K'])
+  store().tryAssign('view.toggleFullscreen', ['F10'])
+  const saved = JSON.parse(storage.get(SHORTCUTS_STORAGE_KEY))
+  assert.deepEqual(saved, { 'view.zoomIn': ['Mod', 'Shift', 'K'], 'view.toggleFullscreen': ['F10'] })
+  const fresh = await import('../../src/shortcuts/shortcutsStore.ts?view-restart')
+  assert.deepEqual(fresh.useShortcutsStore.getState().overrides, saved)
+
+  store().resetOne('view.zoomIn')
+  assert.deepEqual(current()['view.zoomIn'], ['Mod', '='])
+  assert.deepEqual(current()['view.toggleFullscreen'], ['F10'])
+
+  store().tryAssign('view.zoomOut', ['Mod', 'Shift', 'J'])
+  store().tryAssign('view.resetZoom', ['Mod', 'Shift', 'H'])
+  assert.equal(store().reset(), true)
+  for (const id of VIEW) assert.deepEqual(current()[id], defs.getShortcut(id).defaultKeys, id)
+  assert.equal(storage.has(SHORTCUTS_STORAGE_KEY), false)
+})
+
+await check('each View key has exactly one dispatcher: no legacy listener, one registration', () => {
+  const zoom = read('screens/Reader/logic/hooks/useReaderZoomControls.ts')
+  assert.doesNotMatch(zoom, /addEventListener\('keydown'/)
+  assert.doesNotMatch(zoom, /e\.key ===/)
+  assert.match(zoom, /useShortcutAction\('view\.zoomIn', \(\) => handleZoomStep\(1\)\)/)
+  assert.match(zoom, /useShortcutAction\('view\.zoomOut', \(\) => handleZoomStep\(-1\)\)/)
+  assert.match(zoom, /useShortcutAction\('view\.resetZoom', \(\) => setViewZoomCentered\(ZOOM_DEFAULT\)\)/)
+
+  // Main no longer toggles on F11 (it would toggle a second time); it keeps Esc → leave fullscreen.
+  const main = readFileSync(new URL('../../electron/ipc/app.ipc.ts', import.meta.url), 'utf8')
+  assert.doesNotMatch(main, /input\.key === 'F11'/)
+  assert.match(main, /input\.key === 'Escape'/)
+
+  const registrations = {}
+  const walk = (dir) => {
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      const path = new URL(entry.name + (entry.isDirectory() ? '/' : ''), dir)
+      if (entry.isDirectory()) walk(path)
+      else if (/\.tsx?$/.test(entry.name)) {
+        const source = readFileSync(path, 'utf8')
+        for (const m of source.matchAll(/useShortcutAction\(\s*'(view\.[A-Za-z]+)'/g)) {
+          registrations[m[1]] = [...(registrations[m[1]] ?? []), entry.name]
+        }
+      }
+    }
+  }
+  walk(new URL('../../src/', import.meta.url))
+  assert.deepEqual(registrations, {
+    'view.zoomIn': ['useReaderZoomControls.ts'],
+    'view.zoomOut': ['useReaderZoomControls.ts'],
+    'view.resetZoom': ['useReaderZoomControls.ts'],
+    'view.toggleFullscreen': ['ImmersiveReadingContext.tsx'],
+  })
+  // The fullscreen registration reuses the existing context callback (same one the footer button calls).
+  assert.match(read('chrome/ImmersiveReadingContext.tsx'), /useShortcutAction\('view\.toggleFullscreen', toggleFullscreen\)/)
+  // The bridge keeps zoom keys out of text fields, as the legacy listener did.
+  assert.match(read('shortcuts/ShortcutsBridge.tsx'), /s\.ignoreInTextFields && isTypingTarget/)
 })
 
 if (failures > 0) {
