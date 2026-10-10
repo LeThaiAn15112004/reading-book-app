@@ -44,16 +44,17 @@ export type ToolGroupDef = {
   id: ToolGroupId
   label: string
   icon: ToolIconId
-  /** `never`: always inline (frequent tools). `auto`: inline until the strip runs out of room. */
-  collapse: 'never' | 'auto'
+  /** `never`: always inline (frequent tools). `always`: always one dropdown. `auto`: inline until
+   *  the strip runs out of room. */
+  collapse: 'never' | 'always' | 'auto'
 }
 
 /** Toolbar order. Empty groups (nothing supported by the surface) are not rendered. */
 export const TOOL_GROUPS: readonly ToolGroupDef[] = [
   { id: 'navigate', label: 'Navigate', icon: 'hand', collapse: 'never' },
-  { id: 'annotation', label: 'Annotation', icon: 'highlight', collapse: 'auto' },
+  { id: 'annotation', label: 'Annotation', icon: 'highlight', collapse: 'always' },
   { id: 'view', label: 'View', icon: 'view', collapse: 'auto' },
-  { id: 'tools', label: 'Tools', icon: 'tools', collapse: 'auto' },
+  { id: 'tools', label: 'Tools', icon: 'tools', collapse: 'always' },
   { id: 'settings', label: 'Settings', icon: 'settings', collapse: 'never' },
 ]
 

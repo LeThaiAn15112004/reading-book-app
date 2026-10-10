@@ -35,8 +35,8 @@ liệu* (Share, Favorites, Book info, Move to trash) — không bao giờ chứa
 | Nhóm | Công cụ | Hiển thị |
 |---|---|---|
 | Navigate | Hand, Select, Search, Audio, Translate | inline (không gập) |
-| Annotation | Highlight, Underline, Strikethrough | gập → `Annotation ⌄` (gập **sau cùng**) |
-| Tools | Snapshot, Word Count | gập → `Tools ⌄` (gập **đầu tiên**) |
+| Annotation | Highlight, Underline, Strikethrough | dropdown `Annotation ⌄` |
+| Tools | Snapshot, Word Count | dropdown `Tools ⌄` |
 | Settings | Settings (Aa) | inline (không gập) |
 | — | `⋮ More` | inline |
 
@@ -47,7 +47,7 @@ Zoom, Fit, Fullscreen: ở footer như cũ (không lặp lại trên toolbar).
 | Nhóm | Công cụ | Hiển thị |
 |---|---|---|
 | Navigate | Hand, Select | inline |
-| Tools | Snapshot, Word Count | gập → `Tools ⌄` |
+| Tools | Snapshot, Word Count | dropdown `Tools ⌄` |
 | Settings | Settings | inline |
 
 Ẩn: Search, Audio, Translate, Highlight / Underline / Strikethrough, Textbox, Freehand (trước đây hiện nhưng không
@@ -84,6 +84,8 @@ Find Next / Find Previous **không** lên toolbar: đã có trong panel Search (
    (`src/reader/capabilities.ts`); công cụ khai báo `requires`. Thiếu capability → không render (không disable).
 2. **Nhóm** (`TOOL_GROUPS` trong `toolRegistry.ts`): `navigate`, `annotation`, `view`, `tools`, `settings`.
    `navigate` và `settings` không bao giờ gập (công cụ dùng thường xuyên; menu Audio neo vào nút của nó).
+   `annotation` và `tools` **luôn là dropdown** (`collapse: 'always'`, theo mẫu "nhiều công cụ hơn"); `view`
+   là `auto`.
 3. Nhóm có **> 4 công cụ** (`INLINE_MAX`) luôn là dropdown.
 4. Khi thanh tràn: gập lần lượt theo `FOLD_ORDER` = `tools` → `view` → `annotation` (ít dùng trước). Rộng ra
    lại thì bung theo thứ tự ngược. Đo bằng `ResizeObserver` (`useToolbarOverflow`). Hết nhóm để gập thì thanh
@@ -143,8 +145,7 @@ Không sửa `ToolsStrip`, `ToolGroupMenu`, quy tắc gập.
 
 ### Kiểm tay (repo không có UI test)
 
-- [ ] EPUB, cửa sổ rộng: thanh giống trước (Hand … Settings), không còn nút View.
-- [ ] Thu hẹp cửa sổ: `Snapshot / Word Count` gập thành `Tools ⌄` trước, rồi `Annotation ⌄`; kéo rộng ra bung lại.
+- [ ] EPUB: Hand, Select, Search, Audio, Translate │ `Annotation ⌄` │ `Tools ⌄` │ Settings │ ⋮; không có View.
 - [ ] Đang bật Underline khi đã gập: nút hiện "Underline" màu accent; mở menu thấy mục Underline được đánh dấu.
 - [ ] Dropdown: Esc đóng menu và *không* đồng thời tắt tool / ẩn chrome; click vào trang sách (iframe) đóng menu;
       ↑ / ↓ di chuyển; ẩn chrome (immersive) thì menu đóng.
@@ -157,5 +158,5 @@ Không sửa `ToolsStrip`, `ToolGroupMenu`, quy tắc gập.
 - Gỡ dropdown **View** (Zoom / Reset / Fullscreen) khỏi toolbar EPUB (thêm ở `644cd97`) — trùng footer.
 - Định dạng chưa có renderer không còn hiện Search, Audio, Translate, Highlight / Underline / Strikethrough,
   Textbox, Freehand (trước đó bấm không có tác dụng hoặc chỉ toast "coming soon").
-- Thứ tự gập đổi thành Tools → Annotation (trước: Annotation → Tools) — Annotation dùng nhiều hơn khi đọc.
+- Annotation và Tools luôn là dropdown (kể cả cửa sổ rộng), theo mẫu UI tham chiếu.
 - Tooltip có mô tả + phím tắt (vd. Search: `Search in book (Ctrl+F)`).

@@ -7,7 +7,7 @@
  *   2. surfaces        -> format → surface mapping; EPUB vs placeholder capability sets
  *   3. EPUB layout     -> exact groups / order at fold level 0
  *   4. placeholder     -> only tools that work without a renderer (no Search / Audio / Translate / markup)
- *   5. folding         -> fold order tools → view → annotation; navigate + settings never fold; clamps
+ *   5. folding         -> Annotation / Tools always dropdowns; navigate + settings never fold; clamps
  *   6. no duplicates   -> zoom / fit / fullscreen stay in the footer, not on the toolbar
  *   7. wiring (static) -> every tool id has a `handleTool` branch; no "coming soon" tool stubs; dropdown
  *                         reuses useDismissOnOutsideOrEscape with consumeEscape
@@ -77,8 +77,8 @@ console.log('3. EPUB layout')
 check('groups and order at fold level 0', () => {
   assert.deepEqual(shape(resolveToolbarLayout(epub, 0)), [
     'navigate:inline[hand,select,search,speech,translate]',
-    'annotation:inline[highlight,underline,strikethrough]',
-    'tools:inline[snapshot,wordCount]',
+    'annotation:menu[highlight,underline,strikethrough]',
+    'tools:menu[snapshot,wordCount]',
     'settings:inline[settings]',
   ])
 })
@@ -90,26 +90,16 @@ console.log('4. placeholder layout')
 check('only renderer-independent tools', () => {
   assert.deepEqual(shape(resolveToolbarLayout(placeholder, 0)), [
     'navigate:inline[hand,select]',
-    'tools:inline[snapshot,wordCount]',
+    'tools:menu[snapshot,wordCount]',
     'settings:inline[settings]',
   ])
 })
 
 console.log('5. folding')
-check('EPUB folds tools first, then annotation', () => {
-  assert.deepEqual(foldableGroups(epub), ['tools', 'annotation'])
-  assert.deepEqual(shape(resolveToolbarLayout(epub, 1)), [
-    'navigate:inline[hand,select,search,speech,translate]',
-    'annotation:inline[highlight,underline,strikethrough]',
-    'tools:menu[snapshot,wordCount]',
-    'settings:inline[settings]',
-  ])
-  assert.deepEqual(shape(resolveToolbarLayout(epub, 2)), [
-    'navigate:inline[hand,select,search,speech,translate]',
-    'annotation:menu[highlight,underline,strikethrough]',
-    'tools:menu[snapshot,wordCount]',
-    'settings:inline[settings]',
-  ])
+check('Annotation and Tools are always dropdowns; nothing left to fold for EPUB', () => {
+  for (const id of ['annotation', 'tools']) assert.equal(TOOL_GROUPS.find((g) => g.id === id).collapse, 'always')
+  assert.deepEqual(foldableGroups(epub), [])
+  assert.deepEqual(shape(resolveToolbarLayout(epub, 2)), shape(resolveToolbarLayout(epub, 0)))
 })
 check('levels beyond the foldable count clamp; negatives act as 0', () => {
   assert.deepEqual(shape(resolveToolbarLayout(epub, 9)), shape(resolveToolbarLayout(epub, 2)))

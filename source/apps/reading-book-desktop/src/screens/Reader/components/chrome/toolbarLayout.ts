@@ -40,7 +40,7 @@ export function resolveToolbarLayout(
     const mode: ResolvedToolGroup['mode'] =
       group.collapse === 'never'
         ? 'inline'
-        : tools.length > INLINE_MAX || folded.has(group.id)
+        : group.collapse === 'always' || tools.length > INLINE_MAX || folded.has(group.id)
           ? 'menu'
           : 'inline'
     return [{ group, tools, mode }]
