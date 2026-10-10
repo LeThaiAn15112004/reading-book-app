@@ -4,7 +4,7 @@
  *
  *   1. registry        -> unique ids, known groups, shortcut ids exist in the shortcut registry, every
  *                         tool is shown by at least one surface (no dead entries)
- *   2. surfaces        -> format → surface mapping; EPUB vs placeholder capability sets
+ *   2. surfaces        -> format → surface mapping; EPUB / PDF / placeholder capability sets
  *   3. EPUB layout     -> exact groups / order at fold level 0
  *   4. placeholder     -> only tools that work without a renderer (no Search / Audio / Translate / markup)
  *   5. folding         -> Annotation / Tools always dropdowns; navigate + settings never fold; clamps
@@ -39,7 +39,8 @@ const shape = (layout) =>
   layout.map((g) => `${g.group.id}:${g.mode}[${g.tools.map((t) => t.id).join(',')}]`)
 
 const epub = caps.getReaderCapabilities('epub')
-const placeholder = caps.getReaderCapabilities('pdf')
+const pdf = caps.getReaderCapabilities('pdf')
+const placeholder = caps.getReaderCapabilities('txt')
 
 console.log('1. registry')
 check('tool ids are unique', () => {
@@ -62,15 +63,19 @@ check('every tool is shown by at least one surface', () => {
 })
 
 console.log('2. surfaces')
-check('only epub maps to the EPUB surface', () => {
+check('epub and pdf map to their own surfaces, everything else to the placeholder', () => {
   assert.equal(caps.readerSurfaceForFormat('epub'), 'epub')
-  for (const f of ['pdf', 'txt', 'md', 'docx', 'doc', null, undefined]) {
+  assert.equal(caps.readerSurfaceForFormat('pdf'), 'pdf')
+  for (const f of ['txt', 'md', 'docx', 'doc', null, undefined]) {
     assert.equal(caps.readerSurfaceForFormat(f), 'placeholder', String(f))
   }
 })
 check('placeholder is a strict subset of EPUB', () => {
   for (const c of placeholder) assert.ok(epub.has(c), c)
   assert.ok(placeholder.size < epub.size)
+})
+check('PDF = placeholder + search (no audio / translate / markup yet)', () => {
+  assert.deepEqual([...pdf].sort(), [...placeholder, 'search'].sort())
 })
 
 console.log('3. EPUB layout')
@@ -90,6 +95,14 @@ console.log('4. placeholder layout')
 check('only renderer-independent tools', () => {
   assert.deepEqual(shape(resolveToolbarLayout(placeholder, 0)), [
     'navigate:inline[hand,select]',
+    'tools:menu[snapshot,wordCount]',
+    'settings:inline[settings]',
+  ])
+})
+
+check('PDF layout adds Search to the navigate group', () => {
+  assert.deepEqual(shape(resolveToolbarLayout(pdf, 0)), [
+    'navigate:inline[hand,select,search]',
     'tools:menu[snapshot,wordCount]',
     'settings:inline[settings]',
   ])

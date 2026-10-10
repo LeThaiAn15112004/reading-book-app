@@ -23,7 +23,9 @@
     "spike:settings:notifications": "node --experimental-strip-types --import ./spikes/reset-app-settings/register-alias.mjs spikes/notifications/run-notifications.mjs",
     "spike:settings:background": "node --experimental-strip-types --import ./spikes/background/register-alias.mjs spikes/background/run-background.mjs",
     "spike:settings:reminders": "node --experimental-strip-types --import ./spikes/background/register-alias.mjs spikes/reminders/run-reminders.mjs",
-    "spike:reader:toolbar": "node --experimental-strip-types --import ./spikes/reset-app-settings/register-alias.mjs spikes/reader-toolbar/run-toolbar.mjs"
+    "spike:reader:toolbar": "node --experimental-strip-types --import ./spikes/reset-app-settings/register-alias.mjs spikes/reader-toolbar/run-toolbar.mjs",
+    "spike:pdf:fixtures": "node spikes/pdf-search/build-fixtures.mjs",
+    "spike:pdf:search": "node --experimental-strip-types --import ./spikes/pdf-search/register-alias.mjs spikes/pdf-search/run-pdf-search.mjs"
   },
   "dependencies": {
     "@huggingface/transformers": "^4.3.0",

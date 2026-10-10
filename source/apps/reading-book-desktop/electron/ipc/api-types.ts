@@ -502,7 +502,7 @@ export interface BookSearchMatchDto {
   /** 1-based number of the first matched word within the whole book. */
   wordIndex: number
   chunkIndex: number
-  /** EPUB spine index (0 for single-flow formats) — from the chunk's `location_start`. */
+  /** EPUB spine index / 0-based PDF page (0 for single-flow formats) — from `location_start`. */
   chapterIndex: number
   /** 0-based rank of this match among the matches of its chapter. */
   chapterOccurrence: number
@@ -527,8 +527,10 @@ export type BookSearchResultDto =
     }
   /** The book isn't chunked yet; a background worker was started — retry after `bookIndex:status` done. */
   | { state: 'indexing' }
-  /** No text extractor for this format yet (PDF, DOCX…). */
+  /** No text extractor for this format yet (DOCX, DOC…). */
   | { state: 'unsupported' }
+  /** Extraction ran but the book has no text at all (scanned / image-only PDF or EPUB). */
+  | { state: 'noText' }
   | { state: 'error'; message: string }
 
 /** Foxit-style Word Count statistics — see `word-count-service.ts` for how each is derived from
@@ -547,8 +549,10 @@ export type WordCountStatsDto =
     }
   /** The book isn't chunked yet; a background worker was started — retry after `bookIndex:status` done. */
   | { state: 'indexing' }
-  /** No text extractor for this format yet (PDF, DOCX…). */
+  /** No text extractor for this format yet (DOCX, DOC…). */
   | { state: 'unsupported' }
+  /** Extraction ran but the book has no text at all (scanned / image-only PDF or EPUB). */
+  | { state: 'noText' }
   | { state: 'error'; message: string }
 
 export interface DesktopApi {

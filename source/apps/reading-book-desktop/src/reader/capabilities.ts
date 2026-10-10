@@ -23,10 +23,10 @@ export type ReaderCapability =
   | 'readingSettings'
 
 /**
- * Which surface renders a format. Only EPUB has a real renderer today; every other format shows the
- * placeholder `ReadingCanvas`. A future `renderers/pdf` adds `'pdf'` here with its own set.
+ * Which surface renders a format: EPUB (`renderers/epub`), PDF (`renderers/pdf`); every other format
+ * shows the placeholder `ReadingCanvas`.
  */
-export type ReaderSurface = 'epub' | 'placeholder'
+export type ReaderSurface = 'epub' | 'pdf' | 'placeholder'
 
 const SURFACE_CAPABILITIES: Record<ReaderSurface, readonly ReaderCapability[]> = {
   epub: [
@@ -39,11 +39,16 @@ const SURFACE_CAPABILITIES: Record<ReaderSurface, readonly ReaderCapability[]> =
     'wordCount',
     'readingSettings',
   ],
+  // PDF: the placeholder set plus search (Main extracts the text layer, hits paint on the PDF.js
+  // text layer — see docs/implementation_plan/pdf_search.md).
+  pdf: ['interaction', 'search', 'snapshot', 'wordCount', 'readingSettings'],
   placeholder: ['interaction', 'snapshot', 'wordCount', 'readingSettings'],
 }
 
 export function readerSurfaceForFormat(format: string | null | undefined): ReaderSurface {
-  return format === 'epub' ? 'epub' : 'placeholder'
+  if (format === 'epub') return 'epub'
+  if (format === 'pdf') return 'pdf'
+  return 'placeholder'
 }
 
 export function getReaderCapabilities(format: string | null | undefined): ReadonlySet<ReaderCapability> {

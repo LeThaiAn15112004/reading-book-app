@@ -163,6 +163,8 @@ export function ReaderScreen() {
     bookId,
     isEpubSurface: book.isEpubSurface,
     epubApiRef,
+    isPdfSurface,
+    pdfApiRef,
     searchOpen: chrome.searchOpen,
     readerSearchQuery,
     readerSearchRequestId,

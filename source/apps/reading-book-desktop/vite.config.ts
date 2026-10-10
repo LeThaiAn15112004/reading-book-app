@@ -40,7 +40,14 @@ export default defineConfig({
             rollupOptions: {
               // Native / huge packages load from node_modules at runtime instead of being bundled
               // (ONNX Runtime ships .node binaries that Rollup can't inline).
-              external: ['better-sqlite3', '@huggingface/transformers', 'onnxruntime-node', 'sharp'],
+              // pdfjs-dist: the chunk worker loads its Node (`legacy`) build from node_modules.
+              external: [
+                'better-sqlite3',
+                '@huggingface/transformers',
+                'onnxruntime-node',
+                'sharp',
+                /^pdfjs-dist(\/|$)/,
+              ],
             },
           },
         },

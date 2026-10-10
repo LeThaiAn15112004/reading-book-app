@@ -1,9 +1,9 @@
 import { create } from 'zustand'
-import type { MutableRefObject } from 'react'
 import {
   DEFAULT_TEXT_SEARCH_OPTIONS,
   createTextMatcher,
   parseTextSearchQuery,
+  type TextMatcher,
   type TextSearchOptions,
 } from '@reading-book/book-reader-sdk'
 import {
@@ -12,7 +12,6 @@ import {
   type BookSearchOrder,
   type BookSearchResult,
 } from '../../../../bridge'
-import type { EpubRendererApi } from '../../../../reader/renderers/epub'
 import { clampPanelSize, type PanelPosition, type PanelSize } from '../floatingPanel/panelGeometry'
 
 /** Matches per IPC page; the total count is always exact regardless. */
@@ -24,9 +23,30 @@ const BUSY_AFTER_MS = 150
  * - idle: nothing searched (or the query has no searchable word)
  * - searching: request in flight (`busy` flips on after BUSY_AFTER_MS)
  * - indexing: the book's text is still being chunked; re-run automatically when that finishes
- * - ready / unsupported / error: final
+ * - ready / unsupported / noText / error: final (noText = the book has no extractable text, e.g. a
+ *   scanned PDF)
  */
-export type BookSearchStatus = 'idle' | 'searching' | 'indexing' | 'ready' | 'unsupported' | 'error'
+export type BookSearchStatus =
+  | 'idle'
+  | 'searching'
+  | 'indexing'
+  | 'ready'
+  | 'unsupported'
+  | 'noText'
+  | 'error'
+
+/**
+ * What the search store needs from the open book's renderer — one small adapter per format
+ * (built in `useReaderSearch`), so the store never talks to a renderer API directly.
+ */
+export type BookSearchSurface = {
+  /** Paint every hit of `matcher` in the book, or clear them (null). */
+  paint: (matcher: TextMatcher | null) => void
+  /** Show one match (Main's chapter = EPUB spine section / PDF page). Rejects when it can't. */
+  goToMatch: (match: BookSearchMatch) => Promise<void>
+  /** Result-list labels by `chapterIndex` (section titles / `Page N`). */
+  chapterLabels: () => string[]
+}
 
 /** Dragged panel position in px, relative to its positioning container (its `offsetParent`). */
 export type SearchPanelPosition = PanelPosition
@@ -88,8 +108,8 @@ function writeStoredPanelSize(size: SearchPanelSize | null): void {
 /** Values `useReaderSearch` syncs in from ReaderScreen — read via `get()`, never rendered. */
 type BookSearchContext = {
   bookId: string | undefined
-  isEpubSurface: boolean
-  epubApiRef: MutableRefObject<EpubRendererApi | null> | null
+  /** Renderer adapter; null while no searchable surface is mounted (paint / jump are skipped). */
+  surface: BookSearchSurface | null
   /** Live text of the search box; `submit()` searches it. */
   inputQuery: string
   /** Results can arrive while the panel is closed (indexing retry) — don't jump/paint then. */
@@ -98,8 +118,7 @@ type BookSearchContext = {
 
 const emptyContext: BookSearchContext = {
   bookId: undefined,
-  isEpubSurface: false,
-  epubApiRef: null,
+  surface: null,
   inputQuery: '',
   panelOpen: false,
 }
@@ -200,18 +219,17 @@ const emptyResults: Pick<
 /**
  * In-book full-text search for the open book (FTS5 in Main, see electron/search). Owns the UI
  * state of the search panel and the side effects around it: the IPC round-trips, the delayed
- * loading indicator, painting hits and jumping through the `EpubRendererApi` handle threaded in
- * via `setContext`. One Reader route is mounted at a time, so one shared store is safe
+ * loading indicator, painting hits and jumping through the format's `BookSearchSurface` threaded
+ * in via `setContext`. One Reader route is mounted at a time, so one shared store is safe
  * (`resetForNewBook` on every book switch), same as `useHighlightsStore`.
  */
 export const useBookSearchStore = create<BookSearchState>()((set, get) => {
   /** Paint every hit of the current query in the book, or clear them. */
   const paintHits = (): void => {
-    const { epubApiRef, isEpubSurface, panelOpen, status, query, options } = get()
-    const api = isEpubSurface ? epubApiRef?.current : null
-    if (!api) return
+    const { surface, panelOpen, status, query, options } = get()
+    if (!surface) return
     const parsed = panelOpen && status === 'ready' ? parseTextSearchQuery(query, options) : null
-    api.setSearchHighlights(parsed ? createTextMatcher(parsed) : null)
+    surface.paint(parsed ? createTextMatcher(parsed) : null)
   }
 
   const drainJumps = async (): Promise<void> => {
@@ -221,14 +239,10 @@ export const useBookSearchStore = create<BookSearchState>()((set, get) => {
       while (pendingJump) {
         const match = pendingJump
         pendingJump = null
-        const api = get().epubApiRef?.current
-        if (!api) break
+        const surface = get().surface
+        if (!surface) break
         try {
-          await api.goToSearchMatch({
-            spineIndex: match.chapterIndex,
-            occurrence: match.chapterOccurrence,
-            count: match.chapterMatchCount,
-          })
+          await surface.goToMatch(match)
         } catch {
           // A failed jump leaves the reader where it was; the next click just tries again.
         }
@@ -297,6 +311,9 @@ export const useBookSearchStore = create<BookSearchState>()((set, get) => {
         case 'unsupported':
           set({ status: 'unsupported', busy: false })
           break
+        case 'noText':
+          set({ status: 'noText', busy: false })
+          break
         case 'error':
           set({ status: 'error', busy: false, errorMessage: result.message })
           break
@@ -308,7 +325,7 @@ export const useBookSearchStore = create<BookSearchState>()((set, get) => {
             totalWords: result.totalWords,
             matches: result.matches,
             hasMore: result.hasMore,
-            chapterLabels: get().epubApiRef?.current?.getSpineSectionLabels() ?? [],
+            chapterLabels: get().surface?.chapterLabels() ?? [],
           })
           break
       }
@@ -350,7 +367,7 @@ export const useBookSearchStore = create<BookSearchState>()((set, get) => {
       const match = get().matches[index]
       if (!match) return
       set({ activeIndex: index })
-      if (!get().isEpubSurface) return
+      if (!get().surface) return
       pendingJump = match
       void drainJumps()
     },

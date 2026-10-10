@@ -2,12 +2,14 @@ import fsp from 'node:fs/promises'
 import type { DocumentFormatDto } from '../ipc/api-types'
 import { readEpubSpineDocuments } from '../adapters/epub.adapter'
 import { htmlToParagraphs, type TextParagraph } from '@reading-book/book-reader-sdk'
+import { pdfParagraphs } from './pdf-text'
 
 /**
- * Formats whose text we can pull out today. PDF / DOCX / DOC need a parser that is not a
- * dependency yet (G6), so they are reported as unsupported instead of failing every open.
+ * Formats whose text we can pull out today. DOCX / DOC need a parser that is not a dependency yet
+ * (G6), so they are reported as unsupported instead of failing every open. PDF uses its text layer
+ * (pdf.js); scanned PDFs have none and end up with zero chunks ("no text"), not "unsupported".
  */
-const CHUNKABLE_FORMATS: ReadonlySet<DocumentFormatDto> = new Set(['epub', 'txt', 'md'])
+const CHUNKABLE_FORMATS: ReadonlySet<DocumentFormatDto> = new Set(['epub', 'txt', 'md', 'pdf'])
 
 const BYTE_ORDER_MARK = String.fromCharCode(0xfeff)
 
@@ -55,6 +57,9 @@ export async function* extractBookParagraphs(
     case 'txt':
     case 'md':
       yield* plainTextParagraphs(await fsp.readFile(filePath, 'utf8'))
+      return
+    case 'pdf':
+      yield* pdfParagraphs(filePath)
       return
     default:
       throw new Error(`Text extraction is not supported for format: ${format}`)

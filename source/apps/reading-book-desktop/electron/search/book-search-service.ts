@@ -95,6 +95,8 @@ export async function searchBook(request: BookSearchRequestDto): Promise<BookSea
     }
     // `ready`: chunking finished in the meantime, or the book has no extractable text.
     stats = readBookChunkStats(db, bookId)
+    // Say so instead of answering every query with an empty, "successful" result list.
+    if (stats.chunkCount === 0) return { state: 'noText' }
   }
 
   let all: BookMatch[] = []

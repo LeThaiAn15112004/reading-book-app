@@ -236,6 +236,8 @@ function StatusLine() {
     )
   } else if (status === 'unsupported') {
     content = 'Search isn’t available for this format yet.'
+  } else if (status === 'noText') {
+    content = 'Text search isn’t available — this document has no selectable text (it may be a scanned PDF).'
   } else if (status === 'error') {
     content = errorMessage ?? 'Search failed.'
   } else if (status === 'ready' && totalMatches === 0) {

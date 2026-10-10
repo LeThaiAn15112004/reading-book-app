@@ -25,7 +25,14 @@ import {
   type PDFDocumentProxy,
   type PDFPageProxy,
 } from 'pdfjs-dist'
-import { PageRectLocation } from '@reading-book/book-reader-sdk'
+import { PageRectLocation, type TextMatcher } from '@reading-book/book-reader-sdk'
+import { pickSectionMatch, rangeForMatch } from '../epub/search/epubSearchDom'
+import {
+  buildPdfTextLayerIndex,
+  clearPdfSearchHighlights,
+  paintPdfSearchHighlights,
+  pdfPageSearchRanges,
+} from './pdfSearchDom'
 // `?url` makes Vite emit the worker as a local asset in dist/ — never loaded from a CDN.
 import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
 import 'pdfjs-dist/web/pdf_viewer.css'
@@ -42,6 +49,8 @@ const RENDER_AHEAD = 2
 const KEEP_AROUND = 6
 /** Cap one canvas' backing store (high zoom × HiDPI) — the page just gets a little softer. */
 const MAX_CANVAS_PIXELS = 16_777_216
+/** How long a search jump waits for the target page's text layer before giving up on the hit. */
+const TEXT_LAYER_WAIT_MS = 4000
 /** Assumed page size (A4) until the first page is measured. */
 const FALLBACK_SIZE: PageSize = { w: 595, h: 842 }
 
@@ -68,7 +77,16 @@ export interface PdfRendererApi {
   prevPage: () => void
   getNavState: () => PdfNavState
   getCurrentLocation: () => PageRectLocation | undefined
+  /** Paint every hit of `matcher` on the rendered pages (kept across re-renders / zoom), or clear. */
+  setSearchHighlights: (matcher: TextMatcher | null) => void
+  /**
+   * Scroll to Main's `occurrence`-th of `count` matches on 0-based page `pageIndex` and mark it as
+   * the current hit (falls back to the page when its text layer can't be matched).
+   */
+  goToSearchMatch: (target: PdfSearchTarget) => Promise<void>
 }
+
+export type PdfSearchTarget = { pageIndex: number; occurrence: number; count: number }
 
 export interface PdfRendererProps {
   data: ArrayBuffer
@@ -157,6 +175,12 @@ export function PdfRenderer({
   const restoredRef = useRef(false)
   /** Kept across a page-size refresh so the reader doesn't jump. */
   const anchorRef = useRef<{ index: number; fraction: number } | null>(null)
+  /** Search hits to paint (null = none) and the hit last jumped to. */
+  const searchMatcherRef = useRef<TextMatcher | null>(null)
+  const searchHitRef = useRef<PdfSearchTarget | null>(null)
+  const searchFrameRef = useRef<number | null>(null)
+  /** Jumps waiting for a page's text layer, by page index. */
+  const textWaitersRef = useRef(new Map<number, Array<() => void>>())
 
   const zoomRef = useRef(zoom)
   zoomRef.current = zoom
@@ -181,6 +205,68 @@ export function PdfRenderer({
     onNavStateRef.current?.({ pageCurrent: index + 1, pageTotal: pageCountRef.current })
   }, [])
 
+  /**
+   * Repaint search hits over every page that currently has a text layer. Returns the current hit's
+   * Range (if its page is rendered) so a jump can scroll it into view.
+   */
+  const repaintSearch = useCallback((): Range | null => {
+    searchFrameRef.current = null
+    const matcher = searchMatcherRef.current
+    if (!matcher) {
+      clearPdfSearchHighlights(document)
+      return null
+    }
+    const hit = searchHitRef.current
+    const ranges: Range[] = []
+    let current: Range | null = null
+    const pages = [...renderedRef.current.entries()].sort((a, b) => a[0] - b[0])
+    for (const [index, entry] of pages) {
+      if (!entry.text) continue
+      ranges.push(...pdfPageSearchRanges(entry.text, matcher))
+      if (hit && hit.pageIndex === index) {
+        const textIndex = buildPdfTextLayerIndex(entry.text)
+        const match = pickSectionMatch(matcher.find(textIndex.text), hit.occurrence, hit.count)
+        current = match ? rangeForMatch(document, textIndex, match) : null
+      }
+    }
+    paintPdfSearchHighlights(document, ranges, current)
+    return current
+  }, [])
+
+  const scheduleSearchRepaint = useCallback(() => {
+    if (searchFrameRef.current !== null || !searchMatcherRef.current) return
+    searchFrameRef.current = requestAnimationFrame(() => {
+      repaintSearch()
+    })
+  }, [repaintSearch])
+
+  const notifyTextLayer = useCallback(
+    (index: number) => {
+      const waiters = textWaitersRef.current.get(index)
+      if (waiters) {
+        textWaitersRef.current.delete(index)
+        for (const resolve of waiters) resolve()
+      }
+      scheduleSearchRepaint()
+    },
+    [scheduleSearchRepaint],
+  )
+
+  /** Resolves once page `index` has an up-to-date text layer (or after a timeout). */
+  const waitForTextLayer = useCallback((index: number): Promise<void> => {
+    const entry = renderedRef.current.get(index)
+    if (entry?.text && entry.scale === PDF_TO_CSS * zoomRef.current) return Promise.resolve()
+    return new Promise((resolve) => {
+      const timer = window.setTimeout(resolve, TEXT_LAYER_WAIT_MS)
+      const list = textWaitersRef.current.get(index) ?? []
+      list.push(() => {
+        window.clearTimeout(timer)
+        resolve()
+      })
+      textWaitersRef.current.set(index, list)
+    })
+  }, [])
+
   const release = useCallback((index: number) => {
     const entry = renderedRef.current.get(index)
     if (!entry) return
@@ -195,7 +281,8 @@ export function PdfRenderer({
     }
     entry.text?.remove()
     entry.page?.cleanup()
-  }, [])
+    scheduleSearchRepaint()
+  }, [scheduleSearchRepaint])
 
   const ensureRendered = useCallback((index: number, scale: number) => {
     const pdf = docRef.current
@@ -264,11 +351,12 @@ export function PdfRenderer({
       entry.text?.remove()
       slot.append(text)
       entry.text = text
+      notifyTextLayer(index)
     })().catch((err: unknown) => {
       if (isCancelled(err)) return
       console.warn('[PdfRenderer] page render failed', index + 1, err)
     })
-  }, [])
+  }, [notifyTextLayer])
 
   /** Visible range + current page from the scroll container's geometry, then render / release. */
   const updateView = useCallback(() => {
@@ -353,11 +441,32 @@ export function PdfRenderer({
       getNavState: () => ({ pageCurrent: currentRef.current + 1, pageTotal: pageCountRef.current }),
       getCurrentLocation: () =>
         pageCountRef.current > 0 ? new PageRectLocation(currentRef.current + 1) : undefined,
+      setSearchHighlights: (matcher) => {
+        searchMatcherRef.current = matcher
+        if (!matcher) searchHitRef.current = null
+        repaintSearch()
+      },
+      goToSearchMatch: async (target) => {
+        searchHitRef.current = target
+        scrollToIndex(target.pageIndex)
+        await waitForTextLayer(target.pageIndex)
+        // A newer jump (rapid Next) or a cleared search took over meanwhile.
+        if (searchHitRef.current !== target) return
+        const current = repaintSearch()
+        const root = getScrollRootRef.current()
+        if (!current || !root) return
+        const rect = current.getBoundingClientRect()
+        const rootRect = root.getBoundingClientRect()
+        // Bring the hit to the upper third unless it is already comfortably on screen.
+        if (rect.top < rootRect.top || rect.bottom > rootRect.top + root.clientHeight) {
+          root.scrollTop += rect.top - rootRect.top - root.clientHeight / 3
+        }
+      },
     }
     return () => {
       apiRef.current = null
     }
-  }, [apiRef, scrollToIndex])
+  }, [apiRef, scrollToIndex, repaintSearch, waitForTextLayer])
 
   // Open the document. PDF.js transfers the buffer to its worker, so hand it a copy and keep the
   // caller's ArrayBuffer intact.
@@ -369,6 +478,7 @@ export function PdfRenderer({
     const task = getDocument({ data: new Uint8Array(data.slice(0)) })
     let cancelled = false
     const rendered = renderedRef.current
+    const textWaiters = textWaitersRef.current
 
     void (async () => {
       try {
@@ -435,6 +545,10 @@ export function PdfRenderer({
       }
       if (frameRef.current !== null) cancelAnimationFrame(frameRef.current)
       frameRef.current = null
+      if (searchFrameRef.current !== null) cancelAnimationFrame(searchFrameRef.current)
+      searchFrameRef.current = null
+      textWaiters.clear()
+      clearPdfSearchHighlights(document)
       // Destroys the document and terminates its worker-side state.
       void task.destroy()
     }
