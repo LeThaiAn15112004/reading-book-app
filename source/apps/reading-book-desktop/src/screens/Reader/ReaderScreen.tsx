@@ -18,6 +18,7 @@ import {
   EpubRenderer,
   type EpubRendererApi,
 } from '../../reader/renderers/epub'
+import { PdfRenderer } from '../../reader/renderers/pdf'
 import {
   AaSettingsPanel,
   BookInfoDialog,
@@ -847,6 +848,8 @@ export function ReaderScreen() {
               onToc={nav.setEpubToc}
               onSections={nav.setEpubSections}
             />
+          ) : book.bookFormat === 'pdf' && book.bookBytes ? (
+            <PdfRenderer key={bookId} data={book.bookBytes} />
           ) : (
             <ReadingCanvas
               chapter={chapter}
