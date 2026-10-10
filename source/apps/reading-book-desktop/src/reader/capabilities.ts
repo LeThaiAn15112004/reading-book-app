@@ -8,12 +8,18 @@ export type ReaderCapability =
   | 'markupAnnotations'
   /** Free-form annotations that are not tied to a text selection (textbox, freehand drawing). */
   | 'freeformAnnotations'
+  /** Page-level view zoom (Zoom In / Out / Reset). */
+  | 'viewZoom'
 
-const ALL_CAPABILITIES: readonly ReaderCapability[] = ['markupAnnotations', 'freeformAnnotations']
+const ALL_CAPABILITIES: readonly ReaderCapability[] = [
+  'markupAnnotations',
+  'freeformAnnotations',
+  'viewZoom',
+]
 
 /** Per-format overrides; a format absent here keeps the full set (the pre-registry behaviour). */
 const CAPABILITIES_BY_FORMAT: Record<string, readonly ReaderCapability[]> = {
-  epub: ['markupAnnotations'],
+  epub: ['markupAnnotations', 'viewZoom'],
 }
 
 export function getReaderCapabilities(format: string | null | undefined): ReadonlySet<ReaderCapability> {

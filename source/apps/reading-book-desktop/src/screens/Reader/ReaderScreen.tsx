@@ -67,6 +67,7 @@ import {
   useReadAloud,
   useReaderTranslation,
   useRightPanelStore,
+  ZOOM_DEFAULT,
   type HighlightShortcuts,
   type ReaderChromeEscapeUi,
 } from './logic'
@@ -405,6 +406,13 @@ export function ReaderScreen() {
             chrome.setSettingsOpen((v) => !v)
           }}
           capabilities={readerCapabilities}
+          fullscreen={fullscreen}
+          onViewTool={(tool) => {
+            if (tool === 'zoomIn') zoom.handleZoomStep(1)
+            else if (tool === 'zoomOut') zoom.handleZoomStep(-1)
+            else if (tool === 'resetZoom') zoom.handleZoomChange(ZOOM_DEFAULT)
+            else toggleFullscreen()
+          }}
           onSelectTool={selectTool}
           onCompanionTool={(tool) => {
             if (tool === 'search') {

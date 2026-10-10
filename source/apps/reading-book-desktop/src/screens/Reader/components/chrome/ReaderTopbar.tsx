@@ -5,6 +5,7 @@ import {
   type AnnotationTool,
   type CompanionTool,
   type ModeTool,
+  type ViewTool,
 } from './ToolsMenu'
 
 type ReaderTopbarProps = {
@@ -17,6 +18,8 @@ type ReaderTopbarProps = {
   onSelectTool: (tool: ModeTool) => void
   onCompanionTool: (tool: CompanionTool) => void
   onAnnotationTool: (tool: AnnotationTool) => void
+  onViewTool: (tool: ViewTool) => void
+  fullscreen: boolean
   onShare: () => void
   onFavorites: () => void
   onBookInfo: () => void
@@ -60,6 +63,8 @@ export function ReaderTopbar({
   snapshotActive,
   onSnapshot,
   onWordCount,
+  onViewTool,
+  fullscreen,
   capabilities,
 }: ReaderTopbarProps) {
   return (
@@ -88,6 +93,8 @@ export function ReaderTopbar({
         onWordCount={onWordCount}
         settingsOpen={settingsOpen}
         onToggleSettings={onToggleSettings}
+        onViewTool={onViewTool}
+        fullscreen={fullscreen}
         capabilities={capabilities}
       />
 
