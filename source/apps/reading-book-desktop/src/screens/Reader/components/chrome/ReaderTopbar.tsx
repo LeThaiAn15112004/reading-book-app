@@ -1,3 +1,4 @@
+import type { ReaderCapability } from '../../../../reader/capabilities'
 import { MoreMenu } from './MoreMenu'
 import {
   ToolsStrip,
@@ -30,8 +31,8 @@ type ReaderTopbarProps = {
   snapshotActive: boolean
   onSnapshot: () => void
   onWordCount: () => void
-  /** Annotation tools to omit from the strip entirely — e.g. EPUB has no Freehand/Textbox. */
-  hiddenAnnotationTools?: AnnotationTool[]
+  /** What the open book's reader supports; unsupported tools are not rendered. */
+  capabilities: ReadonlySet<ReaderCapability>
 }
 
 const chromeBtn =
@@ -59,7 +60,7 @@ export function ReaderTopbar({
   snapshotActive,
   onSnapshot,
   onWordCount,
-  hiddenAnnotationTools,
+  capabilities,
 }: ReaderTopbarProps) {
   return (
     <header
@@ -87,7 +88,7 @@ export function ReaderTopbar({
         onWordCount={onWordCount}
         settingsOpen={settingsOpen}
         onToggleSettings={onToggleSettings}
-        hiddenAnnotationTools={hiddenAnnotationTools}
+        capabilities={capabilities}
       />
 
       <div className="relative flex shrink-0 items-center gap-1.5 sm:gap-2">

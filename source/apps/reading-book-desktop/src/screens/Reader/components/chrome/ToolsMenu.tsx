@@ -1,11 +1,13 @@
-/** Toolbar mode buttons. */
-export type ModeTool = 'hand' | 'select'
+import type { ReaderCapability } from '../../../../reader/capabilities'
+import {
+  TOOL_REGISTRY,
+  toolsForGroup,
+  type AnnotationTool,
+  type CompanionTool,
+  type ModeTool,
+} from './toolRegistry'
 
-/** Companion actions — UI entry only until later phases. */
-export type CompanionTool = 'search' | 'speech' | 'translate'
-
-/** Annotation/markup tools — UI entry only until the rebuild lands. */
-export type AnnotationTool = 'highlight' | 'underline' | 'strikethrough' | 'textarea' | 'freehand'
+export type { AnnotationTool, CompanionTool, ModeTool }
 
 type ToolsStripProps = {
   /** Widened beyond `ModeTool` so the Highlight/Underline/Strikethrough buttons can show their
@@ -32,38 +34,14 @@ type ToolsStripProps = {
   /** Reading settings (Aa) panel open — the panel itself floats independently (see `AaSettingsPanel`). */
   settingsOpen: boolean
   onToggleSettings: () => void
-  /** Annotation tools to omit from the strip entirely — e.g. EPUB has no Freehand/Textbox. */
-  hiddenAnnotationTools?: AnnotationTool[]
+  /** What the open book's reader supports — tools requiring more than this are not rendered. */
+  capabilities: ReadonlySet<ReaderCapability>
 }
 
-const NAV_TOOLS: ModeTool[] = ['hand', 'select']
-const COMPANION_TOOLS: CompanionTool[] = ['search', 'speech', 'translate']
-const ANNOTATION_TOOLS: AnnotationTool[] = [
-  'highlight',
-  'underline',
-  'strikethrough',
-  'textarea',
-  'freehand',
-]
-
-const MODE_LABELS: Record<ModeTool, string> = {
-  hand: 'Hand',
-  select: 'Select',
-}
-
-const COMPANION_LABELS: Record<CompanionTool, string> = {
-  search: 'Search',
-  speech: 'Audio',
-  translate: 'Translate',
-}
-
-const ANNOTATION_LABELS: Record<AnnotationTool, string> = {
-  highlight: 'Highlight',
-  underline: 'Underline',
-  strikethrough: 'Strikethrough',
-  textarea: 'Textbox',
-  freehand: 'Freehand',
-}
+const TOOL_LABELS = Object.fromEntries(TOOL_REGISTRY.map((t) => [t.id, t.label])) as Record<
+  ModeTool | CompanionTool | AnnotationTool,
+  string
+>
 
 const stripBtn =
   'inline-flex h-[52px] w-[52px] shrink-0 cursor-pointer flex-col items-center justify-center gap-0.5 rounded-lg border border-transparent px-0.5 text-lib-muted transition-colors hover:border-lib-accent-ring hover:bg-lib-accent-soft hover:text-lib-text-strong sm:h-[56px] sm:w-[58px]'
@@ -260,14 +238,15 @@ export function ToolsStrip({
   onWordCount,
   settingsOpen,
   onToggleSettings,
-  hiddenAnnotationTools,
+  capabilities,
 }: ToolsStripProps) {
-  const annotationTools = hiddenAnnotationTools?.length
-    ? ANNOTATION_TOOLS.filter((tool) => !hiddenAnnotationTools.includes(tool))
-    : ANNOTATION_TOOLS
+  const navTools = toolsForGroup('navigate', capabilities).map((t) => t.id)
+  const annotationTools = toolsForGroup('annotation', capabilities).map(
+    (t) => t.id as AnnotationTool,
+  )
   function renderModeButton(tool: ModeTool) {
     const active = activeTool === tool && !(tool === 'select' && translateActive)
-    const label = MODE_LABELS[tool]
+    const label = TOOL_LABELS[tool]
 
     return (
       <button
@@ -293,32 +272,35 @@ export function ToolsStrip({
       onClick={(e) => e.stopPropagation()}
     >
       <ToolGroup aria-label="Navigation and lookup">
-        {NAV_TOOLS.map((tool) => renderModeButton(tool))}
-        {COMPANION_TOOLS.map((tool) => (
-          <button
-            key={tool}
-            ref={tool === 'speech' ? audioButtonRef : undefined}
-            className={
-              tool === 'search'
-                ? modeButtonClass(searchOpen)
-                : tool === 'speech'
-                  ? modeButtonClass(audioActive)
-                  : modeButtonClass(translateActive)
-            }
-            type="button"
-            title={COMPANION_LABELS[tool]}
-            aria-label={COMPANION_LABELS[tool]}
-            aria-pressed={
-              tool === 'search' ? searchOpen : tool === 'translate' ? translateActive : undefined
-            }
-            aria-haspopup={tool === 'speech' ? 'menu' : undefined}
-            aria-expanded={tool === 'speech' ? audioMenuOpen : undefined}
-            onClick={() => onCompanionTool(tool)}
-          >
-            <ToolIcon tool={tool} />
-            <span className={stripLabel}>{COMPANION_LABELS[tool]}</span>
-          </button>
-        ))}
+        {navTools.map((tool) =>
+          tool === 'hand' || tool === 'select' ? (
+            renderModeButton(tool)
+          ) : (
+            <button
+              key={tool}
+              ref={tool === 'speech' ? audioButtonRef : undefined}
+              className={
+                tool === 'search'
+                  ? modeButtonClass(searchOpen)
+                  : tool === 'speech'
+                    ? modeButtonClass(audioActive)
+                    : modeButtonClass(translateActive)
+              }
+              type="button"
+              title={TOOL_LABELS[tool]}
+              aria-label={TOOL_LABELS[tool]}
+              aria-pressed={
+                tool === 'search' ? searchOpen : tool === 'translate' ? translateActive : undefined
+              }
+              aria-haspopup={tool === 'speech' ? 'menu' : undefined}
+              aria-expanded={tool === 'speech' ? audioMenuOpen : undefined}
+              onClick={() => onCompanionTool(tool as CompanionTool)}
+            >
+              <ToolIcon tool={tool} />
+              <span className={stripLabel}>{TOOL_LABELS[tool]}</span>
+            </button>
+          ),
+        )}
       </ToolGroup>
 
       <ToolSeparator />
@@ -331,13 +313,13 @@ export function ToolsStrip({
               key={tool}
               className={`relative ${modeButtonClass(active)}`}
               type="button"
-              title={ANNOTATION_LABELS[tool]}
-              aria-label={ANNOTATION_LABELS[tool]}
+              title={TOOL_LABELS[tool]}
+              aria-label={TOOL_LABELS[tool]}
               aria-pressed={active}
               onClick={() => onAnnotationTool(tool)}
             >
               <ToolIcon tool={tool} />
-              <span className={stripLabel}>{ANNOTATION_LABELS[tool]}</span>
+              <span className={stripLabel}>{TOOL_LABELS[tool]}</span>
             </button>
           )
         })}

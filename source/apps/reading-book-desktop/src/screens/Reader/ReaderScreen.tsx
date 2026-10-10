@@ -13,6 +13,7 @@ import {
   useReaderChromeMenu,
 } from '../../chrome'
 import { ReaderShell, readerChromeTopInset, readerChromeBottomInset } from '../../reader'
+import { getReaderCapabilities } from '../../reader/capabilities'
 import {
   EpubRenderer,
   type EpubRendererApi,
@@ -147,6 +148,11 @@ export function ReaderScreen() {
     setDocumentSubtitle,
     globalPrefsRef,
   })
+
+  const readerCapabilities = useMemo(
+    () => getReaderCapabilities(book.bookFormat),
+    [book.bookFormat],
+  )
 
   // "Locate file…" when the book's file was moved or deleted (verified by SHA-256 in Main).
   const relink = useBookRelink({ bookId, onRelinked: book.retryOpen })
@@ -398,9 +404,7 @@ export function ReaderScreen() {
             chrome.setMoreOpen(false)
             chrome.setSettingsOpen((v) => !v)
           }}
-          hiddenAnnotationTools={
-            book.bookFormat === 'epub' ? ['textarea', 'freehand'] : undefined
-          }
+          capabilities={readerCapabilities}
           onSelectTool={selectTool}
           onCompanionTool={(tool) => {
             if (tool === 'search') {
