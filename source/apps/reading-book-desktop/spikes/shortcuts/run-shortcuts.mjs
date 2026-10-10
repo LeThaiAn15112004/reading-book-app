@@ -9,6 +9,10 @@
  *   4. store            -> a conflict never overwrites / swaps / persists; valid keys persist
  *   5. reset            -> per shortcut and all; Reset App Settings group is registered
  *   6. loading          -> invalid / conflicting stored values are dropped
+ *   7. reader keys      -> bare keys only for `allowBare` actions; locked actions are fixed; aliases
+ *                          (Page Down / Page Up) match at runtime and take part in conflict detection
+ *   8. wiring (static)  -> Enter submits instead of stepping, End uses goToEnd, Add Bookmark has one
+ *                          registration that calls the existing toggle once, guards are in the bridge
  *
  * Not covered here (needs the real renderer): Escape cancelling the recording chip, the hover /
  * conflict styling, and that the existing handlers still fire after customizing.
@@ -16,7 +20,7 @@
  * Run: npm run spike:settings:shortcuts
  */
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
+import { readFileSync, readdirSync } from 'node:fs'
 
 const storage = new Map()
 globalThis.localStorage = {
@@ -200,6 +204,143 @@ await check('conflict logic lives in one place', () => {
     const source = readFileSync(new URL(file, root), 'utf8')
     assert.doesNotMatch(source, /findShortcutConflict|contextsOverlap/, file)
   }
+})
+
+const read = (file) => readFileSync(new URL(file, new URL('../../src/', import.meta.url)), 'utf8')
+
+await check('reader defaults are valid and do not collide with each other', () => {
+  for (const s of defs.SHORTCUTS) {
+    if (s.displayOnly || s.locked) continue
+    assert.equal(keys.validateShortcutKeys(s.defaultKeys, false, { allowBare: s.allowBare }), null, s.id)
+  }
+  const d = effectiveShortcutKeys({})
+  for (const a of defs.SHORTCUTS) {
+    for (const b of defs.SHORTCUTS) {
+      if (a.id >= b.id || !conflicts.contextsOverlap(a.id, b.id)) continue
+      const overlap = conflicts
+        .shortcutComboIds(a, d)
+        .filter((combo) => conflicts.shortcutComboIds(b, d).includes(combo))
+      assert.deepEqual(overlap, [], `${a.id} vs ${b.id}`)
+    }
+  }
+})
+
+await check('a plain key is accepted only for actions that opt in (allowBare)', () => {
+  assert.ok(keys.validateShortcutKeys(['T'], false)) // General actions: still rejected
+  assert.equal(keys.validateShortcutKeys(['T'], false, { allowBare: true }), null)
+  assert.equal(keys.validateShortcutKeys(['End'], false, { allowBare: true }), null)
+  for (const unsafe of [['Enter'], ['Space'], ['Backspace'], ['Delete'], ['Tab'], ['Shift', 'T'], [',']]) {
+    assert.ok(keys.validateShortcutKeys(unsafe, false, { allowBare: true }), unsafe.join('+'))
+  }
+  assert.deepEqual(store().tryAssign('navigation.toggleToc', ['G']), { ok: true })
+  assert.equal(store().tryAssign('general.openBook', ['G']).reason, 'invalid')
+})
+
+await check('locked actions cannot be changed or loaded from storage', async () => {
+  const result = store().tryAssign('search.nextResult', ['Mod', 'K'])
+  assert.deepEqual([result.ok, result.reason], [false, 'invalid'])
+  storage.set(SHORTCUTS_STORAGE_KEY, JSON.stringify({ 'search.previousResult': ['Mod', 'K'] }))
+  const fresh = await import('../../src/shortcuts/shortcutsStore.ts?locked')
+  assert.deepEqual(fresh.useShortcutsStore.getState().overrides, {})
+})
+
+await check('aliases match at runtime in the reader only; Esc stays with the existing handlers', () => {
+  const d = effectiveShortcutKeys({})
+  const matching = (event, context) =>
+    defs.SHORTCUTS.filter(
+      (s) =>
+        !s.displayOnly &&
+        s.contexts.includes(context) &&
+        conflicts.shortcutComboIds(s, d).includes(keys.shortcutKeysId(keys.shortcutKeysFromEvent(event, false) ?? [])),
+    ).map((s) => s.id)
+  assert.deepEqual(matching(press('PageDown'), 'reader'), ['navigation.nextPage'])
+  assert.deepEqual(matching(press('ArrowRight'), 'reader'), ['navigation.nextPage'])
+  assert.deepEqual(matching(press('PageUp'), 'reader'), ['navigation.previousPage'])
+  assert.deepEqual(matching(press('PageDown'), 'library'), [])
+  assert.deepEqual(matching(press('Enter'), 'reader'), ['search.nextResult'])
+  assert.deepEqual(matching(press('Enter', { shiftKey: true }), 'reader'), ['search.previousResult'])
+  assert.deepEqual(matching(press('Escape'), 'reader'), [])
+})
+
+await check('aliases take part in conflict detection (and own aliases are refused)', () => {
+  assert.equal(conflicts.findShortcutConflict('navigation.firstPage', ['PageDown'], current()), 'navigation.nextPage')
+  assert.deepEqual(store().tryAssign('navigation.lastPage', ['PageUp']), {
+    ok: false,
+    reason: 'conflict',
+    conflictWith: 'navigation.previousPage',
+  })
+  assert.deepEqual(store().tryAssign('navigation.nextPage', ['PageDown']), {
+    ok: false,
+    reason: 'conflict',
+    conflictWith: 'navigation.nextPage',
+  })
+  assert.deepEqual(store().overrides, {})
+})
+
+await check('stored overrides that collide with an alias are dropped on load', async () => {
+  storage.set(
+    SHORTCUTS_STORAGE_KEY,
+    JSON.stringify({ 'navigation.firstPage': ['PageDown'], 'navigation.lastPage': ['G'] }),
+  )
+  const fresh = await import('../../src/shortcuts/shortcutsStore.ts?alias')
+  assert.deepEqual(fresh.useShortcutsStore.getState().overrides, { 'navigation.lastPage': ['G'] })
+})
+
+await check('handlers can decline: a false result leaves the key press alone', () => {
+  assert.match(read('shortcuts/shortcutActions.ts'), /return handler\(\) !== false/)
+  assert.match(read('shortcuts/ShortcutsBridge.tsx'), /if \(!perform\(match\.id\)\) continue/)
+})
+
+await check('bridge guards: typing field, modal, IME, repeat, iframes, aliases', () => {
+  const bridge = read('shortcuts/ShortcutsBridge.tsx')
+  for (const needle of [
+    'isTypingTarget',
+    'hasOpenModal',
+    'isComposing',
+    'allowRepeat',
+    'listenKeydownInIframes',
+    'shortcutComboIds',
+  ]) {
+    assert.ok(bridge.includes(needle), needle)
+  }
+})
+
+await check('Enter outside the search box submits instead of blindly stepping; Shift+Enter steps back', () => {
+  const source = read('screens/Reader/logic/hooks/useReaderShortcuts.ts')
+  const next = /'search\.nextResult',[\s\S]*?enabled && searchOpen/.exec(source)?.[0] ?? ''
+  assert.match(next, /\.submit\(\)/)
+  assert.doesNotMatch(next, /\.next\(\)/)
+  assert.match(source, /'search\.previousResult'[\s\S]*?\.previous\(\)/)
+  // Inside the input the key never reaches the registry: the bridge skips typing targets.
+  assert.match(read('shortcuts/iframeKeydown.ts'), /tag === 'INPUT'/)
+})
+
+await check('End of Book uses goToEnd, never the start of the last section', () => {
+  const shortcuts = read('screens/Reader/logic/hooks/useReaderShortcuts.ts')
+  assert.match(shortcuts, /'navigation\.lastPage'[\s\S]*?goToEnd\(\)/)
+  assert.doesNotMatch(shortcuts, /goToSpineIndex/)
+  assert.match(read('screens/Reader/logic/hooks/useReaderNavigation.ts'), /api\.goToEnd\(\)/)
+  const epub = read('reader/renderers/epub/openEpubjs.ts')
+  const goToEnd = /const goToEnd = async[\s\S]*?\r?\n  }\r?\n/.exec(epub)?.[0] ?? ''
+  assert.match(goToEnd, /displayed\.total - 1\) \* delta/)
+  assert.match(goToEnd, /scrollTop = container\.scrollHeight/)
+})
+
+await check('Add Bookmark has one registration that calls the existing toggle once', () => {
+  const hits = []
+  const walk = (dir) => {
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      const path = new URL(entry.name + (entry.isDirectory() ? '/' : ''), dir)
+      if (entry.isDirectory()) walk(path)
+      else if (/\.tsx?$/.test(entry.name)) {
+        if (/useShortcutAction\(\s*'navigation\.addBookmark'/.test(readFileSync(path, 'utf8'))) hits.push(entry.name)
+      }
+    }
+  }
+  walk(new URL('../../src/', import.meta.url))
+  assert.deepEqual(hits, ['useReaderShortcuts.ts'])
+  const source = read('screens/Reader/logic/hooks/useReaderShortcuts.ts')
+  assert.equal(source.match(/toggleBookmark\(\)/g)?.length, 1)
 })
 
 if (failures > 0) {

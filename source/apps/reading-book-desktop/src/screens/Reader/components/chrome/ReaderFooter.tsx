@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { useShortcutAction } from '../../../../shortcuts'
 import type { ZoomLayoutPreset } from '../../logic'
 import type { PageLayout, ReadingViewMode } from '@reading-book/book-reader-sdk'
 import { ZoomControl } from './ZoomControl'
@@ -98,6 +99,10 @@ type ReaderFooterProps = {
   onPreviousPage: () => void
   onNextPage: () => void
   onGoToPage: (page: number) => void
+  /** The Go to Page shortcut may run (book ready, no dialog over the reader). */
+  goToPageShortcutEnabled?: boolean
+  /** Go to Page was requested but there is no page box to focus (scroll view, count not ready). */
+  onGoToPageUnavailable?: (reason: 'scroll' | 'not-ready') => void
   layout: PageLayout
   onLayoutChange: (layout: PageLayout) => void
   /** Paginated (default) vs. continuous vertical scroll within a section. */
@@ -127,6 +132,8 @@ export function ReaderFooter({
   onPreviousPage,
   onNextPage,
   onGoToPage,
+  goToPageShortcutEnabled = true,
+  onGoToPageUnavailable,
   layout,
   onLayoutChange,
   viewMode = 'paginated',
@@ -143,6 +150,7 @@ export function ReaderFooter({
   searchIndexing = false,
 }: ReaderFooterProps) {
   const [pageInput, setPageInput] = useState(String(pageCurrent))
+  const pageInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     setPageInput(String(pageCurrent))
@@ -170,6 +178,22 @@ export function ReaderFooter({
   }
 
   const isScrollMode = viewMode === 'scroll'
+
+  // "Go to Page" shortcut: focus (and select) the page box. Without one — scroll view only shows a
+  // percentage, or the page count isn't known yet — say so instead of doing nothing.
+  useShortcutAction(
+    'navigation.goToPage',
+    () => {
+      const input = pageInputRef.current
+      if (!isScrollMode && input) {
+        input.focus()
+        return true
+      }
+      onGoToPageUnavailable?.(isScrollMode ? 'scroll' : 'not-ready')
+      return onGoToPageUnavailable !== undefined
+    },
+    goToPageShortcutEnabled && !immersiveHidden,
+  )
   const atStart = pageCountReady && pageCurrent <= 1
   const atEnd = pageCountReady && pageTotal > 0 && pageCurrent >= pageTotal
   const inputWidthCh = pageCountReady
@@ -248,6 +272,7 @@ export function ReaderFooter({
               type="text"
               inputMode="numeric"
               pattern="[0-9]*"
+              ref={pageInputRef}
               aria-label="Current page"
               className="rounded border border-transparent bg-transparent px-1 py-0.5 text-right font-semibold outline-none hover:border-lib-border-soft focus:border-lib-accent focus:bg-lib-chip"
               style={{

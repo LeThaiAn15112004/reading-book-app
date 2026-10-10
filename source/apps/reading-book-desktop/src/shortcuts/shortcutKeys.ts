@@ -107,17 +107,45 @@ const RESERVED = new Set(
   ].map(shortcutKeysId),
 )
 
+/** Main keys that stay usable without Ctrl/Alt for actions that opt in (`allowBare`). */
+function isBareCapableKey(main: string): boolean {
+  return (
+    /^[A-Z0-9]$/.test(main) ||
+    main.startsWith('Arrow') ||
+    ['Home', 'End', 'PageUp', 'PageDown'].includes(main)
+  )
+}
+
+export type ValidateShortcutOptions = {
+  /** The action accepts a main key without Ctrl/Alt (see `ShortcutDefinition.allowBare`). */
+  allowBare?: boolean
+}
+
+/**
+ * True when no Ctrl/⌘ or Alt/⌥ is held — such a key (Shift aside) is also what the user types, so the
+ * bridge ignores it while a text field has focus.
+ */
+export function isPlainShortcut(keys: ShortcutKeys): boolean {
+  return !keys.includes('Mod') && !keys.includes('Alt')
+}
+
 /** Why `keys` can't be used as a shortcut at all (independent of other actions), or null. */
 export function validateShortcutKeys(
   keys: ShortcutKeys,
   mac: boolean = isMacPlatform,
+  options: ValidateShortcutOptions = {},
 ): string | null {
   const normalized = normalizeShortcutKeys(keys)
   const main = normalized[normalized.length - 1]
   if (!main || MODIFIER_ORDER.includes(main)) return 'Press a key together with the modifier.'
   const isFunctionKey = /^F\d+$/.test(main)
   if (!hasModifier(normalized) && !isFunctionKey) {
-    return `Add ${mac ? '⌘' : 'Ctrl'} or ${mac ? '⌥' : 'Alt'} — a plain key would break typing.`
+    if (!options.allowBare) {
+      return `Add ${mac ? '⌘' : 'Ctrl'} or ${mac ? '⌥' : 'Alt'} — a plain key would break typing.`
+    }
+    if (!isBareCapableKey(main)) {
+      return `Add ${mac ? '⌘' : 'Ctrl'} or ${mac ? '⌥' : 'Alt'} — this key can't be used on its own.`
+    }
   }
   if (normalized.length === 2 && normalized[0] === 'Shift' && !isFunctionKey) {
     return 'Shift alone is used for typing — add another modifier.'
@@ -136,6 +164,7 @@ const KEY_LABELS: Record<string, { win: string; mac: string }> = {
   ArrowDown: { win: '↓', mac: '↓' },
   PageUp: { win: 'Page Up', mac: 'Page Up' },
   PageDown: { win: 'Page Down', mac: 'Page Down' },
+  Escape: { win: 'Esc', mac: 'Esc' },
 }
 
 /** Display label of one key token for the current platform. */

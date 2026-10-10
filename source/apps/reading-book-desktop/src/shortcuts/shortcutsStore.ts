@@ -27,10 +27,11 @@ function loadOverrides(): ShortcutOverrides {
     const stored = parsed as Record<string, unknown>
     const overrides: ShortcutOverrides = {}
     for (const s of SHORTCUTS) {
+      if (s.locked) continue
       const value = stored[s.id]
       if (!Array.isArray(value) || !value.every((k) => typeof k === 'string')) continue
       const keys = normalizeShortcutKeys(value)
-      if (validateShortcutKeys(keys)) continue
+      if (validateShortcutKeys(keys, undefined, { allowBare: s.allowBare })) continue
       if (findShortcutConflict(s.id, keys, effectiveShortcutKeys(overrides))) continue
       overrides[s.id] = keys
     }
@@ -76,14 +77,18 @@ export const useShortcutsStore = create<ShortcutsState>()((set, get) => ({
   recordingId: null,
   setRecording: (recordingId) => set({ recordingId }),
   tryAssign: (id, keys) => {
+    const definition = getShortcut(id)
+    if (definition.locked) {
+      return { ok: false, reason: 'invalid', message: 'This shortcut is fixed and can’t be changed.' }
+    }
     const normalized = normalizeShortcutKeys(keys)
-    const message = validateShortcutKeys(normalized)
+    const message = validateShortcutKeys(normalized, undefined, { allowBare: definition.allowBare })
     if (message) return { ok: false, reason: 'invalid', message }
     const { overrides } = get()
     const conflictWith = findShortcutConflict(id, normalized, effectiveShortcutKeys(overrides))
     if (conflictWith) return { ok: false, reason: 'conflict', conflictWith }
     const next = { ...overrides }
-    if (shortcutKeysId(getShortcut(id).defaultKeys) === shortcutKeysId(normalized)) delete next[id]
+    if (shortcutKeysId(definition.defaultKeys) === shortcutKeysId(normalized)) delete next[id]
     else next[id] = normalized
     set({ overrides: next })
     saveOverrides(next)

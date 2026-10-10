@@ -48,6 +48,7 @@ export type EpubRendererApi = Pick<
   | 'goToHref'
   | 'goToSpineIndex'
   | 'goToLocationPage'
+  | 'goToEnd'
   | 'getSpineLength'
   | 'getNavState'
   | 'getToc'
@@ -340,6 +341,10 @@ function toApi(
         return
       }
       await handle.goToSpineIndex(i)
+    },
+    goToEnd: async () => {
+      cover.hide()
+      return handle.goToEnd()
     },
     goToLocationPage: async (page) => {
       if (cover.isAvailable()) {

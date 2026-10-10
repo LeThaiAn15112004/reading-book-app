@@ -57,6 +57,7 @@ import {
   useReaderChromeUi,
   useReaderNavigation,
   useReaderSearch,
+  useReaderShortcuts,
   useReaderSessionBridge,
   useImmersiveChromeReveal,
   useReaderZoomControls,
@@ -257,6 +258,27 @@ export function ReaderScreen() {
     chapterLabel,
     goChapter: nav.goChapter,
     setChromeHidden: chrome.setChromeHidden,
+    setToast: chrome.setToast,
+  })
+
+  // Reader dialogs without `aria-modal` (so the bridge's DOM guard can't see them) still block the
+  // reading shortcuts behind them.
+  const readerDialogOpen = chrome.bookInfoOpen || chrome.signOpen || chrome.trashOpen
+  const shortcutsEnabled = book.contentStatus === 'ready' && !readerDialogOpen
+  useReaderShortcuts({
+    enabled: shortcutsEnabled,
+    immersive,
+    isEpubSurface: book.isEpubSurface,
+    epubApiRef,
+    switchPage: nav.switchPage,
+    goToStart: nav.goToStart,
+    goToEnd: nav.goToEnd,
+    toggleBookmark: bookmarks.toggleBookmark,
+    searchOpen: chrome.searchOpen,
+    sidebarOpen: chrome.sidebarOpen,
+    sidebarTab: chrome.sidebarTab,
+    openSidebarTab: chrome.openSidebarTab,
+    toggleSidebar: chrome.toggleSidebar,
     setToast: chrome.setToast,
   })
 
@@ -462,6 +484,14 @@ export function ReaderScreen() {
           onPreviousPage={() => nav.switchPage(false)}
           onNextPage={() => nav.switchPage(true)}
           onGoToPage={nav.goToPage}
+          goToPageShortcutEnabled={shortcutsEnabled}
+          onGoToPageUnavailable={(reason) =>
+            chrome.setToast(
+              reason === 'scroll'
+                ? 'Go to Page isn’t available in scroll view.'
+                : 'Page numbers aren’t ready yet.',
+            )
+          }
           layout={book.prefs.layout}
           onLayoutChange={(layout) => {
             book.prefsDirtyRef.current = true

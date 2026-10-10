@@ -10,10 +10,14 @@ import type {
   EpubTocItem,
 } from '../../../../reader/renderers/epub'
 import { blurReaderSidebarFocus } from '../../../../reader/chrome'
+import {
+  isTypingTarget,
+  listenKeydownInIframes,
+} from '../../../../shortcuts/iframeKeydown'
 import { FAKE_CHAPTERS } from '../demo/fakeReaderContent'
 import type { HighlightShortcuts } from './useReaderHighlights'
 
-function navigateEpubByArrow(api: EpubRendererApi, forward: boolean): void {
+function navigateEpubByStep(api: EpubRendererApi, forward: boolean): void {
   void (forward ? api.nextPage() : api.prevPage())
 }
 
@@ -66,7 +70,7 @@ export function useReaderNavigation({
     if (isEpubSurface) {
       const api = epubApiRef.current
       if (!api) return
-      navigateEpubByArrow(api, forward)
+      navigateEpubByStep(api, forward)
       clearTransientNavUi()
       return
     }
@@ -90,6 +94,39 @@ export function useReaderNavigation({
 
     goChapter(page - 1)
   }
+
+  /**
+   * Start of the book (EPUB: first spine section, or its synthetic cover). False when the surface
+   * can't navigate yet — the shortcut then leaves the key alone.
+   */
+  const goToStart = useCallback((): boolean => {
+    if (isEpubSurface) {
+      const api = epubApiRef.current
+      if (!api) return false
+      void api.goToSpineIndex(0)
+    } else {
+      setChapterIndex(0)
+    }
+    clearTransientNavUi()
+    return true
+  }, [epubApiRef, isEpubSurface])
+
+  /**
+   * End of the book. EPUB resolves with whether the reader really reached the last page / bottom of
+   * the last section (not just the start of that section); placeholder chapters jump to the last one.
+   */
+  const goToEnd = useCallback(async (): Promise<boolean> => {
+    if (isEpubSurface) {
+      const api = epubApiRef.current
+      if (!api) return false
+      const reached = await api.goToEnd()
+      clearTransientNavUi()
+      return reached
+    }
+    setChapterIndex(FAKE_CHAPTERS.length - 1)
+    clearTransientNavUi()
+    return true
+  }, [epubApiRef, isEpubSurface])
 
   /** Page layout thumbnails browse spine *sections*, not rendered pages. */
   const goToPageFromLayout = useCallback(
@@ -143,24 +180,13 @@ export function useReaderNavigation({
     void api.goToHref(item.href)
   }
 
-  function isReaderTypingTarget(target: EventTarget | null): boolean {
-    const el = target as HTMLElement | null
-    if (!el) return false
-    const tag = el.tagName
-    return (
-      tag === 'INPUT' ||
-      tag === 'TEXTAREA' ||
-      tag === 'SELECT' ||
-      el.isContentEditable
-    )
-  }
-
-  // Page navigation uses only ArrowLeft/ArrowRight (window + EPUB iframes).
+  // Escape / highlight undo-redo / delete-highlight (window + EPUB iframes). Page turning, Home/End
+  // and the rest of the reading keys are registry shortcuts now (see `useReaderShortcuts`).
   useEffect(() => {
     if (contentStatus !== 'ready') return
 
     function onKeyDown(e: KeyboardEvent) {
-      if (isReaderTypingTarget(e.target)) return
+      if (isTypingTarget(e.target)) return
       if (e.altKey) return
 
       // Highlight/Underline tool armed: Escape drops back to Select instead of leaving the
@@ -205,71 +231,12 @@ export function useReaderNavigation({
         highlightShortcutsRef.current.deleteFocused()
         return
       }
-
-      const isArrow = e.key === 'ArrowLeft' || e.key === 'ArrowRight'
-      if (!isArrow) return
-
-      const pageNav = isArrow && !e.ctrlKey && !e.metaKey
-      if (!pageNav) return
-
-      const forward = e.key === 'ArrowRight'
-
-      if (isEpubSurface) {
-        const api = epubApiRef.current
-        // Bytes may be ready before epubjs finishes opening — don't swallow keys.
-        if (!api) return
-        e.preventDefault()
-        e.stopPropagation()
-        navigateEpubByArrow(api, forward)
-        clearTransientNavUi()
-        return
-      }
-
-      e.preventDefault()
-      e.stopPropagation()
-      setChapterIndex((i) => {
-        const next = forward
-          ? Math.min(i + 1, FAKE_CHAPTERS.length - 1)
-          : Math.max(i - 1, 0)
-        return next
-      })
-      clearTransientNavUi()
     }
 
-    // Capture so it wins over focused footer controls; also works when body has focus.
-    window.addEventListener('keydown', onKeyDown, true)
-
-    // EPUB pages live in iframes — their key events never reach `window`.
-    const boundDocs = new Set<Document>()
-    function bindEpubIframes() {
-      document.querySelectorAll('iframe').forEach((iframe) => {
-        try {
-          const doc = iframe.contentDocument
-          if (!doc || boundDocs.has(doc)) return
-          boundDocs.add(doc)
-          doc.addEventListener('keydown', onKeyDown, true)
-        } catch {
-          // Ignore cross-origin frames.
-        }
-      })
-    }
-
-    bindEpubIframes()
-    const mo = new MutationObserver(bindEpubIframes)
-    mo.observe(document.body, { childList: true, subtree: true })
-    // epubjs swaps iframe docs on page turn; poll briefly so new docs get bound.
-    const pollId = window.setInterval(bindEpubIframes, 500)
-
-    return () => {
-      window.removeEventListener('keydown', onKeyDown, true)
-      mo.disconnect()
-      window.clearInterval(pollId)
-      boundDocs.forEach((doc) => {
-        doc.removeEventListener('keydown', onKeyDown, true)
-      })
-      boundDocs.clear()
-    }
-  }, [bookBytes, bookFormat, chapterIndex, contentStatus, isEpubSurface, highlightShortcutsRef])
+    // Capture so it wins over focused footer controls; EPUB pages live in iframes whose key events
+    // never reach `window`, so the helper binds those documents too.
+    return listenKeydownInIframes(onKeyDown)
+  }, [bookBytes, bookFormat, contentStatus, highlightShortcutsRef])
 
   return {
     chapterIndex,
@@ -283,6 +250,8 @@ export function useReaderNavigation({
     goChapter,
     switchPage,
     goToPage,
+    goToStart,
+    goToEnd,
     goToPageFromLayout,
     goToProgress,
     handleSelectTocItem,

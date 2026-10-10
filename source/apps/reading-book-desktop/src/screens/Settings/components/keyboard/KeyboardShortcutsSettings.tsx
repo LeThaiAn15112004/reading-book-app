@@ -36,6 +36,9 @@ const CHIP_IDLE =
   'border-lib-border bg-lib-chip text-lib-text-strong hover:border-lib-accent hover:bg-lib-accent-soft hover:text-lib-accent focus-visible:border-lib-accent'
 const CHIP_RECORDING = 'border-lib-accent bg-lib-accent-soft text-lib-accent'
 const CHIP_ERROR = 'border-red-400/40 bg-red-500/10 text-red-400'
+/** Alternate / fixed keys: same shape as a chip, but not interactive. */
+const CHIP_STATIC =
+  'inline-flex h-8 min-w-12 items-center justify-center rounded-lg border border-lib-border-soft bg-transparent px-2.5 text-[13px] text-lib-muted'
 
 function ShortcutRow({ shortcut }: { shortcut: ShortcutDefinition }) {
   const overrides = useShortcutsStore((s) => s.overrides)
@@ -72,7 +75,10 @@ function ShortcutRow({ shortcut }: { shortcut: ShortcutDefinition }) {
       } else if (result.reason === 'conflict') {
         setAttempt({
           keys: pressed,
-          message: `Already assigned to ${getShortcut(result.conflictWith).label}.`,
+          message:
+            result.conflictWith === shortcut.id
+              ? 'Already an alternate key of this action.'
+              : `Already assigned to ${getShortcut(result.conflictWith).label}.`,
         })
       } else {
         setAttempt({ keys: pressed, message: result.message })
@@ -107,25 +113,48 @@ function ShortcutRow({ shortcut }: { shortcut: ShortcutDefinition }) {
               Reset
             </button>
           ) : null}
-          <button
-            type="button"
-            onClick={toggleRecording}
-            onBlur={() => {
-              if (recording) stopRecording()
-            }}
-            aria-label={
-              recording
-                ? `Recording a new shortcut for ${shortcut.label}. Press Escape to cancel.`
-                : `${shortcut.label}: change shortcut`
-            }
-            className={`${CHIP_BASE} ${chipClass}`}
-          >
-            {recording && !attempt ? (
-              <span className="font-medium">Press a shortcut…</span>
-            ) : (
-              <KeyCaps keys={attempt ? attempt.keys : keys} />
-            )}
-          </button>
+          {shortcut.locked ? (
+            <span
+              className={`${CHIP_STATIC} min-w-24`}
+              title="Fixed — this shortcut can’t be changed"
+              aria-label={`${shortcut.label}: fixed shortcut`}
+            >
+              <KeyCaps keys={shortcut.defaultKeys} />
+            </span>
+          ) : (
+            <button
+              type="button"
+              onClick={toggleRecording}
+              onBlur={() => {
+                if (recording) stopRecording()
+              }}
+              aria-label={
+                recording
+                  ? `Recording a new shortcut for ${shortcut.label}. Press Escape to cancel.`
+                  : `${shortcut.label}: change shortcut`
+              }
+              className={`${CHIP_BASE} ${chipClass}`}
+            >
+              {recording && !attempt ? (
+                <span className="font-medium">Press a shortcut…</span>
+              ) : (
+                <KeyCaps keys={attempt ? attempt.keys : keys} />
+              )}
+            </button>
+          )}
+          {shortcut.aliases?.map((alias, i) => (
+            <span key={i} className="flex items-center gap-2">
+              <span className="text-[11px] text-lib-muted" aria-hidden>
+                or
+              </span>
+              <span className={CHIP_STATIC} title="Alternate key (fixed)">
+                <KeyCaps keys={alias} />
+              </span>
+            </span>
+          ))}
+          {shortcut.locked ? (
+            <span className="text-[11px] text-lib-muted">Fixed</span>
+          ) : null}
         </span>
       </div>
       {attempt ? (

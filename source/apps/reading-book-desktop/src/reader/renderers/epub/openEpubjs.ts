@@ -202,6 +202,12 @@ export interface EpubjsHandle {
   goToSpineIndex: (index: number) => Promise<void>
   /** Jump to a 1-based epub.js location. No-op until locations are generated. */
   goToLocationPage: (page: number) => Promise<void>
+  /**
+   * Jump to the very end of the book: the last page of the last spine section (paginated) or the
+   * bottom of it (scroll). Resolves true only once the reader is really there — never merely at the
+   * start of the last section.
+   */
+  goToEnd: () => Promise<boolean>
   getSpineLength: () => number
   getNavState: () => EpubNavState
   getToc: () => EpubTocItem[]
@@ -2818,6 +2824,53 @@ export async function openEpubjs(
     }
   }
 
+  const goToEnd = async (): Promise<boolean> => {
+    const sections = spineLengthOf(book)
+    if (sections <= 0) return false
+    cancelResizeAnchor()
+    const lastSpine = sections - 1
+    if (currentSpineIndex() !== lastSpine) {
+      await activeRendition.display(lastSpine)
+      await waitForFrames(2)
+    }
+    await waitForSectionResources(currentSectionDocument(activeRendition))
+
+    if (viewMode === 'scroll') {
+      const container = (
+        renditionManager(activeRendition) as { container?: HTMLElement } | undefined
+      )?.container
+      if (!container) return false
+      // Reflow (images, fonts) can grow the section after the first jump — settle, then re-check.
+      for (let attempt = 0; attempt < 3; attempt += 1) {
+        container.scrollTop = container.scrollHeight
+        await waitForFrames(2)
+        if (isAtVerticalScrollBoundary(activeRendition, 'down')) break
+      }
+      activeRendition.reportLocation()
+      return currentSpineIndex() === lastSpine && isAtVerticalScrollBoundary(activeRendition, 'down')
+    }
+
+    const moveTo = activeRendition as unknown as {
+      moveTo?: (offset: { top: number; left: number }) => void
+    }
+    // The page count of the last section can still change as it reflows, so measure again each
+    // round and only report success once the displayed page is the section's last one.
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      const displayed = currentDisplayedBoundary()
+      const delta = getRenditionLayoutDelta(activeRendition)
+      if (displayed && delta > 0 && displayed.page < displayed.total) {
+        moveTo.moveTo?.({ top: 0, left: (displayed.total - 1) * delta })
+        await waitForFrames(2)
+        activeRendition.reportLocation()
+      }
+      const after = currentDisplayedBoundary()
+      if (after && after.page >= after.total) break
+      await waitForFrames(2)
+    }
+    const final = currentDisplayedBoundary()
+    return currentSpineIndex() === lastSpine && final !== null && final.page >= final.total
+  }
+
   return {
     book,
     rendition: activeRendition,
@@ -2858,6 +2911,7 @@ export async function openEpubjs(
     },
     goToHref,
     goToSpineIndex,
+    goToEnd,
     goToLocationPage: (page: number) => {
       // Absolute page-number navigation is a paginated-only concept — there is
       // no CSS page count to resolve against once pagination measurement is
