@@ -9,6 +9,11 @@ import type {
   EpubRendererApi,
   EpubTocItem,
 } from '../../../../reader/renderers/epub'
+import type {
+  PdfNavState,
+  PdfOutlineItem,
+  PdfRendererApi,
+} from '../../../../reader/renderers/pdf'
 import { blurReaderSidebarFocus } from '../../../../reader/chrome'
 import {
   isTypingTarget,
@@ -21,6 +26,19 @@ function navigateEpubByStep(api: EpubRendererApi, forward: boolean): void {
   void (forward ? api.nextPage() : api.prevPage())
 }
 
+/** PDF outline entries ride the shared TOC tree as `pdf-page:N` hrefs (no EPUB data involved). */
+const PDF_PAGE_HREF = 'pdf-page:'
+
+function pdfOutlineToTocItems(items: PdfOutlineItem[]): EpubTocItem[] {
+  return items.map((item) => ({
+    id: item.id,
+    label: item.label,
+    href: item.page ? `${PDF_PAGE_HREF}${item.page}` : '',
+    level: item.level,
+    children: pdfOutlineToTocItems(item.children),
+  }))
+}
+
 type UseReaderNavigationOptions = {
   bookId: string | undefined
   contentStatus: 'idle' | 'loading' | 'ready' | 'error'
@@ -28,6 +46,8 @@ type UseReaderNavigationOptions = {
   bookFormat: string | null
   isEpubSurface: boolean
   epubApiRef: MutableRefObject<EpubRendererApi | null>
+  isPdfSurface: boolean
+  pdfApiRef: MutableRefObject<PdfRendererApi | null>
   closeFloating: () => void
   highlightShortcutsRef: MutableRefObject<HighlightShortcuts>
 }
@@ -39,6 +59,8 @@ export function useReaderNavigation({
   bookFormat,
   isEpubSurface,
   epubApiRef,
+  isPdfSurface,
+  pdfApiRef,
   closeFloating,
   highlightShortcutsRef,
 }: UseReaderNavigationOptions) {
@@ -46,6 +68,12 @@ export function useReaderNavigation({
   const [epubNav, setEpubNav] = useState<EpubNavState | null>(null)
   const [epubToc, setEpubToc] = useState<EpubTocItem[]>([])
   const [epubSections, setEpubSections] = useState<string[]>([])
+  const [pdfNav, setPdfNav] = useState<PdfNavState | null>(null)
+  const [pdfToc, setPdfToc] = useState<EpubTocItem[]>([])
+
+  const setPdfOutline = useCallback((items: PdfOutlineItem[]) => {
+    setPdfToc(pdfOutlineToTocItems(items))
+  }, [])
 
   // Reset navigation state when switching books.
   useEffect(() => {
@@ -53,8 +81,11 @@ export function useReaderNavigation({
     setEpubNav(null)
     setEpubToc([])
     setEpubSections([])
+    setPdfNav(null)
+    setPdfToc([])
     epubApiRef.current = null
-  }, [bookId, epubApiRef])
+    pdfApiRef.current = null
+  }, [bookId, epubApiRef, pdfApiRef])
 
   function clearTransientNavUi() {
     blurReaderSidebarFocus()
@@ -71,6 +102,14 @@ export function useReaderNavigation({
       const api = epubApiRef.current
       if (!api) return
       navigateEpubByStep(api, forward)
+      clearTransientNavUi()
+      return
+    }
+    if (isPdfSurface) {
+      const api = pdfApiRef.current
+      if (!api) return
+      if (forward) api.nextPage()
+      else api.prevPage()
       clearTransientNavUi()
       return
     }
@@ -91,6 +130,11 @@ export function useReaderNavigation({
       clearTransientNavUi()
       return
     }
+    if (isPdfSurface) {
+      pdfApiRef.current?.goToPage(page)
+      clearTransientNavUi()
+      return
+    }
 
     goChapter(page - 1)
   }
@@ -104,12 +148,16 @@ export function useReaderNavigation({
       const api = epubApiRef.current
       if (!api) return false
       void api.goToSpineIndex(0)
+    } else if (isPdfSurface) {
+      const api = pdfApiRef.current
+      if (!api) return false
+      api.goToPage(1)
     } else {
       setChapterIndex(0)
     }
     clearTransientNavUi()
     return true
-  }, [epubApiRef, isEpubSurface])
+  }, [epubApiRef, isEpubSurface, isPdfSurface, pdfApiRef])
 
   /**
    * End of the book. EPUB resolves with whether the reader really reached the last page / bottom of
@@ -123,18 +171,27 @@ export function useReaderNavigation({
       clearTransientNavUi()
       return reached
     }
+    if (isPdfSurface) {
+      const api = pdfApiRef.current
+      if (!api) return false
+      api.goToPage(api.getNavState().pageTotal)
+      clearTransientNavUi()
+      return true
+    }
     setChapterIndex(FAKE_CHAPTERS.length - 1)
     clearTransientNavUi()
     return true
-  }, [epubApiRef, isEpubSurface])
+  }, [epubApiRef, isEpubSurface, isPdfSurface, pdfApiRef])
 
-  /** Page layout thumbnails browse spine *sections*, not rendered pages. */
+  /** Page layout thumbnails browse spine *sections* (EPUB) or pages (PDF). */
   const goToPageFromLayout = useCallback(
     (page: number) => {
       if (isEpubSurface) {
         const api = epubApiRef.current
         if (!api) return
         void api.goToSpineIndex(page - 1)
+      } else if (isPdfSurface) {
+        pdfApiRef.current?.goToPage(page)
       } else {
         setChapterIndex(
           Math.min(Math.max(page - 1, 0), FAKE_CHAPTERS.length - 1),
@@ -142,7 +199,7 @@ export function useReaderNavigation({
       }
       clearTransientNavUi()
     },
-    [isEpubSurface],
+    [epubApiRef, isEpubSurface, isPdfSurface, pdfApiRef],
   )
 
   /** Seek to a 0..1 fraction of book position (progress-bar click), by spine order. */
@@ -158,6 +215,12 @@ export function useReaderNavigation({
           Math.max(spineLength - 1, 0),
         )
         void api.goToSpineIndex(targetIndex)
+      } else if (isPdfSurface) {
+        const api = pdfApiRef.current
+        if (!api) return
+        const total = api.getNavState().pageTotal
+        if (total <= 0) return
+        api.goToPage(Math.min(Math.floor(clampedFraction * total) + 1, total))
       } else {
         setChapterIndex(
           Math.min(
@@ -168,13 +231,18 @@ export function useReaderNavigation({
       }
       clearTransientNavUi()
     },
-    [epubApiRef, epubNav, isEpubSurface],
+    [epubApiRef, epubNav, isEpubSurface, isPdfSurface, pdfApiRef],
   )
 
   function handleSelectTocItem(item: EpubTocItem) {
     if (!item.href) return
     closeFloating()
     clearTransientNavUi()
+    if (item.href.startsWith(PDF_PAGE_HREF)) {
+      const page = Number.parseInt(item.href.slice(PDF_PAGE_HREF.length), 10)
+      if (Number.isFinite(page)) pdfApiRef.current?.goToPage(page)
+      return
+    }
     const api = epubApiRef.current
     if (!api) return
     void api.goToHref(item.href)
@@ -247,6 +315,10 @@ export function useReaderNavigation({
     setEpubToc,
     epubSections,
     setEpubSections,
+    pdfNav,
+    setPdfNav,
+    pdfToc,
+    setPdfOutline,
     goChapter,
     switchPage,
     goToPage,

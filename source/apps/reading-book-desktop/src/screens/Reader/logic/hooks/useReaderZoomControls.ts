@@ -31,6 +31,14 @@ export function useReaderZoomControls({
 
   function setViewZoomCentered(next: number) {
     const clamped = clampZoom(next)
+    const viewport = zoomViewportRef.current
+    const el = viewport?.getElement()
+    // A native (scrolling) surface keeps the reader's place: anchor the top-center instead of
+    // jumping back to the start of the document.
+    if (viewport && el && viewport.getMode() === 'native') {
+      viewport.applyFocalZoom(clamped, { offsetX: el.clientWidth / 2, offsetY: 0 })
+      return
+    }
     setViewZoom(clamped)
     requestAnimationFrame(() => {
       const el = zoomViewportRef.current?.getElement()

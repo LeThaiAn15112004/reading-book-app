@@ -1,6 +1,8 @@
 import { useMemo, useRef, useState, type CSSProperties } from 'react'
 import { useParams } from 'react-router-dom'
 import {
+  CfiLocation,
+  PageRectLocation,
   fontFamilyCss,
   formatHighlightCitation,
   type InteractionTool,
@@ -18,7 +20,7 @@ import {
   EpubRenderer,
   type EpubRendererApi,
 } from '../../reader/renderers/epub'
-import { PdfRenderer } from '../../reader/renderers/pdf'
+import { PdfRenderer, type PdfRendererApi } from '../../reader/renderers/pdf'
 import {
   AaSettingsPanel,
   BookInfoDialog,
@@ -92,6 +94,7 @@ export function ReaderScreen() {
   globalPrefsRef.current = globalPrefs
 
   const epubApiRef = useRef<EpubRendererApi | null>(null)
+  const pdfApiRef = useRef<PdfRendererApi | null>(null)
   const escapeUiRef = useRef<ReaderChromeEscapeUi>({
     isEpubSurface: false,
   })
@@ -135,6 +138,11 @@ export function ReaderScreen() {
     setDocumentSubtitle,
     globalPrefsRef,
   })
+
+  const isPdfSurface =
+    book.contentStatus === 'ready' && book.bookFormat === 'pdf' && !!book.bookBytes
+  // Like EPUB, wait for the saved position before mounting so the PDF opens on the right page.
+  const isPdfSessionLoading = isPdfSurface && book.sessionLoadStatus === 'loading'
 
   const readerCapabilities = useMemo(
     () => getReaderCapabilities(book.bookFormat),
@@ -181,6 +189,7 @@ export function ReaderScreen() {
   const session = useReaderSessionBridge({
     bookId,
     epubApiRef,
+    pdfApiRef,
     prefsRef: book.prefsRef,
     prefsDirtyRef: book.prefsDirtyRef,
     prefs: book.prefs,
@@ -194,6 +203,8 @@ export function ReaderScreen() {
     bookFormat: book.bookFormat,
     isEpubSurface: book.isEpubSurface,
     epubApiRef,
+    isPdfSurface,
+    pdfApiRef,
     closeFloating: chrome.closeFloating,
     highlightShortcutsRef,
   })
@@ -219,27 +230,51 @@ export function ReaderScreen() {
     : rightSidebarContentInset(rightPanel !== null, rightSidebarDocked)
 
   const chapter = FAKE_CHAPTERS[nav.chapterIndex] ?? FAKE_CHAPTERS[0]
-  const chapterLabel = chapter.title
+  const pdfPageCurrent = nav.pdfNav?.pageCurrent ?? 0
+  const pdfPageTotal = nav.pdfNav?.pageTotal ?? 0
+  const chapterLabel = isPdfSurface ? `Page ${pdfPageCurrent}` : chapter.title
+  // PDF: real page numbers. EPUB: reference pages / spine sections. Otherwise the placeholder.
   const pageCurrent = book.isEpubSurface
     ? (nav.epubNav?.pageCurrent ?? 0)
-    : nav.chapterIndex + 1
+    : isPdfSurface
+      ? pdfPageCurrent
+      : nav.chapterIndex + 1
   const pageTotal = book.isEpubSurface
     ? (nav.epubNav?.pageTotal ?? 0)
-    : FAKE_CHAPTERS.length
+    : isPdfSurface
+      ? pdfPageTotal
+      : FAKE_CHAPTERS.length
   const pageCountReady = book.isEpubSurface
     ? Boolean(nav.epubNav?.pageCountReady)
-    : true
+    : isPdfSurface
+      ? pdfPageTotal > 0
+      : true
   const sectionCurrent = book.isEpubSurface
     ? (nav.epubNav?.spineLength
         ? nav.epubNav.spineIndex + 1
         : 0)
-    : nav.chapterIndex + 1
+    : isPdfSurface
+      ? pdfPageCurrent
+      : nav.chapterIndex + 1
   const sectionTotal = book.isEpubSurface
     ? (nav.epubNav?.spineLength ?? 0)
-    : FAKE_CHAPTERS.length
-  const sectionLabels = book.isEpubSurface
-    ? nav.epubSections
-    : FAKE_CHAPTERS.map((c) => c.title)
+    : isPdfSurface
+      ? pdfPageTotal
+      : FAKE_CHAPTERS.length
+  const sectionLabels = useMemo(
+    () =>
+      book.isEpubSurface
+        ? nav.epubSections
+        : isPdfSurface
+          ? Array.from({ length: pdfPageTotal }, (_, i) => `Page ${i + 1}`)
+          : FAKE_CHAPTERS.map((c) => c.title),
+    [book.isEpubSurface, isPdfSurface, nav.epubSections, pdfPageTotal],
+  )
+  const progress = book.isEpubSurface
+    ? (nav.epubNav?.progress ?? 0)
+    : isPdfSurface && pdfPageTotal > 0
+      ? pdfPageCurrent / pdfPageTotal
+      : 0
   const effectiveMargin = book.prefs.marginEnabled ? book.prefs.margin : 'off'
 
   const bookmarks = useReaderBookmarks({
@@ -263,6 +298,8 @@ export function ReaderScreen() {
     immersive,
     isEpubSurface: book.isEpubSurface,
     epubApiRef,
+    isPdfSurface,
+    pdfApiRef,
     switchPage: nav.switchPage,
     goToStart: nav.goToStart,
     goToEnd: nav.goToEnd,
@@ -477,8 +514,8 @@ export function ReaderScreen() {
           pageCurrent={pageCurrent}
           pageTotal={pageTotal}
           pageCountReady={pageCountReady}
-          progress={book.isEpubSurface ? (nav.epubNav?.progress ?? 0) : 0}
-          onSeekProgress={book.isEpubSurface ? nav.goToProgress : undefined}
+          progress={progress}
+          onSeekProgress={book.isEpubSurface || isPdfSurface ? nav.goToProgress : undefined}
           onPreviousPage={() => nav.switchPage(false)}
           onNextPage={() => nav.switchPage(true)}
           onGoToPage={nav.goToPage}
@@ -495,11 +532,16 @@ export function ReaderScreen() {
             book.prefsDirtyRef.current = true
             book.setPrefs((p) => ({ ...p, layout }))
           }}
-          viewMode={book.prefs.viewMode}
-          onViewModeChange={(viewMode) => {
-            book.prefsDirtyRef.current = true
-            book.setPrefs((p) => ({ ...p, viewMode }))
-          }}
+          // PDF is always one continuous scroll with real page numbers — no paginated/scroll toggle.
+          viewMode={isPdfSurface ? 'paginated' : book.prefs.viewMode}
+          onViewModeChange={
+            isPdfSurface
+              ? undefined
+              : (viewMode) => {
+                  book.prefsDirtyRef.current = true
+                  book.setPrefs((p) => ({ ...p, viewMode }))
+                }
+          }
           zoom={zoom.viewZoom}
           onZoomChange={zoom.handleZoomChange}
           onZoomStep={zoom.handleZoomStep}
@@ -554,9 +596,11 @@ export function ReaderScreen() {
             isResizing={sidebarResize.isResizing}
             chromeHidden={toolsHidden}
             onResizePointerDown={sidebarResize.onResizePointerDown}
-            chapters={FAKE_CHAPTERS}
+            chapters={isPdfSurface ? [] : FAKE_CHAPTERS}
             chapterIndex={nav.chapterIndex}
-            tocItems={book.isEpubSurface ? nav.epubToc : undefined}
+            tocItems={
+              book.isEpubSurface ? nav.epubToc : isPdfSurface ? nav.pdfToc : undefined
+            }
             activeTocHref={book.isEpubSurface ? nav.epubNav?.href : undefined}
             onClose={() => chrome.setSidebarOpen(false)}
             onSelectChapter={nav.goChapter}
@@ -774,7 +818,8 @@ export function ReaderScreen() {
     >
       {book.contentStatus === 'loading' ||
       book.contentStatus === 'idle' ||
-      book.isEpubSessionLoading ? (
+      book.isEpubSessionLoading ||
+      isPdfSessionLoading ? (
         <ReaderOpenStatus
           status={book.contentStatus === 'ready' ? 'loading' : book.contentStatus}
           onRetry={book.retryOpen}
@@ -805,7 +850,8 @@ export function ReaderScreen() {
           ref={zoom.zoomViewportRef}
           zoom={zoom.viewZoom}
           onZoomChange={zoom.setViewZoom}
-          focusZoomEnabled={activeTool === 'hand'}
+          focusZoomEnabled={activeTool === 'hand' || isPdfSurface}
+          mode={isPdfSurface ? 'native' : 'transform'}
         >
           {book.bookFormat === 'epub' && book.bookBytes ? (
             <EpubRenderer
@@ -823,7 +869,9 @@ export function ReaderScreen() {
               marginsEnabled={book.prefs.marginEnabled}
               marginPreset={book.prefs.margin}
               chromeHidden={immersive || chrome.chromeHidden}
-              initialLocation={book.resumeLocation}
+              initialLocation={
+                book.resumeLocation instanceof CfiLocation ? book.resumeLocation : undefined
+              }
               onCenterTap={() => {
                 chrome.handleCenterTap()
                 highlights.dismissAnnotationUi()
@@ -849,7 +897,21 @@ export function ReaderScreen() {
               onSections={nav.setEpubSections}
             />
           ) : book.bookFormat === 'pdf' && book.bookBytes ? (
-            <PdfRenderer key={bookId} data={book.bookBytes} />
+            <PdfRenderer
+              key={bookId}
+              data={book.bookBytes}
+              zoom={zoom.viewZoom}
+              getScrollRoot={() => zoom.zoomViewportRef.current?.getElement() ?? null}
+              initialPage={
+                book.resumeLocation instanceof PageRectLocation ? book.resumeLocation.page : 1
+              }
+              apiRef={pdfApiRef}
+              onNavState={(state) => {
+                nav.setPdfNav(state)
+                session.handlePdfNavState(state)
+              }}
+              onOutline={nav.setPdfOutline}
+            />
           ) : (
             <ReadingCanvas
               chapter={chapter}

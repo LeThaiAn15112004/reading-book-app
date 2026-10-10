@@ -14,8 +14,17 @@ import {
   type ZoomFocalPoint,
 } from '../../logic'
 
+/**
+ * - `transform` (default): the surface fills the viewport and is scaled with a CSS transform; the
+ *   viewport only scrolls once zoomed past 100%.
+ * - `native`: the surface (PDF) lays itself out at the zoom it is given, so the viewport is its one
+ *   scroll container — no transform, no nested scroller, crisp re-rendering at every zoom.
+ */
+export type ReaderZoomMode = 'transform' | 'native'
+
 export type ReaderZoomViewportHandle = {
   getElement: () => HTMLDivElement | null
+  getMode: () => ReaderZoomMode
   getFitMetrics: () => FitMetrics | null
   applyFocalZoom: (nextZoom: number, focal: ZoomFocalPoint) => void
   focalFromClient: (clientX: number, clientY: number) => ZoomFocalPoint | null
@@ -28,19 +37,22 @@ type ReaderZoomViewportProps = {
   focusZoomEnabled: boolean
   children: ReactNode
   className?: string
+  mode?: ReaderZoomMode
 }
 
 export const ReaderZoomViewport = forwardRef<
   ReaderZoomViewportHandle,
   ReaderZoomViewportProps
 >(function ReaderZoomViewport(
-  { zoom, onZoomChange, focusZoomEnabled, children, className },
+  { zoom, onZoomChange, focusZoomEnabled, children, className, mode = 'transform' },
   ref,
 ) {
   const viewportRef = useRef<HTMLDivElement>(null)
   const contentRef = useRef<HTMLDivElement>(null)
   const zoomRef = useRef(zoom)
   zoomRef.current = zoom
+  const modeRef = useRef(mode)
+  modeRef.current = mode
   const focusZoomEnabledRef = useRef(focusZoomEnabled)
   focusZoomEnabledRef.current = focusZoomEnabled
   const onZoomChangeRef = useRef(onZoomChange)
@@ -56,8 +68,10 @@ export const ReaderZoomViewport = forwardRef<
     if (!viewport || !content) return null
     const vw = viewport.clientWidth
     const vh = viewport.clientHeight
-    const cw = content.offsetWidth || vw
-    const ch = content.offsetHeight || vh
+    // Native content is already laid out at the current zoom — report its 100% size.
+    const unzoom = modeRef.current === 'native' ? zoomRef.current : 1
+    const cw = content.offsetWidth / unzoom || vw
+    const ch = content.offsetHeight / unzoom || vh
     if (vw <= 0 || vh <= 0 || cw <= 0 || ch <= 0) return null
     return {
       viewportWidth: vw,
@@ -95,6 +109,7 @@ export const ReaderZoomViewport = forwardRef<
     ref,
     () => ({
       getElement: () => viewportRef.current,
+      getMode: () => modeRef.current,
       getFitMetrics,
       applyFocalZoom,
       focalFromClient,
@@ -140,9 +155,28 @@ export const ReaderZoomViewport = forwardRef<
     return () => {
       viewport.removeEventListener('wheel', onWheelCapture, true)
     }
-  }, [runFocusZoom])
+    // `mode` swaps the viewport element.
+  }, [runFocusZoom, mode])
 
   const z = clampZoom(zoom)
+
+  if (mode === 'native') {
+    return (
+      <div
+        ref={viewportRef}
+        className={`relative min-h-0 flex-1 overflow-auto overscroll-contain ${className ?? ''}`}
+        data-reader-zoom-viewport=""
+      >
+        <div
+          ref={contentRef}
+          className="min-h-full w-max min-w-full"
+          data-reader-zoom-content=""
+        >
+          {children}
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div

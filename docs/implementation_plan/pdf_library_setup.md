@@ -119,3 +119,7 @@ platform change). No component code changed: the 5.4 API used here (`getDocument
 4. Zoom via `ReaderZoomViewport`/scale, continuous scroll with virtualized pages, outline → TOC, text search.
 5. Highlights: selection → page-space quads → overlay tables; render as our own layer. Then `AnnotationLayer` for
    links/existing annotations. Export to a copy only after evaluating a PDF-writing library.
+
+## Next step
+
+Continuous scrolling and shared Reader navigation for PDF: see `pdf_continuous_scroll.md`.

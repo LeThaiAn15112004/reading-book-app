@@ -1,5 +1,6 @@
 import type { MutableRefObject } from 'react'
 import type { EpubRendererApi } from '../../../../reader/renderers/epub'
+import type { PdfRendererApi } from '../../../../reader/renderers/pdf'
 import { useShortcutAction } from '../../../../shortcuts'
 import type { SidebarTab } from '../../components'
 import { useBookSearchStore } from '../search/bookSearchStore'
@@ -11,6 +12,8 @@ type UseReaderShortcutsOptions = {
   immersive: boolean
   isEpubSurface: boolean
   epubApiRef: MutableRefObject<EpubRendererApi | null>
+  isPdfSurface: boolean
+  pdfApiRef: MutableRefObject<PdfRendererApi | null>
   switchPage: (forward: boolean) => void
   goToStart: () => boolean
   goToEnd: () => Promise<boolean>
@@ -36,6 +39,8 @@ export function useReaderShortcuts({
   immersive,
   isEpubSurface,
   epubApiRef,
+  isPdfSurface,
+  pdfApiRef,
   switchPage,
   goToStart,
   goToEnd,
@@ -47,8 +52,10 @@ export function useReaderShortcuts({
   toggleSidebar,
   setToast,
 }: UseReaderShortcutsOptions): void {
-  // EPUB handlers need the renderer (it opens a moment after the bytes arrive).
-  const surfaceReady = () => !isEpubSurface || epubApiRef.current !== null
+  // EPUB / PDF handlers need the renderer (it opens a moment after the bytes arrive).
+  const surfaceReady = () =>
+    (!isEpubSurface || epubApiRef.current !== null) &&
+    (!isPdfSurface || pdfApiRef.current !== null)
 
   useShortcutAction(
     'navigation.nextPage',

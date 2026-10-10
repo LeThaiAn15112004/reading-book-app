@@ -527,6 +527,10 @@ export function TocSidebar({
                 activeHref={activeTocHref}
                 onSelect={(item) => onSelectTocItem?.(item)}
               />
+            ) : chapters.length === 0 ? (
+              <p className="m-0 px-3 py-3 text-sm text-lib-muted">
+                This book has no table of contents.
+              </p>
             ) : (
               <ul className="m-0 flex list-none flex-col gap-1.5 p-0">
                 {chapters.map((ch, i) => (

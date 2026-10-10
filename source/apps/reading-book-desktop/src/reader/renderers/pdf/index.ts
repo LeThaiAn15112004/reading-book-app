@@ -1,1 +1,7 @@
-export { PdfRenderer, type PdfRendererProps } from './PdfRenderer'
+export {
+  PdfRenderer,
+  type PdfNavState,
+  type PdfOutlineItem,
+  type PdfRendererApi,
+  type PdfRendererProps,
+} from './PdfRenderer'

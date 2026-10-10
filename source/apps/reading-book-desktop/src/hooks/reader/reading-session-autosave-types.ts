@@ -1,4 +1,4 @@
-import type { CfiLocation } from '@reading-book/book-reader-sdk'
+import type { Location } from '@reading-book/book-reader-sdk'
 
 /** Trailing quiet period after a relocate before writing. */
 export const READING_SESSION_DEBOUNCE_MS = 750
@@ -25,7 +25,7 @@ export type SessionNavMeta = {
 }
 
 export type SessionLatestSnapshot = {
-  location?: CfiLocation
+  location?: Location
   meta: SessionNavMeta
   theme: SessionThemeFields
 }
@@ -78,7 +78,7 @@ export type PendingSessionSnapshot = {
 
 export function pendingFromSessionParts(
   id: string,
-  location: CfiLocation | undefined,
+  location: Location | undefined,
   meta: SessionNavMeta,
   theme: SessionThemeFields,
 ): PendingSessionSnapshot {

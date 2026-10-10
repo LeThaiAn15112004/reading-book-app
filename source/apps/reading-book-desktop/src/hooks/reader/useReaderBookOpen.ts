@@ -45,7 +45,7 @@ export type UseReaderBookOpenOptions = {
   setDocumentSubtitle?: (title: string) => void
   globalPrefsRef: MutableRefObject<GlobalReadingPrefs>
   client: ReaderBookOpenClient
-  parseResumeLocation?: (raw: string | undefined) => CfiLocation | undefined
+  parseResumeLocation?: (raw: string | undefined) => Location | undefined
 }
 
 function defaultParseResumeLocation(raw: string | undefined): CfiLocation | undefined {
@@ -97,7 +97,7 @@ export function useReaderBookOpen({
   const [openAttempt, setOpenAttempt] = useState(0)
   const [bookBytes, setBookBytes] = useState<ArrayBuffer | null>(null)
   const [bookFormat, setBookFormat] = useState<string | null>(null)
-  const [resumeLocation, setResumeLocation] = useState<CfiLocation | undefined>()
+  const [resumeLocation, setResumeLocation] = useState<Location | undefined>()
   const [sessionLoadStatus, setSessionLoadStatus] = useState<'loading' | 'ready'>(
     'loading',
   )

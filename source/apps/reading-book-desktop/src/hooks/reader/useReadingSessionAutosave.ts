@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef } from 'react'
-import type { CfiLocation } from '@reading-book/book-reader-sdk'
+import type { Location } from '@reading-book/book-reader-sdk'
 import {
   pendingFromSessionParts,
   READING_SESSION_DEBOUNCE_MS,
@@ -89,7 +89,7 @@ export function useReadingSessionAutosave({
 
   const applyPending = useCallback(
     (
-      location: CfiLocation | undefined,
+      location: Location | undefined,
       meta: SessionNavMeta,
       theme: SessionThemeFields,
       id: string,
@@ -166,10 +166,10 @@ export function useReadingSessionAutosave({
     }
   }, [ensureWriteChain])
 
-  /** Called on every EPUB relocated (page / scroll / jump). */
+  /** Called on every relocate (EPUB CFI, PDF page). */
   const noteLocation = useCallback(
     (
-      location: CfiLocation,
+      location: Location,
       meta: SessionNavMeta,
       theme: SessionThemeFields,
     ) => {
