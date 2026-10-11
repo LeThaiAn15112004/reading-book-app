@@ -7,6 +7,7 @@ import {
   type RefObject,
 } from 'react'
 import type { EpubRendererApi } from '../../../../reader/renderers/epub'
+import type { PdfRendererApi } from '../../../../reader/renderers/pdf'
 import { useShortcutAction } from '../../../../shortcuts'
 import {
   READER_CHROME_RESIZE_SETTLE_MS,
@@ -21,6 +22,7 @@ import { useRightPanelStore } from '../rightPanel/rightPanelStore'
 /** Live UI snapshot for Escape / center-tap (filled by ReaderScreen each render). */
 export type ReaderChromeEscapeUi = {
   isEpubSurface: boolean
+  isPdfSurface: boolean
 }
 
 type UseReaderChromeUiOptions = {
@@ -32,6 +34,7 @@ type UseReaderChromeUiOptions = {
     toggleTools: () => void
   } | null) => void
   epubApiRef: RefObject<EpubRendererApi | null>
+  pdfApiRef: RefObject<PdfRendererApi | null>
   escapeUiRef: MutableRefObject<ReaderChromeEscapeUi>
   /** OS fullscreen on Reader — collapse all chrome until edge-reveal. */
   immersive?: boolean
@@ -41,6 +44,7 @@ export function useReaderChromeUi({
   bookId,
   registerReaderChrome,
   epubApiRef,
+  pdfApiRef,
   escapeUiRef,
   immersive = false,
 }: UseReaderChromeUiOptions) {
@@ -130,11 +134,13 @@ export function useReaderChromeUi({
    * The global menubar owns opening/closing tools via its Tools item.
    */
   function handleCenterTap() {
-    const { isEpubSurface } = escapeUiRef.current
+    const { isEpubSurface, isPdfSurface } = escapeUiRef.current
     closeFloating()
     blurReaderSidebarFocus()
     if (isEpubSurface) {
       epubApiRef.current?.clearSelection()
+    } else if (isPdfSurface) {
+      pdfApiRef.current?.clearSelection()
     } else {
       window.getSelection()?.removeAllRanges()
     }
@@ -226,6 +232,12 @@ export function useReaderChromeUi({
         setSearchOpen(false)
         return
       }
+      // PDF text selection lives in this document (no iframe): drop it before hiding the chrome —
+      // one level per keypress, like the panels above.
+      if (escapeUiRef.current.isPdfSurface && pdfApiRef.current?.clearSelection()) {
+        e.preventDefault()
+        return
+      }
       if (!chromeHidden) {
         e.preventDefault()
         setChromeHidden(true)
@@ -234,7 +246,7 @@ export function useReaderChromeUi({
 
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [chromeHidden, moreOpen, settingsOpen, setSettingsOpen, searchOpen])
+  }, [chromeHidden, moreOpen, settingsOpen, setSettingsOpen, searchOpen, escapeUiRef, pdfApiRef])
 
   // "Search in Book" shortcut (Settings → Keyboard Shortcuts, Ctrl/Cmd+F by default): reveal chrome
   // if hidden and open the in-book search panel.

@@ -39,9 +39,10 @@ const SURFACE_CAPABILITIES: Record<ReaderSurface, readonly ReaderCapability[]> =
     'wordCount',
     'readingSettings',
   ],
-  // PDF: the placeholder set plus search (Main extracts the text layer, hits paint on the PDF.js
-  // text layer — see docs/implementation_plan/pdf_search.md).
-  pdf: ['interaction', 'search', 'snapshot', 'wordCount', 'readingSettings'],
+  // PDF: search (Main extracts the text layer, hits paint on the PDF.js text layer — see
+  // docs/implementation_plan/pdf_search.md). No `readingSettings`: every Aa option is EPUB reflow
+  // (font, size, margins…) and does nothing to a fixed-layout page; zoom lives in the footer.
+  pdf: ['interaction', 'search', 'snapshot', 'wordCount'],
   placeholder: ['interaction', 'snapshot', 'wordCount', 'readingSettings'],
 }
 

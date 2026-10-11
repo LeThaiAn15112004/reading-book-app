@@ -476,6 +476,16 @@ a[ref='epubjs-mk'].rb-hl-focused {
   cursor: var(--cursor-hand-tool-active) !important;
 }
 
+/* PDF Hand (renderers/pdf): drag pans, so the PDF.js text layer neither selects nor shows its
+   I-beam (`.textLayer :is(span, br) { cursor: text }` in pdf_viewer.css). Unlayered like that
+   sheet, and more specific, so it wins. */
+[data-pdf-tool='hand'] .textLayer,
+[data-pdf-tool='hand'] .textLayer :is(span, br) {
+  cursor: inherit;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
 /*
  * Global custom scrollbar — replaces the default OS scrollbar across all
  * screens. Track matches the app background; thumb is a neutral gray.

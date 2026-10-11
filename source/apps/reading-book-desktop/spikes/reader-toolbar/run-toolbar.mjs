@@ -4,13 +4,16 @@
  *
  *   1. registry        -> unique ids, known groups, shortcut ids exist in the shortcut registry, every
  *                         tool is shown by at least one surface (no dead entries)
- *   2. surfaces        -> format → surface mapping; EPUB / PDF / placeholder capability sets
+ *   2. surfaces        -> format → surface mapping; EPUB / PDF / placeholder capability sets (PDF:
+ *                         no Aa — its options are EPUB reflow)
  *   3. EPUB layout     -> exact groups / order at fold level 0
  *   4. placeholder     -> only tools that work without a renderer (no Search / Audio / Translate / markup)
  *   5. folding         -> Annotation / Tools always dropdowns; navigate + settings never fold; clamps
  *   6. no duplicates   -> zoom / fit / fullscreen stay in the footer, not on the toolbar
  *   7. wiring (static) -> every tool id has a `handleTool` branch; no "coming soon" tool stubs; dropdown
- *                         reuses useDismissOnOutsideOrEscape with consumeEscape
+ *                         reuses useDismissOnOutsideOrEscape with consumeEscape; PDF gets the toolbar tool
+ *                         (Hand / Select), no 1-page / 2-page footer toggle, and a footer inset that
+ *                         doesn't read the EPUB view-mode pref
  *
  * Not covered (needs the running app): ResizeObserver-driven folding at real widths, menu positioning,
  * focus / arrow-key behaviour, clicks inside the EPUB iframe closing the menu.
@@ -74,8 +77,14 @@ check('placeholder is a strict subset of EPUB', () => {
   for (const c of placeholder) assert.ok(epub.has(c), c)
   assert.ok(placeholder.size < epub.size)
 })
-check('PDF = placeholder + search (no audio / translate / markup yet)', () => {
-  assert.deepEqual([...pdf].sort(), [...placeholder, 'search'].sort())
+check('PDF = placeholder + search − Aa (no audio / translate / markup yet)', () => {
+  const expected = [...placeholder, 'search'].filter((c) => c !== 'readingSettings')
+  assert.deepEqual([...pdf].sort(), expected.sort())
+})
+check('Aa (readingSettings) stays on EPUB and the placeholder, not PDF', () => {
+  assert.ok(epub.has('readingSettings'))
+  assert.ok(placeholder.has('readingSettings'))
+  assert.ok(!pdf.has('readingSettings'))
 })
 
 console.log('3. EPUB layout')
@@ -100,11 +109,10 @@ check('only renderer-independent tools', () => {
   ])
 })
 
-check('PDF layout adds Search to the navigate group', () => {
+check('PDF layout: Search in the navigate group, no Settings group', () => {
   assert.deepEqual(shape(resolveToolbarLayout(pdf, 0)), [
     'navigate:inline[hand,select,search]',
     'tools:menu[snapshot,wordCount]',
-    'settings:inline[settings]',
   ])
 })
 
@@ -163,6 +171,20 @@ check('no "coming soon" stubs behind toolbar tools', () => {
 })
 check('dropdown closes on outside click (incl. iframe) and consumes Escape', () => {
   assert.match(menu, /useDismissOnOutsideOrEscape\(menuRef, onDismiss, \{[^}]*consumeEscape: true/)
+})
+const pdfRendererJsx = (() => {
+  const start = screen.search(/<PdfRenderer\s/)
+  assert.ok(start >= 0, '<PdfRenderer> not found')
+  return screen.slice(start, screen.indexOf('/>', start))
+})()
+check('PdfRenderer gets the toolbar tool, Hand pan and center tap', () => {
+  for (const prop of ['interactionTool={activeTool}', 'onHandPanBy=', 'onCenterTap=']) {
+    assert.ok(pdfRendererJsx.includes(prop), prop)
+  }
+})
+check('footer: no 1-page / 2-page toggle for PDF; inset ignores the EPUB view-mode pref', () => {
+  assert.match(screen, /onLayoutChange=\{\s*isPdfSurface\s*\?\s*undefined/)
+  assert.match(screen, /readerChromeBottomInset\(\s*isPdfSurface \? 'scroll' : book\.prefs\.viewMode/)
 })
 
 console.log(`\n${passed} checks passed`)

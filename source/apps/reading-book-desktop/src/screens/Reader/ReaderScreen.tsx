@@ -97,6 +97,7 @@ export function ReaderScreen() {
   const pdfApiRef = useRef<PdfRendererApi | null>(null)
   const escapeUiRef = useRef<ReaderChromeEscapeUi>({
     isEpubSurface: false,
+    isPdfSurface: false,
   })
   const highlightShortcutsRef = useRef<HighlightShortcuts>({
     undo: () => {},
@@ -110,6 +111,7 @@ export function ReaderScreen() {
     bookId,
     registerReaderChrome,
     epubApiRef,
+    pdfApiRef,
     escapeUiRef,
     immersive,
   })
@@ -353,6 +355,7 @@ export function ReaderScreen() {
 
   escapeUiRef.current = {
     isEpubSurface: book.isEpubSurface,
+    isPdfSurface,
   }
 
   const readingStyle = useMemo(
@@ -454,7 +457,12 @@ export function ReaderScreen() {
       chromeHidden={toolsHidden}
       contentInsetLeft={contentInsetLeft}
       contentInsetRight={contentInsetRight}
-      contentInsetBottom={readerChromeBottomInset(book.prefs.viewMode, footerImmersiveHidden)}
+      // PDF is always one continuous scroll — reserve the footer like EPUB's scroll view, whatever
+      // the book's (EPUB-only) view-mode pref says.
+      contentInsetBottom={readerChromeBottomInset(
+        isPdfSurface ? 'scroll' : book.prefs.viewMode,
+        footerImmersiveHidden,
+      )}
       contentInsetResizing={sidebarResize.isResizing}
       dataAttrs={{
         'data-content-status': book.contentStatus,
@@ -533,10 +541,15 @@ export function ReaderScreen() {
             )
           }
           layout={book.prefs.layout}
-          onLayoutChange={(layout) => {
-            book.prefsDirtyRef.current = true
-            book.setPrefs((p) => ({ ...p, layout }))
-          }}
+          // PDF has no 1-page / 2-page spread (yet) — no toggle that the renderer would ignore.
+          onLayoutChange={
+            isPdfSurface
+              ? undefined
+              : (layout) => {
+                  book.prefsDirtyRef.current = true
+                  book.setPrefs((p) => ({ ...p, layout }))
+                }
+          }
           // PDF is always one continuous scroll with real page numbers — no paginated/scroll toggle.
           viewMode={isPdfSurface ? 'paginated' : book.prefs.viewMode}
           onViewModeChange={
@@ -910,6 +923,9 @@ export function ReaderScreen() {
               initialPage={
                 book.resumeLocation instanceof PageRectLocation ? book.resumeLocation.page : 1
               }
+              interactionTool={activeTool}
+              onHandPanBy={zoom.handleHandPanBy}
+              onCenterTap={chrome.handleCenterTap}
               apiRef={pdfApiRef}
               onNavState={(state) => {
                 nav.setPdfNav(state)

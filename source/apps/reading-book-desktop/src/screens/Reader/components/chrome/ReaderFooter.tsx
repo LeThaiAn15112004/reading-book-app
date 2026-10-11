@@ -104,7 +104,8 @@ type ReaderFooterProps = {
   /** Go to Page was requested but there is no page box to focus (scroll view, count not ready). */
   onGoToPageUnavailable?: (reason: 'scroll' | 'not-ready') => void
   layout: PageLayout
-  onLayoutChange: (layout: PageLayout) => void
+  /** Omitted when the surface has no 1-page / 2-page layout (PDF) — the toggle is hidden. */
+  onLayoutChange?: (layout: PageLayout) => void
   /** Paginated (default) vs. continuous vertical scroll within a section. */
   viewMode?: ReadingViewMode
   onViewModeChange?: (viewMode: ReadingViewMode) => void
@@ -351,23 +352,25 @@ export function ReaderFooter({
           </button>
         ) : null}
 
-        <span className={modeGroupClass} aria-label="Page count">
-          {layoutOptions.map((option) => (
-            <button
-              key={option.id}
-              type="button"
-              className={`${modeButtonClass} ${
-                layout === option.id ? modeButtonActiveClass : ''
-              }`}
-              title={option.label}
-              aria-label={option.label}
-              aria-pressed={layout === option.id}
-              onClick={() => onLayoutChange(option.id)}
-            >
-              <PageCountIcon count={option.count} />
-            </button>
-          ))}
-        </span>
+        {onLayoutChange ? (
+          <span className={modeGroupClass} aria-label="Page count">
+            {layoutOptions.map((option) => (
+              <button
+                key={option.id}
+                type="button"
+                className={`${modeButtonClass} ${
+                  layout === option.id ? modeButtonActiveClass : ''
+                }`}
+                title={option.label}
+                aria-label={option.label}
+                aria-pressed={layout === option.id}
+                onClick={() => onLayoutChange(option.id)}
+              >
+                <PageCountIcon count={option.count} />
+              </button>
+            ))}
+          </span>
+        ) : null}
 
         {onViewModeChange ? (
           <span className={modeGroupClass} aria-label="View mode">

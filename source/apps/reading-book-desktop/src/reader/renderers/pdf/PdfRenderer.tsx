@@ -17,6 +17,7 @@ import {
   useRef,
   useState,
   type MutableRefObject,
+  type PointerEvent as ReactPointerEvent,
 } from 'react'
 import {
   GlobalWorkerOptions,
@@ -25,7 +26,12 @@ import {
   type PDFDocumentProxy,
   type PDFPageProxy,
 } from 'pdfjs-dist'
-import { PageRectLocation, type TextMatcher } from '@reading-book/book-reader-sdk'
+import {
+  PageRectLocation,
+  type InteractionTool,
+  type TextMatcher,
+} from '@reading-book/book-reader-sdk'
+import { PAN_DRAG_THRESHOLD_PX } from '../../interaction'
 import { pickSectionMatch, rangeForMatch } from '../epub/search/epubSearchDom'
 import {
   buildPdfTextLayerIndex,
@@ -84,6 +90,8 @@ export interface PdfRendererApi {
    * the current hit (falls back to the page when its text layer can't be matched).
    */
   goToSearchMatch: (target: PdfSearchTarget) => Promise<void>
+  /** Drop a text selection made in the PDF; false when there was none (Escape falls through). */
+  clearSelection: () => boolean
 }
 
 export type PdfSearchTarget = { pageIndex: number; occurrence: number; count: number }
@@ -96,9 +104,36 @@ export interface PdfRendererProps {
   getScrollRoot: () => HTMLElement | null
   /** 1-based page to open at (restored reading position). */
   initialPage?: number
+  /**
+   * Toolbar tool. `hand`: drag scrolls the pages, no text selection. Anything else (`select`, and
+   * the markup tools PDF doesn't offer yet): native text selection on the PDF.js text layer.
+   */
+  interactionTool?: InteractionTool
+  /** Hand drag deltas — the Reader scrolls its zoom viewport (the PDF's one scroll container). */
+  onHandPanBy?: (dx: number, dy: number) => void
+  /** A plain click (no drag, no selection) in the middle half of the page area. */
+  onCenterTap?: () => void
   apiRef?: MutableRefObject<PdfRendererApi | null>
   onNavState?: (state: PdfNavState) => void
   onOutline?: (items: PdfOutlineItem[]) => void
+}
+
+/** One primary-button press on the pages, from pointerdown to pointerup. */
+type PointerGesture = {
+  pointerId: number
+  startX: number
+  startY: number
+  lastX: number
+  lastY: number
+  /** Travelled at least `PAN_DRAG_THRESHOLD_PX` — a drag, never a tap. */
+  moved: boolean
+  /** Hand: the press pans (pointer captured, grabbing cursor). */
+  pan: boolean
+}
+
+function hasTextSelection(): boolean {
+  const selection = window.getSelection()
+  return !!selection && !selection.isCollapsed && selection.toString().trim() !== ''
 }
 
 type Status = { kind: 'loading' } | { kind: 'ready' } | { kind: 'error'; message: string }
@@ -157,6 +192,9 @@ export function PdfRenderer({
   zoom,
   getScrollRoot,
   initialPage = 1,
+  interactionTool = 'select',
+  onHandPanBy,
+  onCenterTap,
   apiRef,
   onNavState,
   onOutline,
@@ -164,6 +202,17 @@ export function PdfRenderer({
   const [doc, setDoc] = useState<PDFDocumentProxy | null>(null)
   const [sizes, setSizes] = useState<PageSize[]>([])
   const [status, setStatus] = useState<Status>({ kind: 'loading' })
+  const [grabbing, setGrabbing] = useState(false)
+
+  const rootRef = useRef<HTMLDivElement | null>(null)
+  const gestureRef = useRef<PointerGesture | null>(null)
+  const hand = interactionTool === 'hand'
+  const handRef = useRef(hand)
+  handRef.current = hand
+  const onHandPanByRef = useRef(onHandPanBy)
+  onHandPanByRef.current = onHandPanBy
+  const onCenterTapRef = useRef(onCenterTap)
+  onCenterTapRef.current = onCenterTap
 
   const slotsRef = useRef<(HTMLDivElement | null)[]>([])
   const renderedRef = useRef(new Map<number, RenderEntry>())
@@ -339,8 +388,13 @@ export function PdfRenderer({
 
       const text = document.createElement('div')
       text.className = 'textLayer'
+      const userUnit = viewport.userUnit ?? 1
       text.style.setProperty('--scale-factor', String(viewport.scale))
-      text.style.setProperty('--user-unit', String(viewport.userUnit ?? 1))
+      text.style.setProperty('--user-unit', String(userUnit))
+      // The text layer sizes its spans (and itself) from `--total-scale-factor`, which
+      // pdf_viewer.css only defines under `.pdfViewer .page` — not used here. Without it the
+      // invisible text drifts off the canvas, so a selection doesn't land on the visible words.
+      text.style.setProperty('--total-scale-factor', String(viewport.scale * userUnit))
       entry.textLayer = new TextLayer({
         textContentSource: page.streamTextContent(),
         container: text,
@@ -461,6 +515,13 @@ export function PdfRenderer({
         if (rect.top < rootRect.top || rect.bottom > rootRect.top + root.clientHeight) {
           root.scrollTop += rect.top - rootRect.top - root.clientHeight / 3
         }
+      },
+      clearSelection: () => {
+        const selection = window.getSelection()
+        const pages = rootRef.current
+        if (!selection || selection.isCollapsed || !pages?.contains(selection.anchorNode)) return false
+        selection.removeAllRanges()
+        return true
       },
     }
     return () => {
@@ -592,6 +653,95 @@ export function PdfRenderer({
     scheduleUpdate()
   }, [zoom, sizes, scheduleUpdate])
 
+  /** Forget the current press; a Hand press also gives the pointer back. */
+  const endGesture = useCallback((): PointerGesture | null => {
+    const gesture = gestureRef.current
+    gestureRef.current = null
+    if (gesture?.pan) {
+      const el = rootRef.current
+      try {
+        if (el?.hasPointerCapture(gesture.pointerId)) el.releasePointerCapture(gesture.pointerId)
+      } catch {
+        /* element already detached */
+      }
+      setGrabbing(false)
+    }
+    return gesture
+  }, [])
+
+  // Switching Hand ↔ Select mid-press (or unmounting) ends that press cleanly.
+  useEffect(() => () => void endGesture(), [hand, endGesture])
+
+  const onPointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (event.button !== 0 || !event.isPrimary) return
+    const pan = handRef.current
+    if (pan) {
+      // No native text selection or drag-image while panning (the text layer is also
+      // `user-select: none` in Hand — see `[data-pdf-tool='hand']` in index.css).
+      event.preventDefault()
+      try {
+        event.currentTarget.setPointerCapture(event.pointerId)
+      } catch {
+        /* ignore */
+      }
+      setGrabbing(true)
+    }
+    gestureRef.current = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      lastX: event.clientX,
+      lastY: event.clientY,
+      moved: false,
+      pan,
+    }
+  }
+
+  const onPointerMove = (event: ReactPointerEvent<HTMLDivElement>) => {
+    const gesture = gestureRef.current
+    if (!gesture || event.pointerId !== gesture.pointerId) return
+    if ((event.buttons & 1) === 0) {
+      // Released somewhere we never heard about (e.g. outside the window in Select).
+      endGesture()
+      return
+    }
+    const dx = event.clientX - gesture.lastX
+    const dy = event.clientY - gesture.lastY
+    gesture.lastX = event.clientX
+    gesture.lastY = event.clientY
+    if (
+      !gesture.moved &&
+      Math.hypot(event.clientX - gesture.startX, event.clientY - gesture.startY) >= PAN_DRAG_THRESHOLD_PX
+    ) {
+      gesture.moved = true
+    }
+    if (!gesture.pan) return
+    if (onHandPanByRef.current) {
+      onHandPanByRef.current(dx, dy)
+    } else {
+      const root = getScrollRootRef.current()
+      if (root) {
+        root.scrollLeft -= dx
+        root.scrollTop -= dy
+      }
+    }
+  }
+
+  const onPointerUp = (event: ReactPointerEvent<HTMLDivElement>) => {
+    const gesture = gestureRef.current
+    if (!gesture || event.pointerId !== gesture.pointerId) return
+    endGesture()
+    if (event.button !== 0 || gesture.moved) return
+    // Select: a press that leaves a selection behind (double / triple click) is not a tap. Hand
+    // can't select, so an older selection there is just what the tap should clear.
+    if (!gesture.pan && hasTextSelection()) return
+    const root = getScrollRootRef.current()
+    if (!root) return
+    const rect = root.getBoundingClientRect()
+    const x = event.clientX - rect.left
+    if (x >= rect.width * 0.25 && x <= rect.width * 0.75) onCenterTapRef.current?.()
+  }
+
   if (status.kind === 'error') {
     return (
       <div className="flex h-full w-full" data-pdf-status="error">
@@ -604,10 +754,25 @@ export function PdfRenderer({
 
   return (
     <div
-      className="flex flex-col items-center"
+      ref={rootRef}
+      className={`flex flex-col items-center ${
+        // Select re-enables text selection: `ReaderShell` is `select-none` for the whole reader
+        // (EPUB lives in its own iframe and is unaffected; PDF is in this document).
+        hand
+          ? `cursor-hand-tool select-none${grabbing ? ' rb-grabbing' : ''}`
+          : 'cursor-select-tool select-text'
+      }`}
       style={{ gap, padding: pad }}
       data-pdf-status={status.kind}
       data-pdf-pages={sizes.length}
+      data-pdf-tool={hand ? 'hand' : 'select'}
+      onPointerDown={onPointerDown}
+      onPointerMove={onPointerMove}
+      onPointerUp={onPointerUp}
+      onPointerCancel={() => void endGesture()}
+      onLostPointerCapture={() => {
+        if (gestureRef.current?.pan) endGesture()
+      }}
     >
       {status.kind === 'loading' ? <p className="mt-6 text-sm">Loading PDF…</p> : null}
       {sizes.map((size, index) => (
