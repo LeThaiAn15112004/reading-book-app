@@ -6,8 +6,12 @@ import {
   type PointerEvent as ReactPointerEvent,
 } from 'react'
 import {
+  createHandHoverDwell,
+  exceedsDragThreshold,
+  isHandHoverCursorTargetAtPoint,
+  isInCenterTapZone,
   isTextNodeAtPoint,
-  PAN_DRAG_THRESHOLD_PX,
+  type HandHoverDwell,
 } from '../../../../reader/interaction'
 import type { InteractionTool } from '@reading-book/book-reader-sdk'
 import type { FakeChapter } from '../../logic'
@@ -41,9 +45,7 @@ function isInteractiveTarget(target: EventTarget | null): boolean {
 }
 
 function isCenterTap(event: MouseEvent<HTMLElement>): boolean {
-  const rect = event.currentTarget.getBoundingClientRect()
-  const x = event.clientX - rect.left
-  return x >= rect.width * 0.25 && x <= rect.width * 0.75
+  return isInCenterTapZone(event.clientX, event.currentTarget.getBoundingClientRect())
 }
 
 const MARGIN: Record<MarginMode, string> = {
@@ -92,9 +94,19 @@ export function ReadingCanvas({
     scrollTop: number
   } | null>(null)
 
-  /** Hand mode: I-beam only while hovering a real text node. */
+  /** Hand mode: I-beam once the hover dwell has armed it over text (shared Hand rules). */
   const [handOverText, setHandOverText] = useState(false)
   const handPanningRef = useRef(false)
+  const dwellRef = useRef<HandHoverDwell | null>(null)
+
+  useEffect(() => {
+    const dwell = createHandHoverDwell(setHandOverText)
+    dwellRef.current = dwell
+    return () => {
+      dwell.dispose()
+      dwellRef.current = null
+    }
+  }, [])
 
   const applySurfaceSelect = (allowSelect: boolean) => {
     const root = surfaceRef.current
@@ -113,22 +125,48 @@ export function ReadingCanvas({
   }, [])
 
   useEffect(() => {
-    if (mode !== 'hand') setHandOverText(false)
+    if (mode !== 'hand') dwellRef.current?.disarm()
   }, [mode])
+
+  /** End a pan press: selection back on (it was suppressed while dragging). */
+  const endPan = () => {
+    gestureRef.current = null
+    if (!handPanningRef.current) return
+    handPanningRef.current = false
+    applySurfaceSelect(true)
+  }
+
+  // Window blur mid-drag (Alt+Tab): no pointerup will come.
+  useEffect(() => {
+    const onBlur = () => {
+      endPan()
+      dwellRef.current?.disarm()
+    }
+    window.addEventListener('blur', onBlur)
+    return () => window.removeEventListener('blur', onBlur)
+    // `endPan` only touches refs and the surface element.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const onPointerDown = (event: ReactPointerEvent<HTMLElement>) => {
     if (event.button !== 0 || isInteractiveTarget(event.target)) return
 
-    const hitText = isTextNodeAtPoint(document, event.clientX, event.clientY)
-    // Hand / Select: text → native select; margin → pan.
-    if (hitText) {
+    // Hand (shared rules): only text the hover dwell has armed (I-beam) selects; any other press
+    // pans, even one that starts on text. Select (unchanged): text selects, margin pans.
+    const selectsText =
+      mode === 'hand'
+        ? !!dwellRef.current?.isArmed() &&
+          isHandHoverCursorTargetAtPoint(document, event.clientX, event.clientY)
+        : isTextNodeAtPoint(document, event.clientX, event.clientY)
+    if (selectsText) {
       gestureRef.current = null
       return
     }
 
     event.preventDefault()
     handPanningRef.current = true
-    setHandOverText(false)
+    dwellRef.current?.disarm()
+    applySurfaceSelect(false)
     gestureRef.current = {
       startX: event.clientX,
       startY: event.clientY,
@@ -141,20 +179,27 @@ export function ReadingCanvas({
   }
 
   const onPointerMove = (event: ReactPointerEvent<HTMLElement>) => {
-    // Hand hover cursor: I-beam on text nodes, grab elsewhere.
-    if (modeRef.current === 'hand' && !handPanningRef.current) {
-      const overText = isTextNodeAtPoint(document, event.clientX, event.clientY)
-      setHandOverText((prev) => (prev === overText ? prev : overText))
+    // Hand hover cursor: grab, then I-beam after resting on text (no button down).
+    if (modeRef.current === 'hand' && !handPanningRef.current && (event.buttons & 1) === 0) {
+      dwellRef.current?.update(
+        isHandHoverCursorTargetAtPoint(document, event.clientX, event.clientY),
+      )
     }
 
     const g = gestureRef.current
-    if (!g || (event.buttons & 1) === 0) return
+    if (!g) return
+    if ((event.buttons & 1) === 0) {
+      // Released somewhere we never heard about.
+      endPan()
+      return
+    }
     const dx = event.clientX - g.lastX
     const dy = event.clientY - g.lastY
     g.lastX = event.clientX
     g.lastY = event.clientY
-    const total = Math.hypot(event.clientX - g.startX, event.clientY - g.startY)
-    if (!g.panned && total >= PAN_DRAG_THRESHOLD_PX) g.panned = true
+    if (!g.panned && exceedsDragThreshold(g.startX, g.startY, event.clientX, event.clientY)) {
+      g.panned = true
+    }
     if (onHandPanBy) {
       onHandPanBy(dx, dy)
     } else {
@@ -165,8 +210,7 @@ export function ReadingCanvas({
 
   const onPointerUp = (event: ReactPointerEvent<HTMLElement>) => {
     const g = gestureRef.current
-    gestureRef.current = null
-    handPanningRef.current = false
+    endPan()
     if (!g || event.button !== 0) return
     if (g.panned) return
     // Margin tap: toggle chrome (toolbar tool unchanged).
@@ -242,8 +286,9 @@ export function ReadingCanvas({
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
-      onPointerCancel={() => {
-        gestureRef.current = null
+      onPointerCancel={endPan}
+      onPointerLeave={() => {
+        if (!handPanningRef.current) dwellRef.current?.update(false)
       }}
       onClick={(e) => {
         if (e.defaultPrevented) return

@@ -31,7 +31,12 @@ import {
   type InteractionTool,
   type TextMatcher,
 } from '@reading-book/book-reader-sdk'
-import { PAN_DRAG_THRESHOLD_PX } from '../../interaction'
+import {
+  createHandHoverDwell,
+  exceedsDragThreshold,
+  isInCenterTapZone,
+  type HandHoverDwell,
+} from '../../interaction'
 import { pickSectionMatch, rangeForMatch } from '../epub/search/epubSearchDom'
 import {
   buildPdfTextLayerIndex,
@@ -105,8 +110,9 @@ export interface PdfRendererProps {
   /** 1-based page to open at (restored reading position). */
   initialPage?: number
   /**
-   * Toolbar tool. `hand`: drag scrolls the pages, no text selection. Anything else (`select`, and
-   * the markup tools PDF doesn't offer yet): native text selection on the PDF.js text layer.
+   * Toolbar tool. `hand`: the shared Hand model (grab cursor; I-beam after resting on text, then a
+   * press on text selects; any other press drags the pages). Anything else (`select`, and the markup
+   * tools PDF doesn't offer yet): native text selection on the PDF.js text layer.
    */
   interactionTool?: InteractionTool
   /** Hand drag deltas — the Reader scrolls its zoom viewport (the PDF's one scroll container). */
@@ -127,9 +133,12 @@ type PointerGesture = {
   lastY: number
   /** Travelled at least `PAN_DRAG_THRESHOLD_PX` — a drag, never a tap. */
   moved: boolean
-  /** Hand: the press pans (pointer captured, grabbing cursor). */
+  /** Hand press that pans (pointer captured, grabbing cursor) — not a text selection. */
   pan: boolean
 }
+
+/** Surface flags set imperatively (not through React) so CSS applies before the next event. */
+type SurfaceFlag = 'data-pdf-hover-text' | 'data-pdf-grabbing'
 
 function hasTextSelection(): boolean {
   const selection = window.getSelection()
@@ -202,10 +211,10 @@ export function PdfRenderer({
   const [doc, setDoc] = useState<PDFDocumentProxy | null>(null)
   const [sizes, setSizes] = useState<PageSize[]>([])
   const [status, setStatus] = useState<Status>({ kind: 'loading' })
-  const [grabbing, setGrabbing] = useState(false)
 
   const rootRef = useRef<HTMLDivElement | null>(null)
   const gestureRef = useRef<PointerGesture | null>(null)
+  const dwellRef = useRef<HandHoverDwell | null>(null)
   const hand = interactionTool === 'hand'
   const handRef = useRef(hand)
   handRef.current = hand
@@ -653,7 +662,28 @@ export function PdfRenderer({
     scheduleUpdate()
   }, [zoom, sizes, scheduleUpdate])
 
-  /** Forget the current press; a Hand press also gives the pointer back. */
+  const setSurfaceFlag = useCallback((flag: SurfaceFlag, on: boolean) => {
+    rootRef.current?.toggleAttribute(flag, on)
+  }, [])
+
+  // Hand hover dwell (shared rules, `reader/interaction/hand-gesture.ts`): arms the I-beam over
+  // text after HAND_HOVER_CURSOR_DELAY_MS — CSS `[data-pdf-hover-text]` in index.css.
+  useEffect(() => {
+    const dwell = createHandHoverDwell((armed) => setSurfaceFlag('data-pdf-hover-text', armed))
+    dwellRef.current = dwell
+    return () => {
+      dwell.dispose()
+      dwellRef.current = null
+    }
+  }, [setSurfaceFlag])
+
+  /** PDF hit-test for the dwell: a glyph run of the text layer (no link layer is rendered). */
+  const isTextAt = (clientX: number, clientY: number): boolean => {
+    const span = document.elementFromPoint(clientX, clientY)?.closest('.textLayer span')
+    return !!span && !!rootRef.current?.contains(span)
+  }
+
+  /** Forget the current press; a pan also gives the pointer back and drops the grabbing cursor. */
   const endGesture = useCallback((): PointerGesture | null => {
     const gesture = gestureRef.current
     gestureRef.current = null
@@ -664,27 +694,46 @@ export function PdfRenderer({
       } catch {
         /* element already detached */
       }
-      setGrabbing(false)
     }
+    setSurfaceFlag('data-pdf-grabbing', false)
     return gesture
-  }, [])
+  }, [setSurfaceFlag])
 
-  // Switching Hand ↔ Select mid-press (or unmounting) ends that press cleanly.
-  useEffect(() => () => void endGesture(), [hand, endGesture])
+  // Switching Hand ↔ Select mid-press (or unmounting) ends that press and drops the I-beam.
+  useEffect(
+    () => () => {
+      endGesture()
+      dwellRef.current?.disarm()
+    },
+    [hand, endGesture],
+  )
+
+  // Window blur mid-drag (Alt+Tab): no pointerup will come — end the press, back to grab.
+  useEffect(() => {
+    const onBlur = () => {
+      endGesture()
+      dwellRef.current?.disarm()
+    }
+    window.addEventListener('blur', onBlur)
+    return () => window.removeEventListener('blur', onBlur)
+  }, [endGesture])
 
   const onPointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
     if (event.button !== 0 || !event.isPrimary) return
-    const pan = handRef.current
+    // Hand: a press on text the dwell has armed selects natively; every other press pans.
+    const pan =
+      handRef.current &&
+      !(dwellRef.current?.isArmed() && isTextAt(event.clientX, event.clientY))
     if (pan) {
-      // No native text selection or drag-image while panning (the text layer is also
-      // `user-select: none` in Hand — see `[data-pdf-tool='hand']` in index.css).
+      dwellRef.current?.disarm()
+      // Synchronously, so `user-select: none` is in place before a selection could start.
+      setSurfaceFlag('data-pdf-grabbing', true)
       event.preventDefault()
       try {
         event.currentTarget.setPointerCapture(event.pointerId)
       } catch {
         /* ignore */
       }
-      setGrabbing(true)
     }
     gestureRef.current = {
       pointerId: event.pointerId,
@@ -699,9 +748,16 @@ export function PdfRenderer({
 
   const onPointerMove = (event: ReactPointerEvent<HTMLDivElement>) => {
     const gesture = gestureRef.current
-    if (!gesture || event.pointerId !== gesture.pointerId) return
+    if (!gesture) {
+      // Hover (no button): feed the dwell. Never while a press is in progress.
+      if (handRef.current && (event.buttons & 1) === 0) {
+        dwellRef.current?.update(isTextAt(event.clientX, event.clientY))
+      }
+      return
+    }
+    if (event.pointerId !== gesture.pointerId) return
     if ((event.buttons & 1) === 0) {
-      // Released somewhere we never heard about (e.g. outside the window in Select).
+      // Released somewhere we never heard about (e.g. outside the window while selecting).
       endGesture()
       return
     }
@@ -711,7 +767,7 @@ export function PdfRenderer({
     gesture.lastY = event.clientY
     if (
       !gesture.moved &&
-      Math.hypot(event.clientX - gesture.startX, event.clientY - gesture.startY) >= PAN_DRAG_THRESHOLD_PX
+      exceedsDragThreshold(gesture.startX, gesture.startY, event.clientX, event.clientY)
     ) {
       gesture.moved = true
     }
@@ -732,14 +788,13 @@ export function PdfRenderer({
     if (!gesture || event.pointerId !== gesture.pointerId) return
     endGesture()
     if (event.button !== 0 || gesture.moved) return
-    // Select: a press that leaves a selection behind (double / triple click) is not a tap. Hand
-    // can't select, so an older selection there is just what the tap should clear.
+    // A press that leaves a selection behind (double / triple click on text) is not a tap. A pan
+    // press can't select, so an older selection there is just what the tap should clear.
     if (!gesture.pan && hasTextSelection()) return
     const root = getScrollRootRef.current()
-    if (!root) return
-    const rect = root.getBoundingClientRect()
-    const x = event.clientX - rect.left
-    if (x >= rect.width * 0.25 && x <= rect.width * 0.75) onCenterTapRef.current?.()
+    if (root && isInCenterTapZone(event.clientX, root.getBoundingClientRect())) {
+      onCenterTapRef.current?.()
+    }
   }
 
   if (status.kind === 'error') {
@@ -755,13 +810,9 @@ export function PdfRenderer({
   return (
     <div
       ref={rootRef}
-      className={`flex flex-col items-center ${
-        // Select re-enables text selection: `ReaderShell` is `select-none` for the whole reader
-        // (EPUB lives in its own iframe and is unaffected; PDF is in this document).
-        hand
-          ? `cursor-hand-tool select-none${grabbing ? ' rb-grabbing' : ''}`
-          : 'cursor-select-tool select-text'
-      }`}
+      // Cursor + text selection per tool come from `[data-pdf-tool]` rules in index.css (they must
+      // beat pdf_viewer.css, and `ReaderShell` is `select-none` for the whole reader).
+      className="flex flex-col items-center"
       style={{ gap, padding: pad }}
       data-pdf-status={status.kind}
       data-pdf-pages={sizes.length}
@@ -772,6 +823,9 @@ export function PdfRenderer({
       onPointerCancel={() => void endGesture()}
       onLostPointerCapture={() => {
         if (gestureRef.current?.pan) endGesture()
+      }}
+      onPointerLeave={() => {
+        if (!gestureRef.current) dwellRef.current?.update(false)
       }}
     >
       {status.kind === 'loading' ? <p className="mt-6 text-sm">Loading PDF…</p> : null}

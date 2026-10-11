@@ -476,14 +476,45 @@ a[ref='epubjs-mk'].rb-hl-focused {
   cursor: var(--cursor-hand-tool-active) !important;
 }
 
-/* PDF Hand (renderers/pdf): drag pans, so the PDF.js text layer neither selects nor shows its
-   I-beam (`.textLayer :is(span, br) { cursor: text }` in pdf_viewer.css). Unlayered like that
-   sheet, and more specific, so it wins. */
+/*
+ * PDF surface (renderers/pdf, `data-pdf-tool` + flags PdfRenderer toggles imperatively). Unlayered
+ * like pdf_viewer.css — its `.textLayer :is(span, br) { cursor: text }` beats any layered Tailwind
+ * utility — and more specific. `ReaderShell` is select-none for the whole reader, so Select turns
+ * selection back on here. Hand follows the EPUB rules (`rb-tool-hand` / `rb-hover-text` /
+ * `rb-grabbing` in reader/interaction/cursors.ts).
+ */
+[data-pdf-tool='select'] {
+  cursor: var(--cursor-select-tool);
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+/* Hand: grab everywhere, even over text — a quick drag across text pans… */
+[data-pdf-tool='hand'],
 [data-pdf-tool='hand'] .textLayer,
 [data-pdf-tool='hand'] .textLayer :is(span, br) {
-  cursor: inherit;
+  cursor: var(--cursor-hand-tool);
   user-select: none;
   -webkit-user-select: none;
+}
+
+/* …until the pointer rests on text (hover dwell): I-beam, and a press there selects. */
+[data-pdf-tool='hand'][data-pdf-hover-text] .textLayer,
+[data-pdf-tool='hand'][data-pdf-hover-text] .textLayer :is(span, br) {
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+[data-pdf-tool='hand'][data-pdf-hover-text] .textLayer :is(span, br) {
+  cursor: var(--cursor-select-tool);
+}
+
+/* While panning: grabbing, and nothing can be selected. */
+[data-pdf-tool='hand'][data-pdf-grabbing],
+[data-pdf-tool='hand'][data-pdf-grabbing] * {
+  cursor: var(--cursor-hand-tool-active) !important;
+  user-select: none !important;
+  -webkit-user-select: none !important;
 }
 
 /*

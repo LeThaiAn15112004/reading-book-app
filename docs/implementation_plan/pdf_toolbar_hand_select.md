@@ -62,6 +62,10 @@ Người dùng báo: chọn Select, kéo qua chữ PDF nhưng không thấy vùn
 Sau hai sửa đổi: người dùng xác nhận bôi đen hiển thị đúng ở Select (kiểm tra thủ công trong app).
 Kiểm tra lại: `npm run typecheck`, eslint trên `PdfRenderer.tsx`, `npx vite build` đều đạt.
 
+> **Cập nhật sau:** Hand ở PDF đã chuyển sang quy tắc của EPUB (dừng trên chữ ~300 ms → I-beam →
+> chọn được text). Các mục "Hand không bao giờ chọn text" dưới đây đã lỗi thời; xem
+> `hand_mode_unified.md`.
+
 ## 3. Hành vi sau thay đổi
 
 | | EPUB | PDF |
