@@ -1,7 +1,14 @@
 import { SdkError } from '../core/errors.js'
 import type { BookmarkRecord } from '../domain/annotation/bookmark.js'
 import type { HighlightRecord } from '../domain/annotation/highlight.js'
-import type { Book, BookAuthor, BookGenre, ReadingSessionState } from '../domain/index.js'
+import {
+  Book,
+  Location,
+  ReadingSessionState,
+  type BookAuthor,
+  type BookGenre,
+  type BookProps,
+} from '../domain/index.js'
 import type { LibraryStore } from '../domain-ports/library-store.js'
 import type { OverlayStore, SaveBookmarkInput, SaveHighlightInput } from '../domain-ports/overlay-store.js'
 import type { FileRef, FileSystemAdapter } from '../ports/file-system.js'
@@ -10,6 +17,19 @@ import type { StorageAdapter } from '../ports/storage.js'
 /** JSON round-trip copy: proves adapters never share mutable objects with the stores. */
 function clone<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T
+}
+
+/** Fresh `Book` instance — the port returns the domain class, like the SQLite store does. */
+function cloneBook(book: Book): Book {
+  return new Book(clone(book) as BookProps)
+}
+
+/** Fresh `ReadingSessionState` with a revived `Location` (a JSON copy would lose its methods). */
+function cloneSession(session: ReadingSessionState): ReadingSessionState {
+  return new ReadingSessionState({
+    ...clone(session),
+    lastReadLocation: Location.parse(session.lastReadLocation.toString()),
+  })
 }
 
 let nextId = 1
@@ -48,19 +68,19 @@ export function createInMemoryStorage(): InMemoryStorage {
       .map(clone)
 
   const library: LibraryStore = {
-    findById: async (id) => (books.has(id) ? clone(books.get(id) as Book) : undefined),
+    findById: async (id) => (books.has(id) ? cloneBook(books.get(id) as Book) : undefined),
     findBySha256: async (sha256) => {
       const found = [...books.values()].find((b) => b.sha256 === sha256)
-      return found ? clone(found) : undefined
+      return found ? cloneBook(found) : undefined
     },
     findByAuthor: async (authorId) => {
       const bookIds = [...bookAuthors.entries()]
         .filter(([, links]) => links.some((l) => l.authorId === authorId))
         .map(([bookId]) => bookId)
-      return bookIds.map((id) => books.get(id)).filter((b): b is Book => b !== undefined).map(clone)
+      return bookIds.map((id) => books.get(id)).filter((b): b is Book => b !== undefined).map(cloneBook)
     },
     save: async (book) => {
-      books.set(book.id, clone(book))
+      books.set(book.id, cloneBook(book))
     },
     linkAuthors: async (bookId, authors) => {
       bookAuthors.set(bookId, clone(authors))
@@ -121,9 +141,9 @@ export function createInMemoryStorage(): InMemoryStorage {
   }
 
   const overlays: OverlayStore = {
-    getSessionState: async (bookId) => (sessions.has(bookId) ? clone(sessions.get(bookId) as ReadingSessionState) : undefined),
+    getSessionState: async (bookId) => (sessions.has(bookId) ? cloneSession(sessions.get(bookId) as ReadingSessionState) : undefined),
     saveSessionState: async (session) => {
-      sessions.set(session.bookId, clone(session))
+      sessions.set(session.bookId, cloneSession(session))
     },
     listBookmarks: (bookId) => Promise.resolve(byBook(bookmarks, bookId)),
     saveBookmark,

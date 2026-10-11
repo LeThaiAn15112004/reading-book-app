@@ -31,8 +31,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "build": "node scripts/build.mjs",
-    "example:node": "node examples/node-host/host.mjs",
-    "verify": "npm run typecheck && npm run typecheck:tests && npm test && npm run build && npm run example:node"
+    "verify": "npm run typecheck && npm run typecheck:tests && npm test && npm run build"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.13",

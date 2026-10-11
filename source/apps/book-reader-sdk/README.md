@@ -38,9 +38,8 @@ book-reader-sdk/
 │   ├── services/           use case: library (import/dedupe/rollback), annotations, bookmarks, session
 │   ├── stores/             zustand vanilla: library, annotations, bookmarks, session
 │   └── testing/            adapter in-memory (spec thực thi được của các port)
-└── examples/
-    ├── node-host/          host Node chạy end-to-end (node:sqlite, node:fs, zip tự viết)
-    └── expo-host/          template expo-sqlite / expo-file-system / expo-crypto + metro.config.js
+└── tests/                  vitest — unit test (cùng cấu trúc src/) + integration/reader-flow.test.ts
+                            (import → mở sách → annotate → undo/redo → bookmark → autosave → mở lại)
 ```
 
 ## Kiến trúc
@@ -97,7 +96,7 @@ interface SqlDatabase {
 
 ```bash
 cd source/apps/book-reader-sdk
-npm run verify        # typecheck → typecheck test → unit test → build → chạy node-host end-to-end
+npm run verify        # typecheck → typecheck test → unit + integration test → build
 npm test              # chỉ chạy unit test (vitest, tests/**/*.test.ts)
 ```
 
@@ -145,8 +144,15 @@ const { createBookReaderSdk } = require('../libs/book-reader-sdk')      // packa
 resolve: { alias: { '@reading-book/book-reader-sdk': path.resolve(__dirname, '../book-reader-sdk/dist/index.mjs') } }
 ```
 
-Expo/Metro: xem `examples/expo-host/metro.config.js` (`watchFolders` + `extraNodeModules`, vì Metro
-mặc định không đọc file ngoài project root).
+Expo/Metro mặc định không đọc file ngoài project root, nên `metro.config.js` của app cần:
+
+```js
+const SDK_DIR = path.resolve(__dirname, '../book-reader-sdk')
+const config = getDefaultConfig(__dirname)
+config.watchFolders = [...(config.watchFolders ?? []), SDK_DIR]
+config.resolver.extraNodeModules = { ...config.resolver.extraNodeModules, '@reading-book/book-reader-sdk': SDK_DIR }
+for (const ext of ['cjs', 'mjs']) if (!config.resolver.sourceExts.includes(ext)) config.resolver.sourceExts.push(ext)
+```
 
 ## Khởi tạo
 
@@ -212,9 +218,7 @@ await sdk.dispose()     // mọi lời gọi sau đó ném SdkError('DISPOSED')
 | Dùng gì | `sdk.services.*` trong IPC handler | `sdk.stores.*` qua hooks |
 
 Ví dụ tích hợp Electron chính là app desktop thật (`apps/reading-book-desktop`): Main ở
-`electron/persistence/` + `electron/ipc/`, Renderer ở `src/bridge/` + `src/hooks/`. (Bản mẫu
-`examples/electron-host/` cũ đã bị xoá vì lặp lại phần đó và không theo kịp API SDK.)
-
+`electron/persistence/` + `electron/ipc/`, Renderer ở `src/bridge/` + `src/hooks/`.
 ## Lộ trình áp dụng vào desktop app
 
 1. Thêm alias `@reading-book/book-reader-sdk` (tsconfig + vite, cả bản build Electron main).
