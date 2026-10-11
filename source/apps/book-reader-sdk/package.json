@@ -27,15 +27,19 @@
   "sideEffects": false,
   "scripts": {
     "typecheck": "tsc -p tsconfig.json",
+    "typecheck:tests": "tsc -p tests/tsconfig.json",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "build": "node scripts/build.mjs",
     "example:node": "node examples/node-host/host.mjs",
     "example:typecheck": "tsc -p examples/electron-host/tsconfig.json",
-    "verify": "npm run typecheck && npm run build && npm run example:typecheck && npm run example:node"
+    "verify": "npm run typecheck && npm run typecheck:tests && npm test && npm run build && npm run example:typecheck && npm run example:node"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.13",
     "rolldown": "^1.1.5",
     "typescript": "^5.9.3",
+    "vitest": "^3.2.7",
     "zustand": "^5.0.15"
   }
 }

@@ -77,13 +77,15 @@ Desktop app (`cd source/apps/reading-book-desktop`):
   `spike:settings:reminders` (Reading Reminder rules at UTC+7, SQLite on the real schema, minute-aligned worker),
   `spike:reader:toolbar` (capability-driven Reader toolbar: per-surface tools, fold order, handler wiring)
 
-SDK (`cd source/apps/book-reader-sdk`): `npm run typecheck`, `npm run build`, `npm run verify` (typecheck + build +
-example-host typecheck + Node example run).
+SDK (`cd source/apps/book-reader-sdk`): `npm run typecheck`, `npm test` (vitest, single file:
+`npx vitest run tests/text/chunk-text.test.ts`), `npm run test:watch`, `npm run typecheck:tests`, `npm run build`,
+`npm run verify` (typecheck + test typecheck + tests + build + example-host typecheck + Node example run).
 
 Mobile app (`cd source/apps/reading-book-mobile`): `npm run start`, `android`, `ios`, `web`, `lint`.
 
-**There is no test runner configured anywhere in the repo** (no `*.test.*` files, no vitest/jest config, no `test`
-script) — don't assume a test suite exists or try to run one. Checks are the standalone spike scripts above.
+**Unit tests exist only in `book-reader-sdk`** (vitest, `node` environment, files under `tests/**/*.test.ts`
+mirroring `src/`, importing from `../../src/...`). The desktop and mobile apps have no test runner — their checks are
+the standalone spike scripts above.
 
 ## Architecture
 

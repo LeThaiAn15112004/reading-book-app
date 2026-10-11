@@ -1,0 +1,6 @@
+{
+  // Typecheck for unit tests. Extends the SDK config; tests themselves may only reach the SDK
+  // through `../src`, so the core's no-DOM / no-Node guarantee is still enforced by tsconfig.json.
+  "extends": "../tsconfig.json",
+  "include": ["./**/*.ts"]
+}
