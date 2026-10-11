@@ -49,6 +49,19 @@ Chi tiết `PdfRenderer` (một bộ handler React trên khối trang, không c�
 - Ctrl+wheel zoom: không đổi (listener capture của `ReaderZoomViewport`, `focusZoomEnabled` luôn
   bật với PDF). Cuộn thường: không đổi. Tô kết quả tìm kiếm: không đụng tới.
 
+### 2.1 Sửa thêm sau khi chạy thử: kéo thả ở Select không bôi đen
+
+Người dùng báo: chọn Select, kéo qua chữ PDF nhưng không thấy vùng bôi đen. Hai nguyên nhân độc lập,
+đều có từ trước phase này:
+
+| Nguyên nhân | Hệ quả | Sửa |
+|---|---|---|
+| `ReaderShell` (`src/reader/chrome/ReaderShell.tsx`) đặt `select-none` cho toàn bộ Reader. EPUB nằm trong iframe riêng nên không bị ảnh hưởng; placeholder tự đặt `userSelect: 'text'`; PDF nằm thẳng trong document nên kế thừa `none` | Không chọn được text PDF ở bất kỳ chế độ nào | `PdfRenderer`: khối trang có `select-text` khi không phải Hand (Hand vẫn `select-none`) |
+| PDF.js 5 tính cỡ chữ span và kích thước text layer từ `--total-scale-factor`, biến này chỉ được khai báo dưới `.pdfViewer .page` trong `pdf_viewer.css` (class không dùng ở đây) | Text layer ẩn lệch khỏi chữ trên canvas: vùng chọn (và tô kết quả tìm kiếm) không nằm đúng chữ | `PdfRenderer`: đặt `--total-scale-factor = viewport.scale × userUnit` trên mỗi text layer, cạnh `--scale-factor` / `--user-unit` |
+
+Sau hai sửa đổi: người dùng xác nhận bôi đen hiển thị đúng ở Select (kiểm tra thủ công trong app).
+Kiểm tra lại: `npm run typecheck`, eslint trên `PdfRenderer.tsx`, `npx vite build` đều đạt.
+
 ## 3. Hành vi sau thay đổi
 
 | | EPUB | PDF |
