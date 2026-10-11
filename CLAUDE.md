@@ -83,6 +83,9 @@ SDK (`cd source/apps/book-reader-sdk`): `npm run typecheck`, `npm test` (vitest,
 
 Mobile app (`cd source/apps/reading-book-mobile`): `npm run start`, `android`, `ios`, `web`, `lint`.
 
+**CI** (`.github/workflows/ci.yml`, every push and PR, Ubuntu, `npm ci` in `source/`): SDK typecheck, test
+typecheck, tests, build; desktop typecheck and lint. Keep all six green locally before pushing.
+
 **Unit tests exist only in `book-reader-sdk`** (vitest, `node` environment, files under `tests/**/*.test.ts`
 mirroring `src/`, importing from `../../src/...`; `tests/integration/reader-flow.test.ts` drives the public API
 end-to-end on `createInMemoryStorage()` — update it when the SDK API changes). The desktop and mobile apps have no test runner — their checks are

@@ -1,0 +1,61 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    name: Typecheck · Lint · Test
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: source
+    env:
+      # Typecheck / lint / unit tests never launch Electron — skip the ~100 MB binary download.
+      ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: source/package-lock.json
+
+      - name: Install
+        id: install
+        run: npm ci
+
+      # Each check runs even when an earlier check failed, so one push reports every problem.
+      - name: SDK · typecheck
+        if: (success() || failure()) && steps.install.outcome == 'success'
+        run: npm run typecheck -w @reading-book/book-reader-sdk
+
+      - name: SDK · typecheck tests
+        if: (success() || failure()) && steps.install.outcome == 'success'
+        run: npm run typecheck:tests -w @reading-book/book-reader-sdk
+
+      - name: SDK · test
+        if: (success() || failure()) && steps.install.outcome == 'success'
+        run: npm test -w @reading-book/book-reader-sdk
+
+      - name: SDK · build
+        if: (success() || failure()) && steps.install.outcome == 'success'
+        run: npm run build -w @reading-book/book-reader-sdk
+
+      - name: Desktop · typecheck
+        if: (success() || failure()) && steps.install.outcome == 'success'
+        run: npm run typecheck -w reading-book-desktop
+
+      - name: Desktop · lint
+        if: (success() || failure()) && steps.install.outcome == 'success'
+        run: npm run lint -w reading-book-desktop
