@@ -1,8 +1,7 @@
 import { SdkError, isSdkError } from '../../core/errors.js'
 import { platformGlobals } from '../../core/platform-globals.js'
-import type { Logger } from '../../ports/platform.js'
+import type { AbortSignalLike, Logger } from '../../ports/platform.js'
 import type {
-  AbortSignalLike,
   TranslationEngine,
   TranslationLoadProgress,
   TranslationLoadProgressListener,

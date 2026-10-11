@@ -1,9 +1,8 @@
 import type {
-  AbortSignalLike,
   TranslationEngineLoader,
   TranslationLoadProgressListener,
 } from '../../ports/translation.js'
-import type { Logger } from '../../ports/platform.js'
+import type { AbortSignalLike, Logger } from '../../ports/platform.js'
 
 export const DEFAULT_TRANSLATION_MODEL_ID = 'Xenova/opus-mt-en-vi'
 

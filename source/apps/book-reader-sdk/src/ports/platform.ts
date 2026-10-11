@@ -29,3 +29,11 @@ export interface Logger {
 export interface HashAdapter {
   sha256Hex(bytes: Uint8Array): Promise<string>
 }
+
+/** Minimal `AbortSignal` shape — the SDK core compiles without DOM typings. */
+export interface AbortSignalLike {
+  readonly aborted: boolean
+  readonly reason?: unknown
+  addEventListener(type: 'abort', listener: () => void, options?: { once?: boolean }): void
+  removeEventListener(type: 'abort', listener: () => void): void
+}

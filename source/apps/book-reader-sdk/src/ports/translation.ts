@@ -5,6 +5,7 @@
  *
  * Reference implementation: `host-adapters/translation/transformers-translation-engine.ts`.
  */
+import type { AbortSignalLike } from './platform.js'
 
 /** One progress event while model files are fetched / read from cache / compiled. */
 export type TranslationLoadProgress = {
@@ -48,11 +49,3 @@ export interface TranslationEngine {
 
 /** Loads (downloads on first use, then from cache) a model and returns a ready engine. */
 export type TranslationEngineLoader = (options: TranslationEngineLoadOptions) => Promise<TranslationEngine>
-
-/** Minimal `AbortSignal` shape — the SDK core compiles without DOM typings. */
-export interface AbortSignalLike {
-  readonly aborted: boolean
-  readonly reason?: unknown
-  addEventListener(type: 'abort', listener: () => void, options?: { once?: boolean }): void
-  removeEventListener(type: 'abort', listener: () => void): void
-}
