@@ -44,13 +44,11 @@ export function openGoogleOAuthViaLoopback(
 ): Promise<LoopbackAuthResult> {
   return new Promise((resolve) => {
     let settled = false
-    let server: Server | undefined
-
     const finish = (result: LoopbackAuthResult) => {
       if (settled) return
       settled = true
       clearTimeout(timer)
-      server?.close()
+      server.close()
       resolve(result)
     }
 
@@ -58,7 +56,7 @@ export function openGoogleOAuthViaLoopback(
       finish({ error: 'Sign-in timed out. Please try connecting again.' })
     }, timeoutMs)
 
-    server = createServer((req, res) => {
+    const server: Server = createServer((req, res) => {
       const url = new URL(req.url ?? '/', `http://${GOOGLE_OAUTH_LOOPBACK_HOST}:${GOOGLE_OAUTH_LOOPBACK_PORT}`)
       if (url.pathname !== GOOGLE_OAUTH_LOOPBACK_CALLBACK_PATH) {
         res.writeHead(404).end()

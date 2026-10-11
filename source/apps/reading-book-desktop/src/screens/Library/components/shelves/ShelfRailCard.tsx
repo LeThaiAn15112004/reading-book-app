@@ -27,8 +27,17 @@ function CloudBadgeIcon({ className }: { className?: string }) {
   )
 }
 
+/** The fields the card reads — a full `LibraryBook` or a lighter shelf item both fit. */
+export type ShelfRailCardBook = Pick<LibraryBook, 'id' | 'title'> &
+  Partial<
+    Pick<
+      LibraryBook,
+      'author' | 'coverUrl' | 'isFavorite' | 'status' | 'progressPercent' | 'lastReadLocation' | 'format' | 'sourceProvider'
+    >
+  >
+
 export type ShelfRailCardProps = {
-  book: LibraryBook
+  book: ShelfRailCardBook
   onOpen: (bookId: string) => void
   onBookMenu: (bookId: string, point: BookMenuPoint) => void
   /** Width classes; default fixed 132px (collection grid). Library grid passes `w-full`. */

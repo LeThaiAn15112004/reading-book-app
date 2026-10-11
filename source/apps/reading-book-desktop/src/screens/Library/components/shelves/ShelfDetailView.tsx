@@ -94,7 +94,7 @@ export function ShelfDetailView({
               {items.map((item) => (
                 <div key={item.id} className="w-[132px]">
                   <ShelfRailCard
-                    book={item as any}
+                    book={item}
                     onOpen={onOpenItem}
                     onBookMenu={onBookMenu}
                   />

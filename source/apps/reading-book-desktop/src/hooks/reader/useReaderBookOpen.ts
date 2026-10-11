@@ -9,6 +9,7 @@ import {
   readingPrefsFromGlobal,
   readingPrefsFromSession,
   type GlobalReadingPrefs,
+  type ReadingSessionPrefsFields,
   type ResolvedReadingPrefs,
 } from '@reading-book/book-reader-sdk'
 
@@ -26,16 +27,18 @@ const DEFAULT_PREFS: ResolvedReadingPrefs = {
 
 export type ReaderBookOpenClient = {
   getBook: (bookId: string) => Promise<{ title?: string; coverUrl?: string; author?: string } | null>
-  getSessionState: (bookId: string) => Promise<any>
+  getSessionState: (
+    bookId: string,
+  ) => Promise<(ReadingSessionPrefsFields & { lastReadLocation?: string }) | null>
   openBookContent: (bookId: string) => Promise<{
     ok: boolean
-    data?: any
+    data?: ArrayBuffer | ArrayBufferView
     format?: string | null
     /** Stable failure code, e.g. `missing_file` when the book's file was moved or deleted. */
     errorCode?: string | null
     errorMessage?: string | null
   }>
-  markAsReading: (bookId: string) => Promise<any>
+  markAsReading: (bookId: string) => Promise<unknown>
 }
 
 export type UseReaderBookOpenOptions = {
@@ -55,11 +58,13 @@ function defaultParseResumeLocation(raw: string | undefined): CfiLocation | unde
     if (location instanceof CfiLocation) {
       return location
     }
-  } catch {}
+  } catch {
+    // Not Location JSON (legacy placeholder) — start from the beginning.
+  }
   return undefined
 }
 
-function toArrayBuffer(data: any): ArrayBuffer {
+function toArrayBuffer(data: ArrayBuffer | ArrayBufferView): ArrayBuffer {
   if (data instanceof ArrayBuffer) {
     const copy = new Uint8Array(data.byteLength)
     copy.set(new Uint8Array(data))

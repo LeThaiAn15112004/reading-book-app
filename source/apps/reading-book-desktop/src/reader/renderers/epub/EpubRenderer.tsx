@@ -1279,6 +1279,9 @@ export function EpubRenderer({
       window.removeEventListener('pointercancel', onGlobalPointerEnd, true)
       clearHandPanGesture()
     }
+    // `clearHandPanGesture` is a per-render function that only touches refs; listing it would
+    // re-attach the window listeners on every render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- ref-only helper, see above
   }, [status])
 
   useEffect(() => {

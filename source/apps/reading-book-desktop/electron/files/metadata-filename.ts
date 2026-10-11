@@ -8,6 +8,7 @@ import path from 'node:path'
  */
 export function sanitizeFilename(name: string): string {
   const illegalChars = /[\\/:*?"<>|]/g
+  // eslint-disable-next-line no-control-regex -- stripping control characters is the point
   const controlChars = /[\x00-\x1f]/g
   const cleaned = name
     .replace(illegalChars, ' ')

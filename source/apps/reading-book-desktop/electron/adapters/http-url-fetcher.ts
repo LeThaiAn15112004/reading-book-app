@@ -63,6 +63,7 @@ function isHtmlContentType(contentType: string | null): boolean {
 }
 
 function safeFileName(name: string): string {
+  // eslint-disable-next-line no-control-regex -- stripping control characters is the point
   const base = path.basename(name).replace(/[<>:"|?*\u0000-\u001f]/g, '_').trim()
   return base || 'downloaded-document'
 }
@@ -174,7 +175,7 @@ export class HttpUrlFetcher implements UrlDocumentFetcher {
       let redirects = 0
       let response: Response | undefined
 
-      while (true) {
+      for (;;) {
         try {
           response = await fetch(current.href, {
             method: 'GET',

@@ -1,50 +1,8 @@
-import { useCallback, useState } from 'react'
-
-import {
-  PAGE_LAYOUT_COLUMN_STEPS,
-  PAGE_LAYOUT_DEFAULT_STEP,
-  columnsForStep,
-  type PageLayoutColumnCount,
-} from './pageLayoutGrid'
+import type { PageLayoutColumnCount } from './pageLayoutGrid'
+import type { PageLayoutGridState } from './usePageLayoutGrid'
 
 const zoomButtonClass =
   'inline-flex size-7 cursor-pointer items-center justify-center rounded-md border border-lib-border-soft bg-lib-bg-mid/40 text-sm font-bold text-lib-muted transition-colors hover:border-lib-accent-ring hover:bg-lib-accent-soft hover:text-lib-accent disabled:cursor-not-allowed disabled:opacity-35'
-
-export type PageLayoutGridState = {
-  columns: PageLayoutColumnCount
-  step: number
-  zoomIn: () => void
-  zoomOut: () => void
-  canZoomIn: boolean
-  canZoomOut: boolean
-}
-
-export function usePageLayoutGrid(
-  initialStep = PAGE_LAYOUT_DEFAULT_STEP,
-): PageLayoutGridState {
-  const [step, setStep] = useState(initialStep)
-
-  const zoomIn = useCallback(() => {
-    setStep((current) => Math.max(0, current - 1))
-  }, [])
-
-  const zoomOut = useCallback(() => {
-    setStep((current) =>
-      Math.min(PAGE_LAYOUT_COLUMN_STEPS.length - 1, current + 1),
-    )
-  }, [])
-
-  const columns = columnsForStep(step)
-
-  return {
-    columns,
-    step,
-    zoomIn,
-    zoomOut,
-    canZoomIn: step > 0,
-    canZoomOut: step < PAGE_LAYOUT_COLUMN_STEPS.length - 1,
-  }
-}
 
 type PageLayoutZoomControlsProps = Pick<
   PageLayoutGridState,

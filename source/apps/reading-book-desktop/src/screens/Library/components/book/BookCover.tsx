@@ -8,7 +8,7 @@ const COVER_GRADS = [
   'linear-gradient(135deg, #831843, #ec4899)',
 ] as const
 
-export function coverGradForId(id: string): string {
+function coverGradForId(id: string): string {
   let hash = 0
   for (let i = 0; i < id.length; i++) hash = (hash + id.charCodeAt(i)) % 5
   return COVER_GRADS[hash % 5]

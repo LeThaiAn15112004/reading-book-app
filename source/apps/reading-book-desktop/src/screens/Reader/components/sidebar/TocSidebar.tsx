@@ -7,8 +7,8 @@ import { NoteItemMenu } from './NoteItemMenu'
 import {
   PageLayoutPanel,
   PageLayoutZoomControls,
-  usePageLayoutGrid,
 } from './PageLayoutPanel'
+import { usePageLayoutGrid } from './usePageLayoutGrid'
 import {
   READER_FOOTER_HEIGHT_PX,
   SIDEBAR_RAIL_WIDTH_PX,
