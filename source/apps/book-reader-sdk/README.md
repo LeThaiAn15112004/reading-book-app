@@ -40,7 +40,6 @@ book-reader-sdk/
 │   └── testing/            adapter in-memory (spec thực thi được của các port)
 └── examples/
     ├── node-host/          host Node chạy end-to-end (node:sqlite, node:fs, zip tự viết)
-    ├── electron-host/      main: better-sqlite3 + schema desktop hiện có; renderer: IPC storage, epub.js surface, React hooks
     └── expo-host/          template expo-sqlite / expo-file-system / expo-crypto + metro.config.js
 ```
 
@@ -98,7 +97,8 @@ interface SqlDatabase {
 
 ```bash
 cd source/apps/book-reader-sdk
-npm run verify        # typecheck → build → typecheck ví dụ Electron → chạy node-host end-to-end
+npm run verify        # typecheck → typecheck test → unit test → build → chạy node-host end-to-end
+npm test              # chỉ chạy unit test (vitest, tests/**/*.test.ts)
 ```
 
 Trong repo này devDependencies (rolldown, typescript, zustand) được resolve từ `source/node_modules`
@@ -211,9 +211,9 @@ await sdk.dispose()     // mọi lời gọi sau đó ném SdkError('DISPOSED')
 | fs / zip / hash | `node:fs`, JSZip, `node:crypto` | — (renderer không bao giờ thấy path thật) |
 | Dùng gì | `sdk.services.*` trong IPC handler | `sdk.stores.*` qua hooks |
 
-File mẫu: `examples/electron-host/main/*`, `examples/electron-host/renderer/*` (typecheck bằng
-`npm run example:typecheck`). Repo `desktop-sqlite-storage.ts` đã được chạy thử trên DB dựng từ
-toàn bộ migrations 001–020 của app.
+Ví dụ tích hợp Electron chính là app desktop thật (`apps/reading-book-desktop`): Main ở
+`electron/persistence/` + `electron/ipc/`, Renderer ở `src/bridge/` + `src/hooks/`. (Bản mẫu
+`examples/electron-host/` cũ đã bị xoá vì lặp lại phần đó và không theo kịp API SDK.)
 
 ## Lộ trình áp dụng vào desktop app
 

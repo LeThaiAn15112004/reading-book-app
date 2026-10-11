@@ -20,7 +20,7 @@ source/                          # npm workspaces root (workspaces: apps/*, pack
 │   │   ├── src/                 # domain, domain-ports, ports, services (use cases), stores, cfi, epub,
 │   │   │                        #   annotations, persistence codecs, text, pagination, app-models…
 │   │   ├── host-adapters/       # Node-side adapters outside the core (cloud providers, translation engine)
-│   │   └── examples/ dist/      # sample hosts; built self-contained bundle
+│   │   └── examples/ dist/      # sample hosts (node, expo); built self-contained bundle
 │   ├── reading-book-desktop/    # MVP app — Electron main/preload + React renderer
 │   └── reading-book-mobile/     # Expo Router scaffold, not yet built out
 └── packages/
@@ -79,7 +79,7 @@ Desktop app (`cd source/apps/reading-book-desktop`):
 
 SDK (`cd source/apps/book-reader-sdk`): `npm run typecheck`, `npm test` (vitest, single file:
 `npx vitest run tests/text/chunk-text.test.ts`), `npm run test:watch`, `npm run typecheck:tests`, `npm run build`,
-`npm run verify` (typecheck + test typecheck + tests + build + example-host typecheck + Node example run).
+`npm run verify` (typecheck + test typecheck + tests + build + Node example run).
 
 Mobile app (`cd source/apps/reading-book-mobile`): `npm run start`, `android`, `ios`, `web`, `lint`.
 

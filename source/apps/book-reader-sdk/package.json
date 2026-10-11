@@ -32,8 +32,7 @@
     "test:watch": "vitest",
     "build": "node scripts/build.mjs",
     "example:node": "node examples/node-host/host.mjs",
-    "example:typecheck": "tsc -p examples/electron-host/tsconfig.json",
-    "verify": "npm run typecheck && npm run typecheck:tests && npm test && npm run build && npm run example:typecheck && npm run example:node"
+    "verify": "npm run typecheck && npm run typecheck:tests && npm test && npm run build && npm run example:node"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.13",
