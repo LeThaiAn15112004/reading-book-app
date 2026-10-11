@@ -6,11 +6,11 @@ import type {
   TextAlign,
 } from '@reading-book/book-reader-sdk'
 import type {
-  EpubjsHandle,
   EpubPageLayout,
   EpubSettingsPatch,
   EpubViewMode,
-} from '../openEpubjs'
+  EpubjsHandle,
+} from '../epubjs/types'
 
 /** Every reader-appearance value that can change without re-opening the book. */
 export type EpubAppearanceSettings = {

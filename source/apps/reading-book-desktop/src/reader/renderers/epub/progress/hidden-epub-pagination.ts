@@ -9,21 +9,22 @@
 import ePubImport, { type Book, type Rendition } from 'epubjs'
 import type { ReaderTheme } from '@reading-book/book-reader-sdk'
 import {
-  applyDualSpreadHost,
-  applyEpubFontSize,
-  applyEpubReadingStyle,
-  applyEpubThemeVars,
   EPUB_VIEW_MANAGER,
-  injectEpubThemeStyles,
-  linkSpineSections,
-  spineLengthOf,
+  applyDualSpreadHost,
   spreadForLayout,
   toArrayBuffer,
   waitForFrames,
   waitForSectionResources,
-  type EpubPageLayout,
+} from '../epubjs/host-layout'
+import { linkSpineSections, spineLengthOf } from '../epubjs/spine'
+import {
+  applyEpubFontSize,
+  applyEpubReadingStyle,
+  applyEpubThemeVars,
+  injectEpubThemeStyles,
   type EpubReadingStyle,
-} from '../openEpubjs'
+} from '../epubjs/theme'
+import type { EpubPageLayout } from '../epubjs/types'
 import { displayedPagesFromLocation } from './reader-position'
 
 /** Vite/CJS interop: default may be the ePub fn or a module namespace. */

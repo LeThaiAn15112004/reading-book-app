@@ -27,26 +27,27 @@ export {
   toEpubjsDisplayCfi,
   type SplitCfiRange,
 } from './cfi'
+export { openEpubjs } from './openEpubjs'
 export {
-  openEpubjs,
   injectEpubThemeStyles,
   applyEpubThemeVars,
   applyEpubFontSize,
-  buildEpubNavState,
-  toArrayBuffer,
-  waitForFrames,
   EPUB_BASE_FONT_PX,
-  type EpubjsHandle,
-  type EpubNavState,
-  type EpubPageLayout,
-  type EpubTocItem,
-  type EpubSelectionInfo,
-  type EpubHighlightClickInfo,
-  type EpubSearchTarget,
-  type ReadAloudMode,
-  type ReadAloudSection,
-  type ViewportRectLike,
-} from './openEpubjs'
+} from './epubjs/theme'
+export { buildEpubNavState } from './epubjs/spine'
+export { toArrayBuffer, waitForFrames } from './epubjs/host-layout'
+export type {
+  EpubjsHandle,
+  EpubNavState,
+  EpubPageLayout,
+  EpubTocItem,
+  EpubSelectionInfo,
+  EpubHighlightClickInfo,
+  EpubSearchTarget,
+  ReadAloudMode,
+  ReadAloudSection,
+  ViewportRectLike,
+} from './epubjs/types'
 export {
   cfiFromLocation,
   displayedPagesFromLocation,

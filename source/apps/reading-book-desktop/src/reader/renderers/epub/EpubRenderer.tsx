@@ -14,14 +14,18 @@ import type {
 } from '@reading-book/book-reader-sdk'
 import {
   openEpubjs,
-  type EpubHighlightClickInfo,
-  type EpubjsHandle,
-  type EpubNavState,
-  type EpubPageLayout,
-  type EpubSelectionInfo,
-  type EpubTocItem,
-  type EpubViewMode,
 } from './openEpubjs'
+
+import type {
+  EpubHighlightClickInfo,
+  EpubNavState,
+  EpubPageLayout,
+  EpubSelectionInfo,
+  EpubTocItem,
+  EpubViewMode,
+  EpubjsHandle,
+} from './epubjs/types'
+
 import {
   syncEpubAppearance,
   resetEpubSettingsBaseline,

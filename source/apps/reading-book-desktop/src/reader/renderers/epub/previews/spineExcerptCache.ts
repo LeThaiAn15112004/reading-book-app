@@ -1,6 +1,6 @@
 import type { Book } from 'epubjs'
 import { collectDescendantTextNodes } from '../cfi/cfi-dom-range'
-import { spineLengthOf } from '../openEpubjs'
+import { spineLengthOf } from '../epubjs/spine'
 
 /** Label + opening excerpt for one spine section (chapter), keyed by 0-based spine index. */
 export type SpineExcerpt = {
