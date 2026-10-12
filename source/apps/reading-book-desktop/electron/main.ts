@@ -59,7 +59,10 @@ registerCoverSchemePrivileged()
 // electron.exe with no script path, so OAuth redirects launch a blank Electron instance instead
 // of this app and the pending callback promise just times out. Electron's own docs call this out:
 // https://www.electronjs.org/docs/latest/api/app#appsetasdefaultprotocolclientprotocol-path-args
-if (process.defaultApp) {
+// E2E runs (READMATE_E2E=1) must not re-point the user's real OS handler at the test binary.
+if (process.env.READMATE_E2E === '1') {
+  // no OS registration
+} else if (process.defaultApp) {
   if (process.argv.length >= 2) {
     app.setAsDefaultProtocolClient(OAUTH_CUSTOM_SCHEME, process.execPath, [path.resolve(process.argv[1])])
   }
