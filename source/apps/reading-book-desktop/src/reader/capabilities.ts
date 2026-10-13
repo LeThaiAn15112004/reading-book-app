@@ -21,6 +21,11 @@ export type ReaderCapability =
   | 'wordCount'
   /** Reading settings panel (Aa). */
   | 'readingSettings'
+  /**
+   * Sidebar "Page layout" panel (page / section cards that jump on click). Not on EPUB: there the
+   * Contents (TOC) tab is the navigation surface.
+   */
+  | 'pageLayout'
 
 /**
  * Which surface renders a format: EPUB (`renderers/epub`), PDF (`renderers/pdf`); every other format
@@ -42,8 +47,8 @@ const SURFACE_CAPABILITIES: Record<ReaderSurface, readonly ReaderCapability[]> =
   // PDF: search (Main extracts the text layer, hits paint on the PDF.js text layer — see
   // docs/implementation_plan/pdf_search.md). No `readingSettings`: every Aa option is EPUB reflow
   // (font, size, margins…) and does nothing to a fixed-layout page; zoom lives in the footer.
-  pdf: ['interaction', 'search', 'snapshot', 'wordCount'],
-  placeholder: ['interaction', 'snapshot', 'wordCount', 'readingSettings'],
+  pdf: ['interaction', 'search', 'snapshot', 'wordCount', 'pageLayout'],
+  placeholder: ['interaction', 'snapshot', 'wordCount', 'readingSettings', 'pageLayout'],
 }
 
 export function readerSurfaceForFormat(format: string | null | undefined): ReaderSurface {

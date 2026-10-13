@@ -1,14 +1,10 @@
-import { Component, useMemo, useState, type ReactNode } from 'react'
+import { Component, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import type { ReaderBookmark, ReaderHighlight } from '@reading-book/book-reader-sdk'
 import type { EpubTocItem } from '../../../../reader/renderers/epub'
 import type { FakeChapter } from '../../logic'
 import { useNotesFilterStore, type NotesTypeFilter } from '../../logic/highlights/notesFilterStore'
 import { NoteItemMenu } from './NoteItemMenu'
-import {
-  PageLayoutPanel,
-  PageLayoutZoomControls,
-} from './PageLayoutPanel'
-import { usePageLayoutGrid } from './usePageLayoutGrid'
+import { PageLayoutPanel, type PageThumbnailRenderer } from './PageLayoutPanel'
 import {
   READER_FOOTER_HEIGHT_PX,
   SIDEBAR_RAIL_WIDTH_PX,
@@ -29,6 +25,11 @@ type TocSidebarProps = {
   chapterIndex: number
   tocItems?: EpubTocItem[]
   activeTocHref?: string
+  /**
+   * Active TOC entry by id (PDF: resolved from the current page). When defined — `null` meaning
+   * "none" — it replaces `activeTocHref` matching, so entries sharing a page href are not all lit.
+   */
+  activeTocItemId?: string | null
   onClose: () => void
   onSelectChapter: (index: number) => void
   onSelectTocItem?: (item: EpubTocItem) => void
@@ -36,6 +37,8 @@ type TocSidebarProps = {
   pageCurrent: number
   pageTotal: number
   onGoToPage: (page: number) => void
+  /** Page layout draws real pages with this (PDF); omitted → placeholder cards. */
+  renderPageThumbnail?: PageThumbnailRenderer
   /** Section titles indexed by 0-based spine position. */
   sectionLabels?: string[]
   /** Whether the reader is in immersive/fullscreen mode. */
@@ -208,36 +211,56 @@ class NotesErrorBoundary extends Component<NotesErrorBoundaryProps, NotesErrorBo
   }
 }
 
-function tocItemIsActive(item: EpubTocItem, activeHref?: string): boolean {
-  if (!activeHref || !item.href) return false
-  return normalizeHref(item.href) === normalizeHref(activeHref)
+/** What marks a TOC entry active: its id (PDF) or its href (EPUB). */
+type TocActiveKey = { id: string | null } | { href?: string }
+
+function tocItemIsActive(item: EpubTocItem, active: TocActiveKey): boolean {
+  if ('id' in active) return active.id !== null && item.id === active.id
+  if (!active.href || !item.href) return false
+  return normalizeHref(item.href) === normalizeHref(active.href)
 }
 
 function tocItemHasActiveDescendant(
   item: EpubTocItem,
-  activeHref?: string,
+  active: TocActiveKey,
 ): boolean {
   return item.children.some(
     (child) =>
-      tocItemIsActive(child, activeHref) ||
-      tocItemHasActiveDescendant(child, activeHref),
+      tocItemIsActive(child, active) ||
+      tocItemHasActiveDescendant(child, active),
   )
+}
+
+/**
+ * Bring the active entry into view inside `container` only when it is outside the visible band —
+ * so a reader who scrolled the list by hand is not yanked back while the entry stays visible.
+ */
+function revealActiveTocEntry(container: HTMLElement) {
+  const el = container.querySelector<HTMLElement>('[aria-current="location"]')
+  if (!el) return
+  const box = container.getBoundingClientRect()
+  const rect = el.getBoundingClientRect()
+  if (rect.top < box.top) {
+    container.scrollTop -= box.top - rect.top + 8
+  } else if (rect.bottom > box.bottom) {
+    container.scrollTop += rect.bottom - box.bottom + 8
+  }
 }
 
 function TocTree({
   items,
-  activeHref,
+  active,
   onSelect,
 }: {
   items: EpubTocItem[]
-  activeHref?: string
+  active: TocActiveKey
   onSelect: (item: EpubTocItem) => void
 }) {
   return (
     <ul className="m-0 flex list-none flex-col gap-0.5 p-0">
       {items.map((item) => {
-        const active = tocItemIsActive(item, activeHref)
-        const parentOfActive = tocItemHasActiveDescendant(item, activeHref)
+        const isActive = tocItemIsActive(item, active)
+        const parentOfActive = tocItemHasActiveDescendant(item, active)
         const level = Math.min(item.level, 4)
         const font =
           level === 0
@@ -253,7 +276,7 @@ function TocTree({
           <li key={item.id} className={spacing}>
             <button
               className={`flex min-h-9 w-full cursor-pointer items-center justify-between gap-2 rounded-lg border-none py-2 pr-3 text-left transition-colors ${font} ${
-                active
+                isActive
                   ? 'rounded-l-none border-l-[3px] border-lib-accent bg-lib-accent-soft text-lib-text-strong'
                   : parentOfActive
                     ? 'bg-lib-hint/70 text-lib-text-strong'
@@ -262,6 +285,7 @@ function TocTree({
               style={indentStyle}
               type="button"
               aria-label={item.label}
+              aria-current={isActive ? 'location' : undefined}
               onClick={() => onSelect(item)}
             >
               <span className="min-w-0 truncate">{item.label}</span>
@@ -269,7 +293,7 @@ function TocTree({
             {item.children.length > 0 ? (
               <TocTree
                 items={item.children}
-                activeHref={activeHref}
+                active={active}
                 onSelect={onSelect}
               />
             ) : null}
@@ -393,12 +417,14 @@ export function TocSidebar({
   chapterIndex,
   tocItems,
   activeTocHref,
+  activeTocItemId,
   onClose,
   onSelectChapter,
   onSelectTocItem,
   pageCurrent,
   pageTotal,
   onGoToPage,
+  renderPageThumbnail,
   sectionLabels,
   immersive = false,
   bookmarks = [],
@@ -416,7 +442,20 @@ export function TocSidebar({
   onAskAiHighlight,
 }: TocSidebarProps) {
   const hasRealToc = !!tocItems && tocItems.length > 0
-  const pageLayoutGrid = usePageLayoutGrid()
+  const tocActive: TocActiveKey =
+    activeTocItemId !== undefined ? { id: activeTocItemId } : { href: activeTocHref }
+  const tocActiveKey = activeTocItemId !== undefined ? `id:${activeTocItemId}` : `href:${activeTocHref}`
+  const tocScrollRef = useRef<HTMLDivElement | null>(null)
+  // Auto-reveal is limited to id mode (PDF) so the EPUB sidebar keeps its existing behaviour.
+  const revealsActiveToc = open && tab === 'chapters' && hasRealToc && activeTocItemId !== undefined
+
+  // Reveal the active entry when it changes (or the Contents tab is shown) — once per change, never
+  // on every render, so rapid page tracking can't fight a manual scroll of the list.
+  useEffect(() => {
+    if (!revealsActiveToc) return
+    const container = tocScrollRef.current
+    if (container) revealActiveTocEntry(container)
+  }, [revealsActiveToc, tocActiveKey])
   const [bookmarkQuery, setBookmarkQuery] = useState('')
   const filteredBookmarks = useMemo(() => {
     const q = bookmarkQuery.trim().toLowerCase()
@@ -500,14 +539,6 @@ export function TocSidebar({
           {SIDEBAR_TAB_LABEL[tab]}
         </h2>
         <div className="flex shrink-0 items-center gap-1">
-          {tab === 'layout' ? (
-            <PageLayoutZoomControls
-              zoomIn={pageLayoutGrid.zoomIn}
-              zoomOut={pageLayoutGrid.zoomOut}
-              canZoomIn={pageLayoutGrid.canZoomIn}
-              canZoomOut={pageLayoutGrid.canZoomOut}
-            />
-          ) : null}
           <button
             className="inline-flex size-8 cursor-pointer items-center justify-center rounded-md border-none bg-transparent text-base text-lib-muted hover:bg-lib-surface-hover hover:text-lib-text-strong"
             type="button"
@@ -519,12 +550,12 @@ export function TocSidebar({
         </div>
       </div>
 
-      <div className="app-scroll min-h-0 flex-1 overflow-y-auto p-2.5">
+      <div ref={tocScrollRef} className="app-scroll min-h-0 flex-1 overflow-y-auto p-2.5">
           {tab === 'chapters' ? (
             hasRealToc ? (
               <TocTree
                 items={tocItems}
-                activeHref={activeTocHref}
+                active={tocActive}
                 onSelect={(item) => onSelectTocItem?.(item)}
               />
             ) : chapters.length === 0 ? (
@@ -840,8 +871,8 @@ export function TocSidebar({
               pageCurrent={pageCurrent}
               pageTotal={pageTotal}
               sectionLabels={sectionLabels}
-              columns={pageLayoutGrid.columns}
               onGoToPage={onGoToPage}
+              renderThumbnail={renderPageThumbnail}
             />
           ) : null}
 

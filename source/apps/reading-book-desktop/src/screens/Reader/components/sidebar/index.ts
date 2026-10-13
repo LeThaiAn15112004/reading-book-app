@@ -1,9 +1,5 @@
 export { NoteFloatingMenu } from './NoteFloatingMenu'
-export {
-  PageLayoutPanel,
-  PageLayoutZoomControls,
-} from './PageLayoutPanel'
-export { usePageLayoutGrid } from './usePageLayoutGrid'
+export { PageLayoutPanel, type PageThumbnailRenderer } from './PageLayoutPanel'
 export { SidebarEdgeRail } from './SidebarEdgeRail'
 export { TocEdgeButton } from './TocEdgeButton'
 export { TocSidebar } from './TocSidebar'
@@ -18,6 +14,9 @@ export {
   SIDEBAR_RAIL_WIDTH_PX,
   SIDEBAR_TABS,
   clampSidebarPanelWidth,
+  isSidebarTabAvailable,
+  resolveSidebarTab,
+  sidebarTabsFor,
   sidebarContentInsetLeft,
   sidebarContentInsetRight,
 } from './sidebarTabs'

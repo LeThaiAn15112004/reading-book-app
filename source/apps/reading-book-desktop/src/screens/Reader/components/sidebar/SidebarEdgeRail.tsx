@@ -3,12 +3,15 @@ import {
   READER_FOOTER_HEIGHT_PX,
   SIDEBAR_RAIL_WIDTH_PX,
   SIDEBAR_TABS,
+  type SidebarTabDef,
 } from './sidebarTabs'
 import { readerChromeTopInset } from '../../../../reader/chrome'
 
 type SidebarEdgeRailProps = {
   open: boolean
   activeTab: SidebarTab
+  /** Tabs this book offers (see `sidebarTabsFor`); defaults to every tab. */
+  tabs?: SidebarTabDef[]
   panelWidth: number
   isResizing?: boolean
   chromeHidden?: boolean
@@ -23,6 +26,7 @@ type SidebarEdgeRailProps = {
 export function SidebarEdgeRail({
   open,
   activeTab,
+  tabs = SIDEBAR_TABS,
   panelWidth,
   isResizing = false,
   chromeHidden = true,
@@ -59,7 +63,7 @@ export function SidebarEdgeRail({
         }}
         aria-label="Sidebar navigation"
       >
-        {SIDEBAR_TABS.map((tab) => {
+        {tabs.map((tab) => {
           const isActive = activeTab === tab.id
           const merged = open && isActive
           const bookmarkHint =

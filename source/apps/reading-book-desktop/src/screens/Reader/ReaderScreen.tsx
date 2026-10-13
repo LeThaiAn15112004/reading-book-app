@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState, type CSSProperties } from 'react'
+import { useCallback, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { useParams } from 'react-router-dom'
 import {
   CfiLocation,
@@ -42,6 +42,8 @@ import {
   ImmersiveExitButton,
   ReadingCanvas,
   SidebarEdgeRail,
+  resolveSidebarTab,
+  sidebarTabsFor,
   SnapshotOverlay,
   WordCountPanel,
   rightSidebarContentInset,
@@ -52,6 +54,7 @@ import {
   TrashConfirmDialog,
   useRightSidebarDocked,
   useSidebarPanelResize,
+  type SidebarTab,
   type ToolId,
   type ToolStates,
 } from './components'
@@ -154,6 +157,22 @@ export function ReaderScreen() {
   const readerCapabilities = useMemo(
     () => getReaderCapabilities(book.bookFormat),
     [book.bookFormat],
+  )
+  // Sidebar tabs follow the surface's capabilities (Page layout: PDF yes, EPUB no). Every entry point
+  // opens tabs through `openSidebarTab`, and the shown tab is resolved, so a tab left selected by
+  // another book / format can never render here.
+  // Page layout thumbnails come from the open PDF document (fixed layout → real pages).
+  const renderPdfThumbnail = useCallback(
+    (page: number, cssWidth: number, signal: AbortSignal) =>
+      pdfApiRef.current?.renderThumbnail(page, cssWidth, signal) ?? Promise.resolve(null),
+    [],
+  )
+  const sidebarTabs = useMemo(() => sidebarTabsFor(readerCapabilities), [readerCapabilities])
+  const sidebarTab = resolveSidebarTab(chrome.sidebarTab, readerCapabilities)
+  const chromeOpenSidebarTab = chrome.openSidebarTab
+  const openSidebarTab = useCallback(
+    (tab: SidebarTab) => chromeOpenSidebarTab(resolveSidebarTab(tab, readerCapabilities)),
+    [chromeOpenSidebarTab, readerCapabilities],
   )
 
   // "Locate file…" when the book's file was moved or deleted (verified by SHA-256 in Main).
@@ -318,8 +337,8 @@ export function ReaderScreen() {
     toggleBookmark: bookmarks.toggleBookmark,
     searchOpen: chrome.searchOpen,
     sidebarOpen: chrome.sidebarOpen,
-    sidebarTab: chrome.sidebarTab,
-    openSidebarTab: chrome.openSidebarTab,
+    sidebarTab,
+    openSidebarTab,
     toggleSidebar: chrome.toggleSidebar,
     setToast: chrome.setToast,
   })
@@ -491,12 +510,13 @@ export function ReaderScreen() {
           {!immersive ? (
             <SidebarEdgeRail
               open={chrome.sidebarOpen}
-              activeTab={chrome.sidebarTab}
+              activeTab={sidebarTab}
+              tabs={sidebarTabs}
               panelWidth={sidebarResize.panelWidth}
               isResizing={sidebarResize.isResizing}
               chromeHidden={toolsHidden}
               bookmarkActive={bookmarks.isCurrentPlaceBookmarked}
-              onOpenTab={chrome.openSidebarTab}
+              onOpenTab={openSidebarTab}
               onToggle={chrome.toggleSidebar}
             />
           ) : null}
@@ -623,7 +643,7 @@ export function ReaderScreen() {
           <TocSidebar
             immersive={immersive}
             open={!immersive && chrome.sidebarOpen}
-            tab={chrome.sidebarTab}
+            tab={sidebarTab}
             panelWidth={sidebarResize.panelWidth}
             isResizing={sidebarResize.isResizing}
             chromeHidden={toolsHidden}
@@ -634,6 +654,7 @@ export function ReaderScreen() {
               book.isEpubSurface ? nav.epubToc : isPdfSurface ? nav.pdfToc : undefined
             }
             activeTocHref={book.isEpubSurface ? nav.epubNav?.href : undefined}
+            activeTocItemId={isPdfSurface ? (nav.pdfActiveTocId ?? null) : undefined}
             onClose={() => chrome.setSidebarOpen(false)}
             onSelectChapter={nav.goChapter}
             onSelectTocItem={nav.handleSelectTocItem}
@@ -641,6 +662,7 @@ export function ReaderScreen() {
             pageTotal={sectionTotal}
             sectionLabels={sectionLabels}
             onGoToPage={nav.goToPageFromLayout}
+            renderPageThumbnail={isPdfSurface ? renderPdfThumbnail : undefined}
             bookmarks={bookmarks.bookmarks}
             currentBookmarkId={bookmarks.currentBookmarkId}
             currentPlaceBookmarked={bookmarks.isCurrentPlaceBookmarked}

@@ -10,6 +10,10 @@
  *   4. placeholder     -> only tools that work without a renderer (no Search / Audio / Translate / markup)
  *   5. folding         -> Annotation / Tools always dropdowns; navigate + settings never fold; clamps
  *   6. no duplicates   -> zoom / fit / fullscreen stay in the footer, not on the toolbar
+ *   8. sidebar tabs    -> Page layout tab: PDF and placeholder yes, EPUB no (hidden from the rail, a
+ *                         request to open it or a stale selection falls back to Contents); every other
+ *                         tab on every surface; ReaderScreen routes rail / sidebar / shortcuts through
+ *                         the resolved tab
  *   7. wiring (static) -> every tool id has a `handleTool` branch; no "coming soon" tool stubs; dropdown
  *                         reuses useDismissOnOutsideOrEscape with consumeEscape; PDF gets the toolbar tool
  *                         (Hand / Select), no 1-page / 2-page footer toggle, and a footer inset that
@@ -27,6 +31,7 @@ const caps = await import('../../src/reader/capabilities.ts')
 const registry = await import('../../src/screens/Reader/components/chrome/toolRegistry.ts')
 const layoutMod = await import('../../src/screens/Reader/components/chrome/toolbarLayout.ts')
 const shortcuts = await import('../../src/shortcuts/shortcutDefinitions.ts')
+const sidebarTabs = await import('../../src/screens/Reader/components/sidebar/sidebarTabs.ts')
 
 const { TOOL_REGISTRY, TOOL_GROUPS, FOLD_ORDER, INLINE_MAX } = registry
 const { resolveToolbarLayout, foldableGroups } = layoutMod
@@ -73,9 +78,9 @@ check('epub and pdf map to their own surfaces, everything else to the placeholde
     assert.equal(caps.readerSurfaceForFormat(f), 'placeholder', String(f))
   }
 })
-check('placeholder is a strict subset of EPUB', () => {
-  for (const c of placeholder) assert.ok(epub.has(c), c)
-  assert.ok(placeholder.size < epub.size)
+check('placeholder is a strict subset of EPUB, apart from Page layout', () => {
+  for (const c of placeholder) if (c !== 'pageLayout') assert.ok(epub.has(c), c)
+  assert.ok(placeholder.size - 1 < epub.size)
 })
 check('PDF = placeholder + search − Aa (no audio / translate / markup yet)', () => {
   const expected = [...placeholder, 'search'].filter((c) => c !== 'readingSettings')
@@ -185,6 +190,47 @@ check('PdfRenderer gets the toolbar tool, Hand pan and center tap', () => {
 check('footer: no 1-page / 2-page toggle for PDF; inset ignores the EPUB view-mode pref', () => {
   assert.match(screen, /onLayoutChange=\{\s*isPdfSurface\s*\?\s*undefined/)
   assert.match(screen, /readerChromeBottomInset\(\s*isPdfSurface \? 'scroll' : book\.prefs\.viewMode/)
+})
+
+console.log('8. sidebar tabs')
+const railIds = (set) => sidebarTabs.sidebarTabsFor(set).map((t) => t.id)
+check('Page layout capability: PDF and placeholder only', () => {
+  assert.ok(pdf.has('pageLayout'))
+  assert.ok(placeholder.has('pageLayout'))
+  assert.ok(!epub.has('pageLayout'))
+})
+check('rail: PDF keeps every tab including Page layout', () => {
+  assert.deepEqual(railIds(pdf), ['chapters', 'bookmarks', 'highlights', 'layout', 'attachments'])
+})
+check('rail: EPUB hides only Page layout', () => {
+  assert.deepEqual(railIds(epub), ['chapters', 'bookmarks', 'highlights', 'attachments'])
+})
+check('rail: other formats unchanged (placeholder keeps Page layout)', () => {
+  for (const f of ['txt', 'md', 'docx', 'doc', null]) {
+    assert.deepEqual(railIds(caps.getReaderCapabilities(f)), sidebarTabs.SIDEBAR_TABS.map((t) => t.id), String(f))
+  }
+})
+check('opening / showing Page layout on EPUB resolves to Contents; other tabs untouched', () => {
+  assert.equal(sidebarTabs.resolveSidebarTab('layout', epub), 'chapters')
+  assert.equal(sidebarTabs.isSidebarTabAvailable('layout', epub), false)
+  for (const tab of ['chapters', 'bookmarks', 'highlights', 'attachments']) {
+    assert.equal(sidebarTabs.resolveSidebarTab(tab, epub), tab)
+  }
+})
+check('PDF -> EPUB -> PDF: a stale Page layout selection is hidden on EPUB, usable again on PDF', () => {
+  const stale = 'layout'
+  assert.equal(sidebarTabs.resolveSidebarTab(stale, pdf), 'layout')
+  assert.equal(sidebarTabs.resolveSidebarTab(stale, epub), 'chapters')
+  assert.equal(sidebarTabs.resolveSidebarTab(stale, pdf), 'layout')
+})
+check('ReaderScreen routes rail, sidebar and shortcuts through the resolved tab', () => {
+  assert.match(screen, /const sidebarTab = resolveSidebarTab\(chrome\.sidebarTab, readerCapabilities\)/)
+  assert.match(screen, /chromeOpenSidebarTab\(resolveSidebarTab\(tab, readerCapabilities\)\)/)
+  assert.match(screen, /activeTab=\{sidebarTab\}\s+tabs=\{sidebarTabs\}/)
+  assert.match(screen, /onOpenTab=\{openSidebarTab\}/)
+  assert.match(screen, /tab=\{sidebarTab\}/)
+  assert.match(screen, /sidebarTab,\s+openSidebarTab,/)
+  assert.doesNotMatch(screen, /chrome\.sidebarTab\}|onOpenTab=\{chrome\.openSidebarTab\}/)
 })
 
 console.log(`\n${passed} checks passed`)

@@ -56,6 +56,7 @@ export {
   type NavFilterId,
   type ShelfId,
 } from './library-book.js'
+export { resolveActivePageTocEntry, type PageTocNode } from './page-toc.js'
 export {
   type InteractionTool,
   type PageLayout,

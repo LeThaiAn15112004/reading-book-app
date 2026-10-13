@@ -99,6 +99,11 @@ export interface PdfRendererApi {
   goToSearchMatch: (target: PdfSearchTarget) => Promise<void>
   /** Drop a text selection made in the PDF; false when there was none (Escape falls through). */
   clearSelection: () => boolean
+  /**
+   * Rasterize 1-based `page` into a new canvas `cssWidth` CSS px wide (Page layout thumbnails).
+   * Thumbnail renders run one at a time (shared queue); null when aborted or unavailable.
+   */
+  renderThumbnail: (page: number, cssWidth: number, signal: AbortSignal) => Promise<HTMLCanvasElement | null>
 }
 
 export type PdfSearchTarget = { pageIndex: number; occurrence: number; count: number }
@@ -506,9 +511,48 @@ export function PdfRenderer({
     [reportCurrent, scheduleUpdate],
   )
 
+  /** Serialises thumbnail renders so a scrolled Page layout grid never floods PDF.js. */
+  const thumbQueueRef = useRef<Promise<unknown>>(Promise.resolve())
+
+  const renderThumbnail = useCallback(
+    (pageNumber: number, cssWidth: number, signal: AbortSignal): Promise<HTMLCanvasElement | null> => {
+      const run = async (): Promise<HTMLCanvasElement | null> => {
+        const pdf = docRef.current
+        if (signal.aborted || !pdf || pageNumber < 1 || pageNumber > pdf.numPages || cssWidth <= 0) return null
+        const page = await pdf.getPage(pageNumber)
+        if (signal.aborted) return null
+        const base = page.getViewport({ scale: 1 })
+        const ratio = window.devicePixelRatio || 1
+        const viewport = page.getViewport({ scale: (cssWidth * ratio) / base.width })
+        const canvas = document.createElement('canvas')
+        canvas.width = Math.max(1, Math.floor(viewport.width))
+        canvas.height = Math.max(1, Math.floor(viewport.height))
+        const task = page.render({ canvas, viewport })
+        const cancel = () => task.cancel()
+        signal.addEventListener('abort', cancel, { once: true })
+        try {
+          await task.promise
+        } catch (err) {
+          canvas.width = 0
+          canvas.height = 0
+          if (isCancelled(err)) return null
+          throw err
+        } finally {
+          signal.removeEventListener('abort', cancel)
+        }
+        return signal.aborted ? null : canvas
+      }
+      const result = thumbQueueRef.current.then(run, run)
+      thumbQueueRef.current = result.catch(() => null)
+      return result
+    },
+    [],
+  )
+
   useEffect(() => {
     if (!apiRef) return
     apiRef.current = {
+      renderThumbnail,
       goToPage: (page) => scrollToIndex(page - 1),
       nextPage: () => scrollToIndex(currentRef.current + 1),
       prevPage: () => scrollToIndex(currentRef.current - 1),
@@ -547,7 +591,7 @@ export function PdfRenderer({
     return () => {
       apiRef.current = null
     }
-  }, [apiRef, scrollToIndex, repaintSearch, waitForTextLayer])
+  }, [apiRef, scrollToIndex, repaintSearch, waitForTextLayer, renderThumbnail])
 
   // Open the document. PDF.js transfers the buffer to its worker, so hand it a copy and keep the
   // caller's ArrayBuffer intact.

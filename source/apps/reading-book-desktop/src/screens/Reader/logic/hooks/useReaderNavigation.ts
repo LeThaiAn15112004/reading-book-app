@@ -1,6 +1,7 @@
 import {
   useCallback,
   useEffect,
+  useMemo,
   useState,
   type MutableRefObject,
 } from 'react'
@@ -14,12 +15,14 @@ import type {
   PdfOutlineItem,
   PdfRendererApi,
 } from '../../../../reader/renderers/pdf'
+import { resolveActivePageTocEntry } from '@reading-book/book-reader-sdk'
 import { blurReaderSidebarFocus } from '../../../../reader/chrome'
 import {
   isTypingTarget,
   listenKeydownInIframes,
 } from '../../../../shortcuts/iframeKeydown'
 import { FAKE_CHAPTERS } from '../demo/fakeReaderContent'
+import { usePdfTocStore } from '../pdfToc/pdfTocStore'
 import type { HighlightShortcuts } from './useReaderHighlights'
 
 function navigateEpubByStep(api: EpubRendererApi, forward: boolean): void {
@@ -37,6 +40,13 @@ function pdfOutlineToTocItems(items: PdfOutlineItem[]): EpubTocItem[] {
     level: item.level,
     children: pdfOutlineToTocItems(item.children),
   }))
+}
+
+/** Destination page of a PDF TOC entry; null for entries without an in-document destination. */
+function pdfTocItemPage(item: EpubTocItem): number | null {
+  if (!item.href.startsWith(PDF_PAGE_HREF)) return null
+  const page = Number(item.href.slice(PDF_PAGE_HREF.length))
+  return Number.isInteger(page) && page >= 1 ? page : null
 }
 
 type UseReaderNavigationOptions = {
@@ -71,6 +81,17 @@ export function useReaderNavigation({
   const [pdfNav, setPdfNav] = useState<PdfNavState | null>(null)
   const [pdfToc, setPdfToc] = useState<EpubTocItem[]>([])
 
+  const pdfTocPickedId = usePdfTocStore((s) => s.pickedId)
+  const pdfPageCurrent = pdfNav?.pageCurrent ?? 0
+  /** Keyed on the page number, so nav reports that keep the page (zoom, re-layout) reuse it. */
+  const pdfActiveTocId = useMemo(
+    () =>
+      isPdfSurface
+        ? resolveActivePageTocEntry(pdfToc, pdfPageCurrent, pdfTocItemPage, pdfTocPickedId)?.id
+        : undefined,
+    [isPdfSurface, pdfToc, pdfPageCurrent, pdfTocPickedId],
+  )
+
   const setPdfOutline = useCallback((items: PdfOutlineItem[]) => {
     setPdfToc(pdfOutlineToTocItems(items))
   }, [])
@@ -83,6 +104,7 @@ export function useReaderNavigation({
     setEpubSections([])
     setPdfNav(null)
     setPdfToc([])
+    usePdfTocStore.getState().reset()
     epubApiRef.current = null
     pdfApiRef.current = null
   }, [bookId, epubApiRef, pdfApiRef])
@@ -239,8 +261,10 @@ export function useReaderNavigation({
     closeFloating()
     clearTransientNavUi()
     if (item.href.startsWith(PDF_PAGE_HREF)) {
-      const page = Number.parseInt(item.href.slice(PDF_PAGE_HREF.length), 10)
-      if (Number.isFinite(page)) pdfApiRef.current?.goToPage(page)
+      const page = pdfTocItemPage(item)
+      if (page === null) return
+      usePdfTocStore.getState().pick(item.id)
+      pdfApiRef.current?.goToPage(page)
       return
     }
     const api = epubApiRef.current
@@ -318,6 +342,7 @@ export function useReaderNavigation({
     pdfNav,
     setPdfNav,
     pdfToc,
+    pdfActiveTocId,
     setPdfOutline,
     goChapter,
     switchPage,

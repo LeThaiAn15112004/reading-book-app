@@ -26,6 +26,9 @@
     "spike:reader:toolbar": "node --experimental-strip-types --import ./spikes/reset-app-settings/register-alias.mjs spikes/reader-toolbar/run-toolbar.mjs",
     "spike:reader:hand": "node --experimental-strip-types --import ./spikes/reset-app-settings/register-alias.mjs spikes/reader-hand/run-hand.mjs",
     "spike:e2e:launch": "vite build && node spikes/e2e-launch/launch.mjs",
+    "e2e": "vite build && playwright test -c e2e/playwright.config.ts",
+    "e2e:only": "playwright test -c e2e/playwright.config.ts",
+    "e2e:typecheck": "tsc --noEmit -p e2e/tsconfig.json",
     "spike:pdf:fixtures": "node spikes/pdf-search/build-fixtures.mjs",
     "spike:pdf:search": "node --experimental-strip-types --import ./spikes/pdf-search/register-alias.mjs spikes/pdf-search/run-pdf-search.mjs"
   },

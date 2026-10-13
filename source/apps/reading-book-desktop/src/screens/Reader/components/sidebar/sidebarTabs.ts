@@ -1,16 +1,46 @@
+import type { ReaderCapability } from '../../../../reader/capabilities'
 import type { SidebarTab } from './TocSidebar'
 
-export const SIDEBAR_TABS: {
+export type SidebarTabDef = {
   id: SidebarTab
   label: string
   icon: string
-}[] = [
+  /** Shown / openable only when the open book's surface has this capability. */
+  requires?: ReaderCapability
+}
+
+export const SIDEBAR_TABS: SidebarTabDef[] = [
   { id: 'chapters', label: 'Contents', icon: '📑' },
   { id: 'bookmarks', label: 'Bookmark', icon: '🔖' },
   { id: 'highlights', label: 'Notes', icon: '🖍️' },
-  { id: 'layout', label: 'Page layout', icon: '📄' },
+  { id: 'layout', label: 'Page layout', icon: '📄', requires: 'pageLayout' },
   { id: 'attachments', label: 'Attachment', icon: '📎' },
 ]
+
+/** True when `tab` can be shown for a surface with `capabilities`. */
+export function isSidebarTabAvailable(
+  tab: SidebarTab,
+  capabilities: ReadonlySet<ReaderCapability>,
+): boolean {
+  const def = SIDEBAR_TABS.find((t) => t.id === tab)
+  return !!def && (!def.requires || capabilities.has(def.requires))
+}
+
+/** Rail entries for the open book — unsupported tabs are hidden, never shown disabled. */
+export function sidebarTabsFor(capabilities: ReadonlySet<ReaderCapability>): SidebarTabDef[] {
+  return SIDEBAR_TABS.filter((t) => isSidebarTabAvailable(t.id, capabilities))
+}
+
+/**
+ * The tab to actually show: a selected tab the surface doesn't support (e.g. Page layout left over
+ * from a PDF, or a format that resolved after the tab was picked) falls back to Contents.
+ */
+export function resolveSidebarTab(
+  tab: SidebarTab,
+  capabilities: ReadonlySet<ReaderCapability>,
+): SidebarTab {
+  return isSidebarTabAvailable(tab, capabilities) ? tab : 'chapters'
+}
 
 export const SIDEBAR_TAB_LABEL: Record<SidebarTab, string> = {
   chapters: 'Contents',
