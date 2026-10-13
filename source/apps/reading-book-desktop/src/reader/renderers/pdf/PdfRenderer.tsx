@@ -17,6 +17,7 @@ import {
   useRef,
   useState,
   type MutableRefObject,
+  type MouseEvent as ReactMouseEvent,
   type PointerEvent as ReactPointerEvent,
 } from 'react'
 import {
@@ -44,6 +45,7 @@ import {
   paintPdfSearchHighlights,
   pdfPageSearchRanges,
 } from './pdfSearchDom'
+import { readPdfSelectionAt, type PdfSelectionInfo } from './pdfSelection'
 // `?url` makes Vite emit the worker as a local asset in dist/ — never loaded from a CDN.
 import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
 import 'pdfjs-dist/web/pdf_viewer.css'
@@ -119,6 +121,12 @@ export interface PdfRendererProps {
   onHandPanBy?: (dx: number, dy: number) => void
   /** A plain click (no drag, no selection) in the middle half of the page area. */
   onCenterTap?: () => void
+  /**
+   * Right-click inside a live text selection on the text layer, at client (`x`, `y`) — the
+   * Reader's own window coordinates (no iframe / transform on the PDF surface). The native context
+   * menu is always suppressed on the pages; a right-click anywhere else fires nothing.
+   */
+  onSelectionContextMenu?: (selection: PdfSelectionInfo, x: number, y: number) => void
   apiRef?: MutableRefObject<PdfRendererApi | null>
   onNavState?: (state: PdfNavState) => void
   onOutline?: (items: PdfOutlineItem[]) => void
@@ -204,6 +212,7 @@ export function PdfRenderer({
   interactionTool = 'select',
   onHandPanBy,
   onCenterTap,
+  onSelectionContextMenu,
   apiRef,
   onNavState,
   onOutline,
@@ -222,6 +231,8 @@ export function PdfRenderer({
   onHandPanByRef.current = onHandPanBy
   const onCenterTapRef = useRef(onCenterTap)
   onCenterTapRef.current = onCenterTap
+  const onSelectionContextMenuRef = useRef(onSelectionContextMenu)
+  onSelectionContextMenuRef.current = onSelectionContextMenu
 
   const slotsRef = useRef<(HTMLDivElement | null)[]>([])
   const renderedRef = useRef(new Map<number, RenderEntry>())
@@ -797,6 +808,15 @@ export function PdfRenderer({
     }
   }
 
+  // Like the EPUB surface: never the native menu on the pages; inside a selection, ours.
+  const onContextMenu = (event: ReactMouseEvent<HTMLDivElement>) => {
+    event.preventDefault()
+    const root = rootRef.current
+    if (!root) return
+    const selection = readPdfSelectionAt(root, event.clientX, event.clientY)
+    if (selection) onSelectionContextMenuRef.current?.(selection, event.clientX, event.clientY)
+  }
+
   if (status.kind === 'error') {
     return (
       <div className="flex h-full w-full" data-pdf-status="error">
@@ -821,6 +841,7 @@ export function PdfRenderer({
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
       onPointerCancel={() => void endGesture()}
+      onContextMenu={onContextMenu}
       onLostPointerCapture={() => {
         if (gestureRef.current?.pan) endGesture()
       }}

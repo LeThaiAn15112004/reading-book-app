@@ -4,7 +4,8 @@ export type HighlightCitationInput = {
   text: string
   bookTitle: string
   author?: string
-  /** Chapter/section label — EPUB is reflowable, so there's no fixed page number to cite. */
+  /** Where the quote is from: EPUB chapter/section label (reflowable — no fixed page number), or a
+   *  PDF page label ("p. 12" / "pp. 12–13"). */
   locationLabel?: string
 }
 

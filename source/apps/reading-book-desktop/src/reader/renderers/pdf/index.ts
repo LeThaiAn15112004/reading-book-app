@@ -6,3 +6,8 @@ export {
   type PdfRendererProps,
   type PdfSearchTarget,
 } from './PdfRenderer'
+export {
+  pdfSelectionPageLabel,
+  type PdfSelectionInfo,
+  type PdfSelectionPageRect,
+} from './pdfSelection'

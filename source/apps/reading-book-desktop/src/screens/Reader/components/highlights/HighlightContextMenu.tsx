@@ -7,10 +7,15 @@ export type HighlightContextMenuPoint = { x: number; y: number }
 type HighlightContextMenuProps = {
   point: HighlightContextMenuPoint
   selectedText: string
-  onHighlight: () => void
-  onUnderline: () => void
-  onStrikethrough: () => void
-  onAddNote: () => void
+  /**
+   * Markup actions — shared by EPUB and PDF, so each is optional: a surface without a persistence +
+   * anchor path for marks (PDF today) leaves them out and the menu hides those items rather than
+   * showing buttons that do nothing.
+   */
+  onHighlight?: () => void
+  onUnderline?: () => void
+  onStrikethrough?: () => void
+  onAddNote?: () => void
   onBookmarkHere: () => void
   onCopy: () => void
   onCopyWithCitation: () => void
@@ -23,7 +28,7 @@ const FALLBACK_SIZE = { width: 190, height: 292 }
 const itemClass =
   'flex h-8 w-full cursor-pointer items-center rounded-md border-none bg-transparent px-2.5 text-left text-[12px] font-semibold text-lib-text hover:bg-lib-bg-mid/50 focus-visible:bg-lib-bg-mid/50 focus-visible:outline-none disabled:cursor-default disabled:opacity-40'
 
-/** Right-click-only context menu for a fresh (not-yet-highlighted) text selection. */
+/** Right-click-only context menu for a fresh (not-yet-highlighted) text selection (EPUB or PDF). */
 export function HighlightContextMenu({
   point,
   selectedText,
@@ -79,27 +84,37 @@ export function HighlightContextMenu({
         event.stopPropagation()
       }}
     >
-      <button type="button" role="menuitem" className={itemClass} onClick={() => run(onHighlight)}>
-        Highlight
-      </button>
-      <button
-        type="button"
-        role="menuitem"
-        className={`${itemClass} underline`}
-        onClick={() => run(onUnderline)}
-      >
-        Underline
-      </button>
-      <button
-        type="button"
-        role="menuitem"
-        className={`${itemClass} line-through`}
-        onClick={() => run(onStrikethrough)}
-      >
-        Strikethrough
-      </button>
+      {onHighlight || onUnderline || onStrikethrough ? (
+        <>
+          {onHighlight ? (
+            <button type="button" role="menuitem" className={itemClass} onClick={() => run(onHighlight)}>
+              Highlight
+            </button>
+          ) : null}
+          {onUnderline ? (
+            <button
+              type="button"
+              role="menuitem"
+              className={`${itemClass} underline`}
+              onClick={() => run(onUnderline)}
+            >
+              Underline
+            </button>
+          ) : null}
+          {onStrikethrough ? (
+            <button
+              type="button"
+              role="menuitem"
+              className={`${itemClass} line-through`}
+              onClick={() => run(onStrikethrough)}
+            >
+              Strikethrough
+            </button>
+          ) : null}
 
-      <div className="my-0.5 border-t border-lib-border-soft" />
+          <div className="my-0.5 border-t border-lib-border-soft" />
+        </>
+      ) : null}
 
       <button
         type="button"
@@ -111,10 +126,12 @@ export function HighlightContextMenu({
         <span aria-hidden className="mr-1.5">🌐</span>
         Translate
       </button>
-      <button type="button" role="menuitem" className={itemClass} onClick={() => run(onAddNote)}>
-        <span aria-hidden className="mr-1.5">📝</span>
-        Add note
-      </button>
+      {onAddNote ? (
+        <button type="button" role="menuitem" className={itemClass} onClick={() => run(onAddNote)}>
+          <span aria-hidden className="mr-1.5">📝</span>
+          Add note
+        </button>
+      ) : null}
       <button
         type="button"
         role="menuitem"

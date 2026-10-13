@@ -157,11 +157,33 @@ export function useReaderBookmarks({
       setToast('Could not bookmark this place yet.')
       return
     }
+    toggleBookmarkAt(currentLocation, bookmarkChapterIndex, bookmarksHere)
+  }
 
-    if (bookmarksHere.length > 0) {
-      const removeIds = new Set(bookmarksHere.map((b) => b.id))
+  /** PDF only: toggle the bookmark on a given 1-based page (e.g. the page a selection is on),
+   *  which may differ from the page currently being read. */
+  function togglePdfPageBookmark(page: number) {
+    if (!bookId || !isPdfSurface || page < 1) return
+    const location = new PageRectLocation(page)
+    toggleBookmarkAt(
+      location,
+      page - 1,
+      findReaderBookmarksAtLocation(bookmarks, location),
+      `Page ${page}`,
+    )
+  }
+
+  function toggleBookmarkAt(
+    location: NonNullable<typeof currentLocation>,
+    chapterIndexAt: number,
+    existing: ReaderBookmark[],
+    labelOverride?: string,
+  ) {
+    if (!bookId) return
+    if (existing.length > 0) {
+      const removeIds = new Set(existing.map((b) => b.id))
       setBookmarks((list) => list.filter((b) => !removeIds.has(b.id)))
-      for (const b of bookmarksHere) persistDelete(b.id)
+      for (const b of existing) persistDelete(b.id)
       setToast('Bookmark removed.')
       return
     }
@@ -170,9 +192,9 @@ export function useReaderBookmarks({
     // lands before the save resolves still targets the id the store will have written.
     const bookmark: ReaderBookmark = {
       id: crypto.randomUUID(),
-      locatorRef: packBookmarkLocator(currentLocation, bookmarkChapterIndex),
-      chapterIndex: bookmarkChapterIndex,
-      label: epubNav?.label?.trim() || chapterLabel.trim() || 'Bookmark',
+      locatorRef: packBookmarkLocator(location, chapterIndexAt),
+      chapterIndex: chapterIndexAt,
+      label: labelOverride || epubNav?.label?.trim() || chapterLabel.trim() || 'Bookmark',
       // Only the EPUB surface can read text at the current position today.
       excerpt: isEpubSurface
         ? epubApiRef.current?.getCurrentExcerpt()
@@ -256,6 +278,7 @@ export function useReaderBookmarks({
     isCurrentPlaceBookmarked,
     currentBookmarkId,
     toggleBookmark,
+    togglePdfPageBookmark,
     jumpToBookmark,
     deleteBookmarkById,
   }

@@ -20,6 +20,7 @@ export {
   useWordCount,
   useReadAloud,
   useReaderTranslation,
+  usePdfSelectionMenu,
   type HighlightShortcuts,
   type ReaderChromeEscapeUi,
   type SnapshotRect,

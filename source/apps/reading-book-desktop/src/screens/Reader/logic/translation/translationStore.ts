@@ -6,7 +6,6 @@ import {
   type TtsEngine,
 } from '@reading-book/book-reader-sdk'
 import { translationApi, type TranslationErrorCode, type TranslationProgress } from '../../../../bridge'
-import type { EpubSelectionInfo } from '../../../../reader/renderers/epub'
 import { createWebSpeechEngine } from '../../../../reader/tts/webSpeechEngine'
 import { useReadAloudStore } from '../readAloud/readAloudStore'
 import { clampPanelSize, type PanelPosition, type PanelSize } from '../floatingPanel/panelGeometry'
@@ -159,7 +158,7 @@ type TranslationState = TranslationContext & {
   setContext: (context: TranslationContext) => void
   setMode: (on: boolean) => void
   /** Opens the popover for a selection regardless of mode (context menu "Translate"). */
-  openForSelection: (info: EpubSelectionInfo) => void
+  openForSelection: (info: TranslationSelection) => void
   close: () => void
   setSourceLang: (code: string) => void
   setTargetLang: (code: string) => void
@@ -175,6 +174,9 @@ type TranslationState = TranslationContext & {
   setPanelSize: (size: PanelSize | null) => void
   setPanelResizing: (resizing: boolean) => void
 }
+
+/** What the popover needs from a selection — an EPUB or a PDF selection both provide it. */
+export type TranslationSelection = { text: string; lang: string }
 
 const stored = readStoredPrefs()
 
@@ -230,7 +232,7 @@ export const useTranslationStore = create<TranslationState>()((set, get) => {
     }
   }
 
-  const open = (info: EpubSelectionInfo) => {
+  const open = (info: TranslationSelection) => {
     const text = info.text.trim()
     if (!text) return
     const detected = normalizeTranslationLanguage(info.lang) ?? FALLBACK_SOURCE

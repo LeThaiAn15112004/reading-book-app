@@ -20,7 +20,11 @@ import {
   EpubRenderer,
   type EpubRendererApi,
 } from '../../reader/renderers/epub'
-import { PdfRenderer, type PdfRendererApi } from '../../reader/renderers/pdf'
+import {
+  PdfRenderer,
+  pdfSelectionPageLabel,
+  type PdfRendererApi,
+} from '../../reader/renderers/pdf'
 import {
   AaSettingsPanel,
   BookInfoDialog,
@@ -69,6 +73,7 @@ import {
   useWordCount,
   useReadAloud,
   useReaderTranslation,
+  usePdfSelectionMenu,
   useRightPanelStore,
   type HighlightShortcuts,
   type ReaderChromeEscapeUi,
@@ -327,6 +332,15 @@ export function ReaderScreen() {
     setToast: chrome.setToast,
     setChromeHidden: chrome.setChromeHidden,
     activeAnnotationTool,
+  })
+
+  // PDF: right-click inside a text-layer selection → the same menu, minus the markup actions
+  // (no PDF mark anchor / painting yet — see docs/implementation_plan/pdf_selection_context_menu.md).
+  const pdfSelectionMenu = usePdfSelectionMenu({
+    bookId,
+    isPdfSurface,
+    getScrollRoot: () => zoom.zoomViewportRef.current?.getElement() ?? null,
+    zoom: zoom.viewZoom,
   })
 
   highlightShortcutsRef.current = {
@@ -743,6 +757,35 @@ export function ReaderScreen() {
             />
           ) : null}
 
+          {pdfSelectionMenu.menu ? (
+            <HighlightContextMenu
+              point={pdfSelectionMenu.menu.point}
+              selectedText={pdfSelectionMenu.menu.selection.text}
+              onBookmarkHere={() => {
+                const menu = pdfSelectionMenu.menu
+                if (menu) bookmarks.togglePdfPageBookmark(menu.selection.pageStart)
+              }}
+              onCopy={() => copyHighlightText(pdfSelectionMenu.menu?.selection.text)}
+              onTranslate={() => {
+                const menu = pdfSelectionMenu.menu
+                if (menu) translation.openForSelection(menu.selection)
+              }}
+              onCopyWithCitation={() => {
+                const menu = pdfSelectionMenu.menu
+                if (!menu) return
+                copyHighlightText(
+                  formatHighlightCitation({
+                    text: menu.selection.text,
+                    bookTitle: book.bookTitle,
+                    author: book.author,
+                    locationLabel: pdfSelectionPageLabel(menu.selection),
+                  }),
+                )
+              }}
+              onDismiss={pdfSelectionMenu.close}
+            />
+          ) : null}
+
           {highlights.activeHighlight?.highlight.styleKind === 'textbox' ? (
             // A textbox note's entire purpose is its text — its own dedicated popup, regardless
             // of hand/select mode (unlike highlight/underline/strikethrough below).
@@ -926,6 +969,7 @@ export function ReaderScreen() {
               interactionTool={activeTool}
               onHandPanBy={zoom.handleHandPanBy}
               onCenterTap={chrome.handleCenterTap}
+              onSelectionContextMenu={pdfSelectionMenu.open}
               apiRef={pdfApiRef}
               onNavState={(state) => {
                 nav.setPdfNav(state)
