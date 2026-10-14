@@ -84,6 +84,15 @@ export function useReaderZoomControls({
     setViewZoomCentered(next)
   }, [])
 
+  /**
+   * Set the zoom outright (no focal anchoring), then run `after` once the surface has laid out at
+   * that zoom — e.g. PDF Fit page scrolling the measured page into place.
+   */
+  const setZoomThen = useCallback((next: number, after: () => void) => {
+    setViewZoom(clampZoom(next))
+    requestAnimationFrame(() => requestAnimationFrame(after))
+  }, [])
+
   const handleHandPanBy = useCallback((dx: number, dy: number) => {
     const el = zoomViewportRef.current?.getElement()
     if (!el) return
@@ -123,6 +132,7 @@ export function useReaderZoomControls({
     handleZoomStep,
     handleZoomChange,
     handleZoomLayoutPreset,
+    setZoomThen,
     handleHandPanBy,
     handleFocusZoomWheel,
   }

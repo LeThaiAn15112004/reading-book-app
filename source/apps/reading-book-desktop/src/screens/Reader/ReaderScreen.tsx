@@ -22,6 +22,7 @@ import {
 } from '../../reader/renderers/epub'
 import {
   PdfRenderer,
+  pdfFitPageZoom,
   pdfSelectionPageLabel,
   type PdfRendererApi,
 } from '../../reader/renderers/pdf'
@@ -241,6 +242,26 @@ export function ReaderScreen() {
     bookId,
     activeToolRef,
   })
+  const setZoomThen = zoom.setZoomThen
+  const zoomViewportRef = zoom.zoomViewportRef
+
+  /**
+   * PDF Fit page: measure the page being read from the document, zoom so that page fills the reading
+   * area (width and height), then scroll it to the top of the view and centre it horizontally.
+   */
+  const fitPdfPage = useCallback(async () => {
+    const api = pdfApiRef.current
+    const viewport = zoomViewportRef.current?.getElement()
+    if (!api || !viewport) return
+    const page = api.getNavState().pageCurrent
+    const size = await api.measurePage(page)
+    const next = size ? pdfFitPageZoom(size, viewport.clientWidth, viewport.clientHeight) : null
+    if (next === null) return
+    setZoomThen(next, () => {
+      api.goToPage(page)
+      viewport.scrollLeft = Math.max(0, (viewport.scrollWidth - viewport.clientWidth) / 2)
+    })
+  }, [setZoomThen, zoomViewportRef])
 
   // Immersive: tools/footer stay hidden unless an edge reveal is active. Left sidebar is disabled in fullscreen.
   const toolsHidden = immersive
@@ -597,7 +618,10 @@ export function ReaderScreen() {
           zoom={zoom.viewZoom}
           onZoomChange={zoom.handleZoomChange}
           onZoomStep={zoom.handleZoomStep}
-          onZoomLayoutPreset={zoom.handleZoomLayoutPreset}
+          onZoomLayoutPreset={(preset) =>
+            isPdfSurface && preset === 'fit-page' ? fitPdfPage() : zoom.handleZoomLayoutPreset(preset)
+          }
+          onFitPage={isPdfSurface ? fitPdfPage : undefined}
           fullscreen={fullscreen}
           onToggleFullscreen={toggleFullscreen}
           immersiveHidden={footerImmersiveHidden}

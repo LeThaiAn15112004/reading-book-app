@@ -46,16 +46,13 @@ import {
   pdfPageSearchRanges,
 } from './pdfSearchDom'
 import { readPdfSelectionAt, type PdfSelectionInfo } from './pdfSelection'
+import { PAD_PX, PAGE_GAP_PX, PDF_TO_CSS, type PdfPageCssSize } from './pdfLayout'
 // `?url` makes Vite emit the worker as a local asset in dist/ — never loaded from a CDN.
 import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
 import 'pdfjs-dist/web/pdf_viewer.css'
 
 GlobalWorkerOptions.workerSrc = pdfWorkerUrl
 
-/** PDF points → CSS px (72 → 96 dpi), so zoom 100% is the page's real size. */
-const PDF_TO_CSS = 96 / 72
-const PAGE_GAP_PX = 12
-const PAD_PX = 16
 /** Pages rendered beyond the visible range in each direction. */
 const RENDER_AHEAD = 2
 /** Rendered pages farther than this from the visible range are released. */
@@ -68,6 +65,7 @@ const TEXT_LAYER_WAIT_MS = 4000
 const FALLBACK_SIZE: PageSize = { w: 595, h: 842 }
 
 type PageSize = { w: number; h: number }
+
 
 export type PdfNavState = {
   /** 1-based page currently being read. */
@@ -104,6 +102,8 @@ export interface PdfRendererApi {
    * Thumbnail renders run one at a time (shared queue); null when aborted or unavailable.
    */
   renderThumbnail: (page: number, cssWidth: number, signal: AbortSignal) => Promise<HTMLCanvasElement | null>
+  /** Measure 1-based `page` from the document itself (its own size and rotation); null if unavailable. */
+  measurePage: (page: number) => Promise<PdfPageCssSize | null>
 }
 
 export type PdfSearchTarget = { pageIndex: number; occurrence: number; count: number }
@@ -553,6 +553,12 @@ export function PdfRenderer({
     if (!apiRef) return
     apiRef.current = {
       renderThumbnail,
+      measurePage: async (pageNumber) => {
+        const pdf = docRef.current
+        if (!pdf || pageNumber < 1 || pageNumber > pdf.numPages) return null
+        const viewport = (await pdf.getPage(pageNumber)).getViewport({ scale: 1 })
+        return { width: viewport.width * PDF_TO_CSS, height: viewport.height * PDF_TO_CSS }
+      },
       goToPage: (page) => scrollToIndex(page - 1),
       nextPage: () => scrollToIndex(currentRef.current + 1),
       prevPage: () => scrollToIndex(currentRef.current - 1),

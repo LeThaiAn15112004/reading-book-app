@@ -6,6 +6,7 @@ export {
   type PdfRendererProps,
   type PdfSearchTarget,
 } from './PdfRenderer'
+export { pdfFitPageZoom, type PdfPageCssSize } from './pdfLayout'
 export {
   pdfSelectionPageLabel,
   type PdfSelectionInfo,

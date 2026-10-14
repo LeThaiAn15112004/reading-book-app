@@ -113,6 +113,8 @@ type ReaderFooterProps = {
   onZoomChange: (scale: number) => void
   onZoomStep: (direction: 1 | -1) => void
   onZoomLayoutPreset: (preset: ZoomLayoutPreset) => void
+  /** Fit the current page to the reading area (PDF only — omitted elsewhere, the button is hidden). */
+  onFitPage?: () => void
   fullscreen?: boolean
   onToggleFullscreen?: () => void
   /** Immersive fullscreen: slide footer away until bottom-edge reveal. */
@@ -122,6 +124,25 @@ type ReaderFooterProps = {
   onToggleBookmark?: () => void
   /** Background text chunking for search is running long enough to be worth a subtle hint. */
   searchIndexing?: boolean
+}
+
+/** A page outline inside a frame of corner marks — the whole page fitted to the view. */
+function FitPageIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      className="size-4"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.8}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <path d="M3.75 8.25v-4.5h4.5M15.75 3.75h4.5v4.5M20.25 15.75v4.5h-4.5M8.25 20.25h-4.5v-4.5" />
+      <rect x="8.25" y="6.75" width="7.5" height="10.5" rx="1" />
+    </svg>
+  )
 }
 
 export function ReaderFooter({
@@ -143,6 +164,7 @@ export function ReaderFooter({
   onZoomChange,
   onZoomStep,
   onZoomLayoutPreset,
+  onFitPage,
   fullscreen = false,
   onToggleFullscreen,
   immersiveHidden = false,
@@ -420,6 +442,17 @@ export function ReaderFooter({
           onZoomStep={onZoomStep}
           onLayoutPreset={onZoomLayoutPreset}
         />
+        {onFitPage ? (
+          <button
+            type="button"
+            className="inline-flex size-7 cursor-pointer items-center justify-center rounded text-lib-text-strong hover:bg-lib-chip"
+            title="Fit page"
+            aria-label="Fit page"
+            onClick={onFitPage}
+          >
+            <FitPageIcon />
+          </button>
+        ) : null}
         {onToggleFullscreen ? (
           <FullscreenButton
             fullscreen={fullscreen}
