@@ -1,9 +1,13 @@
 import {
   Location,
+  isConsistentPdfHighlight,
+  packPdfAnnotationRef,
+  parsePdfAnnotationRef,
   type BookmarkRecord,
   type HighlightRecord,
   type NoteLocator,
   type NoteSelectionText,
+  type PdfAnnotation,
 } from '@reading-book/book-reader-sdk'
 import { ipcMain } from 'electron'
 import {
@@ -93,6 +97,7 @@ function toHighlightDto(highlight: HighlightRecord): HighlightDto {
   }
   if (highlight.note) dto.note = highlight.note
   if (highlight.selectionText) dto.selectionTextRef = JSON.stringify(highlight.selectionText)
+  if (highlight.pdfAnnotation) dto.pdfAnnotationRef = packPdfAnnotationRef(highlight.pdfAnnotation)
   return dto
 }
 
@@ -242,6 +247,14 @@ export function registerOverlayIpc(): void {
       if (!validStyleKinds.includes(body.styleKind)) return null
       if (typeof body.colorHex !== 'string' || !body.colorHex.trim()) return null
 
+      // PDF markup: the geometry must be valid on its own and agree with the jump target. A
+      // present-but-invalid payload rejects the save rather than storing a mark that can't paint.
+      let pdfAnnotation: PdfAnnotation | undefined
+      if (body.pdfAnnotationRef !== undefined) {
+        pdfAnnotation = parsePdfAnnotationRef(body.pdfAnnotationRef)
+        if (!pdfAnnotation || !isConsistentPdfHighlight(locator, pdfAnnotation)) return null
+      }
+
       try {
         const saved = await overlays.saveHighlight({
           id: body.id?.trim() || undefined,
@@ -252,6 +265,7 @@ export function registerOverlayIpc(): void {
           note: body.note?.trim() || undefined,
           tags: body.tags,
           selectionText: parseSelectionTextRef(body.selectionTextRef),
+          pdfAnnotation,
           createdAt: body.createdAt?.trim() || undefined,
         })
         return toHighlightDto(saved)

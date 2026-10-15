@@ -1,5 +1,12 @@
 import { Component, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import type { ReaderBookmark, ReaderHighlight } from '@reading-book/book-reader-sdk'
+import type { ReaderBookmark, ReaderHighlightBase } from '@reading-book/book-reader-sdk'
+
+/**
+ * A highlight / note card in the sidebar — EPUB (`ReaderHighlight`) and PDF (`PdfReaderHighlight`)
+ * rows alike. `chapterIndex` is the grouping key: the spine section for EPUB, the 0-based page for
+ * PDF (so its group label comes from `sectionLabels`, i.e. "Page N").
+ */
+export type SidebarHighlight = ReaderHighlightBase & { chapterIndex: number }
 import type { EpubTocItem } from '../../../../reader/renderers/epub'
 import type { FakeChapter } from '../../logic'
 import { useNotesFilterStore, type NotesTypeFilter } from '../../logic/highlights/notesFilterStore'
@@ -41,6 +48,8 @@ type TocSidebarProps = {
   renderPageThumbnail?: PageThumbnailRenderer
   /** Section titles indexed by 0-based spine position. */
   sectionLabels?: string[]
+  /** What one section is called in the Notes group header ("Page 3 of 40" for PDF). */
+  sectionNoun?: 'Chapter' | 'Page'
   /** Whether the reader is in immersive/fullscreen mode. */
   immersive?: boolean
   bookmarks?: ReaderBookmark[]
@@ -51,13 +60,13 @@ type TocSidebarProps = {
   onToggleBookmark?: () => void
   onJumpBookmark?: (bookmark: ReaderBookmark) => void
   onDeleteBookmark?: (id: string) => void
-  highlights?: ReaderHighlight[]
-  onJumpHighlight?: (highlight: ReaderHighlight) => void
+  highlights?: SidebarHighlight[]
+  onJumpHighlight?: (highlight: SidebarHighlight) => void
   onDeleteHighlight?: (id: string) => void
   onChangeHighlightColor?: (id: string, colorHex: string) => void
   onChangeHighlightNote?: (id: string, note: string) => void
-  onCopyHighlight?: (highlight: ReaderHighlight) => void
-  onAskAiHighlight?: (highlight: ReaderHighlight) => void
+  onCopyHighlight?: (highlight: SidebarHighlight) => void
+  onAskAiHighlight?: (highlight: SidebarHighlight) => void
 }
 
 function normalizeHref(href: string): string {
@@ -78,16 +87,16 @@ function bookmarkProgressLabel(
   return `${percent.toFixed(2)}%`
 }
 
-type HighlightChapterGroup = { chapterIndex: number; label: string; items: ReaderHighlight[] }
+type HighlightChapterGroup = { chapterIndex: number; label: string; items: SidebarHighlight[] }
 
 /** Groups highlights by the chapter/section they were created in, chapter order ascending,
  *  oldest-first within a chapter. `sectionLabels` (0-based, indexed by spine position — same
- *  as `ReaderHighlight.chapterIndex`) supplies the human-readable chapter title. */
+ *  as `SidebarHighlight.chapterIndex`) supplies the human-readable chapter title. */
 function groupHighlightsByChapter(
-  highlights: ReaderHighlight[],
+  highlights: SidebarHighlight[],
   sectionLabels?: string[],
 ): HighlightChapterGroup[] {
-  const byChapter = new Map<number, ReaderHighlight[]>()
+  const byChapter = new Map<number, SidebarHighlight[]>()
   for (const h of highlights) {
     const list = byChapter.get(h.chapterIndex)
     if (list) list.push(h)
@@ -104,7 +113,7 @@ function groupHighlightsByChapter(
 
 /** Human label for a note's type — distinct from `styleKind` so it can carry copy that differs
  *  from the raw discriminator (e.g. "Note" for `textbox`). */
-function highlightTypeLabel(styleKind: ReaderHighlight['styleKind']): string {
+function highlightTypeLabel(styleKind: SidebarHighlight['styleKind']): string {
   switch (styleKind) {
     case 'underline':
       return 'Underline'
@@ -142,7 +151,7 @@ const NOTE_TYPE_OPTIONS: { value: NotesTypeFilter; label: string }[] = [
 ]
 
 /** Case-insensitive substring match over a highlight's excerpt, note and tags. */
-function highlightMatchesSearch(highlight: ReaderHighlight, needle: string): boolean {
+function highlightMatchesSearch(highlight: SidebarHighlight, needle: string): boolean {
   const haystack = [highlight.selectionText?.highlight, highlight.note, ...(highlight.tags ?? [])]
     .filter((part): part is string => typeof part === 'string' && part.length > 0)
     .join('\n')
@@ -154,9 +163,9 @@ function highlightMatchesSearch(highlight: ReaderHighlight, needle: string): boo
  *  input shape — a `null`/`undefined` list (e.g. a bridge call that failed upstream) or a
  *  malformed row must degrade to "no matches" rather than throw during render. */
 function filterHighlights(
-  highlights: ReaderHighlight[] | null | undefined,
+  highlights: SidebarHighlight[] | null | undefined,
   options: { searchTerm: string; activeType: NotesTypeFilter },
-): ReaderHighlight[] {
+): SidebarHighlight[] {
   if (!Array.isArray(highlights)) return []
   const needle = options.searchTerm.trim().toLowerCase()
   return highlights.filter((h) => {
@@ -169,7 +178,7 @@ function filterHighlights(
 
 /** Flat, most-recent-first ordering — the "Chronological" alternative to the default
  *  reading-order (chapter-grouped) view. */
-function sortHighlightsChronological(highlights: ReaderHighlight[]): ReaderHighlight[] {
+function sortHighlightsChronological(highlights: SidebarHighlight[]): SidebarHighlight[] {
   return [...highlights].sort((a, b) => (b.createdAt ?? '').localeCompare(a.createdAt ?? ''))
 }
 
@@ -305,14 +314,14 @@ function TocTree({
 }
 
 type HighlightListItemProps = {
-  highlight: ReaderHighlight
+  highlight: SidebarHighlight
   pageTotal: number
-  onJump?: (highlight: ReaderHighlight) => void
+  onJump?: (highlight: SidebarHighlight) => void
   onDelete?: (id: string) => void
   onChangeColor?: (id: string, colorHex: string) => void
   onChangeNote?: (id: string, note: string) => void
-  onCopy?: (highlight: ReaderHighlight) => void
-  onAskAi?: (highlight: ReaderHighlight) => void
+  onCopy?: (highlight: SidebarHighlight) => void
+  onAskAi?: (highlight: SidebarHighlight) => void
 }
 
 /** One note/highlight card — shared by the reading-order (grouped) and chronological (flat)
@@ -426,6 +435,7 @@ export function TocSidebar({
   onGoToPage,
   renderPageThumbnail,
   sectionLabels,
+  sectionNoun = 'Chapter',
   immersive = false,
   bookmarks = [],
   currentBookmarkId,
@@ -832,7 +842,7 @@ export function TocSidebar({
                               </span>
                               <span className="flex items-center gap-1.5 text-xs text-lib-muted">
                                 <span aria-hidden>📖</span>
-                                Chapter {group.chapterIndex + 1} of {pageTotal}
+                                {sectionNoun} {group.chapterIndex + 1} of {pageTotal}
                               </span>
                               <span className="text-xs text-lib-muted">
                                 {highlightsOnlyCount} Highlights / {notesCount} Notes

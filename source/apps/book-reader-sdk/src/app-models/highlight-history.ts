@@ -3,19 +3,20 @@ import type { ReaderHighlight } from './highlight-location.js'
 /**
  * One reversible highlight mutation for Ctrl+Z / Ctrl+Y. Adapted from the deleted, generic
  * `annotation-history.ts` (recoverable via `git show HEAD`), narrowed to this app's one
- * remaining overlay type — no more `{entity, value}` tagged-union wrapper.
+ * remaining overlay type — no more `{entity, value}` tagged-union wrapper. Generic over the row
+ * type so the PDF store (`PdfReaderHighlight`) shares it; defaults to the EPUB `ReaderHighlight`.
  */
-export type HighlightAction =
-  | { kind: 'add'; value: ReaderHighlight }
-  | { kind: 'remove'; value: ReaderHighlight }
-  | { kind: 'replace'; before: ReaderHighlight; after: ReaderHighlight }
+export type HighlightAction<T = ReaderHighlight> =
+  | { kind: 'add'; value: T }
+  | { kind: 'remove'; value: T }
+  | { kind: 'replace'; before: T; after: T }
 
 const DEFAULT_LIMIT = 50
 
-export type HighlightHistory = {
-  push: (action: HighlightAction) => void
-  undo: () => HighlightAction | null
-  redo: () => HighlightAction | null
+export type HighlightHistory<T = ReaderHighlight> = {
+  push: (action: HighlightAction<T>) => void
+  undo: () => HighlightAction<T> | null
+  redo: () => HighlightAction<T> | null
   clear: () => void
   canUndo: () => boolean
   canRedo: () => boolean
@@ -25,9 +26,9 @@ export type HighlightHistory = {
  * Session-only undo/redo stack — never persisted to disk. A fresh instance is created per book
  * (the reader hook calls `.clear()` whenever the open book changes).
  */
-export function createHighlightHistory(limit = DEFAULT_LIMIT): HighlightHistory {
-  let undoStack: HighlightAction[] = []
-  let redoStack: HighlightAction[] = []
+export function createHighlightHistory<T = ReaderHighlight>(limit = DEFAULT_LIMIT): HighlightHistory<T> {
+  let undoStack: HighlightAction<T>[] = []
+  let redoStack: HighlightAction<T>[] = []
 
   return {
     push(action) {
@@ -56,14 +57,14 @@ export function createHighlightHistory(limit = DEFAULT_LIMIT): HighlightHistory 
   }
 }
 
-export function highlightAdd(value: ReaderHighlight): HighlightAction {
+export function highlightAdd<T = ReaderHighlight>(value: T): HighlightAction<T> {
   return { kind: 'add', value }
 }
 
-export function highlightRemove(value: ReaderHighlight): HighlightAction {
+export function highlightRemove<T = ReaderHighlight>(value: T): HighlightAction<T> {
   return { kind: 'remove', value }
 }
 
-export function highlightReplace(before: ReaderHighlight, after: ReaderHighlight): HighlightAction {
+export function highlightReplace<T = ReaderHighlight>(before: T, after: T): HighlightAction<T> {
   return { kind: 'replace', before, after }
 }

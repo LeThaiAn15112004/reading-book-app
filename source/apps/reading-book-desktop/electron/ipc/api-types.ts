@@ -441,6 +441,11 @@ export interface HighlightDto {
   note?: string
   tags: string[]
   selectionTextRef?: string
+  /**
+   * PDF text markup only: JSON `PdfAnnotation` — `{ pageIndex (0-based), rects: normalized 0–1 }`
+   * (see `app-models/pdf-highlight.ts`). Absent on EPUB highlights.
+   */
+  pdfAnnotationRef?: string
   createdAt: string
   updatedAt: string
 }
@@ -455,6 +460,11 @@ export interface SaveHighlightInput {
   note?: string
   tags?: string[]
   selectionTextRef?: string
+  /**
+   * PDF text markup only (JSON `PdfAnnotation`). Validated in Main: finite normalized rects, sane
+   * page indices and sizes, and a `page-rect` `locatorRef` on the annotation's first page.
+   */
+  pdfAnnotationRef?: string
   createdAt?: string
 }
 

@@ -16,7 +16,8 @@ type PdfSelectionMenuStore = {
 /**
  * PDF counterpart of `highlightsStore`'s `selectionMenu`. Kept separate on purpose: that store is
  * CFI/epub.js-bound (marks, undo history, `pendingSelection` fed by epub.js events), while a PDF
- * selection is read synchronously on right-click and only feeds the non-markup menu actions.
+ * selection is read synchronously on right-click. Its markup actions hand the selection to
+ * `pdfHighlightsStore`; the rest (copy, citation, translate, bookmark) only read it.
  */
 export const usePdfSelectionMenuStore = create<PdfSelectionMenuStore>()((set) => ({
   menu: null,

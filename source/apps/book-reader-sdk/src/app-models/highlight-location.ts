@@ -16,14 +16,15 @@ import { DEFAULT_HIGHLIGHT_COLOR } from './highlight-colors.js'
 
 export type HighlightStyleKind = 'highlight' | 'underline' | 'strikethrough' | 'textbox'
 
-/** Renderer-side view of one highlight row. */
-export type ReaderHighlight = {
+/**
+ * The format-independent part of a renderer-side highlight row — everything the shared
+ * annotation UI (color picker, edit popup, note popup, sidebar card) reads. EPUB rows extend it
+ * with a CFI (`ReaderHighlight`), PDF rows with page rects (`PdfReaderHighlight`).
+ */
+export type ReaderHighlightBase = {
   id: string
   /** Locator JSON exactly as stored — round-trips back to IPC unchanged. */
   locatorRef: string
-  /** Full range CFI string (`epubcfi(base,start,end)`) extracted from the locator. */
-  cfiRange: string
-  chapterIndex: number
   styleKind: HighlightStyleKind
   colorHex: string
   note?: string
@@ -31,6 +32,13 @@ export type ReaderHighlight = {
   selectionText?: NoteSelectionText
   createdAt: string
   updatedAt: string
+}
+
+/** Renderer-side view of one EPUB highlight row. */
+export type ReaderHighlight = ReaderHighlightBase & {
+  /** Full range CFI string (`epubcfi(base,start,end)`) extracted from the locator. */
+  cfiRange: string
+  chapterIndex: number
 }
 
 /** Pack a CFI Location + chapterIndex — identical packing to bookmarks, kept as a
@@ -67,9 +75,9 @@ export function highlightDtoToReaderHighlight(dto: {
   const locatorRef = dto.locatorRef?.trim()
   if (!locatorRef) return null
   const location = parseBookmarkLocation(locatorRef)
-  // Highlights are EPUB-only in this feature (rendering goes through epub.js's
-  // rendition.annotations, which is CFI-based) — a non-CFI locator means a stale/foreign row,
-  // drop it defensively rather than listing an entry that can never render.
+  // The EPUB mapper (rendering goes through epub.js's CFI-based rendition.annotations): a
+  // non-CFI locator is not an EPUB row — PDF rows (`page-rect` + `pdfAnnotation`) are mapped by
+  // `pdfHighlightDtoToReaderHighlight` instead — so drop it rather than list an unrenderable entry.
   if (!(location instanceof CfiLocation)) return null
 
   return {

@@ -78,6 +78,7 @@ import {
   useReadAloud,
   useReaderTranslation,
   usePdfSelectionMenu,
+  useReaderPdfHighlights,
   useRightPanelStore,
   type HighlightShortcuts,
   type ReaderChromeEscapeUi,
@@ -374,8 +375,9 @@ export function ReaderScreen() {
     activeAnnotationTool,
   })
 
-  // PDF: right-click inside a text-layer selection → the same menu, minus the markup actions
-  // (no PDF mark anchor / painting yet — see docs/implementation_plan/pdf_selection_context_menu.md).
+  // PDF: right-click inside a text-layer selection → the same menu as EPUB (see
+  // docs/implementation_plan/pdf_selection_context_menu.md); its markup actions create PDF text
+  // annotations (docs/implementation_plan/pdf_text_annotations.md).
   const pdfSelectionMenu = usePdfSelectionMenu({
     bookId,
     isPdfSurface,
@@ -383,11 +385,30 @@ export function ReaderScreen() {
     zoom: zoom.viewZoom,
   })
 
+  // PDF text annotations — the PDF counterpart of `highlights` (page + normalized rects, no CFI).
+  const pdfHighlights = useReaderPdfHighlights({
+    bookId,
+    isPdfSurface,
+    pdfApiRef,
+    zoom: zoom.viewZoom,
+    setToast: chrome.setToast,
+    setChromeHidden: chrome.setChromeHidden,
+  })
+  /** The open surface's annotation store: drives the shared popups, sidebar actions and shortcuts. */
+  const markup = isPdfSurface ? pdfHighlights : highlights
+
+  /** PDF selection menu → mark that selection (`textbox` = a note, its popup opens at the click). */
+  function markPdfSelection(styleKind: 'highlight' | 'underline' | 'strikethrough' | 'textbox') {
+    const menu = pdfSelectionMenu.menu
+    if (!menu) return
+    pdfHighlights.createFromSelection(menu.selection, styleKind, new DOMRect(menu.point.x, menu.point.y, 0, 0))
+  }
+
   highlightShortcutsRef.current = {
-    undo: highlights.undo,
-    redo: highlights.redo,
-    deleteFocused: highlights.deleteFocused,
-    hasFocusedHighlight: highlights.hasFocusedHighlight,
+    undo: markup.undo,
+    redo: markup.redo,
+    deleteFocused: markup.deleteFocused,
+    hasFocusedHighlight: markup.hasFocusedHighlight,
     // Escape while Highlight/Underline/Strikethrough is armed: drop back to Select instead of
     // leaving the reader (matches Foxit/Adobe — Escape backs a modal tool out one level at a time).
     cancelAnnotationTool: () => {
@@ -685,6 +706,7 @@ export function ReaderScreen() {
             pageCurrent={sectionCurrent}
             pageTotal={sectionTotal}
             sectionLabels={sectionLabels}
+            sectionNoun={isPdfSurface ? 'Page' : 'Chapter'}
             onGoToPage={nav.goToPageFromLayout}
             renderPageThumbnail={isPdfSurface ? renderPdfThumbnail : undefined}
             bookmarks={bookmarks.bookmarks}
@@ -695,13 +717,19 @@ export function ReaderScreen() {
               void bookmarks.jumpToBookmark(bookmark)
             }}
             onDeleteBookmark={bookmarks.deleteBookmarkById}
-            highlights={highlights.highlights}
+            highlights={isPdfSurface ? pdfHighlights.highlights : highlights.highlights}
             onJumpHighlight={(highlight) => {
-              void highlights.jumpToHighlight(highlight)
+              if (isPdfSurface) {
+                const row = pdfHighlights.highlights.find((h) => h.id === highlight.id)
+                if (row) pdfHighlights.jumpToHighlight(row)
+                return
+              }
+              const row = highlights.highlights.find((h) => h.id === highlight.id)
+              if (row) void highlights.jumpToHighlight(row)
             }}
-            onDeleteHighlight={highlights.deleteHighlight}
-            onChangeHighlightColor={highlights.updateHighlightColor}
-            onChangeHighlightNote={(id, note) => highlights.updateHighlightNote(id, note)}
+            onDeleteHighlight={markup.deleteHighlight}
+            onChangeHighlightColor={markup.updateHighlightColor}
+            onChangeHighlightNote={(id, note) => markup.updateHighlightNote(id, note)}
             onCopyHighlight={(highlight) => copyHighlightText(highlight.selectionText?.highlight)}
             onAskAiHighlight={() => chrome.setToast('AI Ask — coming soon.')}
           />
@@ -807,6 +835,10 @@ export function ReaderScreen() {
             <HighlightContextMenu
               point={pdfSelectionMenu.menu.point}
               selectedText={pdfSelectionMenu.menu.selection.text}
+              onHighlight={() => markPdfSelection('highlight')}
+              onUnderline={() => markPdfSelection('underline')}
+              onStrikethrough={() => markPdfSelection('strikethrough')}
+              onAddNote={() => markPdfSelection('textbox')}
               onBookmarkHere={() => {
                 const menu = pdfSelectionMenu.menu
                 if (menu) bookmarks.togglePdfPageBookmark(menu.selection.pageStart)
@@ -832,77 +864,77 @@ export function ReaderScreen() {
             />
           ) : null}
 
-          {highlights.activeHighlight?.highlight.styleKind === 'textbox' ? (
+          {markup.activeHighlight?.highlight.styleKind === 'textbox' ? (
             // A textbox note's entire purpose is its text — its own dedicated popup, regardless
             // of hand/select mode (unlike highlight/underline/strikethrough below).
             <NoteTextboxPopup
-              anchorRect={highlights.activeHighlight.rect}
-              highlight={highlights.activeHighlight.highlight}
+              anchorRect={markup.activeHighlight.rect}
+              highlight={markup.activeHighlight.highlight}
               onSave={(note) =>
-                highlights.updateHighlightNote(highlights.activeHighlight!.highlight.id, note)
+                markup.updateHighlightNote(markup.activeHighlight!.highlight.id, note)
               }
-              onDelete={() => highlights.deleteHighlight(highlights.activeHighlight!.highlight.id)}
-              onDismiss={highlights.closeEditPopup}
+              onDelete={() => markup.deleteHighlight(markup.activeHighlight!.highlight.id)}
+              onDismiss={markup.closeEditPopup}
             />
           ) : null}
 
-          {highlights.activeHighlight &&
-          highlights.activeHighlight.highlight.styleKind !== 'textbox' &&
+          {markup.activeHighlight &&
+          markup.activeHighlight.highlight.styleKind !== 'textbox' &&
           activeTool === 'hand' ? (
             // Hand mode: a click on the highlight's mark in the book gets the exact same floating
             // toolbar as the "⋯" kebab on its sidebar note card (see NoteFloatingMenu) — same
             // actions, same look, regardless of where the click came from.
             <NoteFloatingMenu
               open
-              anchorRect={highlights.activeHighlight.rect}
-              highlight={highlights.activeHighlight.highlight}
+              anchorRect={markup.activeHighlight.rect}
+              highlight={markup.activeHighlight.highlight}
               onChangeColor={(hex) =>
-                highlights.updateHighlightColor(highlights.activeHighlight!.highlight.id, hex)
+                markup.updateHighlightColor(markup.activeHighlight!.highlight.id, hex)
               }
               onEditNote={(note) =>
-                highlights.updateHighlightNote(highlights.activeHighlight!.highlight.id, note)
+                markup.updateHighlightNote(markup.activeHighlight!.highlight.id, note)
               }
               onCopy={() =>
-                copyHighlightText(highlights.activeHighlight?.highlight.selectionText?.highlight)
+                copyHighlightText(markup.activeHighlight?.highlight.selectionText?.highlight)
               }
               onAskAi={() => chrome.setToast('AI Ask — coming soon.')}
-              onDelete={() => highlights.deleteHighlight(highlights.activeHighlight!.highlight.id)}
-              onDismiss={highlights.closeEditPopup}
+              onDelete={() => markup.deleteHighlight(markup.activeHighlight!.highlight.id)}
+              onDismiss={markup.closeEditPopup}
             />
           ) : null}
 
-          {highlights.activeHighlight &&
-          highlights.activeHighlight.highlight.styleKind !== 'textbox' &&
+          {markup.activeHighlight &&
+          markup.activeHighlight.highlight.styleKind !== 'textbox' &&
           activeTool !== 'hand' ? (
             <HighlightEditPopup
-              anchorRect={highlights.activeHighlight.rect}
-              highlight={highlights.activeHighlight.highlight}
+              anchorRect={markup.activeHighlight.rect}
+              highlight={markup.activeHighlight.highlight}
               onChangeColor={(hex) =>
-                highlights.updateHighlightColor(highlights.activeHighlight!.highlight.id, hex)
+                markup.updateHighlightColor(markup.activeHighlight!.highlight.id, hex)
               }
               onToggleUnderline={(isUnderline) =>
-                highlights.updateHighlightStyleKind(
-                  highlights.activeHighlight!.highlight.id,
+                markup.updateHighlightStyleKind(
+                  markup.activeHighlight!.highlight.id,
                   isUnderline ? 'underline' : 'highlight',
                 )
               }
               onToggleStrikethrough={(isStrikethrough) =>
-                highlights.updateHighlightStyleKind(
-                  highlights.activeHighlight!.highlight.id,
+                markup.updateHighlightStyleKind(
+                  markup.activeHighlight!.highlight.id,
                   isStrikethrough ? 'strikethrough' : 'highlight',
                 )
               }
               onChangeNote={(note) =>
-                highlights.updateHighlightNote(highlights.activeHighlight!.highlight.id, note)
+                markup.updateHighlightNote(markup.activeHighlight!.highlight.id, note)
               }
               onChangeTags={(tags) =>
-                highlights.updateHighlightTags(highlights.activeHighlight!.highlight.id, tags)
+                markup.updateHighlightTags(markup.activeHighlight!.highlight.id, tags)
               }
               onCopy={() =>
-                copyHighlightText(highlights.activeHighlight?.highlight.selectionText?.highlight)
+                copyHighlightText(markup.activeHighlight?.highlight.selectionText?.highlight)
               }
-              onDelete={() => highlights.deleteHighlight(highlights.activeHighlight!.highlight.id)}
-              onClose={highlights.closeEditPopup}
+              onDelete={() => markup.deleteHighlight(markup.activeHighlight!.highlight.id)}
+              onClose={markup.closeEditPopup}
             />
           ) : null}
 
@@ -1015,7 +1047,25 @@ export function ReaderScreen() {
               interactionTool={activeTool}
               onHandPanBy={zoom.handleHandPanBy}
               onCenterTap={chrome.handleCenterTap}
-              onSelectionContextMenu={pdfSelectionMenu.open}
+              onSelectionContextMenu={(selection, x, y) => {
+                pdfHighlights.dismissAnnotationUi()
+                pdfSelectionMenu.open(selection, x, y)
+              }}
+              annotations={pdfHighlights.highlights}
+              focusedAnnotationId={pdfHighlights.focusedHighlightId}
+              onAnnotationClick={(hit) => {
+                pdfSelectionMenu.close()
+                pdfHighlights.openHighlight(hit.id, hit.rect)
+              }}
+              onAnnotationContextMenu={(hit) => {
+                pdfSelectionMenu.close()
+                pdfHighlights.openHighlight(hit.id, hit.rect)
+              }}
+              onBlankClick={pdfHighlights.dismissAnnotationUi}
+              onMarkupSelection={(selection, tool) => {
+                pdfSelectionMenu.close()
+                pdfHighlights.commitMarkupSelection(selection, tool)
+              }}
               apiRef={pdfApiRef}
               onNavState={(state) => {
                 nav.setPdfNav(state)

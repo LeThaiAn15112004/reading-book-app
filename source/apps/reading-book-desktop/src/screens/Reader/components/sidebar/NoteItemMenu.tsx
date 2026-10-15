@@ -1,10 +1,10 @@
 import { useRef, useState } from 'react'
-import type { ReaderHighlight } from '@reading-book/book-reader-sdk'
+import type { ReaderHighlightBase } from '@reading-book/book-reader-sdk'
 import type { ViewportRectLike } from '../../../../reader/renderers/epub'
 import { NoteFloatingMenu } from './NoteFloatingMenu'
 
 type NoteItemMenuProps = {
-  highlight: ReaderHighlight
+  highlight: ReaderHighlightBase
   onChangeColor: (colorHex: string) => void
   onEditNote: (note: string) => void
   onCopy: () => void

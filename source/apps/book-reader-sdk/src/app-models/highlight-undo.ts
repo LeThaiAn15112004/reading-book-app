@@ -9,17 +9,17 @@ import type { ReaderHighlight } from './highlight-location.js'
  * restore/remove pairs or a separate "replaced" refresh callback (the zustand store's
  * `patchHighlightById` already keeps an open edit popup in sync with the live row).
  */
-export type HighlightUndoHandlers = {
+export type HighlightUndoHandlers<T extends { id: string } = ReaderHighlight> = {
   /** Make `h` the current row — insert if missing, overwrite if present. Covers an 'add' redo,
    *  a 'remove' undo, and either side of a 'replace' uniformly. */
-  restore: (h: ReaderHighlight) => void
+  restore: (h: T) => void
   remove: (id: string) => void
 }
 
-export function applyHighlightHistoryStep(
-  action: HighlightAction,
+export function applyHighlightHistoryStep<T extends { id: string } = ReaderHighlight>(
+  action: HighlightAction<T>,
   direction: 'undo' | 'redo',
-  handlers: HighlightUndoHandlers,
+  handlers: HighlightUndoHandlers<T>,
 ): void {
   if (action.kind === 'add') {
     if (direction === 'undo') handlers.remove(action.value.id)

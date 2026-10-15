@@ -63,7 +63,7 @@ action, scrolling the pages, zoom change, book change, leaving the PDF surface a
 | Copy with Citation | Enabled — `"…" — Title, Author (p. 12)` or `(pp. 12–13)` |
 | Translate | Enabled — existing popover/worker flow |
 | Bookmark here | Enabled — toggles the bookmark on the selection's **first page** (`togglePdfPageBookmark`), which may differ from the page in view |
-| Highlight / Underline / Strikethrough / Add note | **Hidden** — see §6 |
+| Highlight / Underline / Strikethrough / Add note | **Hidden** at the time — see §6. Since enabled: [pdf_text_annotations.md](pdf_text_annotations.md) |
 
 ## 5. Files
 
@@ -80,6 +80,10 @@ action, scrolling the pages, zoom change, book change, leaving the PDF surface a
 No database schema change and no migration.
 
 ## 6. Not done — PDF annotations (follow-up)
+
+> **Update (2026-10-15):** implemented in [pdf_text_annotations.md](pdf_text_annotations.md). The list
+> below is the original plan; the final contract stores the rects as `note_json.pdfAnnotation`
+> next to a `page-rect` locator rather than inside `locatorRef`.
 
 Highlight/Underline/Strikethrough/Add note and the right-click-on-existing-mark menu need, for PDF:
 

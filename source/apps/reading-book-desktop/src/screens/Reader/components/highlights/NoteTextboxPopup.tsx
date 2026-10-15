@@ -1,12 +1,12 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import type { ReaderHighlight } from '@reading-book/book-reader-sdk'
+import type { ReaderHighlightBase } from '@reading-book/book-reader-sdk'
 import type { ViewportRectLike } from '../../../../reader/renderers/epub'
 import { highlightPopoverPosition, useDismissOnOutsideOrEscape } from '../../logic'
 
 type NoteTextboxPopupProps = {
   anchorRect: ViewportRectLike
-  highlight: ReaderHighlight
+  highlight: ReaderHighlightBase
   onSave: (note: string) => void
   onDelete: () => void
   onDismiss: () => void

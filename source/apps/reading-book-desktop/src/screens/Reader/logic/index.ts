@@ -21,6 +21,7 @@ export {
   useReadAloud,
   useReaderTranslation,
   usePdfSelectionMenu,
+  useReaderPdfHighlights,
   type HighlightShortcuts,
   type ReaderChromeEscapeUi,
   type SnapshotRect,

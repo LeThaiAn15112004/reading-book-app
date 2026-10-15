@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import type { ReaderHighlight } from '@reading-book/book-reader-sdk'
+import type { ReaderHighlightBase } from '@reading-book/book-reader-sdk'
 import type { ViewportRectLike } from '../../../../reader/renderers/epub'
 import { highlightPopoverPosition, useDismissOnOutsideOrEscape } from '../../logic'
 import { HighlightColorPicker } from '../highlights/HighlightColorPicker'
@@ -10,7 +10,7 @@ type NoteFloatingMenuProps = {
   /** Screen rect to anchor the popover next to — the "⋯" button, or the highlight mark that was
    *  clicked directly in the book. */
   anchorRect: ViewportRectLike | null
-  highlight: ReaderHighlight
+  highlight: ReaderHighlightBase
   onChangeColor: (colorHex: string) => void
   onEditNote: (note: string) => void
   onCopy: () => void

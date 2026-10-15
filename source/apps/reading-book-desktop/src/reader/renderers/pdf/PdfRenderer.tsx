@@ -14,6 +14,7 @@ import {
   useCallback,
   useEffect,
   useLayoutEffect,
+  useMemo,
   useRef,
   useState,
   type MutableRefObject,
@@ -29,6 +30,7 @@ import {
 } from 'pdfjs-dist'
 import {
   PageRectLocation,
+  pdfMarkAt,
   type InteractionTool,
   type TextMatcher,
 } from '@reading-book/book-reader-sdk'
@@ -45,7 +47,13 @@ import {
   paintPdfSearchHighlights,
   pdfPageSearchRanges,
 } from './pdfSearchDom'
-import { readPdfSelectionAt, type PdfSelectionInfo } from './pdfSelection'
+import { readPdfSelection, readPdfSelectionAt, type PdfSelectionInfo } from './pdfSelection'
+import { attachTextLayerSelection, detachTextLayerSelection } from './pdfTextLayerSelection'
+import {
+  PdfPageAnnotations,
+  type PdfAnnotationFlash,
+  type PdfAnnotationMark,
+} from './PdfAnnotationLayer'
 import { PAD_PX, PAGE_GAP_PX, PDF_TO_CSS, type PdfPageCssSize } from './pdfLayout'
 // `?url` makes Vite emit the worker as a local asset in dist/ — never loaded from a CDN.
 import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
@@ -61,11 +69,25 @@ const KEEP_AROUND = 6
 const MAX_CANVAS_PIXELS = 16_777_216
 /** How long a search jump waits for the target page's text layer before giving up on the hit. */
 const TEXT_LAYER_WAIT_MS = 4000
+/** How long a jumped-to annotation pulses. */
+const ANNOTATION_FLASH_MS = 1200
+/** Extra reach around an annotation rect for a click, in CSS px. */
+const ANNOTATION_HIT_SLOP_PX = 2
 /** Assumed page size (A4) until the first page is measured. */
 const FALLBACK_SIZE: PageSize = { w: 595, h: 842 }
 
 type PageSize = { w: number; h: number }
 
+
+/** A click / right-click that landed on an annotation; `rect` = its box (client px) to anchor UI. */
+export type PdfAnnotationHit = { id: string; rect: DOMRect }
+
+/** Markup tools (Highlight / Underline / Strikethrough): a drag that selects text marks it. */
+type MarkupTool = Extract<InteractionTool, 'highlight' | 'underline' | 'strikethrough'>
+
+function markupToolOf(tool: InteractionTool): MarkupTool | null {
+  return tool === 'highlight' || tool === 'underline' || tool === 'strikethrough' ? tool : null
+}
 
 export type PdfNavState = {
   /** 1-based page currently being read. */
@@ -84,6 +106,13 @@ export type PdfOutlineItem = {
 
 export interface PdfRendererApi {
   goToPage: (page: number) => void
+  /**
+   * Scroll 1-based `page` into view with the normalized `y` (0–1 of the page height) near the top
+   * third of the view — an annotation's position. `y` undefined behaves like `goToPage`.
+   */
+  goToPagePoint: (page: number, y?: number) => void
+  /** Pulse an annotation's marks (after a jump from the sidebar). */
+  flashAnnotation: (id: string) => void
   nextPage: () => void
   prevPage: () => void
   getNavState: () => PdfNavState
@@ -132,6 +161,21 @@ export interface PdfRendererProps {
    * menu is always suppressed on the pages; a right-click anywhere else fires nothing.
    */
   onSelectionContextMenu?: (selection: PdfSelectionInfo, x: number, y: number) => void
+  /** Text markup to paint (normalized rects, see PdfAnnotationLayer). */
+  annotations?: readonly PdfAnnotationMark[]
+  /** The annotation whose marks get the focus outline. */
+  focusedAnnotationId?: string | null
+  /** A plain click (no drag, no selection) on an annotation's mark / note icon. */
+  onAnnotationClick?: (hit: PdfAnnotationHit) => void
+  /** Right-click on an annotation (outside any live text selection). */
+  onAnnotationContextMenu?: (hit: PdfAnnotationHit) => void
+  /** A plain click that hit no annotation (anywhere on the pages) — dismisses annotation UI. */
+  onBlankClick?: () => void
+  /**
+   * A Highlight / Underline / Strikethrough tool is armed and a press just ended with text
+   * selected — the selection to mark with that tool.
+   */
+  onMarkupSelection?: (selection: PdfSelectionInfo, tool: MarkupTool) => void
   apiRef?: MutableRefObject<PdfRendererApi | null>
   onNavState?: (state: PdfNavState) => void
   onOutline?: (items: PdfOutlineItem[]) => void
@@ -151,7 +195,7 @@ type PointerGesture = {
 }
 
 /** Surface flags set imperatively (not through React) so CSS applies before the next event. */
-type SurfaceFlag = 'data-pdf-hover-text' | 'data-pdf-grabbing'
+type SurfaceFlag = 'data-pdf-hover-text' | 'data-pdf-grabbing' | 'data-pdf-has-selection'
 
 function hasTextSelection(): boolean {
   const selection = window.getSelection()
@@ -218,6 +262,12 @@ export function PdfRenderer({
   onHandPanBy,
   onCenterTap,
   onSelectionContextMenu,
+  annotations,
+  focusedAnnotationId = null,
+  onAnnotationClick,
+  onAnnotationContextMenu,
+  onBlankClick,
+  onMarkupSelection,
   apiRef,
   onNavState,
   onOutline,
@@ -238,6 +288,33 @@ export function PdfRenderer({
   onCenterTapRef.current = onCenterTap
   const onSelectionContextMenuRef = useRef(onSelectionContextMenu)
   onSelectionContextMenuRef.current = onSelectionContextMenu
+  const markupTool = markupToolOf(interactionTool)
+  const markupToolRef = useRef(markupTool)
+  markupToolRef.current = markupTool
+  const onMarkupSelectionRef = useRef(onMarkupSelection)
+  onMarkupSelectionRef.current = onMarkupSelection
+  const onAnnotationClickRef = useRef(onAnnotationClick)
+  onAnnotationClickRef.current = onAnnotationClick
+  const onAnnotationContextMenuRef = useRef(onAnnotationContextMenu)
+  onAnnotationContextMenuRef.current = onAnnotationContextMenu
+  const onBlankClickRef = useRef(onBlankClick)
+  onBlankClickRef.current = onBlankClick
+  const annotationsRef = useRef(annotations)
+  annotationsRef.current = annotations
+
+  /** Marks per 1-based page (a mark spanning pages is listed on each). */
+  const marksByPage = useMemo(() => {
+    const byPage = new Map<number, PdfAnnotationMark[]>()
+    for (const mark of annotations ?? []) {
+      for (const page of new Set(mark.rects.map((r) => r.page))) {
+        const list = byPage.get(page)
+        if (list) list.push(mark)
+        else byPage.set(page, [mark])
+      }
+    }
+    return byPage
+  }, [annotations])
+  const [flash, setFlash] = useState<PdfAnnotationFlash | null>(null)
 
   const slotsRef = useRef<(HTMLDivElement | null)[]>([])
   const renderedRef = useRef(new Map<number, RenderEntry>())
@@ -353,6 +430,7 @@ export function PdfRenderer({
       entry.canvas.height = 0
       entry.canvas.remove()
     }
+    detachTextLayerSelection(entry.text)
     entry.text?.remove()
     entry.page?.cleanup()
     scheduleSearchRepaint()
@@ -427,6 +505,9 @@ export function PdfRenderer({
       })
       await entry.textLayer.render()
       if (stale()) return
+      // pdf.js viewer's `.endOfContent` trick: dragging through gaps no longer jumps to the end.
+      attachTextLayerSelection(text)
+      detachTextLayerSelection(entry.text)
       entry.text?.remove()
       slot.append(text)
       entry.text = text
@@ -560,6 +641,18 @@ export function PdfRenderer({
         return { width: viewport.width * PDF_TO_CSS, height: viewport.height * PDF_TO_CSS }
       },
       goToPage: (page) => scrollToIndex(page - 1),
+      goToPagePoint: (page, y) => {
+        scrollToIndex(page - 1)
+        const root = getScrollRootRef.current()
+        const slot = slotsRef.current[page - 1]
+        if (y === undefined || !root || !slot) return
+        // The page top is now at the top of the view; bring a point lower down to the upper third
+        // (a point already in the upper third keeps the page top visible).
+        const rect = slot.getBoundingClientRect()
+        const shift = rect.top + y * rect.height - root.getBoundingClientRect().top - root.clientHeight / 3
+        if (shift > 0) root.scrollTop += shift
+      },
+      flashAnnotation: (id) => setFlash({ id, nonce: Date.now() }),
       nextPage: () => scrollToIndex(currentRef.current + 1),
       prevPage: () => scrollToIndex(currentRef.current - 1),
       getNavState: () => ({ pageCurrent: currentRef.current + 1, pageTotal: pageCountRef.current }),
@@ -669,6 +762,7 @@ export function PdfRenderer({
         rendered.delete(index)
         entry?.task?.cancel()
         entry?.textLayer?.cancel()
+        detachTextLayerSelection(entry?.text)
         if (entry?.canvas) {
           entry.canvas.width = 0
           entry.canvas.height = 0
@@ -736,6 +830,76 @@ export function PdfRenderer({
       dwell.dispose()
       dwellRef.current = null
     }
+  }, [setSurfaceFlag])
+
+  // A jump's pulse ends on its own (a newer flash restarts the timer).
+  useEffect(() => {
+    if (!flash) return
+    const timer = window.setTimeout(() => setFlash(null), ANNOTATION_FLASH_MS)
+    return () => window.clearTimeout(timer)
+  }, [flash])
+
+  /**
+   * The annotation under client (`x`, `y`): a note icon first (small, may sit past the page edge),
+   * then the topmost mark rect on the page there. Marks never take pointer events themselves.
+   */
+  const annotationAt = (x: number, y: number): PdfAnnotationHit | null => {
+    const marks = annotationsRef.current
+    const root = rootRef.current
+    if (!marks?.length || !root) return null
+    const within = (r: DOMRect) =>
+      x >= r.left - ANNOTATION_HIT_SLOP_PX &&
+      x <= r.right + ANNOTATION_HIT_SLOP_PX &&
+      y >= r.top - ANNOTATION_HIT_SLOP_PX &&
+      y <= r.bottom + ANNOTATION_HIT_SLOP_PX
+    for (const icon of root.querySelectorAll<HTMLElement>('[data-pdf-annot-note]')) {
+      const rect = icon.getBoundingClientRect()
+      if (icon.dataset.pdfAnnotId && within(rect)) return { id: icon.dataset.pdfAnnotId, rect }
+    }
+    const slot = document.elementFromPoint(x, y)?.closest<HTMLElement>('[data-page-number]')
+    if (!slot || !root.contains(slot)) return null
+    const box = slot.getBoundingClientRect()
+    if (box.width <= 0 || box.height <= 0) return null
+    const mark = pdfMarkAt(
+      marks.filter((m) => m.styleKind !== 'textbox'),
+      Number(slot.dataset.pageNumber),
+      (x - box.left) / box.width,
+      (y - box.top) / box.height,
+      ANNOTATION_HIT_SLOP_PX / box.width,
+      ANNOTATION_HIT_SLOP_PX / box.height,
+    )
+    if (!mark) return null
+    // Anchor UI to the mark's boxes on this page (their union).
+    let left = Infinity
+    let top = Infinity
+    let right = -Infinity
+    let bottom = -Infinity
+    for (const el of slot.querySelectorAll<HTMLElement>(`[data-pdf-annot-id="${CSS.escape(mark.id)}"]`)) {
+      const r = el.getBoundingClientRect()
+      left = Math.min(left, r.left)
+      top = Math.min(top, r.top)
+      right = Math.max(right, r.right)
+      bottom = Math.max(bottom, r.bottom)
+    }
+    const rect = Number.isFinite(left) ? new DOMRect(left, top, right - left, bottom - top) : new DOMRect(x, y, 0, 0)
+    return { id: mark.id, rect }
+  }
+
+  // While the PDF holds a text selection, keep its text selectable (CSS `[data-pdf-has-selection]`).
+  // Hand only allows selection while the pointer rests on text; without this, moving off the text —
+  // e.g. into the selection menu — turned `user-select` back to none, and Chromium stops painting
+  // (and `toString()`-ing) a selection inside user-select:none content, so it looked lost.
+  useEffect(() => {
+    const update = () => {
+      const selection = window.getSelection()
+      const root = rootRef.current
+      setSurfaceFlag(
+        'data-pdf-has-selection',
+        !!selection && !selection.isCollapsed && !!root?.contains(selection.anchorNode),
+      )
+    }
+    document.addEventListener('selectionchange', update)
+    return () => document.removeEventListener('selectionchange', update)
   }, [setSurfaceFlag])
 
   /** PDF hit-test for the dwell: a glyph run of the text layer (no link layer is rendered). */
@@ -848,23 +1012,45 @@ export function PdfRenderer({
     const gesture = gestureRef.current
     if (!gesture || event.pointerId !== gesture.pointerId) return
     endGesture()
-    if (event.button !== 0 || gesture.moved) return
+    if (event.button !== 0) return
+    // Markup tool armed: a press that leaves text selected (drag, double / triple click) marks it.
+    const tool = markupToolRef.current
+    if (tool && !gesture.pan && rootRef.current) {
+      const selection = readPdfSelection(rootRef.current)
+      if (selection) {
+        onMarkupSelectionRef.current?.(selection, tool)
+        return
+      }
+    }
+    if (gesture.moved) return
     // A press that leaves a selection behind (double / triple click on text) is not a tap. A pan
     // press can't select, so an older selection there is just what the tap should clear.
     if (!gesture.pan && hasTextSelection()) return
+    const hit = annotationAt(event.clientX, event.clientY)
+    if (hit) {
+      onAnnotationClickRef.current?.(hit)
+      return
+    }
+    onBlankClickRef.current?.()
     const root = getScrollRootRef.current()
     if (root && isInCenterTapZone(event.clientX, root.getBoundingClientRect())) {
       onCenterTapRef.current?.()
     }
   }
 
-  // Like the EPUB surface: never the native menu on the pages; inside a selection, ours.
+  // Like the EPUB surface: never the native menu on the pages; inside a selection, ours; on an
+  // annotation (outside a selection), that annotation's menu.
   const onContextMenu = (event: ReactMouseEvent<HTMLDivElement>) => {
     event.preventDefault()
     const root = rootRef.current
     if (!root) return
     const selection = readPdfSelectionAt(root, event.clientX, event.clientY)
-    if (selection) onSelectionContextMenuRef.current?.(selection, event.clientX, event.clientY)
+    if (selection) {
+      onSelectionContextMenuRef.current?.(selection, event.clientX, event.clientY)
+      return
+    }
+    const hit = annotationAt(event.clientX, event.clientY)
+    if (hit) onAnnotationContextMenuRef.current?.(hit)
   }
 
   if (status.kind === 'error') {
@@ -887,6 +1073,8 @@ export function PdfRenderer({
       data-pdf-status={status.kind}
       data-pdf-pages={sizes.length}
       data-pdf-tool={hand ? 'hand' : 'select'}
+      // Highlight / Underline / Strikethrough: Select's surface with the tool's pen cursor.
+      data-pdf-markup={markupTool ?? undefined}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
@@ -911,7 +1099,16 @@ export function PdfRenderer({
           data-page-number={index + 1}
           // Ctrl+wheel / toolbar zoom anchors to the page under the focal point (ReaderZoomViewport).
           data-zoom-anchor=""
-        />
+        >
+          {marksByPage.has(index + 1) ? (
+            <PdfPageAnnotations
+              page={index + 1}
+              marks={marksByPage.get(index + 1)!}
+              focusedId={focusedAnnotationId}
+              flash={flash}
+            />
+          ) : null}
+        </div>
       ))}
     </div>
   )

@@ -8,6 +8,7 @@ import {
   type NoteLocator,
   type NoteSelectionText,
   type OverlayStore,
+  type PdfAnnotation,
   type SaveBookmarkInput,
   type SaveHighlightInput,
 } from '@reading-book/book-reader-sdk'
@@ -20,6 +21,7 @@ import {
 import { getDatabase } from './db'
 import {
   packSessionLocation,
+  parsePdfAnnotation,
   unpackSessionLocation,
 } from '@reading-book/book-reader-sdk'
 
@@ -214,6 +216,8 @@ function rowToHighlightRecord(row: NoteRow): HighlightRecord | undefined {
     note: note.note?.trim() || undefined,
     tags: Array.isArray(note.tags) ? note.tags : [],
     selectionText: note.locatorExtended?.text,
+    // PDF markup geometry; re-validated so a hand-edited / corrupt row can't reach the renderer.
+    pdfAnnotation: note.pdfAnnotation ? parsePdfAnnotation(note.pdfAnnotation) : undefined,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   }
@@ -226,6 +230,7 @@ function buildHighlightNoteJson(input: {
   note?: string
   tags?: string[]
   selectionText?: NoteSelectionText
+  pdfAnnotation?: PdfAnnotation
   createdAt: string
   modifiedAt: string
 }): string {
@@ -234,6 +239,7 @@ function buildHighlightNoteJson(input: {
     type: input.styleKind,
     group: 'annotation',
     locatorExtended: { locator: input.locator, text: input.selectionText },
+    pdfAnnotation: input.pdfAnnotation,
     textualValue: input.selectionText?.highlight,
     note: input.note ?? null,
     style: { colorHex: input.colorHex },
@@ -512,6 +518,7 @@ export class SqliteOverlayStore implements OverlayStore {
       note,
       tags: input.tags,
       selectionText: input.selectionText,
+      pdfAnnotation: input.pdfAnnotation,
       createdAt,
       modifiedAt: now,
     })
@@ -548,6 +555,7 @@ export class SqliteOverlayStore implements OverlayStore {
       note,
       tags: input.tags ?? [],
       selectionText: input.selectionText,
+      pdfAnnotation: input.pdfAnnotation,
       createdAt,
       updatedAt: now,
     }

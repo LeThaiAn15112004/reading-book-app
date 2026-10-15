@@ -31,7 +31,28 @@ export {
   packSelectionTextRef,
   parseSelectionTextRef,
   type ReaderHighlight,
+  type ReaderHighlightBase,
 } from './highlight-location.js'
+export {
+  PDF_ANNOTATION_MAX_PAGE_INDEX,
+  PDF_ANNOTATION_MAX_RECTS,
+  PDF_ANNOTATION_MAX_REF_LENGTH,
+  isConsistentPdfHighlight,
+  isPdfReaderHighlight,
+  normalizePdfHighlightRects,
+  packPdfAnnotationRef,
+  packPdfHighlightLocator,
+  parsePdfAnnotation,
+  parsePdfAnnotationRef,
+  pdfAnnotationFromRects,
+  pdfAnnotationLocation,
+  pdfAnnotationRefForRects,
+  pdfHighlightDtoToReaderHighlight,
+  pdfMarkAt,
+  pdfRectsFromAnnotation,
+  type PdfHighlightRect,
+  type PdfReaderHighlight,
+} from './pdf-highlight.js'
 export {
   applyHighlightHistoryStep,
   type HighlightUndoHandlers,

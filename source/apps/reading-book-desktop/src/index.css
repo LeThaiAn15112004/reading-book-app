@@ -509,12 +509,128 @@ a[ref='epubjs-mk'].rb-hl-focused {
   cursor: var(--cursor-select-tool);
 }
 
+/* …and while a selection exists, so it stays painted when the pointer leaves the text (e.g. into
+   the selection menu). The cursor stays Hand's; a pan press still turns selection off below. */
+[data-pdf-tool='hand'][data-pdf-has-selection] .textLayer,
+[data-pdf-tool='hand'][data-pdf-has-selection] .textLayer :is(span, br) {
+  user-select: text;
+  -webkit-user-select: text;
+}
+
 /* While panning: grabbing, and nothing can be selected. */
 [data-pdf-tool='hand'][data-pdf-grabbing],
 [data-pdf-tool='hand'][data-pdf-grabbing] * {
   cursor: var(--cursor-hand-tool-active) !important;
   user-select: none !important;
   -webkit-user-select: none !important;
+}
+
+/* Highlight / Underline / Strikethrough armed: Select's surface with the EPUB tools' pen cursors. */
+[data-pdf-markup='highlight'],
+[data-pdf-markup='highlight'] .textLayer :is(span, br) {
+  cursor: var(--cursor-highlight-tool);
+}
+
+[data-pdf-markup='underline'],
+[data-pdf-markup='underline'] .textLayer :is(span, br) {
+  cursor: var(--cursor-underline-tool);
+}
+
+[data-pdf-markup='strikethrough'],
+[data-pdf-markup='strikethrough'] .textLayer :is(span, br) {
+  cursor: var(--cursor-strikethrough-tool);
+}
+
+/*
+ * PDF text markup (renderers/pdf/PdfAnnotationLayer.tsx). Boxes are percentages of the page slot;
+ * no layer ever takes pointer events (PdfRenderer hit-tests clicks), so text under a mark stays
+ * selectable. The marks layer multiplies onto the white page so glyphs stay crisp black; its
+ * `z-index: 0` keeps it under the text layer's spans (z-index 1) and their ::selection.
+ */
+.rb-pdf-annot-layer,
+.rb-pdf-annot-notes {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.rb-pdf-annot-layer {
+  z-index: 0;
+  mix-blend-mode: multiply;
+}
+
+.rb-pdf-annot-notes {
+  z-index: 2;
+}
+
+.rb-pdf-annot {
+  position: absolute;
+  border-radius: 1px;
+}
+
+.rb-pdf-annot[data-kind='highlight'] {
+  background: color-mix(in srgb, var(--rb-annot-color) 55%, transparent);
+}
+
+.rb-pdf-annot[data-kind='underline']::after,
+.rb-pdf-annot[data-kind='strikethrough']::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: max(1.5px, 8%);
+  background: var(--rb-annot-color);
+}
+
+.rb-pdf-annot[data-kind='underline']::after {
+  bottom: 0;
+}
+
+.rb-pdf-annot[data-kind='strikethrough']::after {
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+/* Same focused outline as the EPUB marks' `.rb-hl-focused`. */
+.rb-pdf-annot[data-focused] {
+  outline: 2px solid #4fc3f7;
+  outline-offset: 1px;
+}
+
+.rb-pdf-annot-note {
+  position: absolute;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  font-size: 13px;
+  line-height: 1;
+  transform: translate(2px, -6px);
+}
+
+.rb-pdf-annot-note::before {
+  content: '📝';
+}
+
+.rb-pdf-annot-note[data-focused] {
+  border-radius: 999px;
+  box-shadow: 0 0 0 2px #4fc3f7;
+}
+
+.rb-pdf-annot[data-flash],
+.rb-pdf-annot-note[data-flash] {
+  animation: rb-pdf-annot-flash 0.4s ease-in-out 3;
+}
+
+@keyframes rb-pdf-annot-flash {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.2;
+  }
 }
 
 /*

@@ -75,7 +75,8 @@ Desktop app (`cd source/apps/reading-book-desktop`):
   `spike:settings:notifications` (Enable Notifications toggle + permission flow),
   `spike:settings:background` (tray / close-to-hide / quit flag / login item, Main modules with a stubbed `electron`),
   `spike:settings:reminders` (Reading Reminder rules at UTC+7, SQLite on the real schema, minute-aligned worker),
-  `spike:reader:toolbar` (capability-driven Reader toolbar: per-surface tools, fold order, handler wiring)
+  `spike:reader:toolbar` (capability-driven Reader toolbar: per-surface tools, fold order, handler wiring),
+  `spike:pdf:annotations` (PDF text annotations: real `overlay:*` IPC + SQLite store on the migrated schema)
 
 SDK (`cd source/apps/book-reader-sdk`): `npm run typecheck`, `npm test` (vitest, single file:
 `npx vitest run tests/text/chunk-text.test.ts`), `npm run test:watch`, `npm run typecheck:tests`, `npm run build`,
@@ -148,6 +149,13 @@ absent = not checked) is the single source of truth — the app detects whether 
 PDF signatures are verified in `electron/signature/`; EPUB and other formats report `unsupported`. A cached result
 is reused only while the file's current SHA-256 equals `signatureCheckedSha256`. Annotations are not signatures and
 `books.sha256` is a fingerprint, not a signature. See `docs/change_plan/book_signature_status.md`.
+
+**PDF text annotations** (highlight/underline/strikethrough/note) are `notes` rows like EPUB highlights: a
+`page-rect` locator (1-based page, `chapterIndex` = 0-based page, like PDF bookmarks) plus
+`note_json.pdfAnnotation` (0-based `pageIndex`, rects normalized 0–1 to the displayed page box). Only
+`book-reader-sdk/src/app-models/pdf-highlight.ts` converts page ↔ pageIndex; Main re-validates the payload. The
+SDK `persistence/sql-notes.ts` JSON layout differs from Main's and is not compatible yet. See
+`docs/implementation_plan/pdf_text_annotations.md`.
 
 Per-book reading state (position, percent, and that book's font/size/line-height/align/layout/margin overrides)
 lives in `books.reading_state_json`, written via `overlay:saveSessionState`.

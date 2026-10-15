@@ -1,29 +1,29 @@
 import type { PdfAnnotationRect } from '@reading-book/book-reader-sdk'
 
 /**
- * Freehand and stamp notes (`NoteType` in packages/domain/models/annotation/note.ts) are
- * intentionally NOT wired up in this app yet — both anchor via `PdfAnnotation.rects`/`pageIndex`,
- * which needs a stable per-page image plane to draw or place icons on. EPUB is reflowable HTML
- * with no such plane (text reflows on every font-size/window change), so there is nothing correct
- * to build against until a PDF renderer exists under `src/reader/renderers/pdf/` — there is none
- * today (only an import-time metadata adapter at `electron/adapters/pdf.adapter.ts`).
+ * Freehand and stamp notes (`NoteType` in book-reader-sdk `domain/annotation/note.ts`) are
+ * intentionally NOT wired up yet — out of scope for PDF text annotations
+ * (docs/implementation_plan/pdf_text_annotations.md), which cover highlight / underline /
+ * strikethrough / note over the PDF.js text layer only.
  *
  * This file is the placeholder for that future work, kept empty on purpose rather than adding a
- * "Freehand"/"Stamp" button that opens onto nothing. When a PDF renderer lands:
- *   - Freehand: a canvas overlay per page, one pointer-drag → one stroke, saved as
- *     `PdfAnnotation.rects` (an approximating bounding box per segment) or an SVG path in
- *     `NoteStyle` — plus a toolbar button gated on `book.format === 'pdf'`.
+ * "Freehand"/"Stamp" button that opens onto nothing. The PDF surface already has what they need:
+ * a stable per-page plane (`PdfRenderer` page slots) and `PdfAnnotationLayer`, which paints
+ * normalized rects as percentages of the slot. When they land:
+ *   - Freehand: one pointer-drag → one stroke, saved as `PdfAnnotation.rects` (an approximating
+ *     bounding box per segment) or an SVG path in `NoteStyle` — plus a toolbar button gated on a
+ *     new reader capability.
  *   - Stamp: an icon picker (✅ ⭐ ❗), placing a single small `PdfAnnotationRect` at the click
- *     point — same toolbar gating.
- * Both would reuse the same `notes` persistence path highlights already use (extend
- * `HighlightRecord`-equivalent handling, or add a sibling `PdfAnnotationRecord`), not a new one.
+ *     point — same gating.
+ * Both reuse the `notes` persistence path PDF text annotations use (`pdfAnnotation` next to a
+ * `page-rect` locator), not a new one.
  */
-/** TODO(pdf-renderer): implement once src/reader/renderers/pdf exists — a pointer-drag stroke on
- *  the given page, saved as `PdfAnnotation.rects`/an SVG path in `NoteStyle`. */
+/** TODO(pdf-freehand): a pointer-drag stroke on the given page, saved as `PdfAnnotation.rects` /
+ *  an SVG path in `NoteStyle`. */
 export function beginFreehandStroke(): PdfAnnotationRect[] {
   return []
 }
 
-/** TODO(pdf-renderer): implement once src/reader/renderers/pdf exists — places one icon stamp
- *  (a single small `PdfAnnotationRect`) at a page click point. */
+/** TODO(pdf-stamp): places one icon stamp (a single small `PdfAnnotationRect`) at a page click
+ *  point. */
 export function placeStamp(): void {}

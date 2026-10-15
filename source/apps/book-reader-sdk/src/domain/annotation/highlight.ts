@@ -1,4 +1,4 @@
-import type { NoteLocator, NoteSelectionText } from './note.js';
+import type { NoteLocator, NoteSelectionText, PdfAnnotation } from './note.js';
 
 /**
  * `'highlight'` = background fill; `'underline'` = underline stroke; `'strikethrough'` = a line
@@ -17,8 +17,9 @@ export type HighlightStyleKind = 'highlight' | 'underline' | 'strikethrough' | '
 export interface HighlightRecord {
   id: string;
   bookId: string;
-  /** Jump target: a range CFI (`epubcfi(base,start,end)`) plus `chapterIndex`, same shape as
-   *  `BookmarkRecord.locator`. */
+  /** Jump target, same shape as `BookmarkRecord.locator`: a range CFI (`epubcfi(base,start,end)`)
+   *  plus `chapterIndex` for EPUB; a `page-rect` (1-based page) plus `chapterIndex` = 0-based page
+   *  for PDF. */
   locator: NoteLocator;
   styleKind: HighlightStyleKind;
   colorHex: string;
@@ -26,6 +27,8 @@ export interface HighlightRecord {
   tags: string[];
   /** Selected text + surrounding context (`note_json.locatorExtended.text`). */
   selectionText?: NoteSelectionText;
+  /** PDF text markup geometry (`note_json.pdfAnnotation`); absent for EPUB highlights. */
+  pdfAnnotation?: PdfAnnotation;
   createdAt: string;
   updatedAt: string;
 }

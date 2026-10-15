@@ -82,8 +82,8 @@ check('placeholder is a strict subset of EPUB, apart from Page layout', () => {
   for (const c of placeholder) if (c !== 'pageLayout') assert.ok(epub.has(c), c)
   assert.ok(placeholder.size - 1 < epub.size)
 })
-check('PDF = placeholder + search − Aa (no audio / translate / markup yet)', () => {
-  const expected = [...placeholder, 'search'].filter((c) => c !== 'readingSettings')
+check('PDF = placeholder + search + text markup − Aa (no audio / translate yet)', () => {
+  const expected = [...placeholder, 'search', 'markupAnnotations'].filter((c) => c !== 'readingSettings')
   assert.deepEqual([...pdf].sort(), expected.sort())
 })
 check('Aa (readingSettings) stays on EPUB and the placeholder, not PDF', () => {
@@ -114,9 +114,10 @@ check('only renderer-independent tools', () => {
   ])
 })
 
-check('PDF layout: Search in the navigate group, no Settings group', () => {
+check('PDF layout: Search in the navigate group, the Annotation menu, no Settings group', () => {
   assert.deepEqual(shape(resolveToolbarLayout(pdf, 0)), [
     'navigate:inline[hand,select,search]',
+    'annotation:menu[highlight,underline,strikethrough]',
     'tools:menu[snapshot,wordCount]',
   ])
 })

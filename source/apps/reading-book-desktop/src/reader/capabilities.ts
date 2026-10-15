@@ -45,9 +45,11 @@ const SURFACE_CAPABILITIES: Record<ReaderSurface, readonly ReaderCapability[]> =
     'readingSettings',
   ],
   // PDF: search (Main extracts the text layer, hits paint on the PDF.js text layer — see
-  // docs/implementation_plan/pdf_search.md). No `readingSettings`: every Aa option is EPUB reflow
-  // (font, size, margins…) and does nothing to a fixed-layout page; zoom lives in the footer.
-  pdf: ['interaction', 'search', 'snapshot', 'wordCount', 'pageLayout'],
+  // docs/implementation_plan/pdf_search.md); text markup over the text layer, stored as page +
+  // normalized rects (docs/implementation_plan/pdf_text_annotations.md). No `readingSettings`: every
+  // Aa option is EPUB reflow (font, size, margins…) and does nothing to a fixed-layout page; zoom
+  // lives in the footer.
+  pdf: ['interaction', 'search', 'markupAnnotations', 'snapshot', 'wordCount', 'pageLayout'],
   placeholder: ['interaction', 'snapshot', 'wordCount', 'readingSettings', 'pageLayout'],
 }
 

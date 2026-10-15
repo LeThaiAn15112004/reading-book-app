@@ -1,5 +1,5 @@
 import { useLayoutEffect, useRef, useState } from 'react'
-import { HIGHLIGHT_TAG_PRESETS, type ReaderHighlight } from '@reading-book/book-reader-sdk'
+import { HIGHLIGHT_TAG_PRESETS, type ReaderHighlightBase } from '@reading-book/book-reader-sdk'
 import type { ViewportRectLike } from '../../../../reader/renderers/epub'
 import {
   highlightPopoverPosition,
@@ -9,7 +9,7 @@ import { HighlightColorPicker } from './HighlightColorPicker'
 
 type HighlightEditPopupProps = {
   anchorRect: ViewportRectLike
-  highlight: ReaderHighlight
+  highlight: ReaderHighlightBase
   onChangeColor: (colorHex: string) => void
   onToggleUnderline: (isUnderline: boolean) => void
   onToggleStrikethrough: (isStrikethrough: boolean) => void

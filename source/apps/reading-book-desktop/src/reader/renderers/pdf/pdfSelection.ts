@@ -97,7 +97,22 @@ export function readPdfSelectionAt(root: HTMLElement, x: number, y: number): Pdf
   if (!range) return null
   const rects = selectedTextRects(range, root)
   if (!rects.some((rect) => contains(rect, x, y))) return null
+  return selectionInfo(root, range, rects)
+}
 
+/**
+ * The live text selection in the PDF, wherever it is (a markup tool's drag just ended); null when
+ * there is none or it selected no glyphs.
+ */
+export function readPdfSelection(root: HTMLElement): PdfSelectionInfo | null {
+  const range = liveRange(root)
+  if (!range) return null
+  const rects = selectedTextRects(range, root)
+  if (rects.length === 0) return null
+  return selectionInfo(root, range, rects)
+}
+
+function selectionInfo(root: HTMLElement, range: Range, rects: DOMRect[]): PdfSelectionInfo | null {
   const startSlot = pageSlotOf(range.startContainer)
   const endSlot = pageSlotOf(range.endContainer)
   const pageStart = Number(startSlot?.dataset.pageNumber)
