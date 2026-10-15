@@ -909,6 +909,8 @@ export function PdfRenderer({
           className="relative shrink-0 bg-white shadow"
           style={{ width: Math.floor(size.w * cssScale), height: Math.floor(size.h * cssScale) }}
           data-page-number={index + 1}
+          // Ctrl+wheel / toolbar zoom anchors to the page under the focal point (ReaderZoomViewport).
+          data-zoom-anchor=""
         />
       ))}
     </div>

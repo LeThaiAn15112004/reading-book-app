@@ -10,9 +10,14 @@ export const MIXED_PDF_PAGES = [
 ]
 
 export function buildMixedPdf() {
+  return buildSizedPdf(MIXED_PDF_PAGES)
+}
+
+/** Same layout for any list of page sizes (pt); page N shows "Page N marker". */
+export function buildSizedPdf(pages) {
   const objects = ['<< /Type /Catalog /Pages 2 0 R >>', '', '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>']
   const kids = []
-  MIXED_PDF_PAGES.forEach(({ w, h }, i) => {
+  pages.forEach(({ w, h }, i) => {
     const pageNo = objects.length + 1
     kids.push(`${pageNo} 0 R`)
     objects.push(

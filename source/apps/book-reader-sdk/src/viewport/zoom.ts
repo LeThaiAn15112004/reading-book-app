@@ -95,6 +95,80 @@ export function focalZoomScroll(
   }
 }
 
+/** A laid-out box (e.g. one PDF page) in client coordinates. */
+export type ZoomAnchorBox = {
+  left: number
+  top: number
+  width: number
+  height: number
+}
+
+/**
+ * A document point as a position inside one laid-out box: box `index` and the point's fraction of
+ * that box's width / height (may fall outside 0..1 for a point in the gap beside the box).
+ * Unlike a raw content offset it survives a relayout that is not exactly proportional to the zoom
+ * (per-box pixel rounding, centred columns, gaps rounded separately).
+ */
+export type ZoomAnchor = {
+  index: number
+  fx: number
+  fy: number
+}
+
+/**
+ * Index of the box (of `count`, stacked top to bottom in document order) that holds client `y`,
+ * or the nearest one when `y` lies in a gap or beyond the ends. `edgesAt(i)` reads box i's
+ * vertical edges; only O(log n) boxes are read. -1 when there are no boxes.
+ */
+export function nearestZoomAnchorIndex(
+  count: number,
+  edgesAt: (index: number) => { top: number; bottom: number },
+  y: number,
+): number {
+  if (count <= 0) return -1
+  // First box whose bottom edge is below y.
+  let lo = 0
+  let hi = count - 1
+  while (lo < hi) {
+    const mid = (lo + hi) >> 1
+    if (edgesAt(mid).bottom <= y) lo = mid + 1
+    else hi = mid
+  }
+  if (lo === 0) return 0
+  const box = edgesAt(lo)
+  if (y >= box.top) return lo
+  // In the gap above box `lo` (or below the last box): the closer of the two neighbours.
+  const above = edgesAt(lo - 1)
+  return y - above.bottom <= box.top - y ? lo - 1 : lo
+}
+
+/** The document point at client (`x`, `y`), expressed against box `index` laid out at `box`. */
+export function zoomAnchorAt(index: number, box: ZoomAnchorBox, x: number, y: number): ZoomAnchor {
+  return {
+    index,
+    fx: box.width > 0 ? (x - box.left) / box.width : 0,
+    fy: box.height > 0 ? (y - box.top) / box.height : 0,
+  }
+}
+
+/**
+ * Scroll offset that brings `anchor` back under client point (`x`, `y`), given the anchor box's
+ * client rect `box` measured at the current `scroll` (i.e. after the relayout). The host clamps
+ * by assigning it to its scroll container.
+ */
+export function scrollToHoldZoomAnchor(
+  scroll: ScrollOffset,
+  box: ZoomAnchorBox,
+  anchor: ZoomAnchor,
+  x: number,
+  y: number,
+): ScrollOffset {
+  return {
+    left: scroll.left + box.left + anchor.fx * box.width - x,
+    top: scroll.top + box.top + anchor.fy * box.height - y,
+  }
+}
+
 export type FitMetrics = {
   viewportWidth: number
   viewportHeight: number
