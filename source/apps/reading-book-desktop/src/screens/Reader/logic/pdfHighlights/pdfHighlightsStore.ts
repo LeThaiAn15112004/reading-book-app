@@ -16,6 +16,7 @@ import {
   type HighlightHistory,
   type HighlightStyleKind,
   type PdfReaderHighlight,
+  type ScannedPdfAnnotation,
 } from '@reading-book/book-reader-sdk'
 import { overlayApi } from '../../../../bridge'
 import type { PdfRendererApi, PdfSelectionInfo } from '../../../../reader/renderers/pdf'
@@ -63,6 +64,12 @@ type PdfHighlightsStoreState = PdfHighlightsContext & {
   setContext: (patch: Partial<PdfHighlightsContext>) => void
   resetForNewBook: () => void
   loadHighlights: () => Promise<void>
+  /**
+   * Import / refresh the annotations embedded in the open file (PdfRenderer scans them on every
+   * open) and merge the rows Main wrote into the list. Resolves to the scanned `objectId`s the app
+   * now paints itself, or null when nothing was synced (the renderer then leaves the canvas alone).
+   */
+  syncEmbeddedAnnotations: (annotations: ScannedPdfAnnotation[]) => Promise<readonly string[] | null>
   /**
    * Mark `selection` (from the selection menu or a markup-tool drag) as `styleKind`. A `textbox`
    * note opens its popup at `anchor` right away; other kinds just get the focus outline.
@@ -128,6 +135,32 @@ export const usePdfHighlightsStore = create<PdfHighlightsStoreState>()((set, get
       })
     } catch {
       if (get().bookId === bookId) onToast('Could not load highlights.')
+    }
+  },
+
+  syncEmbeddedAnnotations: async (annotations) => {
+    const { bookId } = get()
+    if (!bookId) return null
+    try {
+      const result = await overlayApi.syncPdfEmbeddedAnnotations({ bookId, annotations })
+      if (get().bookId !== bookId || !result.ok) return null
+      const written = [...result.inserted, ...result.updated]
+        .map(pdfHighlightDtoToReaderHighlight)
+        .filter((h): h is PdfReaderHighlight => h != null)
+      if (written.length > 0) {
+        const byId = new Map(written.map((h) => [h.id, h]))
+        set((s) => ({
+          highlights: [
+            ...s.highlights.map((h) => byId.get(h.id) ?? h),
+            ...written.filter((h) => !s.highlights.some((x) => x.id === h.id)),
+          ],
+        }))
+      }
+      return result.managedObjectIds
+    } catch (err) {
+      // Reading goes on with the file's own rendering; the next open scans again.
+      console.warn('[pdfHighlights] embedded annotation sync failed', err)
+      return null
     }
   },
 

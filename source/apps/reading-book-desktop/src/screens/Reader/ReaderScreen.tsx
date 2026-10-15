@@ -1066,6 +1066,7 @@ export function ReaderScreen() {
                 pdfSelectionMenu.close()
                 pdfHighlights.commitMarkupSelection(selection, tool)
               }}
+              onEmbeddedAnnotations={pdfHighlights.syncEmbeddedAnnotations}
               apiRef={pdfApiRef}
               onNavState={(state) => {
                 nav.setPdfNav(state)

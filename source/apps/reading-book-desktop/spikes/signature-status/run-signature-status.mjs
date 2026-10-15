@@ -266,7 +266,8 @@ await check('unknown / legacy status strings read as "not checked"', () => {
 await check('migrations 001–020 + 022 apply in order; 022 clears legacy isSigned data and keeps the rest', () => {
   const dir = path.join(__dirname, '../../electron/persistence/migrations')
   const files = fs.readdirSync(dir).filter((f) => f.endsWith('.sql')).sort()
-  assert.equal(files.at(-1), '022_book_signature_status.sql')
+  // Later migrations (023+) don't touch `books.metadata_json`; only 001–022 matter here.
+  assert.ok(files.includes('022_book_signature_status.sql'))
 
   const db = new DatabaseSync(':memory:')
   // 021 builds an FTS5 index over book_chunks (node:sqlite ships without FTS5) and never touches

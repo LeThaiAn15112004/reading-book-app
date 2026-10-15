@@ -54,6 +54,26 @@ export {
   type PdfReaderHighlight,
 } from './pdf-highlight.js'
 export {
+  EMBEDDED_PDF_ANNOTATION_STYLE,
+  EMBEDDED_PDF_ANNOTATION_SUBTYPES,
+  EMBEDDED_PDF_SCAN_MAX_ANNOTATIONS,
+  embeddedAnnotationKeys,
+  embeddedAnnotationSourceHash,
+  highlightContentHash,
+  highlightFromEmbeddedAnnotation,
+  parseScannedPdfAnnotation,
+  planEmbeddedAnnotationSync,
+  readPdfJsAnnotation,
+  type EmbeddedAnnotationHighlight,
+  type EmbeddedAnnotationLedgerEntry,
+  type EmbeddedAnnotationSyncPlan,
+  type EmbeddedAnnotationSyncStep,
+  type EmbeddedPdfAnnotationSubtype,
+  type HighlightContent,
+  type PdfPageViewportInfo,
+  type ScannedPdfAnnotation,
+} from './pdf-embedded-annotations.js'
+export {
   applyHighlightHistoryStep,
   type HighlightUndoHandlers,
 } from './highlight-undo.js'

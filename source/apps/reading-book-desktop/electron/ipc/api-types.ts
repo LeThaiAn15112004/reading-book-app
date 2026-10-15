@@ -473,6 +473,49 @@ export interface DeleteHighlightInput {
   id: string
 }
 
+/**
+ * One annotation embedded in the open PDF file, as the renderer scanned it (sdk
+ * `ScannedPdfAnnotation`: normalized display-space rects, color, comment, author, underlying text).
+ * Re-validated item by item in Main.
+ */
+export interface ScannedPdfAnnotationDto {
+  objectId: string
+  subtype: 'Highlight' | 'Underline' | 'Squiggly' | 'StrikeOut' | 'Text'
+  pageIndex: number
+  rects: { pageIndex?: number; x: number; y: number; width: number; height: number }[]
+  colorHex?: string
+  contents?: string
+  author?: string
+  text?: string
+}
+
+/** Input for overlay:syncPdfEmbeddedAnnotations — every annotation of one scan, in document order. */
+export interface SyncPdfEmbeddedAnnotationsInput {
+  bookId: string
+  annotations: ScannedPdfAnnotationDto[]
+}
+
+/**
+ * Outcome of one embedded-annotation sync. `ok` is false when the book is not a PDF in the library
+ * or the write failed (nothing was written then).
+ */
+export interface SyncPdfEmbeddedAnnotationsResult {
+  ok: boolean
+  /** Rows created for annotations seen for the first time. */
+  inserted: HighlightDto[]
+  /** Imported rows rewritten because the file's version changed (and the app's didn't). */
+  updated: HighlightDto[]
+  unchanged: number
+  /** Changed in the file, but edited by the user in the app — the app's version was kept. */
+  keptAppEdits: number
+  /** Imported before and deleted in the app since — not imported again. */
+  dismissed: number
+  /** Items dropped by validation (malformed, or past the per-sync cap). */
+  invalid: number
+  /** `objectId`s of the scanned annotations the app now paints (or deleted) itself. */
+  managedObjectIds: string[]
+}
+
 /** Outcome of asking Main to chunk a book's text for search (returns before the work finishes). */
 export interface EnsureBookIndexResult {
   /**
@@ -658,6 +701,8 @@ export interface DesktopApi {
     /** Resolves to null when the input is rejected (bad book id or unparsable locator). */
     saveHighlight(input: SaveHighlightInput): Promise<HighlightDto | null>
     deleteHighlight(input: DeleteHighlightInput): Promise<OkResult>
+    /** Import / refresh the annotations embedded in the open PDF (read-only on the file). */
+    syncPdfEmbeddedAnnotations(input: SyncPdfEmbeddedAnnotationsInput): Promise<SyncPdfEmbeddedAnnotationsResult>
   }
   bookIndex: {
     /** Fire-and-forget from the reader after the book is shown; never blocks on chunking. */

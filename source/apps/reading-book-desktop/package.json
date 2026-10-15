@@ -40,11 +40,15 @@
     "fast-xml-parser": "^5.10.1",
     "foliate-js": "^1.0.1",
     "jszip": "^3.10.1",
+    "mammoth": "^1.13.0",
+    "music-metadata": "^12.2.1",
     "pdfjs-dist": "5.4.624",
     "react": "^18.2.0",
     "react-colorful": "^5.8.1",
     "react-dom": "^18.2.0",
+    "react-markdown": "^10.1.0",
     "react-router-dom": "^7.18.1",
+    "word-extractor": "^1.0.4",
     "zustand": "^5.0.15"
   },
   "devDependencies": {
@@ -55,6 +59,7 @@
     "@types/jszip": "^3.4.0",
     "@types/react": "^18.2.64",
     "@types/react-dom": "^18.2.21",
+    "@types/word-extractor": "^1.0.6",
     "@typescript-eslint/eslint-plugin": "^7.1.1",
     "@typescript-eslint/parser": "^7.1.1",
     "@vitejs/plugin-react": "^5.2.0",

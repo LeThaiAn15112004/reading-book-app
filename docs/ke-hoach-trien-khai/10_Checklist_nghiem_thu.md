@@ -75,6 +75,11 @@ Dùng file này để đánh dấu tiến độ. Chỉ sang giai đoạn sau khi
 
 ## G6 — Đa format + App Settings + polish MVP
 
+> **Chuẩn bị dependencies (2026-10-15)** — chỉ cài thư viện, chưa có renderer: `react-markdown` (MD), `mammoth`
+> (DOCX), `word-extractor` (DOC, chỉ văn bản thuần), `music-metadata` (metadata audiobook, ngoài MVP); TXT dùng
+> `TextDecoder` có sẵn. Các mục đọc TXT/MD/DOCX/DOC bên dưới **vẫn chưa đạt**. Chi tiết + giới hạn:
+> [document_audio_library_setup.md](../implementation_plan/document_audio_library_setup.md).
+
 - [ ] PDF: mở + resume trang (+ overlay tối thiểu)
 - [ ] TXT + Markdown: mở + resume
 - [ ] DOCX + DOC: import + mở + resume (extract/render)

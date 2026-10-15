@@ -123,6 +123,8 @@ const api: DesktopApi = {
       ipcRenderer.invoke(OverlayChannels.saveHighlight, input),
     deleteHighlight: (input) =>
       ipcRenderer.invoke(OverlayChannels.deleteHighlight, input),
+    syncPdfEmbeddedAnnotations: (input) =>
+      ipcRenderer.invoke(OverlayChannels.syncPdfEmbeddedAnnotations, input),
   },
   bookIndex: {
     ensure: (bookId) => ipcRenderer.invoke(BookIndexChannels.ensure, bookId),

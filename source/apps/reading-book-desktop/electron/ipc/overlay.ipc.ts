@@ -1,6 +1,8 @@
 import {
+  EMBEDDED_PDF_SCAN_MAX_ANNOTATIONS,
   Location,
   isConsistentPdfHighlight,
+  parseScannedPdfAnnotation,
   packPdfAnnotationRef,
   parsePdfAnnotationRef,
   type BookmarkRecord,
@@ -8,6 +10,7 @@ import {
   type NoteLocator,
   type NoteSelectionText,
   type PdfAnnotation,
+  type ScannedPdfAnnotation,
 } from '@reading-book/book-reader-sdk'
 import { ipcMain } from 'electron'
 import {
@@ -24,6 +27,8 @@ import type {
   SaveBookmarkInput,
   SaveHighlightInput,
   SaveReadingSessionStateInput,
+  SyncPdfEmbeddedAnnotationsInput,
+  SyncPdfEmbeddedAnnotationsResult,
 } from './api-types'
 import { OverlayChannels } from './channels'
 
@@ -290,6 +295,56 @@ export function registerOverlayIpc(): void {
         return { ok }
       } catch {
         return { ok: false }
+      }
+    },
+  )
+
+  ipcMain.removeHandler(OverlayChannels.syncPdfEmbeddedAnnotations)
+  ipcMain.handle(
+    OverlayChannels.syncPdfEmbeddedAnnotations,
+    async (_event, input: unknown): Promise<SyncPdfEmbeddedAnnotationsResult> => {
+      void _event
+      const failed: SyncPdfEmbeddedAnnotationsResult = {
+        ok: false,
+        inserted: [],
+        updated: [],
+        unchanged: 0,
+        keptAppEdits: 0,
+        dismissed: 0,
+        invalid: 0,
+        managedObjectIds: [],
+      }
+      if (!input || typeof input !== 'object') return failed
+      const body = input as SyncPdfEmbeddedAnnotationsInput
+      if (typeof body.bookId !== 'string' || !body.bookId.trim() || !Array.isArray(body.annotations)) {
+        return failed
+      }
+
+      // Each item is independent: a malformed one is dropped, the rest still sync.
+      const items: ScannedPdfAnnotation[] = []
+      let invalid = Math.max(0, body.annotations.length - EMBEDDED_PDF_SCAN_MAX_ANNOTATIONS)
+      for (const raw of body.annotations.slice(0, EMBEDDED_PDF_SCAN_MAX_ANNOTATIONS)) {
+        const item = parseScannedPdfAnnotation(raw)
+        if (item) items.push(item)
+        else invalid += 1
+      }
+
+      try {
+        const outcome = overlays.syncEmbeddedPdfAnnotations(body.bookId.trim(), items)
+        if (!outcome) return { ...failed, invalid }
+        return {
+          ok: true,
+          inserted: outcome.inserted.map(toHighlightDto),
+          updated: outcome.updated.map(toHighlightDto),
+          unchanged: outcome.unchanged,
+          keptAppEdits: outcome.keptAppEdits,
+          dismissed: outcome.dismissed,
+          invalid,
+          managedObjectIds: outcome.managedIndices.map((i) => items[i]!.objectId),
+        }
+      } catch (err) {
+        console.warn('[overlay] embedded PDF annotation sync failed', err)
+        return { ...failed, invalid }
       }
     },
   )

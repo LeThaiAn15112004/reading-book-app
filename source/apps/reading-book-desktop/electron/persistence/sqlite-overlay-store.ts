@@ -20,9 +20,16 @@ import {
 } from '@reading-book/book-reader-sdk'
 import { getDatabase } from './db'
 import {
+  embeddedAnnotationSourceHash,
+  highlightContentHash,
+  highlightFromEmbeddedAnnotation,
   packSessionLocation,
   parsePdfAnnotation,
+  planEmbeddedAnnotationSync,
   unpackSessionLocation,
+  type EmbeddedAnnotationLedgerEntry,
+  type EmbeddedAnnotationSyncStep,
+  type ScannedPdfAnnotation,
 } from '@reading-book/book-reader-sdk'
 
 export type SessionRecord = {
@@ -493,6 +500,11 @@ export class SqliteOverlayStore implements OverlayStore {
   }
 
   async saveHighlight(input: SaveHighlightInput): Promise<HighlightRecord> {
+    return this.writeHighlight(input)
+  }
+
+  /** `saveHighlight`'s synchronous body — also run inside the embedded-annotation sync transaction. */
+  private writeHighlight(input: SaveHighlightInput): HighlightRecord {
     const bookId = input.bookId.trim()
     if (!bookId) throw new Error('saveHighlight requires a bookId')
 
@@ -575,6 +587,106 @@ export class SqliteOverlayStore implements OverlayStore {
 
     return result.changes > 0
   }
+
+  /**
+   * Import / refresh the annotations embedded in a PDF file (scanned by the renderer on every open)
+   * into `notes`, through the `pdf_embedded_annotations` ledger — see
+   * docs/implementation_plan/pdf_embedded_annotation_import.md. One transaction; inserts new
+   * annotations, rewrites rows whose file version changed while the app's copy didn't, and never
+   * deletes or overwrites anything the user made or edited in the app.
+   *
+   * `items` must already be validated (`parseScannedPdfAnnotation`). Returns null when `bookId` is
+   * not a PDF in the library.
+   */
+  syncEmbeddedPdfAnnotations(bookId: string, items: readonly ScannedPdfAnnotation[]): EmbeddedPdfSyncOutcome | null {
+    const book = bookId.trim()
+    const row = this.db.prepare(`SELECT file_format FROM books WHERE id = ?`).get(book) as
+      | { file_format: string }
+      | undefined
+    if (!row || row.file_format !== 'pdf') return null
+
+    const outcome: EmbeddedPdfSyncOutcome = {
+      inserted: [],
+      updated: [],
+      unchanged: 0,
+      keptAppEdits: 0,
+      dismissed: 0,
+      managedIndices: [],
+    }
+    if (items.length === 0) return outcome
+
+    this.db.exec('BEGIN IMMEDIATE')
+    try {
+      const ledger = new Map<string, EmbeddedAnnotationLedgerEntry>()
+      const ledgerRows = this.db
+        .prepare(
+          `SELECT source_key, note_id, source_hash, note_hash FROM pdf_embedded_annotations WHERE book_id = ?`,
+        )
+        .all(book) as Array<{ source_key: string; note_id: string; source_hash: string; note_hash: string }>
+      for (const r of ledgerRows) {
+        ledger.set(r.source_key, { sourceKey: r.source_key, noteId: r.note_id, sourceHash: r.source_hash, noteHash: r.note_hash })
+      }
+      const current = new Map<string, HighlightRecord>()
+      const noteRows = this.db
+        .prepare(`SELECT ${NOTE_COLUMNS} FROM notes WHERE book_id = ? AND ${HIGHLIGHT_TYPE_PREDICATE}`)
+        .all(book) as NoteRow[]
+      for (const noteRow of noteRows) {
+        const record = rowToHighlightRecord(noteRow)
+        if (record) current.set(record.id, record)
+      }
+
+      const plan = planEmbeddedAnnotationSync(items, ledger, (noteId) => {
+        const record = current.get(noteId)
+        return record ? highlightContentHash(record) : undefined
+      })
+
+      const now = new Date().toISOString()
+      const upsertLedger = this.db.prepare(
+        `INSERT INTO pdf_embedded_annotations
+           (book_id, source_key, note_id, source_hash, note_hash, imported_at, synced_at)
+         VALUES (@book_id, @source_key, @note_id, @source_hash, @note_hash, @now, @now)
+         ON CONFLICT(book_id, source_key) DO UPDATE SET
+           note_id = @note_id,
+           source_hash = @source_hash,
+           note_hash = @note_hash,
+           synced_at = @now`,
+      )
+      const write = (step: EmbeddedAnnotationSyncStep, noteId: string | undefined): HighlightRecord => {
+        const highlight = highlightFromEmbeddedAnnotation(step.item)
+        const saved = this.writeHighlight({ ...highlight, id: noteId, bookId: book })
+        upsertLedger.run({
+          book_id: book,
+          source_key: step.key,
+          note_id: saved.id,
+          source_hash: embeddedAnnotationSourceHash(step.item),
+          note_hash: highlightContentHash(saved),
+          now,
+        })
+        return saved
+      }
+      for (const step of plan.inserts) outcome.inserted.push(write(step, undefined))
+      for (const step of plan.updates) outcome.updated.push(write(step, step.noteId))
+      outcome.unchanged = plan.unchanged
+      outcome.keptAppEdits = plan.keptAppEdits
+      outcome.dismissed = plan.dismissed
+      outcome.managedIndices = plan.managed
+      this.db.exec('COMMIT')
+    } catch (err) {
+      this.db.exec('ROLLBACK')
+      throw err
+    }
+    return outcome
+  }
+}
+
+/** What `syncEmbeddedPdfAnnotations` did. `managedIndices` index into the synced `items`. */
+export type EmbeddedPdfSyncOutcome = {
+  inserted: HighlightRecord[]
+  updated: HighlightRecord[]
+  unchanged: number
+  keptAppEdits: number
+  dismissed: number
+  managedIndices: number[]
 }
 
 let overlayStore: SqliteOverlayStore | null = null

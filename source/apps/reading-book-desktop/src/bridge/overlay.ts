@@ -19,4 +19,7 @@ export const overlayApi = {
   deleteHighlight: (
     ...args: Parameters<typeof window.api.overlay.deleteHighlight>
   ) => window.api.overlay.deleteHighlight(...args),
+  syncPdfEmbeddedAnnotations: (
+    ...args: Parameters<typeof window.api.overlay.syncPdfEmbeddedAnnotations>
+  ) => window.api.overlay.syncPdfEmbeddedAnnotations(...args),
 }

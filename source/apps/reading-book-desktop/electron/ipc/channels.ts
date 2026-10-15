@@ -77,6 +77,8 @@ export const OverlayChannels = {
   listHighlights: 'overlay:listHighlights',
   saveHighlight: 'overlay:saveHighlight',
   deleteHighlight: 'overlay:deleteHighlight',
+  /** Renderer → main: annotations scanned from the open PDF file → import / refresh in `notes`. */
+  syncPdfEmbeddedAnnotations: 'overlay:syncPdfEmbeddedAnnotations',
 } as const
 
 export const BookIndexChannels = {

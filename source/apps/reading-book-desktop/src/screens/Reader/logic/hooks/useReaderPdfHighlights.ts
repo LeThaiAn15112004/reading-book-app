@@ -64,6 +64,7 @@ export function useReaderPdfHighlights({
     lastUsedColorHex,
     createFromSelection: usePdfHighlightsStore((s) => s.createFromSelection),
     commitMarkupSelection: usePdfHighlightsStore((s) => s.commitMarkupSelection),
+    syncEmbeddedAnnotations: usePdfHighlightsStore((s) => s.syncEmbeddedAnnotations),
     openHighlight: usePdfHighlightsStore((s) => s.openHighlight),
     closeEditPopup,
     dismissAnnotationUi: usePdfHighlightsStore((s) => s.dismissAnnotationUi),

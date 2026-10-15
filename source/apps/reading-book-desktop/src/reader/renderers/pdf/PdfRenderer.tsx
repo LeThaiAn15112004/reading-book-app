@@ -22,6 +22,7 @@ import {
   type PointerEvent as ReactPointerEvent,
 } from 'react'
 import {
+  AnnotationMode,
   GlobalWorkerOptions,
   TextLayer,
   getDocument,
@@ -32,6 +33,7 @@ import {
   PageRectLocation,
   pdfMarkAt,
   type InteractionTool,
+  type ScannedPdfAnnotation,
   type TextMatcher,
 } from '@reading-book/book-reader-sdk'
 import {
@@ -49,6 +51,7 @@ import {
 } from './pdfSearchDom'
 import { readPdfSelection, readPdfSelectionAt, type PdfSelectionInfo } from './pdfSelection'
 import { attachTextLayerSelection, detachTextLayerSelection } from './pdfTextLayerSelection'
+import { scanEmbeddedPdfAnnotations } from './pdfEmbeddedAnnotations'
 import {
   PdfPageAnnotations,
   type PdfAnnotationFlash,
@@ -176,6 +179,12 @@ export interface PdfRendererProps {
    * selected — the selection to mark with that tool.
    */
   onMarkupSelection?: (selection: PdfSelectionInfo, tool: MarkupTool) => void
+  /**
+   * Called once per opened document with the annotations embedded in the file (scanned in the
+   * background, every open). Resolves to the `objectId`s the app now paints itself — their own
+   * appearance is then hidden on the canvas so a mark isn't drawn twice — or null to change nothing.
+   */
+  onEmbeddedAnnotations?: (annotations: ScannedPdfAnnotation[]) => Promise<readonly string[] | null>
   apiRef?: MutableRefObject<PdfRendererApi | null>
   onNavState?: (state: PdfNavState) => void
   onOutline?: (items: PdfOutlineItem[]) => void
@@ -268,6 +277,7 @@ export function PdfRenderer({
   onAnnotationContextMenu,
   onBlankClick,
   onMarkupSelection,
+  onEmbeddedAnnotations,
   apiRef,
   onNavState,
   onOutline,
@@ -299,6 +309,8 @@ export function PdfRenderer({
   onAnnotationContextMenuRef.current = onAnnotationContextMenu
   const onBlankClickRef = useRef(onBlankClick)
   onBlankClickRef.current = onBlankClick
+  const onEmbeddedAnnotationsRef = useRef(onEmbeddedAnnotations)
+  onEmbeddedAnnotationsRef.current = onEmbeddedAnnotations
   const annotationsRef = useRef(annotations)
   annotationsRef.current = annotations
 
@@ -474,6 +486,9 @@ export function PdfRenderer({
         canvas,
         viewport,
         transform: ratio !== 1 ? [ratio, 0, 0, ratio, 0, 0] : undefined,
+        // Honors the `noView` entries `hideEmbeddedAnnotations` puts in the document's storage;
+        // with none there it draws exactly like the default mode.
+        annotationMode: AnnotationMode.ENABLE_STORAGE,
       })
       await entry.task.promise
       if (stale()) {
@@ -575,6 +590,48 @@ export function PdfRenderer({
     frameRef.current = requestAnimationFrame(updateView)
   }, [updateView])
 
+  /**
+   * Stop drawing the file's own appearance of embedded annotations the app now paints (or that the
+   * user deleted in the app). Only the document in memory changes — never the file. Rendered pages
+   * holding one are re-rendered; the old canvas stays up until the new one replaces it.
+   */
+  const hideEmbeddedAnnotations = useCallback(
+    (pdf: PDFDocumentProxy, pageIndices: ReadonlySet<number>, objectIds: readonly string[]) => {
+      if (docRef.current !== pdf) return
+      for (const id of objectIds) pdf.annotationStorage.setValue(id, { noView: true })
+      for (const index of pageIndices) {
+        const entry = renderedRef.current.get(index)
+        if (entry) entry.scale = -1
+      }
+      scheduleUpdate()
+    },
+    [scheduleUpdate],
+  )
+
+  // Embedded annotations: scan every time a document is opened (never "once per book" — the file
+  // may have gained or changed annotations in another app since), then hand them to the reader.
+  // One scan per loaded document; a newer document cancels it. Failures never affect reading.
+  useEffect(() => {
+    if (!doc || !onEmbeddedAnnotationsRef.current) return
+    let cancelled = false
+    void (async () => {
+      try {
+        const scanned = await scanEmbeddedPdfAnnotations(doc, () => cancelled)
+        if (cancelled || scanned.length === 0) return
+        const managed = await onEmbeddedAnnotationsRef.current?.(scanned)
+        if (cancelled || !managed?.length) return
+        const ids = new Set(managed)
+        const pages = new Set(scanned.filter((a) => ids.has(a.objectId)).map((a) => a.pageIndex))
+        hideEmbeddedAnnotations(doc, pages, managed)
+      } catch (err) {
+        if (!cancelled && !isCancelled(err)) console.warn('[PdfRenderer] embedded annotation import failed', err)
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [doc, hideEmbeddedAnnotations])
+
   const scrollToIndex = useCallback(
     (index: number) => {
       const root = getScrollRootRef.current()
@@ -608,7 +665,7 @@ export function PdfRenderer({
         const canvas = document.createElement('canvas')
         canvas.width = Math.max(1, Math.floor(viewport.width))
         canvas.height = Math.max(1, Math.floor(viewport.height))
-        const task = page.render({ canvas, viewport })
+        const task = page.render({ canvas, viewport, annotationMode: AnnotationMode.ENABLE_STORAGE })
         const cancel = () => task.cancel()
         signal.addEventListener('abort', cancel, { once: true })
         try {
