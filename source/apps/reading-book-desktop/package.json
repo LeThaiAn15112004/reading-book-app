@@ -31,7 +31,8 @@
     "e2e:typecheck": "tsc --noEmit -p e2e/tsconfig.json",
     "spike:pdf:fixtures": "node spikes/pdf-search/build-fixtures.mjs",
     "spike:pdf:search": "node --experimental-strip-types --import ./spikes/pdf-search/register-alias.mjs spikes/pdf-search/run-pdf-search.mjs",
-    "spike:pdf:annotations": "npm run build --prefix ../book-reader-sdk && node --experimental-transform-types --import ./spikes/pdf-annotations/register-alias.mjs spikes/pdf-annotations/run-pdf-annotations.mjs"
+    "spike:pdf:annotations": "npm run build --prefix ../book-reader-sdk && node --experimental-transform-types --import ./spikes/pdf-annotations/register-alias.mjs spikes/pdf-annotations/run-pdf-annotations.mjs",
+    "spike:pdf:embedded": "npm run build --prefix ../book-reader-sdk && node --experimental-transform-types --import ./spikes/pdf-annotations/register-alias.mjs spikes/pdf-annotations/run-pdf-embedded-annotations.mjs"
   },
   "dependencies": {
     "@huggingface/transformers": "^4.3.0",
