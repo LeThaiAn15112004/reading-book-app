@@ -22,3 +22,14 @@ export const app = {
     throw new Error('app.getPath is not available in the PDF annotation checks')
   },
 }
+
+/** Used by the export handler (save dialog); the checks never open a real window or dialog. */
+export const BrowserWindow = {
+  fromWebContents: () => null,
+  getAllWindows: () => [],
+}
+
+export const dialog = {
+  showSaveDialog: async () => ({ canceled: true }),
+  showOpenDialog: async () => ({ canceled: true, filePaths: [] }),
+}

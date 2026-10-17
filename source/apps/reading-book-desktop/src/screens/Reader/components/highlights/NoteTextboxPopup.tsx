@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { type ReactNode, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import type { ReaderHighlightBase } from '@reading-book/book-reader-sdk'
 import type { ViewportRectLike } from '../../../../reader/renderers/epub'
@@ -10,6 +10,8 @@ type NoteTextboxPopupProps = {
   onSave: (note: string) => void
   onDelete: () => void
   onDismiss: () => void
+  /** Two-way sync conflict banner (PDF), shown first. */
+  conflict?: ReactNode
 }
 
 const FALLBACK_SIZE = { width: 240, height: 140 }
@@ -27,6 +29,7 @@ export function NoteTextboxPopup({
   onSave,
   onDelete,
   onDismiss,
+  conflict,
 }: NoteTextboxPopupProps) {
   const containerRef = useRef<HTMLDivElement | null>(null)
   const [draft, setDraft] = useState(highlight.note ?? '')
@@ -67,6 +70,7 @@ export function NoteTextboxPopup({
         e.stopPropagation()
       }}
     >
+      {conflict}
       <textarea
         autoFocus
         value={draft}

@@ -11,6 +11,10 @@ type ReaderTopbarProps = {
   onFavorites: () => void
   onBookInfo: () => void
   onTrash: () => void
+  /** PDF only: "Export PDF with annotations…" in the More menu. */
+  onExportPdf?: () => void
+  /** PDF only: the two-way sync toggle in the More menu. */
+  writeBack?: { enabled: boolean; available: boolean; onToggle: () => void }
   /** What the open book's reader surface supports; unsupported tools are not rendered. */
   capabilities: ReadonlySet<ReaderCapability>
   /** Active / expanded state per tool (see `ToolsStrip`). */
@@ -31,6 +35,8 @@ export function ReaderTopbar({
   onFavorites,
   onBookInfo,
   onTrash,
+  onExportPdf,
+  writeBack,
   capabilities,
   toolStates,
   onTool,
@@ -90,6 +96,8 @@ export function ReaderTopbar({
           onFavorites={onFavorites}
           onBookInfo={onBookInfo}
           onTrash={onTrash}
+          onExportPdf={onExportPdf}
+          writeBack={writeBack}
         />
       </div>
     </header>

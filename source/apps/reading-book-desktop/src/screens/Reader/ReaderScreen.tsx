@@ -15,6 +15,8 @@ import {
   useReaderChromeMenu,
 } from '../../chrome'
 import { ReaderShell, readerChromeTopInset, readerChromeBottomInset } from '../../reader'
+import { usePdfExportStore } from './logic/pdfExport/pdfExportStore'
+import { usePdfWriteBackStore } from './logic/pdfExport/pdfWriteBackStore'
 import { getReaderCapabilities } from '../../reader/capabilities'
 import {
   EpubRenderer,
@@ -50,6 +52,9 @@ import {
   rightSidebarContentInset,
   sidebarContentInsetLeft,
   SignInfoPanel,
+  SignedPdfWriteDialog,
+  PdfWriteBackDialog,
+  SyncConflictBanner,
   TocSidebar,
   TranslationPopover,
   TrashConfirmDialog,
@@ -155,6 +160,15 @@ export function ReaderScreen() {
     book.contentStatus === 'ready' && book.bookFormat === 'pdf' && !!book.bookBytes
   // Like EPUB, wait for the saved position before mounting so the PDF opens on the right page.
   const isPdfSessionLoading = isPdfSurface && book.sessionLoadStatus === 'loading'
+  const exportAnnotatedPdf = usePdfExportStore((st) => st.exportAnnotatedPdf)
+  const pendingSignedExport = usePdfExportStore((st) => st.pendingSigned)
+  const confirmSignedExport = usePdfExportStore((st) => st.confirmSigned)
+  const cancelSignedExport = usePdfExportStore((st) => st.cancelSigned)
+  const writeBackState = usePdfWriteBackStore((st) => st.state)
+  const writeBackConfirming = usePdfWriteBackStore((st) => st.confirming)
+  const toggleWriteBack = usePdfWriteBackStore((st) => st.toggle)
+  const confirmWriteBack = usePdfWriteBackStore((st) => st.confirm)
+  const cancelWriteBack = usePdfWriteBackStore((st) => st.cancel)
 
   const readerCapabilities = useMemo(
     () => getReaderCapabilities(book.bookFormat),
@@ -396,6 +410,17 @@ export function ReaderScreen() {
   })
   /** The open surface's annotation store: drives the shared popups, sidebar actions and shortcuts. */
   const markup = isPdfSurface ? pdfHighlights : highlights
+  /** Two-way sync conflict banner for a PDF annotation's popup (undefined when there is none). */
+  const conflictBannerFor = (id: string) => {
+    const conflict = isPdfSurface ? pdfHighlights.conflicts[id] : undefined
+    return conflict ? (
+      <SyncConflictBanner
+        kind={conflict.kind}
+        onKeepReadmate={() => void pdfHighlights.resolveConflict(id, 'keep-readmate')}
+        onUsePdf={() => void pdfHighlights.resolveConflict(id, 'use-pdf')}
+      />
+    ) : undefined
+  }
 
   /** PDF selection menu → mark that selection (`textbox` = a note, its popup opens at the click). */
   function markPdfSelection(styleKind: 'highlight' | 'underline' | 'strikethrough' | 'textbox') {
@@ -596,6 +621,26 @@ export function ReaderScreen() {
             chrome.closeFloating()
             chrome.setTrashOpen(true)
           }}
+          onExportPdf={
+            isPdfSurface && bookId
+              ? () => {
+                  chrome.closeFloating()
+                  void exportAnnotatedPdf(bookId, chrome.setToast)
+                }
+              : undefined
+          }
+          writeBack={
+            isPdfSurface && writeBackState
+              ? {
+                  enabled: writeBackState.enabled,
+                  available: writeBackState.available,
+                  onToggle: () => {
+                    chrome.closeFloating()
+                    void toggleWriteBack(chrome.setToast)
+                  },
+                }
+              : undefined
+          }
         />
       }
       footer={
@@ -788,6 +833,22 @@ export function ReaderScreen() {
             }}
           />
 
+          <PdfWriteBackDialog
+            open={writeBackConfirming}
+            signed={writeBackState?.signed}
+            signerName={writeBackState?.signerName}
+            onCancel={cancelWriteBack}
+            onConfirm={() => void confirmWriteBack(chrome.setToast)}
+          />
+
+          <SignedPdfWriteDialog
+            open={pendingSignedExport !== null}
+            action="export"
+            signerName={pendingSignedExport?.signerName}
+            onCancel={cancelSignedExport}
+            onConfirm={() => void confirmSignedExport(chrome.setToast)}
+          />
+
           {chrome.toast ? (
             <div className="pointer-events-none fixed top-6 left-1/2 z-[999] -translate-x-1/2 rounded-full border border-lib-border bg-lib-surface-strong px-[18px] py-2.5 text-[13px] font-semibold text-lib-text-strong shadow-xl">
               {chrome.toast}
@@ -870,6 +931,7 @@ export function ReaderScreen() {
             <NoteTextboxPopup
               anchorRect={markup.activeHighlight.rect}
               highlight={markup.activeHighlight.highlight}
+              conflict={conflictBannerFor(markup.activeHighlight.highlight.id)}
               onSave={(note) =>
                 markup.updateHighlightNote(markup.activeHighlight!.highlight.id, note)
               }
@@ -909,6 +971,7 @@ export function ReaderScreen() {
             <HighlightEditPopup
               anchorRect={markup.activeHighlight.rect}
               highlight={markup.activeHighlight.highlight}
+              conflict={conflictBannerFor(markup.activeHighlight.highlight.id)}
               onChangeColor={(hex) =>
                 markup.updateHighlightColor(markup.activeHighlight!.highlight.id, hex)
               }
@@ -1066,7 +1129,7 @@ export function ReaderScreen() {
                 pdfSelectionMenu.close()
                 pdfHighlights.commitMarkupSelection(selection, tool)
               }}
-              onEmbeddedAnnotations={pdfHighlights.syncEmbeddedAnnotations}
+              hiddenEmbeddedAnnotationIds={pdfHighlights.hiddenEmbeddedObjectIds}
               apiRef={pdfApiRef}
               onNavState={(state) => {
                 nav.setPdfNav(state)

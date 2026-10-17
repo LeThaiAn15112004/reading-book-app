@@ -1,6 +1,8 @@
 import { useEffect, type MutableRefObject } from 'react'
+import { overlayApi } from '../../../../bridge'
 import type { PdfRendererApi } from '../../../../reader/renderers/pdf'
 import { usePdfHighlightsStore } from '../pdfHighlights/pdfHighlightsStore'
+import { usePdfWriteBackStore } from '../pdfExport/pdfWriteBackStore'
 
 type UseReaderPdfHighlightsOptions = {
   bookId: string | undefined
@@ -34,6 +36,12 @@ export function useReaderPdfHighlights({
   const setContext = usePdfHighlightsStore((s) => s.setContext)
   const resetForNewBook = usePdfHighlightsStore((s) => s.resetForNewBook)
   const loadHighlights = usePdfHighlightsStore((s) => s.loadHighlights)
+  const applyEmbeddedSync = usePdfHighlightsStore((s) => s.applyEmbeddedSync)
+  const hiddenEmbeddedObjectIds = usePdfHighlightsStore((s) => s.hiddenEmbeddedObjectIds)
+  const conflicts = usePdfHighlightsStore((s) => s.conflicts)
+  const loadConflicts = usePdfHighlightsStore((s) => s.loadConflicts)
+  const loadWriteBack = usePdfWriteBackStore((s) => s.load)
+  const resetWriteBack = usePdfWriteBackStore((s) => s.reset)
   const closeEditPopup = usePdfHighlightsStore((s) => s.closeEditPopup)
 
   useEffect(() => {
@@ -53,6 +61,22 @@ export function useReaderPdfHighlights({
     void loadHighlights()
   }, [bookId, isPdfSurface, resetForNewBook, loadHighlights])
 
+  // Embedded annotations (Foxit / Acrobat): Main syncs them now and again whenever the file settles
+  // after a change in another app, and pushes the result — no reopen needed. One watch per open PDF;
+  // closing or switching the book (or unmounting the reader) ends it.
+  useEffect(() => {
+    if (!bookId || !isPdfSurface) return
+    const unsubscribe = overlayApi.onPdfEmbeddedAnnotationsChanged(applyEmbeddedSync)
+    void overlayApi.watchPdfEmbeddedAnnotations(bookId).catch(() => {})
+    void loadConflicts()
+    void loadWriteBack(bookId)
+    return () => {
+      unsubscribe()
+      void overlayApi.unwatchPdfEmbeddedAnnotations(bookId).catch(() => {})
+      resetWriteBack()
+    }
+  }, [bookId, isPdfSurface, applyEmbeddedSync, loadConflicts, loadWriteBack, resetWriteBack])
+
   useEffect(() => {
     closeEditPopup()
   }, [zoom, closeEditPopup])
@@ -64,7 +88,9 @@ export function useReaderPdfHighlights({
     lastUsedColorHex,
     createFromSelection: usePdfHighlightsStore((s) => s.createFromSelection),
     commitMarkupSelection: usePdfHighlightsStore((s) => s.commitMarkupSelection),
-    syncEmbeddedAnnotations: usePdfHighlightsStore((s) => s.syncEmbeddedAnnotations),
+    hiddenEmbeddedObjectIds,
+    conflicts,
+    resolveConflict: usePdfHighlightsStore((s) => s.resolveConflict),
     openHighlight: usePdfHighlightsStore((s) => s.openHighlight),
     closeEditPopup,
     dismissAnnotationUi: usePdfHighlightsStore((s) => s.dismissAnnotationUi),

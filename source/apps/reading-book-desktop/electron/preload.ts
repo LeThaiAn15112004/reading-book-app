@@ -123,8 +123,31 @@ const api: DesktopApi = {
       ipcRenderer.invoke(OverlayChannels.saveHighlight, input),
     deleteHighlight: (input) =>
       ipcRenderer.invoke(OverlayChannels.deleteHighlight, input),
-    syncPdfEmbeddedAnnotations: (input) =>
-      ipcRenderer.invoke(OverlayChannels.syncPdfEmbeddedAnnotations, input),
+    watchPdfEmbeddedAnnotations: (bookId) =>
+      ipcRenderer.invoke(OverlayChannels.watchPdfEmbeddedAnnotations, bookId),
+    unwatchPdfEmbeddedAnnotations: (bookId) =>
+      ipcRenderer.invoke(OverlayChannels.unwatchPdfEmbeddedAnnotations, bookId),
+    onPdfEmbeddedAnnotationsChanged: (handler) => {
+      const listener = (
+        _event: Electron.IpcRendererEvent,
+        payload: Parameters<typeof handler>[0],
+      ) => {
+        handler(payload)
+      }
+      ipcRenderer.on(OverlayChannels.pdfEmbeddedAnnotationsChanged, listener)
+      return () => {
+        ipcRenderer.removeListener(OverlayChannels.pdfEmbeddedAnnotationsChanged, listener)
+      }
+    },
+    exportAnnotatedPdf: (bookId, options) =>
+      ipcRenderer.invoke(OverlayChannels.exportAnnotatedPdf, bookId, options),
+    getPdfWriteBack: (bookId) => ipcRenderer.invoke(OverlayChannels.getPdfWriteBack, bookId),
+    setPdfWriteBack: (bookId, enabled, options) =>
+      ipcRenderer.invoke(OverlayChannels.setPdfWriteBack, bookId, enabled, options),
+    listPdfAnnotationConflicts: (bookId) =>
+      ipcRenderer.invoke(OverlayChannels.listPdfAnnotationConflicts, bookId),
+    resolvePdfAnnotationConflict: (bookId, noteId, choice) =>
+      ipcRenderer.invoke(OverlayChannels.resolvePdfAnnotationConflict, bookId, noteId, choice),
   },
   bookIndex: {
     ensure: (bookId) => ipcRenderer.invoke(BookIndexChannels.ensure, bookId),

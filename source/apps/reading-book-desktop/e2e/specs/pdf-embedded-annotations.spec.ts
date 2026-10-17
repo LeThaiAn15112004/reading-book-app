@@ -145,7 +145,8 @@ test('annotations embedded in a PDF are imported on every open, without duplicat
     await expect(marks(page, 1, 'underline')).toHaveCount(1)
 
     await goToPage(page, 2)
-    await expect(marks(page, 2, 'strikethrough')).toHaveCount(1) // removed from the file, kept in the app
+    // Removed from the file and never edited in the app → deleted too (live-sync rule, complete scan).
+    await expect(marks(page, 2, 'strikethrough')).toHaveCount(0)
     await expect(marks(page, 2, 'underline')).toHaveCount(1)
     await goToPage(page, 3)
     await expect(noteIcons(page, 3)).toHaveCount(1)

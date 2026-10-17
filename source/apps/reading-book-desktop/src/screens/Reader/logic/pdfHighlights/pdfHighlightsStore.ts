@@ -16,10 +16,13 @@ import {
   type HighlightHistory,
   type HighlightStyleKind,
   type PdfReaderHighlight,
-  type ScannedPdfAnnotation,
 } from '@reading-book/book-reader-sdk'
 import { overlayApi } from '../../../../bridge'
 import type { PdfRendererApi, PdfSelectionInfo } from '../../../../reader/renderers/pdf'
+
+/** Derived from the bridge: the renderer never imports from electron/. */
+type PdfEmbeddedAnnotationsChangedDto = Parameters<Parameters<typeof overlayApi.onPdfEmbeddedAnnotationsChanged>[0]>[0]
+export type PdfAnnotationConflict = PdfEmbeddedAnnotationsChangedDto['conflicts'][number]
 
 /** Client-px box a popup anchors to (a `DOMRect` fits; same shape as the EPUB anchor rects). */
 export type PdfAnnotationAnchor = {
@@ -60,16 +63,27 @@ type PdfHighlightsStoreState = PdfHighlightsContext & {
   lastUsedColorHex: string
   /** Session-only undo/redo, a fresh one per book. */
   history: HighlightHistory<PdfReaderHighlight>
+  /**
+   * PDF.js ids of embedded annotations the app paints itself — PdfRenderer stops drawing their own
+   * appearance. Set by the open sync only (when the scanned file is the displayed one).
+   */
+  hiddenEmbeddedObjectIds: string[]
+  /** Two-way sync conflicts by note id (both Readmate and another app changed the annotation). */
+  conflicts: Record<string, PdfAnnotationConflict>
 
   setContext: (patch: Partial<PdfHighlightsContext>) => void
   resetForNewBook: () => void
   loadHighlights: () => Promise<void>
   /**
-   * Import / refresh the annotations embedded in the open file (PdfRenderer scans them on every
-   * open) and merge the rows Main wrote into the list. Resolves to the scanned `objectId`s the app
-   * now paints itself, or null when nothing was synced (the renderer then leaves the canvas alone).
+   * A sync of the open PDF's embedded annotations (Main: on open and whenever the file settles after
+   * a change in another app — pdf_embedded_annotation_live_sync.md). Merges written rows, drops
+   * deleted ones, and takes the canvas-hiding ids. Ignored for any other book.
    */
-  syncEmbeddedAnnotations: (annotations: ScannedPdfAnnotation[]) => Promise<readonly string[] | null>
+  applyEmbeddedSync: (event: PdfEmbeddedAnnotationsChangedDto) => void
+  /** Open conflicts of the book (on open; later ones arrive with sync events). */
+  loadConflicts: () => Promise<void>
+  /** Keep Readmate's version (written into the PDF) or take the PDF's. */
+  resolveConflict: (id: string, choice: 'keep-readmate' | 'use-pdf') => Promise<void>
   /**
    * Mark `selection` (from the selection menu or a markup-tool drag) as `styleKind`. A `textbox`
    * note opens its popup at `anchor` right away; other kinds just get the focus outline.
@@ -113,12 +127,14 @@ export const usePdfHighlightsStore = create<PdfHighlightsStoreState>()((set, get
   focusedHighlightId: null,
   lastUsedColorHex: DEFAULT_HIGHLIGHT_COLOR,
   history: createHighlightHistory<PdfReaderHighlight>(),
+  hiddenEmbeddedObjectIds: [],
+  conflicts: {},
 
   setContext: (patch) => set(patch),
 
   resetForNewBook: () => {
     get().history.clear()
-    set({ highlights: [], activeHighlight: null, focusedHighlightId: null })
+    set({ highlights: [], activeHighlight: null, focusedHighlightId: null, hiddenEmbeddedObjectIds: [], conflicts: {} })
   },
 
   loadHighlights: async () => {
@@ -138,29 +154,72 @@ export const usePdfHighlightsStore = create<PdfHighlightsStoreState>()((set, get
     }
   },
 
-  syncEmbeddedAnnotations: async (annotations) => {
-    const { bookId } = get()
-    if (!bookId) return null
-    try {
-      const result = await overlayApi.syncPdfEmbeddedAnnotations({ bookId, annotations })
-      if (get().bookId !== bookId || !result.ok) return null
-      const written = [...result.inserted, ...result.updated]
-        .map(pdfHighlightDtoToReaderHighlight)
-        .filter((h): h is PdfReaderHighlight => h != null)
-      if (written.length > 0) {
-        const byId = new Map(written.map((h) => [h.id, h]))
-        set((s) => ({
-          highlights: [
-            ...s.highlights.map((h) => byId.get(h.id) ?? h),
-            ...written.filter((h) => !s.highlights.some((x) => x.id === h.id)),
-          ],
-        }))
+  applyEmbeddedSync: (event) => {
+    if (!event || event.bookId !== get().bookId) return
+    const written = [...event.inserted, ...event.updated]
+      .map(pdfHighlightDtoToReaderHighlight)
+      .filter((h): h is PdfReaderHighlight => h != null)
+    const byId = new Map(written.map((h) => [h.id, h]))
+    const deleted = new Set(event.deletedIds)
+    const { onToast } = get()
+    if (event.writeStatus === 'locked') onToast('The PDF is locked by another app — Readmate will retry writing your annotations.')
+    else if (event.writeStatus === 'failed') onToast('Could not write annotations into the PDF file.')
+    if (event.conflicts.length > 0) {
+      set((s) => ({ conflicts: { ...s.conflicts, ...Object.fromEntries(event.conflicts.map((c) => [c.noteId, c])) } }))
+      onToast(
+        event.conflicts.length === 1
+          ? 'An annotation was changed in Readmate and in another app — open it to choose a version.'
+          : `${event.conflicts.length} annotations were changed in Readmate and in another app — open them to choose.`,
+      )
+    }
+    if (byId.size === 0 && deleted.size === 0 && event.hiddenObjectIds.length === 0) return
+    set((s) => {
+      const kept = s.highlights.filter((h) => !deleted.has(h.id)).map((h) => byId.get(h.id) ?? h)
+      const known = new Set(kept.map((h) => h.id))
+      const active = s.activeHighlight
+      return {
+        highlights: [...kept, ...written.filter((h) => !known.has(h.id))],
+        // An open menu / focus outline on a row that changed or left the file would be stale.
+        activeHighlight: active && (deleted.has(active.highlight.id) || byId.has(active.highlight.id)) ? null : active,
+        focusedHighlightId: s.focusedHighlightId && deleted.has(s.focusedHighlightId) ? null : s.focusedHighlightId,
+        hiddenEmbeddedObjectIds: event.hiddenObjectIds.length > 0 ? event.hiddenObjectIds : s.hiddenEmbeddedObjectIds,
       }
-      return result.managedObjectIds
-    } catch (err) {
-      // Reading goes on with the file's own rendering; the next open scans again.
-      console.warn('[pdfHighlights] embedded annotation sync failed', err)
-      return null
+    })
+  },
+
+  loadConflicts: async () => {
+    const { bookId } = get()
+    if (!bookId) return
+    try {
+      const list = await overlayApi.listPdfAnnotationConflicts(bookId)
+      if (get().bookId === bookId) set({ conflicts: Object.fromEntries(list.map((c) => [c.noteId, c])) })
+    } catch {
+      // No conflicts shown; the next sync event brings new ones.
+    }
+  },
+
+  resolveConflict: async (id, choice) => {
+    const { bookId, onToast } = get()
+    if (!bookId) return
+    try {
+      const result = await overlayApi.resolvePdfAnnotationConflict(bookId, id, choice)
+      if (get().bookId !== bookId) return
+      if (!result.ok) {
+        onToast('Could not resolve the conflict.')
+        return
+      }
+      const updated = result.updated ? pdfHighlightDtoToReaderHighlight(result.updated) : null
+      set((s) => {
+        const conflicts = { ...s.conflicts }
+        delete conflicts[id]
+        return {
+          conflicts,
+          highlights: result.deletedId ? s.highlights.filter((h) => h.id !== result.deletedId) : s.highlights.map((h) => (updated && h.id === updated.id ? updated : h)),
+          activeHighlight: null,
+        }
+      })
+    } catch {
+      onToast('Could not resolve the conflict.')
     }
   },
 

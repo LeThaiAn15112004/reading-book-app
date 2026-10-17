@@ -77,8 +77,22 @@ export const OverlayChannels = {
   listHighlights: 'overlay:listHighlights',
   saveHighlight: 'overlay:saveHighlight',
   deleteHighlight: 'overlay:deleteHighlight',
-  /** Renderer → main: annotations scanned from the open PDF file → import / refresh in `notes`. */
-  syncPdfEmbeddedAnnotations: 'overlay:syncPdfEmbeddedAnnotations',
+  /** Renderer → main: watch the open PDF's file and sync its embedded annotations (now + on change). */
+  watchPdfEmbeddedAnnotations: 'overlay:watchPdfEmbeddedAnnotations',
+  /** Renderer → main: stop watching (book closed / switched). */
+  unwatchPdfEmbeddedAnnotations: 'overlay:unwatchPdfEmbeddedAnnotations',
+  /** Main → renderer: a sync of the watched PDF changed rows (always sent for the open sync). */
+  pdfEmbeddedAnnotationsChanged: 'overlay:pdfEmbeddedAnnotationsChanged',
+  /** Renderer → main: save a NEW PDF with the book's annotations written in (save dialog in Main). */
+  exportAnnotatedPdf: 'overlay:exportAnnotatedPdf',
+  /** Renderer → main: is writing annotations into this book's PDF enabled / possible (two-way sync)? */
+  getPdfWriteBack: 'overlay:getPdfWriteBack',
+  /** Renderer → main: enable / disable writing annotations into this book's PDF file. */
+  setPdfWriteBack: 'overlay:setPdfWriteBack',
+  /** Renderer → main: open two-way conflicts of a book. */
+  listPdfAnnotationConflicts: 'overlay:listPdfAnnotationConflicts',
+  /** Renderer → main: resolve one conflict (keep Readmate's version / use the PDF's). */
+  resolvePdfAnnotationConflict: 'overlay:resolvePdfAnnotationConflict',
 } as const
 
 export const BookIndexChannels = {

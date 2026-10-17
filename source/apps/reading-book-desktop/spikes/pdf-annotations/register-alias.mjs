@@ -5,7 +5,8 @@
  *     the npm script builds it first);
  *   - `electron` → `electron-stub.mjs` (records `ipcMain.handle` handlers);
  *   - `electron/persistence/db.ts` → `db-stub.mjs` (node:sqlite on the real migrations);
- *   - extensionless relative imports → the `.ts` file next to the importer.
+ *   - extensionless relative imports → the `.ts` file next to the importer;
+ *   - relative `./x.js` imports with only an `x.ts` on disk → that `.ts` file.
  */
 import { register } from 'node:module'
 
@@ -31,6 +32,16 @@ register(
             return { url: ${JSON.stringify(dbStub)}, shortCircuit: true }
           }
           if (existsSync(fileURLToPath(candidate))) return { url: candidate.href, shortCircuit: true }
+        }
+        // TS sources importing siblings as \`./x.js\` (e.g. @reading-book/config) → the \`.ts\` file.
+        if (
+          (specifier.startsWith('./') || specifier.startsWith('../')) &&
+          specifier.endsWith('.js') &&
+          context.parentURL?.startsWith('file:')
+        ) {
+          const js = new URL(specifier, context.parentURL)
+          const ts = new URL(specifier.slice(0, -3) + '.ts', context.parentURL)
+          if (!existsSync(fileURLToPath(js)) && existsSync(fileURLToPath(ts))) return { url: ts.href, shortCircuit: true }
         }
         return next(specifier, context)
       }

@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto'
 import fsp from 'node:fs/promises'
 import { getLibraryStore } from '../persistence/sqlite-library-store'
 import type {
@@ -5,6 +6,16 @@ import type {
   OpenBookContentResult,
 } from '../ipc/api-types'
 import { resolveBookFile } from './sandbox'
+
+/**
+ * SHA-256 of the bytes last served per book — lets the embedded-annotation sync tell whether the
+ * file it scanned is the very one the reader displays (pdf_embedded_annotation_live_sync.md §2).
+ */
+const servedSha256 = new Map<string, string>()
+
+export function servedBookSha256(bookId: string): string | undefined {
+  return servedSha256.get(bookId)
+}
 
 /** Copy into a standalone ArrayBuffer (avoid Node Buffer pool / IPC edge cases). */
 function bufferToArrayBuffer(buf: Buffer): ArrayBuffer {
@@ -56,6 +67,7 @@ export async function openBookContent(bookId: string): Promise<OpenBookContentRe
 
   try {
     const buf = await fsp.readFile(file.path)
+    servedSha256.set(id, createHash('sha256').update(buf).digest('hex'))
     const data = bufferToArrayBuffer(buf)
     return {
       ok: true,

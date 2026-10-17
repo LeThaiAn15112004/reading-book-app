@@ -20,14 +20,23 @@ import {
 } from '@reading-book/book-reader-sdk'
 import { getDatabase } from './db'
 import {
+  applyFileFields,
+  packPdfHighlightLocator,
+  embeddedAnnotationIdentities,
   embeddedAnnotationSourceHash,
   highlightContentHash,
   highlightFromEmbeddedAnnotation,
+  syncBase,
+  type ExportableHighlight,
+  type SyncConflict,
+  type TwoWayLedgerEntry,
+  type TwoWayPlan,
   packSessionLocation,
   parsePdfAnnotation,
   planEmbeddedAnnotationSync,
   unpackSessionLocation,
   type EmbeddedAnnotationLedgerEntry,
+  type EmbeddedAnnotationSyncOptions,
   type EmbeddedAnnotationSyncStep,
   type ScannedPdfAnnotation,
 } from '@reading-book/book-reader-sdk'
@@ -589,16 +598,251 @@ export class SqliteOverlayStore implements OverlayStore {
   }
 
   /**
-   * Import / refresh the annotations embedded in a PDF file (scanned by the renderer on every open)
-   * into `notes`, through the `pdf_embedded_annotations` ledger — see
-   * docs/implementation_plan/pdf_embedded_annotation_import.md. One transaction; inserts new
-   * annotations, rewrites rows whose file version changed while the app's copy didn't, and never
-   * deletes or overwrites anything the user made or edited in the app.
+   * Import / refresh the annotations embedded in a PDF file (scanned in Main on open and on every
+   * settled change of the file) into `notes`, through the `pdf_embedded_annotations` ledger — see
+   * docs/implementation_plan/pdf_embedded_annotation_import.md and pdf_embedded_annotation_live_sync.md.
+   * One transaction (all or nothing): re-keys pre-`/NM` ledger rows, inserts new annotations,
+   * rewrites rows whose file version changed while the app's copy didn't, and — for a `complete`
+   * scan only — deletes imported rows whose annotation left the file and that the user never
+   * edited. Never touches a row the user made, or edited, in the app.
    *
    * `items` must already be validated (`parseScannedPdfAnnotation`). Returns null when `bookId` is
    * not a PDF in the library.
    */
-  syncEmbeddedPdfAnnotations(bookId: string, items: readonly ScannedPdfAnnotation[]): EmbeddedPdfSyncOutcome | null {
+  /** Ledger rows with their two-way state (base snapshot, conflict) — pdf_annotation_two_way_sync.md. */
+  listTwoWayLedger(bookId: string): TwoWayLedgerEntry[] {
+    const rows = this.db
+      .prepare(
+        `SELECT source_key, note_id, source_hash, note_hash, base_json, conflict_json FROM pdf_embedded_annotations WHERE book_id = ?`,
+      )
+      .all(bookId.trim()) as Array<{ source_key: string; note_id: string; source_hash: string; note_hash: string; base_json: string | null; conflict_json: string | null }>
+    return rows.map((r) => {
+      const entry: TwoWayLedgerEntry = { sourceKey: r.source_key, noteId: r.note_id, sourceHash: r.source_hash, noteHash: r.note_hash }
+      try {
+        if (r.base_json) entry.base = JSON.parse(r.base_json)
+        if (r.conflict_json) entry.conflict = JSON.parse(r.conflict_json)
+      } catch {
+        // A corrupt snapshot just falls back to the hash comparison.
+      }
+      return entry
+    })
+  }
+
+  /** Whether the user enabled writing annotations into this book's PDF file (off by default). */
+  getPdfWriteBack(bookId: string): boolean {
+    const row = this.db.prepare(`SELECT enabled FROM pdf_annotation_write_back WHERE book_id = ?`).get(bookId.trim()) as { enabled: number } | undefined
+    return row?.enabled === 1
+  }
+
+  setPdfWriteBack(bookId: string, enabled: boolean): void {
+    this.db
+      .prepare(
+        `INSERT INTO pdf_annotation_write_back (book_id, enabled, updated_at) VALUES (?, ?, ?)
+         ON CONFLICT(book_id) DO UPDATE SET enabled = excluded.enabled, updated_at = excluded.updated_at`,
+      )
+      .run(bookId.trim(), enabled ? 1 : 0, new Date().toISOString())
+  }
+
+  /** Open two-way conflicts of a book (one per note). */
+  listPdfAnnotationConflicts(bookId: string): { noteId: string; conflict: SyncConflict }[] {
+    return this.listTwoWayLedger(bookId)
+      .filter((e) => e.conflict)
+      .map((e) => ({ noteId: e.noteId, conflict: e.conflict! }))
+  }
+
+  /**
+   * Resolve a conflict. `keep-readmate`: the row stays, and the pair's base is set so that only the
+   * app side counts as changed — the next sync rewrites (or re-adds) the file annotation.
+   * `use-pdf`: the row takes the file's version (or is deleted for `removed-in-file`).
+   * Returns the updated row (null when deleted / nothing to do).
+   */
+  resolvePdfAnnotationConflict(bookId: string, noteId: string, choice: 'keep-readmate' | 'use-pdf'): { updated?: HighlightRecord; deleted?: string } | null {
+    const book = bookId.trim()
+    const entries = this.listTwoWayLedger(book).filter((e) => e.noteId === noteId && e.conflict)
+    if (entries.length === 0) return null
+    const current = this.listHighlightRecordsSync(book).find((r) => r.id === noteId)
+    const result: { updated?: HighlightRecord; deleted?: string } = {}
+    this.db.exec('BEGIN IMMEDIATE')
+    try {
+      for (const entry of entries) {
+        const conflict = entry.conflict!
+        if (choice === 'use-pdf') {
+          if (conflict.kind === 'removed-in-file' || !conflict.item) {
+            this.db.prepare(`DELETE FROM notes WHERE id = ? AND book_id = ? AND ${HIGHLIGHT_TYPE_PREDICATE}`).run(noteId, book)
+            this.db.prepare(`DELETE FROM pdf_embedded_annotations WHERE book_id = ? AND source_key = ?`).run(book, entry.sourceKey)
+            result.deleted = noteId
+            continue
+          }
+          if (!current) continue
+          const next: ExportableHighlight = applyFileFields(current, conflict.item, conflict.fields ?? ['kind', 'color', 'text', 'geometry'])
+          const saved = this.writeHighlight({ ...next, tags: [...(next.tags ?? [])], id: noteId, bookId: book, locator: current.locator })
+          result.updated = saved
+          this.upsertTwoWayLedger(book, entry.sourceKey, noteId, conflict.item, saved, null)
+        } else {
+          if (!current) continue
+          if (conflict.kind === 'removed-in-file') {
+            // Forget the link: the row then counts as made in Readmate and is added to the file again.
+            this.db.prepare(`DELETE FROM pdf_embedded_annotations WHERE book_id = ? AND source_key = ?`).run(book, entry.sourceKey)
+          } else if (conflict.item) {
+            // Base = the file as it is now + an app side that differs from the row: the next cycle sees
+            // only the app side as changed and rewrites the file annotation from the row.
+            const base = syncBase(conflict.item, current)
+            const forcedApp = { kind: base.app.kind, color: '\u0000', text: '\u0000', geometry: '\u0000' }
+            this.db
+              .prepare(`UPDATE pdf_embedded_annotations SET base_json = ?, conflict_json = NULL, synced_at = ? WHERE book_id = ? AND source_key = ?`)
+              .run(JSON.stringify({ file: base.file, app: forcedApp }), new Date().toISOString(), book, entry.sourceKey)
+          }
+          result.updated = current
+        }
+      }
+      this.db.exec('COMMIT')
+    } catch (err) {
+      this.db.exec('ROLLBACK')
+      throw err
+    }
+    return result
+  }
+
+  private listHighlightRecordsSync(bookId: string): HighlightRecord[] {
+    const rows = this.db
+      .prepare(`SELECT ${NOTE_COLUMNS} FROM notes WHERE book_id = ? AND ${HIGHLIGHT_TYPE_PREDICATE} ORDER BY created_at ASC`)
+      .all(bookId) as NoteRow[]
+    return rows.map(rowToHighlightRecord).filter((h): h is HighlightRecord => h !== undefined)
+  }
+
+  private upsertTwoWayLedger(
+    bookId: string,
+    key: string,
+    noteId: string,
+    item: ScannedPdfAnnotation,
+    row: HighlightRecord | ExportableHighlight,
+    conflict: SyncConflict | null,
+  ): void {
+    const now = new Date().toISOString()
+    this.db
+      .prepare(
+        `INSERT INTO pdf_embedded_annotations
+           (book_id, source_key, note_id, source_hash, note_hash, base_json, conflict_json, imported_at, synced_at)
+         VALUES (@book_id, @source_key, @note_id, @source_hash, @note_hash, @base_json, @conflict_json, @now, @now)
+         ON CONFLICT(book_id, source_key) DO UPDATE SET
+           note_id = @note_id, source_hash = @source_hash, note_hash = @note_hash,
+           base_json = @base_json, conflict_json = @conflict_json, synced_at = @now`,
+      )
+      .run({
+        book_id: bookId,
+        source_key: key,
+        note_id: noteId,
+        source_hash: embeddedAnnotationSourceHash(item),
+        note_hash: highlightContentHash(row),
+        base_json: JSON.stringify(syncBase(item, row)),
+        conflict_json: conflict ? JSON.stringify(conflict) : null,
+        now,
+      })
+  }
+
+  /**
+   * Apply a two-way plan (SDK `planTwoWaySync`) in ONE transaction. `items` is the scan the plan was
+   * made from; `after` the read-back scan of the file once the plan's file operations were written,
+   * or null when nothing was written (write not needed, or it failed — then everything that depends
+   * on the write is left for the next cycle). Returns null when `bookId` is not a PDF.
+   */
+  applyTwoWaySync(bookId: string, plan: TwoWayPlan, items: readonly ScannedPdfAnnotation[], after: readonly ScannedPdfAnnotation[] | null): TwoWaySyncOutcome | null {
+    const book = bookId.trim()
+    const row = this.db.prepare(`SELECT file_format FROM books WHERE id = ?`).get(book) as { file_format: string } | undefined
+    if (!row || row.file_format !== 'pdf') return null
+    const outcome: TwoWaySyncOutcome = { inserted: [], updated: [], deleted: [], conflicts: [] }
+    const keys = embeddedAnnotationIdentities(items).map((i) => i.key)
+    const itemByKey = new Map(keys.map((k, i) => [k, items[i]!]))
+    const writtenIds = new Set(plan.writtenRows.map((w) => w.noteId))
+    const wrote = after !== null
+    const dropLedger = this.db.prepare(`DELETE FROM pdf_embedded_annotations WHERE book_id = ? AND source_key = ?`)
+
+    this.db.exec('BEGIN IMMEDIATE')
+    try {
+      for (const noteId of plan.rowDeletes) {
+        if (this.db.prepare(`DELETE FROM notes WHERE id = ? AND book_id = ? AND ${HIGHLIGHT_TYPE_PREDICATE}`).run(noteId, book).changes > 0) outcome.deleted.push(noteId)
+      }
+      for (const key of plan.ledgerDrops) dropLedger.run(book, key)
+      if (wrote) for (const key of plan.ledgerDropsAfterWrite) dropLedger.run(book, key)
+
+      const records = new Map(this.listHighlightRecordsSync(book).map((r) => [r.id, r]))
+      for (const { noteId, next, expectedHash } of plan.rowUpdates) {
+        const current = records.get(noteId)
+        // Edited in Readmate while this cycle ran: leave it — the next cycle sees both changes.
+        if (!current || highlightContentHash(current) !== expectedHash) continue
+        const saved = this.writeHighlight({
+          ...next,
+          tags: [...(next.tags ?? [])],
+          id: noteId,
+          bookId: book,
+          locator: JSON.parse(packPdfHighlightLocator(next.pdfAnnotation!)) as NoteLocator,
+        })
+        records.set(noteId, saved)
+        outcome.updated.push(saved)
+        // Its base moves to (file now, row now) — unless the write it also needed didn't happen.
+        if (!writtenIds.has(noteId) || wrote) {
+          for (const entry of this.listTwoWayLedger(book).filter((e) => e.noteId === noteId && !e.conflict)) {
+            const item = itemByKey.get(entry.sourceKey)
+            if (item && !writtenIds.has(noteId)) this.upsertTwoWayLedger(book, entry.sourceKey, noteId, item, saved, null)
+          }
+        }
+      }
+      for (const { key, item } of [...plan.inserts, ...plan.restores]) {
+        const highlight = highlightFromEmbeddedAnnotation(item)
+        const saved = this.writeHighlight({ ...highlight, bookId: book })
+        records.set(saved.id, saved)
+        outcome.inserted.push(saved)
+        this.upsertTwoWayLedger(book, key, saved.id, item, saved, null)
+      }
+      for (const { key, noteId, item } of plan.links) {
+        const current = records.get(noteId)
+        if (current) this.upsertTwoWayLedger(book, key, noteId, item, current, null)
+      }
+      for (const { key, noteId, conflict } of plan.conflicts) {
+        this.db.prepare(`UPDATE pdf_embedded_annotations SET conflict_json = ?, synced_at = ? WHERE book_id = ? AND source_key = ?`).run(JSON.stringify(conflict), new Date().toISOString(), book, key)
+        outcome.conflicts.push({ noteId, conflict })
+      }
+      for (const key of plan.conflictsCleared) {
+        this.db.prepare(`UPDATE pdf_embedded_annotations SET conflict_json = NULL WHERE book_id = ? AND source_key = ?`).run(book, key)
+      }
+      for (const { key, noteId, item } of plan.baseRefresh) {
+        const current = records.get(noteId)
+        if (current) this.upsertTwoWayLedger(book, key, noteId, item, current, null)
+      }
+      if (wrote) {
+        const afterKeys = embeddedAnnotationIdentities(after).map((i) => i.key)
+        for (const { noteId, row: written, oldKeys, names } of plan.writtenRows) {
+          // Even when the row was deleted while this cycle ran: its entry then is a tombstone, so the
+          // next cycle removes the annotation from the file instead of importing it back as a new row.
+          for (const key of oldKeys) dropLedger.run(book, key)
+          // The base / hash record what was WRITTEN: an edit made meanwhile stays "changed" and is
+          // written by the next cycle.
+          after.forEach((item, i) => {
+            if (item.nm && names.includes(item.nm)) this.upsertTwoWayLedger(book, afterKeys[i]!, noteId, item, written, null)
+          })
+        }
+      }
+      this.db.exec('COMMIT')
+    } catch (err) {
+      this.db.exec('ROLLBACK')
+      throw err
+    }
+    return outcome
+  }
+
+  /** The book's import-ledger rows (which embedded annotation became which `notes` row). */
+  listEmbeddedLedger(bookId: string): EmbeddedAnnotationLedgerEntry[] {
+    const rows = this.db
+      .prepare(`SELECT source_key, note_id, source_hash, note_hash FROM pdf_embedded_annotations WHERE book_id = ?`)
+      .all(bookId.trim()) as Array<{ source_key: string; note_id: string; source_hash: string; note_hash: string }>
+    return rows.map((r) => ({ sourceKey: r.source_key, noteId: r.note_id, sourceHash: r.source_hash, noteHash: r.note_hash }))
+  }
+
+  syncEmbeddedPdfAnnotations(
+    bookId: string,
+    items: readonly ScannedPdfAnnotation[],
+    options: EmbeddedAnnotationSyncOptions = {},
+  ): EmbeddedPdfSyncOutcome | null {
     const book = bookId.trim()
     const row = this.db.prepare(`SELECT file_format FROM books WHERE id = ?`).get(book) as
       | { file_format: string }
@@ -612,8 +856,12 @@ export class SqliteOverlayStore implements OverlayStore {
       keptAppEdits: 0,
       dismissed: 0,
       managedIndices: [],
+      deleted: [],
+      rekeyed: 0,
+      keptAppEditsOnRemoval: 0,
     }
-    if (items.length === 0) return outcome
+    // Nothing scanned and nothing that could be deleted: no transaction at all.
+    if (items.length === 0 && !options.complete) return outcome
 
     this.db.exec('BEGIN IMMEDIATE')
     try {
@@ -635,10 +883,15 @@ export class SqliteOverlayStore implements OverlayStore {
         if (record) current.set(record.id, record)
       }
 
-      const plan = planEmbeddedAnnotationSync(items, ledger, (noteId) => {
-        const record = current.get(noteId)
-        return record ? highlightContentHash(record) : undefined
-      })
+      const plan = planEmbeddedAnnotationSync(
+        items,
+        ledger,
+        (noteId) => {
+          const record = current.get(noteId)
+          return record ? highlightContentHash(record) : undefined
+        },
+        options,
+      )
 
       const now = new Date().toISOString()
       const upsertLedger = this.db.prepare(
@@ -664,12 +917,27 @@ export class SqliteOverlayStore implements OverlayStore {
         })
         return saved
       }
+      const rekey = this.db.prepare(
+        `UPDATE pdf_embedded_annotations SET source_key = ?, synced_at = ? WHERE book_id = ? AND source_key = ?`,
+      )
+      for (const { from, to } of plan.rekeys) rekey.run(to, now, book, from)
       for (const step of plan.inserts) outcome.inserted.push(write(step, undefined))
       for (const step of plan.updates) outcome.updated.push(write(step, step.noteId))
+
+      const deleteLedger = this.db.prepare(`DELETE FROM pdf_embedded_annotations WHERE book_id = ? AND source_key = ?`)
+      const deleteNote = this.db.prepare(`DELETE FROM notes WHERE id = ? AND book_id = ? AND ${HIGHLIGHT_TYPE_PREDICATE}`)
+      for (const { key, noteId } of plan.deletions) {
+        if (deleteNote.run(noteId, book).changes > 0) outcome.deleted.push(noteId)
+        deleteLedger.run(book, key)
+      }
+      for (const key of plan.tombstonesCleared) deleteLedger.run(book, key)
+
       outcome.unchanged = plan.unchanged
       outcome.keptAppEdits = plan.keptAppEdits
       outcome.dismissed = plan.dismissed
       outcome.managedIndices = plan.managed
+      outcome.rekeyed = plan.rekeys.length
+      outcome.keptAppEditsOnRemoval = plan.keptAppEditsOnRemoval
       this.db.exec('COMMIT')
     } catch (err) {
       this.db.exec('ROLLBACK')
@@ -677,6 +945,14 @@ export class SqliteOverlayStore implements OverlayStore {
     }
     return outcome
   }
+}
+
+/** What `applyTwoWaySync` did (rows for the renderer, conflicts for the UI). */
+export type TwoWaySyncOutcome = {
+  inserted: HighlightRecord[]
+  updated: HighlightRecord[]
+  deleted: string[]
+  conflicts: { noteId: string; conflict: SyncConflict }[]
 }
 
 /** What `syncEmbeddedPdfAnnotations` did. `managedIndices` index into the synced `items`. */
@@ -687,6 +963,12 @@ export type EmbeddedPdfSyncOutcome = {
   keptAppEdits: number
   dismissed: number
   managedIndices: number[]
+  /** Note ids deleted because their annotation left the file (complete scans only). */
+  deleted: string[]
+  /** Ledger rows moved from their anchor key to their `/NM` key. */
+  rekeyed: number
+  /** Left the file, but edited in the app — kept. */
+  keptAppEditsOnRemoval: number
 }
 
 let overlayStore: SqliteOverlayStore | null = null

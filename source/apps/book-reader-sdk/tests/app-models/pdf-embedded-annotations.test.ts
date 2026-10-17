@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   EMBEDDED_PDF_ANNOTATION_STYLE,
+  embeddedAnnotationIdentities,
   embeddedAnnotationKeys,
   embeddedAnnotationSourceHash,
   highlightContentHash,
@@ -9,6 +10,7 @@ import {
   planEmbeddedAnnotationSync,
   readPdfJsAnnotation,
   type EmbeddedAnnotationLedgerEntry,
+  type EmbeddedAnnotationSyncOptions,
   type HighlightContent,
   type PdfPageViewportInfo,
   type ScannedPdfAnnotation,
@@ -258,11 +260,26 @@ function createSyncModel() {
       notes.set(id, { ...content, origin: 'app' })
       return id
     },
-    open(items: ScannedPdfAnnotation[]) {
-      const plan = planEmbeddedAnnotationSync(items, ledger, (id) => {
-        const note = notes.get(id)
-        return note ? highlightContentHash(note) : undefined
-      })
+    open(items: ScannedPdfAnnotation[], options: EmbeddedAnnotationSyncOptions = {}) {
+      const plan = planEmbeddedAnnotationSync(
+        items,
+        ledger,
+        (id) => {
+          const note = notes.get(id)
+          return note ? highlightContentHash(note) : undefined
+        },
+        options,
+      )
+      for (const { from, to } of plan.rekeys) {
+        const entry = ledger.get(from)!
+        ledger.delete(from)
+        ledger.set(to, { ...entry, sourceKey: to })
+      }
+      for (const { key, noteId } of plan.deletions) {
+        notes.delete(noteId)
+        ledger.delete(key)
+      }
+      for (const key of plan.tombstonesCleared) ledger.delete(key)
       for (const step of plan.inserts) {
         const id = `pdf-${nextId++}`
         const row = highlightFromEmbeddedAnnotation(step.item)
@@ -345,7 +362,7 @@ describe('planEmbeddedAnnotationSync', () => {
     expect(model.notes.size).toBe(2)
   })
 
-  it('6. deleting an annotation from the file never deletes the row', () => {
+  it('6. an incomplete scan never deletes a row, whatever is missing from it', () => {
     const model = createSyncModel()
     model.open([A(), B()])
     const plan = model.open([A()])
@@ -356,7 +373,20 @@ describe('planEmbeddedAnnotationSync', () => {
   it('7. a file without annotations changes nothing', () => {
     const model = createSyncModel()
     const plan = model.open([])
-    expect(plan).toEqual({ inserts: [], updates: [], unchanged: 0, keptAppEdits: 0, dismissed: 0, managed: [] })
+    expect(plan).toEqual({
+      inserts: [],
+      updates: [],
+      unchanged: 0,
+      keptAppEdits: 0,
+      dismissed: 0,
+      managed: [],
+      rekeys: [],
+      deletions: [],
+      tombstonesCleared: [],
+      keptAppEditsOnRemoval: 0,
+    })
+    // A complete scan of an empty file with an empty ledger changes nothing either.
+    expect(model.open([], { complete: true }).deletions).toEqual([])
     expect(model.notes.size).toBe(0)
     expect(model.ledger.size).toBe(0)
   })
@@ -398,5 +428,134 @@ describe('planEmbeddedAnnotationSync', () => {
     expect(model.notes.size).toBe(1)
     // Still "managed": the app keeps the deleted mark off the canvas too.
     expect(plan.managed).toEqual([0, 1])
+  })
+})
+
+/** A scanned item with an `/NM`. */
+const named = (nm: string, extra: Record<string, unknown> = {}, page: PdfPageViewportInfo = LETTER): ScannedPdfAnnotation => ({
+  ...scan(extra, page),
+  nm,
+})
+
+describe('identity with /NM', () => {
+  it('uses the name, not the geometry, subtype or object id', () => {
+    const [a] = embeddedAnnotationIdentities([named('{uuid-1}')])
+    const [moved] = embeddedAnnotationIdentities([named('{uuid-1}', { id: '99R', subtype: 'Underline', quadPoints: quad(72, 500, 200, 516) })])
+    expect(moved!.key).toBe(a!.key)
+    expect(a!.key.startsWith('nm1:0:')).toBe(true)
+    expect(a!.legacyKey.startsWith('pdf1:')).toBe(true)
+    // Same name on another page is another annotation (names are unique per page).
+    const [other] = embeddedAnnotationIdentities([named('{uuid-1}', {}, { ...LETTER, pageIndex: 1 })])
+    expect(other!.key).not.toBe(a!.key)
+  })
+
+  it('keeps duplicated names (copied annotations) apart', () => {
+    const ids = embeddedAnnotationIdentities([named('dup'), named('dup', { quadPoints: quad(72, 500, 200, 516) })])
+    expect(ids[0]!.key).not.toBe(ids[1]!.key)
+  })
+
+  it('validates the name on the worker boundary', () => {
+    const item = named('{uuid-1}')
+    expect(parseScannedPdfAnnotation(JSON.parse(JSON.stringify(item)))?.nm).toBe('{uuid-1}')
+    expect(parseScannedPdfAnnotation({ ...item, nm: 'x'.repeat(1001) })).toBeNull()
+    expect(parseScannedPdfAnnotation({ ...item, nm: 7 })).toBeNull()
+  })
+})
+
+describe('live sync rules', () => {
+  it('a move or resize of a named annotation updates the same row', () => {
+    const model = createSyncModel()
+    model.open([named('n1')], { complete: true })
+    const [entry] = [...model.ledger.values()]
+    const plan = model.open([named('n1', { quadPoints: quad(72, 400, 400, 420) })], { complete: true })
+    expect(plan.updates).toHaveLength(1)
+    expect(plan.updates[0]!.noteId).toBe(entry!.noteId)
+    expect(plan.inserts).toHaveLength(0)
+    expect(plan.deletions).toHaveLength(0)
+    expect(model.notes.size).toBe(1)
+    expect(model.notes.get(entry!.noteId)!.pdfAnnotation!.rects[0]!.y).toBeCloseTo((792 - 420) / 792, 4)
+  })
+
+  it('a move without /NM is a delete plus an insert on a complete scan (no leftover row)', () => {
+    const model = createSyncModel()
+    model.open([A()], { complete: true })
+    const plan = model.open([scan({ id: '10R', quadPoints: quad(72, 400, 300, 416) })], { complete: true })
+    expect(plan.inserts).toHaveLength(1)
+    expect(plan.deletions).toHaveLength(1)
+    expect(model.notes.size).toBe(1)
+  })
+
+  it('an annotation removed from the file is deleted on a complete scan only', () => {
+    const model = createSyncModel()
+    model.open([A(), B(), C()], { complete: true })
+    expect(model.open([A(), C()]).deletions).toHaveLength(0) // incomplete: kept
+    expect(model.notes.size).toBe(3)
+    const plan = model.open([A(), C()], { complete: true })
+    expect(plan.deletions).toHaveLength(1)
+    expect(model.notes.size).toBe(2)
+    expect(model.ledger.size).toBe(2)
+    // Re-added in the file later (e.g. undo in Foxit): imported again, not blocked by a tombstone.
+    expect(model.open([A(), B(), C()], { complete: true }).inserts).toHaveLength(1)
+    expect(model.notes.size).toBe(3)
+  })
+
+  it('removing everything in the file deletes every untouched import (and nothing made in the app)', () => {
+    const model = createSyncModel()
+    const appId = model.addAppNote(highlightFromEmbeddedAnnotation(A()))
+    model.open([A(), B(), C(), D(), E()], { complete: true })
+    const plan = model.open([], { complete: true })
+    expect(plan.deletions).toHaveLength(5)
+    expect([...model.notes.keys()]).toEqual([appId])
+    expect(model.ledger.size).toBe(0)
+  })
+
+  it('a row edited in the app survives its removal from the file', () => {
+    const model = createSyncModel()
+    model.open([A(), B()], { complete: true })
+    const entry = [...model.ledger.values()][0]!
+    model.notes.set(entry.noteId, { ...model.notes.get(entry.noteId)!, note: 'my own note' })
+    const plan = model.open([B()], { complete: true })
+    expect(plan.deletions).toHaveLength(0)
+    expect(plan.keptAppEditsOnRemoval).toBe(1)
+    expect(model.notes.get(entry.noteId)?.note).toBe('my own note')
+  })
+
+  it('a row deleted in the app and then removed from the file drops its tombstone', () => {
+    const model = createSyncModel()
+    model.open([A()], { complete: true })
+    const entry = [...model.ledger.values()][0]!
+    model.notes.delete(entry.noteId)
+    const plan = model.open([], { complete: true })
+    expect(plan.tombstonesCleared).toEqual([entry.sourceKey])
+    expect(model.ledger.size).toBe(0)
+  })
+
+  it('upgrades rows imported before /NM support instead of duplicating them', () => {
+    const model = createSyncModel()
+    // Imported by the previous version: same annotation, no name read → anchor key.
+    model.open([A(), B()], { complete: true })
+    const before = new Map([...model.ledger.values()].map((e) => [e.noteId, e.sourceKey]))
+    const plan = model.open([{ ...A(), nm: 'A-name' }, { ...B(), nm: 'B-name' }], { complete: true })
+    expect(plan.rekeys).toHaveLength(2)
+    expect(plan.inserts).toHaveLength(0)
+    expect(plan.deletions).toHaveLength(0)
+    expect(plan.unchanged).toBe(2)
+    expect(model.notes.size).toBe(2)
+    for (const entry of model.ledger.values()) {
+      expect(entry.sourceKey.startsWith('nm1:')).toBe(true)
+      expect(before.has(entry.noteId)).toBe(true)
+    }
+    // …and from then on a move keeps the row.
+    const moved = model.open([{ ...scan({ id: '10R', quadPoints: quad(72, 300, 300, 316) }), nm: 'A-name' }, { ...B(), nm: 'B-name' }], { complete: true })
+    expect(moved.updates).toHaveLength(1)
+    expect(model.notes.size).toBe(2)
+  })
+
+  it('repeated scans of the same file never duplicate', () => {
+    const model = createSyncModel()
+    const items = [named('a'), A(), scan({ id: '1R' }), named('b', { subtype: 'StrikeOut' })]
+    for (let i = 0; i < 5; i++) model.open(items, { complete: true })
+    expect(model.notes.size).toBe(4)
+    expect(model.ledger.size).toBe(4)
   })
 })

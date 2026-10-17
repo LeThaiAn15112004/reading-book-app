@@ -17,6 +17,7 @@ import {
 import { HIDDEN_AT_STARTUP_ARG, wasLaunchedAtLogin } from './background/login-item'
 import { afterHideFlush, decideWindowClose } from './background/close-decision'
 import { disposeBookChunkWorkers } from './chunking/book-chunk-service'
+import { disposePdfAnnotationSync } from './ipc/overlay.ipc'
 import { disposeTranslationWorker } from './translation/translation-service'
 import { ensureBooksSandbox } from './files/sandbox'
 import { registerAllIpcHandlers } from './ipc'
@@ -413,6 +414,7 @@ app.on('will-quit', () => {
   stopReadingReminders()
   disposeTray()
   disposeBookChunkWorkers()
+  disposePdfAnnotationSync()
   disposeTranslationWorker()
   closeDatabase()
 })

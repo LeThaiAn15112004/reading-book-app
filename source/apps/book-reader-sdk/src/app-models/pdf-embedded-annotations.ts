@@ -2,21 +2,25 @@
  * Annotations embedded in a PDF file (written by Foxit, Acrobat, …) → the app's `notes` rows.
  * Read-only import, re-run on every open: see docs/implementation_plan/pdf_embedded_annotation_import.md.
  *
- * Pipeline (everything here is pure; the renderer feeds it PDF.js data, Main persists the plan):
+ * Live sync while the book is open (file watcher in Main): docs/implementation_plan/pdf_embedded_annotation_live_sync.md.
+ *
+ * Pipeline (everything here is pure; Main's scan worker feeds it PDF.js data, Main persists the plan):
  *  1. `readPdfJsAnnotation` — one item of `PDFPageProxy.getAnnotations({ intent: 'display' })` plus
  *     the page's scale-1 viewport → a `ScannedPdfAnnotation` in the same normalized 0–1 display
- *     space as app-made PDF annotations, or null for a type the app can't represent.
- *  2. `parseScannedPdfAnnotation` — Main re-validates every item that crossed IPC.
- *  3. `embeddedAnnotationKeys` — identity of each item inside its file (see below).
- *  4. `planEmbeddedAnnotationSync` — compare with the import ledger → insert / update / leave alone.
+ *     space as app-made PDF annotations, or null for a type the app can't represent. The worker adds
+ *     the annotation's `/NM` (read from the raw PDF object — PDF.js doesn't expose it).
+ *  2. `parseScannedPdfAnnotation` — re-validation of every item leaving the worker.
+ *  3. `embeddedAnnotationIdentities` — identity of each item inside its file (see below).
+ *  4. `planEmbeddedAnnotationSync` — compare with the import ledger → insert / update / delete /
+ *     leave alone.
  *
- * Identity: PDF.js exposes neither `/NM` nor anything else stable across a full rewrite of the
- * file — its `id` is the object reference ("12R"), which a non-incremental save may renumber and
- * even hand to a different annotation. So the key is the annotation's *anchor*: subtype, page and
- * geometry (normalized, rounded to 0.001 of the page), plus an occurrence counter so two identical
- * annotations stay two rows. Color, comment text and author are not part of the key — editing them
- * in another viewer updates the imported row. Moving or resizing one in another viewer makes it a
- * new annotation (the old row stays: nothing is ever deleted by a scan).
+ * Identity: with an `/NM` (unique per page, PDF 32000 §12.5.2) the key is `nm1:<page>:<hash of NM>`,
+ * so a move, resize, recolor or comment edit in another viewer updates the same row. Without one,
+ * PDF.js offers nothing stable across a full rewrite of the file — its `id` is the object reference
+ * ("12R"), which a non-incremental save may renumber and even hand to a different annotation — so
+ * the key is the annotation's *anchor*: `pdf1:<subtype>:<page>:<geometry hash>` (normalized,
+ * rounded to 0.001 of the page). Both get an occurrence counter so identical keys stay separate
+ * rows. A move or resize without `/NM` is a delete plus an insert.
  */
 
 import type { NoteLocator, NoteSelectionText, PdfAnnotation, PdfAnnotationRect } from '../domain/index.js'
@@ -53,6 +57,7 @@ const MAX_CONTENTS_LENGTH = 10_000
 const MAX_TEXT_LENGTH = 10_000
 const MAX_AUTHOR_LENGTH = 500
 const MAX_OBJECT_ID_LENGTH = 64
+const MAX_NAME_LENGTH = 1000
 /** Geometry precision of the identity key, as a fraction of the page (≈0.6 pt on a Letter page). */
 const KEY_DECIMALS = 3
 /**
@@ -92,6 +97,8 @@ export type ScannedPdfAnnotation = {
   author?: string
   /** The page text under a markup annotation, as PDF.js extracts it (`overlaidText`). */
   text?: string
+  /** `/NM`, the annotation's name (unique per page) — the stable identity when present. */
+  nm?: string
 }
 
 function isFiniteNumber(value: unknown): value is number {
@@ -237,7 +244,8 @@ export function parseScannedPdfAnnotation(value: unknown): ScannedPdfAnnotation 
   const contents = optionalString(v.contents, MAX_CONTENTS_LENGTH)
   const author = optionalString(v.author, MAX_AUTHOR_LENGTH)
   const text = optionalString(v.text, MAX_TEXT_LENGTH)
-  if (contents === null || author === null || text === null) return null
+  const nm = optionalString(v.nm, MAX_NAME_LENGTH)
+  if (contents === null || author === null || text === null || nm === null) return null
 
   const item: ScannedPdfAnnotation = {
     objectId: v.objectId,
@@ -249,6 +257,7 @@ export function parseScannedPdfAnnotation(value: unknown): ScannedPdfAnnotation 
   if (contents) item.contents = contents
   if (author) item.author = author
   if (text) item.text = text
+  if (nm) item.nm = nm
   return item
 }
 
@@ -282,6 +291,31 @@ export function embeddedAnnotationKeys(items: readonly ScannedPdfAnnotation[]): 
     const n = seen.get(base) ?? 0
     seen.set(base, n + 1)
     return `${base}#${n}`
+  })
+}
+
+/** Identity of one scanned item: `key` is what the ledger uses; `legacyKey` the anchor key. */
+export type EmbeddedAnnotationIdentity = {
+  key: string
+  /** The `pdf1` anchor key — what an import before `/NM` support stored for this item. */
+  legacyKey: string
+}
+
+/**
+ * Identity of each item within its file, in scan order (see the module comment). `key` is the
+ * `/NM` key when the item has a name, the anchor key otherwise; `legacyKey` is always the anchor
+ * key, so ledger rows written before `/NM` support can be re-keyed instead of duplicated.
+ */
+export function embeddedAnnotationIdentities(items: readonly ScannedPdfAnnotation[]): EmbeddedAnnotationIdentity[] {
+  const legacy = embeddedAnnotationKeys(items)
+  const seen = new Map<string, number>()
+  return items.map((item, index) => {
+    const legacyKey = legacy[index]!
+    if (!item.nm) return { key: legacyKey, legacyKey }
+    const base = `nm1:${item.pageIndex}:${hash53(item.nm)}`
+    const n = seen.get(base) ?? 0
+    seen.set(base, n + 1)
+    return { key: `${base}#${n}`, legacyKey }
   })
 }
 
@@ -379,25 +413,74 @@ export type EmbeddedAnnotationSyncPlan = {
   dismissed: number
   /** Indices (into the scanned list) of items the app now paints itself, deleted ones included. */
   managed: number[]
+  /** Ledger rows to re-key before anything else (anchor key → `/NM` key, same row). */
+  rekeys: { from: string; to: string }[]
+  /** Removed from the file (complete scans only), row untouched in the app: delete row + entry. */
+  deletions: { key: string; noteId: string }[]
+  /** Removed from the file, row already deleted in the app: drop the ledger entry. */
+  tombstonesCleared: string[]
+  /** Removed from the file, but the row was edited in the app: row and entry are kept. */
+  keptAppEditsOnRemoval: number
+}
+
+export type EmbeddedAnnotationSyncOptions = {
+  /**
+   * The scan saw the whole file (document loaded, every page read, no cap hit). Only then can a
+   * missing ledger entry mean "removed from the file"; an incomplete scan never deletes anything.
+   */
+  complete?: boolean
 }
 
 /**
  * Compare a fresh scan with the ledger. `noteHashOf(noteId)` is the current `highlightContentHash`
- * of that row, undefined when the row no longer exists. Nothing is ever planned for deletion:
- * ledger entries the scan didn't see (removed from the file, or a key that changed) are left alone.
+ * of that row, undefined when the row no longer exists. Deletions are only planned for a
+ * `complete` scan, and never for a row the user edited in the app.
  */
 export function planEmbeddedAnnotationSync(
   items: readonly ScannedPdfAnnotation[],
   ledger: ReadonlyMap<string, EmbeddedAnnotationLedgerEntry>,
   noteHashOf: (noteId: string) => string | undefined,
+  options: EmbeddedAnnotationSyncOptions = {},
 ): EmbeddedAnnotationSyncPlan {
-  const plan: EmbeddedAnnotationSyncPlan = { inserts: [], updates: [], unchanged: 0, keptAppEdits: 0, dismissed: 0, managed: [] }
-  const keys = embeddedAnnotationKeys(items)
+  const plan: EmbeddedAnnotationSyncPlan = {
+    inserts: [],
+    updates: [],
+    unchanged: 0,
+    keptAppEdits: 0,
+    dismissed: 0,
+    managed: [],
+    rekeys: [],
+    deletions: [],
+    tombstonesCleared: [],
+    keptAppEditsOnRemoval: 0,
+  }
+  const identities = embeddedAnnotationIdentities(items)
+
+  // Pass 1: exact keys. Pass 2: a named item whose name is new to the ledger may still be an
+  // annotation imported before `/NM` support, under its anchor key — re-key that row.
+  const matched = new Map<number, EmbeddedAnnotationLedgerEntry>()
+  const claimed = new Set<string>()
+  identities.forEach(({ key }, index) => {
+    const entry = ledger.get(key)
+    if (entry && !claimed.has(key)) {
+      matched.set(index, entry)
+      claimed.add(key)
+    }
+  })
+  identities.forEach(({ key, legacyKey }, index) => {
+    if (matched.has(index) || key === legacyKey || claimed.has(legacyKey)) return
+    const entry = ledger.get(legacyKey)
+    if (!entry) return
+    matched.set(index, { ...entry, sourceKey: key })
+    claimed.add(legacyKey)
+    plan.rekeys.push({ from: legacyKey, to: key })
+  })
+
   items.forEach((item, index) => {
-    const key = keys[index]!
+    const key = identities[index]!.key
     const step = { index, key, item }
     plan.managed.push(index)
-    const entry = ledger.get(key)
+    const entry = matched.get(index)
     if (!entry) {
       plan.inserts.push(step)
       return
@@ -408,5 +491,15 @@ export function planEmbeddedAnnotationSync(
     else if (noteHash !== entry.noteHash) plan.keptAppEdits += 1
     else plan.updates.push({ ...step, noteId: entry.noteId })
   })
+
+  if (options.complete) {
+    for (const [key, entry] of ledger) {
+      if (claimed.has(key)) continue
+      const noteHash = noteHashOf(entry.noteId)
+      if (noteHash === undefined) plan.tombstonesCleared.push(key)
+      else if (noteHash === entry.noteHash) plan.deletions.push({ key, noteId: entry.noteId })
+      else plan.keptAppEditsOnRemoval += 1
+    }
+  }
   return plan
 }

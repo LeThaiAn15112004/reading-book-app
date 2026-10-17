@@ -1,9 +1,11 @@
 /**
  * Checks for the embedded PDF annotation import (docs/implementation_plan/pdf_embedded_annotation_import.md),
  * end to end without Electron: real PDFs with `/Annots` (e2e/support/build-annotated-pdf.mjs) →
- * the installed pdf.js (legacy build, 5.4.624) → the renderer's `scanEmbeddedPdfAnnotations` →
- * the real `overlay:syncPdfEmbeddedAnnotations` handler → `SqliteOverlayStore` on the real migrated
- * schema (node:sqlite, migration 023 included).
+ * the installed pdf.js (legacy build, 5.4.624) → Main's scan (`scanPdfAnnotationBytes`, what the scan
+ * worker runs) → `SqliteOverlayStore.syncEmbeddedPdfAnnotations` on the real migrated schema
+ * (node:sqlite, migration 023 included). The import rules are checked here through *incomplete*
+ * scans (no deletions); deletions, `/NM`, the file watcher and the live sync service are checked by
+ * run-pdf-embedded-live.mjs (`npm run spike:pdf:live`).
  *
  *   1. types        -> what pdf.js 5.4.624 actually yields: Highlight / Underline / Squiggly /
  *                      StrikeOut / Text read with geometry, color, comment, author, text under the
@@ -13,12 +15,12 @@
  *   4. never synced -> a book opened before (no ledger) is still imported
  *   5. added        -> two annotations added + every object renumbered: 2 new rows, 5 unchanged
  *   6. edited       -> color / comment changed in the file: the row is updated, created_at kept
- *   7. removed      -> deleted from the file: the row stays
+ *   7. removed      -> deleted from the file, incomplete scan: the row stays
  *   8. empty        -> a PDF without annotations writes nothing
  *   9. twins        -> identical / overlapping annotations stay separate rows, stable on reopen
  *  10. app rows     -> an app-made row is never touched; an app-edited imported row keeps the app's
  *                      version; an imported row deleted in the app is not imported again
- *  11. failures     -> unreadable page / bad items / wrong book never crash and never write junk
+ *  11. failures     -> garbage / truncated bytes and wrong books never crash and never write junk
  *  12. regressions  -> PDF bookmark and a legacy EPUB row byte-identical
  *
  * Run: npm run spike:pdf:embedded   (builds the SDK bundle first)
@@ -30,13 +32,10 @@ import { getDatabase } from './db-stub.mjs'
 import { SAMPLE_ANNOTATIONS, buildAnnotatedPdf } from '../../e2e/support/build-annotated-pdf.mjs'
 import { textPdfLine } from '../../e2e/support/build-text-pdf.mjs'
 
-const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs')
-globalThis.pdfjsWorker ??= await import('pdfjs-dist/legacy/build/pdf.worker.mjs')
-
 const { OverlayChannels } = await import('../../electron/ipc/channels.ts')
 const { registerOverlayIpc } = await import('../../electron/ipc/overlay.ipc.ts')
 const { getOverlayStore } = await import('../../electron/persistence/sqlite-overlay-store.ts')
-const { scanEmbeddedPdfAnnotations } = await import('../../src/reader/renderers/pdf/pdfEmbeddedAnnotations.ts')
+const { scanPdfAnnotationBytes } = await import('../../electron/pdf-sync/pdf-annotation-scan.ts')
 
 let passed = 0
 async function check(name, fn) {
@@ -80,20 +79,20 @@ await store.saveBookmark({ bookId: 'pdf-a', locator: { kind: 'page-rect', page: 
 const bookmarkJson = () => db.prepare(`SELECT note_json FROM notes WHERE book_id = 'pdf-a' AND json_extract(note_json, '$.group') = 'bookmark'`).get().note_json
 const bookmarkBefore = bookmarkJson()
 
-/** Open a PDF the way PdfRenderer does (bytes in memory) and run the renderer's scan on it. */
+/** Main's scan of a PDF's bytes (what the scan worker runs). */
 async function scanPdf(bytes) {
-  const task = pdfjs.getDocument({ data: new Uint8Array(bytes), verbosity: 0 })
-  const pdf = await task.promise
-  try {
-    return await scanEmbeddedPdfAnnotations(pdf, () => false)
-  } finally {
-    await task.destroy()
-  }
+  return (await scanPdfAnnotationBytes(new Uint8Array(bytes))).items
 }
 
-/** The renderer → Main hop: structured-clone the scan, call the real handler. */
+/**
+ * The store sync, as an *incomplete* scan (import rules only — never deletes). The worker → Main hop
+ * is a structured clone.
+ */
 async function sync(bookId, scanned) {
-  return invoke(OverlayChannels.syncPdfEmbeddedAnnotations, { bookId, annotations: structuredClone(scanned) })
+  const items = structuredClone(scanned)
+  const outcome = store.syncEmbeddedPdfAnnotations(bookId, items, { complete: false })
+  if (!outcome) return { ok: false, inserted: [], updated: [] }
+  return { ok: true, ...outcome, managedObjectIds: outcome.managedIndices.map((i) => items[i].objectId) }
 }
 
 const pdfRows = async (bookId) =>
@@ -277,55 +276,26 @@ await check('10. app rows: never overwritten, app edits win, app deletions stick
   assert.deepEqual(appJson(), appBefore, 'app-made row untouched')
 })
 
-await check('11. unreadable pages, bad items and wrong books never crash or write junk', async () => {
-  // A document whose page 2 can't be read: the other pages are still scanned.
-  const task = pdfjs.getDocument({ data: new Uint8Array(v1), verbosity: 0 })
-  const pdf = await task.promise
-  const flaky = { numPages: pdf.numPages, getPage: (n) => (n === 2 ? Promise.reject(new Error('broken page')) : pdf.getPage(n)) }
-  const warn = console.warn
-  console.warn = () => {}
-  let partial
-  try {
-    partial = await scanEmbeddedPdfAnnotations(flaky, () => false)
-  } finally {
-    console.warn = warn
-    await task.destroy()
-  }
-  assert.deepEqual(partial.map((a) => a.subtype), ['Highlight', 'Underline', 'Text'])
-
-  // A cancelled scan stops right away.
-  assert.deepEqual(await scanEmbeddedPdfAnnotations(flaky, () => true), [])
-
+await check('11. garbage / truncated bytes and wrong books never crash or write junk', async () => {
   const notesBefore = noteCount('pdf-c')
-  const good = (await scanPdf(buildAnnotatedPdf({ annotations: [{ page: 2, subtype: 'Highlight', lines: [3], color: [1, 1, 0] }] })))[0]
-  const mixed = await invoke(OverlayChannels.syncPdfEmbeddedAnnotations, {
-    bookId: 'pdf-c',
-    annotations: [
-      { ...good, subtype: 'Ink' },
-      { ...good, rects: [{ x: 0.5, y: 0.5, width: 0.9, height: 0.1 }] },
-      { ...good, colorHex: 'javascript:alert(1)' },
-      null,
-      'nope',
-      good,
-    ],
-  })
-  assert.equal(mixed.ok, true)
-  assert.equal(mixed.invalid, 5)
-  assert.equal(mixed.inserted.length, 1)
-  assert.equal(noteCount('pdf-c'), notesBefore + 1)
+  // Not a PDF at all: the document can't be opened — the scan throws, nothing is synced.
+  await assert.rejects(scanPdfAnnotationBytes(new Uint8Array(Buffer.from('definitely not a pdf'))))
+  // A save caught half-way (the live sync never even scans a file without %%EOF): whatever pdf.js
+  // makes of it, the scan returns or throws — it never crashes the process.
+  const truncated = new Uint8Array(v1.subarray(0, Math.floor(v1.length * 0.6)))
+  await scanPdfAnnotationBytes(truncated).then(
+    (r) => assert.ok(Array.isArray(r.items)),
+    (err) => assert.ok(err instanceof Error),
+  )
 
-  for (const input of [null, {}, { bookId: 'pdf-c' }, { bookId: '', annotations: [] }, { bookId: 'missing', annotations: [good] }, { bookId: 'epub-e', annotations: [good] }]) {
-    const result = await invoke(OverlayChannels.syncPdfEmbeddedAnnotations, input)
-    assert.equal(result.ok, false, JSON.stringify(input))
-    assert.equal(result.inserted.length, 0)
+  // Wrong / unknown book: the store refuses before writing anything.
+  const good = (await scanPdf(buildAnnotatedPdf({ annotations: [{ page: 2, subtype: 'Highlight', lines: [3], color: [1, 1, 0] }] })))[0]
+  for (const bookId of ['missing', 'epub-e', '']) {
+    assert.equal(store.syncEmbeddedPdfAnnotations(bookId, [good], { complete: true }), null)
   }
   assert.equal(noteCount('epub-e'), 1)
+  assert.equal(noteCount('pdf-c'), notesBefore)
   assert.equal(ledgerCount('epub-e') + ledgerCount('missing'), 0)
-
-  // Oversized: items past the cap are counted invalid, never stored.
-  const many = await invoke(OverlayChannels.syncPdfEmbeddedAnnotations, { bookId: 'pdf-c', annotations: Array.from({ length: 5003 }, () => ({ ...good, subtype: 'Ink' })) })
-  assert.equal(many.invalid, 5003)
-  assert.equal(noteCount('pdf-c'), notesBefore + 1)
 })
 
 await check('12. PDF bookmark and legacy EPUB row are byte-identical; deleting a book clears its ledger', async () => {

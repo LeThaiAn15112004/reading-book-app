@@ -77,7 +77,10 @@ Desktop app (`cd source/apps/reading-book-desktop`):
   `spike:settings:reminders` (Reading Reminder rules at UTC+7, SQLite on the real schema, minute-aligned worker),
   `spike:reader:toolbar` (capability-driven Reader toolbar: per-surface tools, fold order, handler wiring),
   `spike:pdf:annotations` (PDF text annotations: real `overlay:*` IPC + SQLite store on the migrated schema),
-  `spike:pdf:embedded` (embedded PDF annotation import: real pdf.js scan → sync IPC → SQLite ledger)
+  `spike:pdf:embedded` (embedded PDF annotation import: real pdf.js scan → SQLite ledger),
+  `spike:pdf:live` (live sync: watcher on real temp files, `/NM` reader, sync service, SQLite),
+  `spike:pdf:export` (incremental writer + export flow, pdf.js read-back), `spike:pdf:two-way` (two-way coordinator on
+  real files), `spike:pdf:compat-kit -- <dir>` (manual cross-reader test kit)
 
 SDK (`cd source/apps/book-reader-sdk`): `npm run typecheck`, `npm test` (vitest, single file:
 `npx vitest run tests/text/chunk-text.test.ts`), `npm run test:watch`, `npm run typecheck:tests`, `npm run build`,
@@ -141,8 +144,8 @@ Domain/port code only ever deals with `DocumentImporter` / `DocumentRenderer` / 
 ### Persistence & the read-only/overlay invariant
 
 `better-sqlite3`, schema versioned as numbered SQL files in `electron/persistence/migrations/` (currently
-001–023: books, genres, comments, collections, reading sessions, notes/annotations, reading status, cloud
-provenance, FTS chunks, signature status, embedded PDF annotation ledger), run through `migrate.ts`. `sqlite-library-store.ts` and
+001–024: books, genres, comments, collections, reading sessions, notes/annotations, reading status, cloud
+provenance, FTS chunks, signature status, embedded PDF annotation ledger, two-way sync base/conflict + write-back), run through `migrate.ts`. `sqlite-library-store.ts` and
 `sqlite-overlay-store.ts` implement the domain's `LibraryStore`/`CollectionStore`/`OverlayStore` ports.
 
 **Signature status (verification only):** `books.metadata_json.signatureStatus` (`unsigned|valid|invalid|unsupported`;
@@ -158,18 +161,30 @@ is reused only while the file's current SHA-256 equals `signatureCheckedSha256`.
 SDK `persistence/sql-notes.ts` JSON layout differs from Main's and is not compatible yet. See
 `docs/implementation_plan/pdf_text_annotations.md`.
 
-**Embedded PDF annotations** (Foxit/Acrobat markup + sticky notes inside the file) are scanned on *every* PDF open
-from the already-loaded PDF.js document (`reader/renderers/pdf/pdfEmbeddedAnnotations.ts`) and synced by
-`overlay:syncPdfEmbeddedAnnotations` into ordinary `notes` rows, through the `pdf_embedded_annotations` ledger
-(migration 023). Read-only on the file; a scan never deletes, never touches app-made rows, and app edits win over
-file edits. Identity is subtype + page + rounded geometry (PDF.js exposes no `/NM`). Logic lives in
-`book-reader-sdk/src/app-models/pdf-embedded-annotations.ts`. See `docs/implementation_plan/pdf_embedded_annotation_import.md`.
+**Embedded PDF annotations** (Foxit/Acrobat markup + sticky notes inside the file) are synced into ordinary `notes`
+rows through the `pdf_embedded_annotations` ledger (migration 023) — on open and live while the PDF is open:
+`overlay:watchPdfEmbeddedAnnotations` starts a per-window session in Main (`electron/pdf-sync/`: `StableFileWatcher`
+on the file's folder + stat poll, debounce + stability check, `%%EOF`/SHA-256 guards, one long-lived pdf.js scan
+worker — a worker per scan crashed Electron Main) and results come back as `overlay:pdfEmbeddedAnnotationsChanged`.
+Identity is `/NM` (read from raw PDF objects by `pdf-raw-objects.ts`; PDF.js doesn't expose it), else subtype + page
++ rounded geometry. Deletions only after a `complete` scan; never touches app-made rows; app edits win. Logic lives
+in `book-reader-sdk/src/app-models/pdf-embedded-annotations.ts`. See `docs/implementation_plan/pdf_embedded_annotation_import.md`
+and `pdf_embedded_annotation_live_sync.md`.
+
+**Writing annotations into PDFs** — `electron/pdf-sync/pdf-incremental-writer.ts` appends ONE incremental update
+(original bytes untouched; encrypted / unparseable trailers refused) and every write is read back with pdf.js.
+Export (More → "Export PDF with annotations…", `overlay:exportAnnotatedPdf`) writes a NEW file chosen in a Main-owned
+save dialog. Two-way sync (`planTwoWaySync` in the SDK, run by the same per-window coordinator) writes into the
+book's own file **only for books the user enabled** ("Sync annotations into this PDF file", `pdf_annotation_write_back`,
+referenced files only); three-way merge per field from `base_json`, conflicts frozen in `conflict_json` until the user
+picks. See `pdf_annotation_export.md`, `pdf_annotation_two_way_sync.md`, `pdf_annotation_reader_compatibility.md`.
 
 Per-book reading state (position, percent, and that book's font/size/line-height/align/layout/margin overrides)
 lives in `books.reading_state_json`, written via `overlay:saveSessionState`.
 
-Core invariant: **the book file is never mutated.** All highlights/notes/bookmarks/session state are
-written to separate SQLite "overlay" tables / columns keyed by `bookId`.
+Core invariant: **the book file is never mutated** — except a referenced PDF whose user explicitly enabled
+two-way annotation sync for that book (then only as appended incremental updates). All highlights/notes/bookmarks/
+session state live in separate SQLite "overlay" tables / columns keyed by `bookId`.
 
 **Reference-based library:** a book picked from the user's filesystem is *not* copied — `books.file_path` is the
 user's own absolute path (`referenced`). Only URL/cloud downloads (no lasting file on disk) and books imported

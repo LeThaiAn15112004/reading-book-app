@@ -473,47 +473,103 @@ export interface DeleteHighlightInput {
   id: string
 }
 
-/**
- * One annotation embedded in the open PDF file, as the renderer scanned it (sdk
- * `ScannedPdfAnnotation`: normalized display-space rects, color, comment, author, underlying text).
- * Re-validated item by item in Main.
- */
-export interface ScannedPdfAnnotationDto {
-  objectId: string
-  subtype: 'Highlight' | 'Underline' | 'Squiggly' | 'StrikeOut' | 'Text'
-  pageIndex: number
-  rects: { pageIndex?: number; x: number; y: number; width: number; height: number }[]
-  colorHex?: string
-  contents?: string
-  author?: string
-  text?: string
-}
+/** Why an annotated-PDF export did not produce a file. */
+export type ExportAnnotatedPdfErrorCode =
+  | 'cancelled'
+  | 'not_found'
+  | 'encrypted'
+  | 'signed_needs_confirmation'
+  | 'unsupported_pdf'
+  | 'verify_failed'
+  | 'same_as_source'
+  | 'source_changed'
+  | 'no_space'
+  | 'permission_denied'
+  | 'busy'
+  | 'write_failed'
 
-/** Input for overlay:syncPdfEmbeddedAnnotations — every annotation of one scan, in document order. */
-export interface SyncPdfEmbeddedAnnotationsInput {
-  bookId: string
-  annotations: ScannedPdfAnnotationDto[]
-}
-
-/**
- * Outcome of one embedded-annotation sync. `ok` is false when the book is not a PDF in the library
- * or the write failed (nothing was written then).
- */
-export interface SyncPdfEmbeddedAnnotationsResult {
+/** Outcome of overlay:exportAnnotatedPdf. No paths: `fileName` is the chosen file's base name only. */
+export interface ExportAnnotatedPdfResult {
   ok: boolean
+  fileName?: string
+  /** Annotations added / rewritten / removed / kept as they were in the source. */
+  summary?: { added: number; replaced: number; removed: number; kept: number }
+  errorCode?: ExportAnnotatedPdfErrorCode
+  message?: string
+  /** For `signed_needs_confirmation`: the source's signature verdict and signer. */
+  signatureStatus?: string
+  signerName?: string
+}
+
+/** A two-way conflict on one annotation (pdf_annotation_two_way_sync.md §5). */
+export interface PdfAnnotationConflictDto {
+  noteId: string
+  kind: 'both-changed' | 'removed-in-file'
+  /** The fields both sides changed differently (`both-changed`). */
+  fields?: ('kind' | 'color' | 'text' | 'geometry')[]
+}
+
+/** Why writing annotations into a book's PDF file is not possible. */
+export type PdfWriteBackUnavailable = 'not_found' | 'managed_copy' | 'encrypted' | 'unsupported_pdf'
+
+/** overlay:getPdfWriteBack */
+export interface PdfWriteBackStateDto {
+  enabled: boolean
+  available: boolean
+  reason?: PdfWriteBackUnavailable
+  /** The file carries a digital signature (enabling needs a confirmation). */
+  signed?: boolean
+  signerName?: string
+}
+
+/** overlay:setPdfWriteBack */
+export interface SetPdfWriteBackResult {
+  ok: boolean
+  enabled: boolean
+  errorCode?: PdfWriteBackUnavailable | 'signed_needs_confirmation'
+  signerName?: string
+}
+
+/** overlay:resolvePdfAnnotationConflict */
+export interface ResolvePdfAnnotationConflictResult {
+  ok: boolean
+  updated?: HighlightDto
+  deletedId?: string
+}
+
+/** Outcome of overlay:watchPdfEmbeddedAnnotations (the sync itself is reported by the push event). */
+export interface WatchPdfEmbeddedAnnotationsResult {
+  ok: boolean
+  /** `not_found`: unknown book, not a PDF, or its file can't be read right now. */
+  errorCode?: 'not_found' | 'unavailable'
+}
+
+/**
+ * Pushed (overlay:pdfEmbeddedAnnotationsChanged) after a sync of the watched PDF's embedded
+ * annotations: on open, and after every settled change of the file that changed rows.
+ */
+export interface PdfEmbeddedAnnotationsChangedDto {
+  bookId: string
+  reason: 'open' | 'file-change' | 'app-change'
   /** Rows created for annotations seen for the first time. */
   inserted: HighlightDto[]
-  /** Imported rows rewritten because the file's version changed (and the app's didn't). */
+  /** Imported rows rewritten (color, comment, position, size… changed in the file). */
   updated: HighlightDto[]
-  unchanged: number
-  /** Changed in the file, but edited by the user in the app — the app's version was kept. */
-  keptAppEdits: number
-  /** Imported before and deleted in the app since — not imported again. */
-  dismissed: number
-  /** Items dropped by validation (malformed, or past the per-sync cap). */
-  invalid: number
-  /** `objectId`s of the scanned annotations the app now paints (or deleted) itself. */
-  managedObjectIds: string[]
+  /** Imported rows deleted because their annotation left the file (complete scans only). */
+  deletedIds: string[]
+  /**
+   * PDF.js ids whose own appearance the reader should stop drawing — only for the open sync and
+   * only when the scanned file is byte-identical to the one displayed; empty otherwise.
+   */
+  hiddenObjectIds: string[]
+  /** The scan read every page (a precondition for deletions). */
+  complete: boolean
+  /** Two-way sync: conflicts detected by this cycle (both sides changed the same field differently). */
+  conflicts: PdfAnnotationConflictDto[]
+  /** Two-way sync: the file write this cycle needed — `locked` = another app holds the file (retried). */
+  writeStatus?: 'written' | 'locked' | 'failed'
+  /** Diagnostics: ms from the first file event (null for the open sync) and of the scan. */
+  timing: { totalMs: number; scanMs: number }
 }
 
 /** Outcome of asking Main to chunk a book's text for search (returns before the work finishes). */
@@ -701,8 +757,25 @@ export interface DesktopApi {
     /** Resolves to null when the input is rejected (bad book id or unparsable locator). */
     saveHighlight(input: SaveHighlightInput): Promise<HighlightDto | null>
     deleteHighlight(input: DeleteHighlightInput): Promise<OkResult>
-    /** Import / refresh the annotations embedded in the open PDF (read-only on the file). */
-    syncPdfEmbeddedAnnotations(input: SyncPdfEmbeddedAnnotationsInput): Promise<SyncPdfEmbeddedAnnotationsResult>
+    /**
+     * Sync the embedded annotations of the open PDF now and whenever its file settles after a change
+     * in another app (read-only on the file). One watched book per window; watching another replaces it.
+     */
+    watchPdfEmbeddedAnnotations(bookId: string): Promise<WatchPdfEmbeddedAnnotationsResult>
+    unwatchPdfEmbeddedAnnotations(bookId: string): Promise<OkResult>
+    /** Subscribe to embedded-annotation sync results. Returns unsubscribe. */
+    onPdfEmbeddedAnnotationsChanged(handler: (event: PdfEmbeddedAnnotationsChangedDto) => void): () => void
+    /**
+     * Save a NEW PDF (native save dialog) holding the book's annotations as standard PDF annotations.
+     * The book's own file is never written. A signed source needs `acknowledgeSignature`.
+     */
+    exportAnnotatedPdf(bookId: string, options?: { acknowledgeSignature?: boolean }): Promise<ExportAnnotatedPdfResult>
+    /** Two-way sync: whether Readmate writes its annotations into this book's own PDF file. */
+    getPdfWriteBack(bookId: string): Promise<PdfWriteBackStateDto>
+    /** Enable (signed file: needs `acknowledgeSignature`) or disable writing into the book's PDF file. */
+    setPdfWriteBack(bookId: string, enabled: boolean, options?: { acknowledgeSignature?: boolean }): Promise<SetPdfWriteBackResult>
+    listPdfAnnotationConflicts(bookId: string): Promise<PdfAnnotationConflictDto[]>
+    resolvePdfAnnotationConflict(bookId: string, noteId: string, choice: 'keep-readmate' | 'use-pdf'): Promise<ResolvePdfAnnotationConflictResult>
   }
   bookIndex: {
     /** Fire-and-forget from the reader after the book is shown; never blocks on chunking. */

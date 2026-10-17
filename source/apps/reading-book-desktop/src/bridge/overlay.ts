@@ -19,7 +19,17 @@ export const overlayApi = {
   deleteHighlight: (
     ...args: Parameters<typeof window.api.overlay.deleteHighlight>
   ) => window.api.overlay.deleteHighlight(...args),
-  syncPdfEmbeddedAnnotations: (
-    ...args: Parameters<typeof window.api.overlay.syncPdfEmbeddedAnnotations>
-  ) => window.api.overlay.syncPdfEmbeddedAnnotations(...args),
+  watchPdfEmbeddedAnnotations: (bookId: string) => window.api.overlay.watchPdfEmbeddedAnnotations(bookId),
+  unwatchPdfEmbeddedAnnotations: (bookId: string) => window.api.overlay.unwatchPdfEmbeddedAnnotations(bookId),
+  onPdfEmbeddedAnnotationsChanged: (
+    ...args: Parameters<typeof window.api.overlay.onPdfEmbeddedAnnotationsChanged>
+  ) => window.api.overlay.onPdfEmbeddedAnnotationsChanged(...args),
+  exportAnnotatedPdf: (...args: Parameters<typeof window.api.overlay.exportAnnotatedPdf>) =>
+    window.api.overlay.exportAnnotatedPdf(...args),
+  getPdfWriteBack: (bookId: string) => window.api.overlay.getPdfWriteBack(bookId),
+  setPdfWriteBack: (...args: Parameters<typeof window.api.overlay.setPdfWriteBack>) =>
+    window.api.overlay.setPdfWriteBack(...args),
+  listPdfAnnotationConflicts: (bookId: string) => window.api.overlay.listPdfAnnotationConflicts(bookId),
+  resolvePdfAnnotationConflict: (...args: Parameters<typeof window.api.overlay.resolvePdfAnnotationConflict>) =>
+    window.api.overlay.resolvePdfAnnotationConflict(...args),
 }

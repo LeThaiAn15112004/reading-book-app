@@ -31,7 +31,8 @@ type PdfjsModule = typeof import('pdfjs-dist/legacy/build/pdf.mjs')
 
 let pdfjsPromise: Promise<PdfjsModule> | null = null
 
-function loadPdfjs(): Promise<PdfjsModule> {
+/** The Node (`legacy`) pdf.js build with its worker in-thread — shared with the annotation scan worker. */
+export function loadPdfjs(): Promise<PdfjsModule> {
   pdfjsPromise ??= (async () => {
     const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs')
     const holder = globalThis as { pdfjsWorker?: unknown }

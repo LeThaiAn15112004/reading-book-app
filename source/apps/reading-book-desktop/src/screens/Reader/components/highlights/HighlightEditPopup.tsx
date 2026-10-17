@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState } from 'react'
+import { type ReactNode, useLayoutEffect, useRef, useState } from 'react'
 import { HIGHLIGHT_TAG_PRESETS, type ReaderHighlightBase } from '@reading-book/book-reader-sdk'
 import type { ViewportRectLike } from '../../../../reader/renderers/epub'
 import {
@@ -18,6 +18,8 @@ type HighlightEditPopupProps = {
   onCopy: () => void
   onDelete: () => void
   onClose: () => void
+  /** Two-way sync conflict banner (PDF), shown first. */
+  conflict?: ReactNode
 }
 
 const FALLBACK_SIZE = { width: 260, height: 220 }
@@ -33,6 +35,7 @@ export function HighlightEditPopup({
   onCopy,
   onDelete,
   onClose,
+  conflict,
 }: HighlightEditPopupProps) {
   const containerRef = useRef<HTMLDivElement | null>(null)
   const [size, setSize] = useState(FALLBACK_SIZE)
@@ -80,6 +83,7 @@ export function HighlightEditPopup({
       role="dialog"
       aria-label="Edit highlight"
     >
+      {conflict}
       <div className="flex items-start gap-1.5">
         <HighlightColorPicker
           value={highlight.colorHex}
