@@ -16,6 +16,8 @@ export const appApi = {
   /** Snapshot tool: crop `region` (viewport CSS px) and copy it to the clipboard. */
   captureSnapshot: (region: Parameters<typeof window.api.captureSnapshot>[0]) =>
     window.api.captureSnapshot(region),
+  /** Open an http(s) / mailto link from a document in the OS default handler (validated in Main). */
+  openExternalLink: (url: string) => window.api.openExternalLink(url),
 }
 
 export type SnapshotRegion = Parameters<typeof window.api.captureSnapshot>[0]

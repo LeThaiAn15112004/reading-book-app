@@ -539,6 +539,8 @@ export function ReaderScreen() {
     hand: { active: activeTool === 'hand' },
     // Translate rides on Select (text must be selectable), so Select isn't shown pressed meanwhile.
     select: { active: activeTool === 'select' && !translation.mode },
+    // TXT: the text box is editable whenever no markup tool is armed.
+    edit: { active: !isMarkupTool(activeTool) },
     search: { active: chrome.searchOpen },
     speech: { active: readAloud.active, expanded: readAloud.menuOpen },
     translate: { active: translation.mode },
@@ -557,6 +559,9 @@ export function ReaderScreen() {
       case 'hand':
       case 'select':
         selectTool(tool)
+        return
+      case 'edit':
+        selectTool('select')
         return
       case 'search':
         chrome.toggleSearch()

@@ -1,0 +1,177 @@
+/*
+ * Markdown reading surface (docs/implementation_plan/markdown_reader.md). Reuses the reader's
+ * typography variables (font, size, weight, line height, alignment) and the app theme tokens, so
+ * Aa settings and the theme apply exactly as they do on the TXT surface.
+ */
+
+.md-content {
+  font-family: var(--reader-font-reading);
+  font-size: var(--reader-reading-size);
+  font-weight: var(--reader-reading-weight);
+  line-height: var(--reader-reading-line-height);
+  text-align: var(--reader-reading-align);
+  color: var(--reader-text, #cbd5e1);
+  overflow-wrap: break-word;
+  word-break: normal;
+}
+
+.md-content > :first-child {
+  margin-top: 0;
+}
+
+.md-content p,
+.md-content ul,
+.md-content ol,
+.md-content blockquote,
+.md-content pre,
+.md-content .md-table-wrap {
+  margin: 0 0 1em;
+}
+
+.md-content h1,
+.md-content h2,
+.md-content h3,
+.md-content h4,
+.md-content h5,
+.md-content h6 {
+  margin: 1.6em 0 0.6em;
+  line-height: 1.25;
+  font-weight: 700;
+  color: var(--lib-text-strong, inherit);
+  text-align: left;
+}
+
+.md-content h1 { font-size: 2em; padding-bottom: 0.25em; border-bottom: 1px solid var(--lib-border, rgb(51 65 85 / 0.45)); }
+.md-content h2 { font-size: 1.55em; padding-bottom: 0.2em; border-bottom: 1px solid var(--lib-border-soft, rgb(51 65 85 / 0.28)); }
+.md-content h3 { font-size: 1.3em; }
+.md-content h4 { font-size: 1.12em; }
+.md-content h5 { font-size: 1em; }
+.md-content h6 { font-size: 0.92em; color: var(--lib-muted, #94a3b8); }
+
+.md-content ul,
+.md-content ol {
+  padding-left: 1.6em;
+}
+
+.md-content ul { list-style: disc; }
+.md-content ol { list-style: decimal; }
+.md-content li > ul,
+.md-content li > ol { margin: 0.25em 0; }
+.md-content li + li { margin-top: 0.2em; }
+.md-content li:has(> input[type='checkbox']) { list-style: none; margin-left: -1.3em; }
+.md-content input[type='checkbox'] { margin-right: 0.5em; }
+
+.md-content blockquote {
+  padding: 0.1em 1em;
+  border-left: 3px solid var(--lib-accent, #f59e0b);
+  color: var(--lib-muted, #94a3b8);
+}
+
+.md-content hr {
+  margin: 2em 0;
+  border: 0;
+  border-top: 1px solid var(--lib-border, rgb(51 65 85 / 0.45));
+}
+
+.md-content code {
+  padding: 0.12em 0.35em;
+  border-radius: 4px;
+  background: var(--lib-chip, rgb(51 65 85 / 0.35));
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace;
+  font-size: 0.88em;
+}
+
+/* Wide code scrolls inside its own box instead of widening the page. */
+.md-content pre {
+  overflow-x: auto;
+  padding: 0.9em 1.1em;
+  border-radius: 8px;
+  background: var(--lib-surface-strong, rgb(15 23 42 / 0.85));
+  border: 1px solid var(--lib-border-soft, rgb(51 65 85 / 0.28));
+  line-height: 1.5;
+  text-align: left;
+}
+
+.md-content pre code {
+  padding: 0;
+  background: transparent;
+  font-size: 0.88em;
+  white-space: pre;
+}
+
+.md-content img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin: 1em auto;
+  border-radius: 4px;
+}
+
+.md-content strong { font-weight: 700; }
+.md-content del { opacity: 0.7; }
+
+.md-table-wrap {
+  overflow-x: auto;
+}
+
+.md-content table {
+  border-collapse: collapse;
+  min-width: 50%;
+  font-size: 0.95em;
+}
+
+.md-content th,
+.md-content td {
+  padding: 0.45em 0.8em;
+  border: 1px solid var(--lib-border, rgb(51 65 85 / 0.45));
+  text-align: left;
+  vertical-align: top;
+}
+
+.md-content th {
+  background: var(--lib-surface, rgb(30 41 59 / 0.45));
+  font-weight: 700;
+}
+
+.md-link {
+  color: var(--lib-accent, #f59e0b);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+.md-link:hover { color: var(--lib-accent-hover, #d97706); }
+.md-link:focus-visible { outline: 2px solid var(--lib-accent-ring, rgb(245 158 11 / 0.28)); outline-offset: 2px; border-radius: 2px; }
+
+.md-link-blocked { text-decoration: underline dotted; text-underline-offset: 2px; cursor: not-allowed; }
+
+.md-image-blocked {
+  display: inline-block;
+  padding: 0.1em 0.5em;
+  border: 1px dashed var(--lib-border, rgb(51 65 85 / 0.45));
+  border-radius: 4px;
+  color: var(--lib-muted, #94a3b8);
+  font-size: 0.9em;
+}
+
+.md-notice {
+  margin: 0 0 1.2em;
+  padding: 0.6em 0.9em;
+  border-radius: 6px;
+  background: var(--lib-accent-soft, rgb(245 158 11 / 0.14));
+  color: var(--lib-text-strong, inherit);
+  font-size: 0.9rem;
+}
+
+.md-empty {
+  margin-top: 4em;
+  text-align: center;
+  color: var(--lib-muted, #94a3b8);
+}
+
+.md-plain {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.9em;
+}

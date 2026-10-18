@@ -6,6 +6,7 @@ import {
   registerCoverProtocol,
   registerCoverSchemePrivileged,
 } from './files/cover-protocol'
+import { MD_ASSET_SCHEME, registerMdAssetProtocol } from './md/md-asset-protocol'
 import {
   disposeTray,
   hasTray,
@@ -49,7 +50,7 @@ const APP_USER_MODEL_ID = 'YourAppID'
 const FLUSH_BEFORE_CLOSE_TIMEOUT_MS = 2000
 
 // Custom schemes must be registered before app is ready.
-registerCoverSchemePrivileged()
+registerCoverSchemePrivileged([MD_ASSET_SCHEME])
 
 // Claim the readmate-reader:// scheme so the OS routes Cloud Sources OAuth callbacks back to this
 // app (see electron-builder.json5 `protocols` for the packaged-build registration, and
@@ -444,6 +445,7 @@ app.whenReady().then(async () => {
     console.error('Library metadata backfill failed:', err)
   }
   registerCoverProtocol()
+  registerMdAssetProtocol()
   registerAllIpcHandlers()
   // Tray + Run in Background prefs (Main-owned) before the window, so its close button knows them.
   initBackgroundMode({ showWindow: showMainWindow, publicDir: process.env.VITE_PUBLIC })

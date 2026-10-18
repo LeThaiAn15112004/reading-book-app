@@ -64,6 +64,7 @@ export * from './persistence/index.js'
 export * from './search/index.js'
 export * from './text/index.js'
 export * from './txt/index.js'
+export * from './md/index.js'
 export * from './pagination/index.js'
 export * from './viewport/index.js'
 

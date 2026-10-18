@@ -69,7 +69,7 @@ check('shortcut ids exist in the shortcut registry', () => {
 })
 check('every tool is shown by at least one surface', () => {
   for (const t of TOOL_REGISTRY) {
-    assert.ok([epub, placeholder].some((set) => t.requires.every((c) => set.has(c))), t.id)
+    assert.ok([epub, txt, placeholder].some((set) => t.requires.every((c) => set.has(c))), t.id)
   }
 })
 
@@ -83,7 +83,7 @@ check('epub, pdf and txt map to their own surfaces, everything else to the place
   }
 })
 check('TXT = text markup + snapshot + word count + Aa; no Hand / Select, search painting, audio, translate or pages', () => {
-  assert.deepEqual([...txt].sort(), ['markupAnnotations', 'readingSettings', 'snapshot', 'wordCount'])
+  assert.deepEqual([...txt].sort(), ['markupAnnotations', 'readingSettings', 'snapshot', 'textEdit', 'wordCount'])
   assert.ok(!txt.has('interaction') && !txt.has('search') && !txt.has('pageLayout'))
 })
 check('placeholder is a strict subset of EPUB, apart from Page layout', () => {
@@ -114,8 +114,9 @@ check('no empty View group for EPUB', () => {
 })
 
 console.log('3b. TXT layout')
-check('TXT toolbar: the inline Annotation icons, Tools, Settings — no Navigate group', () => {
+check('TXT toolbar: Edit, the inline Annotation icons, Tools, Settings — no Hand/Select', () => {
   assert.deepEqual(shape(resolveToolbarLayout(txt, 0)), [
+    'navigate:inline[edit]',
     'annotation:inline[highlight,underline,squiggly,strikethrough,replace,insert]',
     'tools:menu[snapshot,wordCount]',
     'settings:inline[settings]',

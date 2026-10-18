@@ -52,6 +52,7 @@ const api: DesktopApi = {
     }
   },
   captureSnapshot: (region) => ipcRenderer.invoke(AppChannels.captureSnapshot, region),
+  openExternalLink: (url) => ipcRenderer.invoke(AppChannels.openExternalLink, url),
   library: {
     listBooks: () => ipcRenderer.invoke(LibraryChannels.listBooks),
     getBook: (id) => ipcRenderer.invoke(LibraryChannels.getBook, id),

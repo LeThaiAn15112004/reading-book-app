@@ -20,6 +20,8 @@ export const AppChannels = {
   flushSessionDone: 'app:flushSessionDone',
   /** Snapshot tool: crop a screen region from the reader window and copy it to the clipboard. */
   captureSnapshot: 'app:captureSnapshot',
+  /** Open a document link (http/https/mailto only) in the OS default handler. */
+  openExternalLink: 'app:openExternalLink',
 } as const
 
 export const LibraryChannels = {

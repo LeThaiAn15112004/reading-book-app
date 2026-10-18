@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto'
 import fsp from 'node:fs/promises'
+import { checkMdFileSize, describeMdTooLarge } from '@reading-book/book-reader-sdk'
 import { getLibraryStore } from '../persistence/sqlite-library-store'
 import type {
   DocumentFormatDto,
@@ -71,8 +72,23 @@ export async function openBookContent(bookId: string): Promise<OpenBookContentRe
     return { ok: true, bookId: id, format: 'txt', data: new ArrayBuffer(0), byteLength: 0 }
   }
 
+  // Markdown is rendered whole in the renderer: refuse a file above the limit BEFORE reading it,
+  // so an oversized file is never loaded into memory or sent over IPC.
+  if (book.format === 'md') {
+    try {
+      const { size } = await fsp.stat(file.path)
+      if (!checkMdFileSize(size).ok) return fail(id, 'too_large', describeMdTooLarge())
+    } catch {
+      return fail(id, 'read_failed', 'Could not read the book file.')
+    }
+  }
+
   try {
     const buf = await fsp.readFile(file.path)
+    // The file may have grown between stat and read.
+    if (book.format === 'md' && !checkMdFileSize(buf.byteLength).ok) {
+      return fail(id, 'too_large', describeMdTooLarge())
+    }
     servedSha256.set(id, createHash('sha256').update(buf).digest('hex'))
     const data = bufferToArrayBuffer(buf)
     return {

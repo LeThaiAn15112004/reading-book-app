@@ -89,6 +89,12 @@ function ToolIcon({ tool }: { tool: ToolIconId }) {
           />
         </svg>
       )
+    case 'edit':
+      return (
+        <svg className={cls} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor" aria-hidden>
+          <path strokeLinecap="round" strokeLinejoin="round" d="m16.9 4.6 2.5 2.5M4 20l.9-3.6L16 5.3a1.8 1.8 0 0 1 2.5 0l.2.2a1.8 1.8 0 0 1 0 2.5L7.6 19.1 4 20Z" />
+        </svg>
+      )
     case 'select':
       return (
         <svg className={cls} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor" aria-hidden>

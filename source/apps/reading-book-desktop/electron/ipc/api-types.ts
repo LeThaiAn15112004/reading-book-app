@@ -270,6 +270,8 @@ export type OpenBookErrorCode =
   | 'missing_file'
   | 'path_denied'
   | 'read_failed'
+  /** Markdown file above `MD_MAX_FILE_BYTES`. */
+  | 'too_large'
 
 /**
  * Book file bytes for the renderer. Never includes a filesystem path —
@@ -700,6 +702,9 @@ export interface DesktopApi {
    *  to the OS clipboard as an image — the Snapshot tool. Works uniformly across formats since it
    *  captures composited pixels, not the underlying DOM/canvas. */
   captureSnapshot(region: SnapshotRegionDto): Promise<OkResult>
+  /** Opens an http(s) / mailto link from a document in the OS default handler. Main re-validates
+   *  the URL; anything else is refused (`ok: false`). */
+  openExternalLink(url: string): Promise<OkResult>
   library: {
     listBooks(): Promise<BookSummaryDto[]>
     getBook(id: string): Promise<BookSummaryDto | null>

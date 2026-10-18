@@ -8,7 +8,7 @@ import type { ShortcutId } from '../../../../shortcuts/shortcutDefinitions'
  */
 
 /** Toolbar mode buttons. */
-export type ModeTool = 'hand' | 'select'
+export type ModeTool = 'hand' | 'select' | 'edit'
 
 /** Companion actions next to the modes. */
 export type CompanionTool = 'search' | 'speech' | 'translate'
@@ -69,6 +69,7 @@ export const FOLD_ORDER: readonly ToolGroupId[] = ['tools', 'view', 'annotation'
 /** Order within a group is toolbar / menu order. */
 export const TOOL_REGISTRY: readonly ToolDef[] = [
   { id: 'hand', label: 'Hand', group: 'navigate', description: 'Hand — pan and turn pages', requires: ['interaction'] },
+  { id: 'edit', label: 'Edit', group: 'navigate', description: 'Edit text — type in the document', requires: ['textEdit'] },
   { id: 'select', label: 'Select', group: 'navigate', description: 'Select text', requires: ['interaction'] },
   { id: 'search', label: 'Search', group: 'navigate', description: 'Search in book', requires: ['search'], shortcutId: 'general.searchBook' },
   { id: 'speech', label: 'Audio', group: 'navigate', description: 'Read aloud', requires: ['readAloud'], popup: 'menu' },

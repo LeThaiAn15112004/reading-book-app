@@ -1,4 +1,5 @@
-import { app, BrowserWindow, clipboard, ipcMain } from 'electron'
+import { app, BrowserWindow, clipboard, ipcMain, shell } from 'electron'
+import { isSafeExternalUrl } from '@reading-book/book-reader-sdk'
 import type {
   AppInfo,
   GoogleOAuthClientConfigDto,
@@ -96,6 +97,18 @@ export function registerAppIpc(): void {
       return { ok: true, fullscreen }
     },
   )
+
+  ipcMain.removeHandler(AppChannels.openExternalLink)
+  ipcMain.handle(AppChannels.openExternalLink, async (_event, url: unknown): Promise<OkResult> => {
+    // Renderer input is untrusted: only http(s) / mailto, bounded, no whitespace or control chars.
+    if (!isSafeExternalUrl(url)) return { ok: false }
+    try {
+      await shell.openExternal(url)
+      return { ok: true }
+    } catch {
+      return { ok: false }
+    }
+  })
 
   ipcMain.removeHandler(AppChannels.captureSnapshot)
   ipcMain.handle(

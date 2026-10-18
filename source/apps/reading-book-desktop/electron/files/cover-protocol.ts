@@ -18,8 +18,10 @@ const MIME_BY_EXT: Record<string, string> = {
 }
 
 /** Must run before `app.whenReady()`. */
-export function registerCoverSchemePrivileged(): void {
+export function registerCoverSchemePrivileged(extraSchemes: Electron.CustomScheme[] = []): void {
+  // One call for every custom scheme (the Markdown image scheme is passed in by main.ts).
   protocol.registerSchemesAsPrivileged([
+    ...extraSchemes,
     {
       scheme: COVER_PROTOCOL,
       privileges: {

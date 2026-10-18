@@ -7,6 +7,8 @@
 export type ReaderCapability =
   /** Hand / Select interaction tools on the reading surface. */
   | 'interaction'
+  /** The text box itself is live: click = caret, typing edits (TXT). */
+  | 'textEdit'
   /** Full-text search that can jump to and paint hits in the rendered book. */
   | 'search'
   /** Read aloud (TTS) following the rendered text. */
@@ -50,11 +52,11 @@ const SURFACE_CAPABILITIES: Record<ReaderSurface, readonly ReaderCapability[]> =
   // Aa option is EPUB reflow (font, size, margins…) and does nothing to a fixed-layout page; zoom
   // lives in the footer.
   pdf: ['interaction', 'search', 'markupAnnotations', 'snapshot', 'wordCount', 'pageLayout'],
-  // TXT: one continuous, editable text. No Hand / Select tools (the text box is always live: click =
-  // caret, drag = selection), no page layout (there are no pages), no search painting / read aloud /
+  // TXT: one continuous, editable text. No Hand / Select tools (the text box is live: click = caret,
+  // drag = selection); the Edit tool is the way back from a markup tool, no page layout (there are no pages), no search painting / read aloud /
   // translate (out of scope). Markup is stored as offsets into the text
   // (docs/implementation_plan/txt_reader.md).
-  txt: ['markupAnnotations', 'snapshot', 'wordCount', 'readingSettings'],
+  txt: ['textEdit', 'markupAnnotations', 'snapshot', 'wordCount', 'readingSettings'],
   placeholder: ['interaction', 'snapshot', 'wordCount', 'readingSettings', 'pageLayout'],
 }
 
