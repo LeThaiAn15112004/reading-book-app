@@ -115,11 +115,8 @@ async function epubFirstText(data: ArrayBuffer): Promise<string> {
     const doc = new DOMParser().parseFromString(html, 'text/html')
     doc.querySelectorAll('script,style').forEach((n) => n.remove())
     const text = (doc.body?.innerText ?? doc.body?.textContent ?? '')
-      .replace(/[ 	]+/g, ' ')
-      .replace(/
-\s*
-+/g, '
-')
+      .replace(/[ \t]+/g, ' ')
+      .replace(/\n\s*\n+/g, '\n')
       .trim()
     if (text.length > 40) return text
   }
