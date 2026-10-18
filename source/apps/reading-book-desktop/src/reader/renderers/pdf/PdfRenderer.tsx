@@ -199,6 +199,20 @@ type PointerGesture = {
   moved: boolean
   /** Hand press that pans (pointer captured, grabbing cursor) — not a text selection. */
   pan: boolean
+  /** The selection's range when the press began (null: none) — to tell a new selection from a stale one. */
+  selectionAtDown: Range | null
+}
+
+/** True when the live selection is a different range than `before` (the press changed it). */
+function selectionChangedSince(before: Range | null): boolean {
+  const selection = window.getSelection()
+  if (!selection || selection.rangeCount === 0) return false
+  if (!before) return true
+  const now = selection.getRangeAt(0)
+  return (
+    now.compareBoundaryPoints(Range.START_TO_START, before) !== 0 ||
+    now.compareBoundaryPoints(Range.END_TO_END, before) !== 0
+  )
 }
 
 /** Surface flags set imperatively (not through React) so CSS applies before the next event. */
@@ -1002,6 +1016,7 @@ export function PdfRenderer({
       lastY: event.clientY,
       moved: false,
       pan,
+      selectionAtDown: hasTextSelection() ? (window.getSelection()?.getRangeAt(0).cloneRange() ?? null) : null,
     }
   }
 
@@ -1049,7 +1064,10 @@ export function PdfRenderer({
     if (event.button !== 0) return
     // Markup tool armed: a press that leaves text selected (drag, double / triple click) marks it.
     const tool = markupToolRef.current
-    if (tool && !gesture.pan && rootRef.current) {
+    // Only a selection THIS press made: a press that landed on non-selectable space (a gap, the
+    // `.endOfContent` filler) leaves an older selection untouched, and committing that one would
+    // mark text the user never dragged.
+    if (tool && !gesture.pan && rootRef.current && selectionChangedSince(gesture.selectionAtDown)) {
       const selection = readPdfSelection(rootRef.current)
       if (selection) {
         onMarkupSelectionRef.current?.(selection, tool)
