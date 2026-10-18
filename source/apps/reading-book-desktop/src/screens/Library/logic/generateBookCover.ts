@@ -3,8 +3,8 @@ import { libraryApi, txtApi } from '../../../bridge'
 const COVER_W = 400
 const COVER_H = 560
 
-/** Formats whose first page can be rendered here; EPUB covers are extracted by Main at import. */
-const RENDERABLE = new Set(['pdf', 'docx', 'txt', 'md'])
+/** Formats whose first page can be rendered here (an EPUB only when Main found no cover image). */
+const RENDERABLE = new Set(['pdf', 'docx', 'txt', 'md', 'epub'])
 
 /** Books already tried this session (success or not) — a failing file is never retried in a loop. */
 const attempted = new Set<string>()
@@ -91,6 +91,41 @@ function renderTextPage(text: string): HTMLCanvasElement {
   return canvas
 }
 
+/** Text of the first spine document that has any (EPUB without a cover image). */
+async function epubFirstText(data: ArrayBuffer): Promise<string> {
+  const { default: JSZip } = await import('jszip')
+  const zip = await JSZip.loadAsync(data)
+  const parse = (xml: string) => new DOMParser().parseFromString(xml, 'application/xml')
+  const container = await zip.file('META-INF/container.xml')?.async('string')
+  const opfPath = container
+    ? parse(container).querySelector('rootfile')?.getAttribute('full-path')
+    : null
+  if (!opfPath) return ''
+  const opf = parse((await zip.file(opfPath)?.async('string')) ?? '')
+  const dir = opfPath.includes('/') ? opfPath.slice(0, opfPath.lastIndexOf('/') + 1) : ''
+  const hrefById = new Map<string, string>()
+  for (const item of Array.from(opf.querySelectorAll('manifest > item'))) {
+    hrefById.set(item.getAttribute('id') ?? '', item.getAttribute('href') ?? '')
+  }
+  for (const ref of Array.from(opf.querySelectorAll('spine > itemref'))) {
+    const href = hrefById.get(ref.getAttribute('idref') ?? '')
+    if (!href) continue
+    const html = await zip.file(decodeURIComponent(dir + href))?.async('string')
+    if (!html) continue
+    const doc = new DOMParser().parseFromString(html, 'text/html')
+    doc.querySelectorAll('script,style').forEach((n) => n.remove())
+    const text = (doc.body?.innerText ?? doc.body?.textContent ?? '')
+      .replace(/[ 	]+/g, ' ')
+      .replace(/
+\s*
++/g, '
+')
+      .trim()
+    if (text.length > 40) return text
+  }
+  return ''
+}
+
 async function renderCover(bookId: string, format: string): Promise<HTMLCanvasElement | null> {
   if (format === 'txt') {
     const opened = await txtApi.open(bookId)
@@ -101,6 +136,10 @@ async function renderCover(bookId: string, format: string): Promise<HTMLCanvasEl
   switch (format) {
     case 'pdf':
       return renderPdfFirstPage(content.data)
+    case 'epub': {
+      const text = (await epubFirstText(content.data)).slice(0, 4000)
+      return text ? renderTextPage(text) : null
+    }
     case 'md': {
       const text = new TextDecoder('utf-8').decode(content.data).slice(0, 4000)
       return text.trim() ? renderTextPage(text.replace(/^[#>*\-\s`]+/gm, '')) : null
@@ -115,14 +154,35 @@ async function renderCover(bookId: string, format: string): Promise<HTMLCanvasEl
   }
 }
 
+/** One stuck file must not hold up the covers of every book after it. */
+function withTimeout<T>(work: Promise<T>, ms: number): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(`timed out after ${ms} ms`)), ms)
+    work.then(
+      (v) => {
+        clearTimeout(timer)
+        resolve(v)
+      },
+      (e) => {
+        clearTimeout(timer)
+        reject(e)
+      },
+    )
+  })
+}
+
 /** Render the book's first page and store it as its cover. Resolves true when a cover was saved. */
 export async function generateBookCover(bookId: string, format: string): Promise<boolean> {
   try {
-    const canvas = await renderCover(bookId, format.toLowerCase())
-    if (!canvas) return false
+    const canvas = await withTimeout(renderCover(bookId, format.toLowerCase()), 30_000)
+    if (!canvas) {
+      console.warn('[cover] nothing to render', bookId, format)
+      return false
+    }
     const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/png'))
     if (!blob) return false
     const result = await libraryApi.setGeneratedCover(bookId, await blob.arrayBuffer())
+    if (!result.ok) console.warn('[cover] not saved', bookId, format)
     return result.ok
   } catch (err) {
     console.warn('[cover] generation failed', bookId, err)

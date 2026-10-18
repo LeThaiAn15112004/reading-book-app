@@ -75,11 +75,9 @@ export function useLibraryScreen() {
     )
     if (pending.length === 0) return
     void (async () => {
-      let saved = 0
       for (const book of pending) {
-        if (await generateBookCover(book.id, book.format)) saved += 1
+        if (await generateBookCover(book.id, book.format)) await refreshLibrary()
       }
-      if (saved > 0) await refreshLibrary()
     })()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [books])
