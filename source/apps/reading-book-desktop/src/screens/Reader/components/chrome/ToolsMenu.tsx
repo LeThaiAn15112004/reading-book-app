@@ -58,12 +58,19 @@ function ToolSeparator() {
 function ToolGroup({
   children,
   'aria-label': ariaLabel,
+  twoRows = false,
 }: {
   children: ReactNode
   'aria-label'?: string
+  /** Icon-only tools laid out in two rows instead of one long row. */
+  twoRows?: boolean
 }) {
   return (
-    <div className={toolGroupClass} role="group" aria-label={ariaLabel}>
+    <div
+      className={twoRows ? `${toolGroupClass} grid grid-flow-col grid-rows-2` : toolGroupClass}
+      role="group"
+      aria-label={ariaLabel}
+    >
       {children}
     </div>
   )
@@ -216,7 +223,7 @@ function ToolIcon({ tool }: { tool: ToolIconId }) {
 }
 
 const iconOnlyBtn =
-  'inline-flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-lg border border-transparent text-lib-muted transition-colors hover:border-lib-accent-ring hover:bg-lib-accent-soft hover:text-lib-text-strong'
+  'inline-flex h-6 w-9 shrink-0 cursor-pointer items-center justify-center rounded-lg border border-transparent text-lib-muted transition-colors hover:border-lib-accent-ring hover:bg-lib-accent-soft hover:text-lib-text-strong'
 
 function iconOnlyClass(active: boolean): string {
   return active ? `${iconOnlyBtn} border-lib-accent bg-lib-accent-soft text-lib-accent` : iconOnlyBtn
@@ -332,7 +339,7 @@ export function ToolsStrip({ capabilities, toolStates, onTool, toolRefs, hidden 
       {layout.map((resolved, index) => (
         <div key={resolved.group.id} className="contents">
           {index > 0 ? <ToolSeparator /> : null}
-          <ToolGroup aria-label={resolved.group.label}>
+          <ToolGroup aria-label={resolved.group.label} twoRows={resolved.mode === 'inline' && resolved.group.iconOnly}>
             {resolved.mode === 'menu'
               ? renderMenu(resolved)
               : resolved.tools.map((tool) => renderButton(tool, resolved.group.iconOnly))}
