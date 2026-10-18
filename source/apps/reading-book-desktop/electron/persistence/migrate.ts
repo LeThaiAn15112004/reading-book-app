@@ -23,6 +23,7 @@ import migration021 from './migrations/021_book_chunks_fts.sql?raw'
 import migration022 from './migrations/022_book_signature_status.sql?raw'
 import migration023 from './migrations/023_pdf_embedded_annotations.sql?raw'
 import migration024 from './migrations/024_pdf_annotation_two_way_sync.sql?raw'
+import migration025 from './migrations/025_txt_documents.sql?raw'
 
 interface Migration {
   name: string
@@ -54,6 +55,7 @@ const MIGRATIONS: Migration[] = [
   { name: '022_book_signature_status.sql', sql: migration022 },
   { name: '023_pdf_embedded_annotations.sql', sql: migration023 },
   { name: '024_pdf_annotation_two_way_sync.sql', sql: migration024 },
+  { name: '025_txt_documents.sql', sql: migration025 },
 ]
 
 /**

@@ -13,6 +13,7 @@ import {
   removeManagedBookDir,
 } from '../files/sandbox'
 import { getLibraryStore } from '../persistence/sqlite-library-store'
+import { removeTxtData } from '../txt/txt-runtime'
 import type {
   BookSummaryDto,
   CheckSignatureResult,
@@ -234,8 +235,10 @@ export function registerLibraryIpc(): void {
       const book = await store.findById(id.trim())
       if (!book) return { ok: false }
       await store.deleteCascade(book.id)
-      // The book file is kept (sandbox copy or the user's own); only the app-owned cover goes.
+      // The book file is kept (sandbox copy or the user's own); only app-owned data goes: the cover
+      // and, for TXT, the edited copy.
       await removeCoverFile(book.coverPath)
+      await removeTxtData(book.id)
       return { ok: true }
     },
   )
@@ -254,6 +257,7 @@ export function registerLibraryIpc(): void {
       if (!(await removeManagedBookDir(book.filePath))) return { ok: false }
       await store.deleteCascade(book.id)
       await removeCoverFile(book.coverPath)
+      await removeTxtData(book.id)
       return { ok: true }
     },
   )

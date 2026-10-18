@@ -62,6 +62,16 @@ export interface PdfAnnotation {
   contents?: string;
 }
 
+/**
+ * TXT-only markup anchor: a half-open range `[startOffset, endOffset)` of UTF-16 code units into the
+ * book's canonical text (BOM stripped, `\n` line breaks — `txt/txt-text.ts`). A TXT note's locator is
+ * a `text-offset` at `startOffset`; this holds the whole range.
+ */
+export interface TxtAnnotation {
+  startOffset: number;
+  endOffset: number;
+}
+
 /** Presentation attributes, open-ended so each `NoteType` can add its own keys. */
 export interface NoteStyle {
   colorHex?: string;
@@ -115,6 +125,8 @@ export interface INoteState {
   locatorExtended?: LocatorExtended;
   /** PDF-only markup geometry (page + normalized rects) — absent for text-based notes. */
   pdfAnnotation?: PdfAnnotation;
+  /** TXT-only markup range (offsets into the canonical text) — absent for every other format. */
+  txtAnnotation?: TxtAnnotation;
   textualValue?: string;
   note?: string | null;
   style?: NoteStyle;

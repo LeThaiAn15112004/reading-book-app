@@ -97,6 +97,14 @@ process.env.VITE_PUBLIC = VITE_DEV_SERVER_URL ? path.join(process.env.APP_ROOT, 
 
 let win: BrowserWindow | null
 
+/**
+ * E2E "hidden" mode (`READMATE_E2E=1` + `READMATE_E2E_HIDDEN=1`, set by e2e/fixtures/app.ts unless
+ * `READMATE_E2E_SHOW=1`): the window is rendered off-screen (Electron offscreen rendering) and is never
+ * shown, so an automated run cannot take over the user's desktop or steal focus while they work.
+ * Playwright drives it through CDP exactly as it does a visible window. Never active in a normal launch.
+ */
+const E2E_HIDDEN = process.env.READMATE_E2E === '1' && process.env.READMATE_E2E_HIDDEN === '1'
+
 /** First close intercepted until renderer flush acks (or times out). */
 let sessionFlushDone = false
 let flushingClose = false
@@ -182,6 +190,7 @@ function showMainWindow(): void {
     return
   }
   hiddenInBackground = false
+  if (E2E_HIDDEN) return
   if (win.isMinimized()) win.restore()
   win.show()
   win.focus()
@@ -269,6 +278,8 @@ function createWindow({ showOnReady = true }: { showOnReady?: boolean } = {}) {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
+      // E2E hidden mode only: paint into memory, not onto the desktop (see E2E_HIDDEN).
+      ...(E2E_HIDDEN ? { offscreen: true, backgroundThrottling: false } : {}),
     },
   })
 
@@ -341,6 +352,7 @@ function createWindow({ showOnReady = true }: { showOnReady?: boolean } = {}) {
       hiddenInBackground = true
       return
     }
+    if (E2E_HIDDEN) return
     win?.show()
     // Detached DevTools window on every launch while running against the
     // Vite dev server — F12 / Ctrl+Shift+I (installDevToolsShortcuts below)

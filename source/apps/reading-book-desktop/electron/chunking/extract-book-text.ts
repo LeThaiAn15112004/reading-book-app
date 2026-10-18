@@ -3,6 +3,7 @@ import type { DocumentFormatDto } from '../ipc/api-types'
 import { readEpubSpineDocuments } from '../adapters/epub.adapter'
 import { htmlToParagraphs, type TextParagraph } from '@reading-book/book-reader-sdk'
 import { pdfParagraphs } from './pdf-text'
+import { decodeTxtBytes } from '../txt/txt-codec'
 
 /**
  * Formats whose text we can pull out today. DOCX / DOC need a parser that is not a dependency yet
@@ -55,6 +56,10 @@ export async function* extractBookParagraphs(
       yield* epubParagraphs(filePath)
       return
     case 'txt':
+      // The same decoder the reader opens the book with, so a chunk's `offset` is an offset into
+      // the text on screen (BOM / UTF-16 / legacy encodings included).
+      yield* plainTextParagraphs(decodeTxtBytes(await fsp.readFile(filePath)).text)
+      return
     case 'md':
       yield* plainTextParagraphs(await fsp.readFile(filePath, 'utf8'))
       return

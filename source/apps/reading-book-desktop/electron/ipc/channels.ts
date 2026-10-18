@@ -163,3 +163,10 @@ export const WordCountChannels = {
   /** Renderer → main: total + per-chapter word counts, from the same chunk index as search. */
   getStats: 'wordCount:getStats',
 } as const
+
+export const TxtChannels = {
+  /** Renderer → main: decoded canonical text (edited copy if there is one) + its annotations. */
+  open: 'txt:open',
+  /** Renderer → main: atomically save edited text + annotation changes against a revision. */
+  commit: 'txt:commit',
+} as const

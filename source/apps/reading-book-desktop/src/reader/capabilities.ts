@@ -28,10 +28,10 @@ export type ReaderCapability =
   | 'pageLayout'
 
 /**
- * Which surface renders a format: EPUB (`renderers/epub`), PDF (`renderers/pdf`); every other format
- * shows the placeholder `ReadingCanvas`.
+ * Which surface renders a format: EPUB (`renderers/epub`), PDF (`renderers/pdf`), TXT
+ * (`renderers/txt`); every other format shows the placeholder `ReadingCanvas`.
  */
-export type ReaderSurface = 'epub' | 'pdf' | 'placeholder'
+export type ReaderSurface = 'epub' | 'pdf' | 'txt' | 'placeholder'
 
 const SURFACE_CAPABILITIES: Record<ReaderSurface, readonly ReaderCapability[]> = {
   epub: [
@@ -50,12 +50,18 @@ const SURFACE_CAPABILITIES: Record<ReaderSurface, readonly ReaderCapability[]> =
   // Aa option is EPUB reflow (font, size, margins…) and does nothing to a fixed-layout page; zoom
   // lives in the footer.
   pdf: ['interaction', 'search', 'markupAnnotations', 'snapshot', 'wordCount', 'pageLayout'],
+  // TXT: one continuous, editable text. No Hand / Select tools (the text box is always live: click =
+  // caret, drag = selection), no page layout (there are no pages), no search painting / read aloud /
+  // translate (out of scope). Markup is stored as offsets into the text
+  // (docs/implementation_plan/txt_reader.md).
+  txt: ['markupAnnotations', 'snapshot', 'wordCount', 'readingSettings'],
   placeholder: ['interaction', 'snapshot', 'wordCount', 'readingSettings', 'pageLayout'],
 }
 
 export function readerSurfaceForFormat(format: string | null | undefined): ReaderSurface {
   if (format === 'epub') return 'epub'
   if (format === 'pdf') return 'pdf'
+  if (format === 'txt') return 'txt'
   return 'placeholder'
 }
 

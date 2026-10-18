@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useRef, type MutableRefObject, type RefObject } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { PageRectLocation, type CfiLocation } from '@reading-book/book-reader-sdk'
+import { PageRectLocation, txtReadingLocation, type CfiLocation } from '@reading-book/book-reader-sdk'
 import type { EpubRendererApi } from '../../../../reader/renderers/epub'
 import type { PdfNavState, PdfRendererApi } from '../../../../reader/renderers/pdf'
+import type { TxtRendererApi } from '../../../../reader/renderers/txt'
 import type { ReadingPrefs } from '../../components'
 import {
   useReadingSessionAutosave,
@@ -17,10 +18,17 @@ function pdfSessionMeta(state: PdfNavState) {
   }
 }
 
+/** Footer label + Library progress for a TXT book: share of the text scrolled (0–1). */
+function txtSessionMeta(progress: number) {
+  const percent = Math.round(Math.min(1, Math.max(0, progress)) * 100)
+  return { label: `${percent}%`, percent }
+}
+
 type UseReaderSessionBridgeOptions = {
   bookId: string | undefined
   epubApiRef: RefObject<EpubRendererApi | null>
   pdfApiRef: RefObject<PdfRendererApi | null>
+  txtApiRef: RefObject<TxtRendererApi | null>
   prefsRef: MutableRefObject<ReadingPrefs>
   prefsDirtyRef: MutableRefObject<boolean>
   prefs: ReadingPrefs
@@ -31,6 +39,7 @@ export function useReaderSessionBridge({
   bookId,
   epubApiRef,
   pdfApiRef,
+  txtApiRef,
   prefsRef,
   prefsDirtyRef,
   prefs,
@@ -41,18 +50,21 @@ export function useReaderSessionBridge({
   const getLatestSessionSnapshot = useCallback((): SessionLatestSnapshot | null => {
     const api = epubApiRef.current
     const pdf = api ? null : pdfApiRef.current
+    const txt = api || pdf ? null : txtApiRef.current
     const readingPrefs = prefsRef.current
-    const location = api?.getCurrentLocation() ?? pdf?.getCurrentLocation()
+    const location = api?.getCurrentLocation() ?? pdf?.getCurrentLocation() ?? txt?.getCurrentLocation()
     const nav = api?.getNavState()
     const pdfNav = pdf?.getNavState()
     return {
       location,
       meta: pdfNav
         ? pdfSessionMeta(pdfNav)
-        : {
-            label: nav?.label,
-            percent: Math.round((nav?.progress ?? 0) * 100),
-          },
+        : txt
+          ? txtSessionMeta(txt.getProgress())
+          : {
+              label: nav?.label,
+              percent: Math.round((nav?.progress ?? 0) * 100),
+            },
       theme: prefsDirtyRef.current
         ? {
             fontSize: readingPrefs.fontSize,
@@ -67,7 +79,7 @@ export function useReaderSessionBridge({
           }
         : {},
     }
-  }, [epubApiRef, pdfApiRef, prefsDirtyRef, prefsRef])
+  }, [epubApiRef, pdfApiRef, prefsDirtyRef, prefsRef, txtApiRef])
 
   const { noteLocation, noteSettingsChange, flush: flushSession } =
     useReadingSessionAutosave({
@@ -119,6 +131,19 @@ export function useReaderSessionBridge({
     [getLatestSessionSnapshot, noteLocation],
   )
 
+  /** TXT scrolled to a new top line: the position is a text offset; the autosave debounces. */
+  const handleTxtLocation = useCallback(
+    (offset: number, textLength: number) => {
+      const latest = getLatestSessionSnapshot()
+      noteLocation(
+        txtReadingLocation(offset, textLength),
+        latest?.meta ?? txtSessionMeta(0),
+        latest?.theme ?? {},
+      )
+    },
+    [getLatestSessionSnapshot, noteLocation],
+  )
+
   useEffect(() => {
     lastPdfPageRef.current = null
   }, [bookId])
@@ -140,6 +165,7 @@ export function useReaderSessionBridge({
     flushSession,
     handleEpubLocationChange,
     handlePdfNavState,
+    handleTxtLocation,
     leaveToLibrary,
   }
 }

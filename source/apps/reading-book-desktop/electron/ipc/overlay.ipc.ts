@@ -3,6 +3,7 @@ import {
   isConsistentPdfHighlight,
   planTwoWaySync,
   packPdfAnnotationRef,
+  packTxtAnnotationRef,
   parsePdfAnnotationRef,
   type BookmarkRecord,
   type HighlightRecord,
@@ -122,6 +123,7 @@ function toHighlightDto(highlight: HighlightRecord): HighlightDto {
   if (highlight.note) dto.note = highlight.note
   if (highlight.selectionText) dto.selectionTextRef = JSON.stringify(highlight.selectionText)
   if (highlight.pdfAnnotation) dto.pdfAnnotationRef = packPdfAnnotationRef(highlight.pdfAnnotation)
+  if (highlight.txtAnnotation) dto.txtAnnotationRef = packTxtAnnotationRef(highlight.txtAnnotation)
   return dto
 }
 
@@ -267,6 +269,8 @@ export function registerOverlayIpc(): void {
 
       const locator = parseLocatorRef(body.locatorRef)
       if (!locator) return null
+      // TXT annotations belong to a text revision and are saved with it (txt:commit), never alone.
+      if (body.txtAnnotationRef !== undefined) return null
       const validStyleKinds = ['highlight', 'underline', 'strikethrough', 'textbox']
       if (!validStyleKinds.includes(body.styleKind)) return null
       if (typeof body.colorHex !== 'string' || !body.colorHex.trim()) return null

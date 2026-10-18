@@ -12,4 +12,5 @@ export type {
   NoteType,
   PdfAnnotation,
   PdfAnnotationRect,
+  TxtAnnotation,
 } from './note.js';

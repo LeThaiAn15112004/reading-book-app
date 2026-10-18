@@ -1,22 +1,25 @@
 /**
  * Module-level registry so Electron quit handshake (and other chrome exits)
  * can flush the active Reader session without prop-drilling.
+ *
+ * More than one thing can need flushing before the window closes (the reading position, and for a
+ * TXT book the edited text), so handlers are a set; all of them run, and one failing doesn't stop
+ * the others.
  */
 
 type FlushHandler = () => Promise<void>
 
-let handler: FlushHandler | null = null
+const handlers = new Set<FlushHandler>()
 
-/** Register the active Reader flush; returns unregister. */
+/** Register a Reader flush; returns unregister. */
 export function registerSessionFlushHandler(next: FlushHandler): () => void {
-  handler = next
+  handlers.add(next)
   return () => {
-    if (handler === next) handler = null
+    handlers.delete(next)
   }
 }
 
-/** Run the registered flush if any (no-op when Reader is not mounted). */
+/** Run every registered flush (no-op when Reader is not mounted). */
 export async function flushRegisteredSession(): Promise<void> {
-  if (!handler) return
-  await handler()
+  await Promise.allSettled([...handlers].map((handler) => handler()))
 }

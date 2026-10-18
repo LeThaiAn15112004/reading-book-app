@@ -9,6 +9,7 @@ import { registerOverlayIpc } from './overlay.ipc'
 import { registerSearchIpc } from './search.ipc'
 import { registerStorageIpc } from './storage.ipc'
 import { registerTranslationIpc } from './translation.ipc'
+import { registerTxtIpc } from './txt.ipc'
 import { registerUpdatesIpc } from './updates.ipc'
 import { registerWordCountIpc } from './word-count.ipc'
 
@@ -18,6 +19,7 @@ export function registerAllIpcHandlers(): void {
   registerLibraryIpc()
   registerImportIpc()
   registerOverlayIpc()
+  registerTxtIpc()
   registerCloudIpc()
   registerBookIndexIpc()
   registerSearchIpc()

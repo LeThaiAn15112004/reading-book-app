@@ -4,8 +4,9 @@
  *
  *   1. registry        -> unique ids, known groups, shortcut ids exist in the shortcut registry, every
  *                         tool is shown by at least one surface (no dead entries)
- *   2. surfaces        -> format → surface mapping; EPUB / PDF / placeholder capability sets (PDF:
- *                         no Aa — its options are EPUB reflow)
+ *   2. surfaces        -> format → surface mapping; EPUB / PDF / TXT / placeholder capability sets (PDF:
+ *                         no Aa — its options are EPUB reflow; TXT: text markup + Aa, no Hand / Select,
+ *                         no Page layout)
  *   3. EPUB layout     -> exact groups / order at fold level 0
  *   4. placeholder     -> only tools that work without a renderer (no Search / Audio / Translate / markup)
  *   5. folding         -> Annotation / Tools always dropdowns; navigate + settings never fold; clamps
@@ -48,7 +49,9 @@ const shape = (layout) =>
 
 const epub = caps.getReaderCapabilities('epub')
 const pdf = caps.getReaderCapabilities('pdf')
-const placeholder = caps.getReaderCapabilities('txt')
+// The placeholder surface is whatever has no renderer: Markdown stands in (TXT has its own surface now).
+const placeholder = caps.getReaderCapabilities('md')
+const txt = caps.getReaderCapabilities('txt')
 
 console.log('1. registry')
 check('tool ids are unique', () => {
@@ -71,12 +74,17 @@ check('every tool is shown by at least one surface', () => {
 })
 
 console.log('2. surfaces')
-check('epub and pdf map to their own surfaces, everything else to the placeholder', () => {
+check('epub, pdf and txt map to their own surfaces, everything else to the placeholder', () => {
   assert.equal(caps.readerSurfaceForFormat('epub'), 'epub')
   assert.equal(caps.readerSurfaceForFormat('pdf'), 'pdf')
-  for (const f of ['txt', 'md', 'docx', 'doc', null, undefined]) {
+  assert.equal(caps.readerSurfaceForFormat('txt'), 'txt')
+  for (const f of ['md', 'docx', 'doc', null, undefined]) {
     assert.equal(caps.readerSurfaceForFormat(f), 'placeholder', String(f))
   }
+})
+check('TXT = text markup + snapshot + word count + Aa; no Hand / Select, search painting, audio, translate or pages', () => {
+  assert.deepEqual([...txt].sort(), ['markupAnnotations', 'readingSettings', 'snapshot', 'wordCount'])
+  assert.ok(!txt.has('interaction') && !txt.has('search') && !txt.has('pageLayout'))
 })
 check('placeholder is a strict subset of EPUB, apart from Page layout', () => {
   for (const c of placeholder) if (c !== 'pageLayout') assert.ok(epub.has(c), c)
@@ -103,6 +111,15 @@ check('groups and order at fold level 0', () => {
 })
 check('no empty View group for EPUB', () => {
   assert.ok(!resolveToolbarLayout(epub, 0).some((g) => g.group.id === 'view'))
+})
+
+console.log('3b. TXT layout')
+check('TXT toolbar: the Annotation menu, Tools, Settings — no Navigate group', () => {
+  assert.deepEqual(shape(resolveToolbarLayout(txt, 0)), [
+    'annotation:menu[highlight,underline,strikethrough]',
+    'tools:menu[snapshot,wordCount]',
+    'settings:inline[settings]',
+  ])
 })
 
 console.log('4. placeholder layout')
@@ -188,13 +205,17 @@ check('PdfRenderer gets the toolbar tool, Hand pan and center tap', () => {
     assert.ok(pdfRendererJsx.includes(prop), prop)
   }
 })
-check('footer: no 1-page / 2-page toggle for PDF; inset ignores the EPUB view-mode pref', () => {
-  assert.match(screen, /onLayoutChange=\{\s*isPdfSurface\s*\?\s*undefined/)
-  assert.match(screen, /readerChromeBottomInset\(\s*isPdfSurface \? 'scroll' : book\.prefs\.viewMode/)
+check('footer: no 1-page / 2-page toggle for PDF and TXT (both continuous scroll); inset ignores the EPUB view-mode pref', () => {
+  assert.match(screen, /onLayoutChange=\{\s*isPdfSurface \|\| isTxtSurface\s*\?\s*undefined/)
+  assert.match(screen, /readerChromeBottomInset\(\s*isPdfSurface \|\| isTxtSurface \? 'scroll' : book\.prefs\.viewMode/)
 })
 
 console.log('8. sidebar tabs')
 const railIds = (set) => sidebarTabs.sidebarTabsFor(set).map((t) => t.id)
+check('TXT has no Page layout tab (one continuous text, no pages)', () => {
+  assert.ok(!txt.has('pageLayout'))
+  assert.ok(!railIds(txt).includes('layout'))
+})
 check('Page layout capability: PDF and placeholder only', () => {
   assert.ok(pdf.has('pageLayout'))
   assert.ok(placeholder.has('pageLayout'))
@@ -206,8 +227,11 @@ check('rail: PDF keeps every tab including Page layout', () => {
 check('rail: EPUB hides only Page layout', () => {
   assert.deepEqual(railIds(epub), ['chapters', 'bookmarks', 'highlights', 'attachments'])
 })
+check('rail: TXT hides Page layout like EPUB (no pages)', () => {
+  assert.deepEqual(railIds(txt), ['chapters', 'bookmarks', 'highlights', 'attachments'])
+})
 check('rail: other formats unchanged (placeholder keeps Page layout)', () => {
-  for (const f of ['txt', 'md', 'docx', 'doc', null]) {
+  for (const f of ['md', 'docx', 'doc', null]) {
     assert.deepEqual(railIds(caps.getReaderCapabilities(f)), sidebarTabs.SIDEBAR_TABS.map((t) => t.id), String(f))
   }
 })

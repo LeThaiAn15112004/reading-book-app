@@ -7,6 +7,7 @@ import { BookIndexChannels } from '../ipc/channels'
 import type { BookIndexStatusDto, EnsureBookIndexResult } from '../ipc/api-types'
 import { getDatabase } from '../persistence/db'
 import { getLibraryStore } from '../persistence/sqlite-library-store'
+import { currentTxtIndexSource } from '../txt/txt-storage'
 import { hasBookChunks } from './book-chunk-writer'
 import type { BookChunkJob, BookChunkWorkerMessage } from './book-chunk-job'
 import { isChunkableFormat } from './extract-book-text'
@@ -109,9 +110,13 @@ export async function ensureBookChunks(bookId: string): Promise<EnsureBookIndexR
     const file = await resolveBookFile(book)
     if (!file.ok) return { state: 'error' }
 
+    // A TXT book the user edited is indexed from the app's edited copy, so search and word count
+    // describe the text on screen (docs/implementation_plan/txt_reader.md §5).
+    const editedCopy = book.format === 'txt' ? await currentTxtIndexSource(id) : undefined
+
     const started = spawnWorker({
       bookId: id,
-      filePath: file.path,
+      filePath: editedCopy ?? file.path,
       format: book.format,
       dbPath: getDatabase().name,
     })
@@ -120,6 +125,22 @@ export async function ensureBookChunks(bookId: string): Promise<EnsureBookIndexR
     // `running` (set synchronously inside spawnWorker) takes over the claim.
     pending.delete(id)
   }
+}
+
+/**
+ * A TXT book's text changed: its chunks describe the old text. Stop a run that may be reading it,
+ * drop the rows (the FTS5 index follows through its delete trigger) and let the next open rebuild.
+ */
+export function invalidateBookChunks(bookId: string): void {
+  const id = bookId.trim()
+  if (!id) return
+  const worker = running.get(id)
+  if (worker) {
+    running.delete(id)
+    void worker.terminate()
+  }
+  yieldedNoText.delete(id)
+  getDatabase().prepare('DELETE FROM book_chunks WHERE book_id = ?').run(id)
 }
 
 /** Whether any book is being chunked right now (Clear Cache must wait for it). */

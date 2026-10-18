@@ -1,6 +1,6 @@
 import type { BookmarkRecord } from '../domain/annotation/bookmark.js';
 import type { HighlightRecord, HighlightStyleKind } from '../domain/annotation/highlight.js';
-import type { NoteLocator, NoteSelectionText, PdfAnnotation } from '../domain/annotation/note.js';
+import type { NoteLocator, NoteSelectionText, PdfAnnotation, TxtAnnotation } from '../domain/annotation/note.js';
 import type { ReadingSessionState } from '../domain/reading-session-state.js';
 
 /** Insert when `id` is absent; update that row's locator/label/excerpt when it is present. */
@@ -30,6 +30,8 @@ export interface SaveHighlightInput {
   selectionText?: NoteSelectionText;
   /** PDF text markup only: page + normalized rects, stored as `note_json.pdfAnnotation`. */
   pdfAnnotation?: PdfAnnotation;
+  /** TXT markup only: offsets into the canonical text, stored as `note_json.txtAnnotation`. */
+  txtAnnotation?: TxtAnnotation;
   /** Preserved on update; defaults to now on insert. */
   createdAt?: string;
 }

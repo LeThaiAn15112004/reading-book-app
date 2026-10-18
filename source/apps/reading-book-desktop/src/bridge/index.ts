@@ -12,6 +12,7 @@ export {
   type BookSearchResult,
 } from './search'
 export { wordCountApi, type WordCountStats, type WordCountStatsOk } from './wordCount'
+export { txtApi, type TxtCommitInput, type TxtCommitResult, type TxtOpenResult } from './txt'
 export {
   translationApi,
   type TranslateRequest,

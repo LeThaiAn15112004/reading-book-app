@@ -134,6 +134,7 @@ export function createInMemoryStorage(): InMemoryStorage {
       tags: input.tags ? [...input.tags] : [],
       selectionText: input.selectionText,
       ...(input.pdfAnnotation ? { pdfAnnotation: input.pdfAnnotation } : {}),
+      ...(input.txtAnnotation ? { txtAnnotation: input.txtAnnotation } : {}),
       createdAt: existing?.createdAt ?? input.createdAt ?? now,
       updatedAt: now,
     }

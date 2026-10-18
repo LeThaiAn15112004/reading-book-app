@@ -65,6 +65,12 @@ export async function openBookContent(bookId: string): Promise<OpenBookContentRe
     }
   }
 
+  // TXT is read through txt:open (decoded, and the edited copy when there is one); the path above
+  // was only validated. Nothing is read here — a multi-megabyte buffer would cross IPC for nothing.
+  if (book.format === 'txt') {
+    return { ok: true, bookId: id, format: 'txt', data: new ArrayBuffer(0), byteLength: 0 }
+  }
+
   try {
     const buf = await fsp.readFile(file.path)
     servedSha256.set(id, createHash('sha256').update(buf).digest('hex'))

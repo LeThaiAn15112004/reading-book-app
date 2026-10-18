@@ -11,6 +11,7 @@ import {
   type PdfAnnotation,
   type SaveBookmarkInput,
   type SaveHighlightInput,
+  type TxtAnnotation,
 } from '@reading-book/book-reader-sdk'
 import type { Database as SqliteDatabase } from 'better-sqlite3'
 import { randomUUID } from 'node:crypto'
@@ -33,6 +34,7 @@ import {
   type TwoWayPlan,
   packSessionLocation,
   parsePdfAnnotation,
+  parseTxtAnnotation,
   planEmbeddedAnnotationSync,
   unpackSessionLocation,
   type EmbeddedAnnotationLedgerEntry,
@@ -234,6 +236,8 @@ function rowToHighlightRecord(row: NoteRow): HighlightRecord | undefined {
     selectionText: note.locatorExtended?.text,
     // PDF markup geometry; re-validated so a hand-edited / corrupt row can't reach the renderer.
     pdfAnnotation: note.pdfAnnotation ? parsePdfAnnotation(note.pdfAnnotation) : undefined,
+    // TXT markup range; same re-validation.
+    txtAnnotation: note.txtAnnotation ? parseTxtAnnotation(note.txtAnnotation) : undefined,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   }
@@ -247,6 +251,7 @@ function buildHighlightNoteJson(input: {
   tags?: string[]
   selectionText?: NoteSelectionText
   pdfAnnotation?: PdfAnnotation
+  txtAnnotation?: TxtAnnotation
   createdAt: string
   modifiedAt: string
 }): string {
@@ -256,6 +261,7 @@ function buildHighlightNoteJson(input: {
     group: 'annotation',
     locatorExtended: { locator: input.locator, text: input.selectionText },
     pdfAnnotation: input.pdfAnnotation,
+    txtAnnotation: input.txtAnnotation,
     textualValue: input.selectionText?.highlight,
     note: input.note ?? null,
     style: { colorHex: input.colorHex },
@@ -512,8 +518,11 @@ export class SqliteOverlayStore implements OverlayStore {
     return this.writeHighlight(input)
   }
 
-  /** `saveHighlight`'s synchronous body — also run inside the embedded-annotation sync transaction. */
-  private writeHighlight(input: SaveHighlightInput): HighlightRecord {
+  /**
+   * `saveHighlight`'s synchronous body — also run inside the embedded-annotation sync transaction
+   * and the TXT commit transaction (`SqliteTxtStore.commit`), which is why it is public.
+   */
+  writeHighlight(input: SaveHighlightInput): HighlightRecord {
     const bookId = input.bookId.trim()
     if (!bookId) throw new Error('saveHighlight requires a bookId')
 
@@ -540,6 +549,7 @@ export class SqliteOverlayStore implements OverlayStore {
       tags: input.tags,
       selectionText: input.selectionText,
       pdfAnnotation: input.pdfAnnotation,
+      txtAnnotation: input.txtAnnotation,
       createdAt,
       modifiedAt: now,
     })
@@ -577,12 +587,18 @@ export class SqliteOverlayStore implements OverlayStore {
       tags: input.tags ?? [],
       selectionText: input.selectionText,
       pdfAnnotation: input.pdfAnnotation,
+      txtAnnotation: input.txtAnnotation,
       createdAt,
       updatedAt: now,
     }
   }
 
   async deleteHighlight(bookId: string, id: string): Promise<boolean> {
+    return this.deleteHighlightRow(bookId, id)
+  }
+
+  /** `deleteHighlight`'s synchronous body (also run inside the TXT commit transaction). */
+  deleteHighlightRow(bookId: string, id: string): boolean {
     const book = bookId.trim()
     const noteId = id.trim()
     if (!book || !noteId) return false

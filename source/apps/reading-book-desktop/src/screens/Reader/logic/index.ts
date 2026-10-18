@@ -22,6 +22,7 @@ export {
   useReaderTranslation,
   usePdfSelectionMenu,
   useReaderPdfHighlights,
+  useReaderTxt,
   type HighlightShortcuts,
   type ReaderChromeEscapeUi,
   type SnapshotRect,

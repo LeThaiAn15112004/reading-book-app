@@ -1,10 +1,12 @@
-import { useCallback, useMemo, useRef, useState, type CSSProperties } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { useParams } from 'react-router-dom'
 import {
   CfiLocation,
   PageRectLocation,
+  TextOffsetLocation,
   fontFamilyCss,
   formatHighlightCitation,
+  resolveTxtReadingOffset,
   type InteractionTool,
 } from '@reading-book/book-reader-sdk'
 import {
@@ -28,6 +30,7 @@ import {
   pdfSelectionPageLabel,
   type PdfRendererApi,
 } from '../../reader/renderers/pdf'
+import { TxtRenderer, type TxtRendererApi } from '../../reader/renderers/txt'
 import {
   AaSettingsPanel,
   BookInfoDialog,
@@ -57,6 +60,7 @@ import {
   TocSidebar,
   TranslationPopover,
   TrashConfirmDialog,
+  TxtSaveStatus,
   useRightSidebarDocked,
   useSidebarPanelResize,
   type SidebarTab,
@@ -83,6 +87,7 @@ import {
   useReaderTranslation,
   usePdfSelectionMenu,
   useReaderPdfHighlights,
+  useReaderTxt,
   useRightPanelStore,
   type HighlightShortcuts,
   type ReaderChromeEscapeUi,
@@ -109,6 +114,7 @@ export function ReaderScreen() {
 
   const epubApiRef = useRef<EpubRendererApi | null>(null)
   const pdfApiRef = useRef<PdfRendererApi | null>(null)
+  const txtApiRef = useRef<TxtRendererApi | null>(null)
   const escapeUiRef = useRef<ReaderChromeEscapeUi>({
     isEpubSurface: false,
     isPdfSurface: false,
@@ -159,6 +165,34 @@ export function ReaderScreen() {
     book.contentStatus === 'ready' && book.bookFormat === 'pdf' && !!book.bookBytes
   // Like EPUB, wait for the saved position before mounting so the PDF opens on the right page.
   const isPdfSessionLoading = isPdfSurface && book.sessionLoadStatus === 'loading'
+
+  // TXT: the text itself comes from Main (`txt:open`, edited copy aware), not from the book bytes.
+  const isTxtSurface = book.contentStatus === 'ready' && book.bookFormat === 'txt'
+  const txt = useReaderTxt({
+    bookId,
+    active: isTxtSurface,
+    txtApiRef,
+    setToast: chrome.setToast,
+    setChromeHidden: chrome.setChromeHidden,
+  })
+  const txtReady = isTxtSurface && txt.loadStatus === 'ready'
+  const txtLoadFailed = isTxtSurface && txt.loadStatus === 'error'
+  // Like EPUB / PDF, wait for the saved position before mounting so the text opens where it was left.
+  const isTxtLoading = isTxtSurface && !txtLoadFailed && (!txtReady || book.sessionLoadStatus === 'loading')
+  const [txtPercent, setTxtPercent] = useState(0)
+  useEffect(() => {
+    setTxtPercent(0)
+  }, [bookId])
+  const txtInitialOffset = useMemo(
+    () =>
+      book.resumeLocation instanceof TextOffsetLocation
+        ? resolveTxtReadingOffset(book.resumeLocation, txt.getTextLength())
+        : 0,
+    // The renderer reads this once, when it mounts (text and saved position are both ready then).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [book.resumeLocation, txtReady],
+  )
+  const txtSidebarHighlights = useMemo(() => [...txt.highlights], [txt.highlights])
   const exportAnnotatedPdf = usePdfExportStore((st) => st.exportAnnotatedPdf)
   const pendingSignedExport = usePdfExportStore((st) => st.pendingSigned)
   const confirmSignedExport = usePdfExportStore((st) => st.confirmSigned)
@@ -231,6 +265,7 @@ export function ReaderScreen() {
     bookId,
     epubApiRef,
     pdfApiRef,
+    txtApiRef,
     prefsRef: book.prefsRef,
     prefsDirtyRef: book.prefsDirtyRef,
     prefs: book.prefs,
@@ -246,6 +281,8 @@ export function ReaderScreen() {
     epubApiRef,
     isPdfSurface,
     pdfApiRef,
+    isTxtSurface,
+    txtApiRef,
     closeFloating: chrome.closeFloating,
     highlightShortcutsRef,
   })
@@ -293,18 +330,27 @@ export function ReaderScreen() {
   const chapter = FAKE_CHAPTERS[nav.chapterIndex] ?? FAKE_CHAPTERS[0]
   const pdfPageCurrent = nav.pdfNav?.pageCurrent ?? 0
   const pdfPageTotal = nav.pdfNav?.pageTotal ?? 0
-  const chapterLabel = isPdfSurface ? `Page ${pdfPageCurrent}` : chapter.title
+  const chapterLabel = isPdfSurface
+    ? `Page ${pdfPageCurrent}`
+    : isTxtSurface
+      ? `${txtPercent}%`
+      : chapter.title
   // PDF: real page numbers. EPUB: reference pages / spine sections. Otherwise the placeholder.
+  // TXT is one continuous text: a single "section", progress is the share scrolled.
   const pageCurrent = book.isEpubSurface
     ? (nav.epubNav?.pageCurrent ?? 0)
     : isPdfSurface
       ? pdfPageCurrent
-      : nav.chapterIndex + 1
+      : isTxtSurface
+        ? 1
+        : nav.chapterIndex + 1
   const pageTotal = book.isEpubSurface
     ? (nav.epubNav?.pageTotal ?? 0)
     : isPdfSurface
       ? pdfPageTotal
-      : FAKE_CHAPTERS.length
+      : isTxtSurface
+        ? 1
+        : FAKE_CHAPTERS.length
   const pageCountReady = book.isEpubSurface
     ? Boolean(nav.epubNav?.pageCountReady)
     : isPdfSurface
@@ -316,26 +362,34 @@ export function ReaderScreen() {
         : 0)
     : isPdfSurface
       ? pdfPageCurrent
-      : nav.chapterIndex + 1
+      : isTxtSurface
+        ? 1
+        : nav.chapterIndex + 1
   const sectionTotal = book.isEpubSurface
     ? (nav.epubNav?.spineLength ?? 0)
     : isPdfSurface
       ? pdfPageTotal
-      : FAKE_CHAPTERS.length
+      : isTxtSurface
+        ? 1
+        : FAKE_CHAPTERS.length
   const sectionLabels = useMemo(
     () =>
       book.isEpubSurface
         ? nav.epubSections
         : isPdfSurface
           ? Array.from({ length: pdfPageTotal }, (_, i) => `Page ${i + 1}`)
-          : FAKE_CHAPTERS.map((c) => c.title),
-    [book.isEpubSurface, isPdfSurface, nav.epubSections, pdfPageTotal],
+          : isTxtSurface
+            ? ['Text']
+            : FAKE_CHAPTERS.map((c) => c.title),
+    [book.isEpubSurface, isPdfSurface, isTxtSurface, nav.epubSections, pdfPageTotal],
   )
   const progress = book.isEpubSurface
     ? (nav.epubNav?.progress ?? 0)
     : isPdfSurface && pdfPageTotal > 0
       ? pdfPageCurrent / pdfPageTotal
-      : 0
+      : isTxtSurface
+        ? txtPercent / 100
+        : 0
   const effectiveMargin = book.prefs.marginEnabled ? book.prefs.margin : 'off'
 
   const bookmarks = useReaderBookmarks({
@@ -406,7 +460,7 @@ export function ReaderScreen() {
     setChromeHidden: chrome.setChromeHidden,
   })
   /** The open surface's annotation store: drives the shared popups, sidebar actions and shortcuts. */
-  const markup = isPdfSurface ? pdfHighlights : highlights
+  const markup = isPdfSurface ? pdfHighlights : isTxtSurface ? txt.markup : highlights
   /** Two-way sync conflict banner for a PDF annotation's popup (undefined when there is none). */
   const conflictBannerFor = (id: string) => {
     const conflict = isPdfSurface ? pdfHighlights.conflicts[id] : undefined
@@ -417,6 +471,13 @@ export function ReaderScreen() {
         onUsePdf={() => void pdfHighlights.resolveConflict(id, 'use-pdf')}
       />
     ) : undefined
+  }
+
+  /** TXT selection menu → mark that selection (`textbox` = a note, its popup opens at the click). */
+  function markTxtSelection(styleKind: 'highlight' | 'underline' | 'strikethrough' | 'textbox') {
+    const menu = txt.selectionMenu
+    if (!menu) return
+    txt.createFromSelection(menu.selection, styleKind, new DOMRect(menu.point.x, menu.point.y, 0, 0))
   }
 
   /** PDF selection menu → mark that selection (`textbox` = a note, its popup opens at the click). */
@@ -557,7 +618,7 @@ export function ReaderScreen() {
       // PDF is always one continuous scroll — reserve the footer like EPUB's scroll view, whatever
       // the book's (EPUB-only) view-mode pref says.
       contentInsetBottom={readerChromeBottomInset(
-        isPdfSurface ? 'scroll' : book.prefs.viewMode,
+        isPdfSurface || isTxtSurface ? 'scroll' : book.prefs.viewMode,
         footerImmersiveHidden,
       )}
       contentInsetResizing={sidebarResize.isResizing}
@@ -634,7 +695,7 @@ export function ReaderScreen() {
           pageTotal={pageTotal}
           pageCountReady={pageCountReady}
           progress={progress}
-          onSeekProgress={book.isEpubSurface || isPdfSurface ? nav.goToProgress : undefined}
+          onSeekProgress={book.isEpubSurface || isPdfSurface || isTxtSurface ? nav.goToProgress : undefined}
           onPreviousPage={() => nav.switchPage(false)}
           onNextPage={() => nav.switchPage(true)}
           onGoToPage={nav.goToPage}
@@ -649,7 +710,7 @@ export function ReaderScreen() {
           layout={book.prefs.layout}
           // PDF has no 1-page / 2-page spread (yet) — no toggle that the renderer would ignore.
           onLayoutChange={
-            isPdfSurface
+            isPdfSurface || isTxtSurface
               ? undefined
               : (layout) => {
                   book.prefsDirtyRef.current = true
@@ -657,9 +718,10 @@ export function ReaderScreen() {
                 }
           }
           // PDF is always one continuous scroll with real page numbers — no paginated/scroll toggle.
-          viewMode={isPdfSurface ? 'paginated' : book.prefs.viewMode}
+          // TXT is one continuous scroll with a progress readout instead of page numbers.
+          viewMode={isPdfSurface ? 'paginated' : isTxtSurface ? 'scroll' : book.prefs.viewMode}
           onViewModeChange={
-            isPdfSurface
+            isPdfSurface || isTxtSurface
               ? undefined
               : (viewMode) => {
                   book.prefsDirtyRef.current = true
@@ -723,7 +785,7 @@ export function ReaderScreen() {
             isResizing={sidebarResize.isResizing}
             chromeHidden={toolsHidden}
             onResizePointerDown={sidebarResize.onResizePointerDown}
-            chapters={isPdfSurface ? [] : FAKE_CHAPTERS}
+            chapters={isPdfSurface || isTxtSurface ? [] : FAKE_CHAPTERS}
             chapterIndex={nav.chapterIndex}
             tocItems={
               book.isEpubSurface ? nav.epubToc : isPdfSurface ? nav.pdfToc : undefined
@@ -747,8 +809,15 @@ export function ReaderScreen() {
               void bookmarks.jumpToBookmark(bookmark)
             }}
             onDeleteBookmark={bookmarks.deleteBookmarkById}
-            highlights={isPdfSurface ? pdfHighlights.highlights : highlights.highlights}
+            highlights={
+              isPdfSurface ? pdfHighlights.highlights : isTxtSurface ? txtSidebarHighlights : highlights.highlights
+            }
             onJumpHighlight={(highlight) => {
+              if (isTxtSurface) {
+                const row = txt.highlights.find((h) => h.id === highlight.id)
+                if (row) txt.jumpToHighlight(row)
+                return
+              }
               if (isPdfSurface) {
                 const row = pdfHighlights.highlights.find((h) => h.id === highlight.id)
                 if (row) pdfHighlights.jumpToHighlight(row)
@@ -874,6 +943,45 @@ export function ReaderScreen() {
                 copyHighlightText(citation)
               }}
               onDismiss={highlights.closeSelectionMenu}
+            />
+          ) : null}
+
+          {txtReady ? (
+            <TxtSaveStatus
+              status={txt.saveStatus}
+              error={txt.saveError}
+              editable={txt.editable}
+              onRetry={txt.retrySave}
+            />
+          ) : null}
+
+          {txt.selectionMenu ? (
+            <HighlightContextMenu
+              point={txt.selectionMenu.point}
+              selectedText={txt.selectionMenu.selection.text}
+              onHighlight={() => markTxtSelection('highlight')}
+              onUnderline={() => markTxtSelection('underline')}
+              onStrikethrough={() => markTxtSelection('strikethrough')}
+              onAddNote={() => markTxtSelection('textbox')}
+              onBookmarkHere={bookmarks.toggleBookmark}
+              onCopy={() => copyHighlightText(txt.selectionMenu?.selection.text)}
+              onTranslate={() => {
+                const menu = txt.selectionMenu
+                if (menu) translation.openForSelection({ text: menu.selection.text, lang: '' })
+              }}
+              onCopyWithCitation={() => {
+                const menu = txt.selectionMenu
+                if (!menu) return
+                copyHighlightText(
+                  formatHighlightCitation({
+                    text: menu.selection.text,
+                    bookTitle: book.bookTitle,
+                    author: book.author,
+                    locationLabel: undefined,
+                  }),
+                )
+              }}
+              onDismiss={txt.closeSelectionMenu}
             />
           ) : null}
 
@@ -1006,7 +1114,8 @@ export function ReaderScreen() {
       {book.contentStatus === 'loading' ||
       book.contentStatus === 'idle' ||
       book.isEpubSessionLoading ||
-      isPdfSessionLoading ? (
+      isPdfSessionLoading ||
+      isTxtLoading ? (
         <ReaderOpenStatus
           status={book.contentStatus === 'ready' ? 'loading' : book.contentStatus}
           onRetry={book.retryOpen}
@@ -1014,13 +1123,13 @@ export function ReaderScreen() {
             void session.leaveToLibrary()
           }}
         />
-      ) : book.contentStatus === 'error' ? (
+      ) : book.contentStatus === 'error' || txtLoadFailed ? (
         <ReaderOpenStatus
           status="error"
-          message={book.openErrorMessage}
-          onRetry={book.retryOpen}
+          message={txtLoadFailed ? txt.errorMessage : book.openErrorMessage}
+          onRetry={txtLoadFailed && bookId ? () => txt.retryLoad(bookId) : book.retryOpen}
           onLocate={
-            book.openErrorCode === 'missing_file'
+            (txtLoadFailed ? txt.errorCode : book.openErrorCode) === 'missing_file'
               ? () => {
                   void relink.locateFile()
                 }
@@ -1121,6 +1230,53 @@ export function ReaderScreen() {
                 session.handlePdfNavState(state)
               }}
               onOutline={nav.setPdfOutline}
+            />
+          ) : book.bookFormat === 'txt' ? (
+            <TxtRenderer
+              key={bookId}
+              text={txt.text}
+              highlights={txt.highlights}
+              focusedHighlightId={txt.focusedHighlightId}
+              editable={txt.editable}
+              markupTool={activeAnnotationTool}
+              margin={effectiveMargin}
+              chromeHidden={immersive || chrome.chromeHidden}
+              initialOffset={txtInitialOffset}
+              caretRequest={txt.caretRequest}
+              onEdit={txt.applyEdit}
+              onUndo={txt.undo}
+              onRedo={txt.redo}
+              onSaveShortcut={txt.saveNow}
+              onSelectionContextMenu={(selection, x, y) => {
+                txt.dismissAnnotationUi()
+                txt.openSelectionMenu(selection, x, y)
+              }}
+              onMarkupSelection={(selection, tool) => {
+                txt.closeSelectionMenu()
+                txt.commitMarkupSelection(selection, tool)
+              }}
+              onHighlightClick={(hit) => {
+                txt.closeSelectionMenu()
+                txt.openHighlight(hit.id, hit.box)
+              }}
+              onHighlightContextMenu={(hit) => {
+                txt.closeSelectionMenu()
+                txt.openHighlight(hit.id, hit.box)
+              }}
+              onBlankClick={() => {
+                txt.closeSelectionMenu()
+                txt.dismissAnnotationUi()
+              }}
+              onMarginClick={chrome.handleCenterTap}
+              onScrolled={txt.closeSelectionMenu}
+              onLocation={(offset) => {
+                const length = txt.getTextLength()
+                if (length === 0) return
+                setTxtPercent(Math.round((txtApiRef.current?.getProgress() ?? 0) * 100))
+                txt.setReadingOffset(offset)
+                session.handleTxtLocation(offset, length)
+              }}
+              apiRef={txtApiRef}
             />
           ) : (
             <ReadingCanvas

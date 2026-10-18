@@ -80,7 +80,9 @@ Desktop app (`cd source/apps/reading-book-desktop`):
   `spike:pdf:embedded` (embedded PDF annotation import: real pdf.js scan → SQLite ledger),
   `spike:pdf:live` (live sync: watcher on real temp files, `/NM` reader, sync service, SQLite),
   `spike:pdf:export` (incremental writer + export flow, pdf.js read-back), `spike:pdf:two-way` (two-way coordinator on
-  real files), `spike:pdf:compat-kit -- <dir>` (manual cross-reader test kit)
+  real files), `spike:pdf:compat-kit -- <dir>` (manual cross-reader test kit),
+  `spike:txt:main` (TXT reader, Main side: codec, edited copy, `txt:*` IPC, SQLite incl. migration 025, on real temp files),
+  `spike:txt:store` (the real renderer TXT store against the real Main service: save loop, failures, switching books)
 
 SDK (`cd source/apps/book-reader-sdk`): `npm run typecheck`, `npm test` (vitest, single file:
 `npx vitest run tests/text/chunk-text.test.ts`), `npm run test:watch`, `npm run typecheck:tests`, `npm run build`,
@@ -91,9 +93,11 @@ Mobile app (`cd source/apps/reading-book-mobile`): `npm run start`, `android`, `
 **CI** (`.github/workflows/ci.yml`, every push and PR, Ubuntu, `npm ci` in `source/`): SDK typecheck, test
 typecheck, tests, build; desktop typecheck and lint. Keep all six green locally before pushing.
 
-**E2E is manual-only.** Desktop E2E (`npm run e2e` / `e2e:only` / `spike:e2e:launch`, Playwright driving the built
-Electron app) opens a real, visible window and grabs desktop focus (Main calls `win.show()`; Electron has no headless
-mode). Nothing in `dev`, Vite/HMR, git hooks or CI runs it, and an agent must not run it after edits or as routine
+**E2E is manual-only.** Desktop E2E (`npm run e2e` / `e2e:only`, Playwright driving the built Electron app) runs on a
+throw-away `userData` folder and, by default, in **hidden mode**: the window is rendered off-screen (Electron offscreen
+rendering, `E2E_HIDDEN` in `electron/main.ts`) and never shown, so a run does not take over the desktop or steal focus.
+Set `READMATE_E2E_SHOW=1` to watch it in a real window (`spike:e2e:launch` is always a visible window and grabs focus).
+Nothing in `dev`, Vite/HMR, git hooks or CI runs it, and an agent must not run it after edits or as routine
 verification — only when the user asks or the task is E2E itself. Default checks: `typecheck`, `lint`,
 `e2e:typecheck` (compile only), SDK `npm test`, `npx vite build`. `.claude/settings.local.json` lists the E2E
 commands under `permissions.ask` so they always prompt.
@@ -143,7 +147,7 @@ DTOs in `api-types.ts` (suffixed `Dto`) are separate, structured-clone-safe plai
 ### Document format adapters
 
 Each supported format (epub, pdf, txt, md, docx, doc) is a `DocumentImporter` implementation in
-`electron/adapters/<fmt>.adapter.ts`, registered by `DocumentFormat` enum key in
+`electron/adapters/<fmt>.adapter.ts` (TXT's importer is still the filename stub; its text is read by `electron/txt/`), registered by `DocumentFormat` enum key in
 `electron/adapters/importer-registry.ts`. Adding a format means: new adapter file + registry entry, a matching
 renderer under `src/reader/renderers/<fmt>/`, and a `SUPPORTED_FORMATS` entry in `packages/config/formats.ts`.
 Domain/port code only ever deals with `DocumentImporter` / `DocumentRenderer` / `Location` — never format specifics.
@@ -151,8 +155,9 @@ Domain/port code only ever deals with `DocumentImporter` / `DocumentRenderer` / 
 ### Persistence & the read-only/overlay invariant
 
 `better-sqlite3`, schema versioned as numbered SQL files in `electron/persistence/migrations/` (currently
-001–024: books, genres, comments, collections, reading sessions, notes/annotations, reading status, cloud
-provenance, FTS chunks, signature status, embedded PDF annotation ledger, two-way sync base/conflict + write-back), run through `migrate.ts`. `sqlite-library-store.ts` and
+001–025: books, genres, comments, collections, reading sessions, notes/annotations, reading status, cloud
+provenance, FTS chunks, signature status, embedded PDF annotation ledger, two-way sync base/conflict + write-back,
+TXT edited-copy revisions), run through `migrate.ts`. `sqlite-library-store.ts` and
 `sqlite-overlay-store.ts` implement the domain's `LibraryStore`/`CollectionStore`/`OverlayStore` ports.
 
 **Signature status (verification only):** `books.metadata_json.signatureStatus` (`unsigned|valid|invalid|unsupported`;
@@ -187,6 +192,17 @@ there is no write-back switch**: annotations are written into the book's own fil
 since read); a file that fails it is never written and the data stays pending in SQLite. Three-way merge per field
 from `base_json`, conflicts frozen in `conflict_json` until the user picks; `books.sha256` is kept in step with the
 file. See `pdf_annotation_export.md`, `pdf_annotation_two_way_sync.md`, `pdf_annotation_reader_compatibility.md`.
+
+**TXT reader** (`src/reader/renderers/txt/`, state in `screens/Reader/logic/txtDocument/`): an editable plain-text surface
+— a `<textarea>` over a same-metrics backdrop that paints annotation marks. Offsets are UTF-16 indices into the canonical
+text (BOM stripped, `\n` line breaks; `book-reader-sdk/src/txt/`). TXT markup is a `notes` row with
+`note_json.txtAnnotation = { startOffset, endOffset }` + the quote in `locatorExtended.text`; an edit that touches an
+annotation's text removes it, one entirely before moves it, one entirely after leaves it
+(`planAnnotationEdit`). The user's file is only ever read: edits are saved as an app-owned UTF-8 copy
+`{userData}/txt-edits/{bookId}/r{revision}.txt` + one `txt_documents` row, and `txt:commit` writes text revision and
+annotation rows in ONE transaction (`SqliteTxtStore.commit`); TXT rows are never written through `overlay:saveHighlight`.
+Reading position is a `text-offset` `Location` in `reading_state_json`. Text above `TXT_EDIT_MAX_CHARS` opens read-only.
+See `docs/implementation_plan/txt_reader.md`.
 
 Per-book reading state (position, percent, and that book's font/size/line-height/align/layout/margin overrides)
 lives in `books.reading_state_json`, written via `overlay:saveSessionState`.

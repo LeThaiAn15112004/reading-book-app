@@ -15,6 +15,7 @@ import type {
   PdfOutlineItem,
   PdfRendererApi,
 } from '../../../../reader/renderers/pdf'
+import type { TxtRendererApi } from '../../../../reader/renderers/txt'
 import { resolveActivePageTocEntry } from '@reading-book/book-reader-sdk'
 import { blurReaderSidebarFocus } from '../../../../reader/chrome'
 import {
@@ -58,6 +59,8 @@ type UseReaderNavigationOptions = {
   epubApiRef: MutableRefObject<EpubRendererApi | null>
   isPdfSurface: boolean
   pdfApiRef: MutableRefObject<PdfRendererApi | null>
+  isTxtSurface: boolean
+  txtApiRef: MutableRefObject<TxtRendererApi | null>
   closeFloating: () => void
   highlightShortcutsRef: MutableRefObject<HighlightShortcuts>
 }
@@ -71,6 +74,8 @@ export function useReaderNavigation({
   epubApiRef,
   isPdfSurface,
   pdfApiRef,
+  isTxtSurface,
+  txtApiRef,
   closeFloating,
   highlightShortcutsRef,
 }: UseReaderNavigationOptions) {
@@ -107,7 +112,8 @@ export function useReaderNavigation({
     usePdfTocStore.getState().reset()
     epubApiRef.current = null
     pdfApiRef.current = null
-  }, [bookId, epubApiRef, pdfApiRef])
+    txtApiRef.current = null
+  }, [bookId, epubApiRef, pdfApiRef, txtApiRef])
 
   function clearTransientNavUi() {
     blurReaderSidebarFocus()
@@ -135,6 +141,11 @@ export function useReaderNavigation({
       clearTransientNavUi()
       return
     }
+    if (isTxtSurface) {
+      txtApiRef.current?.scrollByPage(forward ? 1 : -1)
+      clearTransientNavUi()
+      return
+    }
 
     setChapterIndex((index) =>
       forward
@@ -157,6 +168,8 @@ export function useReaderNavigation({
       clearTransientNavUi()
       return
     }
+    // A TXT book has no pages to go to.
+    if (isTxtSurface) return
 
     goChapter(page - 1)
   }
@@ -174,12 +187,16 @@ export function useReaderNavigation({
       const api = pdfApiRef.current
       if (!api) return false
       api.goToPage(1)
+    } else if (isTxtSurface) {
+      const api = txtApiRef.current
+      if (!api) return false
+      api.scrollToFraction(0)
     } else {
       setChapterIndex(0)
     }
     clearTransientNavUi()
     return true
-  }, [epubApiRef, isEpubSurface, isPdfSurface, pdfApiRef])
+  }, [epubApiRef, isEpubSurface, isPdfSurface, isTxtSurface, pdfApiRef, txtApiRef])
 
   /**
    * End of the book. EPUB resolves with whether the reader really reached the last page / bottom of
@@ -200,10 +217,17 @@ export function useReaderNavigation({
       clearTransientNavUi()
       return true
     }
+    if (isTxtSurface) {
+      const api = txtApiRef.current
+      if (!api) return false
+      api.scrollToFraction(1)
+      clearTransientNavUi()
+      return true
+    }
     setChapterIndex(FAKE_CHAPTERS.length - 1)
     clearTransientNavUi()
     return true
-  }, [epubApiRef, isEpubSurface, isPdfSurface, pdfApiRef])
+  }, [epubApiRef, isEpubSurface, isPdfSurface, isTxtSurface, pdfApiRef, txtApiRef])
 
   /** Page layout thumbnails browse spine *sections* (EPUB) or pages (PDF). */
   const goToPageFromLayout = useCallback(
@@ -214,6 +238,8 @@ export function useReaderNavigation({
         void api.goToSpineIndex(page - 1)
       } else if (isPdfSurface) {
         pdfApiRef.current?.goToPage(page)
+      } else if (isTxtSurface) {
+        return
       } else {
         setChapterIndex(
           Math.min(Math.max(page - 1, 0), FAKE_CHAPTERS.length - 1),
@@ -221,7 +247,7 @@ export function useReaderNavigation({
       }
       clearTransientNavUi()
     },
-    [epubApiRef, isEpubSurface, isPdfSurface, pdfApiRef],
+    [epubApiRef, isEpubSurface, isPdfSurface, isTxtSurface, pdfApiRef],
   )
 
   /** Seek to a 0..1 fraction of book position (progress-bar click), by spine order. */
@@ -243,6 +269,8 @@ export function useReaderNavigation({
         const total = api.getNavState().pageTotal
         if (total <= 0) return
         api.goToPage(Math.min(Math.floor(clampedFraction * total) + 1, total))
+      } else if (isTxtSurface) {
+        txtApiRef.current?.scrollToFraction(clampedFraction)
       } else {
         setChapterIndex(
           Math.min(
@@ -253,7 +281,7 @@ export function useReaderNavigation({
       }
       clearTransientNavUi()
     },
-    [epubApiRef, epubNav, isEpubSurface, isPdfSurface, pdfApiRef],
+    [epubApiRef, epubNav, isEpubSurface, isPdfSurface, isTxtSurface, pdfApiRef, txtApiRef],
   )
 
   function handleSelectTocItem(item: EpubTocItem) {

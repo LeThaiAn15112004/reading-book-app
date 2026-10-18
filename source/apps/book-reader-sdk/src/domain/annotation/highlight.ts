@@ -1,4 +1,4 @@
-import type { NoteLocator, NoteSelectionText, PdfAnnotation } from './note.js';
+import type { NoteLocator, NoteSelectionText, PdfAnnotation, TxtAnnotation } from './note.js';
 
 /**
  * `'highlight'` = background fill; `'underline'` = underline stroke; `'strikethrough'` = a line
@@ -29,6 +29,8 @@ export interface HighlightRecord {
   selectionText?: NoteSelectionText;
   /** PDF text markup geometry (`note_json.pdfAnnotation`); absent for EPUB highlights. */
   pdfAnnotation?: PdfAnnotation;
+  /** TXT markup range (`note_json.txtAnnotation`); absent for every other format. */
+  txtAnnotation?: TxtAnnotation;
   createdAt: string;
   updatedAt: string;
 }

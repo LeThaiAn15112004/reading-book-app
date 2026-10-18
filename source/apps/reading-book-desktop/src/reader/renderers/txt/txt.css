@@ -1,0 +1,126 @@
+/*
+ * TXT reading surface (docs/implementation_plan/txt_reader.md §6).
+ *
+ * Two layers with IDENTICAL text metrics inside one box:
+ *   .txt-backdrop — transparent text that only exists to paint annotation marks (background,
+ *                   underline, strike-through) and to be measured; it never takes input;
+ *   .txt-input    — the real <textarea>: transparent background, visible text, caret and selection.
+ * The textarea grows with its content (field-sizing), so the page has ONE scroll container and both
+ * layers always line up. Anything that changes a metric below (font, size, wrapping, padding…) must
+ * change it on both layers.
+ */
+
+.txt-editor {
+  position: relative;
+  font-family: var(--reader-font-reading);
+  font-size: var(--reader-reading-size);
+  font-weight: var(--reader-reading-weight);
+  line-height: var(--reader-reading-line-height);
+  text-align: var(--reader-reading-align);
+  color: var(--reader-text, #cbd5e1);
+  letter-spacing: normal;
+  word-spacing: normal;
+  text-indent: 0;
+  text-transform: none;
+  tab-size: 4;
+}
+
+.txt-backdrop,
+.txt-input {
+  box-sizing: border-box;
+  display: block;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  font: inherit;
+  line-height: inherit;
+  text-align: inherit;
+  letter-spacing: inherit;
+  word-spacing: inherit;
+  text-indent: inherit;
+  text-transform: none;
+  text-shadow: none;
+  tab-size: inherit;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+  word-break: normal;
+  font-kerning: normal;
+  font-variant-ligatures: normal;
+}
+
+.txt-backdrop {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  color: transparent;
+  pointer-events: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.txt-input {
+  position: relative;
+  z-index: 1;
+  min-height: 55vh;
+  overflow: hidden;
+  resize: none;
+  outline: none;
+  background: transparent;
+  color: inherit;
+  caret-color: currentColor;
+  /* Grow with the text instead of scrolling inside: one scroll container for the whole page. */
+  field-sizing: content;
+  cursor: text;
+}
+
+.txt-input::selection {
+  background: var(--lib-accent-ring, rgb(96 165 250 / 0.35));
+}
+
+.txt-input:read-only {
+  cursor: text;
+}
+
+/* An annotation mark: colors and lines come from inline styles (they depend on the annotation). */
+.txt-mark {
+  border-radius: 2px;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+  transition: outline-color 120ms ease;
+}
+
+.txt-mark[data-focused='true'] {
+  outline: 2px solid var(--txt-mark-ring, currentColor);
+  outline-offset: 1px;
+}
+
+.txt-mark[data-flash='true'] {
+  animation: txt-mark-flash 900ms ease-out 1;
+}
+
+@keyframes txt-mark-flash {
+  0% {
+    outline: 3px solid var(--txt-mark-ring, #f59e0b);
+    outline-offset: 2px;
+  }
+  100% {
+    outline: 3px solid transparent;
+    outline-offset: 2px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .txt-mark[data-flash='true'] {
+    animation: none;
+  }
+}
+
+/* Save-state pill (top-right of the reading area). */
+.txt-save-status {
+  pointer-events: none;
+}
+.txt-save-status button {
+  pointer-events: auto;
+}

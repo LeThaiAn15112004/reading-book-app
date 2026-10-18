@@ -12,6 +12,7 @@ import {
   SearchChannels,
   StorageChannels,
   TranslationChannels,
+  TxtChannels,
   UpdateChannels,
   WordCountChannels,
 } from './ipc/channels'
@@ -167,6 +168,10 @@ const api: DesktopApi = {
   },
   wordCount: {
     getStats: (bookId) => ipcRenderer.invoke(WordCountChannels.getStats, bookId),
+  },
+  txt: {
+    open: (bookId) => ipcRenderer.invoke(TxtChannels.open, bookId),
+    commit: (input) => ipcRenderer.invoke(TxtChannels.commit, input),
   },
   notifications: {
     getSupport: () => ipcRenderer.invoke(NotificationChannels.getSupport),

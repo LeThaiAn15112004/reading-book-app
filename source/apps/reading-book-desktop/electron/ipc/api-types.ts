@@ -446,6 +446,11 @@ export interface HighlightDto {
    * (see `app-models/pdf-highlight.ts`). Absent on EPUB highlights.
    */
   pdfAnnotationRef?: string
+  /**
+   * TXT markup only: JSON `TxtAnnotation` — `{ startOffset, endOffset }` into the book's canonical
+   * text (see `txt/txt-text.ts`). Absent on EPUB / PDF highlights.
+   */
+  txtAnnotationRef?: string
   createdAt: string
   updatedAt: string
 }
@@ -465,6 +470,11 @@ export interface SaveHighlightInput {
    * page indices and sizes, and a `page-rect` `locatorRef` on the annotation's first page.
    */
   pdfAnnotationRef?: string
+  /**
+   * TXT markup only (JSON `TxtAnnotation`). TXT rows are written by `txt:commit`, in the same
+   * transaction as the text revision they refer to — `overlay:saveHighlight` refuses them.
+   */
+  txtAnnotationRef?: string
   createdAt?: string
 }
 
@@ -791,6 +801,18 @@ export interface DesktopApi {
      *  `book_chunks` index built for search — no separate re-scan of the book text. */
     getStats(bookId: string): Promise<WordCountStatsDto>
   }
+  txt: {
+    /**
+     * The TXT book's canonical text (the app's edited copy when there is one, else the decoded
+     * original file) with its annotations. The original file is only ever read.
+     */
+    open(bookId: string): Promise<TxtOpenResult>
+    /**
+     * Save edited text and annotation changes in one step against `baseRevision`. The edited text
+     * goes to Main-owned storage, never to the original file; `ok: true` is the only proof of saving.
+     */
+    commit(input: TxtCommitInput): Promise<TxtCommitResult>
+  }
   cloud: {
     /** Opens the provider's OAuth consent screen in a popup and stores tokens securely on success. */
     connect(provider: CloudProviderDto): Promise<CloudConnectResult>
@@ -882,4 +904,80 @@ export interface TranslationProgressDto {
   progress?: number
   loadedBytes?: number
   totalBytes?: number
+}
+
+// ---------------------------------------------------------------------------------------------
+// TXT reader (docs/implementation_plan/txt_reader.md)
+// ---------------------------------------------------------------------------------------------
+
+/** Why txt:open could not produce a text. */
+export type TxtOpenErrorCode =
+  | 'not_found'
+  | 'missing_file'
+  | 'path_denied'
+  | 'read_failed'
+  /** The file is bigger than the reader opens at all (`TXT_MAX_FILE_BYTES`). */
+  | 'too_large'
+
+/** What txt:open found that the reader should tell the user about. */
+export type TxtOpenNotice =
+  /** The original file changed outside Readmate since the book was added / the copy was started. */
+  | 'source_changed'
+  /** The app's edited copy could not be read — the original file is shown instead. */
+  | 'working_copy_lost'
+  /** The file isn't valid UTF-8: it was read as Windows-1252, accents may be wrong. */
+  | 'legacy_encoding'
+
+/**
+ * Open result for a TXT book. `text` is the canonical text (BOM stripped, `\n` line breaks);
+ * every offset in `highlights` is a UTF-16 index into it. No paths: the edited copy lives in
+ * Main-owned storage and is never addressed by the renderer.
+ */
+export interface TxtOpenResult {
+  ok: boolean
+  bookId: string
+  text?: string
+  /** 0 = the original file; +1 for every committed text change. Pass it back as `baseRevision`. */
+  revision?: number
+  /** False when the text is longer than `TXT_EDIT_MAX_CHARS` — read and annotate only. */
+  editable?: boolean
+  /** True when the text comes from the app's edited copy rather than the original file. */
+  edited?: boolean
+  notices?: TxtOpenNotice[]
+  /** Label of the encoding the original file was decoded with (`utf-8`, `utf-16le`, …). */
+  encoding?: string
+  highlights?: HighlightDto[]
+  errorCode?: TxtOpenErrorCode
+  errorMessage?: string
+}
+
+/** Input for txt:commit — everything that changed since the revision the renderer holds. */
+export interface TxtCommitInput {
+  bookId: string
+  /** Revision the renderer's text is based on (from txt:open / the previous commit). */
+  baseRevision: number
+  /** The whole new text; absent when only annotations changed. */
+  text?: string
+  /** Annotation rows to insert or rewrite (`txtAnnotationRef` required). */
+  upserts: SaveHighlightInput[]
+  deletedIds: string[]
+}
+
+export type TxtCommitErrorCode =
+  | 'not_found'
+  /** The stored revision isn't the one the commit is based on. */
+  | 'conflict'
+  /** The payload didn't validate (bad offsets, quote mismatch, wrong shape). */
+  | 'invalid'
+  | 'too_large'
+  /** The edited copy couldn't be written (disk full, folder not writable…). */
+  | 'write_failed'
+  | 'db_failed'
+
+export interface TxtCommitResult {
+  ok: boolean
+  /** The revision after the commit (unchanged when only annotations were written). */
+  revision?: number
+  errorCode?: TxtCommitErrorCode
+  errorMessage?: string
 }

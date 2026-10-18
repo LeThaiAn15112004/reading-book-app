@@ -10,13 +10,20 @@ const desktopRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '
 // workspace's binary (see docs/implementation_plan/e2e_testing/e2e_testing_survey.md §9).
 const electronPath = createRequire(path.join(desktopRoot, 'package.json'))('electron') as unknown as string
 
-/** Launch the built app on `userData`. Exported so a spec can relaunch it on the same data. */
+/**
+ * Launch the built app on `userData`. Exported so a spec can relaunch it on the same data.
+ *
+ * The window is HIDDEN by default (rendered off-screen, never shown — `E2E_HIDDEN` in
+ * electron/main.ts), so running the suite never takes over the desktop or steals focus. Set
+ * `READMATE_E2E_SHOW=1` to watch the run in a real window.
+ */
 export function launchApp(userData: string): Promise<ElectronApplication> {
+  const show = process.env.READMATE_E2E_SHOW === '1'
   return electron.launch({
     args: [path.join(desktopRoot, 'dist-electron/main.js'), `--user-data-dir=${userData}`],
     executablePath: electronPath,
     cwd: desktopRoot,
-    env: { ...process.env, READMATE_E2E: '1' },
+    env: { ...process.env, READMATE_E2E: '1', READMATE_E2E_HIDDEN: show ? '0' : '1' },
   })
 }
 

@@ -28,6 +28,7 @@
     "spike:e2e:launch": "vite build && node spikes/e2e-launch/launch.mjs",
     "e2e": "vite build && playwright test -c e2e/playwright.config.ts",
     "e2e:only": "playwright test -c e2e/playwright.config.ts",
+    "e2e:txt": "vite build && playwright test -c e2e/playwright.config.ts txt-",
     "e2e:typecheck": "tsc --noEmit -p e2e/tsconfig.json",
     "spike:pdf:fixtures": "node spikes/pdf-search/build-fixtures.mjs",
     "spike:pdf:search": "node --experimental-strip-types --import ./spikes/pdf-search/register-alias.mjs spikes/pdf-search/run-pdf-search.mjs",
@@ -36,7 +37,9 @@
     "spike:pdf:live": "npm run build --prefix ../book-reader-sdk && node --experimental-transform-types --import ./spikes/pdf-annotations/register-alias.mjs spikes/pdf-annotations/run-pdf-embedded-live.mjs",
     "spike:pdf:export": "npm run build --prefix ../book-reader-sdk && node --experimental-transform-types --import ./spikes/pdf-annotations/register-alias.mjs spikes/pdf-annotations/run-pdf-annotation-export.mjs",
     "spike:pdf:two-way": "npm run build --prefix ../book-reader-sdk && node --experimental-transform-types --import ./spikes/pdf-annotations/register-alias.mjs spikes/pdf-annotations/run-pdf-two-way.mjs",
-    "spike:pdf:compat-kit": "npm run build --prefix ../book-reader-sdk && node --experimental-transform-types --import ./spikes/pdf-annotations/register-alias.mjs spikes/pdf-annotations/build-compat-kit.mjs"
+    "spike:pdf:compat-kit": "npm run build --prefix ../book-reader-sdk && node --experimental-transform-types --import ./spikes/pdf-annotations/register-alias.mjs spikes/pdf-annotations/build-compat-kit.mjs",
+    "spike:txt:main": "npm run build --prefix ../book-reader-sdk && node --experimental-transform-types --import ./spikes/pdf-annotations/register-alias.mjs spikes/txt/run-txt-document.mjs",
+    "spike:txt:store": "npm run build --prefix ../book-reader-sdk && node --experimental-transform-types --import ./spikes/txt/register-alias.mjs spikes/txt/run-txt-store.mjs"
   },
   "dependencies": {
     "@huggingface/transformers": "^4.3.0",
