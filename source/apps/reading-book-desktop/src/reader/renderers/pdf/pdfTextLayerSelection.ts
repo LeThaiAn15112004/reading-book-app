@@ -11,7 +11,8 @@
  *    gaps hit it instead of the layer;
  *  - on every `selectionchange` it is moved right after the selection's moving end, so the text
  *    after that point is "behind" it and the browser extends the selection only up to there.
- * Pointer up / blur / keyup (outside a drag) put it back at the end.
+ * Pointer up / blur / keyup (outside a drag) put it back at the end, and a `selectionchange` with
+ * no pointer held never arms it.
  */
 
 /** Text layer div → its `.endOfContent` element. */
@@ -68,6 +69,14 @@ function enableGlobalListeners(): void {
       for (const textLayer of [...textLayers.keys()]) if (!textLayer.isConnected) textLayers.delete(textLayer)
       const selection = document.getSelection()
       if (!selection || selection.rangeCount === 0) {
+        resetAll()
+        return
+      }
+      // `selectionchange` often fires AFTER pointerup (end of a drag, double click, programmatic
+      // change). Arming the helper then would leave the full-layer `.endOfContent` parked behind
+      // the old selection with nothing left to reset it, and the next press in a gap (paragraph
+      // start) would snap the new selection to it. Only a held pointer drags.
+      if (!pointerDown) {
         resetAll()
         return
       }
