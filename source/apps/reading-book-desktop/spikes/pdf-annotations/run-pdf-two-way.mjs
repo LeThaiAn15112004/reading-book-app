@@ -11,11 +11,15 @@
  *   4. conflict          same field changed differently: frozen, nothing overwritten; resolved both ways
  *   5. deletions         deleted in Readmate while edited in the file → restored; removed in the file
  *                        while edited in Readmate → conflict
- *   6. locked file       write fails (read-only file) → pending, retried, then written
+ *   6. blocked files     read-only file → not written, status reported, no retries, written once writable;
+ *                        locked (EBUSY) → bounded retries, then waits; app-owned copy, signed (needs the
+ *                        user's confirmation, announced once), encrypted / unsupported → never written
  *   7. race              another app saves while Readmate prepares its write → restart, nothing lost
  *   8. crash recovery    transaction fails after the file write → next cycle links, no duplicates;
  *                        a row deleted while its own write is in flight leaves the file, not resurrected
- *   9. write-back off    Readmate edits never touch the file
+ *   9. always on         no switch: new AND existing books write; style change, move, undo of a delete
+ *                        write; a tag change doesn't touch the file; books.sha256 follows the file and
+ *                        "Locate file" still matches after write-backs
  *
  * Run: npm run spike:pdf:two-way   (builds the SDK bundle first)
  */
@@ -35,6 +39,10 @@ const { scanPdfAnnotationBytes } = await import('../../electron/pdf-sync/pdf-ann
 const { applyAnnotationOps } = await import('../../electron/pdf-sync/pdf-annotation-write.ts')
 const { writeFileSafely } = await import('../../electron/pdf-sync/pdf-annotation-export.ts')
 const { createPdfAnnotationSyncService, sha256Hex } = await import('../../electron/pdf-sync/pdf-annotation-sync-service.ts')
+const { checkPdfWritable } = await import('../../electron/pdf-sync/pdf-write-eligibility.ts')
+const { verifyPdf } = await import('../../electron/signature/signature-service.ts')
+const { getLibraryStore } = await import('../../electron/persistence/sqlite-library-store.ts')
+const { relinkBookToFile } = await import('../../electron/files/relink-book.ts')
 
 let passed = 0
 async function check(name, fn) {
@@ -59,19 +67,20 @@ const insertBook = db.prepare(
    VALUES (?, ?, ?, 'pdf', ?, 'reading', '{}', '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z')`,
 )
 const file = path.join(tmp, 'shared.pdf')
-const fileOff = path.join(tmp, 'off.pdf')
 insertBook.run('tw', 'Two-way', file, 'sha-tw')
-insertBook.run('off', 'Write-back off', fileOff, 'sha-off')
 registerOverlayIpc()
 const store = getOverlayStore()
-store.setPdfWriteBack('tw', true)
 
-const paths = { tw: file, off: fileOff }
+const paths = { tw: file }
 const events = []
 let scans = 0
 let writes = 0
 let beforeApplyOps = async () => {}
 let applyHook = null
+/** Make the file write fail like another app holding the file (errno code), or not. */
+let failWriteWith = null
+/** Per book: a fake signature verdict (the real `verifyPdf` is used otherwise). */
+const signatureOverride = {}
 const service = createPdfAnnotationSyncService({
   resolvePdfPath: async (id) => (paths[id] && fs.existsSync(paths[id]) ? paths[id] : null),
   scan: async (bytes) => {
@@ -82,8 +91,19 @@ const service = createPdfAnnotationSyncService({
   servedSha256: () => undefined,
   emit: (_t, e) => events.push({ ...e, at: Date.now() }),
   watcherOptions: { debounceMs: 60, stableMs: 120, pollMs: 400, maxWaitMs: 5000 },
+  retryTiming: { retryMs: 150, lockedMs: 120, lockedMax: 3 },
+  log: (m, d) => process.env.DEBUG2W && console.log(`    [${Date.now() % 100000}] ${m}`, d?.message ?? ''),
   twoWay: {
-    isEnabled: (id) => store.getPdfWriteBack(id),
+    // The same gate the app uses before every write; "managed copy" = a path under a `managed-copy` folder.
+    checkWritable: (id, filePath, bytes, allowSigned) =>
+      checkPdfWritable({
+        filePath,
+        bytes,
+        isReferenced: (p) => !p.includes('managed-copy'),
+        verifySignature: (b) => signatureOverride[id] ?? verifyPdf(b),
+        allowSigned,
+      }),
+    recordFileVersion: (id, sha, size) => getLibraryStore().updateFileFingerprint(id, sha, size),
     plan: async (id, items, complete) => planTwoWaySync({ items, complete, ledger: store.listTwoWayLedger(id), rows: await store.listHighlights(id) }),
     apply: (id, plan, items, after) => (applyHook ? applyHook(id, plan, items, after) : store.applyTwoWaySync(id, plan, items, after)),
     applyOps: async (bytes, ops) => {
@@ -92,6 +112,7 @@ const service = createPdfAnnotationSyncService({
     },
     writeFile: async (p, bytes) => {
       writes++
+      if (failWriteWith) throw Object.assign(new Error(`injected ${failWriteWith}`), { code: failWriteWith })
       await writeFileSafely(p, bytes)
     },
   },
@@ -152,7 +173,6 @@ async function externalSave(edit) {
 
 console.log('two-way sync')
 fs.writeFileSync(file, buildAnnotatedPdf())
-fs.writeFileSync(fileOff, buildAnnotatedPdf())
 await service.watch(target, 'tw')
 await until(() => events.some((e) => e.reason === 'open'), 6000, 'open')
 
@@ -164,7 +184,8 @@ await check('1a. a row made in Readmate is written into the PDF (standard /Highl
   const item = await written(a.id)
   assert.equal(item.subtype, 'Highlight')
   assert.equal(item.contents, 'from Readmate')
-  assert.equal(lastEvent().writeStatus, 'written')
+  // The file is replaced before the transaction commits and the event is pushed: wait for the event.
+  await until(() => lastEvent()?.writeStatus === 'written', 8000, 'the written event')
 })
 
 await check('1b. Readmate’s own write is not synced back (no loop, no duplicate)', async () => {
@@ -273,14 +294,41 @@ await check('5. deleted in Readmate while edited in the file → restored; remov
   await until(async () => !!(await written(e.id)), 8000, 're-added')
 })
 
-await check('6. a locked (read-only) file: the write fails, stays pending, and is retried once it’s free', async () => {
+await check('6a. a read-only file: not written, reported once, no retries; written as soon as it is writable', async () => {
   const f = await saveRow({ ...rectRow(1, 0.7) })
+  const writesBefore = writes
+  const eventsBefore = events.length
   fs.chmodSync(file, 0o444)
   service.notifyAppChange('tw')
-  await until(() => events.some((e) => e.writeStatus === 'locked' || e.writeStatus === 'failed'), 8000, 'locked status')
-  assert.equal(await written(f.id), undefined)
+  await until(() => events.some((e) => e.writeStatus === 'read_only'), 8000, 'read_only status')
+  assert.equal(await written(f.id), undefined, 'nothing written')
+  assert.equal(writes, writesBefore, 'no write attempt at all')
+  await sleep(1000)
+  assert.equal(writes, writesBefore, 'and no retries')
+  assert.equal(events.slice(eventsBefore).filter((e) => e.writeStatus === 'read_only').length, 1, 'announced once')
+  assert.equal((await rows()).some((r) => r.id === f.id), true, 'the row is kept')
   fs.chmodSync(file, 0o666)
-  await until(async () => !!(await written(f.id)), 15000, 'retried write')
+  service.notifyAppChange('tw')
+  await until(async () => !!(await written(f.id)), 10000, 'written once writable')
+})
+
+await check('6b. a file another app holds (EBUSY): bounded retries, reported once, then written when free', async () => {
+  const f = await saveRow({ ...rectRow(1, 0.75) })
+  const writesBefore = writes
+  const eventsBefore = events.length
+  failWriteWith = 'EBUSY'
+  service.notifyAppChange('tw')
+  await until(() => events.some((e) => e.writeStatus === 'locked'), 8000, 'locked status')
+  await sleep(2000)
+  const attempts = writes - writesBefore
+  assert.ok(attempts >= 2 && attempts <= 4, `1 attempt + at most 3 retries (got ${attempts})`)
+  await sleep(1200)
+  assert.equal(writes - writesBefore, attempts, 'retrying stopped')
+  assert.equal(await written(f.id), undefined)
+  assert.equal(events.slice(eventsBefore).filter((e) => e.writeStatus === 'locked').length, 1, 'announced once')
+  failWriteWith = null
+  service.notifyAppChange('tw')
+  await until(async () => !!(await written(f.id)), 10000, 'written when free')
 })
 
 await check('7. another app saves while Readmate prepares its write → the cycle restarts, nothing is lost', async () => {
@@ -327,6 +375,9 @@ await check('8b. a row deleted while its own write is in flight is not resurrect
     if (deletedMidWrite) return
     deletedMidWrite = true
     await invoke(OverlayChannels.deleteHighlight, { bookId: 'tw', id: r.id })
+    // The real delete handler notifies the coordinator (`notifyAppChange`); this spike's own service
+    // is not the one the handler talks to, so it is told the same way.
+    service.notifyAppChange('tw')
   }
   service.notifyAppChange('tw')
   await until(() => deletedMidWrite, 8000, 'delete during write')
@@ -336,15 +387,158 @@ await check('8b. a row deleted while its own write is in flight is not resurrect
   assert.equal((await rows()).some((x) => x.note === 'deleted mid-write'), false, 'not imported back')
 })
 
-await check('9. write-back off: Readmate edits never touch the file', async () => {
-  const before = sha256Hex(fs.readFileSync(fileOff))
-  const target2 = { id: 2, isDestroyed: () => false, once: () => {} }
-  await service.watch(target2, 'off')
-  await sleep(400)
-  await invoke(OverlayChannels.saveHighlight, { bookId: 'off', styleKind: 'highlight', colorHex: '#FFEB3B', ...rectRow(0, 0.1) })
-  service.notifyAppChange('off')
+/** Another book with its own window / file (ids 10+), for the cases below. */
+let nextTarget = 10
+async function openBook(id, title, bytes, folder = tmp) {
+  fs.mkdirSync(folder, { recursive: true })
+  const p = path.join(folder, `${id}.pdf`)
+  fs.writeFileSync(p, bytes)
+  insertBook.run(id, title, p, `sha-${id}`)
+  paths[id] = p
+  const t = { id: nextTarget++, isDestroyed: () => false, once: () => {} }
+  return { id, path: p, target: t }
+}
+const saveFor = (id, input) => invoke(OverlayChannels.saveHighlight, { bookId: id, styleKind: 'highlight', colorHex: '#FFEB3B', ...input })
+const statusCount = (id, status) => events.filter((e) => e.bookId === id && e.writeStatus === status).length
+const itemsOf = async (p) => (await scanPdfAnnotationBytes(new Uint8Array(fs.readFileSync(p)))).items
+
+await check('9a. always on: a book that already had annotations (no switch, no row) is written when opened; new books too', async () => {
+  // "Existing book": annotations made before this behaviour existed, saved straight into SQLite.
+  const old = await openBook('old', 'Existing book', buildAnnotatedPdf())
+  for (const [i, y] of [0.1, 0.3].entries()) {
+    await store.saveHighlight({
+      bookId: 'old',
+      id: `old-${i}`,
+      locator: JSON.parse(rectRow(0, y).locatorRef),
+      styleKind: 'highlight',
+      colorHex: '#FFEB3B',
+      tags: [],
+      pdfAnnotation: JSON.parse(rectRow(0, y).pdfAnnotationRef),
+    })
+  }
+  await service.watch(old.target, 'old')
+  await until(async () => (await itemsOf(old.path)).length === 2, 10000, 'existing annotations written on open')
+  assert.deepEqual((await itemsOf(old.path)).map((i) => i.nm).sort(), ['readmate:old-0', 'readmate:old-1'])
+  // A new book: the first annotation is written with nothing set up.
+  const fresh = await openBook('fresh', 'New book', buildAnnotatedPdf())
+  await service.watch(fresh.target, 'fresh')
+  await sleep(500)
+  const r = await saveFor('fresh', rectRow(0, 0.2))
+  service.notifyAppChange('fresh')
+  await until(async () => (await itemsOf(fresh.path)).some((i) => i.nm === `readmate:${r.id}`), 10000, 'new book written')
+  // There is no write-back switch left: the legacy table is never read or written.
+  assert.equal(db.prepare('SELECT COUNT(*) n FROM pdf_annotation_write_back').get().n, 0)
+})
+
+await check('9b. kind change, move, undo of a delete are written; a tag change does not touch the file', async () => {
+  const g = await saveRow({ ...rectRow(0, 0.2), note: 'to be changed' })
+  service.notifyAppChange('tw')
+  await until(async () => !!(await written(g.id)), 8000, 'written')
+  const objectId = (await written(g.id)).objectId
+  // Highlight → underline: same object, new subtype.
+  await saveRow({ id: g.id, ...rectRow(0, 0.2), styleKind: 'underline', note: 'to be changed' })
+  service.notifyAppChange('tw')
+  await until(async () => (await written(g.id))?.subtype === 'Underline', 8000, 'kind change')
+  assert.equal((await written(g.id)).objectId, objectId)
+  // Move: geometry follows.
+  await saveRow({ id: g.id, ...rectRow(0, 0.6), styleKind: 'underline', note: 'to be changed' })
+  service.notifyAppChange('tw')
+  await until(async () => Math.abs(((await written(g.id))?.rects[0]?.y ?? 0) - 0.6) < 0.004, 8000, 'move')
+  // Tags are not a PDF concept: changing them must not rewrite the file.
+  const shaBefore = sha256Hex(fs.readFileSync(file))
+  const writesBefore = writes
+  await saveRow({ id: g.id, ...rectRow(0, 0.6), styleKind: 'underline', note: 'to be changed', tags: ['x'] })
+  service.notifyAppChange('tw')
   await sleep(1200)
-  assert.equal(sha256Hex(fs.readFileSync(fileOff)), before)
+  assert.equal(writes, writesBefore)
+  assert.equal(sha256Hex(fs.readFileSync(file)), shaBefore)
+  // Delete, then undo (the same row saved again): removed, then added back, once.
+  await invoke(OverlayChannels.deleteHighlight, { bookId: 'tw', id: g.id })
+  service.notifyAppChange('tw')
+  await until(async () => !(await written(g.id)), 8000, 'delete written')
+  await saveRow({ id: g.id, ...rectRow(0, 0.6), styleKind: 'underline', note: 'to be changed' })
+  service.notifyAppChange('tw')
+  await until(async () => !!(await written(g.id)), 8000, 'undo written')
+  assert.equal((await fileItems()).filter((i) => i.nm === `readmate:${g.id}`).length, 1)
+})
+
+await check('9c. an app-owned copy is never written (status managed_copy, data kept)', async () => {
+  const managed = await openBook('managed', 'Managed copy', buildAnnotatedPdf(), path.join(tmp, 'managed-copy'))
+  const before = sha256Hex(fs.readFileSync(managed.path))
+  const writesBefore = writes
+  await service.watch(managed.target, 'managed')
+  await sleep(500)
+  const r = await saveFor('managed', rectRow(0, 0.2))
+  service.notifyAppChange('managed')
+  await until(() => statusCount('managed', 'managed_copy') >= 1, 8000, 'managed_copy status')
+  await sleep(600)
+  assert.equal(sha256Hex(fs.readFileSync(managed.path)), before)
+  assert.equal(writes, writesBefore)
+  assert.equal(statusCount('managed', 'managed_copy'), 1, 'announced once')
+  assert.equal(statusCount('managed', 'written'), 0, 'never reported as written')
+  assert.equal((await store.listHighlights('managed')).some((h) => h.id === r.id), true, 'row kept')
+})
+
+await check('9d. a signed PDF is not written silently: announced once, written only after the user confirms', async () => {
+  const signed = await openBook('signed', 'Signed', buildAnnotatedPdf())
+  signatureOverride.signed = { status: 'valid', signerName: 'Ann' }
+  const before = sha256Hex(fs.readFileSync(signed.path))
+  await service.watch(signed.target, 'signed')
+  await sleep(500)
+  const r1 = await saveFor('signed', rectRow(0, 0.2))
+  service.notifyAppChange('signed')
+  await until(() => statusCount('signed', 'signed') >= 1, 8000, 'signed status')
+  assert.equal(events.find((e) => e.writeStatus === 'signed' && e.bookId === 'signed').signerName, 'Ann')
+  assert.equal(sha256Hex(fs.readFileSync(signed.path)), before)
+  const r2 = await saveFor('signed', rectRow(0, 0.4))
+  service.notifyAppChange('signed')
+  await sleep(1000)
+  assert.equal(statusCount('signed', 'signed'), 1, 'not announced again')
+  assert.equal(sha256Hex(fs.readFileSync(signed.path)), before, 'still untouched')
+  // Wrong window / book can't confirm.
+  assert.equal(service.allowSignedWrite({ id: 999 }, 'signed'), false)
+  assert.equal(service.allowSignedWrite(signed.target, 'tw'), false)
+  assert.equal(service.allowSignedWrite(signed.target, 'signed'), true)
+  await until(async () => (await itemsOf(signed.path)).length === 2, 10000, 'written after confirmation')
+  assert.ok((await itemsOf(signed.path)).some((i) => i.nm === `readmate:${r1.id}`) && (await itemsOf(signed.path)).some((i) => i.nm === `readmate:${r2.id}`))
+  // A signature that can't even be evaluated blocks too (prefer not writing).
+  signatureOverride.signed = { status: 'unsupported' }
+  const x = await openBook('unverifiable', 'Unverifiable', buildAnnotatedPdf())
+  signatureOverride.unverifiable = { status: 'unsupported' }
+  await service.watch(x.target, 'unverifiable')
+  await sleep(500)
+  await saveFor('unverifiable', rectRow(0, 0.2))
+  service.notifyAppChange('unverifiable')
+  await until(() => statusCount('unverifiable', 'signed') >= 1, 8000, 'unverifiable blocks')
+})
+
+await check('9e. encrypted and structurally unsupported PDFs are refused by the write gate', async () => {
+  const plain = buildAnnotatedPdf()
+  const gate = (bytes) =>
+    checkPdfWritable({ filePath: path.join(tmp, 'tw.pdf'), bytes: new Uint8Array(bytes), isReferenced: () => true, verifySignature: verifyPdf, allowSigned: false })
+  fs.writeFileSync(path.join(tmp, 'tw.pdf'), plain)
+  assert.deepEqual(await gate(plain), { ok: true })
+  const encrypted = Buffer.from(plain.toString('latin1').replace('trailer\n<< /Size', 'trailer\n<< /Encrypt 99 0 R /Size'), 'latin1')
+  assert.deepEqual(await gate(encrypted), { ok: false, reason: 'encrypted' })
+  const broken = Buffer.from(plain.toString('latin1').replace(/startxref\n\d+/, 'startxref\n12'), 'latin1')
+  assert.deepEqual(await gate(broken), { ok: false, reason: 'unsupported_pdf' })
+})
+
+await check('9f. books.sha256 follows the file after write-backs and external saves; Locate file still matches', async () => {
+  const lib = getLibraryStore()
+  const book = await lib.findById('tw')
+  assert.equal(book.sha256, sha256Hex(fs.readFileSync(file)), 'the recorded hash is the file on disk')
+  // An external save changes the file: the next sync records it.
+  await externalSave((list) => list.map((x) => ({ ...x })))
+  await until(async () => (await lib.findById('tw')).sha256 === sha256Hex(fs.readFileSync(file)), 10000, 'external version recorded')
+  // The user moved the file: relinking the moved copy matches by hash.
+  const moved = path.join(tmp, 'moved', 'shared-moved.pdf')
+  fs.mkdirSync(path.dirname(moved), { recursive: true })
+  fs.copyFileSync(file, moved)
+  assert.deepEqual(await relinkBookToFile('tw', moved), { ok: true })
+  assert.equal((await lib.findById('tw')).filePath, moved)
+  // Put it back for the checks that follow.
+  lib.updateFilePath('tw', file)
 })
 
 await check('no duplicates overall: every row ↔ one annotation, ledger keys unique', async () => {

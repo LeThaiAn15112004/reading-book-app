@@ -17,10 +17,12 @@ export async function invoke(channel, ...args) {
   return fn({}, ...args)
 }
 
+import os from 'node:os'
+import path from 'node:path'
+
+/** `userData` & co. point into a temp folder (the checks that need them only compare paths). */
 export const app = {
-  getPath: () => {
-    throw new Error('app.getPath is not available in the PDF annotation checks')
-  },
+  getPath: (name) => path.join(os.tmpdir(), 'readmate-spike-userdata', String(name)),
 }
 
 /** Used by the export handler (save dialog); the checks never open a real window or dialog. */

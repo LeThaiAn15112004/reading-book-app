@@ -1,4 +1,4 @@
-import { readFileSync, writeFileSync } from 'node:fs'
+import { chmodSync, readFileSync, writeFileSync } from 'node:fs'
 import type { Page } from '@playwright/test'
 import { buildAnnotatedPdf } from '../support/build-annotated-pdf.mjs'
 import { textPdfLine } from '../support/build-text-pdf.mjs'
@@ -7,10 +7,11 @@ import { goToPage, openBook, pdfPage } from '../support/reader'
 
 /**
  * Two-way sync (docs/implementation_plan/pdf_annotation_two_way_sync.md) in the built Electron app,
- * the PDF staying open: write-back is enabled from the More menu (with its confirmation); an
- * annotation made, recolored and deleted in Readmate lands in the PDF file (checked with pdf.js in
- * the test process); a change "another app" saves into the file comes back into the reader.
- * Latency (UI action → file written; file written → UI updated) is attached to the result.
+ * the PDF staying open. Write-back is ALWAYS on — there is nothing to enable: an annotation made,
+ * recolored, deleted and un-deleted (undo) in Readmate lands in the PDF file (checked with pdf.js in
+ * the test process); a change "another app" saves into the file comes back into the reader; a
+ * read-only file is never written and the user is told why. Latency (UI action → file written; file
+ * written → UI updated) is attached to the result.
  */
 
 type FileAnnotation = { subtype: string; nm: string; color: string; contents: string }
@@ -77,15 +78,11 @@ test('annotations flow both ways between Readmate and the PDF file while it is o
   await openBook(reader, file)
   await goToPage(page, 1)
 
-  // Enable write-back (off by default) — the confirmation names what will happen.
+  // There is no write-back switch (neither in the menu nor anywhere else): annotations just sync.
   await openMore(page)
-  const toggle = page.getByRole('menuitemcheckbox', { name: /Sync annotations into this PDF file/ })
-  await expect(toggle).toHaveAttribute('aria-checked', 'false')
-  await toggle.click()
-  const dialog = page.getByRole('alertdialog', { name: 'Sync annotations into this PDF file?' })
-  await expect(dialog).toBeVisible()
-  await dialog.getByRole('button', { name: 'Write into the PDF' }).click()
-  await expect(page.getByText('Annotations will be written into this PDF file.')).toBeVisible()
+  await expect(page.getByRole('menuitem', { name: 'Export PDF with annotations…' })).toBeVisible()
+  await expect(page.getByText(/Sync annotations into this PDF file/)).toHaveCount(0)
+  await page.keyboard.press('Escape')
 
   // 1. A highlight made in Readmate is written into the file.
   let t = Date.now()
@@ -136,6 +133,36 @@ test('annotations flow both ways between Readmate and the PDF file while it is o
   latency.push(`Readmate delete → file: ${Date.now() - t} ms`)
   await expect(mark).toHaveCount(0)
 
+  // 5. Undo the delete (Ctrl+Z) → the annotation comes back, in the file too, once.
+  await page.keyboard.press('Control+z')
+  await expect(mark).toHaveCount(1)
+  await expect.poll(async () => (await fileAnnotations(file)).length, { timeout: 15_000, intervals: [100] }).toBe(1)
+  await page.waitForTimeout(1500)
+  expect((await fileAnnotations(file)).length).toBe(1)
+
   test.info().annotations.push({ type: 'latency', description: latency.join('; ') })
   console.log('[two-way latency]', latency.join(' | '))
+})
+
+test('a read-only PDF is never written: the user is told, the annotation is kept, and it is written once the file is writable', async ({ reader }) => {
+  test.setTimeout(120_000)
+  const file = reader.writeFixture('read-only.pdf', buildAnnotatedPdf())
+  const page = reader.page
+  await openBook(reader, file)
+  await goToPage(page, 1)
+  try {
+    chmodSync(file, 0o444)
+    await highlightLine(page, 1, 2)
+    await expect(pdfPage(page, 1).locator('.rb-pdf-annot[data-kind="highlight"]')).toHaveCount(1)
+    await expect(page.getByText(/read-only, so your annotations are kept in Readmate but not written into it/)).toBeVisible({ timeout: 15_000 })
+    await page.waitForTimeout(1500)
+    expect(await fileAnnotations(file)).toEqual([]) // nothing written, nothing reported as written
+
+    // Writable again: the next annotation flushes everything that was pending.
+    chmodSync(file, 0o666)
+    await highlightLine(page, 1, 5)
+    await expect.poll(async () => (await fileAnnotations(file)).filter((a) => a.subtype === 'Highlight').length, { timeout: 15_000, intervals: [100] }).toBe(2)
+  } finally {
+    chmodSync(file, 0o666)
+  }
 })

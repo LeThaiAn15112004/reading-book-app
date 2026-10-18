@@ -16,8 +16,8 @@ import { fileURLToPath } from 'node:url'
 import { Worker } from 'node:worker_threads'
 import { servedBookSha256 } from '../files/open-book-content'
 import { bookFileStorage, isPathInsideUserData, resolveBookFile } from '../files/sandbox'
-import fsp from 'node:fs/promises'
-import { assertPdfWritable, PdfWriteError, type AnnotationUpdate } from '../pdf-sync/pdf-incremental-writer'
+import type { AnnotationUpdate } from '../pdf-sync/pdf-incremental-writer'
+import { checkPdfWritable } from '../pdf-sync/pdf-write-eligibility'
 import { exportAnnotatedPdf as runExport, writeFileSafely } from '../pdf-sync/pdf-annotation-export'
 import type { PdfAnnotationApplyOutput } from '../pdf-sync/pdf-annotation-write'
 import { verifyPdf } from '../signature/signature-service'
@@ -46,9 +46,7 @@ import type {
   ExportAnnotatedPdfResult,
   PdfAnnotationConflictDto,
   PdfEmbeddedAnnotationsChangedDto,
-  PdfWriteBackStateDto,
   ResolvePdfAnnotationConflictResult,
-  SetPdfWriteBackResult,
   WatchPdfEmbeddedAnnotationsResult,
 } from './api-types'
 import { OverlayChannels } from './channels'
@@ -370,36 +368,11 @@ export function registerOverlayIpc(): void {
     },
   )
 
-  ipcMain.removeHandler(OverlayChannels.getPdfWriteBack)
-  ipcMain.handle(OverlayChannels.getPdfWriteBack, async (_event, bookId: unknown): Promise<PdfWriteBackStateDto> => {
-    void _event
-    if (typeof bookId !== 'string' || !bookId.trim()) return { enabled: false, available: false, reason: 'not_found' }
-    const id = bookId.trim()
-    const check = await writeBackEligibility(id)
-    return { enabled: overlays.getPdfWriteBack(id) && check.available, ...check }
+  ipcMain.removeHandler(OverlayChannels.confirmSignedPdfWrite)
+  ipcMain.handle(OverlayChannels.confirmSignedPdfWrite, async (event, bookId: unknown): Promise<OkResult> => {
+    if (typeof bookId !== 'string' || !bookId.trim()) return { ok: false }
+    return { ok: pdfAnnotationSync().allowSignedWrite(event.sender, bookId.trim()) }
   })
-
-  ipcMain.removeHandler(OverlayChannels.setPdfWriteBack)
-  ipcMain.handle(
-    OverlayChannels.setPdfWriteBack,
-    async (_event, bookId: unknown, enabled: unknown, options: unknown): Promise<SetPdfWriteBackResult> => {
-      void _event
-      if (typeof bookId !== 'string' || !bookId.trim()) return { ok: false, enabled: false, errorCode: 'not_found' }
-      const id = bookId.trim()
-      if (enabled !== true) {
-        overlays.setPdfWriteBack(id, false)
-        return { ok: true, enabled: false }
-      }
-      const check = await writeBackEligibility(id)
-      if (!check.available) return { ok: false, enabled: false, errorCode: check.reason }
-      const acknowledged = !!(options && typeof options === 'object' && (options as { acknowledgeSignature?: unknown }).acknowledgeSignature === true)
-      if (check.signed && !acknowledged) return { ok: false, enabled: false, errorCode: 'signed_needs_confirmation', signerName: check.signerName }
-      overlays.setPdfWriteBack(id, true)
-      // Write what Readmate already holds into the file right away.
-      pdfAnnotationSync().notifyAppChange(id)
-      return { ok: true, enabled: true }
-    },
-  )
 
   ipcMain.removeHandler(OverlayChannels.listPdfAnnotationConflicts)
   ipcMain.handle(OverlayChannels.listPdfAnnotationConflicts, async (_event, bookId: unknown): Promise<PdfAnnotationConflictDto[]> => {
@@ -534,34 +507,9 @@ function toChangedDto(event: PdfAnnotationSyncEvent): PdfEmbeddedAnnotationsChan
     complete: event.complete,
     conflicts: event.outcome.conflicts.map(({ noteId, conflict }) => ({ noteId, kind: conflict.kind, fields: conflict.fields })),
     writeStatus: event.writeStatus,
+    signerName: event.signerName,
     timing: { totalMs: event.timing.totalMs, scanMs: event.timing.scanMs },
   }
-}
-
-/**
- * Can Readmate write annotations into this book's own file? Only a referenced (user-owned) PDF the
- * writer can append to; reports a digital signature so enabling can ask first.
- */
-async function writeBackEligibility(bookId: string): Promise<Omit<PdfWriteBackStateDto, 'enabled'>> {
-  const book = await getLibraryStore().findById(bookId)
-  if (!book || book.format !== 'pdf') return { available: false, reason: 'not_found' }
-  const file = await resolveBookFile(book)
-  if (!file.ok) return { available: false, reason: 'not_found' }
-  if (bookFileStorage(file.path) !== 'referenced') return { available: false, reason: 'managed_copy' }
-  let bytes: Buffer
-  try {
-    bytes = await fsp.readFile(file.path)
-  } catch {
-    return { available: false, reason: 'not_found' }
-  }
-  try {
-    assertPdfWritable(new Uint8Array(bytes))
-  } catch (err) {
-    return { available: false, reason: err instanceof PdfWriteError ? err.code : 'unsupported_pdf' }
-  }
-  const signature = verifyPdf(bytes)
-  const signed = signature.status !== 'unsigned'
-  return { available: true, signed, signerName: signed ? signature.signerName : undefined }
 }
 
 let syncService: PdfAnnotationSyncService | null = null
@@ -584,7 +532,17 @@ function pdfAnnotationSync(): PdfAnnotationSyncService {
     },
     log: (message, detail) => console.warn(message, detail ?? ''),
     twoWay: {
-      isEnabled: (bookId) => getOverlayStore().getPdfWriteBack(bookId),
+      checkWritable: (_bookId, filePath, bytes, allowSigned) =>
+        checkPdfWritable({
+          filePath,
+          bytes,
+          isReferenced: (p) => bookFileStorage(p) === 'referenced',
+          verifySignature: verifyPdf,
+          allowSigned,
+        }),
+      recordFileVersion: (bookId, sha256, sizeBytes) => {
+        getLibraryStore().updateFileFingerprint(bookId, sha256, sizeBytes)
+      },
       plan: async (bookId, items, complete) =>
         planTwoWaySync({ items, complete, ledger: getOverlayStore().listTwoWayLedger(bookId), rows: await getOverlayStore().listHighlights(bookId) }),
       apply: (bookId, plan, items, after) => getOverlayStore().applyTwoWaySync(bookId, plan, items, after),

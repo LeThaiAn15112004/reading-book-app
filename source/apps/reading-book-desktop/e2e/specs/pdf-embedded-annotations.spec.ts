@@ -6,6 +6,7 @@ import {
   lineBaseline,
 } from '../support/build-annotated-pdf.mjs'
 import { textPdfLine } from '../support/build-text-pdf.mjs'
+import { readmateAnnotationSpecs } from '../support/readmate-annotations.mjs'
 import { expect, launchApp, test } from '../fixtures/app'
 import { goToPage, openBook, pdfPage } from '../support/reader'
 
@@ -115,6 +116,10 @@ test('annotations embedded in a PDF are imported on every open, without duplicat
 
   // 2. "Another viewer" rewrites the file: highlight recolored, StrikeOut removed, two annotations
   //    added, every object renumbered. The file is the user's own (referenced in place).
+  // Write-back is always on, so the highlight made in the app is written into the file first; the
+  // other viewer's save keeps it (a viewer keeps annotations it doesn't know), `/NM` included.
+  await expect.poll(async () => (await readmateAnnotationSpecs(file)).length, { timeout: 15_000, intervals: [100] }).toBe(1)
+  const carried = await readmateAnnotationSpecs(file)
   await reader.app.close()
   const edited = [
     { ...SAMPLE_ANNOTATIONS[0], color: [0, 0.6, 1], contents: 'Recolored in Foxit' },
@@ -122,6 +127,7 @@ test('annotations embedded in a PDF are imported on every open, without duplicat
     ...SAMPLE_ANNOTATIONS.slice(3),
     { page: 1, subtype: 'Highlight', lines: [8], color: [0.5, 0.8, 0.5], contents: 'Added in Foxit' },
     { page: 3, subtype: 'Underline', lines: [2], color: [0.6, 0.4, 0.9] },
+    ...carried,
   ]
   const before = readFileSync(file)
   writeFileSync(file, buildAnnotatedPdf({ annotations: edited, padObjects: 9 }))

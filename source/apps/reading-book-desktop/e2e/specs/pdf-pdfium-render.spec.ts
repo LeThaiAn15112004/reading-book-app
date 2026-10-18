@@ -68,6 +68,9 @@ test('annotations written by Readmate are rendered by PDFium (Chromium / Edge en
   test.setTimeout(150_000)
   const source = buildAnnotatedPdf()
   const file = reader.writeFixture('pdfium.pdf', source)
+  // Write-back is always on, so the book file itself gets the annotations. A pristine copy of the
+  // original bytes is the "before" picture.
+  const pristine = reader.writeFixture('pdfium-pristine.pdf', source)
   const target = path.join(reader.workDir, 'pdfium-exported.pdf')
   await reader.app.evaluate(({ dialog }, out) => {
     dialog.showSaveDialog = (async () => ({ canceled: false, filePath: out })) as typeof dialog.showSaveDialog
@@ -88,18 +91,23 @@ test('annotations written by Readmate are rendered by PDFium (Chromium / Edge en
   await page.getByRole('menuitem', { name: 'Export PDF with annotations…' }).click()
   await expect(page.getByText(/Exported “pdfium-exported\.pdf”/)).toBeVisible({ timeout: 20_000 })
   expect(readFileSync(target).length).toBeGreaterThan(source.length)
+  // …and the book file was written by write-back (3 annotations appended after the original bytes).
+  await expect.poll(() => readFileSync(file).length, { timeout: 15_000, intervals: [100] }).toBeGreaterThan(source.length)
 
-  const before = await renderWithPdfium(reader.app, file, test.info().outputPath('pdfium-source.png'))
+  const before = await renderWithPdfium(reader.app, pristine, test.info().outputPath('pdfium-source.png'))
   const after = await renderWithPdfium(reader.app, target, test.info().outputPath('pdfium-exported.png'))
+  const book = await renderWithPdfium(reader.app, file, test.info().outputPath('pdfium-book.png'))
   await test.info().attach('pdfium-source', { path: test.info().outputPath('pdfium-source.png'), contentType: 'image/png' })
   await test.info().attach('pdfium-exported', { path: test.info().outputPath('pdfium-exported.png'), contentType: 'image/png' })
-  console.log('[pdfium census] source', JSON.stringify(before), 'exported', JSON.stringify(after))
+  console.log('[pdfium census] source', JSON.stringify(before), 'exported', JSON.stringify(after), 'book file', JSON.stringify(book))
 
   // The viewer actually rendered a page (not a blank / error view).
   expect(before.total).toBeGreaterThan(100_000)
   // The highlight shows up in PDFium's rendering of the exported file, and not in the source.
   expect(before.yellow).toBeLessThan(50)
   expect(after.yellow).toBeGreaterThan(before.yellow + 500)
+  // The write-back in the book file itself renders the same way in PDFium.
+  expect(book.yellow).toBeGreaterThan(before.yellow + 500)
 })
 
 /**

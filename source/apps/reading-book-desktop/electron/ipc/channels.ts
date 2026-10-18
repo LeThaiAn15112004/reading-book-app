@@ -85,10 +85,8 @@ export const OverlayChannels = {
   pdfEmbeddedAnnotationsChanged: 'overlay:pdfEmbeddedAnnotationsChanged',
   /** Renderer → main: save a NEW PDF with the book's annotations written in (save dialog in Main). */
   exportAnnotatedPdf: 'overlay:exportAnnotatedPdf',
-  /** Renderer → main: is writing annotations into this book's PDF enabled / possible (two-way sync)? */
-  getPdfWriteBack: 'overlay:getPdfWriteBack',
-  /** Renderer → main: enable / disable writing annotations into this book's PDF file. */
-  setPdfWriteBack: 'overlay:setPdfWriteBack',
+  /** Renderer → main: the user confirmed writing annotations into this (digitally signed) PDF. */
+  confirmSignedPdfWrite: 'overlay:confirmSignedPdfWrite',
   /** Renderer → main: open two-way conflicts of a book. */
   listPdfAnnotationConflicts: 'overlay:listPdfAnnotationConflicts',
   /** Renderer → main: resolve one conflict (keep Readmate's version / use the PDF's). */

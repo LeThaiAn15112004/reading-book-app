@@ -141,9 +141,7 @@ const api: DesktopApi = {
     },
     exportAnnotatedPdf: (bookId, options) =>
       ipcRenderer.invoke(OverlayChannels.exportAnnotatedPdf, bookId, options),
-    getPdfWriteBack: (bookId) => ipcRenderer.invoke(OverlayChannels.getPdfWriteBack, bookId),
-    setPdfWriteBack: (bookId, enabled, options) =>
-      ipcRenderer.invoke(OverlayChannels.setPdfWriteBack, bookId, enabled, options),
+    confirmSignedPdfWrite: (bookId) => ipcRenderer.invoke(OverlayChannels.confirmSignedPdfWrite, bookId),
     listPdfAnnotationConflicts: (bookId) =>
       ipcRenderer.invoke(OverlayChannels.listPdfAnnotationConflicts, bookId),
     resolvePdfAnnotationConflict: (bookId, noteId, choice) =>

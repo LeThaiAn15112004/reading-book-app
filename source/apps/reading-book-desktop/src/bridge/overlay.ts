@@ -26,9 +26,7 @@ export const overlayApi = {
   ) => window.api.overlay.onPdfEmbeddedAnnotationsChanged(...args),
   exportAnnotatedPdf: (...args: Parameters<typeof window.api.overlay.exportAnnotatedPdf>) =>
     window.api.overlay.exportAnnotatedPdf(...args),
-  getPdfWriteBack: (bookId: string) => window.api.overlay.getPdfWriteBack(bookId),
-  setPdfWriteBack: (...args: Parameters<typeof window.api.overlay.setPdfWriteBack>) =>
-    window.api.overlay.setPdfWriteBack(...args),
+  confirmSignedPdfWrite: (bookId: string) => window.api.overlay.confirmSignedPdfWrite(bookId),
   listPdfAnnotationConflicts: (bookId: string) => window.api.overlay.listPdfAnnotationConflicts(bookId),
   resolvePdfAnnotationConflict: (...args: Parameters<typeof window.api.overlay.resolvePdfAnnotationConflict>) =>
     window.api.overlay.resolvePdfAnnotationConflict(...args),

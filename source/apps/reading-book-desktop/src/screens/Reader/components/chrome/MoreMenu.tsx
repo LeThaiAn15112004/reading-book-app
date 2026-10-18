@@ -6,8 +6,6 @@ type MoreMenuProps = {
   onTrash: () => void
   /** PDF only: save a new PDF with the annotations written in. Hidden when absent. */
   onExportPdf?: () => void
-  /** PDF only: "Sync annotations into this PDF file" (two-way sync). Hidden when absent. */
-  writeBack?: { enabled: boolean; available: boolean; onToggle: () => void }
 }
 
 const itemClass =
@@ -20,7 +18,6 @@ export function MoreMenu({
   onBookInfo,
   onTrash,
   onExportPdf,
-  writeBack,
 }: MoreMenuProps) {
   if (!open) return null
 
@@ -52,18 +49,6 @@ export function MoreMenu({
       {onExportPdf ? (
         <button className={itemClass} type="button" role="menuitem" onClick={onExportPdf}>
           Export PDF with annotations…
-        </button>
-      ) : null}
-      {writeBack ? (
-        <button
-          className={`${itemClass}${writeBack.available ? '' : ' opacity-60'}`}
-          type="button"
-          role="menuitemcheckbox"
-          aria-checked={writeBack.enabled}
-          onClick={writeBack.onToggle}
-        >
-          <span aria-hidden className="w-4 text-center">{writeBack.enabled ? '✓' : ''}</span>
-          Sync annotations into this PDF file
         </button>
       ) : null}
       <div className="mx-1.5 my-1 h-px bg-lib-border-soft" />

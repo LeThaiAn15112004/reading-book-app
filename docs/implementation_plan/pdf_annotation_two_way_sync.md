@@ -18,21 +18,42 @@ standard (ISO 32000 annotation dictionaries, `/NM`, incremental updates), not on
 | Ledger schema, identity, hashes | 023 ledger; `/NM` keys with anchor fallback; source / content hashes |
 | Test environment | Windows 11. **Foxit PDF Reader 2024.4.0.27683** and **Microsoft Edge 155** are installed; **no** Adobe Acrobat Reader, **no** SumatraPDF. No GUI automation tool is available in this session, so real readers can only be checked by hand (phase 4) |
 
-## 2. Opt-in: this changes the core invariant
+## 2. Always on, gated by a write check (decided 2026-10-18; replaces the per-book opt-in)
 
-Writing back means writing to the **user's own book file**. Until now, "the book file is never
-mutated" was a core invariant. It now holds **unless the user enables write-back for that book**:
+Writing back means writing to the **user's own book file**, so the old invariant "the book file is
+never mutated" changes. First version: opt-in per book (a menu switch, off by default). **Product
+decision, 2026-10-18: write-back is always on.** There is no switch in Settings, none per book, and
+nothing to enable first; existing PDF books follow the same behaviour as new ones.
 
-- **Per book, off by default.** More menu → "Sync annotations into this PDF file". Enabling it shows
-  a confirmation that names what will happen. A signed PDF gets an extra warning, because the
-  signature will show as modified.
-- **Only referenced PDFs** (the user's own file). App-managed copies under `{userData}/books` are
-  never written, since no other reader opens them.
-- **Never** for encrypted PDFs, or for files the writer can't handle (`unsupported_pdf`): the toggle
-  is refused, with the reason.
-- **Turning it off** stops all writes immediately. Annotations already written stay in the file.
+What replaces the switch is a **write check run before every write** (`pdf-write-eligibility.ts`,
+`checkPdfWritable`, asked through `twoWay.checkWritable`). A file that fails it is **never written and
+never reported as written**; Readmate's changes stay pending in SQLite, the renderer is told why
+(once per reason), and the next trigger tries again:
 
-The setting is stored in the new `pdf_annotation_write_back` table (migration 024).
+| Check | Result when it fails (`writeStatus`) | User sees |
+|---|---|---|
+| Referenced file (the user's own), not an app-owned copy under `{userData}/books` | `managed_copy` | nothing (by design: annotations of URL / cloud downloads stay in Readmate; Export still works) |
+| File and folder writable (`W_OK`: read-only attribute, no permission) | `read_only`, no retries | toast: kept in Readmate, not written |
+| Not encrypted, and the trailer can be appended to | `encrypted` / `unsupported_pdf` | toast: kept in Readmate, can't be written |
+| Not digitally signed — or the signature **could not be evaluated** (prefer not writing) | `signed` | **confirmation dialog** (signer shown): writing makes readers report the signature as modified or invalid. Confirming allows writes into that file **for the rest of the session** (`overlay:confirmSignedPdfWrite`); declining keeps everything pending |
+| File not held by another app (`EBUSY` / `EPERM` on the replace) | `locked`, **bounded retries** (10 × 3 s in the app) | toast: in use by another app, Readmate will retry |
+| File unchanged since it was read for this plan (SHA-256) | the cycle restarts | nothing |
+| Write verified by read-back before the file is replaced | `failed` if not | toast: kept in Readmate |
+
+- **No backup file is made.** The write is an appended incremental update, so the earlier revisions
+  of the file remain inside it, and the temp file is removed after the rename. No journal exists, so
+  there is nothing to age out. The cost is file growth: every write appends the rewritten
+  annotation objects, and nothing compacts the file.
+- **`books.sha256` follows the file** (`updateFileFingerprint`, called after every successful
+  cycle, for Readmate's writes and for external saves), so "Locate file" keeps matching after
+  write-backs. It is skipped when another book already has that hash (unique index). Limit: if
+  another app saves the file **while Readmate is closed** and the file is then moved, the hash no
+  longer matches until the book is opened at its new place.
+- **The table `pdf_annotation_write_back` (migration 024) is kept but no longer read or written.**
+  Existing rows are ignored (an earlier "off" no longer disables anything), and nothing is deleted.
+  A later migration may drop it.
+- **Removed:** the More-menu item, its confirmation dialog, the `getPdfWriteBack` /
+  `setPdfWriteBack` IPC and DTOs, the per-book store accessors.
 
 ## 3. Sync coordinator (extends phase 1's per-window session)
 
@@ -43,7 +64,7 @@ session's serialized queue.**
 |---|---|
 | `open` | `overlay:watchPdfEmbeddedAnnotations` |
 | `file-change` | `StableFileWatcher` (settled change, phase 1) |
-| `app-change` | Main's `overlay:saveHighlight` / `deleteHighlight` handlers call `notifyAppChange(bookId)`, debounced 300 ms. This is one call; the logic lives in the coordinator |
+| `app-change` | Main's `overlay:saveHighlight` / `deleteHighlight` handlers call `notifyAppChange(bookId)`, debounced 300 ms (create, edit, kind, note, move, undo / redo and delete all save through these). One call; the logic lives in the coordinator. A tag-only change is not an annotation change (tags don't exist in PDF) and writes nothing |
 | `retry` | after a failed or locked write (backoff 1.5 s × 3, then on the next trigger) |
 
 One **reconcile cycle**, under the session's queue:
@@ -245,3 +266,36 @@ shown in the reader without being written back.
 
 These numbers mean the data reached the file or the database. They are **not** how fast another
 reader refreshes its own view (§6).
+
+## 9. Always-on update: results (2026-10-18, Windows 11, automated)
+
+The behaviour is described in §2. Files added or changed on top of §7:
+- new: `electron/pdf-sync/pdf-write-eligibility.ts`, `src/screens/Reader/logic/pdfExport/pdfSignedWriteStore.ts`,
+  `e2e/support/readmate-annotations.mjs`;
+- removed: `PdfWriteBackDialog.tsx`, `pdfWriteBackStore.ts`, the get / set write-back IPC;
+- changed: `pdf-annotation-sync-service.ts`, `overlay.ipc.ts`, `sqlite-overlay-store.ts`,
+  `sqlite-library-store.ts` (`updateFileFingerprint`), the renderer stores, the More menu, the
+  specs and spikes listed in the audit doc §11.
+
+| Check | Result |
+|---|---|
+| SDK `verify` | ✅ 164 tests |
+| Typecheck, lint, E2E typecheck | ✅ |
+| `spike:pdf:two-way` | ✅ 21/21; **25 consecutive green runs** after the fixes below, plus every other spike (annotations, embedded, live, export, signature, toolbar, search, session, cfi, reset, reminders, background, notifications) |
+| Full E2E (`vite build` + `playwright test`) | ✅ 29 passed, 1 skipped (the optional compatibility-kit capture) |
+
+Not run: `npm run build` as a whole (it ends in `electron-builder` packaging); `npx vite build`, the
+bundle check named in `CLAUDE.md`, was run before each E2E pass.
+
+Found while looping the spike, and fixed:
+1. **Retry budget was cumulative per session.** After one lock used it up, a later transient lock
+   (on Windows, a rename over a file another process is reading gives `EPERM`) got no retry until a
+   write succeeded. Now every fresh trigger (open, file change, an edit in Readmate) gets its own
+   bounded budget; retries and internal restarts don't reset it.
+2. Test-side races (not product bugs): checking the *written* status before the event was pushed;
+   a delete through the spike's IPC not notifying the spike's coordinator the way the real handler
+   does; counting `locked` events across checks.
+
+Not verified: any real external reader (Foxit, Acrobat, SumatraPDF, PDF-XChange), a real signed PDF
+through the whole flow (the signed path is tested with a faked verdict), file growth over many
+edits, network or synced folders, and a reader that saves a stale in-memory copy.

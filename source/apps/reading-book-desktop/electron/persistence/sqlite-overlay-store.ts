@@ -628,21 +628,6 @@ export class SqliteOverlayStore implements OverlayStore {
     })
   }
 
-  /** Whether the user enabled writing annotations into this book's PDF file (off by default). */
-  getPdfWriteBack(bookId: string): boolean {
-    const row = this.db.prepare(`SELECT enabled FROM pdf_annotation_write_back WHERE book_id = ?`).get(bookId.trim()) as { enabled: number } | undefined
-    return row?.enabled === 1
-  }
-
-  setPdfWriteBack(bookId: string, enabled: boolean): void {
-    this.db
-      .prepare(
-        `INSERT INTO pdf_annotation_write_back (book_id, enabled, updated_at) VALUES (?, ?, ?)
-         ON CONFLICT(book_id) DO UPDATE SET enabled = excluded.enabled, updated_at = excluded.updated_at`,
-      )
-      .run(bookId.trim(), enabled ? 1 : 0, new Date().toISOString())
-  }
-
   /** Open two-way conflicts of a book (one per note). */
   listPdfAnnotationConflicts(bookId: string): { noteId: string; conflict: SyncConflict }[] {
     return this.listTwoWayLedger(bookId)

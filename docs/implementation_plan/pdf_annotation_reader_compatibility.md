@@ -100,8 +100,9 @@ Checklist per reader:
    show with the right type and color. The comment, the note text (Vietnamese) and the author
    `Readmate` should appear in the reader's comments panel. Rotated pages should keep the marks in
    place.
-2. **Reader → Readmate.** In Readmate, add `blank-for-external.pdf` and open it. Enable
-   "Sync annotations into this PDF file" only for the two-way part. Then, in the reader, with the
+2. **Reader → Readmate.** In Readmate, add `blank-for-external.pdf` and open it (write-back is
+   always on: there is nothing to enable; use a copy of the file, since Readmate will write into it).
+   Then, in the reader, with the
    file open in both apps:
    1. Create a highlight, save, and check it appears in Readmate within a few seconds.
    2. Recolor it and add a comment, save, and check Readmate updates.
@@ -110,8 +111,8 @@ Checklist per reader:
    4. Delete one, then several, save, and check they are removed in Readmate.
    5. Save several times in a row, and check there are no duplicates.
    6. Close and reopen both apps, and check the state is the same.
-3. **Two-way.** With write-back on, add or recolor or delete in Readmate, then reload or reopen in
-   the reader:
+3. **Two-way.** Add or recolor or delete in Readmate (it writes into the file by itself), then
+   reload or reopen in the reader:
    - Is the change visible?
    - Does the reader notice the file changed without a reload?
    - Change the same annotation in both apps before saving, and check Readmate shows the conflict

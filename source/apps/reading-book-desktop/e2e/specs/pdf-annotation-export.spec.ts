@@ -51,11 +51,10 @@ async function annotationsOf(file: string) {
   return out
 }
 
-test('export writes Readmate annotations into a new PDF; the book file is untouched', async ({ reader }) => {
+test('export saves a new PDF holding the annotations (the book file is kept in step by write-back, only ever appended to)', async ({ reader }) => {
   test.setTimeout(120_000)
   const source = buildAnnotatedPdf({ annotations: [{ page: 1, subtype: 'Underline', lines: [4], color: [0, 0, 1], nm: '{FOXIT-1}', author: 'Alice' }] })
   const file = reader.writeFixture('to-export.pdf', source)
-  const sourceSha = sha(source)
   const target = path.join(reader.workDir, 'exported.pdf')
   await reader.app.evaluate(({ dialog }, out) => {
     dialog.showSaveDialog = (async () => ({ canceled: false, filePath: out })) as typeof dialog.showSaveDialog
@@ -67,6 +66,9 @@ test('export writes Readmate annotations into a new PDF; the book file is untouc
   await expect(pdfPage(page, 1).locator('.rb-pdf-annot[data-kind="underline"]')).toHaveCount(1) // imported
   await highlightLine(page, 1, 2)
   await expect(pdfPage(page, 1).locator('.rb-pdf-annot[data-kind="highlight"]')).toHaveCount(1)
+  // Write-back is always on: the highlight reaches the book file by itself, appended after the
+  // original bytes. Wait for it, so the export starts from a settled file.
+  await expect.poll(async () => (await annotationsOf(file)).filter((a) => a.subtype === 'Highlight').length, { timeout: 15_000, intervals: [100] }).toBe(1)
 
   async function exportNow() {
     // The reader toolbar (with "More") starts hidden; the menubar's "Tools" item shows it.
@@ -79,8 +81,9 @@ test('export writes Readmate annotations into a new PDF; the book file is untouc
 
   await exportNow()
   const first = readFileSync(target)
-  expect(first.subarray(0, source.length).equals(source)).toBe(true) // source bytes kept, update appended
-  expect(sha(readFileSync(file))).toBe(sourceSha) // the book file was not written
+  expect(first.subarray(0, source.length).equals(source)).toBe(true) // the original bytes are kept, updates only appended
+  // The export of a file that already holds everything is a faithful copy of it (nothing to add).
+  expect(sha(first)).toBe(sha(readFileSync(file)))
   const annots = await annotationsOf(target)
   expect(annots.filter((a) => a.subtype === 'Underline')).toEqual([{ page: 1, subtype: 'Underline', title: 'Alice', contents: '', color: [0, 0, 255] }])
   const highlights = annots.filter((a) => a.subtype === 'Highlight')

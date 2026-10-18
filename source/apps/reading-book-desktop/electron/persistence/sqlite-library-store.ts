@@ -344,6 +344,28 @@ export class SqliteLibraryStore implements LibraryStore {
       .run(filePath, new Date().toISOString(), bookId)
   }
 
+  /**
+   * The book's file now has this content: a PDF whose annotations Readmate or another app just wrote
+   * (the book is the same, so id, annotations and progress stay). Keeps `books.sha256` equal to the
+   * file on disk so "Locate file" (`library:relinkBook`, an exact hash match) and duplicate detection
+   * keep working. No-op when unchanged; skipped (returns false) if another book already has that hash
+   * (`idx_books_sha256` is unique). `updated_at` is left alone: derived data, not a user edit.
+   */
+  updateFileFingerprint(bookId: string, sha256: string, fileSizeBytes: number): boolean {
+    try {
+      const result = this.db
+        .prepare(
+          `UPDATE books
+           SET sha256 = @sha256, metadata_json = json_patch(metadata_json, @patch)
+           WHERE id = @id AND sha256 <> @sha256`,
+        )
+        .run({ id: bookId, sha256, patch: JSON.stringify({ fileSizeBytes }) })
+      return result.changes > 0
+    } catch {
+      return false
+    }
+  }
+
   setFavorite(bookId: string, value: boolean): void {
     this.db
       .prepare(

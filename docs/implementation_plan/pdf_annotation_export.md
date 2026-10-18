@@ -5,7 +5,9 @@ Date: 2026-10-17. Builds on `pdf_text_annotations.md`, `pdf_embedded_annotation_
 
 Goal: **Export a new PDF file** with Readmate's annotations, meaning the ones it created, edited or
 deleted, written as standard PDF annotations, so Foxit, Acrobat and other compliant viewers show
-them. The book's own file is never written ("the book file is never mutated" still holds in phase 2).
+them. Export itself never writes the book's own file. (Since 2026-10-18 the app also writes
+annotations into the book's own PDF continuously — see `pdf_annotation_two_way_sync.md` §2; the export
+of a file that already holds everything is a faithful copy of it.)
 
 ## 1. Audit (verified in code)
 

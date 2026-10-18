@@ -16,7 +16,7 @@ import {
 } from '../../chrome'
 import { ReaderShell, readerChromeTopInset, readerChromeBottomInset } from '../../reader'
 import { usePdfExportStore } from './logic/pdfExport/pdfExportStore'
-import { usePdfWriteBackStore } from './logic/pdfExport/pdfWriteBackStore'
+import { usePdfSignedWriteStore } from './logic/pdfExport/pdfSignedWriteStore'
 import { getReaderCapabilities } from '../../reader/capabilities'
 import {
   EpubRenderer,
@@ -53,7 +53,6 @@ import {
   sidebarContentInsetLeft,
   SignInfoPanel,
   SignedPdfWriteDialog,
-  PdfWriteBackDialog,
   SyncConflictBanner,
   TocSidebar,
   TranslationPopover,
@@ -164,11 +163,9 @@ export function ReaderScreen() {
   const pendingSignedExport = usePdfExportStore((st) => st.pendingSigned)
   const confirmSignedExport = usePdfExportStore((st) => st.confirmSigned)
   const cancelSignedExport = usePdfExportStore((st) => st.cancelSigned)
-  const writeBackState = usePdfWriteBackStore((st) => st.state)
-  const writeBackConfirming = usePdfWriteBackStore((st) => st.confirming)
-  const toggleWriteBack = usePdfWriteBackStore((st) => st.toggle)
-  const confirmWriteBack = usePdfWriteBackStore((st) => st.confirm)
-  const cancelWriteBack = usePdfWriteBackStore((st) => st.cancel)
+  const pendingSignedWrite = usePdfSignedWriteStore((st) => st.pending)
+  const confirmSignedWrite = usePdfSignedWriteStore((st) => st.confirm)
+  const declineSignedWrite = usePdfSignedWriteStore((st) => st.decline)
 
   const readerCapabilities = useMemo(
     () => getReaderCapabilities(book.bookFormat),
@@ -629,18 +626,6 @@ export function ReaderScreen() {
                 }
               : undefined
           }
-          writeBack={
-            isPdfSurface && writeBackState
-              ? {
-                  enabled: writeBackState.enabled,
-                  available: writeBackState.available,
-                  onToggle: () => {
-                    chrome.closeFloating()
-                    void toggleWriteBack(chrome.setToast)
-                  },
-                }
-              : undefined
-          }
         />
       }
       footer={
@@ -833,12 +818,12 @@ export function ReaderScreen() {
             }}
           />
 
-          <PdfWriteBackDialog
-            open={writeBackConfirming}
-            signed={writeBackState?.signed}
-            signerName={writeBackState?.signerName}
-            onCancel={cancelWriteBack}
-            onConfirm={() => void confirmWriteBack(chrome.setToast)}
+          <SignedPdfWriteDialog
+            open={pendingSignedWrite !== null}
+            action="write"
+            signerName={pendingSignedWrite?.signerName}
+            onCancel={() => declineSignedWrite(chrome.setToast)}
+            onConfirm={() => void confirmSignedWrite(chrome.setToast)}
           />
 
           <SignedPdfWriteDialog

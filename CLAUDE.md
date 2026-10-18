@@ -91,6 +91,13 @@ Mobile app (`cd source/apps/reading-book-mobile`): `npm run start`, `android`, `
 **CI** (`.github/workflows/ci.yml`, every push and PR, Ubuntu, `npm ci` in `source/`): SDK typecheck, test
 typecheck, tests, build; desktop typecheck and lint. Keep all six green locally before pushing.
 
+**E2E is manual-only.** Desktop E2E (`npm run e2e` / `e2e:only` / `spike:e2e:launch`, Playwright driving the built
+Electron app) opens a real, visible window and grabs desktop focus (Main calls `win.show()`; Electron has no headless
+mode). Nothing in `dev`, Vite/HMR, git hooks or CI runs it, and an agent must not run it after edits or as routine
+verification — only when the user asks or the task is E2E itself. Default checks: `typecheck`, `lint`,
+`e2e:typecheck` (compile only), SDK `npm test`, `npx vite build`. `.claude/settings.local.json` lists the E2E
+commands under `permissions.ask` so they always prompt.
+
 **Unit tests exist only in `book-reader-sdk`** (vitest, `node` environment, files under `tests/**/*.test.ts`
 mirroring `src/`, importing from `../../src/...`; `tests/integration/reader-flow.test.ts` drives the public API
 end-to-end on `createInMemoryStorage()` — update it when the SDK API changes). The desktop and mobile apps have no test runner — their checks are
@@ -174,17 +181,20 @@ and `pdf_embedded_annotation_live_sync.md`.
 **Writing annotations into PDFs** — `electron/pdf-sync/pdf-incremental-writer.ts` appends ONE incremental update
 (original bytes untouched; encrypted / unparseable trailers refused) and every write is read back with pdf.js.
 Export (More → "Export PDF with annotations…", `overlay:exportAnnotatedPdf`) writes a NEW file chosen in a Main-owned
-save dialog. Two-way sync (`planTwoWaySync` in the SDK, run by the same per-window coordinator) writes into the
-book's own file **only for books the user enabled** ("Sync annotations into this PDF file", `pdf_annotation_write_back`,
-referenced files only); three-way merge per field from `base_json`, conflicts frozen in `conflict_json` until the user
-picks. See `pdf_annotation_export.md`, `pdf_annotation_two_way_sync.md`, `pdf_annotation_reader_compatibility.md`.
+save dialog. Two-way sync (`planTwoWaySync` in the SDK, run by the same per-window coordinator) is **always on —
+there is no write-back switch**: annotations are written into the book's own file after a per-write check
+(`pdf-write-eligibility.ts`: user-owned file, writable, not encrypted, not signed unless the user confirms, unchanged
+since read); a file that fails it is never written and the data stays pending in SQLite. Three-way merge per field
+from `base_json`, conflicts frozen in `conflict_json` until the user picks; `books.sha256` is kept in step with the
+file. See `pdf_annotation_export.md`, `pdf_annotation_two_way_sync.md`, `pdf_annotation_reader_compatibility.md`.
 
 Per-book reading state (position, percent, and that book's font/size/line-height/align/layout/margin overrides)
 lives in `books.reading_state_json`, written via `overlay:saveSessionState`.
 
-Core invariant: **the book file is never mutated** — except a referenced PDF whose user explicitly enabled
-two-way annotation sync for that book (then only as appended incremental updates). All highlights/notes/bookmarks/
-session state live in separate SQLite "overlay" tables / columns keyed by `bookId`.
+Core invariant: **the book file is never mutated** — except that Readmate appends annotation updates (incremental
+updates, original bytes untouched) to a referenced PDF the user owns, automatically and without a switch (see above).
+Every other format and every app-owned copy stays read-only. All highlights/notes/bookmarks/session state live in
+separate SQLite "overlay" tables / columns keyed by `bookId`.
 
 **Reference-based library:** a book picked from the user's filesystem is *not* copied — `books.file_path` is the
 user's own absolute path (`referenced`). Only URL/cloud downloads (no lasting file on disk) and books imported

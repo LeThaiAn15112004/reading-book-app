@@ -9,11 +9,14 @@
  *  3. runs one sync at a time — a change during a sync makes exactly one more run follow;
  *  4. ends on unwatch, on watching another book, when the window goes away, or on app quit.
  *
- * Two-way mode (phase 3, docs/implementation_plan/pdf_annotation_two_way_sync.md) — only for books
- * the user enabled write-back for: a cycle also writes Readmate's changes into the file (one
- * incremental update, read back and verified), after checking the file is still the version it
- * scanned; `notifyAppChange` (a row saved / deleted in Readmate) triggers a cycle. Readmate's own
- * write is recognised by its SHA-256 and never synced back (no loop).
+ * Two-way mode (docs/implementation_plan/pdf_annotation_two_way_sync.md) — ALWAYS on in the app (there
+ * is no write-back switch): a cycle also writes Readmate's changes into the file (one incremental
+ * update, read back and verified), after `checkWritable` approved this very file and after checking
+ * it is still the version that was scanned; `notifyAppChange` (a row saved / deleted in Readmate)
+ * triggers a cycle. Readmate's own write is recognised by its SHA-256 and never synced back (no
+ * loop). A file that can't be written safely (app-owned copy, read-only, encrypted, unsupported,
+ * signed without confirmation, locked) is never written and never reported as written: the data
+ * stays pending in SQLite and the renderer is told why, once per reason.
  *
  * Dependencies are injected (`createPdfAnnotationSyncService`) so the spikes can drive the real
  * logic on real temp files without Electron; `pdfAnnotationSyncService()` wires the app's own.
@@ -22,6 +25,7 @@ import { createHash } from 'node:crypto'
 import fsp from 'node:fs/promises'
 import { hasFileWrites, type ScannedPdfAnnotation, type TwoWayPlan } from '@reading-book/book-reader-sdk'
 import type { PdfAnnotationScanResult } from './pdf-annotation-scan'
+import type { WriteBlockReason, WriteEligibility } from './pdf-write-eligibility'
 import { StableFileWatcher, sameSignature, statSignature, type FileSignature, type StableFileWatcherOptions } from './stable-file-watcher'
 import type { EmbeddedPdfSyncOutcome, TwoWaySyncOutcome } from '../persistence/sqlite-overlay-store'
 import type { AnnotationUpdate } from './pdf-incremental-writer'
@@ -38,7 +42,8 @@ const LOCKED_RETRY_DELAY_MS = 3000
 const APP_CHANGE_DEBOUNCE_MS = 300
 
 export type SyncReason = 'open' | 'file-change' | 'app-change'
-export type WriteStatus = 'written' | 'locked' | 'failed'
+/** `written`; a failure (`locked`: another app holds the file, retried a bounded number of times; `failed`); or why the file may not be written. */
+export type WriteStatus = 'written' | 'locked' | 'failed' | WriteBlockReason
 
 /** Pushed to the renderer after a sync that changed something (and always after the open sync). */
 export type PdfAnnotationSyncEvent = {
@@ -49,6 +54,8 @@ export type PdfAnnotationSyncEvent = {
   }
   /** Two-way mode: what happened to the file write this cycle needed (absent when none was needed). */
   writeStatus?: WriteStatus
+  /** For `writeStatus: 'signed'`: the signer, when known. */
+  signerName?: string
   /** PDF.js ids of the scanned items, aligned with `outcome.managedIndices`. */
   items: readonly ScannedPdfAnnotation[]
   /**
@@ -77,9 +84,20 @@ export type PdfAnnotationSyncDeps = {
   emit: (target: SyncTarget, event: PdfAnnotationSyncEvent) => void
   watcherOptions?: Omit<StableFileWatcherOptions, 'onStable' | 'initialSignature'>
   log?: (message: string, detail?: unknown) => void
-  /** Two-way sync (write-back). Absent = phase 1 behaviour for every book. */
+  /** Retry timing (tests shorten it). */
+  retryTiming?: { retryMs?: number; lockedMs?: number; lockedMax?: number }
+  /**
+   * Two-way sync (write-back). The app always passes it; absent = read-only import (only the
+   * phase 1 test harness runs without it).
+   */
   twoWay?: {
-    isEnabled: (bookId: string) => boolean
+    /** Is this exact file safe to write right now? Asked before every write (`checkPdfWritable`). */
+    checkWritable: (bookId: string, filePath: string, bytes: Uint8Array, allowSigned: boolean) => Promise<WriteEligibility>
+    /**
+     * The file is now at this version (SHA-256, size) — after Readmate's own write or an external
+     * save. Keeps `books.sha256` current so "Locate file" keeps matching.
+     */
+    recordFileVersion?: (bookId: string, sha256: string, sizeBytes: number) => void
     /** `planTwoWaySync` with the book's ledger and rows. */
     plan: (bookId: string, items: readonly ScannedPdfAnnotation[], complete: boolean) => Promise<TwoWayPlan>
     /** The store's `applyTwoWaySync`. */
@@ -102,6 +120,12 @@ type Session = {
   retries: number
   retryTimer: ReturnType<typeof setTimeout> | null
   appChangeTimer: ReturnType<typeof setTimeout> | null
+  /** The user confirmed writing into this (signed) file; valid until the session ends. */
+  allowSigned: boolean
+  /** Last write status told to the renderer — a blocked status is announced once, not every cycle. */
+  lastStatus: WriteStatus | undefined
+  /** Last file version handed to `recordFileVersion`. */
+  recordedSha: string | null
   disposed: boolean
   /** Resolves when the current run (and any queued follow-up) is finished — for tests. */
   idle: Promise<void>
@@ -122,6 +146,10 @@ export function sha256Hex(bytes: Uint8Array): string {
 export function createPdfAnnotationSyncService(deps: PdfAnnotationSyncDeps) {
   const sessions = new Map<number, Session>()
   const log = deps.log ?? (() => {})
+  const maxRetries = MAX_RETRIES
+  const retryMs = deps.retryTiming?.retryMs ?? RETRY_DELAY_MS
+  const lockedMs = deps.retryTiming?.lockedMs ?? LOCKED_RETRY_DELAY_MS
+  const lockedMax = deps.retryTiming?.lockedMax ?? LOCKED_RETRIES
 
   function dispose(session: Session): void {
     session.disposed = true
@@ -135,8 +163,14 @@ export function createPdfAnnotationSyncService(deps: PdfAnnotationSyncDeps) {
     if (sessions.get(session.target.id) === session) sessions.delete(session.target.id)
   }
 
-  function request(session: Session, reason: SyncReason, firstEventAt: number | null): void {
+  /**
+   * Queue a cycle. A fresh trigger (open, file change, an edit in Readmate) gets its own bounded retry
+   * budget; a retry or an internal restart (`isRetry`) does not reset it — so retrying is bounded per
+   * trigger, never unlimited, and a lock that outlasted one budget doesn't starve later edits.
+   */
+  function request(session: Session, reason: SyncReason, firstEventAt: number | null, isRetry = false): void {
     if (session.disposed) return
+    if (!isRetry) session.retries = 0
     // `open` wins over a queued change (it also carries the canvas-hiding ids); a file change wins over
     // an app change (the cycle reconciles both anyway, and a file change must not be skipped).
     const rank = (r: SyncReason) => (r === 'open' ? 2 : r === 'file-change' ? 1 : 0)
@@ -167,13 +201,13 @@ export function createPdfAnnotationSyncService(deps: PdfAnnotationSyncDeps) {
   }
 
   function scheduleRetry(session: Session, reason: SyncReason, firstEventAt: number | null, locked = false): void {
-    const max = locked ? LOCKED_RETRIES : MAX_RETRIES
+    const max = locked ? lockedMax : maxRetries
     if (session.disposed || session.retries >= max || session.retryTimer) return
     session.retries++
     session.retryTimer = setTimeout(() => {
       session.retryTimer = null
-      request(session, reason, firstEventAt)
-    }, locked ? LOCKED_RETRY_DELAY_MS : RETRY_DELAY_MS)
+      request(session, reason, firstEventAt, true)
+    }, locked ? lockedMs : retryMs)
     session.retryTimer.unref?.()
   }
 
@@ -181,7 +215,7 @@ export function createPdfAnnotationSyncService(deps: PdfAnnotationSyncDeps) {
     return err && typeof err === 'object' && 'code' in err ? String((err as { code: unknown }).code) : ''
   }
 
-  /** Two-way cycle (write-back enabled): reconcile both sides, writing the file when the plan needs it. */
+  /** Two-way cycle: reconcile both sides, writing the file when the plan needs it and the file may be written. */
   async function runTwoWay(
     session: Session,
     reason: SyncReason,
@@ -198,40 +232,54 @@ export function createPdfAnnotationSyncService(deps: PdfAnnotationSyncDeps) {
     if (session.disposed) return
     let after: readonly ScannedPdfAnnotation[] | null = null
     let writeStatus: WriteStatus | undefined
+    let signerName: string | undefined
     let newSha = sha
+    let newSize = bytes.length
     if (hasFileWrites(plan)) {
-      let written: { output: Uint8Array; after: { items: ScannedPdfAnnotation[] } } | null = null
-      try {
-        written = await twoWay.applyOps(bytes, plan.file)
-      } catch (err) {
-        log('[pdf-sync] write-back could not be prepared; the file is untouched', err)
-        writeStatus = 'failed'
-      }
+      const eligibility = await twoWay.checkWritable(session.bookId, filePath, bytes, session.allowSigned)
       if (session.disposed) return
-      if (written) {
-        // The file must still be exactly the version the plan was made from.
-        let current: Uint8Array | null = null
+      if (!eligibility.ok) {
+        // Not written, not reported as written: Readmate's changes stay pending in SQLite.
+        writeStatus = eligibility.reason
+        signerName = eligibility.signerName
+        log(`[pdf-sync] not writing into the file (${eligibility.reason}); Readmate's changes stay pending`)
+      } else {
+        let written: { output: Uint8Array; after: { items: ScannedPdfAnnotation[] } } | null = null
         try {
-          current = new Uint8Array(await fsp.readFile(filePath))
-        } catch {
-          current = null
-        }
-        if (!current || sha256Hex(current) !== sha) {
-          log('[pdf-sync] the file changed before the write-back; starting over')
-          request(session, reason, firstEventAt)
-          return
-        }
-        try {
-          await twoWay.writeFile(filePath, written.output)
-          after = written.after.items
-          newSha = sha256Hex(written.output)
-          writeStatus = 'written'
+          written = await twoWay.applyOps(bytes, plan.file)
         } catch (err) {
-          const code = errnoCode(err)
-          const locked = code === 'EBUSY' || code === 'EPERM' || code === 'EACCES'
-          writeStatus = locked ? 'locked' : 'failed'
-          log(`[pdf-sync] write-back failed (${code || 'error'}); Readmate's changes stay pending`, err)
-          scheduleRetry(session, reason, firstEventAt, locked)
+          log('[pdf-sync] write-back could not be prepared; the file is untouched', err)
+          writeStatus = 'failed'
+        }
+        if (session.disposed) return
+        if (written) {
+          // The file must still be exactly the version the plan was made from.
+          let current: Uint8Array | null = null
+          try {
+            current = new Uint8Array(await fsp.readFile(filePath))
+          } catch {
+            current = null
+          }
+          if (!current || sha256Hex(current) !== sha) {
+            log('[pdf-sync] the file changed before the write-back; starting over')
+            request(session, reason, firstEventAt, true)
+            return
+          }
+          try {
+            await twoWay.writeFile(filePath, written.output)
+            after = written.after.items
+            newSha = sha256Hex(written.output)
+            newSize = written.output.length
+            writeStatus = 'written'
+          } catch (err) {
+            const code = errnoCode(err)
+            // EBUSY / EPERM: another app holds the file — retried a bounded number of times.
+            // EACCES and the rest: retrying can't help; the next trigger tries again.
+            const locked = code === 'EBUSY' || code === 'EPERM'
+            writeStatus = locked ? 'locked' : code === 'EACCES' || code === 'EROFS' ? 'read_only' : 'failed'
+            log(`[pdf-sync] write-back failed (${code || 'error'}); Readmate's changes stay pending`, err)
+            if (locked) scheduleRetry(session, reason, firstEventAt, true)
+          }
         }
       }
     }
@@ -249,15 +297,29 @@ export function createPdfAnnotationSyncService(deps: PdfAnnotationSyncDeps) {
     if (!outcome || session.disposed) return
     session.lastSyncedSha = newSha
     if (writeStatus === 'written' || !hasFileWrites(plan)) session.retries = 0
+    if (twoWay.recordFileVersion && session.recordedSha !== newSha) {
+      try {
+        twoWay.recordFileVersion(session.bookId, newSha, newSize)
+        session.recordedSha = newSha
+      } catch (err) {
+        log('[pdf-sync] could not record the file version', err)
+      }
+    }
+
+    // A blocked / failed status is announced once per reason until something else happens.
+    const blocked = writeStatus !== undefined && writeStatus !== 'written'
+    const repeated = blocked && session.lastStatus === writeStatus
+    session.lastStatus = blocked ? writeStatus : undefined
 
     const changed = outcome.inserted.length + outcome.updated.length + outcome.deleted.length + outcome.conflicts.length > 0
-    if (!changed && reason !== 'open' && !writeStatus) return
+    if (!changed && reason !== 'open' && (!writeStatus || repeated)) return
     if (session.target.isDestroyed()) return
     deps.emit(session.target, {
       bookId: session.bookId,
       reason,
       outcome: { ...outcome, managedIndices: scanned.items.map((_, i) => i) },
       writeStatus,
+      signerName,
       items: scanned.items,
       matchesDisplayedFile: reason === 'open' && deps.servedSha256(session.bookId) === sha,
       complete: scanned.complete,
@@ -267,8 +329,8 @@ export function createPdfAnnotationSyncService(deps: PdfAnnotationSyncDeps) {
 
   async function runOnce(session: Session, reason: SyncReason, firstEventAt: number | null): Promise<void> {
     const startedAt = Date.now()
-    // Write-back off: Readmate's own edits never touch the file, so there is nothing to do.
-    if (reason === 'app-change' && !deps.twoWay?.isEnabled(session.bookId)) return
+    // Without two-way deps (test harness only) Readmate's own edits never touch the file.
+    if (reason === 'app-change' && !deps.twoWay) return
     // Re-resolve every time: the guard on the registered path is the same as for opening the book.
     const filePath = await deps.resolvePdfPath(session.bookId)
     if (session.disposed || !filePath) return
@@ -289,7 +351,7 @@ export function createPdfAnnotationSyncService(deps: PdfAnnotationSyncDeps) {
     }
 
     const sha = sha256Hex(bytes)
-    const twoWay = !!deps.twoWay?.isEnabled(session.bookId)
+    const twoWay = !!deps.twoWay
     // Content-identical save / touch / Readmate's own write. An app change still needs a cycle.
     if (sha === session.lastSyncedSha && reason === 'file-change') return
     if (!hasEofMarker(bytes)) {
@@ -359,6 +421,9 @@ export function createPdfAnnotationSyncService(deps: PdfAnnotationSyncDeps) {
         retries: 0,
         retryTimer: null,
         appChangeTimer: null,
+        allowSigned: false,
+        lastStatus: undefined,
+        recordedSha: null,
         disposed: false,
         idle: Promise.resolve(),
         resolveIdle: null,
@@ -390,12 +455,12 @@ export function createPdfAnnotationSyncService(deps: PdfAnnotationSyncDeps) {
     },
 
     /**
-     * A row of `bookId` was saved or deleted in Readmate. With write-back enabled, the sessions on
+     * A row of `bookId` was saved or deleted in Readmate: the sessions on
      * that book reconcile shortly after (edits within the debounce window are written together).
      */
     notifyAppChange(bookId: string): void {
       for (const session of sessions.values()) {
-        if (session.bookId !== bookId || session.disposed || !deps.twoWay?.isEnabled(bookId)) continue
+        if (session.bookId !== bookId || session.disposed || !deps.twoWay) continue
         if (session.appChangeTimer) clearTimeout(session.appChangeTimer)
         session.appChangeTimer = setTimeout(() => {
           session.appChangeTimer = null
@@ -403,6 +468,19 @@ export function createPdfAnnotationSyncService(deps: PdfAnnotationSyncDeps) {
         }, APP_CHANGE_DEBOUNCE_MS)
         session.appChangeTimer.unref?.()
       }
+    },
+
+    /**
+     * The user confirmed writing annotations into this signed PDF. Valid for the rest of the session
+     * (the signature is already reported as modified after the first write); then reconcile now.
+     */
+    allowSignedWrite(target: SyncTarget, bookId: string): boolean {
+      const session = sessions.get(target.id)
+      if (!session || session.bookId !== bookId || session.disposed) return false
+      session.allowSigned = true
+      session.lastStatus = undefined
+      request(session, 'app-change', Date.now())
+      return true
     },
 
     disposeAll(): void {

@@ -18,6 +18,7 @@ import {
   type PdfReaderHighlight,
 } from '@reading-book/book-reader-sdk'
 import { overlayApi } from '../../../../bridge'
+import { usePdfSignedWriteStore } from '../pdfExport/pdfSignedWriteStore'
 import type { PdfRendererApi, PdfSelectionInfo } from '../../../../reader/renderers/pdf'
 
 /** Derived from the bridge: the renderer never imports from electron/. */
@@ -162,8 +163,29 @@ export const usePdfHighlightsStore = create<PdfHighlightsStoreState>()((set, get
     const byId = new Map(written.map((h) => [h.id, h]))
     const deleted = new Set(event.deletedIds)
     const { onToast } = get()
-    if (event.writeStatus === 'locked') onToast('The PDF is locked by another app — Readmate will retry writing your annotations.')
-    else if (event.writeStatus === 'failed') onToast('Could not write annotations into the PDF file.')
+    switch (event.writeStatus) {
+      case 'locked':
+        onToast('The PDF is in use by another app — Readmate will retry writing your annotations.')
+        break
+      case 'failed':
+        onToast('Could not write your annotations into the PDF file. They are kept in Readmate.')
+        break
+      case 'read_only':
+        onToast('The PDF file or its folder is read-only, so your annotations are kept in Readmate but not written into it.')
+        break
+      case 'encrypted':
+        onToast('This PDF is encrypted — your annotations are kept in Readmate but can’t be written into it.')
+        break
+      case 'unsupported_pdf':
+        onToast('This PDF’s structure doesn’t allow writing annotations — they are kept in Readmate.')
+        break
+      case 'signed':
+        usePdfSignedWriteStore.getState().request(event.bookId, event.signerName)
+        break
+      // 'managed_copy': a copy Readmate keeps itself (URL / cloud) — annotations stay in Readmate by design.
+      default:
+        break
+    }
     if (event.conflicts.length > 0) {
       set((s) => ({ conflicts: { ...s.conflicts, ...Object.fromEntries(event.conflicts.map((c) => [c.noteId, c])) } }))
       onToast(

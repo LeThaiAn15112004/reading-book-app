@@ -509,26 +509,22 @@ export interface PdfAnnotationConflictDto {
   fields?: ('kind' | 'color' | 'text' | 'geometry')[]
 }
 
-/** Why writing annotations into a book's PDF file is not possible. */
-export type PdfWriteBackUnavailable = 'not_found' | 'managed_copy' | 'encrypted' | 'unsupported_pdf'
-
-/** overlay:getPdfWriteBack */
-export interface PdfWriteBackStateDto {
-  enabled: boolean
-  available: boolean
-  reason?: PdfWriteBackUnavailable
-  /** The file carries a digital signature (enabling needs a confirmation). */
-  signed?: boolean
-  signerName?: string
-}
-
-/** overlay:setPdfWriteBack */
-export interface SetPdfWriteBackResult {
-  ok: boolean
-  enabled: boolean
-  errorCode?: PdfWriteBackUnavailable | 'signed_needs_confirmation'
-  signerName?: string
-}
+/**
+ * What happened to the PDF write a sync cycle needed (annotations are always written into the book's
+ * own PDF; there is no switch). `written`; `locked` (another app holds the file, retried a bounded
+ * number of times); `failed`; or why the file may not be written — nothing is written then and the
+ * data stays pending in Readmate: `managed_copy` (an app-owned copy), `read_only`, `encrypted`,
+ * `unsupported_pdf`, `signed` (needs the user's confirmation: `overlay:confirmSignedPdfWrite`).
+ */
+export type PdfWriteStatusDto =
+  | 'written'
+  | 'locked'
+  | 'failed'
+  | 'managed_copy'
+  | 'read_only'
+  | 'encrypted'
+  | 'unsupported_pdf'
+  | 'signed'
 
 /** overlay:resolvePdfAnnotationConflict */
 export interface ResolvePdfAnnotationConflictResult {
@@ -566,8 +562,10 @@ export interface PdfEmbeddedAnnotationsChangedDto {
   complete: boolean
   /** Two-way sync: conflicts detected by this cycle (both sides changed the same field differently). */
   conflicts: PdfAnnotationConflictDto[]
-  /** Two-way sync: the file write this cycle needed — `locked` = another app holds the file (retried). */
-  writeStatus?: 'written' | 'locked' | 'failed'
+  /** The file write this cycle needed, when it needed one (see `PdfWriteStatusDto`). */
+  writeStatus?: PdfWriteStatusDto
+  /** For `writeStatus: 'signed'`: the signer, when known. */
+  signerName?: string
   /** Diagnostics: ms from the first file event (null for the open sync) and of the scan. */
   timing: { totalMs: number; scanMs: number }
 }
@@ -770,10 +768,11 @@ export interface DesktopApi {
      * The book's own file is never written. A signed source needs `acknowledgeSignature`.
      */
     exportAnnotatedPdf(bookId: string, options?: { acknowledgeSignature?: boolean }): Promise<ExportAnnotatedPdfResult>
-    /** Two-way sync: whether Readmate writes its annotations into this book's own PDF file. */
-    getPdfWriteBack(bookId: string): Promise<PdfWriteBackStateDto>
-    /** Enable (signed file: needs `acknowledgeSignature`) or disable writing into the book's PDF file. */
-    setPdfWriteBack(bookId: string, enabled: boolean, options?: { acknowledgeSignature?: boolean }): Promise<SetPdfWriteBackResult>
+    /**
+     * The user confirmed writing annotations into this digitally signed PDF (answer to
+     * `writeStatus: 'signed'`). Valid until the book is closed; Readmate then writes what is pending.
+     */
+    confirmSignedPdfWrite(bookId: string): Promise<OkResult>
     listPdfAnnotationConflicts(bookId: string): Promise<PdfAnnotationConflictDto[]>
     resolvePdfAnnotationConflict(bookId: string, noteId: string, choice: 'keep-readmate' | 'use-pdf'): Promise<ResolvePdfAnnotationConflictResult>
   }

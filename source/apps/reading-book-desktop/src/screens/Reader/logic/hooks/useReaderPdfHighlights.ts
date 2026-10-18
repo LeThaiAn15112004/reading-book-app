@@ -2,7 +2,7 @@ import { useEffect, type MutableRefObject } from 'react'
 import { overlayApi } from '../../../../bridge'
 import type { PdfRendererApi } from '../../../../reader/renderers/pdf'
 import { usePdfHighlightsStore } from '../pdfHighlights/pdfHighlightsStore'
-import { usePdfWriteBackStore } from '../pdfExport/pdfWriteBackStore'
+import { usePdfSignedWriteStore } from '../pdfExport/pdfSignedWriteStore'
 
 type UseReaderPdfHighlightsOptions = {
   bookId: string | undefined
@@ -40,8 +40,7 @@ export function useReaderPdfHighlights({
   const hiddenEmbeddedObjectIds = usePdfHighlightsStore((s) => s.hiddenEmbeddedObjectIds)
   const conflicts = usePdfHighlightsStore((s) => s.conflicts)
   const loadConflicts = usePdfHighlightsStore((s) => s.loadConflicts)
-  const loadWriteBack = usePdfWriteBackStore((s) => s.load)
-  const resetWriteBack = usePdfWriteBackStore((s) => s.reset)
+  const resetSignedWrite = usePdfSignedWriteStore((s) => s.reset)
   const closeEditPopup = usePdfHighlightsStore((s) => s.closeEditPopup)
 
   useEffect(() => {
@@ -69,13 +68,12 @@ export function useReaderPdfHighlights({
     const unsubscribe = overlayApi.onPdfEmbeddedAnnotationsChanged(applyEmbeddedSync)
     void overlayApi.watchPdfEmbeddedAnnotations(bookId).catch(() => {})
     void loadConflicts()
-    void loadWriteBack(bookId)
     return () => {
       unsubscribe()
       void overlayApi.unwatchPdfEmbeddedAnnotations(bookId).catch(() => {})
-      resetWriteBack()
+      resetSignedWrite()
     }
-  }, [bookId, isPdfSurface, applyEmbeddedSync, loadConflicts, loadWriteBack, resetWriteBack])
+  }, [bookId, isPdfSurface, applyEmbeddedSync, loadConflicts, resetSignedWrite])
 
   useEffect(() => {
     closeEditPopup()
