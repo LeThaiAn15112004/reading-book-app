@@ -708,6 +708,8 @@ export interface DesktopApi {
     markAsReading(id: string): Promise<OkResult>
     markAsCompleted(id: string): Promise<OkResult>
     setFavorite(id: string, value: boolean): Promise<OkResult>
+    /** Store a PNG rendered by the renderer as the cover; refused when the book already has one. */
+    setGeneratedCover(id: string, png: ArrayBuffer): Promise<OkResult>
     updateMetadata(input: UpdateBookMetadataInput): Promise<OkResult>
     showInFolder(id: string): Promise<OkResult>
     copyFilePath(id: string): Promise<OkResult>

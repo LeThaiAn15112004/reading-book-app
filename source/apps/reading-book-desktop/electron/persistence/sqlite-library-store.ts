@@ -366,6 +366,12 @@ export class SqliteLibraryStore implements LibraryStore {
     }
   }
 
+  setCoverPath(bookId: string, coverPath: string): void {
+    this.db
+      .prepare(`UPDATE books SET cover_path = ?, updated_at = ? WHERE id = ?`)
+      .run(coverPath, new Date().toISOString(), bookId)
+  }
+
   setFavorite(bookId: string, value: boolean): void {
     this.db
       .prepare(

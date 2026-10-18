@@ -31,6 +31,8 @@ export const LibraryChannels = {
   markAsReading: 'library:markAsReading',
   markAsCompleted: 'library:markAsCompleted',
   setFavorite: 'library:setFavorite',
+  /** Renderer-rendered first page (PDF / DOCX / TXT / MD) stored as the book's cover when it has none. */
+  setGeneratedCover: 'library:setGeneratedCover',
   updateMetadata: 'library:updateMetadata',
   showInFolder: 'library:showInFolder',
   copyFilePath: 'library:copyFilePath',

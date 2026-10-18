@@ -17,6 +17,7 @@ import type {
   ShelfDetailItemData,
 } from '../components'
 import { toShelfDetailItem } from './toShelfDetailItem'
+import { canGenerateCover, generateBookCover, markCoverAttempted } from './generateBookCover'
 import { useLibraryBrowseStore } from './libraryBrowseStore'
 import { useCloudSources } from './useCloudSources'
 
@@ -65,6 +66,23 @@ export function useLibraryScreen() {
   const { books, refreshLibrary } = useLibraryBooks({
     client: libraryApi,
   })
+
+  // Books without a cover (everything but EPUB) get their first page rendered once, one at a time.
+  useEffect(() => {
+    if (!books) return
+    const pending = books.filter(
+      (b) => !b.coverUrl && canGenerateCover(b.format) && markCoverAttempted(b.id),
+    )
+    if (pending.length === 0) return
+    void (async () => {
+      let saved = 0
+      for (const book of pending) {
+        if (await generateBookCover(book.id, book.format)) saved += 1
+      }
+      if (saved > 0) await refreshLibrary()
+    })()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [books])
 
   function openReader(bookId: string) {
     const title = books?.find((b) => b.id === bookId)?.title

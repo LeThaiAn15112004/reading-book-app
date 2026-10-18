@@ -1,3 +1,5 @@
+import { randomUUID } from 'node:crypto'
+import fsp from 'node:fs/promises'
 import path from 'node:path'
 import { SUPPORTED_FORMATS } from '@reading-book/config'
 import { BrowserWindow, clipboard, dialog, ipcMain, shell } from 'electron'
@@ -9,6 +11,7 @@ import { checkBookSignature, toSignatureDto } from '../signature/book-signature'
 import {
   bookFileStorage,
   checkRegisteredBookPath,
+  ensureCoversDir,
   removeCoverFile,
   removeManagedBookDir,
 } from '../files/sandbox'
@@ -137,6 +140,29 @@ export function registerLibraryIpc(): void {
       const store = getLibraryStore()
       if (!(await store.findById(id.trim()))) return { ok: false }
       store.setReadingStatus(id.trim(), 'completed')
+      return { ok: true }
+    },
+  )
+
+  ipcMain.removeHandler(LibraryChannels.setGeneratedCover)
+  ipcMain.handle(
+    LibraryChannels.setGeneratedCover,
+    async (_event, id: unknown, png: unknown): Promise<OkResult> => {
+      if (typeof id !== 'string' || !id.trim() || !(png instanceof ArrayBuffer)) {
+        return { ok: false }
+      }
+      const bytes = Buffer.from(png)
+      const isPng =
+        bytes.length > 8 &&
+        bytes.length <= 4 * 1024 * 1024 &&
+        bytes.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))
+      if (!isPng) return { ok: false }
+      const store = getLibraryStore()
+      const book = await store.findById(id.trim())
+      if (!book || book.coverPath) return { ok: false }
+      const dest = path.join(ensureCoversDir(), `${randomUUID()}.png`)
+      await fsp.writeFile(dest, bytes)
+      store.setCoverPath(book.id, dest)
       return { ok: true }
     },
   )

@@ -6,6 +6,8 @@ export const libraryApi = {
   openBookContent: (id: string) => window.api.library.openBookContent(id),
   markAsReading: (id: string) => window.api.library.markAsReading(id),
   markAsCompleted: (id: string) => window.api.library.markAsCompleted(id),
+  setGeneratedCover: (id: string, png: ArrayBuffer) =>
+    window.api.library.setGeneratedCover(id, png),
   setFavorite: (id: string, value: boolean) =>
     window.api.library.setFavorite(id, value),
   updateMetadata: (input: Parameters<typeof window.api.library.updateMetadata>[0]) =>

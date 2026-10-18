@@ -59,6 +59,8 @@ const api: DesktopApi = {
     markAsReading: (id) => ipcRenderer.invoke(LibraryChannels.markAsReading, id),
     markAsCompleted: (id) =>
       ipcRenderer.invoke(LibraryChannels.markAsCompleted, id),
+    setGeneratedCover: (id, png) =>
+      ipcRenderer.invoke(LibraryChannels.setGeneratedCover, id, png),
     setFavorite: (id, value) =>
       ipcRenderer.invoke(LibraryChannels.setFavorite, id, value),
     updateMetadata: (input) =>
