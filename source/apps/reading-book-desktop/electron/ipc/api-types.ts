@@ -436,7 +436,7 @@ export interface HighlightDto {
   id: string
   bookId: string
   locatorRef: string
-  styleKind: 'highlight' | 'underline' | 'strikethrough' | 'textbox'
+  styleKind: 'highlight' | 'underline' | 'strikethrough' | 'squiggly' | 'replace' | 'insert' | 'textbox'
   colorHex: string
   note?: string
   tags: string[]
@@ -460,7 +460,7 @@ export interface SaveHighlightInput {
   bookId: string
   id?: string
   locatorRef: string
-  styleKind: 'highlight' | 'underline' | 'strikethrough' | 'textbox'
+  styleKind: 'highlight' | 'underline' | 'strikethrough' | 'squiggly' | 'replace' | 'insert' | 'textbox'
   colorHex: string
   note?: string
   tags?: string[]

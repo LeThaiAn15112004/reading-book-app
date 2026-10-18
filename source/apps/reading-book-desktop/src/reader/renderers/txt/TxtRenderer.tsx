@@ -18,6 +18,7 @@ import {
   type TextEdit,
   type TxtReaderHighlight,
   type TxtSelection,
+  type MarkupInteractionTool,
 } from '@reading-book/book-reader-sdk'
 import {
   boxForOffsets,
@@ -28,7 +29,7 @@ import {
 import { txtMarkStyle } from './txtMarkStyle'
 import './txt.css'
 
-export type TxtMarkupTool = 'highlight' | 'underline' | 'strikethrough'
+export type TxtMarkupTool = MarkupInteractionTool
 
 type MarginMode = 'narrow' | 'normal' | 'wide' | 'off'
 

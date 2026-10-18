@@ -271,7 +271,7 @@ export function registerOverlayIpc(): void {
       if (!locator) return null
       // TXT annotations belong to a text revision and are saved with it (txt:commit), never alone.
       if (body.txtAnnotationRef !== undefined) return null
-      const validStyleKinds = ['highlight', 'underline', 'strikethrough', 'textbox']
+      const validStyleKinds = ['highlight', 'underline', 'strikethrough', 'squiggly', 'replace', 'insert', 'textbox']
       if (!validStyleKinds.includes(body.styleKind)) return null
       if (typeof body.colorHex !== 'string' || !body.colorHex.trim()) return null
 

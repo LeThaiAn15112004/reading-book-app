@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { markupToast } from '../markupToast'
 import type { MutableRefObject } from 'react'
 import {
   DEFAULT_HIGHLIGHT_COLOR,
@@ -477,11 +478,7 @@ export const useTxtDocumentStore = create<TxtDocumentStoreState>()((set, get) =>
     commitMarkupSelection: (selection, tool) => {
       if (!get().createFromSelection(selection, tool)) return
       get().onToast(
-        tool === 'highlight'
-          ? 'Highlighted — Ctrl+Z to undo'
-          : tool === 'underline'
-            ? 'Underlined — Ctrl+Z to undo'
-            : 'Struck through — Ctrl+Z to undo',
+        markupToast(tool),
       )
     },
 

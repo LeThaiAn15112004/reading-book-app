@@ -537,7 +537,13 @@ a[ref='epubjs-mk'].rb-hl-focused {
 }
 
 [data-pdf-markup='strikethrough'],
-[data-pdf-markup='strikethrough'] .textLayer :is(span, br) {
+[data-pdf-markup='strikethrough'] .textLayer :is(span, br),
+[data-pdf-markup='squiggly'],
+[data-pdf-markup='squiggly'] .textLayer :is(span, br),
+[data-pdf-markup='replace'],
+[data-pdf-markup='replace'] .textLayer :is(span, br),
+[data-pdf-markup='insert'],
+[data-pdf-markup='insert'] .textLayer :is(span, br) {
   cursor: var(--cursor-strikethrough-tool);
 }
 
@@ -573,7 +579,9 @@ a[ref='epubjs-mk'].rb-hl-focused {
 }
 
 .rb-pdf-annot[data-kind='underline']::after,
-.rb-pdf-annot[data-kind='strikethrough']::after {
+.rb-pdf-annot[data-kind='strikethrough']::after,
+.rb-pdf-annot[data-kind='replace']::after,
+.rb-pdf-annot[data-kind='insert']::after {
   content: '';
   position: absolute;
   left: 0;
@@ -586,9 +594,32 @@ a[ref='epubjs-mk'].rb-hl-focused {
   bottom: 0;
 }
 
-.rb-pdf-annot[data-kind='strikethrough']::after {
+.rb-pdf-annot[data-kind='strikethrough']::after,
+.rb-pdf-annot[data-kind='replace']::after {
   top: 50%;
   transform: translateY(-50%);
+}
+
+/* Replace / Insert: a dashed line instead of a solid one. */
+.rb-pdf-annot[data-kind='replace']::after,
+.rb-pdf-annot[data-kind='insert']::after {
+  background: repeating-linear-gradient(90deg, var(--rb-annot-color) 0 5px, transparent 5px 8px);
+}
+
+.rb-pdf-annot[data-kind='insert']::after {
+  bottom: 0;
+}
+
+/* Squiggly: a zigzag along the bottom edge — the line color painted through a repeating zigzag mask. */
+.rb-pdf-annot[data-kind='squiggly']::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 4px;
+  background: var(--rb-annot-color);
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 6 4'%3E%3Cpath d='M0 3 L3 1 L6 3' fill='none' stroke='black' stroke-width='1.2'/%3E%3C/svg%3E") repeat-x 0 100% / 6px 4px;
 }
 
 /* Same focused outline as the EPUB marks' `.rb-hl-focused`. */

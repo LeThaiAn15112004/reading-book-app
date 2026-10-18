@@ -103,25 +103,16 @@ export async function showToolbar(page: Page): Promise<void> {
   await expect(tools).toHaveAttribute('aria-expanded', 'true')
 }
 
-/**
- * Arm / disarm a markup tool. The Annotation tools live in a dropdown ("Annotation ▾"); the menu is
- * closed again by toggling its button (Escape would disarm an armed tool).
- */
-export async function toggleTool(page: Page, tool: 'Highlight' | 'Underline' | 'Strikethrough', on: boolean): Promise<void> {
+/** Arm / disarm a markup tool — each is an icon button in the toolbar's Annotation group. */
+export async function toggleTool(
+  page: Page,
+  tool: 'Highlight' | 'Underline' | 'Squiggly' | 'Strikethrough' | 'Replace Text' | 'Insert Text',
+  on: boolean,
+): Promise<void> {
   await showToolbar(page)
-  // The dropdown button is labelled with the armed tool ("Strikethrough"), "Annotation" when none is.
-  const group = page.locator('button[aria-haspopup="menu"]').filter({ hasText: /^(Annotation|Highlight|Underline|Strikethrough)$/ })
-  const item = page.getByRole('menuitemcheckbox', { name: tool, exact: true })
-  await group.click()
-  await expect(item).toBeVisible()
-  if (((await item.getAttribute('aria-checked')) === 'true') !== on) {
-    await item.click()
-    // Picking an item closes the menu; reopen it to read the state back.
-    if (!(await item.isVisible())) await group.click()
-  }
-  await expect(item).toHaveAttribute('aria-checked', on ? 'true' : 'false')
-  await group.click()
-  await expect(item).toBeHidden()
+  const button = page.getByRole('toolbar', { name: 'Reading tools' }).getByRole('button', { name: tool, exact: true })
+  if (((await button.getAttribute('aria-pressed')) === 'true') !== on) await button.click()
+  await expect(button).toHaveAttribute('aria-pressed', on ? 'true' : 'false')
 }
 
 /** Select `[start, end)`, right-click inside it and pick `action` in the selection menu. */

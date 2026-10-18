@@ -99,6 +99,19 @@ function appearanceContent(annotation: PdfWriteAnnotation, quads: Quad[]): strin
         // Along the bottom edge, nudged up by half the stroke so it stays inside the box.
         const up: Point = [(q.tl[0] - q.bl[0]) * 0.06, (q.tl[1] - q.bl[1]) * 0.06]
         ops.push(`${num(width)} w ${pt([q.bl[0] + up[0], q.bl[1] + up[1]])} m ${pt([q.br[0] + up[0], q.br[1] + up[1]])} l S`)
+      } else if (annotation.subtype === 'Squiggly') {
+        // A zigzag along the bottom edge: teeth about as wide as the line is tall, kept inside the box.
+        const h = dist(q.tl, q.bl)
+        const len = dist(q.bl, q.br)
+        const steps = Math.max(2, Math.round(len / Math.max(1, h * 0.25)))
+        const along: Point = [(q.br[0] - q.bl[0]) / steps, (q.br[1] - q.bl[1]) / steps]
+        const up: Point = [(q.tl[0] - q.bl[0]) * 0.12, (q.tl[1] - q.bl[1]) * 0.12]
+        ops.push(`${num(width)} w ${pt(q.bl)} m`)
+        for (let i = 1; i <= steps; i++) {
+          const lift = i % 2 === 1 ? 1 : 0
+          ops.push(`${pt([q.bl[0] + along[0] * i + up[0] * lift, q.bl[1] + along[1] * i + up[1] * lift])} l`)
+        }
+        ops.push('S')
       } else {
         ops.push(`${num(width)} w ${pt(mid(q.tl, q.bl))} m ${pt(mid(q.tr, q.br))} l S`)
       }

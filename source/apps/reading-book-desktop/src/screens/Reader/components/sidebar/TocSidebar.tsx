@@ -119,6 +119,12 @@ function highlightTypeLabel(styleKind: SidebarHighlight['styleKind']): string {
       return 'Underline'
     case 'strikethrough':
       return 'Strikethrough'
+    case 'squiggly':
+      return 'Squiggly'
+    case 'replace':
+      return 'Replace'
+    case 'insert':
+      return 'Insert'
     case 'textbox':
       return 'Note'
     default:
@@ -147,7 +153,10 @@ const NOTE_TYPE_OPTIONS: { value: NotesTypeFilter; label: string }[] = [
   { value: 'all', label: 'All types' },
   { value: 'highlight', label: 'Highlight' },
   { value: 'underline', label: 'Underline' },
+  { value: 'squiggly', label: 'Squiggly' },
   { value: 'strikethrough', label: 'Strikethrough' },
+  { value: 'replace', label: 'Replace' },
+  { value: 'insert', label: 'Insert' },
 ]
 
 /** Case-insensitive substring match over a highlight's excerpt, note and tags. */
@@ -362,7 +371,7 @@ function HighlightListItem({
           <span
             className="mt-1 h-3 w-3 shrink-0 rounded-full"
             style={
-              h.styleKind === 'underline' || h.styleKind === 'strikethrough'
+              h.styleKind !== 'highlight'
                 ? { border: `2px solid ${h.colorHex}` }
                 : { backgroundColor: h.colorHex }
             }

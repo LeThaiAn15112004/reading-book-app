@@ -14,7 +14,7 @@ import {
 } from './bookmark-location.js'
 import { DEFAULT_HIGHLIGHT_COLOR } from './highlight-colors.js'
 
-export type HighlightStyleKind = 'highlight' | 'underline' | 'strikethrough' | 'textbox'
+export type HighlightStyleKind = 'highlight' | 'underline' | 'strikethrough' | 'squiggly' | 'replace' | 'insert' | 'textbox'
 
 /**
  * The format-independent part of a renderer-side highlight row — everything the shared

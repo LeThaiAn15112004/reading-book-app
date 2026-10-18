@@ -67,7 +67,7 @@ const MAX_UPSERTS = 20_000
 const MAX_DELETES = 20_000
 const MAX_ID_LENGTH = 128
 const ID_RE = /^[A-Za-z0-9_-]+$/
-const STYLE_KINDS = new Set(['highlight', 'underline', 'strikethrough', 'textbox'])
+const STYLE_KINDS = new Set(['highlight', 'underline', 'strikethrough', 'squiggly', 'replace', 'insert', 'textbox'])
 const MAX_NOTE_LENGTH = 10_000
 const MAX_TAGS = 100
 /** A commit text may be a few characters per byte over the file limit (UTF-16 units vs bytes). */

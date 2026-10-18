@@ -145,6 +145,25 @@ function ToolIcon({ tool }: { tool: ToolIconId }) {
           />
         </svg>
       )
+    case 'squiggly':
+      return (
+        <svg className={cls} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor" aria-hidden>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M6 4v6.5a6 6 0 0 0 12 0V4M3.5 20l2-1.6 2 1.6 2-1.6 2 1.6 2-1.6 2 1.6 2-1.6 2 1.6" />
+        </svg>
+      )
+    case 'replace':
+      return (
+        <svg className={cls} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor" aria-hidden>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M5 7.5h8M9 7.5V3.5M3.5 11.5h11M12 20l3-5 3 5M13 18.2h4" />
+          <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 6.5 19 9l-2.5 2.5" />
+        </svg>
+      )
+    case 'insert':
+      return (
+        <svg className={cls} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor" aria-hidden>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.5 7.5 15h9L12 6.5ZM12 15v4.5M9.5 19.5h5M4 5h4M6 3v4" />
+        </svg>
+      )
     case 'snapshot':
       return (
         <svg className={cls} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor" aria-hidden>
@@ -196,6 +215,13 @@ function ToolIcon({ tool }: { tool: ToolIconId }) {
   }
 }
 
+const iconOnlyBtn =
+  'inline-flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-lg border border-transparent text-lib-muted transition-colors hover:border-lib-accent-ring hover:bg-lib-accent-soft hover:text-lib-text-strong'
+
+function iconOnlyClass(active: boolean): string {
+  return active ? `${iconOnlyBtn} border-lib-accent bg-lib-accent-soft text-lib-accent` : iconOnlyBtn
+}
+
 function modeButtonClass(active: boolean): string {
   if (active) {
     return `${stripBtn} border-lib-accent bg-lib-accent-soft text-lib-accent`
@@ -234,9 +260,25 @@ export function ToolsStrip({ capabilities, toolStates, onTool, toolRefs, hidden 
   const layout = resolveToolbarLayout(capabilities, foldLevel)
   const toolTitle = useToolTitle()
 
-  function renderButton(tool: ToolDef) {
+  function renderButton(tool: ToolDef, iconOnly = false) {
     const state = toolStates[tool.id]
     const active = state?.active ?? false
+    if (iconOnly) {
+      return (
+        <button
+          key={tool.id}
+          ref={toolRefs?.[tool.id]}
+          className={iconOnlyClass(active)}
+          type="button"
+          title={toolTitle(tool)}
+          aria-label={tool.label}
+          aria-pressed={active}
+          onClick={() => onTool(tool.id)}
+        >
+          <ToolIcon tool={tool.id} />
+        </button>
+      )
+    }
     return (
       <button
         key={tool.id}
@@ -291,7 +333,9 @@ export function ToolsStrip({ capabilities, toolStates, onTool, toolRefs, hidden 
         <div key={resolved.group.id} className="contents">
           {index > 0 ? <ToolSeparator /> : null}
           <ToolGroup aria-label={resolved.group.label}>
-            {resolved.mode === 'menu' ? renderMenu(resolved) : resolved.tools.map(renderButton)}
+            {resolved.mode === 'menu'
+              ? renderMenu(resolved)
+              : resolved.tools.map((tool) => renderButton(tool, resolved.group.iconOnly))}
           </ToolGroup>
         </div>
       ))}

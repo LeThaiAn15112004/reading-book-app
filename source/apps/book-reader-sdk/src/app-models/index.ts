@@ -88,6 +88,7 @@ export {
   type ExportableHighlight,
   type PdfAnnotationWritePlan,
   type PdfWriteAnnotation,
+  isPdfWritableStyle,
   type PdfWriteSubtype,
 } from './pdf-annotation-export.js'
 export {
@@ -131,6 +132,9 @@ export {
 } from './library-book.js'
 export { resolveActivePageTocEntry, type PageTocNode } from './page-toc.js'
 export {
+  MARKUP_TOOLS,
+  isMarkupTool,
+  type MarkupInteractionTool,
   type InteractionTool,
   type PageLayout,
   type ViewportRect,

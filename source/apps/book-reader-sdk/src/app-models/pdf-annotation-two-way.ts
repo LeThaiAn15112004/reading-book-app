@@ -21,6 +21,7 @@ import {
 } from './pdf-embedded-annotations.js'
 import {
   noteIdFromReadmateName,
+  isPdfWritableStyle,
   pdfWriteAnnotationsFromHighlight,
   type ExportableHighlight,
   type PdfWriteAnnotation,
@@ -154,7 +155,7 @@ export function planTwoWaySync(input: TwoWayInput): TwoWayPlan {
     unchanged: 0,
     frozen: 0,
   }
-  const rowsById = new Map(input.rows.filter((r) => r.pdfAnnotation).map((r) => [r.id, r]))
+  const rowsById = new Map(input.rows.filter((r) => r.pdfAnnotation && isPdfWritableStyle(r.styleKind)).map((r) => [r.id, r]))
   const identities = embeddedAnnotationIdentities(input.items)
 
   // Match ledger entries to items: exact key, then the anchor key (pre-/NM rows).

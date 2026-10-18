@@ -36,6 +36,9 @@ export function toOuterRect(
 const LEGACY_ALPHA: Record<HighlightStyleKind, number> = {
   underline: 0.9,
   strikethrough: 0.9,
+  squiggly: 0.9,
+  replace: 0.9,
+  insert: 0.9,
   highlight: 0.35,
   textbox: 1,
 }
@@ -44,15 +47,20 @@ const LEGACY_ALPHA: Record<HighlightStyleKind, number> = {
  * epub.js/marks-pane only know 3 annotation types — `"highlight"`, `"underline"`, `"mark"`
  * (see `Annotation.attach()`/`detach()` in epubjs/src/annotations.js, which hardcode exactly
  * those 3 and silently no-op on anything else). Our `HighlightStyleKind` has 2 more:
- * `strikethrough` reuses the `underline` mark's rect+line geometry (the line is repositioned to
- * mid-height afterward — see `repositionStrikethroughLines`); `textbox` uses the `mark` type,
+ * `strikethrough` / `squiggly` / `replace` / `insert` reuse the `underline` mark's rect+line geometry
+ * (the line is moved, zigzagged or dashed afterward — see `restyleLineMarks`); `textbox` uses the `mark` type,
  * which places a plain positioned element (styled as a 📝 icon via `a[ref="epubjs-mk"]` in
  * index.css) instead of drawing over the text at all.
  */
 export function epubAnnotationTypeFor(styleKind: HighlightStyleKind): 'highlight' | 'underline' | 'mark' {
   if (styleKind === 'textbox') return 'mark'
-  if (styleKind === 'strikethrough') return 'underline'
-  return styleKind
+  return styleKind === 'highlight' ? 'highlight' : 'underline'
+}
+
+/** Kinds drawn with the underline mark's rect+line geometry, then restyled / repositioned by
+ *  `restyleLineMarks` (marks-controller.ts). */
+export function isLineMarkKind(styleKind: HighlightStyleKind): boolean {
+  return styleKind !== 'highlight' && styleKind !== 'textbox'
 }
 
 export function styleAttrsFor(styleKind: HighlightStyleKind, colorHex: string): Record<string, string> {

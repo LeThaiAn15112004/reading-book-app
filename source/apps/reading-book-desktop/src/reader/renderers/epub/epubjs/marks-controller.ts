@@ -7,6 +7,7 @@ import type { Rendition } from 'epubjs'
 import type { HighlightStyleKind } from '@reading-book/book-reader-sdk'
 import {
   epubAnnotationTypeFor,
+  isLineMarkKind,
   pointInIconElement,
   pointInMarkElement,
   styleAttrsFor,
@@ -23,32 +24,64 @@ export type MarksController = Pick<
 
 export function createMarksController(activeRendition: Rendition): MarksController {
   /**
-   * A `strikethrough` mark is really an `underline` mark under the hood (see
+   * Every kind except `highlight` / `textbox` is really an `underline` mark under the hood (see
    * `epubAnnotationTypeFor`) — marks-pane's `Underline.render()` (marks-pane/src/marks.js)
-   * hardcodes its `<line>` at the BOTTOM of each line box, which is exactly what we want for a
-   * real underline but not for a strikethrough. There's no library hook to change that, so this
-   * walks the mark's own `<rect>`/`<line>` child pairs afterward and moves each `<line>` to the
-   * vertical middle of its sibling `<rect>` instead. Re-run on every `rendered` view (alongside
-   * `applyFocusedMarkClass`) since marks-pane recreates this geometry from scratch each time.
+   * hardcodes its `<line>` at the BOTTOM of each line box, which is exactly what a real underline
+   * wants. There's no library hook to change that, so this walks the mark's own `<rect>`/`<line>`
+   * child pairs afterward and restyles each `<line>`: strikethrough / replace move it to the middle
+   * of the sibling `<rect>` (replace also dashes it); insert dashes it in place; squiggly swaps it
+   * for a zigzag `<path>`. Re-run on every `rendered` view (alongside `applyFocusedMarkClass`)
+   * since marks-pane recreates this geometry from scratch each time.
    */
-  const strikethroughCfiRanges = new Set<string>()
-  function repositionStrikethroughLines(): void {
-    if (strikethroughCfiRanges.size === 0) return
+  const lineMarks = new Map<string, HighlightStyleKind>()
+  const SVG_NS = 'http://www.w3.org/2000/svg'
+  function zigzagPoints(x1: number, x2: number, y: number): string {
+    const tooth = 3
+    const amp = 1.5
+    const steps = Math.max(2, Math.round(Math.abs(x2 - x1) / tooth))
+    const points: string[] = []
+    for (let i = 0; i <= steps; i++) {
+      points.push(`${x1 + ((x2 - x1) * i) / steps},${i % 2 === 0 ? y : y - amp}`)
+    }
+    return points.join(' ')
+  }
+  function restyleLineMarks(): void {
+    if (lineMarks.size === 0) return
     const views = activeRendition.views() as unknown as {
       forEach: (cb: (view: MarkedView) => void) => void
     }
     views.forEach((view) => {
-      for (const cfiRange of strikethroughCfiRanges) {
+      for (const [cfiRange, styleKind] of lineMarks) {
+        if (styleKind === 'underline') continue
         const element = view.underlines?.[cfiRange]?.element
         if (!element) continue
         let rect: SVGRectElement | null = null
         for (const child of Array.from(element.children)) {
           if (child.tagName === 'rect') {
             rect = child as SVGRectElement
-          } else if (child.tagName === 'line' && rect) {
-            const y = Number(rect.getAttribute('y')) + Number(rect.getAttribute('height')) / 2
-            child.setAttribute('y1', String(y))
-            child.setAttribute('y2', String(y))
+          } else if ((child.tagName === 'line' || child.tagName === 'polyline') && rect) {
+            const top = Number(rect.getAttribute('y'))
+            const height = Number(rect.getAttribute('height'))
+            if (styleKind === 'strikethrough' || styleKind === 'replace') {
+              const y = top + height / 2
+              child.setAttribute('y1', String(y))
+              child.setAttribute('y2', String(y))
+            }
+            if (styleKind === 'replace' || styleKind === 'insert') {
+              child.setAttribute('stroke-dasharray', '5 3')
+            }
+            if (styleKind === 'squiggly' && child.tagName === 'line') {
+              const x1 = Number(child.getAttribute('x1'))
+              const x2 = Number(child.getAttribute('x2'))
+              const y = Number(child.getAttribute('y1'))
+              const zigzag = document.createElementNS(SVG_NS, 'polyline')
+              for (const attr of Array.from(child.attributes)) {
+                if (!/^(x1|x2|y1|y2)$/.test(attr.name)) zigzag.setAttribute(attr.name, attr.value)
+              }
+              zigzag.setAttribute('fill', 'none')
+              zigzag.setAttribute('points', zigzagPoints(x1, x2, y))
+              child.replaceWith(zigzag)
+            }
             rect = null
           }
         }
@@ -77,7 +110,7 @@ export function createMarksController(activeRendition: Rendition): MarksControll
     } catch {
       /* ignore */
     }
-    strikethroughCfiRanges.delete(cfiRange)
+    lineMarks.delete(cfiRange)
     try {
       if (epubType === 'mark') {
         activeRendition.annotations.add('mark', cfiRange, { id })
@@ -94,17 +127,17 @@ export function createMarksController(activeRendition: Rendition): MarksControll
     } catch {
       /* stale/foreign cfi — ignore */
     }
-    if (styleKind === 'strikethrough') strikethroughCfiRanges.add(cfiRange)
+    if (isLineMarkKind(styleKind)) lineMarks.set(cfiRange, styleKind)
     // Re-apply the focused outline (and strikethrough line position) in case this mark is the
     // currently-focused one — e.g. a brand-new highlight created while already "focused" (see
     // `createHighlight` in useReaderHighlights.ts), whose element didn't exist yet the moment
     // `setFocusedHighlight` was called.
     applyFocusedMarkClass()
-    repositionStrikethroughLines()
+    restyleLineMarks()
   }
 
   function removeHighlight(cfiRange: string, styleKind: HighlightStyleKind): void {
-    if (styleKind === 'strikethrough') strikethroughCfiRanges.delete(cfiRange)
+    if (styleKind === 'strikethrough') lineMarks.delete(cfiRange)
     try {
       activeRendition.annotations.remove(cfiRange, epubAnnotationTypeFor(styleKind))
     } catch {
@@ -236,12 +269,12 @@ export function createMarksController(activeRendition: Rendition): MarksControll
   }
 
   activeRendition.on('rendered', applyFocusedMarkClass)
-  activeRendition.on('rendered', repositionStrikethroughLines)
+  activeRendition.on('rendered', restyleLineMarks)
   // A view's `reframe()` (iframe.js) calls `pane.render()` directly whenever it resizes — e.g.
   // once images/fonts finish loading right after the initial `rendered` fires — which rebuilds
   // every underline's <line> from scratch at marks-pane's hardcoded bottom position, undoing the
   // reposition above. `resized` fires after those internal re-renders settle, so re-run there too.
-  activeRendition.on('resized', repositionStrikethroughLines)
+  activeRendition.on('resized', restyleLineMarks)
 
   return {
     applyHighlight,
@@ -252,13 +285,13 @@ export function createMarksController(activeRendition: Rendition): MarksControll
     dispose: () => {
       try {
         activeRendition.off('rendered', applyFocusedMarkClass)
-        activeRendition.off('rendered', repositionStrikethroughLines)
-        activeRendition.off('resized', repositionStrikethroughLines)
+        activeRendition.off('rendered', restyleLineMarks)
+        activeRendition.off('resized', restyleLineMarks)
       } catch {
         /* ignore */
       }
       focusedMarkId = null
-      strikethroughCfiRanges.clear()
+      lineMarks.clear()
     },
   }
 }

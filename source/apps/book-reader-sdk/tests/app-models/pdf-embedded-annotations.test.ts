@@ -92,7 +92,7 @@ describe('readPdfJsAnnotation', () => {
     expect(EMBEDDED_PDF_ANNOTATION_STYLE).toEqual({
       Highlight: 'highlight',
       Underline: 'underline',
-      Squiggly: 'underline',
+      Squiggly: 'squiggly',
       StrikeOut: 'strikethrough',
       Text: 'textbox',
     })

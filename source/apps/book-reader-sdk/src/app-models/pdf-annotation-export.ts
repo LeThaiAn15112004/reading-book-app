@@ -18,7 +18,7 @@ import {
   type ScannedPdfAnnotation,
 } from './pdf-embedded-annotations.js'
 
-export type PdfWriteSubtype = 'Highlight' | 'Underline' | 'StrikeOut' | 'Text'
+export type PdfWriteSubtype = 'Highlight' | 'Underline' | 'Squiggly' | 'StrikeOut' | 'Text'
 
 /** One annotation to write on one page. */
 export type PdfWriteAnnotation = {
@@ -52,11 +52,22 @@ export type ExportableHighlight = HighlightContent & {
 export const READMATE_NM_PREFIX = 'readmate:'
 export const READMATE_PDF_AUTHOR = 'Readmate'
 
-const SUBTYPE_FOR_STYLE: Record<HighlightStyleKind, PdfWriteSubtype> = {
+/**
+ * `replace` / `insert` have no faithful single-annotation PDF form (Acrobat uses a StrikeOut + Caret
+ * group) and are not written: they stay in SQLite only, so a round trip can never flip them into
+ * another style.
+ */
+const SUBTYPE_FOR_STYLE: Partial<Record<HighlightStyleKind, PdfWriteSubtype>> = {
   highlight: 'Highlight',
   underline: 'Underline',
+  squiggly: 'Squiggly',
   strikethrough: 'StrikeOut',
   textbox: 'Text',
+}
+
+/** Whether a row of this style can be written into a PDF file. */
+export function isPdfWritableStyle(styleKind: HighlightStyleKind): boolean {
+  return SUBTYPE_FOR_STYLE[styleKind] !== undefined
 }
 
 /** `#RRGGBB` / `#RRGGBBAA` → RGB 0–1 + opacity; the default color for anything else. */
@@ -98,7 +109,8 @@ export function pdfWriteAnnotationsFromHighlight(row: ExportableHighlight, first
   const annotation: PdfAnnotation | undefined = row.pdfAnnotation
   if (!annotation || annotation.rects.length === 0) return []
   const { color, opacity } = pdfColorFromHex(row.colorHex)
-  const subtype = SUBTYPE_FOR_STYLE[row.styleKind] ?? 'Highlight'
+  const subtype = SUBTYPE_FOR_STYLE[row.styleKind]
+  if (!subtype) return []
   const byPage = new Map<number, PdfWriteAnnotation['rects']>()
   for (const r of annotation.rects) {
     const page = r.pageIndex ?? annotation.pageIndex
@@ -153,7 +165,7 @@ export function planPdfAnnotationWrite(input: {
   rows: readonly ExportableHighlight[]
 }): PdfAnnotationWritePlan {
   const plan: PdfAnnotationWritePlan = { add: [], replace: [], remove: [], kept: 0, writtenNoteIds: [] }
-  const rowsById = new Map(input.rows.filter((r) => r.pdfAnnotation).map((r) => [r.id, r]))
+  const rowsById = new Map(input.rows.filter((r) => r.pdfAnnotation && isPdfWritableStyle(r.styleKind)).map((r) => [r.id, r]))
   const handledRows = new Set<string>()
   const handledItems = new Set<number>()
 

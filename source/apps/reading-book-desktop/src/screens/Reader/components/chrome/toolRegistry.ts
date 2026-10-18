@@ -14,7 +14,7 @@ export type ModeTool = 'hand' | 'select'
 export type CompanionTool = 'search' | 'speech' | 'translate'
 
 /** Markup tools — armed one at a time, sticky until toggled off / Escape / Hand / Select. */
-export type AnnotationTool = 'highlight' | 'underline' | 'strikethrough'
+export type AnnotationTool = 'highlight' | 'underline' | 'squiggly' | 'strikethrough' | 'replace' | 'insert'
 
 /** Utility tools. */
 export type MiscTool = 'snapshot' | 'wordCount'
@@ -47,12 +47,14 @@ export type ToolGroupDef = {
   /** `never`: always inline (frequent tools). `always`: always one dropdown. `auto`: inline until
    *  the strip runs out of room. */
   collapse: 'never' | 'always' | 'auto'
+  /** Inline buttons are compact icons without a label (the tooltip names the tool). */
+  iconOnly?: boolean
 }
 
 /** Toolbar order. Empty groups (nothing supported by the surface) are not rendered. */
 export const TOOL_GROUPS: readonly ToolGroupDef[] = [
   { id: 'navigate', label: 'Navigate', icon: 'hand', collapse: 'never' },
-  { id: 'annotation', label: 'Annotation', icon: 'highlight', collapse: 'always' },
+  { id: 'annotation', label: 'Annotation', icon: 'highlight', collapse: 'never', iconOnly: true },
   { id: 'view', label: 'View', icon: 'view', collapse: 'auto' },
   { id: 'tools', label: 'Tools', icon: 'tools', collapse: 'always' },
   { id: 'settings', label: 'Settings', icon: 'settings', collapse: 'never' },
@@ -73,7 +75,10 @@ export const TOOL_REGISTRY: readonly ToolDef[] = [
   { id: 'translate', label: 'Translate', group: 'navigate', description: 'Translate selected text', requires: ['translate'] },
   { id: 'highlight', label: 'Highlight', group: 'annotation', description: 'Highlight — drag over text', requires: ['markupAnnotations'] },
   { id: 'underline', label: 'Underline', group: 'annotation', description: 'Underline — drag over text', requires: ['markupAnnotations'] },
+  { id: 'squiggly', label: 'Squiggly', group: 'annotation', description: 'Squiggly underline — drag over text', requires: ['markupAnnotations'] },
   { id: 'strikethrough', label: 'Strikethrough', group: 'annotation', description: 'Strikethrough — drag over text', requires: ['markupAnnotations'] },
+  { id: 'replace', label: 'Replace Text', group: 'annotation', description: 'Replace text — strike out the selection; the note holds the new text', requires: ['markupAnnotations'] },
+  { id: 'insert', label: 'Insert Text', group: 'annotation', description: 'Insert text — mark a place; the note holds the text to add', requires: ['markupAnnotations'] },
   { id: 'snapshot', label: 'Snapshot', group: 'tools', description: 'Snapshot — copy an area as an image', requires: ['snapshot'] },
   { id: 'wordCount', label: 'Word Count', group: 'tools', description: 'Word count and reading time', requires: ['wordCount'] },
   { id: 'settings', label: 'Settings', group: 'settings', description: 'Reading settings', requires: ['readingSettings'], popup: 'dialog' },

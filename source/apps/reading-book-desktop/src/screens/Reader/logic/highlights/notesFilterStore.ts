@@ -7,7 +7,7 @@ export type NotesSortBy = 'readingOrder' | 'chronological'
  *  three annotation kinds the reader fully supports today (`highlight`, `underline`,
  *  `strikethrough`). `textbox` notes still show up under 'all', they just don't get their own
  *  filter option yet. */
-export type NotesTypeFilter = 'all' | Extract<HighlightStyleKind, 'highlight' | 'underline' | 'strikethrough'>
+export type NotesTypeFilter = 'all' | Exclude<HighlightStyleKind, 'textbox'>
 
 /** Search terms longer than this are almost certainly a paste-in-the-wrong-box accident — clamp
  *  instead of letting an unbounded string flow into every `.toLowerCase()`/`.includes()` call on
@@ -29,7 +29,15 @@ type NotesFilterState = {
   reset: () => void
 }
 
-const VALID_TYPE_FILTERS: ReadonlySet<NotesTypeFilter> = new Set(['all', 'highlight', 'underline', 'strikethrough'])
+const VALID_TYPE_FILTERS: ReadonlySet<NotesTypeFilter> = new Set([
+  'all',
+  'highlight',
+  'underline',
+  'squiggly',
+  'strikethrough',
+  'replace',
+  'insert',
+])
 
 /**
  * UI-only state for the Notes sidebar's search/filter/sort row — kept in its own zustand store

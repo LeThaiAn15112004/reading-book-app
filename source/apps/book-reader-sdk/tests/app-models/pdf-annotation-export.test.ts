@@ -73,7 +73,7 @@ describe('mapping helpers', () => {
 
 describe('pdfWriteAnnotationsFromHighlight', () => {
   it('maps each style to its PDF subtype with color, opacity, note, author and dates', () => {
-    const kinds = { highlight: 'Highlight', underline: 'Underline', strikethrough: 'StrikeOut', textbox: 'Text' } as const
+    const kinds = { highlight: 'Highlight', underline: 'Underline', squiggly: 'Squiggly', strikethrough: 'StrikeOut', textbox: 'Text' } as const
     for (const [styleKind, subtype] of Object.entries(kinds)) {
       const [w] = pdfWriteAnnotationsFromHighlight(row('n1', { styleKind: styleKind as keyof typeof kinds, colorHex: '#00FF0080', note: ' my note ' }))
       expect(w).toMatchObject({ nm: 'readmate:n1', subtype, pageIndex: 0, color: [0, 1, 0], contents: 'my note', author: 'Readmate' })

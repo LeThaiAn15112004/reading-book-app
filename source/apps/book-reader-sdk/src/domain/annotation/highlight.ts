@@ -6,7 +6,7 @@ import type { NoteLocator, NoteSelectionText, PdfAnnotation, TxtAnnotation } fro
  * `openEpubjs.ts`); `'textbox'` = a sticky-note anchor with no colored mark at all, just a 📝
  * icon (see `EpubjsHandle.applyHighlight` styleKind branches). Mirrors `note_json.type`.
  */
-export type HighlightStyleKind = 'highlight' | 'underline' | 'strikethrough' | 'textbox';
+export type HighlightStyleKind = 'highlight' | 'underline' | 'strikethrough' | 'squiggly' | 'replace' | 'insert' | 'textbox';
 
 /**
  * Application-facing view of one highlight/underline — a `notes` row whose `note_json.group`

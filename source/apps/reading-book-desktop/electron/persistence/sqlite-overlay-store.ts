@@ -201,13 +201,16 @@ const DEFAULT_HIGHLIGHT_COLOR = '#FFEB3B'
  */
 const HIGHLIGHT_TYPE_PREDICATE = `
   (json_extract(note_json, '$.group') IS NULL OR json_extract(note_json, '$.group') = 'annotation')
-  AND json_extract(note_json, '$.type') IN ('highlight', 'underline', 'strikethrough', 'textbox')
+  AND json_extract(note_json, '$.type') IN ('highlight', 'underline', 'strikethrough', 'squiggly', 'replace', 'insert', 'textbox')
 `
 
 const HIGHLIGHT_STYLE_KINDS: HighlightStyleKind[] = [
   'highlight',
   'underline',
   'strikethrough',
+  'squiggly',
+  'replace',
+  'insert',
   'textbox',
 ]
 

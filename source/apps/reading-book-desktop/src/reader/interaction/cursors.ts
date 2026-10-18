@@ -11,6 +11,9 @@ const SURFACE_CLASSES = [
   'rb-tool-highlight',
   'rb-tool-underline',
   'rb-tool-strikethrough',
+  'rb-tool-squiggly',
+  'rb-tool-replace',
+  'rb-tool-insert',
   'rb-grabbing',
   'rb-hover-text',
 ] as const
@@ -89,7 +92,13 @@ html.rb-tool-underline body {
 /* Strikethrough: same native-selection surface, reuses the underline cursor art (no dedicated
    asset — mirrors how the mark itself reuses underline geometry in openEpubjs.ts). */
 html.rb-tool-strikethrough,
-html.rb-tool-strikethrough body {
+html.rb-tool-strikethrough body,
+html.rb-tool-squiggly,
+html.rb-tool-squiggly body,
+html.rb-tool-replace,
+html.rb-tool-replace body,
+html.rb-tool-insert,
+html.rb-tool-insert body {
   cursor: url(${originUrl('/cursors/underline.svg')}) 6 28, text;
   user-select: text;
   -webkit-user-select: text;

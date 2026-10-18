@@ -40,13 +40,12 @@ export const EMBEDDED_PDF_ANNOTATION_SUBTYPES = ['Highlight', 'Underline', 'Squi
 export type EmbeddedPdfAnnotationSubtype = (typeof EMBEDDED_PDF_ANNOTATION_SUBTYPES)[number]
 
 /**
- * How each subtype is stored. Squiggly has no style of its own in the app and becomes an underline;
- * a Text annotation (sticky note) becomes a note (`textbox`) anchored on its icon.
+ * How each subtype is stored. a Text annotation (sticky note) becomes a note (`textbox`) anchored on its icon.
  */
 export const EMBEDDED_PDF_ANNOTATION_STYLE: Record<EmbeddedPdfAnnotationSubtype, HighlightStyleKind> = {
   Highlight: 'highlight',
   Underline: 'underline',
-  Squiggly: 'underline',
+  Squiggly: 'squiggly',
   StrikeOut: 'strikethrough',
   Text: 'textbox',
 }

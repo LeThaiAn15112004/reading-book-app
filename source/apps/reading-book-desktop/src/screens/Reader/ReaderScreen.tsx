@@ -6,6 +6,7 @@ import {
   TextOffsetLocation,
   fontFamilyCss,
   formatHighlightCitation,
+  isMarkupTool,
   resolveTxtReadingOffset,
   type InteractionTool,
 } from '@reading-book/book-reader-sdk'
@@ -148,10 +149,7 @@ export function ReaderScreen() {
   const [activeTool, setActiveTool] = useState<InteractionTool>('hand')
   const activeToolRef = useRef(activeTool)
   activeToolRef.current = activeTool
-  const activeAnnotationTool =
-    activeTool === 'highlight' || activeTool === 'underline' || activeTool === 'strikethrough'
-      ? activeTool
-      : null
+  const activeAnnotationTool = isMarkupTool(activeTool) ? activeTool : null
 
   const book = useReaderBookOpen({
     bookId,
@@ -474,14 +472,14 @@ export function ReaderScreen() {
   }
 
   /** TXT selection menu → mark that selection (`textbox` = a note, its popup opens at the click). */
-  function markTxtSelection(styleKind: 'highlight' | 'underline' | 'strikethrough' | 'textbox') {
+  function markTxtSelection(styleKind: 'highlight' | 'underline' | 'strikethrough' | 'squiggly' | 'replace' | 'insert' | 'textbox') {
     const menu = txt.selectionMenu
     if (!menu) return
     txt.createFromSelection(menu.selection, styleKind, new DOMRect(menu.point.x, menu.point.y, 0, 0))
   }
 
   /** PDF selection menu → mark that selection (`textbox` = a note, its popup opens at the click). */
-  function markPdfSelection(styleKind: 'highlight' | 'underline' | 'strikethrough' | 'textbox') {
+  function markPdfSelection(styleKind: 'highlight' | 'underline' | 'strikethrough' | 'squiggly' | 'replace' | 'insert' | 'textbox') {
     const menu = pdfSelectionMenu.menu
     if (!menu) return
     pdfHighlights.createFromSelection(menu.selection, styleKind, new DOMRect(menu.point.x, menu.point.y, 0, 0))
@@ -499,13 +497,7 @@ export function ReaderScreen() {
         translation.setMode(false)
         return true
       }
-      if (
-        activeToolRef.current !== 'highlight' &&
-        activeToolRef.current !== 'underline' &&
-        activeToolRef.current !== 'strikethrough'
-      ) {
-        return false
-      }
+      if (!isMarkupTool(activeToolRef.current)) return false
       setActiveTool('select')
       return true
     },
@@ -552,7 +544,10 @@ export function ReaderScreen() {
     translate: { active: translation.mode },
     highlight: { active: activeTool === 'highlight' },
     underline: { active: activeTool === 'underline' },
+    squiggly: { active: activeTool === 'squiggly' },
     strikethrough: { active: activeTool === 'strikethrough' },
+    replace: { active: activeTool === 'replace' },
+    insert: { active: activeTool === 'insert' },
     snapshot: { active: snapshot.active },
     settings: { active: chrome.settingsOpen, expanded: chrome.settingsOpen },
   }
@@ -587,7 +582,10 @@ export function ReaderScreen() {
         return
       case 'highlight':
       case 'underline':
+      case 'squiggly':
       case 'strikethrough':
+      case 'replace':
+      case 'insert':
         // Click the armed tool again to disarm it (back to Select); otherwise arm it — sticky across
         // multiple highlights/underlines/strikethroughs until toggled off, Escape, or Hand/Select.
         selectTool((current) => (current === tool ? 'select' : tool))

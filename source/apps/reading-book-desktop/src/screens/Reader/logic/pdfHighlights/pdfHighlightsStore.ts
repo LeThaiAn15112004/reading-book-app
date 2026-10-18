@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { markupToast } from '../markupToast'
 import type { MutableRefObject } from 'react'
 import {
   DEFAULT_HIGHLIGHT_COLOR,
@@ -15,6 +16,7 @@ import {
   pdfRectsFromAnnotation,
   type HighlightHistory,
   type HighlightStyleKind,
+  type MarkupInteractionTool,
   type PdfReaderHighlight,
 } from '@reading-book/book-reader-sdk'
 import { overlayApi } from '../../../../bridge'
@@ -37,7 +39,7 @@ export type PdfAnnotationAnchor = {
 
 export type ActivePdfHighlight = { highlight: PdfReaderHighlight; rect: PdfAnnotationAnchor }
 
-export type PdfMarkupTool = Extract<HighlightStyleKind, 'highlight' | 'underline' | 'strikethrough'>
+export type PdfMarkupTool = MarkupInteractionTool
 
 /** Inputs `useReaderPdfHighlights` threads in from ReaderScreen — not UI state anything renders. */
 type PdfHighlightsContext = {
@@ -294,11 +296,7 @@ export const usePdfHighlightsStore = create<PdfHighlightsStoreState>()((set, get
   commitMarkupSelection: (selection, tool) => {
     if (!get().createFromSelection(selection, tool)) return
     get().onToast(
-      tool === 'highlight'
-        ? 'Highlighted — Ctrl+Z to undo'
-        : tool === 'underline'
-          ? 'Underlined — Ctrl+Z to undo'
-          : 'Struck through — Ctrl+Z to undo',
+      markupToast(tool),
     )
   },
 

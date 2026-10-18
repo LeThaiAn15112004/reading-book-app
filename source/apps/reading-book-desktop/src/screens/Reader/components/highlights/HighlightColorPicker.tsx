@@ -18,6 +18,9 @@ type HighlightColorPickerProps = {
 const LEGACY_ALPHA: Record<HighlightStyleKind, number> = {
   underline: 0.9,
   strikethrough: 0.9,
+  squiggly: 0.9,
+  replace: 0.9,
+  insert: 0.9,
   highlight: 0.35,
   textbox: 1,
 }

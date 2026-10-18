@@ -4,7 +4,7 @@ import {
   useState,
   type MutableRefObject,
 } from 'react'
-import { CfiLocation } from '@reading-book/book-reader-sdk'
+import { CfiLocation, isMarkupTool } from '@reading-book/book-reader-sdk'
 import type {
   FontFamily,
   FontWeight,
@@ -960,12 +960,7 @@ export function EpubRenderer({
             // Select / Highlight / Underline / Strikethrough: native text selection only — no
             // margin pan. For the three markup tools, the drag's *end* (pointerup, below) is what
             // decides whether it becomes a saved mark — not any mid-drag pause.
-            if (
-              tool === 'select' ||
-              tool === 'highlight' ||
-              tool === 'underline' ||
-              tool === 'strikethrough'
-            ) {
+            if (tool === 'select' || isMarkupTool(tool)) {
               // Deliberately NOT `setPointerCapture` here (unlike Hand's pan gesture below) — it
               // would redirect this pointer's events to a single captured element, which in
               // Chromium can itself interrupt the browser's own native text-selection drag
@@ -1466,7 +1461,7 @@ export function EpubRenderer({
               ? 'cursor-highlight-tool'
               : interactionTool === 'underline'
                 ? 'cursor-underline-tool'
-                : interactionTool === 'strikethrough'
+                : isMarkupTool(interactionTool)
                   ? 'cursor-strikethrough-tool'
                   : 'cursor-hand-tool'
         } ${

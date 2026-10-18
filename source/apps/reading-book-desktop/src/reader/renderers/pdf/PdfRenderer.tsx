@@ -31,8 +31,10 @@ import {
 } from 'pdfjs-dist'
 import {
   PageRectLocation,
+  isMarkupTool,
   pdfMarkAt,
   type InteractionTool,
+  type MarkupInteractionTool,
   type TextMatcher,
 } from '@reading-book/book-reader-sdk'
 import {
@@ -84,10 +86,10 @@ type PageSize = { w: number; h: number }
 export type PdfAnnotationHit = { id: string; rect: DOMRect }
 
 /** Markup tools (Highlight / Underline / Strikethrough): a drag that selects text marks it. */
-type MarkupTool = Extract<InteractionTool, 'highlight' | 'underline' | 'strikethrough'>
+type MarkupTool = MarkupInteractionTool
 
 function markupToolOf(tool: InteractionTool): MarkupTool | null {
-  return tool === 'highlight' || tool === 'underline' || tool === 'strikethrough' ? tool : null
+  return isMarkupTool(tool) ? tool : null
 }
 
 export type PdfNavState = {

@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { markupToast } from '../markupToast'
 import type { MutableRefObject } from 'react'
 import { CfiLocation } from '@reading-book/book-reader-sdk'
 import {
@@ -13,6 +14,7 @@ import {
   DEFAULT_HIGHLIGHT_COLOR,
   type HighlightHistory,
   type HighlightStyleKind,
+  type MarkupInteractionTool,
   type ReaderHighlight,
 } from '@reading-book/book-reader-sdk'
 import { overlayApi } from '../../../../bridge'
@@ -33,7 +35,7 @@ export type SelectionMenuState = {
 }
 
 /** The markup tools that instant-apply on drag-to-select (see `handleTextSelected` below). */
-export type AnnotationMarkTool = Extract<HighlightStyleKind, 'highlight' | 'underline' | 'strikethrough'>
+export type AnnotationMarkTool = MarkupInteractionTool
 
 /**
  * Inputs `useReaderHighlights` threads in from `ReaderScreen`/React props — the imperative
@@ -241,11 +243,7 @@ export const useHighlightsStore = create<HighlightsStoreState>()((set, get) => (
     get().focusHighlight(null)
     get().createHighlight(get().lastUsedColorHex, tool)
     const toastMessage =
-      tool === 'highlight'
-        ? 'Highlighted — Ctrl+Z to undo'
-        : tool === 'underline'
-          ? 'Underlined — Ctrl+Z to undo'
-          : 'Struck through — Ctrl+Z to undo'
+      markupToast(tool)
     get().onToast(toastMessage)
   },
 

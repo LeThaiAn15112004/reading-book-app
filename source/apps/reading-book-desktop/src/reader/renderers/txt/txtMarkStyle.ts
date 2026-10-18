@@ -32,6 +32,21 @@ export function txtMarkStyle(covering: readonly TxtReaderHighlight[]): CSSProper
         lineColor = h.colorHex
         lineStyle = 'solid'
         break
+      case 'squiggly':
+        lines.add('underline')
+        lineColor = h.colorHex
+        lineStyle = 'wavy'
+        break
+      case 'replace':
+        lines.add('line-through')
+        lineColor = h.colorHex
+        lineStyle = 'dashed'
+        break
+      case 'insert':
+        lines.add('underline')
+        lineColor = h.colorHex
+        lineStyle = 'dashed'
+        break
       case 'textbox':
         fill ??= { color: h.colorHex, percent: NOTE_FILL_PERCENT }
         lines.add('underline')

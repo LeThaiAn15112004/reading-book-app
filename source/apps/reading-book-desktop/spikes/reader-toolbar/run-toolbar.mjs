@@ -104,7 +104,7 @@ console.log('3. EPUB layout')
 check('groups and order at fold level 0', () => {
   assert.deepEqual(shape(resolveToolbarLayout(epub, 0)), [
     'navigate:inline[hand,select,search,speech,translate]',
-    'annotation:menu[highlight,underline,strikethrough]',
+    'annotation:inline[highlight,underline,squiggly,strikethrough,replace,insert]',
     'tools:menu[snapshot,wordCount]',
     'settings:inline[settings]',
   ])
@@ -114,9 +114,9 @@ check('no empty View group for EPUB', () => {
 })
 
 console.log('3b. TXT layout')
-check('TXT toolbar: the Annotation menu, Tools, Settings — no Navigate group', () => {
+check('TXT toolbar: the inline Annotation icons, Tools, Settings — no Navigate group', () => {
   assert.deepEqual(shape(resolveToolbarLayout(txt, 0)), [
-    'annotation:menu[highlight,underline,strikethrough]',
+    'annotation:inline[highlight,underline,squiggly,strikethrough,replace,insert]',
     'tools:menu[snapshot,wordCount]',
     'settings:inline[settings]',
   ])
@@ -131,17 +131,18 @@ check('only renderer-independent tools', () => {
   ])
 })
 
-check('PDF layout: Search in the navigate group, the Annotation menu, no Settings group', () => {
+check('PDF layout: Search in the navigate group, the inline Annotation icons, no Settings group', () => {
   assert.deepEqual(shape(resolveToolbarLayout(pdf, 0)), [
     'navigate:inline[hand,select,search]',
-    'annotation:menu[highlight,underline,strikethrough]',
+    'annotation:inline[highlight,underline,squiggly,strikethrough,replace,insert]',
     'tools:menu[snapshot,wordCount]',
   ])
 })
 
 console.log('5. folding')
-check('Annotation and Tools are always dropdowns; nothing left to fold for EPUB', () => {
-  for (const id of ['annotation', 'tools']) assert.equal(TOOL_GROUPS.find((g) => g.id === id).collapse, 'always')
+check('Tools is always a dropdown, Annotation always inline icons; nothing left to fold for EPUB', () => {
+  assert.equal(TOOL_GROUPS.find((g) => g.id === 'tools').collapse, 'always')
+  assert.equal(TOOL_GROUPS.find((g) => g.id === 'annotation').collapse, 'never')
   assert.deepEqual(foldableGroups(epub), [])
   assert.deepEqual(shape(resolveToolbarLayout(epub, 2)), shape(resolveToolbarLayout(epub, 0)))
 })
