@@ -85,7 +85,7 @@ check('epub, pdf, txt and md map to their own surfaces, everything else to the p
   }
 })
 check('TXT = EPUB toolbar UI (no audio) + Edit; no pages', () => {
-  assert.deepEqual([...txt].sort(), ['interaction', 'markupAnnotations', 'readingSettings', 'search', 'snapshot', 'textEdit', 'translate', 'wordCount'])
+  assert.deepEqual([...txt].sort(), ['markupAnnotations', 'readingSettings', 'search', 'snapshot', 'textEdit', 'translate', 'wordCount'])
   assert.ok(!txt.has('readAloud') && !txt.has('pageLayout'))
 })
 check('MD = EPUB toolbar UI (no audio); no pages', () => {
@@ -119,9 +119,9 @@ check('no empty View group for EPUB', () => {
 })
 
 console.log('3b. TXT layout')
-check('TXT toolbar: Edit + the navigate tools, the inline Annotation icons, Tools, Settings', () => {
+check('TXT toolbar: Edit + Search/Translate (no Hand/Select), the inline Annotation icons, Tools, Settings', () => {
   assert.deepEqual(shape(resolveToolbarLayout(txt, 0)), [
-    'navigate:inline[hand,edit,select,search,translate]',
+    'navigate:inline[edit,search,translate]',
     'annotation:inline[highlight,underline,squiggly,strikethrough,replace,insert]',
     'tools:inline[snapshot,wordCount]',
     'settings:inline[settings]',
