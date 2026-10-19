@@ -56,7 +56,7 @@ export const TOOL_GROUPS: readonly ToolGroupDef[] = [
   { id: 'navigate', label: 'Navigate', icon: 'hand', collapse: 'never' },
   { id: 'annotation', label: 'Annotation', icon: 'highlight', collapse: 'never', iconOnly: true },
   { id: 'view', label: 'View', icon: 'view', collapse: 'auto' },
-  { id: 'tools', label: 'Tools', icon: 'tools', collapse: 'always' },
+  { id: 'tools', label: 'Tools', icon: 'tools', collapse: 'never' },
   { id: 'settings', label: 'Settings', icon: 'settings', collapse: 'never' },
 ]
 
@@ -64,7 +64,7 @@ export const TOOL_GROUPS: readonly ToolGroupDef[] = [
 export const INLINE_MAX = 4
 
 /** Order `auto` groups fold into dropdowns when the strip overflows — least used first. */
-export const FOLD_ORDER: readonly ToolGroupId[] = ['tools', 'view', 'annotation']
+export const FOLD_ORDER: readonly ToolGroupId[] = ['view', 'annotation']
 
 /** Order within a group is toolbar / menu order. */
 export const TOOL_REGISTRY: readonly ToolDef[] = [

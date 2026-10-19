@@ -84,10 +84,10 @@ Find Next / Find Previous **không** lên toolbar: đã có trong panel Search (
    (`src/reader/capabilities.ts`); công cụ khai báo `requires`. Thiếu capability → không render (không disable).
 2. **Nhóm** (`TOOL_GROUPS` trong `toolRegistry.ts`): `navigate`, `annotation`, `view`, `tools`, `settings`.
    `navigate` và `settings` không bao giờ gập (công cụ dùng thường xuyên; menu Audio neo vào nút của nó).
-   `annotation` và `tools` **luôn là dropdown** (`collapse: 'always'`, theo mẫu "nhiều công cụ hơn"); `view`
+   `annotation` và `tools` **luôn hiện inline** (`collapse: 'never'`, Tools có 2 nút Snapshot + Word Count để khỏi phải bấm 3 lần); `view`
    là `auto`.
 3. Nhóm có **> 4 công cụ** (`INLINE_MAX`) luôn là dropdown.
-4. Khi thanh tràn: gập lần lượt theo `FOLD_ORDER` = `tools` → `view` → `annotation` (ít dùng trước). Rộng ra
+4. Khi thanh tràn: gập lần lượt theo `FOLD_ORDER` = `view` → `annotation` (ít dùng trước). Rộng ra
    lại thì bung theo thứ tự ngược. Đo bằng `ResizeObserver` (`useToolbarOverflow`). Hết nhóm để gập thì thanh
    vẫn cuộn ngang — phương án cuối, không mất công cụ.
 5. Nhóm rỗng (renderer không hỗ trợ công cụ nào trong nhóm) không render, kể cả vạch phân cách.

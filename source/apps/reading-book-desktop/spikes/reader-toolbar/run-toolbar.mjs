@@ -110,7 +110,7 @@ check('groups and order at fold level 0', () => {
   assert.deepEqual(shape(resolveToolbarLayout(epub, 0)), [
     'navigate:inline[hand,select,search,speech,translate]',
     'annotation:inline[highlight,underline,squiggly,strikethrough,replace,insert]',
-    'tools:menu[snapshot,wordCount]',
+    'tools:inline[snapshot,wordCount]',
     'settings:inline[settings]',
   ])
 })
@@ -123,7 +123,7 @@ check('TXT toolbar: Edit, the inline Annotation icons, Tools, Settings — no Ha
   assert.deepEqual(shape(resolveToolbarLayout(txt, 0)), [
     'navigate:inline[edit]',
     'annotation:inline[highlight,underline,squiggly,strikethrough,replace,insert]',
-    'tools:menu[snapshot,wordCount]',
+    'tools:inline[snapshot,wordCount]',
     'settings:inline[settings]',
   ])
 })
@@ -132,7 +132,7 @@ console.log('4. placeholder layout')
 check('only renderer-independent tools', () => {
   assert.deepEqual(shape(resolveToolbarLayout(placeholder, 0)), [
     'navigate:inline[hand,select]',
-    'tools:menu[snapshot,wordCount]',
+    'tools:inline[snapshot,wordCount]',
     'settings:inline[settings]',
   ])
 })
@@ -141,13 +141,13 @@ check('PDF layout: Search in the navigate group, the inline Annotation icons, no
   assert.deepEqual(shape(resolveToolbarLayout(pdf, 0)), [
     'navigate:inline[hand,select,search]',
     'annotation:inline[highlight,underline,squiggly,strikethrough,replace,insert]',
-    'tools:menu[snapshot,wordCount]',
+    'tools:inline[snapshot,wordCount]',
   ])
 })
 
 console.log('5. folding')
-check('Tools is always a dropdown, Annotation always inline icons; nothing left to fold for EPUB', () => {
-  assert.equal(TOOL_GROUPS.find((g) => g.id === 'tools').collapse, 'always')
+check('Tools and Annotation are always inline; nothing left to fold for EPUB', () => {
+  assert.equal(TOOL_GROUPS.find((g) => g.id === 'tools').collapse, 'never')
   assert.equal(TOOL_GROUPS.find((g) => g.id === 'annotation').collapse, 'never')
   assert.deepEqual(foldableGroups(epub), [])
   assert.deepEqual(shape(resolveToolbarLayout(epub, 2)), shape(resolveToolbarLayout(epub, 0)))
