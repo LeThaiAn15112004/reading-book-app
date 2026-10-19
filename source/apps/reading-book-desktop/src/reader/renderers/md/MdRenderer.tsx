@@ -231,7 +231,9 @@ export function MdRenderer({
     const scroller = scrollerRef.current
     const els = headingElsRef.current
     if (!scroller || els.length === 0) return
-    const top = scroller.getBoundingClientRect().top + 24
+    // A heading counts as reached once it is in the top part of the reading area (the page has top
+    // padding, so a heading at the very start sits a little below the edge).
+    const top = scroller.getBoundingClientRect().top + Math.min(120, scroller.clientHeight * 0.25)
     let lo = 0
     let hi = els.length - 1
     let found = -1

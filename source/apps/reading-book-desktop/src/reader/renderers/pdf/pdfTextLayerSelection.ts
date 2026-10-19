@@ -7,8 +7,10 @@
  * the selection focus to the END of the layer — the selection jumps over everything below the
  * pointer. The fix, as in pdf.js:
  *  - every text layer gets a trailing `.endOfContent` div (`user-select: none`);
- *  - while selecting (`.textLayer.selecting`, pdf_viewer.css) it stretches over the whole layer, so
- *    gaps hit it instead of the layer;
+ *  - while a drag is in progress (`.textLayer.selecting`, pdf_viewer.css; armed by `selectionchange`
+ *    with the pointer held, NOT on mousedown — a press in a gap before a paragraph's first glyph
+ *    would otherwise anchor on the full-layer filler at the end of the page) it stretches over the
+ *    whole layer, so gaps hit it instead of the layer; it stays `user-select: none`;
  *  - on every `selectionchange` it is moved right after the selection's moving end, so the text
  *    after that point is "behind" it and the browser extends the selection only up to there.
  * Pointer up / blur / keyup (outside a drag) put it back at the end, and a `selectionchange` with
@@ -113,7 +115,6 @@ function enableGlobalListeners(): void {
       if (end && parentTextLayer && anchor.parentElement) {
         end.style.width = parentTextLayer.style.width
         end.style.height = parentTextLayer.style.height
-        end.style.userSelect = 'text'
         anchor.parentElement.insertBefore(end, modifyStart ? anchor : anchor.nextSibling)
       }
       prevRange = range.cloneRange()
@@ -127,7 +128,6 @@ export function attachTextLayerSelection(textLayer: HTMLElement): void {
   const end = document.createElement('div')
   end.className = 'endOfContent'
   textLayer.append(end)
-  textLayer.addEventListener('mousedown', () => textLayer.classList.add('selecting'))
   textLayers.set(textLayer, end)
   enableGlobalListeners()
 }
