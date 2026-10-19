@@ -123,11 +123,99 @@ function enableGlobalListeners(): void {
   )
 }
 
+type Caret = { node: Node; offset: number }
+
+function caretAt(x: number, y: number): Caret | null {
+  const pos = document.caretPositionFromPoint?.(x, y)
+  if (pos) return { node: pos.offsetNode, offset: pos.offset }
+  const range = document.caretRangeFromPoint?.(x, y)
+  return range ? { node: range.startContainer, offset: range.startOffset } : null
+}
+
+const isGlyphRun = (el: Element | null): boolean => !!el && el.tagName === 'SPAN' && !!el.closest('.textLayer')
+
+/** The text layer whose page box holds the point, else `fallback` (the layer the press began on). */
+function layerAt(x: number, y: number, fallback: HTMLElement): HTMLElement {
+  for (const layer of textLayers.keys()) {
+    const r = layer.getBoundingClientRect()
+    if (x >= r.left && x <= r.right && y >= r.top && y <= r.bottom) return layer
+  }
+  return fallback
+}
+
+/** The caret of the glyph run nearest the point (the point clamped into that run's box). */
+function caretOfNearestGlyph(layer: HTMLElement, x: number, y: number): Caret | null {
+  let best: DOMRect | null = null
+  let bestDist = Infinity
+  for (const span of layer.querySelectorAll('span')) {
+    if (span.classList.contains('markedContent') || !span.textContent) continue
+    const r = span.getBoundingClientRect()
+    if (r.width < 0.5 || r.height < 0.5) continue
+    const dx = Math.max(r.left - x, 0, x - r.right)
+    const dy = Math.max(r.top - y, 0, y - r.bottom)
+    const dist = dx * dx + dy * dy * 4 // a gap sideways is nearer than one a line away
+    if (dist < bestDist) {
+      bestDist = dist
+      best = r
+    }
+  }
+  if (!best) return null
+  return caretAt(
+    Math.min(Math.max(x, best.left + 0.5), best.right - 0.5),
+    Math.min(Math.max(y, best.top + 0.5), best.bottom - 0.5),
+  )
+}
+
+/**
+ * Keeps a drag-selection to what the pointer actually crossed. With no glyph under the pointer
+ * (the indent before a paragraph's first word, a margin, the space between lines) Chromium picks an
+ * arbitrary caret — measured on a pdf.js text layer, even with the `.endOfContent` helper armed:
+ * a press there starts a selection somewhere else or none at all, and a drag that leaves the text
+ * for a margin runs the selection on across whole paragraphs. So:
+ *  - a press on a gap is taken over: anchor on the nearest glyph, no native selection;
+ *  - while dragging, a move over a gap is cancelled (Blink then skips its own selection update) and
+ *    the focus goes to the glyph nearest the pointer; a move over a glyph stays native.
+ */
+function bindGapSelection(textLayer: HTMLElement): void {
+  textLayer.addEventListener('mousedown', (event) => {
+    if (event.button !== 0 || event.detail > 1 || event.shiftKey || event.altKey) return
+    if (getComputedStyle(textLayer).userSelect === 'none') return // Hand pans; nothing selects
+    const selection = document.getSelection()
+    if (!selection) return
+    const onGlyph = isGlyphRun(event.target as Element)
+    if (!onGlyph) {
+      const anchor = caretOfNearestGlyph(textLayer, event.clientX, event.clientY)
+      if (!anchor) return
+      event.preventDefault()
+      selection.collapse(anchor.node, anchor.offset)
+    }
+    const abort = new AbortController()
+    const stop = () => abort.abort()
+    document.addEventListener(
+      'mousemove',
+      (move) => {
+        if ((move.buttons & 1) === 0) return stop()
+        const over = document.elementFromPoint(move.clientX, move.clientY)
+        if (onGlyph && isGlyphRun(over)) return // native drag over text is right
+        move.preventDefault()
+        const caret = isGlyphRun(over)
+          ? caretAt(move.clientX, move.clientY)
+          : caretOfNearestGlyph(layerAt(move.clientX, move.clientY, textLayer), move.clientX, move.clientY)
+        if (caret) selection.extend(caret.node, caret.offset)
+      },
+      { signal: abort.signal, capture: true },
+    )
+    document.addEventListener('mouseup', stop, { signal: abort.signal, capture: true })
+    window.addEventListener('blur', stop, { signal: abort.signal })
+  })
+}
+
 /** Give a freshly rendered text layer the `.endOfContent` helper and stable drag-selection. */
 export function attachTextLayerSelection(textLayer: HTMLElement): void {
   const end = document.createElement('div')
   end.className = 'endOfContent'
   textLayer.append(end)
+  bindGapSelection(textLayer)
   textLayers.set(textLayer, end)
   enableGlobalListeners()
 }
