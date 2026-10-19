@@ -7,6 +7,9 @@ import {
   isSafeExternalUrl,
   findHeadingForAnchor,
   slugifyHeading,
+  splitMdSource,
+  buildMdOutline,
+  collectMdReferenceDefinitions,
 } from '../../src/md/index.js'
 
 describe('checkMdFileSize', () => {
@@ -118,5 +121,114 @@ describe('heading anchors', () => {
     expect(findHeadingForAnchor(heads, 'INTRO')).toBe(0)
     expect(findHeadingForAnchor(heads, 'missing')).toBe(-1)
     expect(findHeadingForAnchor(heads, '%E0%A4%A')).toBe(-1)
+  })
+})
+
+describe('splitMdSource', () => {
+  const para = (n: number) => `Paragraph ${n} with some words in it.\n\n`
+  const long = (count: number) => Array.from({ length: count }, (_, i) => para(i)).join('')
+
+  it('keeps a short document whole, exactly as written', () => {
+    expect(splitMdSource('# a\n\nb\n')).toEqual(['# a\n\nb\n'])
+    expect(splitMdSource('')).toEqual([''])
+  })
+
+  it('splits a long document into pieces that join back to the original', () => {
+    const text = long(5000)
+    const pieces = splitMdSource(text)
+    expect(pieces.length).toBeGreaterThan(1)
+    expect(pieces.join('')).toBe(text)
+    for (const piece of pieces.slice(0, -1)) expect(piece.length).toBeGreaterThanOrEqual(40_000)
+  })
+
+  it('cuts before headings and paragraphs only, after a blank line', () => {
+    const text = Array.from({ length: 3000 }, (_, i) => `## Heading ${i}\n\nText ${i} here.\n\n`).join('')
+    const pieces = splitMdSource(text)
+    expect(pieces.length).toBeGreaterThan(1)
+    for (const piece of pieces.slice(0, -1)) expect(piece.endsWith('\n\n')).toBe(true)
+    for (const piece of pieces) expect(/^(## Heading|Text)/.test(piece)).toBe(true)
+    expect(pieces.join('')).toBe(text)
+  })
+
+  it('never cuts inside a fenced code block, even one with blank lines and headings', () => {
+    const code = '```\n' + Array.from({ length: 4000 }, (_, i) => `\n# not a heading ${i}\n\nword ${i}\n`).join('') + '```\n\n'
+    const text = para(0) + code + long(3000)
+    const pieces = splitMdSource(text)
+    expect(pieces.join('')).toBe(text)
+    const codeStart = text.indexOf('```')
+    const codeEnd = codeStart + code.trimEnd().length
+    let offset = 0
+    for (const piece of pieces) {
+      offset += piece.length
+      expect(offset > codeStart && offset < codeEnd, `cut at ${offset} is inside the fence`).toBe(false)
+    }
+  })
+
+  it('handles ~~~ fences and longer closing fences', () => {
+    const body = Array.from({ length: 3000 }, (_, i) => `\n## fake ${i}\n\nline ${i}\n`).join('')
+    const text = '~~~~\n' + body + '~~~~~\n\nafter\n\n' + long(3000)
+    const pieces = splitMdSource(text)
+    expect(pieces.join('')).toBe(text)
+    const fenceEnd = text.indexOf('~~~~~\n') + 6
+    let offset = 0
+    for (const piece of pieces) {
+      offset += piece.length
+      expect(offset > 0 && offset < fenceEnd, `cut at ${offset} is inside the fence`).toBe(false)
+    }
+  })
+
+  it('does not cut inside lists, quotes, tables or indented blocks', () => {
+    const block = (s: string) => Array.from({ length: 4000 }, (_, i) => `${s.replace('#', String(i))}\n\n`).join('')
+    for (const line of ['- item #', '1. item #', '> quote #', '| a | b #', '    code #', '<div>#']) {
+      const text = block(line)
+      expect(splitMdSource(text), line).toEqual([text])
+    }
+  })
+
+  it('splits a long document without safe cut points as one piece (no wrong cut)', () => {
+    const text = 'x'.repeat(200_000)
+    expect(splitMdSource(text)).toEqual([text])
+  })
+})
+
+describe('collectMdReferenceDefinitions', () => {
+  it('collects reference definitions, not footnotes or ordinary text', () => {
+    const text = 'Intro [a][1]\n\n[1]: https://example.com "t"\n  [two]: <https://x.y>\n[^n]: footnote\n[not a def] text\n'
+    expect(collectMdReferenceDefinitions(text)).toBe('[1]: https://example.com "t"\n  [two]: <https://x.y>')
+  })
+
+  it('is bounded', () => {
+    const text = Array.from({ length: 1000 }, (_, i) => `[r${i}]: https://e.com/${i}`).join('\n')
+    expect(collectMdReferenceDefinitions(text).split('\n').length).toBe(300)
+  })
+})
+
+describe('buildMdOutline', () => {
+  const h = (level: number, text: string) => ({ level, text })
+
+  it('nests by heading level and keeps document indexes', () => {
+    const outline = buildMdOutline([h(1, 'A'), h(2, 'A1'), h(3, 'A1a'), h(2, 'A2'), h(1, 'B')])
+    expect(outline.map((n) => [n.index, n.label, n.level])).toEqual([[0, 'A', 0], [4, 'B', 0]])
+    expect(outline[0]!.children.map((n) => [n.index, n.label, n.level])).toEqual([[1, 'A1', 1], [3, 'A2', 1]])
+    expect(outline[0]!.children[0]!.children.map((n) => [n.index, n.level])).toEqual([[2, 2]])
+  })
+
+  it('does not leave gaps when a level is skipped or the document starts below H1', () => {
+    const outline = buildMdOutline([h(3, 'deep start'), h(5, 'skipped'), h(2, 'up'), h(6, 'six')])
+    expect(outline.map((n) => [n.label, n.level])).toEqual([['deep start', 0], ['up', 0]])
+    expect(outline[0]!.children.map((n) => [n.label, n.level])).toEqual([['skipped', 1]])
+    expect(outline[1]!.children.map((n) => [n.label, n.level])).toEqual([['six', 1]])
+  })
+
+  it('skips empty headings but still counts them in the index; collapses whitespace; bounds labels', () => {
+    const outline = buildMdOutline([h(1, '   '), h(1, ' Tiếng \n Việt 🌳 '), h(2, 'x'.repeat(500))])
+    expect(outline.map((n) => [n.index, n.label])).toEqual([[1, 'Tiếng Việt 🌳']])
+    expect(outline[0]!.children[0]!.index).toBe(2)
+    expect(outline[0]!.children[0]!.label.length).toBe(200)
+  })
+
+  it('tolerates odd levels and an empty document', () => {
+    expect(buildMdOutline([])).toEqual([])
+    expect(buildMdOutline([h(0, 'z'), h(99, 'y'), h(Number.NaN, 'n')]).map((n) => n.label)).toEqual(['z', 'n'])
   })
 })

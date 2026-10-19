@@ -15,7 +15,7 @@ import type {
   PdfOutlineItem,
   PdfRendererApi,
 } from '../../../../reader/renderers/pdf'
-import type { TxtRendererApi } from '../../../../reader/renderers/txt'
+import type { TextSurfaceApi } from '../../../../reader/renderers/textSurface'
 import { resolveActivePageTocEntry } from '@reading-book/book-reader-sdk'
 import { blurReaderSidebarFocus } from '../../../../reader/chrome'
 import {
@@ -60,7 +60,7 @@ type UseReaderNavigationOptions = {
   isPdfSurface: boolean
   pdfApiRef: MutableRefObject<PdfRendererApi | null>
   isTxtSurface: boolean
-  txtApiRef: MutableRefObject<TxtRendererApi | null>
+  txtApiRef: MutableRefObject<TextSurfaceApi | null>
   closeFloating: () => void
   highlightShortcutsRef: MutableRefObject<HighlightShortcuts>
 }

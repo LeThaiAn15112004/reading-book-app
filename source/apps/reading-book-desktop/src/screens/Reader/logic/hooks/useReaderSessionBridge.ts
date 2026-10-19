@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { PageRectLocation, txtReadingLocation, type CfiLocation } from '@reading-book/book-reader-sdk'
 import type { EpubRendererApi } from '../../../../reader/renderers/epub'
 import type { PdfNavState, PdfRendererApi } from '../../../../reader/renderers/pdf'
-import type { TxtRendererApi } from '../../../../reader/renderers/txt'
+import type { TextSurfaceApi } from '../../../../reader/renderers/textSurface'
 import type { ReadingPrefs } from '../../components'
 import {
   useReadingSessionAutosave,
@@ -28,7 +28,7 @@ type UseReaderSessionBridgeOptions = {
   bookId: string | undefined
   epubApiRef: RefObject<EpubRendererApi | null>
   pdfApiRef: RefObject<PdfRendererApi | null>
-  txtApiRef: RefObject<TxtRendererApi | null>
+  txtApiRef: RefObject<TextSurfaceApi | null>
   prefsRef: MutableRefObject<ReadingPrefs>
   prefsDirtyRef: MutableRefObject<boolean>
   prefs: ReadingPrefs

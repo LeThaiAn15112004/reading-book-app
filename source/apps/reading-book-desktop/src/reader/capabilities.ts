@@ -31,9 +31,9 @@ export type ReaderCapability =
 
 /**
  * Which surface renders a format: EPUB (`renderers/epub`), PDF (`renderers/pdf`), TXT
- * (`renderers/txt`); every other format shows the placeholder `ReadingCanvas`.
+ * (`renderers/txt`), Markdown (`renderers/md`); every other format shows the placeholder `ReadingCanvas`.
  */
-export type ReaderSurface = 'epub' | 'pdf' | 'txt' | 'placeholder'
+export type ReaderSurface = 'epub' | 'pdf' | 'txt' | 'md' | 'placeholder'
 
 const SURFACE_CAPABILITIES: Record<ReaderSurface, readonly ReaderCapability[]> = {
   epub: [
@@ -57,6 +57,9 @@ const SURFACE_CAPABILITIES: Record<ReaderSurface, readonly ReaderCapability[]> =
   // translate (out of scope). Markup is stored as offsets into the text
   // (docs/implementation_plan/txt_reader.md).
   txt: ['textEdit', 'markupAnnotations', 'snapshot', 'wordCount', 'readingSettings'],
+  // Markdown: read-only, one continuous scroll. No annotations, search painting, read aloud or
+  // translate yet (docs/implementation_plan/markdown_reader.md); Aa applies font / size / spacing.
+  md: ['snapshot', 'wordCount', 'readingSettings'],
   placeholder: ['interaction', 'snapshot', 'wordCount', 'readingSettings', 'pageLayout'],
 }
 
@@ -64,6 +67,7 @@ export function readerSurfaceForFormat(format: string | null | undefined): Reade
   if (format === 'epub') return 'epub'
   if (format === 'pdf') return 'pdf'
   if (format === 'txt') return 'txt'
+  if (format === 'md') return 'md'
   return 'placeholder'
 }
 

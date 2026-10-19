@@ -49,9 +49,10 @@ const shape = (layout) =>
 
 const epub = caps.getReaderCapabilities('epub')
 const pdf = caps.getReaderCapabilities('pdf')
-// The placeholder surface is whatever has no renderer: Markdown stands in (TXT has its own surface now).
-const placeholder = caps.getReaderCapabilities('md')
+// The placeholder surface is whatever has no renderer: DOCX stands in (TXT and Markdown have their own surfaces now).
+const placeholder = caps.getReaderCapabilities('docx')
 const txt = caps.getReaderCapabilities('txt')
+const md = caps.getReaderCapabilities('md')
 
 console.log('1. registry')
 check('tool ids are unique', () => {
@@ -74,17 +75,21 @@ check('every tool is shown by at least one surface', () => {
 })
 
 console.log('2. surfaces')
-check('epub, pdf and txt map to their own surfaces, everything else to the placeholder', () => {
+check('epub, pdf, txt and md map to their own surfaces, everything else to the placeholder', () => {
   assert.equal(caps.readerSurfaceForFormat('epub'), 'epub')
   assert.equal(caps.readerSurfaceForFormat('pdf'), 'pdf')
   assert.equal(caps.readerSurfaceForFormat('txt'), 'txt')
-  for (const f of ['md', 'docx', 'doc', null, undefined]) {
+  assert.equal(caps.readerSurfaceForFormat('md'), 'md')
+  for (const f of ['docx', 'doc', null, undefined]) {
     assert.equal(caps.readerSurfaceForFormat(f), 'placeholder', String(f))
   }
 })
 check('TXT = text markup + snapshot + word count + Aa; no Hand / Select, search painting, audio, translate or pages', () => {
   assert.deepEqual([...txt].sort(), ['markupAnnotations', 'readingSettings', 'snapshot', 'textEdit', 'wordCount'])
   assert.ok(!txt.has('interaction') && !txt.has('search') && !txt.has('pageLayout'))
+})
+check('MD = snapshot + word count + Aa; read-only: no markup, Hand / Select, search painting, audio, translate or pages', () => {
+  assert.deepEqual([...md].sort(), ['readingSettings', 'snapshot', 'wordCount'])
 })
 check('placeholder is a strict subset of EPUB, apart from Page layout', () => {
   for (const c of placeholder) if (c !== 'pageLayout') assert.ok(epub.has(c), c)
@@ -208,8 +213,8 @@ check('PdfRenderer gets the toolbar tool, Hand pan and center tap', () => {
   }
 })
 check('footer: no 1-page / 2-page toggle for PDF and TXT (both continuous scroll); inset ignores the EPUB view-mode pref', () => {
-  assert.match(screen, /onLayoutChange=\{\s*isPdfSurface \|\| isTxtSurface\s*\?\s*undefined/)
-  assert.match(screen, /readerChromeBottomInset\(\s*isPdfSurface \|\| isTxtSurface \? 'scroll' : book\.prefs\.viewMode/)
+  assert.match(screen, /onLayoutChange=\{\s*isPdfSurface \|\| isTextSurface\s*\?\s*undefined/)
+  assert.match(screen, /readerChromeBottomInset\(\s*isPdfSurface \|\| isTextSurface \? 'scroll' : book\.prefs\.viewMode/)
 })
 
 console.log('8. sidebar tabs')
@@ -232,8 +237,11 @@ check('rail: EPUB hides only Page layout', () => {
 check('rail: TXT hides Page layout like EPUB (no pages)', () => {
   assert.deepEqual(railIds(txt), ['chapters', 'bookmarks', 'highlights', 'attachments'])
 })
+check('rail: MD hides Page layout like EPUB (no pages)', () => {
+  assert.deepEqual(railIds(md), ['chapters', 'bookmarks', 'highlights', 'attachments'])
+})
 check('rail: other formats unchanged (placeholder keeps Page layout)', () => {
-  for (const f of ['md', 'docx', 'doc', null]) {
+  for (const f of ['docx', 'doc', null]) {
     assert.deepEqual(railIds(caps.getReaderCapabilities(f)), sidebarTabs.SIDEBAR_TABS.map((t) => t.id), String(f))
   }
 })

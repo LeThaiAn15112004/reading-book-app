@@ -29,6 +29,7 @@
     "e2e": "vite build && playwright test -c e2e/playwright.config.ts",
     "e2e:only": "playwright test -c e2e/playwright.config.ts",
     "e2e:txt": "vite build && playwright test -c e2e/playwright.config.ts txt-",
+    "e2e:md": "vite build && playwright test -c e2e/playwright.config.ts md-",
     "e2e:typecheck": "tsc --noEmit -p e2e/tsconfig.json",
     "spike:pdf:fixtures": "node spikes/pdf-search/build-fixtures.mjs",
     "spike:pdf:search": "node --experimental-strip-types --import ./spikes/pdf-search/register-alias.mjs spikes/pdf-search/run-pdf-search.mjs",
@@ -39,7 +40,9 @@
     "spike:pdf:two-way": "npm run build --prefix ../book-reader-sdk && node --experimental-transform-types --import ./spikes/pdf-annotations/register-alias.mjs spikes/pdf-annotations/run-pdf-two-way.mjs",
     "spike:pdf:compat-kit": "npm run build --prefix ../book-reader-sdk && node --experimental-transform-types --import ./spikes/pdf-annotations/register-alias.mjs spikes/pdf-annotations/build-compat-kit.mjs",
     "spike:txt:main": "npm run build --prefix ../book-reader-sdk && node --experimental-transform-types --import ./spikes/pdf-annotations/register-alias.mjs spikes/txt/run-txt-document.mjs",
-    "spike:txt:store": "npm run build --prefix ../book-reader-sdk && node --experimental-transform-types --import ./spikes/txt/register-alias.mjs spikes/txt/run-txt-store.mjs"
+    "spike:txt:store": "npm run build --prefix ../book-reader-sdk && node --experimental-transform-types --import ./spikes/txt/register-alias.mjs spikes/txt/run-txt-store.mjs",
+    "spike:md:main": "npm run build --prefix ../book-reader-sdk && node --experimental-transform-types --import ./spikes/txt/register-alias.mjs spikes/md/run-md-main.mjs",
+    "spike:md:render": "node --experimental-transform-types spikes/md/run-md-render.mjs"
   },
   "dependencies": {
     "@huggingface/transformers": "^4.3.0",

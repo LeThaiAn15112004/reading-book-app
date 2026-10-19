@@ -1,7 +1,9 @@
 import {
   Component,
+  memo,
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -14,8 +16,11 @@ import remarkGfm from 'remark-gfm'
 import {
   classifyMdImageSrc,
   classifyMdLink,
+  collectMdReferenceDefinitions,
   findHeadingForAnchor,
+  splitMdSource,
 } from '@reading-book/book-reader-sdk'
+import type { MdHeadingInfo } from '@reading-book/book-reader-sdk'
 import type { TextSurfaceApi } from '../textSurface'
 import { mdAssetUrl } from './mdSource'
 import './md.css'
@@ -37,7 +42,13 @@ const MARGIN_IMMERSIVE: Record<MarginMode, string> = {
   off: 'max-w-full px-4 sm:px-6',
 }
 
-export type MdRendererApi = TextSurfaceApi
+/** Pieces of a long document mounted right away; the rest follow one per tick. */
+const EAGER_SEGMENTS = 2
+
+export type MdRendererApi = TextSurfaceApi & {
+  /** Scroll to the N-th heading of the document (mounts the rest first when it is not there yet). */
+  scrollToHeading: (index: number) => void
+}
 
 export type MdRendererProps = {
   bookId: string
@@ -53,31 +64,35 @@ export type MdRendererProps = {
   onProgress: (fraction: number) => void
   /** Open an http(s) / mailto link (goes to Main, which validates it again). */
   onOpenExternal: (url: string) => void
+  /** The headings now in the page, in reading order (grows while a long document mounts). */
+  onHeadings?: (headings: MdHeadingInfo[]) => void
+  /** The heading the reader is in (index among all headings), null before the first one. */
+  onActiveHeading?: (index: number | null) => void
+  /** How many pieces of a long document to mount at once (tests render everything). */
+  eagerSegments?: number
   apiRef?: MutableRefObject<MdRendererApi | null>
 }
 
 /**
- * A parser/renderer failure must never take the Reader down: show the source as plain text and say
- * why. Reset when the document changes.
+ * A parser/renderer failure must never take the Reader down: the piece that failed is shown as
+ * plain text with a notice, the rest of the document is unaffected.
  */
 class MdErrorBoundary extends Component<
   { resetKey: string; fallback: ReactNode; children: ReactNode },
-  { failedKey: string | null }
+  { failed: boolean }
 > {
-  state = { failedKey: null as string | null }
+  state = { failed: false }
 
-  static getDerivedStateFromError(): { failedKey: string | null } {
-    return { failedKey: '__failed__' }
+  static getDerivedStateFromError(): { failed: boolean } {
+    return { failed: true }
   }
 
   componentDidUpdate(prev: { resetKey: string }): void {
-    if (prev.resetKey !== this.props.resetKey && this.state.failedKey !== null) {
-      this.setState({ failedKey: null })
-    }
+    if (prev.resetKey !== this.props.resetKey && this.state.failed) this.setState({ failed: false })
   }
 
   render(): ReactNode {
-    return this.state.failedKey !== null ? this.props.fallback : this.props.children
+    return this.state.failed ? this.props.fallback : this.props.children
   }
 }
 
@@ -116,11 +131,40 @@ function MdImage({ bookId, src, alt, title }: { bookId: string; src?: string; al
   )
 }
 
+/** One independently parsed piece of the document. Memoised: scrolling never re-parses it. */
+const MdSegment = memo(function MdSegment({ text, components }: { text: string; components: Components }) {
+  return (
+    <MdErrorBoundary
+      resetKey={String(text.length)}
+      fallback={
+        <>
+          <p className="md-notice" role="status">
+            This part could not be formatted, so it is shown as plain text.
+          </p>
+          <pre className="md-plain">{text}</pre>
+        </>
+      }
+    >
+      <ReactMarkdown
+        remarkPlugins={[remarkGfm]}
+        skipHtml
+        // Our own policy lives in `components.a` / `components.img`; every URL reaches them untouched.
+        urlTransform={(url) => url}
+        components={components}
+      >
+        {text}
+      </ReactMarkdown>
+    </MdErrorBoundary>
+  )
+})
+
 /**
  * Read-only Markdown surface (docs/implementation_plan/markdown_reader.md). The text is parsed by
  * react-markdown into React elements — never `innerHTML`. Raw HTML in the file is dropped
  * (`skipHtml`), links never navigate the window (no `href` is rendered; clicks go through the SDK
  * link policy), images are only shown when they sit next to the document (served by Main).
+ * A long document is split at safe boundaries and mounted piece by piece so the window stays
+ * responsive while it is parsed.
  */
 export function MdRenderer({
   bookId,
@@ -131,11 +175,49 @@ export function MdRenderer({
   onMarginClick,
   onProgress,
   onOpenExternal,
+  onHeadings,
+  onActiveHeading,
+  eagerSegments = EAGER_SEGMENTS,
   apiRef,
 }: MdRendererProps) {
   const scrollerRef = useRef<HTMLElement | null>(null)
   const articleRef = useRef<HTMLElement | null>(null)
   const frameRef = useRef<number | null>(null)
+  const onProgressRef = useRef(onProgress)
+  onProgressRef.current = onProgress
+  const onOpenExternalRef = useRef(onOpenExternal)
+  onOpenExternalRef.current = onOpenExternal
+  const onHeadingsRef = useRef(onHeadings)
+  onHeadingsRef.current = onHeadings
+  const onActiveHeadingRef = useRef(onActiveHeading)
+  onActiveHeadingRef.current = onActiveHeading
+  const headingElsRef = useRef<HTMLElement[]>([])
+  const headingsKeyRef = useRef('')
+  const activeRef = useRef<number | null | undefined>(undefined)
+
+  const pieces = useMemo(() => {
+    const parts = splitMdSource(source)
+    const definitions = parts.length > 1 ? collectMdReferenceDefinitions(source) : ''
+    return parts.map((part) => (definitions ? `${part}\n\n${definitions}\n` : part))
+  }, [source])
+  const total = pieces.length
+  const [mounted, setMounted] = useState(() => Math.min(total, Math.max(1, eagerSegments)))
+  const pendingRef = useRef<{ anchor?: string; fraction?: number; heading?: number }>({})
+
+  // A different document starts again from its first pieces.
+  const sourceRef = useRef(source)
+  useEffect(() => {
+    if (sourceRef.current === source) return
+    sourceRef.current = source
+    setMounted(Math.min(total, Math.max(1, eagerSegments)))
+  }, [source, total, eagerSegments])
+
+  // Mount the rest one piece per tick, yielding to input and painting in between.
+  useEffect(() => {
+    if (mounted >= total) return
+    const timer = window.setTimeout(() => setMounted((m) => Math.min(total, m + 1)), 40)
+    return () => window.clearTimeout(timer)
+  }, [mounted, total])
 
   const progress = useCallback((): number => {
     const scroller = scrollerRef.current
@@ -144,13 +226,36 @@ export function MdRenderer({
     return range <= 0 ? 0 : Math.min(1, Math.max(0, scroller.scrollTop / range))
   }, [])
 
-  const onScroll = useCallback(() => {
+  /** The last heading whose top has reached the top of the reading area. */
+  const updateActiveHeading = useCallback(() => {
+    const scroller = scrollerRef.current
+    const els = headingElsRef.current
+    if (!scroller || els.length === 0) return
+    const top = scroller.getBoundingClientRect().top + 24
+    let lo = 0
+    let hi = els.length - 1
+    let found = -1
+    while (lo <= hi) {
+      const mid = (lo + hi) >> 1
+      if (els[mid]!.getBoundingClientRect().top <= top) {
+        found = mid
+        lo = mid + 1
+      } else hi = mid - 1
+    }
+    const next = found < 0 ? null : found
+    if (activeRef.current === next) return
+    activeRef.current = next
+    onActiveHeadingRef.current?.(next)
+  }, [])
+
+  const reportProgress = useCallback(() => {
     if (frameRef.current !== null) return
     frameRef.current = requestAnimationFrame(() => {
       frameRef.current = null
-      onProgress(progress())
+      onProgressRef.current(progress())
+      updateActiveHeading()
     })
-  }, [onProgress, progress])
+  }, [progress, updateActiveHeading])
 
   useEffect(
     () => () => {
@@ -159,9 +264,69 @@ export function MdRenderer({
     [],
   )
 
-  useEffect(() => {
-    onProgress(progress())
-  }, [source, onProgress, progress])
+  const scrollToAnchorNow = useCallback((anchor: string): boolean => {
+    const article = articleRef.current
+    if (!article) return false
+    const headings = Array.from(article.querySelectorAll<HTMLElement>('h1,h2,h3,h4,h5,h6'))
+    const index = findHeadingForAnchor(
+      headings.map((h) => h.textContent ?? ''),
+      anchor,
+    )
+    if (index < 0) return false
+    headings[index]!.scrollIntoView({ block: 'start' })
+    return true
+  }, [])
+
+  const scrollToHeadingNow = useCallback((index: number): boolean => {
+    const el = headingElsRef.current[index]
+    if (!el) return false
+    el.scrollIntoView({ block: 'start' })
+    return true
+  }, [])
+
+  const scrollToFractionNow = useCallback((fraction: number) => {
+    const scroller = scrollerRef.current
+    if (!scroller) return
+    scroller.scrollTop = (scroller.scrollHeight - scroller.clientHeight) * Math.min(1, Math.max(0, fraction))
+  }, [])
+
+  // Seeking or following an anchor needs the whole document in place: mount the rest first.
+  useLayoutEffect(() => {
+    // Headings now in the page (the outline grows while a long document mounts).
+    const article = articleRef.current
+    const els = article ? Array.from(article.querySelectorAll<HTMLElement>('h1,h2,h3,h4,h5,h6')) : []
+    headingElsRef.current = els
+    const infos: MdHeadingInfo[] = els.map((el) => ({
+      level: Number(el.tagName.slice(1)),
+      text: el.textContent ?? '',
+    }))
+    const key = infos.map((i) => `${i.level}:${i.text}`).join('\u0001')
+    if (key !== headingsKeyRef.current) {
+      headingsKeyRef.current = key
+      onHeadingsRef.current?.(infos)
+    }
+    onProgressRef.current(progress())
+    updateActiveHeading()
+    if (mounted < total) return
+    const pending = pendingRef.current
+    pendingRef.current = {}
+    if (pending.anchor !== undefined) scrollToAnchorNow(pending.anchor)
+    else if (pending.heading !== undefined) scrollToHeadingNow(pending.heading)
+    else if (pending.fraction !== undefined) scrollToFractionNow(pending.fraction)
+  }, [mounted, total, source, progress, updateActiveHeading, scrollToAnchorNow, scrollToHeadingNow, scrollToFractionNow])
+
+  const scrollToAnchor = useCallback(
+    (anchor: string) => {
+      if (scrollToAnchorNow(anchor)) return
+      if (mounted < total) {
+        pendingRef.current = { anchor }
+        setMounted(total)
+      }
+    },
+    [mounted, total, scrollToAnchorNow],
+  )
+  const scrollToAnchorRef = useRef(scrollToAnchor)
+  scrollToAnchorRef.current = scrollToAnchor
 
   useEffect(() => {
     if (!apiRef) return
@@ -169,38 +334,39 @@ export function MdRenderer({
       getProgress: progress,
       getCurrentLocation: () => undefined,
       scrollToFraction: (fraction) => {
-        const scroller = scrollerRef.current
-        if (!scroller) return
-        scroller.scrollTop = (scroller.scrollHeight - scroller.clientHeight) * Math.min(1, Math.max(0, fraction))
+        if (mounted < total) {
+          pendingRef.current = { fraction }
+          setMounted(total)
+          return
+        }
+        scrollToFractionNow(fraction)
       },
       scrollByPage: (direction) => {
         scrollerRef.current?.scrollBy({ top: direction * scrollerRef.current.clientHeight * 0.9 })
+      },
+      scrollToHeading: (index) => {
+        if (scrollToHeadingNow(index)) return
+        if (mounted < total) {
+          pendingRef.current = { heading: index }
+          setMounted(total)
+        }
       },
     }
     return () => {
       apiRef.current = null
     }
-  }, [apiRef, progress])
+  }, [apiRef, progress, mounted, total, scrollToFractionNow, scrollToHeadingNow])
 
-  const scrollToAnchor = useCallback((anchor: string) => {
-    const article = articleRef.current
-    if (!article) return
-    const headings = Array.from(article.querySelectorAll<HTMLElement>('h1,h2,h3,h4,h5,h6'))
-    const index = findHeadingForAnchor(
-      headings.map((h) => h.textContent ?? ''),
-      anchor,
-    )
-    headings[index]?.scrollIntoView({ block: 'start' })
-  }, [])
-
+  // Stable for the life of the book: callbacks are read through refs, so scrolling (which updates
+  // the parent) never invalidates the memoised pieces.
   const components = useMemo<Components>(() => {
     return {
       a({ href, children }) {
         const link = classifyMdLink(href)
         if (link.kind === 'blocked') return <span className="md-link-blocked">{children}</span>
         const activate = () => {
-          if (link.kind === 'anchor') scrollToAnchor(link.id)
-          else onOpenExternal(link.url)
+          if (link.kind === 'anchor') scrollToAnchorRef.current(link.id)
+          else onOpenExternalRef.current(link.url)
         }
         // No `href`: the browser can never navigate (or open a window) from this element.
         return (
@@ -236,7 +402,7 @@ export function MdRenderer({
         )
       },
     }
-  }, [bookId, onOpenExternal, scrollToAnchor])
+  }, [bookId])
 
   const onMainClick = useCallback(
     (event: ReactMouseEvent<HTMLElement>) => {
@@ -248,21 +414,13 @@ export function MdRenderer({
   )
 
   const widthClass = (chromeHidden ? MARGIN_IMMERSIVE : MARGIN)[margin]
-  const plainFallback = (
-    <>
-      <p className="md-notice" role="status">
-        This Markdown could not be formatted, so it is shown as plain text.
-      </p>
-      <pre className="md-plain">{source}</pre>
-    </>
-  )
 
   return (
     <main
       ref={scrollerRef}
       data-md-surface=""
       className="app-scroll relative min-h-0 flex-1 overflow-x-hidden overflow-y-auto px-6 pt-8 pb-20 overscroll-y-contain"
-      onScroll={onScroll}
+      onScroll={reportProgress}
       onClick={onMainClick}
     >
       <div
@@ -274,24 +432,27 @@ export function MdRenderer({
             This file is not valid UTF-8. Some characters could not be read and are shown as �.
           </p>
         ) : null}
-        <article ref={articleRef} className="md-content" data-md-content="">
+        <article
+          ref={articleRef}
+          className="md-content"
+          data-md-content=""
+          data-md-segments={total}
+          data-md-mounted={mounted}
+        >
           {source.trim().length === 0 ? (
             <p className="md-empty" data-md-empty="">
               This Markdown file is empty.
             </p>
           ) : (
-            <MdErrorBoundary resetKey={`${bookId}:${source.length}`} fallback={plainFallback}>
-              <ReactMarkdown
-                remarkPlugins={[remarkGfm]}
-                skipHtml
-                // Our own policy lives in `components.a` / `components.img`; every URL reaches them untouched.
-                urlTransform={(url) => url}
-                components={components}
-              >
-                {source}
-              </ReactMarkdown>
-            </MdErrorBoundary>
+            pieces.slice(0, mounted).map((text, index) => (
+              <MdSegment key={index} text={text} components={components} />
+            ))
           )}
+          {mounted < total ? (
+            <p className="md-notice" role="status" data-md-loading="">
+              Loading the rest of the document…
+            </p>
+          ) : null}
         </article>
       </div>
       <div className="min-h-[40vh]" aria-hidden />

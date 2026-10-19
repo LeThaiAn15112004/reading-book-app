@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type MutableRefObject } from 'react'
 import { useParams } from 'react-router-dom'
 import {
   CfiLocation,
@@ -8,8 +8,13 @@ import {
   formatHighlightCitation,
   isMarkupTool,
   resolveTxtReadingOffset,
+  buildMdOutline,
   type InteractionTool,
+  type MdHeadingInfo,
+  type MdOutlineNode,
 } from '@reading-book/book-reader-sdk'
+
+const MD_HEADING_HREF = 'md-heading:'
 import {
   useAppTitle,
   useGlobalReadingPrefs,
@@ -32,6 +37,10 @@ import {
   type PdfRendererApi,
 } from '../../reader/renderers/pdf'
 import { TxtRenderer, type TxtRendererApi } from '../../reader/renderers/txt'
+import { MdRenderer, decodeMdSource, type MdRendererApi } from '../../reader/renderers/md'
+import type { EpubTocItem } from '../../reader/renderers/epub'
+import type { TextSurfaceApi } from '../../reader/renderers/textSurface'
+import { appApi } from '../../bridge/app'
 import {
   AaSettingsPanel,
   BookInfoDialog,
@@ -173,6 +182,34 @@ export function ReaderScreen() {
     setToast: chrome.setToast,
     setChromeHidden: chrome.setChromeHidden,
   })
+  // Markdown: read-only; the bytes come from `openBookContent` (Main enforces the size limit) and
+  // are decoded here. Like TXT it scrolls as one continuous text and reports a percentage.
+  const isMdSurface = book.contentStatus === 'ready' && book.bookFormat === 'md' && !!book.bookBytes
+  const mdApiRef = useRef<MdRendererApi | null>(null)
+  const mdSource = useMemo(
+    () => (isMdSurface && book.bookBytes ? decodeMdSource(book.bookBytes) : null),
+    [isMdSurface, book.bookBytes],
+  )
+  // Markdown outline: the headings the surface reports, as sidebar Contents entries (`md-heading:N`
+  // = the N-th heading of the page). The active entry follows the scroll.
+  const [mdHeadings, setMdHeadings] = useState<MdHeadingInfo[]>([])
+  const [mdActiveHeading, setMdActiveHeading] = useState<number | null>(null)
+  useEffect(() => {
+    setMdHeadings([])
+    setMdActiveHeading(null)
+  }, [bookId])
+  const mdToc = useMemo<EpubTocItem[]>(() => {
+    const toItem = (node: MdOutlineNode): EpubTocItem => ({
+      id: `md-h-${node.index}`,
+      label: node.label,
+      href: `${MD_HEADING_HREF}${node.index}`,
+      level: node.level,
+      children: node.children.map(toItem),
+    })
+    return buildMdOutline(mdHeadings).map(toItem)
+  }, [mdHeadings])
+  const isTextSurface = isTxtSurface || isMdSurface
+  const textApiRef: MutableRefObject<TextSurfaceApi | null> = isMdSurface ? mdApiRef : txtApiRef
   const txtReady = isTxtSurface && txt.loadStatus === 'ready'
   const txtLoadFailed = isTxtSurface && txt.loadStatus === 'error'
   // Like EPUB / PDF, wait for the saved position before mounting so the text opens where it was left.
@@ -263,7 +300,7 @@ export function ReaderScreen() {
     bookId,
     epubApiRef,
     pdfApiRef,
-    txtApiRef,
+    txtApiRef: textApiRef,
     prefsRef: book.prefsRef,
     prefsDirtyRef: book.prefsDirtyRef,
     prefs: book.prefs,
@@ -279,8 +316,8 @@ export function ReaderScreen() {
     epubApiRef,
     isPdfSurface,
     pdfApiRef,
-    isTxtSurface,
-    txtApiRef,
+    isTxtSurface: isTextSurface,
+    txtApiRef: textApiRef,
     closeFloating: chrome.closeFloating,
     highlightShortcutsRef,
   })
@@ -330,7 +367,7 @@ export function ReaderScreen() {
   const pdfPageTotal = nav.pdfNav?.pageTotal ?? 0
   const chapterLabel = isPdfSurface
     ? `Page ${pdfPageCurrent}`
-    : isTxtSurface
+    : isTextSurface
       ? `${txtPercent}%`
       : chapter.title
   // PDF: real page numbers. EPUB: reference pages / spine sections. Otherwise the placeholder.
@@ -339,14 +376,14 @@ export function ReaderScreen() {
     ? (nav.epubNav?.pageCurrent ?? 0)
     : isPdfSurface
       ? pdfPageCurrent
-      : isTxtSurface
+      : isTextSurface
         ? 1
         : nav.chapterIndex + 1
   const pageTotal = book.isEpubSurface
     ? (nav.epubNav?.pageTotal ?? 0)
     : isPdfSurface
       ? pdfPageTotal
-      : isTxtSurface
+      : isTextSurface
         ? 1
         : FAKE_CHAPTERS.length
   const pageCountReady = book.isEpubSurface
@@ -360,14 +397,14 @@ export function ReaderScreen() {
         : 0)
     : isPdfSurface
       ? pdfPageCurrent
-      : isTxtSurface
+      : isTextSurface
         ? 1
         : nav.chapterIndex + 1
   const sectionTotal = book.isEpubSurface
     ? (nav.epubNav?.spineLength ?? 0)
     : isPdfSurface
       ? pdfPageTotal
-      : isTxtSurface
+      : isTextSurface
         ? 1
         : FAKE_CHAPTERS.length
   const sectionLabels = useMemo(
@@ -376,16 +413,16 @@ export function ReaderScreen() {
         ? nav.epubSections
         : isPdfSurface
           ? Array.from({ length: pdfPageTotal }, (_, i) => `Page ${i + 1}`)
-          : isTxtSurface
+          : isTextSurface
             ? ['Text']
             : FAKE_CHAPTERS.map((c) => c.title),
-    [book.isEpubSurface, isPdfSurface, isTxtSurface, nav.epubSections, pdfPageTotal],
+    [book.isEpubSurface, isPdfSurface, isTextSurface, nav.epubSections, pdfPageTotal],
   )
   const progress = book.isEpubSurface
     ? (nav.epubNav?.progress ?? 0)
     : isPdfSurface && pdfPageTotal > 0
       ? pdfPageCurrent / pdfPageTotal
-      : isTxtSurface
+      : isTextSurface
         ? txtPercent / 100
         : 0
   const effectiveMargin = book.prefs.marginEnabled ? book.prefs.margin : 'off'
@@ -621,7 +658,7 @@ export function ReaderScreen() {
       // PDF is always one continuous scroll — reserve the footer like EPUB's scroll view, whatever
       // the book's (EPUB-only) view-mode pref says.
       contentInsetBottom={readerChromeBottomInset(
-        isPdfSurface || isTxtSurface ? 'scroll' : book.prefs.viewMode,
+        isPdfSurface || isTextSurface ? 'scroll' : book.prefs.viewMode,
         footerImmersiveHidden,
       )}
       contentInsetResizing={sidebarResize.isResizing}
@@ -698,7 +735,7 @@ export function ReaderScreen() {
           pageTotal={pageTotal}
           pageCountReady={pageCountReady}
           progress={progress}
-          onSeekProgress={book.isEpubSurface || isPdfSurface || isTxtSurface ? nav.goToProgress : undefined}
+          onSeekProgress={book.isEpubSurface || isPdfSurface || isTextSurface ? nav.goToProgress : undefined}
           onPreviousPage={() => nav.switchPage(false)}
           onNextPage={() => nav.switchPage(true)}
           onGoToPage={nav.goToPage}
@@ -713,7 +750,7 @@ export function ReaderScreen() {
           layout={book.prefs.layout}
           // PDF has no 1-page / 2-page spread (yet) — no toggle that the renderer would ignore.
           onLayoutChange={
-            isPdfSurface || isTxtSurface
+            isPdfSurface || isTextSurface
               ? undefined
               : (layout) => {
                   book.prefsDirtyRef.current = true
@@ -722,9 +759,9 @@ export function ReaderScreen() {
           }
           // PDF is always one continuous scroll with real page numbers — no paginated/scroll toggle.
           // TXT is one continuous scroll with a progress readout instead of page numbers.
-          viewMode={isPdfSurface ? 'paginated' : isTxtSurface ? 'scroll' : book.prefs.viewMode}
+          viewMode={isPdfSurface ? 'paginated' : isTextSurface ? 'scroll' : book.prefs.viewMode}
           onViewModeChange={
-            isPdfSurface || isTxtSurface
+            isPdfSurface || isTextSurface
               ? undefined
               : (viewMode) => {
                   book.prefsDirtyRef.current = true
@@ -788,16 +825,37 @@ export function ReaderScreen() {
             isResizing={sidebarResize.isResizing}
             chromeHidden={toolsHidden}
             onResizePointerDown={sidebarResize.onResizePointerDown}
-            chapters={isPdfSurface || isTxtSurface ? [] : FAKE_CHAPTERS}
+            chapters={isPdfSurface || isTextSurface ? [] : FAKE_CHAPTERS}
             chapterIndex={nav.chapterIndex}
             tocItems={
-              book.isEpubSurface ? nav.epubToc : isPdfSurface ? nav.pdfToc : undefined
+              book.isEpubSurface
+                ? nav.epubToc
+                : isPdfSurface
+                  ? nav.pdfToc
+                  : isMdSurface
+                    ? mdToc
+                    : undefined
             }
             activeTocHref={book.isEpubSurface ? nav.epubNav?.href : undefined}
-            activeTocItemId={isPdfSurface ? (nav.pdfActiveTocId ?? null) : undefined}
+            activeTocItemId={
+              isPdfSurface
+                ? (nav.pdfActiveTocId ?? null)
+                : isMdSurface
+                  ? mdActiveHeading === null
+                    ? null
+                    : `md-h-${mdActiveHeading}`
+                  : undefined
+            }
             onClose={() => chrome.setSidebarOpen(false)}
             onSelectChapter={nav.goChapter}
-            onSelectTocItem={nav.handleSelectTocItem}
+            onSelectTocItem={(item) => {
+              if (item.href.startsWith(MD_HEADING_HREF)) {
+                chrome.closeFloating()
+                mdApiRef.current?.scrollToHeading(Number(item.href.slice(MD_HEADING_HREF.length)))
+                return
+              }
+              nav.handleSelectTocItem(item)
+            }}
             pageCurrent={sectionCurrent}
             pageTotal={sectionTotal}
             sectionLabels={sectionLabels}
@@ -1233,6 +1291,25 @@ export function ReaderScreen() {
                 session.handlePdfNavState(state)
               }}
               onOutline={nav.setPdfOutline}
+            />
+          ) : book.bookFormat === 'md' && bookId && mdSource ? (
+            <MdRenderer
+              key={bookId}
+              bookId={bookId}
+              source={mdSource.text}
+              lossy={mdSource.lossy}
+              margin={effectiveMargin}
+              chromeHidden={immersive || chrome.chromeHidden}
+              onMarginClick={chrome.handleCenterTap}
+              onProgress={(fraction) => setTxtPercent(Math.round(fraction * 100))}
+              onHeadings={setMdHeadings}
+              onActiveHeading={setMdActiveHeading}
+              onOpenExternal={(url) => {
+                void appApi.openExternalLink(url).then((result) => {
+                  if (!result.ok) chrome.setToast('That link could not be opened.')
+                })
+              }}
+              apiRef={mdApiRef}
             />
           ) : book.bookFormat === 'txt' ? (
             <TxtRenderer
