@@ -56,10 +56,10 @@ const SURFACE_CAPABILITIES: Record<ReaderSurface, readonly ReaderCapability[]> =
   // drag = selection); the Edit tool is the way back from a markup tool, no page layout (there are no pages), no search painting / read aloud /
   // translate (out of scope). Markup is stored as offsets into the text
   // (docs/implementation_plan/txt_reader.md).
-  txt: ['textEdit', 'markupAnnotations', 'snapshot', 'wordCount', 'readingSettings'],
+  txt: ['textEdit', 'interaction', 'search', 'translate', 'markupAnnotations', 'snapshot', 'wordCount', 'readingSettings'],
   // Markdown: read-only, one continuous scroll. No annotations, search painting, read aloud or
   // translate yet (docs/implementation_plan/markdown_reader.md); Aa applies font / size / spacing.
-  md: ['snapshot', 'wordCount', 'readingSettings'],
+  md: ['interaction', 'search', 'translate', 'markupAnnotations', 'snapshot', 'wordCount', 'readingSettings'],
   placeholder: ['interaction', 'snapshot', 'wordCount', 'readingSettings', 'pageLayout'],
 }
 

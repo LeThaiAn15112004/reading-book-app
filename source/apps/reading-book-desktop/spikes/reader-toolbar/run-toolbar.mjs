@@ -84,12 +84,12 @@ check('epub, pdf, txt and md map to their own surfaces, everything else to the p
     assert.equal(caps.readerSurfaceForFormat(f), 'placeholder', String(f))
   }
 })
-check('TXT = text markup + snapshot + word count + Aa; no Hand / Select, search painting, audio, translate or pages', () => {
-  assert.deepEqual([...txt].sort(), ['markupAnnotations', 'readingSettings', 'snapshot', 'textEdit', 'wordCount'])
-  assert.ok(!txt.has('interaction') && !txt.has('search') && !txt.has('pageLayout'))
+check('TXT = EPUB toolbar UI (no audio) + Edit; no pages', () => {
+  assert.deepEqual([...txt].sort(), ['interaction', 'markupAnnotations', 'readingSettings', 'search', 'snapshot', 'textEdit', 'translate', 'wordCount'])
+  assert.ok(!txt.has('readAloud') && !txt.has('pageLayout'))
 })
-check('MD = snapshot + word count + Aa; read-only: no markup, Hand / Select, search painting, audio, translate or pages', () => {
-  assert.deepEqual([...md].sort(), ['readingSettings', 'snapshot', 'wordCount'])
+check('MD = EPUB toolbar UI (no audio); no pages', () => {
+  assert.deepEqual([...md].sort(), ['interaction', 'markupAnnotations', 'readingSettings', 'search', 'snapshot', 'translate', 'wordCount'])
 })
 check('placeholder is a strict subset of EPUB, apart from Page layout', () => {
   for (const c of placeholder) if (c !== 'pageLayout') assert.ok(epub.has(c), c)
@@ -119,9 +119,9 @@ check('no empty View group for EPUB', () => {
 })
 
 console.log('3b. TXT layout')
-check('TXT toolbar: Edit, the inline Annotation icons, Tools, Settings — no Hand/Select', () => {
+check('TXT toolbar: Edit + the navigate tools, the inline Annotation icons, Tools, Settings', () => {
   assert.deepEqual(shape(resolveToolbarLayout(txt, 0)), [
-    'navigate:inline[edit]',
+    'navigate:inline[hand,edit,select,search,translate]',
     'annotation:inline[highlight,underline,squiggly,strikethrough,replace,insert]',
     'tools:inline[snapshot,wordCount]',
     'settings:inline[settings]',
