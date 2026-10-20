@@ -18,6 +18,8 @@ type NotesFilterState = {
   searchTerm: string
   activeType: NotesTypeFilter
   sortBy: NotesSortBy
+  /** Tag filter — exact (case-insensitive) tag name, '' = all tags. */
+  activeTag: string
   /** Row 3 (type filter + sort) visibility — toggled by the row 2 filter icon. */
   filtersOpen: boolean
   /** Last input-validation problem, surfaced inline instead of thrown. */
@@ -25,6 +27,7 @@ type NotesFilterState = {
   setSearchTerm: (value: string) => void
   setActiveType: (type: NotesTypeFilter) => void
   setSortBy: (sortBy: NotesSortBy) => void
+  setActiveTag: (tag: string) => void
   toggleFiltersOpen: () => void
   reset: () => void
 }
@@ -48,6 +51,7 @@ export const useNotesFilterStore = create<NotesFilterState>()((set) => ({
   searchTerm: '',
   activeType: 'all',
   sortBy: 'readingOrder',
+  activeTag: '',
   filtersOpen: true,
   error: null,
 
@@ -74,7 +78,9 @@ export const useNotesFilterStore = create<NotesFilterState>()((set) => ({
 
   setSortBy: (sortBy) => set({ sortBy }),
 
+  setActiveTag: (tag) => set({ activeTag: typeof tag === 'string' ? tag : '' }),
+
   toggleFiltersOpen: () => set((s) => ({ filtersOpen: !s.filtersOpen })),
 
-  reset: () => set({ searchTerm: '', activeType: 'all', sortBy: 'readingOrder', error: null }),
+  reset: () => set({ searchTerm: '', activeType: 'all', sortBy: 'readingOrder', activeTag: '', error: null }),
 }))

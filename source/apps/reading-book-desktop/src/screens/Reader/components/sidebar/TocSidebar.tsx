@@ -173,13 +173,15 @@ function highlightMatchesSearch(highlight: SidebarHighlight, needle: string): bo
  *  malformed row must degrade to "no matches" rather than throw during render. */
 function filterHighlights(
   highlights: SidebarHighlight[] | null | undefined,
-  options: { searchTerm: string; activeType: NotesTypeFilter },
+  options: { searchTerm: string; activeType: NotesTypeFilter; activeTag: string },
 ): SidebarHighlight[] {
   if (!Array.isArray(highlights)) return []
   const needle = options.searchTerm.trim().toLowerCase()
+  const tagNeedle = options.activeTag.trim().toLowerCase()
   return highlights.filter((h) => {
     if (!h || typeof h.id !== 'string') return false
     if (options.activeType !== 'all' && h.styleKind !== options.activeType) return false
+    if (tagNeedle && !(h.tags ?? []).some((t) => t.toLowerCase() === tagNeedle)) return false
     if (needle && !highlightMatchesSearch(h, needle)) return false
     return true
   })
@@ -487,18 +489,36 @@ export function TocSidebar({
   const notesFiltersOpen = useNotesFilterStore((s) => s.filtersOpen)
   const notesFilterError = useNotesFilterStore((s) => s.error)
   const setNotesSearchTerm = useNotesFilterStore((s) => s.setSearchTerm)
+  const notesActiveTag = useNotesFilterStore((s) => s.activeTag)
   const setNotesActiveType = useNotesFilterStore((s) => s.setActiveType)
+  const setNotesActiveTag = useNotesFilterStore((s) => s.setActiveTag)
   const setNotesSortBy = useNotesFilterStore((s) => s.setSortBy)
   const toggleNotesFiltersOpen = useNotesFilterStore((s) => s.toggleFiltersOpen)
 
+  // Distinct tags across this book's notes (case-insensitive, first spelling wins), A→Z.
+  const availableTags = useMemo(() => {
+    const seen = new Map<string, string>()
+    for (const h of Array.isArray(highlights) ? highlights : []) {
+      for (const t of h?.tags ?? []) {
+        const key = t.toLowerCase()
+        if (!seen.has(key)) seen.set(key, t)
+      }
+    }
+    return [...seen.values()].sort((a, b) => a.localeCompare(b))
+  }, [highlights])
+
   const filteredHighlights = useMemo(() => {
     try {
-      return filterHighlights(highlights, { searchTerm: notesSearchTerm, activeType: notesActiveType })
+      return filterHighlights(highlights, {
+        searchTerm: notesSearchTerm,
+        activeType: notesActiveType,
+        activeTag: notesActiveTag,
+      })
     } catch (error) {
       console.error('[TocSidebar] failed to filter notes', error)
       return []
     }
-  }, [highlights, notesSearchTerm, notesActiveType])
+  }, [highlights, notesSearchTerm, notesActiveType, notesActiveTag])
 
   const highlightGroups = useMemo(() => {
     try {
@@ -778,6 +798,27 @@ export function TocSidebar({
                         ))}
                       </select>
                     </label>
+                    {availableTags.length > 0 ? (
+                      <label className="relative block min-w-full flex-1">
+                        <span className="sr-only">Filter by tag</span>
+                        <select
+                          className="h-8 w-full cursor-pointer rounded-lg border border-lib-border bg-lib-input px-2 text-xs font-medium text-lib-text-strong outline-none focus:border-lib-accent"
+                          value={
+                            availableTags.some((t) => t.toLowerCase() === notesActiveTag.toLowerCase())
+                              ? availableTags.find((t) => t.toLowerCase() === notesActiveTag.toLowerCase())
+                              : ''
+                          }
+                          onChange={(e) => setNotesActiveTag(e.target.value)}
+                        >
+                          <option value="">All tags</option>
+                          {availableTags.map((tag) => (
+                            <option key={tag} value={tag}>
+                              #{tag}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                    ) : null}
                     <label className="relative block flex-1">
                       <span className="sr-only">Sort notes</span>
                       <select
