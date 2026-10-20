@@ -507,18 +507,23 @@ export function TocSidebar({
     return [...seen.values()].sort((a, b) => a.localeCompare(b))
   }, [highlights])
 
+  // The tag filter lives in a global store but tags are per book: a tag picked in another book
+  // (or one since removed) must not keep filtering here with no visible control.
+  const effectiveNotesTag =
+    availableTags.find((t) => t.toLowerCase() === notesActiveTag.toLowerCase()) ?? ''
+
   const filteredHighlights = useMemo(() => {
     try {
       return filterHighlights(highlights, {
         searchTerm: notesSearchTerm,
         activeType: notesActiveType,
-        activeTag: notesActiveTag,
+        activeTag: effectiveNotesTag,
       })
     } catch (error) {
       console.error('[TocSidebar] failed to filter notes', error)
       return []
     }
-  }, [highlights, notesSearchTerm, notesActiveType, notesActiveTag])
+  }, [highlights, notesSearchTerm, notesActiveType, effectiveNotesTag])
 
   const highlightGroups = useMemo(() => {
     try {
@@ -803,11 +808,7 @@ export function TocSidebar({
                         <span className="sr-only">Filter by tag</span>
                         <select
                           className="h-8 w-full cursor-pointer rounded-lg border border-lib-border bg-lib-input px-2 text-xs font-medium text-lib-text-strong outline-none focus:border-lib-accent"
-                          value={
-                            availableTags.some((t) => t.toLowerCase() === notesActiveTag.toLowerCase())
-                              ? availableTags.find((t) => t.toLowerCase() === notesActiveTag.toLowerCase())
-                              : ''
-                          }
+                          value={effectiveNotesTag}
                           onChange={(e) => setNotesActiveTag(e.target.value)}
                         >
                           <option value="">All tags</option>
