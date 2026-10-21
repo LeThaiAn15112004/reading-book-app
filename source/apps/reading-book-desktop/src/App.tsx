@@ -15,7 +15,7 @@ import {
   useImmersiveReading,
 } from './chrome'
 import { LibraryScreen } from './screens/Library/LibraryScreen'
-import { ReaderScreen } from './screens/Reader/ReaderScreen'
+import { ReaderRoute } from './screens/ReaderRoute'
 import { SettingsScreen } from './screens/Settings/SettingsScreen'
 import { SplashScreen } from './screens/Splash/SplashScreen'
 import { ShortcutsBridge } from './shortcuts'
@@ -64,7 +64,7 @@ function App() {
                     <Routes>
                       <Route path="/" element={<SplashScreen />} />
                       <Route path="/library" element={<LibraryScreen />} />
-                      <Route path="/reader/:bookId" element={<ReaderScreen />} />
+                      <Route path="/reader/:bookId" element={<ReaderRoute />} />
                       <Route path="/settings" element={<SettingsScreen />} />
                       {/* T3.1 spike harness — not linked from Library → Reader */}
                       <Route path="/spike/epub" element={<SpikeEpubScreen />} />

@@ -5,6 +5,10 @@ export const overlayApi = {
   saveSessionState: (
     ...args: Parameters<typeof window.api.overlay.saveSessionState>
   ) => window.api.overlay.saveSessionState(...args),
+  getAudioProgress: (bookId: string) => window.api.overlay.getAudioProgress(bookId),
+  saveAudioProgress: (
+    ...args: Parameters<typeof window.api.overlay.saveAudioProgress>
+  ) => window.api.overlay.saveAudioProgress(...args),
   listBookmarks: (bookId: string) => window.api.overlay.listBookmarks(bookId),
   saveBookmark: (
     ...args: Parameters<typeof window.api.overlay.saveBookmark>

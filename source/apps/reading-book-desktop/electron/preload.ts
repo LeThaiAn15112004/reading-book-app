@@ -115,6 +115,10 @@ const api: DesktopApi = {
       ipcRenderer.invoke(OverlayChannels.getSessionState, bookId),
     saveSessionState: (input) =>
       ipcRenderer.invoke(OverlayChannels.saveSessionState, input),
+    getAudioProgress: (bookId) =>
+      ipcRenderer.invoke(OverlayChannels.getAudioProgress, bookId),
+    saveAudioProgress: (input) =>
+      ipcRenderer.invoke(OverlayChannels.saveAudioProgress, input),
     listBookmarks: (bookId) =>
       ipcRenderer.invoke(OverlayChannels.listBookmarks, bookId),
     saveBookmark: (input) =>

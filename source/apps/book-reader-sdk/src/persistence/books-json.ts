@@ -35,6 +35,13 @@ export interface ReadingStateJson {
   isLandscape?: boolean | null
   /** ISO-8601. Also the stale-write guard for `saveSessionState`. */
   updatedAt?: string | null
+  /** Audiobook listening progress (src/audio/audio-progress.ts); absent for every other format. */
+  audioProgress?: {
+    positionSeconds: number
+    durationSeconds?: number | null
+    playbackRate?: number | null
+    updatedAt?: string | null
+  } | null
 }
 
 function parseObject<T extends object>(raw: string | null | undefined): T {

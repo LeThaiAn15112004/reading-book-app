@@ -24,6 +24,7 @@ import migration022 from './migrations/022_book_signature_status.sql?raw'
 import migration023 from './migrations/023_pdf_embedded_annotations.sql?raw'
 import migration024 from './migrations/024_pdf_annotation_two_way_sync.sql?raw'
 import migration025 from './migrations/025_txt_documents.sql?raw'
+import migration026 from './migrations/026_books_audio_format.sql?raw'
 
 interface Migration {
   name: string
@@ -56,6 +57,7 @@ const MIGRATIONS: Migration[] = [
   { name: '023_pdf_embedded_annotations.sql', sql: migration023 },
   { name: '024_pdf_annotation_two_way_sync.sql', sql: migration024 },
   { name: '025_txt_documents.sql', sql: migration025 },
+  { name: '026_books_audio_format.sql', sql: migration026 },
 ]
 
 /**

@@ -75,6 +75,8 @@ export const CloudChannels = {
 export const OverlayChannels = {
   getSessionState: 'overlay:getSessionState',
   saveSessionState: 'overlay:saveSessionState',
+  getAudioProgress: 'overlay:getAudioProgress',
+  saveAudioProgress: 'overlay:saveAudioProgress',
   listBookmarks: 'overlay:listBookmarks',
   saveBookmark: 'overlay:saveBookmark',
   deleteBookmark: 'overlay:deleteBookmark',

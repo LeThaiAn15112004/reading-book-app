@@ -47,6 +47,9 @@ export default defineConfig({
                 '@huggingface/transformers',
                 'onnxruntime-node',
                 'sharp',
+                // MP3 tags / cover at import. Bundled, its CommonJS dependencies (`debug` → `require('tty')`)
+                // make the whole Main bundle throw at load; from node_modules they resolve normally.
+                'music-metadata',
                 /^pdfjs-dist(\/|$)/,
               ],
             },

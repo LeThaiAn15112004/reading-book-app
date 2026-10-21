@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto'
 import fsp from 'node:fs/promises'
-import { checkMdFileSize, describeMdTooLarge } from '@reading-book/book-reader-sdk'
+import { checkMdFileSize, describeMdTooLarge, isAudioFormat } from '@reading-book/book-reader-sdk'
 import { getLibraryStore } from '../persistence/sqlite-library-store'
 import type {
   DocumentFormatDto,
@@ -70,6 +70,13 @@ export async function openBookContent(bookId: string): Promise<OpenBookContentRe
   // was only validated. Nothing is read here — a multi-megabyte buffer would cross IPC for nothing.
   if (book.format === 'txt') {
     return { ok: true, bookId: id, format: 'txt', data: new ArrayBuffer(0), byteLength: 0 }
+  }
+
+  // Audio is never read here: it is streamed by the `rb-audio` protocol (Range requests, no whole-file
+  // buffer, no IPC payload). The path check above doubles as the player's "can this be opened?"
+  // preflight, so a moved / unreadable file gets a specific error instead of a generic media error.
+  if (isAudioFormat(book.format)) {
+    return { ok: true, bookId: id, format: book.format as DocumentFormatDto, data: new ArrayBuffer(0), byteLength: 0 }
   }
 
   // Markdown is rendered whole in the renderer: refuse a file above the limit BEFORE reading it,

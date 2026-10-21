@@ -97,6 +97,7 @@ export * from './services/index.js'
 export * from './app-utils/index.js'
 export * from './constants/index.js'
 export * from './readers/index.js'
+export * from './audio/index.js'
 
 // Reference adapters
 export {
