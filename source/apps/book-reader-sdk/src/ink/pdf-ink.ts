@@ -15,6 +15,7 @@
 
 import { PageRectLocation, Rect, type InkPenStyle, type NoteLocator, type PdfInkStroke } from '../domain/index.js'
 import { packBookmarkLocator } from '../app-models/bookmark-location.js'
+import { PDF_INK_MAX_WIDTH, PDF_INK_MIN_WIDTH } from './ink-limits.js'
 
 /** Upper bound on points of one stroke (all paths together). */
 export const PDF_INK_MAX_POINTS = 5000
@@ -24,11 +25,9 @@ export const PDF_INK_MAX_PATHS = 64
 export const PDF_INK_MAX_REF_LENGTH = 256 * 1024
 /** Highest accepted 0-based page index (same as PDF text annotations). */
 export const PDF_INK_MAX_PAGE_INDEX = 99_999
-/** Accepted stroke widths, as a fraction of the page width. */
-export const PDF_INK_MIN_WIDTH = 0.0005
-export const PDF_INK_MAX_WIDTH = 0.1
+export { PDF_INK_MAX_WIDTH, PDF_INK_MIN_WIDTH }
 
-const PEN_STYLES: readonly InkPenStyle[] = ['pen', 'marker', 'pencil']
+const PEN_STYLES: readonly InkPenStyle[] = ['pen', 'marker', 'pencil', 'brush']
 /** Slack for float noise at the page edges. */
 const EDGE_EPSILON = 1e-6
 /** Points are stored rounded to this many decimals (same as PDF text annotations). */

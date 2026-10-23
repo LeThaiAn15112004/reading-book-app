@@ -25,6 +25,15 @@ register(
           const candidate = new URL(specifier + '.ts', context.parentURL)
           if (existsSync(fileURLToPath(candidate))) return { url: candidate.href, shortCircuit: true }
         }
+        // SDK sources import siblings as ./x.js: use the .ts file next to the importer.
+        if (
+          (specifier.startsWith('./') || specifier.startsWith('../')) &&
+          specifier.endsWith('.js') &&
+          context.parentURL?.startsWith('file:')
+        ) {
+          const candidate = new URL(specifier.slice(0, -3) + '.ts', context.parentURL)
+          if (existsSync(fileURLToPath(candidate))) return { url: candidate.href, shortCircuit: true }
+        }
         return next(specifier, context)
       }
     `),

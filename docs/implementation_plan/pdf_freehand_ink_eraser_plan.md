@@ -1,6 +1,6 @@
 # PDF Freehand Ink, Pen Tools & Eraser — implementation plan
 
-Status: **Phase 0 and Phase 1 implemented (2026-10-23), pending review. Phases 2–5 not started.** See "Implementation status" at the end of this file.
+Status: **Phases 0–2 implemented (Phase 2: 2026-10-23), Phase 2 pending review. Phases 3–5 not started.** See "Implementation status" at the end of this file.
 Scope: freehand Ink strokes, pen styles/settings, and an Ink-only Eraser on the PDF surface. Shapes, FreeText, stamps and
 other PDF features are out of scope.
 
@@ -446,3 +446,44 @@ Requested after Phase 1 review (a drawn stroke can be repositioned). With the **
 - Renderer: `PdfRenderer` `onInkMove` + a separate drag state next to the pen draft; cancel / blur / lost pointer capture snaps back without saving. Cursor flag `data-pdf-ink-hover` → `cursor: move` (`index.css`).
 - Still SQLite only — nothing is written into the PDF file; undo/redo of a move is persisted.
 - Checks: `spike:pdf:ink-store` now 13 checks (adds the move case); new real-window E2E `e2e/specs/pdf-ink-move.spec.ts` (hidden window, real mouse): draw → Hand pans an unselected stroke without moving it → click selects → drag moves it by the pointer delta with live preview → undo / redo → drag past the page edge clamps → app restart restores the position. It passes (≈3 min).
+
+
+### Phase 2 — styles and settings polish (implemented, pending review)
+
+**Still SQLite only** — nothing is written into the PDF file; Pencil / Marker have no external-reader compatibility claim (Phase 4).
+
+| Item | Where |
+|---|---|
+| Presets Pen / Pencil / Marker (defaults, ranges, `blend`), `clampInkOpacity`, `clampInkWidth`, `restyleInk` | `book-reader-sdk/src/ink/ink-pen-styles.ts` (+ import-free `ink-limits.ts`) |
+| Per-style preferences (`tool` + `styles.{pen,pencil,marker}`), same key `readmate.pdfInkPrefs.v1`; the Phase 1 `{ pen, tool }` format is still read | `src/screens/Reader/logic/pdfInk/pdfInkPrefsStore.ts` |
+| Freehand dropdown: style selector, colour picker + `#RRGGBB` field, thickness slider with pt value, opacity slider (Pencil/Marker only; Pen shows "always fully opaque"), selected style highlighted | `FreehandSettingsPopover.tsx` + shared `InkStyleControls.tsx` |
+| Edit the SELECTED stroke (style, colour, thickness, opacity) from its own panel: one `replace` history entry, only that row re-saved | `PdfInkPanel.tsx`, `pdfInkStore.updateStroke` |
+| Marker multiply blend (`mix-blend-mode`) in the page layer, style on the live preview and saved strokes; cursor per style | `PdfInkLayer.tsx`, `PdfRenderer.tsx`, `index.css` |
+
+Behaviour decisions:
+- Pencil = thin, 80 % opacity line (no texture). Marker = 16 pt-ish wide (0.016 of page width), 35 % opacity, multiply. Brush / Calligraphy not offered.
+- Dropdown settings apply to the NEXT stroke only. Editing a saved stroke happens only in its own "Selected stroke" panel, so tool settings never retroactively change strokes. Switching a stroke's style re-derives width/opacity (`restyleInk`): Pen → always opaque; Pencil ↔ Marker keeps a chosen opacity.
+- Sliders and the system colour picker commit on release, so one adjustment is one undo step.
+- Toolbar order is unchanged from the previous request (Hand, Select, Search, Annotation, Freehand ▾, Eraser, Snapshot, Word Count); the Freehand button and its arrow are separate buttons and the arrow never arms the tool. Eraser stays a disabled placeholder (Phase 3).
+
+Checks that ran: SDK `npm run verify` (typecheck, test typecheck, **465 tests**, build; 7 new in `tests/ink/ink-pen-styles.test.ts`); desktop typecheck, lint, `e2e:typecheck`, `vite build`; `spike:pdf:ink-store` **21 checks** (defaults, per-style memory, HEX validation, clamping, restart + legacy-format load, reset writes defaults, settings never touch saved rows, edit changes only one row, undo/redo/Ctrl+Z restore the look); `spike:pdf:ink` 12; `spike:reader:toolbar` 36; `spike:settings:reset` 14; `spike:pdf:annotations` 39, `export` 9, `two-way` 21, `live` 18, `attachments` 39 (one run failed once on a temp-folder check and passed twice on rerun — unrelated timing flake).
+Spike harness changes: reset-settings stub now exports the pen presets and its loader maps `./x.js` to `.ts`; toolbar spike title updated.
+
+**Real-window E2E (hidden window, approved afterwards):** `e2e/specs/pdf-ink-styles.spec.ts` passes (≈30 s) together with `pdf-ink-move.spec.ts` (both ran: 2 passed). It checks with real mouse / keyboard input: the dropdown arrow opens settings without arming the tool or drawing; Pen / Pencil / Marker only (no Brush); each style's defaults; opacity slider absent for Pen; invalid HEX flagged and not applied, valid HEX applied; a Pen, a Marker (wider, 40 %, `multiply`) and a Pencil (thin, 80 %) stroke drawn with their own looks; changing tool settings leaves saved strokes identical; selecting one stroke with Hand and editing its colour and style changes only that stroke and leaves the tool settings alone; undo / redo walk the edit back and forth; after an app restart the strokes keep their looks and every style's remembered settings come back. The colour picker's native OS dialog is not driven (the HEX field is).
+The run found one real bug, now fixed: with focus on a button inside the Freehand popover, Escape disarmed the tool and left the popover open (the reader's Escape handler ran first). `useReaderNavigation` now leaves Escape to the popover when focus is inside it.
+The existing E2E `pdf-annotations.spec` failures noted earlier were not re-run and are unchanged.
+
+Known limitations: no eraser, no brush, no pressure; colour picker is the system one (Chromium); the selected-stroke panel sits bottom-right and may overlap the footer on a very short window; Marker multiply is a display effect only until the write-back phase decides how to store it.
+
+### Brush (MVP, added after Phase 2)
+
+Requested as an extra drawing style. **Still SQLite only; not written into PDF files; no external-reader compatibility claim.**
+
+- **Model:** `InkPenStyle` gains `'brush'`; the parser accepts it. Nothing else in the stroke changes (same centre-line, `width` as a fraction of the page width, colour and opacity in `style`), so existing Pen / Pencil / Marker rows are untouched and need no migration. A build older than this one cannot parse a `brush` row and would hide it (it is never converted into another style).
+- **Look:** the Brush is the same centre-line painted as three concentric round-capped layers inside one group (widths 100 % / 72 % / 42 %, alphas 0.3 / 0.5 / 0.9), with the stroke's opacity on the group — a soft, rounded mark whose edge fades. Pen, Pencil and Marker stay one solid path. Width is constant: no pressure, no bristles, no variable width. `inkStrokeLayers(style)` (SDK) is the single definition; `PdfInkLayer` paints saved strokes, the live preview and the eraser preview from it.
+- **Defaults:** `#8E24AA`, width 0.012 of the page width (≈ 7 pt), opacity 85 % (editable 30–100 %), width range 0.004–0.04, normal blend.
+- **Settings:** a fourth entry `styles.brush` under the same `readmate.pdfInkPrefs.v1` key, independent from the other styles. Preferences saved before the Brush existed load with the Brush defaults. Reset App Settings restores it with the rest.
+- **UI:** a fourth button in the Freehand dropdown and in the selected-stroke panel (same colour / thickness / opacity controls), its own cursor. Switching a stroke to Brush from the Pen takes the Brush opacity default; from Pencil / Marker it keeps a chosen opacity.
+- **Eraser / history:** a Brush stroke is an ordinary Readmate Ink row, so the Stroke Eraser removes it as a whole (reach = eraser radius + half its width), as one undo step; draw / edit / delete / move undo and redo as for every stroke.
+- **Checks:** SDK `npm run verify` — 482 tests (new: Brush presets / layers / clamping / restyle / parser, zoom-independent path data and hit test, eraser on a Brush stroke); `spike:pdf:ink-store` 32 checks (adds independent Brush settings, restart + pre-Brush preferences, saved look, undo / redo, edit, Stroke Eraser); desktop typecheck, lint, `e2e:typecheck`, `vite build`; `spike:reader:toolbar` 36, `spike:settings:reset` 14, `spike:pdf:ink` 12, `spike:pdf:annotations` 39, `export` 9, `two-way` 21. Real-window E2E (hidden window, approved): `e2e/specs/pdf-ink-brush.spec.ts` passes, and `pdf-ink-styles` (now expecting four styles) and `pdf-ink-move` still pass (3 passed, ≈34 s). The Brush spec checks, with real mouse / keyboard input: Brush defaults and independent settings (colour, opacity, thickness) next to the Pen's; a Brush stroke rendered as a group of three concentric round layers (narrower = denser) while the Pen stays one solid path; saved strokes unchanged when settings are switched; zoom keeps the stroke's place, proportions and stored width; undo / redo; the Stroke Eraser removing the Brush as a whole (Pen stays) and undo restoring it; restart restoring both strokes and the Brush settings.
+- **Limitations:** the soft edge is a display effect — when write-back exists (Phase 4) a Brush stroke can only be written as a constant-width `/Ink`, so other readers will show it as a plain stroke of that colour / width / opacity; the layered painting has not been looked at in a real window; no pressure sensitivity.

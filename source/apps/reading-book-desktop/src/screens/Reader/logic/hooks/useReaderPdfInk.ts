@@ -35,6 +35,10 @@ export function useReaderPdfInk({ bookId, isPdfSurface, setToast }: UseReaderPdf
     select: usePdfInkStore((s) => s.select),
     commitStroke: usePdfInkStore((s) => s.commitStroke),
     moveStroke: usePdfInkStore((s) => s.moveStroke),
+    updateStroke: usePdfInkStore((s) => s.updateStroke),
+    resizeStroke: usePdfInkStore((s) => s.resizeStroke),
     deleteSelected: usePdfInkStore((s) => s.deleteSelected),
+    eraseStrokes: usePdfInkStore((s) => s.eraseStrokes),
+    applyPartialErase: usePdfInkStore((s) => s.applyPartialErase),
   }
 }

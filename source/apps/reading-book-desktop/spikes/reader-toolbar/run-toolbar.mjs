@@ -137,7 +137,7 @@ check('only renderer-independent tools', () => {
   ])
 })
 
-check('PDF layout: Search in the navigate group, the inline Annotation icons (incl. the Pen), no Settings group', () => {
+check('PDF layout: Search in the navigate group, the inline Annotation icons, the Freehand group (Freehand + Eraser), no Settings group', () => {
   assert.deepEqual(shape(resolveToolbarLayout(pdf, 0)), [
     'navigate:inline[hand,select,search]',
     'annotation:inline[highlight,underline,squiggly,strikethrough,replace,insert]',
@@ -272,6 +272,42 @@ check('ReaderScreen routes rail, sidebar and shortcuts through the resolved tab'
   assert.match(screen, /tab=\{sidebarTab\}/)
   assert.match(screen, /sidebarTab,\s+openSidebarTab,/)
   assert.doesNotMatch(screen, /chrome\.sidebarTab\}|onOpenTab=\{chrome\.openSidebarTab\}/)
+})
+
+const toolsMenu = readFileSync(new URL('../../src/screens/Reader/components/chrome/ToolsMenu.tsx', import.meta.url), 'utf8').replace(/\r\n/g, '\n')
+
+check('Eraser mode dropdown: an arrow beside the Eraser only picks the mode; the Eraser button arms whichever mode is set', () => {
+  // the arrow sits right after the Eraser button, inside the same tool group
+  assert.match(
+    toolsMenu,
+    /tool\.id === 'eraser' && onEraserMode \? \(\s*<div key=\{tool\.id\} className="contents">\s*\{renderButton\(tool, resolved\.group\.iconOnly\)\}\s*<EraserModeButton/,
+  )
+  // the arrow only toggles its own menu (never the tool) and exposes menu semantics
+  const arrow = toolsMenu.slice(toolsMenu.indexOf('function EraserModeButton'), toolsMenu.indexOf('/** Tooltip: description'))
+  assert.match(arrow, /onClick=\{\(\) => setOpen\(\(v\) => !v\)\}/)
+  assert.doesNotMatch(arrow, /onTool|handleTool/)
+  assert.match(arrow, /aria-haspopup="menu"/)
+  assert.match(arrow, /aria-expanded=\{showMenu\}/)
+  assert.match(arrow, /aria-label=\{`Eraser mode:/)
+  // both modes are offered, the current one is checked, choosing one calls onMode
+  assert.match(toolsMenu, /label: 'Stroke Eraser'/)
+  assert.match(toolsMenu, /label: 'Partial Eraser'/)
+  assert.match(arrow, /active: m\.id === mode/)
+  assert.match(arrow, /onSelect: \(\) => onMode\(m\.id\)/)
+  // the shared popup closes first, on an outside click and on Escape, and supports arrow keys
+  assert.match(menu, /onClose\(false\)\s+item\.onSelect\(\)/)
+  assert.match(menu, /useDismissOnOutsideOrEscape\(menuRef, onDismiss, \{ ignoreRef: anchorRef, consumeEscape: true \}\)/)
+  assert.match(menu, /ArrowDown/)
+})
+check('Eraser mode lives in ReaderScreen state (survives switching tools); the Eraser button toggles the tool; the renderer reads the mode', () => {
+  assert.match(screen, /const \[eraserMode, setEraserMode\] = useState<EraserMode>\('stroke'\)/)
+  assert.match(screen, /onEraserMode=\{setEraserMode\}/)
+  assert.match(screen, /case 'eraser':\s+\/\/ Click the armed tool again[^]*selectTool\(\(current\) => \(current === tool \? 'select' : tool\)\)/)
+  assert.match(screen, /eraserMode=\{eraserMode\}\s+onInkPartialErase=\{pdfInk\.applyPartialErase\}/)
+  assert.doesNotMatch(screen, /setEraserMode\([^)]*\)[^\n]*setActiveTool/)
+})
+check('Eraser stays PDF-only (capability inkAnnotations) and is left when the surface is not a PDF', () => {
+  assert.match(screen, /activeTool === 'pen' \|\| activeTool === 'eraser'\)\) setActiveTool\('select'\)/)
 })
 
 console.log(`\n${passed} checks passed`)

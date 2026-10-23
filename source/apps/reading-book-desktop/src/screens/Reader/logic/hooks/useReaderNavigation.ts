@@ -314,6 +314,9 @@ export function useReaderNavigation({
       if (e.key === 'Escape') {
         // Already consumed by an open popover/menu (`consumeEscape`) — one level per keypress.
         if (e.defaultPrevented) return
+        // The Freehand settings popover closes itself on Escape: with focus on one of its buttons the key
+        // must not also disarm the tool (this listener runs before the popover's own).
+        if (e.target instanceof Element && e.target.closest('[data-pdf-ink-panel=""]')) return
         if (highlightShortcutsRef.current.cancelAnnotationTool()) {
           e.preventDefault()
           e.stopPropagation()

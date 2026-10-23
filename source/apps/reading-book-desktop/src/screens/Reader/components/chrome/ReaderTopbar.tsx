@@ -1,7 +1,7 @@
 import type { Ref } from 'react'
 import type { ReaderCapability } from '../../../../reader/capabilities'
 import { MoreMenu } from './MoreMenu'
-import { ToolsStrip, type ToolId, type ToolStates } from './ToolsMenu'
+import { ToolsStrip, type EraserMode, type ToolId, type ToolStates } from './ToolsMenu'
 
 type ReaderTopbarProps = {
   chromeHidden: boolean
@@ -18,6 +18,8 @@ type ReaderTopbarProps = {
   /** Active / expanded state per tool (see `ToolsStrip`). */
   toolStates: ToolStates
   onTool: (tool: ToolId) => void
+  eraserMode?: EraserMode
+  onEraserMode?: (mode: EraserMode) => void
   /** The read-aloud menu floats under the Audio button. */
   audioButtonRef: Ref<HTMLButtonElement>
 }
@@ -37,6 +39,8 @@ export function ReaderTopbar({
   capabilities,
   toolStates,
   onTool,
+  eraserMode,
+  onEraserMode,
   audioButtonRef,
 }: ReaderTopbarProps) {
   return (
@@ -54,6 +58,8 @@ export function ReaderTopbar({
         capabilities={capabilities}
         toolStates={toolStates}
         onTool={onTool}
+        eraserMode={eraserMode}
+        onEraserMode={onEraserMode}
         toolRefs={{ speech: audioButtonRef }}
         hidden={chromeHidden}
       />

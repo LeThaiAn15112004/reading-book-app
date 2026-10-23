@@ -27,3 +27,40 @@ export {
   translateInkPaths,
   type InkClientRect,
 } from './ink-geometry.js'
+export {
+  INK_INTERACTION_IDLE,
+  INK_MIN_RESIZE_EXTENT,
+  INK_OUTLINE_MARGIN,
+  INK_RESIZE_HANDLES,
+  INK_TOOLBAR_CLEARANCE_PX,
+  canResizeInk,
+  inkHandlePosition,
+  inkOutlinesAvailable,
+  inkSelectionBox,
+  inkToolbarSide,
+  pickInkTarget,
+  reduceInkInteraction,
+  resizeInkPaths,
+  type InkBox,
+  type InkInteraction,
+  type InkInteractionEvent,
+  type InkResizeHandle,
+} from './ink-interaction.js'
+export {
+  INK_ERASER_RADIUS_PX,
+  clampEraserRadiusPx,
+  inkStrokesTouchedBySweep,
+  inkSweepTouchesPaths,
+} from './ink-eraser.js'
+export { erasePathsWithSweeps, type InkEraseSweep, type InkPartialErase } from './ink-partial-eraser.js'
+export {
+  INK_PEN_PRESETS,
+  INK_PEN_STYLES,
+  clampInkOpacity,
+  clampInkWidth,
+  inkStrokeLayers,
+  isInkPenStyle,
+  restyleInk,
+  type InkPenPreset,
+  type InkStrokeLayer,
+} from './ink-pen-styles.js'

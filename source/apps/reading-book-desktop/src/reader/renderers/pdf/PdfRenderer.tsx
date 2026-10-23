@@ -34,12 +34,23 @@ import {
   PageRectLocation,
   clientToPageUnit,
   filterMinDistance,
-  inkStrokeAt,
+  INK_ERASER_RADIUS_PX,
+  erasePathsWithSweeps,
+  inkHandlePosition,
+  inkOutlinesAvailable,
+  inkSelectionBox,
+  inkStrokesTouchedBySweep,
+  type InkEraseSweep,
   isMarkupTool,
   pdfMarkAt,
+  pickInkTarget,
+  reduceInkInteraction,
+  resizeInkPaths,
   simplifyInkPoints,
   translateInkPaths,
+  type InkPenStyle,
   type InkPoint,
+  type InkResizeHandle,
   type InteractionTool,
   type MarkupInteractionTool,
   type TextMatcher,
@@ -58,6 +69,7 @@ import {
   pdfPageSearchRanges,
 } from './pdfSearchDom'
 import { PdfPageInk, type PdfInkLayerMark } from './PdfInkLayer'
+import { PdfInkSelectionOverlay } from './PdfInkSelectionOverlay'
 import { readPdfInsertionPoint, type PdfInsertionPoint } from './pdfInsertionPoint'
 import { readPdfSelection, readPdfSelectionAt, type PdfSelectionInfo } from './pdfSelection'
 import { attachTextLayerSelection, detachTextLayerSelection } from './pdfTextLayerSelection'
@@ -214,13 +226,23 @@ export interface PdfRendererProps {
   /** The selected stroke (halo). */
   selectedInkId?: string | null
   /** Pen settings shown on the stroke being drawn; a saved stroke takes its look from the store. */
-  inkPen?: { colorHex: string; width: number; opacity: number }
+  inkPen?: { colorHex: string; width: number; opacity: number; penStyle: InkPenStyle }
   /** A finished pen drag: 0-based `pageIndex` and the decimated page points. The Reader saves it. */
   onInkStroke?: (pageIndex: number, points: InkPoint[]) => void
   /** A click selected a stroke (`id`) or hit none (`null`). */
   onInkSelect?: (id: string | null) => void
   /** The Hand tool dragged the SELECTED stroke: shift it by (`dx`, `dy`) normalized page units (already clamped to the page). */
   onInkMove?: (id: string, dx: number, dy: number) => void
+  /** A resize handle of the SELECTED stroke was released: its points, scaled (already clamped to the page). */
+  onInkResize?: (id: string, paths: InkPoint[][]) => void
+  /** The compact contextual toolbar (colour + Delete) shown next to the selected stroke. */
+  renderInkToolbar?: (stroke: PdfInkLayerMark) => ReactNode
+  /** The Eraser was released: delete these saved strokes (every one the gesture touched) as one operation. */
+  onInkErase?: (ids: string[]) => void
+  /** Stroke (whole strokes) or Partial (only the part under the eraser). Defaults to Stroke. */
+  eraserMode?: 'stroke' | 'partial'
+  /** The Partial Eraser was released: each touched stroke becomes its remaining `pieces` (empty: removed). */
+  onInkPartialErase?: (edits: { id: string; pieces: InkPoint[][] }[]) => void
 }
 
 /** One primary-button press on the pages, from pointerdown to pointerup. */
@@ -338,6 +360,11 @@ export function PdfRenderer({
   onInkStroke,
   onInkSelect,
   onInkMove,
+  onInkResize,
+  renderInkToolbar,
+  onInkErase,
+  eraserMode = 'stroke',
+  onInkPartialErase,
 }: PdfRendererProps) {
   const [doc, setDoc] = useState<PDFDocumentProxy | null>(null)
   const [sizes, setSizes] = useState<PageSize[]>([])
@@ -376,20 +403,56 @@ export function PdfRenderer({
   const inkMoveRef = useRef<{ pointerId: number; id: string; pageIndex: number; startX: number; startY: number; dx: number; dy: number; moved: boolean } | null>(null)
   const [inkMove, setInkMove] = useState<{ id: string; dx: number; dy: number } | null>(null)
   const inkMoveFrameRef = useRef<number | null>(null)
+  const [erasePreview, setErasePreview] = useState<ReadonlyMap<string, InkPoint[][]> | null>(null)
+  const onInkResizeRef = useRef(onInkResize)
+  onInkResizeRef.current = onInkResize
+  /** The handle drag in progress: `offset` = pointer minus the handle's centre at press time, `paths` = the preview. */
+  const inkResizeRef = useRef<{ pointerId: number; id: string; pageIndex: number; handle: InkResizeHandle; offset: InkPoint; paths: InkPoint[][] | null } | null>(null)
+  const [inkResize, setInkResize] = useState<{ id: string; paths: InkPoint[][] } | null>(null)
+  /** Stroke under the pointer (outline only — UI state, never saved) and the last idle pointer position. */
+  const [inkHoverId, setInkHoverId] = useState<string | null>(null)
+  const lastPointerRef = useRef<{ x: number; y: number } | null>(null)
   const inkByPage = useMemo(() => {
     const byPage = new Map<number, PdfInkLayerMark[]>()
     for (const stroke of inkStrokes ?? []) {
       // The stroke being dragged is painted at its preview position (the saved one moves on release).
-      const mark = inkMove?.id === stroke.id ? { ...stroke, paths: translateInkPaths(stroke.paths, inkMove.dx, inkMove.dy).paths } : stroke
+      let mark = inkMove?.id === stroke.id ? { ...stroke, paths: translateInkPaths(stroke.paths, inkMove.dx, inkMove.dy).paths } : stroke
+      if (inkResize?.id === stroke.id) mark = { ...mark, paths: inkResize.paths }
+      // Partial Eraser preview: what would remain, over a faded ghost of the whole stroke.
+      const cut = erasePreview?.get(stroke.id)
+      if (cut) mark = { ...mark, paths: cut, erasedGhost: stroke.paths }
       const list = byPage.get(mark.pageIndex)
       if (list) list.push(mark)
       else byPage.set(mark.pageIndex, [mark])
     }
     return byPage
-  }, [inkStrokes, inkMove])
+  }, [inkStrokes, inkMove, inkResize, erasePreview])
+  const eraser = interactionTool === 'eraser'
+  const eraserRef = useRef(eraser)
+  eraserRef.current = eraser
+  const onInkEraseRef = useRef(onInkErase)
+  onInkEraseRef.current = onInkErase
+  /** The Eraser press in progress: where the last sweep step ended and every stroke touched so far (preview only until release). */
+  const eraseRef = useRef<{
+    pointerId: number
+    last: { pageIndex: number; point: InkPoint } | null
+    ids: Set<string>
+    /** Partial mode: every sweep of the gesture per page, and what each touched stroke would be cut to. */
+    sweeps: Map<number, InkEraseSweep[]>
+    preview: Map<string, InkPoint[][]>
+  } | null>(null)
+  const [erasingIds, setErasingIds] = useState<ReadonlySet<string> | null>(null)
+  const eraserModeRef = useRef(eraserMode)
+  eraserModeRef.current = eraserMode
+  const onInkPartialEraseRef = useRef(onInkPartialErase)
+  onInkPartialEraseRef.current = onInkPartialErase
   const markupTool = markupToolOf(interactionTool)
   const markupToolRef = useRef(markupTool)
   markupToolRef.current = markupTool
+  /** Hover / selection chrome exists only in Hand and Select: never under a pen, the eraser or a text-markup tool. */
+  const outlinesOn = inkOutlinesAvailable({ pen, eraser, markup: markupTool != null })
+  const outlinesOnRef = useRef(outlinesOn)
+  outlinesOnRef.current = outlinesOn
   const onMarkupSelectionRef = useRef(onMarkupSelection)
   onMarkupSelectionRef.current = onMarkupSelection
   const onInsertPointRef = useRef(onInsertPoint)
@@ -1325,7 +1388,7 @@ export function PdfRenderer({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- finishInk only reads refs and stable setters
   }, [pen])
 
-  /** The stroke under client (`x`, `y`), if any (topmost first). */
+  /** The stroke under client (`x`, `y`), if any: the selected one wherever it is hit, else the topmost. */
   const inkAt = (x: number, y: number): PdfInkLayerMark | null => {
     const strokes = inkStrokesRef.current
     if (!strokes?.length) return null
@@ -1333,8 +1396,236 @@ export function PdfRenderer({
     const size = hit ? sizes[hit.index] : undefined
     if (!hit || !size) return null
     const point = clientToPageUnit(x, y, hit.rect)
-    return point ? inkStrokeAt(strokes, hit.index, point[0], point[1], size.h / size.w, pagePx(hit.rect, 6)) : null
+    return point ? pickInkTarget(strokes, selectedInkIdRef.current, hit.index, point[0], point[1], size.h / size.w, pagePx(hit.rect, 6)) : null
   }
+
+  /** Hover feedback for the stroke under client (`x`, `y`): outline only, never selects or changes anything. */
+  const updateInkHover = (x: number, y: number) => {
+    const id = outlinesOnRef.current ? (inkAt(x, y)?.id ?? null) : null
+    setInkHoverId((prev) => (prev === id ? prev : reduceInkInteraction({ hoverId: prev, selectedId: selectedInkIdRef.current }, { type: 'hover', id }).hoverId))
+  }
+
+  /** Re-run the hover hit test at the last idle pointer position (after a scroll, zoom, page change or stroke edit). */
+  const refreshInkHover = () => {
+    const last = lastPointerRef.current
+    if (last) updateInkHover(last.x, last.y)
+    else setInkHoverId(null)
+  }
+  const refreshInkHoverRef = useRef(refreshInkHover)
+  refreshInkHoverRef.current = refreshInkHover
+
+  // The page moved under a still pointer: scroll, zoom, page turn, or the strokes / tool changed.
+  useEffect(() => {
+    refreshInkHoverRef.current()
+  }, [cssScale, spread, sizes, inkStrokes, outlinesOn, selectedInkId])
+  useEffect(() => {
+    const scrollRoot = getScrollRootRef.current()
+    if (!scrollRoot) return
+    let frame: number | null = null
+    const onScroll = () => {
+      if (frame !== null) return
+      frame = requestAnimationFrame(() => {
+        frame = null
+        refreshInkHoverRef.current()
+      })
+    }
+    scrollRoot.addEventListener('scroll', onScroll, { passive: true })
+    return () => {
+      scrollRoot.removeEventListener('scroll', onScroll)
+      if (frame !== null) cancelAnimationFrame(frame)
+    }
+  }, [status.kind])
+
+  // Escape deselects the stroke (and closes its toolbar); hover feedback stays. A running handle drag is cancelled first.
+  useEffect(() => {
+    if (selectedInkId === null || !outlinesOn) return
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return
+      event.stopPropagation()
+      if (inkResizeRef.current) endInkResize(false)
+      else onInkSelectRef.current?.(null)
+    }
+    window.addEventListener('keydown', onKey, true)
+    return () => window.removeEventListener('keydown', onKey, true)
+  }, [selectedInkId, outlinesOn])
+
+  /** A press on a resize handle of the selected stroke: the page must not see it (no pan, tap or text selection). */
+  const beginInkResize = (handle: InkResizeHandle, event: ReactPointerEvent<HTMLElement>) => {
+    event.stopPropagation()
+    if (event.button !== 0 || !event.isPrimary) return
+    const id = selectedInkIdRef.current
+    const stroke = id ? inkStrokesRef.current?.find((m) => m.id === id) : undefined
+    const rect = stroke ? slotsRef.current[stroke.pageIndex]?.getBoundingClientRect() : undefined
+    if (!id || !stroke || !rect || rect.width <= 0) return
+    const size = sizes[stroke.pageIndex]
+    const box = size ? inkSelectionBox(stroke.paths, stroke.width, size.h / size.w) : null
+    const pointer = clientToPageUnit(event.clientX, event.clientY, rect)
+    if (!box || !pointer) return
+    event.preventDefault()
+    window.getSelection()?.removeAllRanges()
+    dwellRef.current?.disarm()
+    try {
+      event.currentTarget.setPointerCapture(event.pointerId)
+    } catch {
+      /* ignore */
+    }
+    const anchor = inkHandlePosition(box, handle)
+    inkResizeRef.current = { pointerId: event.pointerId, id, pageIndex: stroke.pageIndex, handle, offset: [pointer[0] - anchor[0], pointer[1] - anchor[1]], paths: null }
+  }
+
+  const moveInkResize = (event: ReactPointerEvent<HTMLElement>) => {
+    event.stopPropagation()
+    const drag = inkResizeRef.current
+    if (!drag || event.pointerId !== drag.pointerId) return
+    if (event.pointerType === 'mouse' && (event.buttons & 1) === 0) {
+      endInkResize(false)
+      return
+    }
+    const rect = slotsRef.current[drag.pageIndex]?.getBoundingClientRect()
+    const size = sizes[drag.pageIndex]
+    const stroke = inkStrokesRef.current?.find((m) => m.id === drag.id)
+    const pointer = rect ? clientToPageUnit(event.clientX, event.clientY, rect) : null
+    if (!rect || !size || !stroke || !pointer) return
+    const paths = resizeInkPaths(stroke.paths, stroke.width, drag.handle, [pointer[0] - drag.offset[0], pointer[1] - drag.offset[1]], size.h / size.w)
+    if (!paths) return
+    drag.paths = paths
+    setInkResize({ id: drag.id, paths })
+  }
+
+  /** End the handle drag; `commit` (release) hands the resized points over, otherwise the stroke snaps back. */
+  const endInkResize = (commit: boolean) => {
+    const drag = inkResizeRef.current
+    inkResizeRef.current = null
+    setInkResize(null)
+    if (!drag) return
+    try {
+      if (rootRef.current?.hasPointerCapture(drag.pointerId)) rootRef.current.releasePointerCapture(drag.pointerId)
+    } catch {
+      /* element already detached */
+    }
+    if (commit && drag.paths) onInkResizeRef.current?.(drag.id, drag.paths)
+  }
+
+  const releaseInkResize = (event: ReactPointerEvent<HTMLElement>, commit: boolean) => {
+    event.stopPropagation()
+    const drag = inkResizeRef.current
+    if (!drag || event.pointerId !== drag.pointerId) return
+    try {
+      if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId)
+    } catch {
+      /* ignore */
+    }
+    endInkResize(commit && event.type === 'pointerup')
+  }
+
+  /** Run the eraser over one client sample: sweep from the previous sample (same page) and collect touched strokes. */
+  const eraseSample = (x: number, y: number) => {
+    const erase = eraseRef.current
+    if (!erase) return
+    const hit = slotAt(x, y)
+    const point = hit ? clientToPageUnit(x, y, hit.rect) : null
+    if (!hit || !point) {
+      erase.last = null
+      return
+    }
+    const from = erase.last && erase.last.pageIndex === hit.index ? erase.last.point : point
+    erase.last = { pageIndex: hit.index, point }
+    const radius = pagePx(hit.rect, INK_ERASER_RADIUS_PX.default)
+    const ratio = hit.rect.height / hit.rect.width
+    const strokes = inkStrokesRef.current ?? NO_INK
+    const touched = inkStrokesTouchedBySweep(strokes, hit.index, from, point, radius, ratio)
+    if (eraserModeRef.current === 'partial') {
+      // Always recomputed from the ORIGINAL stroke and ALL sweeps of the gesture: re-entering the same
+      // spot, or crossing a stroke again, can never erase more than the eraser's path covers.
+      const pageSweeps = erase.sweeps.get(hit.index) ?? []
+      pageSweeps.push({ from, to: point })
+      erase.sweeps.set(hit.index, pageSweeps)
+      let changedPreview = false
+      for (const id of touched) {
+        const stroke = strokes.find((m) => m.id === id)
+        if (!stroke) continue
+        const result = erasePathsWithSweeps(stroke.paths, stroke.width, pageSweeps, radius, ratio)
+        if (result.changed) {
+          erase.preview.set(id, result.pieces.map((piece) => [...piece]))
+          changedPreview = true
+        }
+      }
+      if (changedPreview) setErasePreview(new Map(erase.preview))
+      return
+    }
+    let added = false
+    for (const id of touched) {
+      if (!erase.ids.has(id)) {
+        erase.ids.add(id)
+        added = true
+      }
+    }
+    if (added) setErasingIds(new Set(erase.ids))
+  }
+
+  const beginErase = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (!slotAt(event.clientX, event.clientY)) return
+    event.preventDefault()
+    window.getSelection()?.removeAllRanges()
+    try {
+      event.currentTarget.setPointerCapture(event.pointerId)
+    } catch {
+      /* ignore */
+    }
+    onInkSelectRef.current?.(null)
+    onBlankClickRef.current?.()
+    eraseRef.current = { pointerId: event.pointerId, last: null, ids: new Set(), sweeps: new Map(), preview: new Map() }
+    eraseSample(event.clientX, event.clientY)
+  }
+
+  const moveErase = (event: ReactPointerEvent<HTMLDivElement>) => {
+    const erase = eraseRef.current
+    if (!erase || event.pointerId !== erase.pointerId) return
+    if (event.pointerType === 'mouse' && (event.buttons & 1) === 0) {
+      endErase(true)
+      return
+    }
+    const native = event.nativeEvent
+    const coalesced = typeof native.getCoalescedEvents === 'function' ? native.getCoalescedEvents() : []
+    for (const sample of coalesced.length > 0 ? coalesced : [native]) eraseSample(sample.clientX, sample.clientY)
+  }
+
+  /** End the Eraser press: `commit` (release) deletes everything touched as one operation, otherwise the preview is dropped and nothing changes. */
+  const endErase = (commit: boolean) => {
+    const erase = eraseRef.current
+    eraseRef.current = null
+    setErasingIds(null)
+    setErasePreview(null)
+    if (!erase) return
+    try {
+      if (rootRef.current?.hasPointerCapture(erase.pointerId)) rootRef.current.releasePointerCapture(erase.pointerId)
+    } catch {
+      /* element already detached */
+    }
+    if (!commit) return
+    if (erase.ids.size > 0) onInkEraseRef.current?.([...erase.ids])
+    if (erase.preview.size > 0) {
+      onInkPartialEraseRef.current?.([...erase.preview].map(([id, pieces]) => ({ id, pieces })))
+    }
+  }
+
+  // Escape, window blur, leaving the Eraser tool or unmounting mid-gesture: nothing is deleted.
+  useEffect(() => {
+    if (!eraser) return
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape' || !eraseRef.current) return
+      event.stopPropagation()
+      endErase(false)
+    }
+    const onBlur = () => endErase(false)
+    window.addEventListener('keydown', onKey, true)
+    window.addEventListener('blur', onBlur)
+    return () => {
+      window.removeEventListener('keydown', onKey, true)
+      window.removeEventListener('blur', onBlur)
+      endErase(false)
+    }
+  }, [eraser])
 
   /** Hand + a press on the SELECTED stroke: drag it. (An unselected stroke is only selected, by the click.) */
   const beginInkMove = (event: ReactPointerEvent<HTMLDivElement>): boolean => {
@@ -1402,6 +1693,10 @@ export function PdfRenderer({
       beginInk(event)
       return
     }
+    if (eraserRef.current) {
+      beginErase(event)
+      return
+    }
     if (beginInkMove(event)) return
     // Hand: a press on text the dwell has armed selects natively; every other press pans.
     const pan =
@@ -1435,12 +1730,20 @@ export function PdfRenderer({
       moveInk(event)
       return
     }
+    if (eraseRef.current) {
+      moveErase(event)
+      return
+    }
     if (inkMoveRef.current) {
       moveInkDrag(event)
       return
     }
     const gesture = gestureRef.current
     if (!gesture) {
+      if ((event.buttons & 1) === 0) {
+        lastPointerRef.current = { x: event.clientX, y: event.clientY }
+        updateInkHover(event.clientX, event.clientY)
+      }
       // Hand over the selected stroke: the move cursor says it can be dragged.
       setSurfaceFlag(
         'data-pdf-ink-hover',
@@ -1454,6 +1757,7 @@ export function PdfRenderer({
       return
     }
     reportAnnotationHover(null)
+    setInkHoverId(null)
     if (event.pointerId !== gesture.pointerId) return
     if ((event.buttons & 1) === 0) {
       // Released somewhere we never heard about (e.g. outside the window while selecting).
@@ -1485,6 +1789,10 @@ export function PdfRenderer({
   const onPointerUp = (event: ReactPointerEvent<HTMLDivElement>) => {
     if (inkDraftRef.current) {
       if (event.pointerId === inkDraftRef.current.pointerId) finishInk()
+      return
+    }
+    if (eraseRef.current) {
+      if (event.pointerId === eraseRef.current.pointerId) endErase(true)
       return
     }
     if (inkMoveRef.current) {
@@ -1532,7 +1840,7 @@ export function PdfRenderer({
       return
     }
     // A click on a freehand stroke selects it (Delete removes it); the text-markup UI closes.
-    const inkHit = inkAt(event.clientX, event.clientY)
+    const inkHit = outlinesOnRef.current ? inkAt(event.clientX, event.clientY) : null
     if (inkHit) {
       onBlankClickRef.current?.()
       onInkSelectRef.current?.(inkHit.id)
@@ -1575,6 +1883,11 @@ export function PdfRenderer({
       </div>
     )
   }
+
+  /** The selected stroke / the hover-outlined one on page `index`, as painted (previews included). The selected stroke is never hover-outlined. */
+  const markOn = (id: string | null, index: number) => (id === null ? null : (inkByPage.get(index)?.find((m) => m.id === id) ?? null))
+  const selectedMarkOn = (index: number) => markOn(selectedInkId, index)
+  const hoverMarkOn = (index: number) => markOn(inkHoverId !== selectedInkId ? inkHoverId : null, index)
 
   const pageRows: ReactNode[] = []
   for (let first = 0; first < sizes.length; first += pagesPerView) {
@@ -1628,10 +1941,24 @@ export function PdfRenderer({
                           width: inkPen?.width ?? 0.004,
                           colorHex: inkPen?.colorHex ?? '#1E88E5',
                           opacity: inkPen?.opacity ?? 1,
+                          penStyle: inkPen?.penStyle ?? 'pen',
                         }
                       : null
                   }
                   selectedId={selectedInkId}
+                  erasingIds={erasingIds}
+                />
+              ) : null}
+              {outlinesOn && (selectedMarkOn(index) || hoverMarkOn(index)) ? (
+                <PdfInkSelectionOverlay
+                  heightRatio={size.h / size.w}
+                  pageHeightPx={Math.floor(size.h * cssScale)}
+                  hovered={hoverMarkOn(index)}
+                  selected={selectedMarkOn(index)}
+                  toolbar={selectedMarkOn(index) && renderInkToolbar ? renderInkToolbar(selectedMarkOn(index)!) : null}
+                  onHandleDown={beginInkResize}
+                  onHandleMove={moveInkResize}
+                  onHandleUp={releaseInkResize}
                 />
               ) : null}
             </div>
@@ -1647,12 +1974,14 @@ export function PdfRenderer({
       // Cursor + text selection per tool come from `[data-pdf-tool]` rules in index.css (they must
       // beat pdf_viewer.css, and `ReaderShell` is `select-none` for the whole reader).
       className="flex flex-col items-center"
-      style={{ gap, padding: pad, touchAction: pen ? 'none' : undefined }}
+      style={{ gap, padding: pad, touchAction: pen || eraser ? 'none' : undefined }}
       data-pdf-status={status.kind}
       data-pdf-pages={sizes.length}
       data-pdf-flow={flow}
       data-pdf-per-view={pagesPerView}
-      data-pdf-tool={pen ? 'pen' : hand ? 'hand' : 'select'}
+      data-pdf-tool={pen ? 'pen' : eraser ? 'eraser' : hand ? 'hand' : 'select'}
+      // Pen cursor per drawing style (index.css).
+      data-pdf-ink-style={pen ? (inkPen?.penStyle ?? 'pen') : undefined}
       // Highlight / Underline / Strikethrough: Select's surface with the tool's pen cursor.
       data-pdf-markup={markupTool ?? undefined}
       onPointerDown={onPointerDown}
@@ -1660,16 +1989,21 @@ export function PdfRenderer({
       onPointerUp={onPointerUp}
       onPointerCancel={() => {
         finishInk()
+        endErase(false)
         endInkMove(false)
+        endInkResize(false)
         void endGesture()
       }}
       onContextMenu={onContextMenu}
       onLostPointerCapture={() => {
         if (inkDraftRef.current) finishInk()
+        if (eraseRef.current) endErase(false)
         if (inkMoveRef.current) endInkMove(false)
         if (gestureRef.current?.pan) endGesture()
       }}
       onPointerLeave={() => {
+        lastPointerRef.current = null
+        setInkHoverId(null)
         reportAnnotationHover(null)
         if (!gestureRef.current) dwellRef.current?.update(false)
       }}

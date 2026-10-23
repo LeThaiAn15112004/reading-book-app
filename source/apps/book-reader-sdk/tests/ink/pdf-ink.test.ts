@@ -49,7 +49,8 @@ describe('parsePdfInk', () => {
     expect(parsePdfInk({ ...stroke(), pageIndex: 1.5 })).toBeUndefined()
     expect(parsePdfInk({ ...stroke(), width: 0 })).toBeUndefined()
     expect(parsePdfInk({ ...stroke(), width: 0.5 })).toBeUndefined()
-    expect(parsePdfInk({ ...stroke(), penStyle: 'brush' })).toBeUndefined()
+    expect(parsePdfInk({ ...stroke(), penStyle: 'laser' })).toBeUndefined()
+    expect(parsePdfInk({ ...stroke(), penStyle: 'brush' })).toBeDefined() // Brush is a stored style
     expect(parsePdfInk(null)).toBeUndefined()
   })
 

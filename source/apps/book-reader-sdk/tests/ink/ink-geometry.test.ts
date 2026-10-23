@@ -173,3 +173,28 @@ describe('translateInkPaths', () => {
     expect(translateInkPaths([], 0.1, 0.1)).toEqual({ paths: [], dx: 0, dy: 0 })
   })
 })
+
+describe('Brush at any zoom', () => {
+  // A Brush stroke is stored like every other stroke: normalized points + a width in page-width units, so what
+  // is painted (path data in a 0 0 1 heightRatio box, scaled to the slot) is identical at every zoom.
+  const points: InkPoint[] = [
+    [0.2, 0.3],
+    [0.5, 0.45],
+    [0.8, 0.3],
+  ]
+
+  it('path data does not depend on the zoom; only the slot size does', () => {
+    expect(inkPathData(points, 1.4)).toBe(inkPathData(points.map(([x, y]) => [x, y] as InkPoint), 1.4))
+    const at = (zoom: number) => {
+      const rect = { left: 40, top: 60, width: 600 * zoom, height: 840 * zoom }
+      return clientToPageUnit(rect.left + rect.width * 0.5, rect.top + rect.height * 0.45, rect)
+    }
+    for (const z of [0.5, 1, 2.5]) expect(at(z)).toEqual(at(1))
+  })
+
+  it('a brush-width stroke is found by the hit test across its whole painted width', () => {
+    const brush = [{ id: 'b', pageIndex: 0, paths: [[[0.2, 0.5], [0.8, 0.5]] as InkPoint[]], width: 0.012 }]
+    expect(inkStrokeAt(brush, 0, 0.5, 0.5 + 0.0059, 1, 0)?.id).toBe('b')
+    expect(inkStrokeAt(brush, 0, 0.5, 0.5 + 0.0065, 1, 0)).toBeNull()
+  })
+})

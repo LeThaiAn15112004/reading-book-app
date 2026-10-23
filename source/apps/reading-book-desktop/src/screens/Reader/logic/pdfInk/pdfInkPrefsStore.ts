@@ -1,29 +1,47 @@
 import { create } from 'zustand'
-import { PDF_INK_MAX_WIDTH, PDF_INK_MIN_WIDTH, isValidHexColor } from '@reading-book/book-reader-sdk'
+import {
+  INK_PEN_PRESETS,
+  INK_PEN_STYLES,
+  clampInkOpacity,
+  clampInkWidth,
+  isInkPenStyle,
+  type InkPenStyle,
+} from '@reading-book/book-reader-sdk'
 
+/** Same key as Phase 1; the old `{ pen, tool }` shape is read as the Pen's settings. */
 const PREFS_STORAGE_KEY = 'readmate.pdfInkPrefs.v1'
 
-/** Pen settings, applied to the NEXT stroke only — a saved stroke keeps what it was drawn with. */
-export type PdfInkPenPrefs = {
+/** One style's remembered settings. Applied to the NEXT stroke only — a saved stroke keeps what it was drawn with. */
+export type PdfInkStyleSettings = {
+  /** `#RRGGBB`. */
   colorHex: string
   /** Fraction of the page width (zoom-independent). */
   width: number
+  /** 0–1; fixed at 1 for the Pen. */
+  opacity: number
 }
 
-type PdfInkPrefs = { pen: PdfInkPenPrefs; tool: PdfInkTool }
+export type PdfInkPrefs = {
+  /** The drawing style the Freehand tool uses. */
+  tool: InkPenStyle
+  /** Color / thickness / opacity remembered separately per style. */
+  styles: Record<InkPenStyle, PdfInkStyleSettings>
+}
 
-/** Single source of the pen defaults (first run and Settings → Reset App Settings). 0.004 ≈ 2.4 pt on a 612 pt page. */
-export const DEFAULT_PDF_INK_PREFS: Readonly<PdfInkPrefs> = { pen: { colorHex: '#1E88E5', width: 0.004 }, tool: 'pen' }
+function defaultSettings(style: InkPenStyle): PdfInkStyleSettings {
+  const p = INK_PEN_PRESETS[style]
+  return { colorHex: p.colorHex, width: p.width, opacity: p.opacity }
+}
 
-/** Drawing tools in the Freehand menu. Only the ones in `PDF_INK_OPERATIONAL_TOOLS` draw; the rest are listed, not built. */
-export type PdfInkTool = 'pen' | 'pencil' | 'brush' | 'marker'
+/** Single source of the Freehand defaults (first run and Settings → Reset App Settings). */
+export const DEFAULT_PDF_INK_PREFS: Readonly<PdfInkPrefs> = {
+  tool: 'pen',
+  styles: { pen: defaultSettings('pen'), pencil: defaultSettings('pencil'), marker: defaultSettings('marker'), brush: defaultSettings('brush') },
+}
 
-export const PDF_INK_OPERATIONAL_TOOLS: readonly PdfInkTool[] = ['pen']
-
-/** Slider range for the stroke thickness (fraction of the page width) — inside the SDK's accepted range. */
-export const PDF_INK_SLIDER_MIN = 0.0015
-export const PDF_INK_SLIDER_MAX = 0.02
-export const PDF_INK_SLIDER_STEP = 0.0005
+function freshDefaults(): PdfInkPrefs {
+  return { tool: 'pen', styles: { pen: defaultSettings('pen'), pencil: defaultSettings('pencil'), marker: defaultSettings('marker'), brush: defaultSettings('brush') } }
+}
 
 /** A page is ~612 pt wide: thickness shown to the user in points. */
 export function inkWidthToPoints(width: number): number {
@@ -39,32 +57,42 @@ export function parseHexInput(raw: string): string | null {
   return `#${full.toUpperCase()}`
 }
 
-function clampWidth(width: number): number {
-  return Math.min(PDF_INK_MAX_WIDTH, Math.max(PDF_INK_MIN_WIDTH, width))
+function readSettings(style: InkPenStyle, raw: unknown): PdfInkStyleSettings {
+  const base = defaultSettings(style)
+  if (!raw || typeof raw !== 'object') return base
+  const r = raw as Record<string, unknown>
+  return {
+    colorHex: typeof r.colorHex === 'string' && /^#[0-9a-f]{6}$/i.test(r.colorHex.trim()) ? r.colorHex.trim().toUpperCase() : base.colorHex,
+    width: typeof r.width === 'number' && Number.isFinite(r.width) ? clampInkWidth(style, r.width) : base.width,
+    opacity: typeof r.opacity === 'number' && Number.isFinite(r.opacity) ? clampInkOpacity(style, r.opacity) : base.opacity,
+  }
 }
 
 function loadPrefs(): PdfInkPrefs {
   try {
-    const parsed = JSON.parse(localStorage.getItem(PREFS_STORAGE_KEY) ?? 'null') as { pen?: Partial<PdfInkPenPrefs>; tool?: string } | null
-    const colorHex = parsed?.pen?.colorHex
-    const width = parsed?.pen?.width
-    const tool = PDF_INK_OPERATIONAL_TOOLS.find((t) => t === parsed?.tool) ?? DEFAULT_PDF_INK_PREFS.tool
+    const parsed = JSON.parse(localStorage.getItem(PREFS_STORAGE_KEY) ?? 'null') as Record<string, unknown> | null
+    if (!parsed || typeof parsed !== 'object') return freshDefaults()
+    const styles = (parsed.styles && typeof parsed.styles === 'object' ? parsed.styles : {}) as Record<string, unknown>
     return {
-      tool,
-      pen: {
-        colorHex: typeof colorHex === 'string' && isValidHexColor(colorHex) ? colorHex : DEFAULT_PDF_INK_PREFS.pen.colorHex,
-        width: typeof width === 'number' && Number.isFinite(width) ? clampWidth(width) : DEFAULT_PDF_INK_PREFS.pen.width,
+      tool: isInkPenStyle(parsed.tool) ? parsed.tool : 'pen',
+      styles: {
+        // Phase 1 stored the Pen's colour / width under `pen`.
+        pen: readSettings('pen', styles.pen ?? parsed.pen),
+        pencil: readSettings('pencil', styles.pencil),
+        marker: readSettings('marker', styles.marker),
+        // Absent in preferences saved before the Brush existed: the Brush defaults.
+        brush: readSettings('brush', styles.brush),
       },
     }
   } catch {
-    return { pen: { ...DEFAULT_PDF_INK_PREFS.pen }, tool: DEFAULT_PDF_INK_PREFS.tool }
+    return freshDefaults()
   }
 }
 
 /** Returns false when the write failed (quota / private mode) — the choice just won't persist. */
 function savePrefs(prefs: PdfInkPrefs): boolean {
   try {
-    localStorage.setItem(PREFS_STORAGE_KEY, JSON.stringify(prefs))
+    localStorage.setItem(PREFS_STORAGE_KEY, JSON.stringify({ tool: prefs.tool, styles: prefs.styles }))
     return true
   } catch {
     return false
@@ -72,38 +100,53 @@ function savePrefs(prefs: PdfInkPrefs): boolean {
 }
 
 type PdfInkPrefsState = PdfInkPrefs & {
-  setPenColor: (colorHex: string) => void
-  setPenWidth: (width: number) => void
-  /** Ignored for tools that are not built yet. */
-  setTool: (tool: PdfInkTool) => void
+  /** Switch the Freehand drawing style (each style keeps its own settings). */
+  setTool: (tool: InkPenStyle) => void
+  setStyleColor: (style: InkPenStyle, colorHex: string) => void
+  setStyleWidth: (style: InkPenStyle, width: number) => void
+  /** Ignored for the Pen (always opaque). */
+  setStyleOpacity: (style: InkPenStyle, opacity: number) => void
   /** Reset App Settings: back to `DEFAULT_PDF_INK_PREFS`; false when the write failed. */
   reset: () => boolean
 }
 
-/** Last-used pen settings, remembered across books and restarts (localStorage, like the other app preferences). */
-export const usePdfInkPrefsStore = create<PdfInkPrefsState>()((set, get) => ({
-  ...loadPrefs(),
-  setPenColor: (colorHex) => {
-    if (!isValidHexColor(colorHex)) return
-    const pen = { ...get().pen, colorHex }
-    set({ pen })
-    savePrefs({ pen, tool: get().tool })
-  },
-  setPenWidth: (width) => {
-    if (!Number.isFinite(width)) return
-    const pen = { ...get().pen, width: clampWidth(width) }
-    set({ pen })
-    savePrefs({ pen, tool: get().tool })
-  },
-  setTool: (tool) => {
-    if (!PDF_INK_OPERATIONAL_TOOLS.includes(tool)) return
-    set({ tool })
-    savePrefs({ pen: get().pen, tool })
-  },
-  reset: () => {
-    const pen = { ...DEFAULT_PDF_INK_PREFS.pen }
-    const tool = DEFAULT_PDF_INK_PREFS.tool
-    set({ pen, tool })
-    return savePrefs({ pen, tool })
-  },
-}))
+/** Last-used Freehand settings, remembered per style across books and restarts (localStorage, like the other app preferences). */
+export const usePdfInkPrefsStore = create<PdfInkPrefsState>()((set, get) => {
+  const patchStyle = (style: InkPenStyle, patch: Partial<PdfInkStyleSettings>) => {
+    const styles = { ...get().styles, [style]: { ...get().styles[style], ...patch } }
+    set({ styles })
+    savePrefs({ tool: get().tool, styles })
+  }
+  return {
+    ...loadPrefs(),
+    setTool: (tool) => {
+      if (!isInkPenStyle(tool) || tool === get().tool) return
+      set({ tool })
+      savePrefs({ tool, styles: get().styles })
+    },
+    setStyleColor: (style, colorHex) => {
+      if (!isInkPenStyle(style) || !/^#[0-9a-f]{6}$/i.test(colorHex)) return
+      patchStyle(style, { colorHex: colorHex.toUpperCase() })
+    },
+    setStyleWidth: (style, width) => {
+      if (!isInkPenStyle(style) || !Number.isFinite(width)) return
+      patchStyle(style, { width: clampInkWidth(style, width) })
+    },
+    setStyleOpacity: (style, opacity) => {
+      if (!isInkPenStyle(style) || !INK_PEN_PRESETS[style].opacityEditable || !Number.isFinite(opacity)) return
+      patchStyle(style, { opacity: clampInkOpacity(style, opacity) })
+    },
+    reset: () => {
+      const defaults = freshDefaults()
+      set(defaults)
+      return savePrefs(defaults)
+    },
+  }
+})
+
+/** The look of the next stroke: the active style with its remembered settings. */
+export function activeInkLook(state: PdfInkPrefs): PdfInkStyleSettings & { penStyle: InkPenStyle } {
+  return { penStyle: state.tool, ...state.styles[state.tool] }
+}
+
+export { INK_PEN_STYLES }

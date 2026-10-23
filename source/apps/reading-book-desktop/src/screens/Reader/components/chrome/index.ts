@@ -13,6 +13,7 @@ export {
   ToolsStrip,
   type AnnotationTool,
   type CompanionTool,
+  type EraserMode,
   type ModeTool,
   type ToolId,
   type ToolStates,

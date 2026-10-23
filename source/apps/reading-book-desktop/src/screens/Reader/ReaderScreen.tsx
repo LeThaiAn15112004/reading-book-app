@@ -78,6 +78,7 @@ import {
   useRightSidebarDocked,
   useSidebarPanelResize,
   type SidebarTab,
+  type EraserMode,
   type ToolId,
   type ToolStates,
 } from './components'
@@ -112,6 +113,7 @@ import { useReaderPdfInk } from './logic/hooks/useReaderPdfInk'
 import { usePdfInkPrefsStore } from './logic/pdfInk/pdfInkPrefsStore'
 import { pdfDeleteFocused, pdfHasFocusedMark, pdfRedo, pdfUndo } from './logic/pdfInk/pdfUndoRouter'
 import { PdfInkPanel } from './components/chrome/PdfInkPanel'
+import { PdfInkQuickToolbar } from './components/chrome/PdfInkQuickToolbar'
 import { MD_INSERT_CARET_COLOR } from './logic/mdHighlights/mdHighlightsStore'
 
 /** Stand-in row for the Inserted Text editor while the caret is only a draft (nothing saved yet). */
@@ -178,6 +180,8 @@ export function ReaderScreen() {
    * never both.
    */
   const [activeTool, setActiveTool] = useState<InteractionTool>('hand')
+  // The Eraser's mode outlives switching tools (the arrow menu sets it; the Eraser button arms it).
+  const [eraserMode, setEraserMode] = useState<EraserMode>('stroke')
   const activeToolRef = useRef(activeTool)
   activeToolRef.current = activeTool
   const activeAnnotationTool = isMarkupTool(activeTool) ? activeTool : null
@@ -328,7 +332,7 @@ export function ReaderScreen() {
   translateModeRef.current = translation.mode
   // The Pen exists on the PDF surface only: another book (or format) leaves it.
   useEffect(() => {
-    if (!isPdfSurface && activeTool === 'pen') setActiveTool('select')
+    if (!isPdfSurface && (activeTool === 'pen' || activeTool === 'eraser')) setActiveTool('select')
   }, [isPdfSurface, activeTool])
   const selectTool = (tool: InteractionTool | ((current: InteractionTool) => InteractionTool)) => {
     if (translateModeRef.current) translation.setMode(false)
@@ -548,7 +552,10 @@ export function ReaderScreen() {
   })
   // PDF freehand Ink (strokes are their own `notes` type; the Pen tool lives in the toolbar's Annotation group).
   const pdfInk = useReaderPdfInk({ bookId, isPdfSurface, setToast: chrome.setToast })
-  const inkPen = usePdfInkPrefsStore((s) => s.pen)
+  const selectedInkStroke = useMemo(() => pdfInk.strokes.find((m) => m.id === pdfInk.selectedId) ?? null, [pdfInk.strokes, pdfInk.selectedId])
+  const inkTool = usePdfInkPrefsStore((s) => s.tool)
+  const inkStyles = usePdfInkPrefsStore((s) => s.styles)
+  const inkPen = useMemo(() => ({ penStyle: inkTool, ...inkStyles[inkTool] }), [inkTool, inkStyles])
   /** The open surface's annotation store: drives the shared popups, sidebar actions and shortcuts. */
   // Markdown annotations — the Markdown counterpart of `pdfHighlights` (piece + offset anchors, no CFI).
   const mdHighlights = useReaderMdHighlights({
@@ -641,7 +648,7 @@ export function ReaderScreen() {
         translation.setMode(false)
         return true
       }
-      if (!isMarkupTool(activeToolRef.current) && activeToolRef.current !== 'pen') return false
+      if (!isMarkupTool(activeToolRef.current) && activeToolRef.current !== 'pen' && activeToolRef.current !== 'eraser') return false
       setActiveTool('select')
       return true
     },
@@ -695,8 +702,7 @@ export function ReaderScreen() {
     replace: { active: activeTool === 'replace' },
     insert: { active: activeTool === 'insert' },
     pen: { active: activeTool === 'pen' },
-    // Eraser is not built yet: shown, disabled, never active.
-    eraser: { disabled: true },
+    eraser: { active: activeTool === 'eraser' },
     snapshot: { active: snapshot.active },
     settings: { active: chrome.settingsOpen, expanded: chrome.settingsOpen },
   }
@@ -739,6 +745,7 @@ export function ReaderScreen() {
       case 'replace':
       case 'insert':
       case 'pen':
+      case 'eraser':
         // Click the armed tool again to disarm it (back to Select); otherwise arm it — sticky across
         // multiple highlights/underlines/strikethroughs until toggled off, Escape, or Hand/Select.
         selectTool((current) => (current === tool ? 'select' : tool))
@@ -750,8 +757,6 @@ export function ReaderScreen() {
       case 'wordCount':
         chrome.closeFloating()
         chrome.setWordCountOpen(true)
-        return
-      case 'eraser':
         return
       case 'settings':
         if (toolsHidden) return
@@ -815,6 +820,8 @@ export function ReaderScreen() {
           capabilities={readerCapabilities}
           toolStates={toolStates}
           onTool={handleTool}
+          eraserMode={eraserMode}
+          onEraserMode={setEraserMode}
           audioButtonRef={audioButtonRef}
           onShare={() => {
             chrome.closeFloating()
@@ -1102,7 +1109,14 @@ export function ReaderScreen() {
             onConfirm={() => void confirmSignedExport(chrome.setToast)}
           />
 
-          {isPdfSurface && pdfInk.selectedId ? <PdfInkPanel onDeleteSelected={pdfInk.deleteSelected} /> : null}
+          {isPdfSurface && selectedInkStroke ? (
+            <PdfInkPanel
+              key={selectedInkStroke.id}
+              stroke={selectedInkStroke}
+              onChange={(patch) => pdfInk.updateStroke(selectedInkStroke.id, patch)}
+              onDeleteSelected={pdfInk.deleteSelected}
+            />
+          ) : null}
 
           {chrome.toast ? (
             <div className="pointer-events-none fixed top-6 left-1/2 z-[999] -translate-x-1/2 rounded-full border border-lib-border bg-lib-surface-strong px-[18px] py-2.5 text-[13px] font-semibold text-lib-text-strong shadow-xl">
@@ -1481,10 +1495,21 @@ export function ReaderScreen() {
               hiddenEmbeddedAnnotationIds={pdfHighlights.hiddenEmbeddedObjectIds}
               inkStrokes={pdfInk.strokes}
               selectedInkId={pdfInk.selectedId}
-              inkPen={{ colorHex: inkPen.colorHex, width: inkPen.width, opacity: 1 }}
+              inkPen={inkPen}
               onInkStroke={pdfInk.commitStroke}
               onInkSelect={pdfInk.select}
               onInkMove={pdfInk.moveStroke}
+              onInkResize={pdfInk.resizeStroke}
+              renderInkToolbar={(stroke) => (
+                <PdfInkQuickToolbar
+                  colorHex={stroke.colorHex}
+                  onColor={(colorHex) => pdfInk.updateStroke(stroke.id, { colorHex })}
+                  onDelete={pdfInk.deleteSelected}
+                />
+              )}
+              onInkErase={pdfInk.eraseStrokes}
+              eraserMode={eraserMode}
+              onInkPartialErase={pdfInk.applyPartialErase}
               apiRef={pdfApiRef}
               onNavState={(state) => {
                 nav.setPdfNav(state)

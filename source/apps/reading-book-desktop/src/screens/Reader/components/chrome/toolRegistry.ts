@@ -16,8 +16,11 @@ export type CompanionTool = 'search' | 'speech' | 'translate'
 /** Markup tools — armed one at a time, sticky until toggled off / Escape / Hand / Select. */
 export type AnnotationTool = 'highlight' | 'underline' | 'squiggly' | 'strikethrough' | 'replace' | 'insert' | 'pen'
 
-/** Freehand Ink tools next to the markup tools (`pen` is armed like a markup tool; `eraser` is not built yet). */
+/** Freehand Ink tools next to the markup tools (both are armed like a markup tool; the eraser removes whole Ink strokes only). */
 export type FreehandTool = 'pen' | 'eraser'
+
+/** How the Eraser removes ink: whole strokes, or only the part under the eraser. */
+export type EraserMode = 'stroke' | 'partial'
 
 /** Utility tools. */
 export type MiscTool = 'snapshot' | 'wordCount'
@@ -85,7 +88,7 @@ export const TOOL_REGISTRY: readonly ToolDef[] = [
   { id: 'replace', label: 'Replace Text', group: 'annotation', description: 'Replace text — strike out the selection; the note holds the new text', requires: ['markupAnnotations'] },
   { id: 'insert', label: 'Insert Text', group: 'annotation', description: 'Insert text — mark a place; the note holds the text to add', requires: ['markupAnnotations'] },
   { id: 'pen', label: 'Freehand', group: 'freehand', description: 'Freehand — draw on the page', requires: ['inkAnnotations'] },
-  { id: 'eraser', label: 'Eraser', group: 'freehand', description: 'Eraser — not available yet', requires: ['inkAnnotations'] },
+  { id: 'eraser', label: 'Eraser', group: 'freehand', description: 'Eraser — remove freehand strokes (whole or in part, see the arrow)', requires: ['inkAnnotations'] },
   { id: 'snapshot', label: 'Snapshot', group: 'tools', description: 'Snapshot — copy an area as an image', requires: ['snapshot'] },
   { id: 'wordCount', label: 'Word Count', group: 'tools', description: 'Word count and reading time', requires: ['wordCount'] },
   { id: 'settings', label: 'Settings', group: 'settings', description: 'Reading settings', requires: ['readingSettings'], popup: 'dialog' },

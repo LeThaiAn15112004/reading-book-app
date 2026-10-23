@@ -4,11 +4,12 @@ import { FreehandSettingsPopover } from './FreehandSettingsPopover'
 import type { ReaderCapability } from '../../../../reader/capabilities'
 import { effectiveShortcutKeys, useShortcutsStore } from '../../../../shortcuts/shortcutsStore'
 import { formatShortcutKey } from '../../../../shortcuts/shortcutKeys'
-import { ToolGroupMenu } from './ToolGroupMenu'
+import { ToolGroupMenu, ToolGroupMenuPopup } from './ToolGroupMenu'
 import { resolveToolbarLayout, foldableGroups, type ResolvedToolGroup } from './toolbarLayout'
 import type {
   AnnotationTool,
   CompanionTool,
+  EraserMode,
   ModeTool,
   ToolDef,
   ToolIconId,
@@ -16,7 +17,7 @@ import type {
 } from './toolRegistry'
 import { useToolbarOverflow } from './useToolbarOverflow'
 
-export type { AnnotationTool, CompanionTool, ModeTool, ToolId }
+export type { AnnotationTool, CompanionTool, EraserMode, ModeTool, ToolId }
 
 /** Per-tool UI state supplied by the screen; tools without an entry are plain, inactive buttons. */
 export type ToolState = {
@@ -39,6 +40,9 @@ type ToolsStripProps = {
   toolRefs?: Partial<Record<ToolId, Ref<HTMLButtonElement>>>
   /** Toolbar is hidden — open dropdowns close. */
   hidden?: boolean
+  /** The Eraser's current mode (its arrow menu switches it; the Eraser button arms whichever is set). */
+  eraserMode?: EraserMode
+  onEraserMode?: (mode: EraserMode) => void
 }
 
 const stripBtn =
@@ -296,6 +300,73 @@ function FreehandSettingsButton({ hidden }: { hidden: boolean }) {
   )
 }
 
+const ERASER_MODES: readonly { id: EraserMode; label: string; hint: string }[] = [
+  { id: 'stroke', label: 'Stroke Eraser', hint: 'Removes the whole stroke it touches' },
+  { id: 'partial', label: 'Partial Eraser', hint: 'Removes only the part it passes over' },
+]
+
+function EraserModeIcon({ mode }: { mode: EraserMode }) {
+  return mode === 'stroke' ? (
+    <svg className="size-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor" aria-hidden>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M4 16c3-8 6-8 8-3s5 3 8-5" strokeDasharray="0" />
+      <path strokeLinecap="round" strokeLinejoin="round" d="m5 5 14 14" />
+    </svg>
+  ) : (
+    <svg className="size-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor" aria-hidden>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M3 16c2-5 4-5 6-2" />
+      <path strokeLinecap="round" strokeLinejoin="round" d="M15 10c2-3 4-3 6 2" />
+      <circle cx="12" cy="12" r="2.2" />
+    </svg>
+  )
+}
+
+/** Dropdown arrow beside Eraser: picks the mode (Stroke / Partial); never arms or disarms the tool. */
+function EraserModeButton({ hidden, mode, onMode }: { hidden: boolean; mode: EraserMode; onMode: (mode: EraserMode) => void }) {
+  const [open, setOpen] = useState(false)
+  const btnRef = useRef<HTMLButtonElement | null>(null)
+  const close = useCallback((refocus: boolean) => {
+    setOpen(false)
+    if (refocus) btnRef.current?.focus()
+  }, [])
+  const showMenu = open && !hidden
+  const current = ERASER_MODES.find((m) => m.id === mode)!
+  return (
+    <>
+      <button
+        ref={btnRef}
+        type="button"
+        className="-ml-0.5 inline-flex h-[52px] w-5 shrink-0 cursor-pointer items-center justify-center rounded-lg border border-transparent text-lib-muted transition-colors hover:border-lib-accent-ring hover:bg-lib-accent-soft hover:text-lib-text-strong sm:h-[56px]"
+        title={`Eraser mode: ${current.label}`}
+        aria-label={`Eraser mode: ${current.label}`}
+        aria-haspopup="menu"
+        aria-expanded={showMenu}
+        data-eraser-mode={mode}
+        onClick={() => setOpen((v) => !v)}
+      >
+        <svg viewBox="0 0 24 24" className={`size-3 transition-transform ${showMenu ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+          <path d="m6 9 6 6 6-6" />
+        </svg>
+      </button>
+      {showMenu
+        ? createPortal(
+            <ToolGroupMenuPopup
+              anchorRef={btnRef}
+              onClose={close}
+              items={ERASER_MODES.map((m) => ({
+                id: m.id,
+                label: m.label,
+                icon: <EraserModeIcon mode={m.id} />,
+                active: m.id === mode,
+                onSelect: () => onMode(m.id),
+              }))}
+            />,
+            document.body,
+          )
+        : null}
+    </>
+  )
+}
+
 /** Tooltip: description (or label) plus the tool's current shortcut, e.g. `Search in book (Ctrl+F)`. */
 function useToolTitle(): (tool: ToolDef) => string {
   const overrides = useShortcutsStore((s) => s.overrides)
@@ -313,7 +384,7 @@ function useToolTitle(): (tool: ToolDef) => string {
  * open surface's capabilities; `auto` groups fold into dropdowns when the strip runs out of room.
  * See docs/implementation_plan/reader_toolbar.md.
  */
-export function ToolsStrip({ capabilities, toolStates, onTool, toolRefs, hidden = false }: ToolsStripProps) {
+export function ToolsStrip({ capabilities, toolStates, onTool, toolRefs, hidden = false, eraserMode = 'stroke', onEraserMode }: ToolsStripProps) {
   const stripRef = useRef<HTMLDivElement | null>(null)
   const foldLevel = useToolbarOverflow(stripRef, foldableGroups(capabilities).length)
   const layout = resolveToolbarLayout(capabilities, foldLevel)
@@ -401,6 +472,11 @@ export function ToolsStrip({ capabilities, toolStates, onTool, toolRefs, hidden 
                     <div key={tool.id} className="contents">
                       {renderButton(tool, resolved.group.iconOnly)}
                       <FreehandSettingsButton hidden={hidden} />
+                    </div>
+                  ) : tool.id === 'eraser' && onEraserMode ? (
+                    <div key={tool.id} className="contents">
+                      {renderButton(tool, resolved.group.iconOnly)}
+                      <EraserModeButton hidden={hidden} mode={eraserMode} onMode={onEraserMode} />
                     </div>
                   ) : (
                     renderButton(tool, resolved.group.iconOnly)

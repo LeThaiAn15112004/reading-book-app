@@ -489,11 +489,21 @@ a[ref='epubjs-mk'].rb-hl-focused {
   -webkit-user-select: text;
 }
 
-/* Pen (freehand Ink): crosshair everywhere, nothing can be selected — a press draws. */
+/* Pen (freehand Ink): a cursor per drawing style (pen: nib, pencil: thin tip, marker: chisel) over the whole
+   page, nothing can be selected — a press draws. */
 [data-pdf-tool='pen'],
 [data-pdf-tool='pen'] .textLayer,
 [data-pdf-tool='pen'] .textLayer :is(span, br) {
   cursor: crosshair;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* Eraser (freehand Ink): a ring the size of the eraser radius (INK_ERASER_RADIUS_PX.default = 10 px), nothing selectable. */
+[data-pdf-tool='eraser'],
+[data-pdf-tool='eraser'] .textLayer,
+[data-pdf-tool='eraser'] .textLayer :is(span, br) {
+  cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24'%3E%3Ccircle cx='12' cy='12' r='10' fill='none' stroke='white' stroke-width='3'/%3E%3Ccircle cx='12' cy='12' r='10' fill='none' stroke='black' stroke-width='1.2'/%3E%3C/svg%3E") 12 12, crosshair;
   user-select: none;
   -webkit-user-select: none;
 }
@@ -505,6 +515,30 @@ a[ref='epubjs-mk'].rb-hl-focused {
   cursor: var(--cursor-hand-tool);
   user-select: none;
   -webkit-user-select: none;
+}
+
+[data-pdf-tool='pen'][data-pdf-ink-style='pen'],
+[data-pdf-tool='pen'][data-pdf-ink-style='pen'] .textLayer,
+[data-pdf-tool='pen'][data-pdf-ink-style='pen'] .textLayer :is(span, br) {
+  cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24'%3E%3Ccircle cx='12' cy='12' r='4' fill='none' stroke='white' stroke-width='3'/%3E%3Ccircle cx='12' cy='12' r='4' fill='none' stroke='black' stroke-width='1.2'/%3E%3C/svg%3E") 12 12, crosshair;
+}
+
+[data-pdf-tool='pen'][data-pdf-ink-style='pencil'],
+[data-pdf-tool='pen'][data-pdf-ink-style='pencil'] .textLayer,
+[data-pdf-tool='pen'][data-pdf-ink-style='pencil'] .textLayer :is(span, br) {
+  cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24'%3E%3Cpath d='M12 5v14M5 12h14' stroke='white' stroke-width='3' stroke-linecap='round'/%3E%3Cpath d='M12 5v14M5 12h14' stroke='black' stroke-width='1' stroke-linecap='round'/%3E%3C/svg%3E") 12 12, crosshair;
+}
+
+[data-pdf-tool='pen'][data-pdf-ink-style='brush'],
+[data-pdf-tool='pen'][data-pdf-ink-style='brush'] .textLayer,
+[data-pdf-tool='pen'][data-pdf-ink-style='brush'] .textLayer :is(span, br) {
+  cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24'%3E%3Ccircle cx='12' cy='12' r='6' fill='none' stroke='white' stroke-width='3.4'/%3E%3Ccircle cx='12' cy='12' r='6' fill='none' stroke='black' stroke-width='1.2' stroke-dasharray='2 2'/%3E%3C/svg%3E") 12 12, crosshair;
+}
+
+[data-pdf-tool='pen'][data-pdf-ink-style='marker'],
+[data-pdf-tool='pen'][data-pdf-ink-style='marker'] .textLayer,
+[data-pdf-tool='pen'][data-pdf-ink-style='marker'] .textLayer :is(span, br) {
+  cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24'%3E%3Crect x='6' y='6' width='12' height='12' rx='2' fill='none' stroke='white' stroke-width='3'/%3E%3Crect x='6' y='6' width='12' height='12' rx='2' fill='none' stroke='black' stroke-width='1.2'/%3E%3C/svg%3E") 12 12, crosshair;
 }
 
 /* Hand over the SELECTED freehand stroke: dragging it moves it (PdfRenderer sets the flag). */

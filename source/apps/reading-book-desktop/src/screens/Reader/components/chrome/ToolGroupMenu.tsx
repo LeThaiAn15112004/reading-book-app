@@ -124,7 +124,7 @@ export function ToolGroupMenu({
   )
 }
 
-function ToolGroupMenuPopup({
+export function ToolGroupMenuPopup({
   items,
   anchorRef,
   onClose,

@@ -93,7 +93,7 @@ export interface TxtAnnotation {
 }
 
 /** Pen presets of a freehand stroke (presets over colour / width / opacity — all stored as `/Ink`). */
-export type InkPenStyle = 'pen' | 'marker' | 'pencil';
+export type InkPenStyle = 'pen' | 'marker' | 'pencil' | 'brush';
 
 /**
  * PDF-only freehand stroke (`NoteType` `'ink'`; docs/implementation_plan/pdf_freehand_ink_eraser_plan.md).

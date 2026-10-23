@@ -6,8 +6,8 @@
 export * from '../../../book-reader-sdk/src/app-models/reading-prefs.ts'
 
 // The PDF pen preferences store validates against these (import-free constants / helper of the real SDK).
-export const PDF_INK_MIN_WIDTH = 0.0005 // mirrors src/ink/pdf-ink.ts (that module pulls in the whole domain)
-export const PDF_INK_MAX_WIDTH = 0.1
+// The pen presets are import-free apart from the two width limits (ink-limits.ts).
+export * from '../../../book-reader-sdk/src/ink/ink-pen-styles.ts'
 export { isValidHexColor } from '../../../book-reader-sdk/src/annotations/colors.ts'
 
 export function filterByNav() {

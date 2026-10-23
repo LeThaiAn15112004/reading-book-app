@@ -27,6 +27,8 @@ export type InteractionTool =
   | 'insert'
   /** Freehand Ink pen (PDF only, capability `inkAnnotations`): a drag draws a stroke; never a text selection. */
   | 'pen'
+  /** Stroke Eraser (PDF only, capability `inkAnnotations`): a drag removes whole Readmate Ink strokes, nothing else. */
+  | 'eraser'
 
 /** The tools whose drag over text saves a mark in that style (the `HighlightStyleKind` of the same name). */
 export const MARKUP_TOOLS = ['highlight', 'underline', 'squiggly', 'strikethrough', 'replace', 'insert'] as const
