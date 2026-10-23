@@ -40,6 +40,11 @@ const VALID_TYPE_FILTERS: ReadonlySet<NotesTypeFilter> = new Set([
   'strikethrough',
   'replace',
   'insert',
+  // PDF shapes
+  'rectangle',
+  'ellipse',
+  'line',
+  'arrow',
 ])
 
 /**

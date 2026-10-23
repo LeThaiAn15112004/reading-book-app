@@ -86,6 +86,9 @@ Desktop app (`cd source/apps/reading-book-desktop`):
   `spike:audio:main` (audiobook MP3, Main side: importer, `rb-audio` stream handler Range/416/path checks, 512 MB streaming, progress),
   `spike:pdf:attachments` (PDF embedded attachments: real pdf.js on generated PDFs, Main service on temp files, the real renderer store; OS opener / save dialog mocked),
   `spike:audio:store` (the real renderer audio player store with a scriptable `Audio`),
+  `spike:audio:zip` (audiobook ZIP import preview, Main side: bounded ZIP reader, path/size safety, inspect → confirm on synthetic ZIPs),
+  `spike:pdf:shapes` (Shape tools: rows in the shared annotation table, written as standard Square/Circle/Line (+arrow end), real sync + files),
+  `spike:pdf:shape-store` (the real renderer annotation / history / prefs stores for shapes against Main IPC + SQLite),
   `spike:pdf:graphics` (graphic objects inside a PDF — Square/Circle/Ink/Line/FreeText made by other readers: real scan, resize/colour/delete as one incremental update, read-back verified),
   `spike:audio:migration` (migration 026 on a populated DB with the real better-sqlite3 + FTS5; re-launches itself with the app's
   Electron binary in `ELECTRON_RUN_AS_NODE` mode — no window — because better-sqlite3 is built for Electron's ABI)
@@ -161,9 +164,9 @@ Domain/port code only ever deals with `DocumentImporter` / `DocumentRenderer` / 
 ### Persistence & the read-only/overlay invariant
 
 `better-sqlite3`, schema versioned as numbered SQL files in `electron/persistence/migrations/` (currently
-001–026: books, genres, comments, collections, reading sessions, notes/annotations, reading status, cloud
+001–027: books, genres, comments, collections, reading sessions, notes/annotations, reading status, cloud
 provenance, FTS chunks, signature status, embedded PDF annotation ledger, two-way sync base/conflict + write-back,
-TXT edited-copy revisions, `books.file_format` accepts `mp3`), run through `migrate.ts`. `sqlite-library-store.ts` and
+TXT edited-copy revisions, `books.file_format` accepts `mp3` and the other audio formats), run through `migrate.ts`. `sqlite-library-store.ts` and
 `sqlite-overlay-store.ts` implement the domain's `LibraryStore`/`CollectionStore`/`OverlayStore` ports.
 
 **Signature status (verification only):** `books.metadata_json.signatureStatus` (`unsigned|valid|invalid|unsupported`;
@@ -199,6 +202,11 @@ since read); a file that fails it is never written and the data stays pending in
 from `base_json`, conflicts frozen in `conflict_json` until the user picks; `books.sha256` is kept in step with the
 file. See `pdf_annotation_export.md`, `pdf_annotation_two_way_sync.md`, `pdf_annotation_reader_compatibility.md`.
 
+**Shape tools** (rectangle / ellipse / line / arrow): first-class annotation rows — a new `HighlightStyleKind` in the same `notes` table, Notes list and
+`pdfHighlightsStore` history; geometry in `pdfAnnotation.rects[0]` + `pdfAnnotation.shape`, opacity in `colorHex` (`#RRGGBBAA`). They reach the file through the
+always-on two-way sync as standard `/Square` `/Circle` `/Line` (`readmate:<id>` `/NM`); shapes from other readers are NOT imported (they are graphic objects).
+See `docs/implementation_plan/pdf_shape_tools.md`.
+
 **TXT reader** (`src/reader/renderers/txt/`, state in `screens/Reader/logic/txtDocument/`): an editable plain-text surface
 — a `<textarea>` over a same-metrics backdrop that paints annotation marks. Offsets are UTF-16 indices into the canonical
 text (BOM stripped, `\n` line breaks; `book-reader-sdk/src/txt/`). TXT markup is a `notes` row with
@@ -218,8 +226,9 @@ unchanged `ReaderScreen`). The `<audio>` element streams from `rb-audio://local/
 single `Range` requests with `206` + `Content-Range` (`416` past EOF) from an `fs.createReadStream` — a plain `200` makes Chromium's
 seeking fail, and `net.fetch(file://)` does not produce proper `206`s, so do not "simplify" it. Listening progress is seconds in
 `reading_state_json.audioProgress` (merge-patched by `overlay:saveAudioProgress`, audio books only; `percent` mirrors it), never a
-`Location`. The player has ONE canonical position (`currentTime`); the Book / Chapter scope only changes how the timeline is derived from it (SDK `timelineView` / `absoluteFromScoped`). Chapters are read from the file itself (ID3 `CHAP`/`CTOC` via `audio:getChapters`) and validated against the real duration (`normalizeChapters`: all-or-nothing); none → no chapters, never a guess. Audio **Notes** (the UI word; storage keeps the key `audioBookmarks`, channels `audio:*Bookmarks`) are a marked position in seconds + optional text + chapter ref, not the EPUB/PDF bookmark model; ONE list in `audioPlayerStore.notes` feeds both the sidebar and the timeline markers, and every entry point opens the same `AudioNoteMenu` via `audioNoteMenuStore`. The chapters panel is on the LEFT (resizable, slide-over below 960 px). Other audio extensions (M4A, M4B, AAC, WAV, FLAC, OGG, Opus, AIFF) and ZIP-of-MP3 are NOT supported until verified with
-real encoder-made files; see `docs/implementation_plan/audiobook_implementation_plan.md`. `music-metadata` is `external` in `vite.config.ts`: bundled, its CommonJS deps make the Main bundle throw at load (the app would not start).
+`Location`. The player has ONE canonical position (`currentTime`); the Book / Chapter scope only changes how the timeline is derived from it (SDK `timelineView` / `absoluteFromScoped`). Chapters are read from the file itself (ID3 `CHAP`/`CTOC` via `audio:getChapters`) and validated against the real duration (`normalizeChapters`: all-or-nothing); none → no chapters, never a guess. Audio **Notes** (the UI word; storage keeps the key `audioBookmarks`, channels `audio:*Bookmarks`) are a marked position in seconds + optional text + chapter ref, not the EPUB/PDF bookmark model; ONE list in `audioPlayerStore.notes` feeds both the sidebar and the timeline markers, and every entry point opens the same `AudioNoteMenu` via `audioNoteMenuStore`. The chapters panel is on the LEFT (resizable, slide-over below 960 px). Other audio formats (M4A, M4B, AAC, WAV, FLAC, OGG, Opus) are imported by the same `audio.adapter.ts` (container AND codec checked, not just the extension; migration 027) and streamed with an app-owned MIME, and SDK `audioPlaybackStatus` marks each `verified` only after a real encoder-made file played, paused, resumed and seeked in the app's Chromium (hidden-window probe; `READMATE_AUDIO_PACK=<dir> npm run spike:audio:main` imports and streams real files too). AIFF/`.aif` is recognised but refused at import (the bundled Chromium cannot decode it; no transcoding). ZIP-of-MP3 is NOT supported; see `docs/implementation_plan/audiobook_implementation_plan.md`. `music-metadata` is `external` in `vite.config.ts`: bundled, its CommonJS deps make the Main bundle throw at load (the app would not start).
+
+**Audiobook ZIP import (preview only)** (`electron/zip-import/`, `electron/ipc/zip-import.ipc.ts`, `src/components/import/AudiobookZipImportDialog.tsx`, SDK `src/audio/audio-zip-import.ts`): Import → "Audiobook ZIP" picks a `.zip` in a Main-owned dialog; `ZipImportService` reads only the central directory (own bounded reader, no `jszip`: limits in `ZIP_IMPORT_LIMITS`, unsafe/duplicate paths reject the archive), probes each audio entry with the importer's own `probeAudioFile`, and returns a preview (tree, natural-ordered tracks, ranked covers) addressed by entry ids — the renderer never sees a path. `zipImport:confirm` re-validates the selection and the archive, then calls `ZipAudiobookImporter`; the default one refuses (`import_not_available`) because `books` has one `file_path` per book and no chapter model yet. See `docs/implementation_plan/audiobook_zip_import_preview.md`.
 
 **PDF attachments** (Attachment sidebar tab, PDF only — capability `attachments`): files embedded in the PDF (`/EmbeddedFiles`
 and page `FileAttachment` annotations) are listed lazily (`attachments:list`) and opened by double-click → confirmation →

@@ -14,7 +14,19 @@ import {
 } from './bookmark-location.js'
 import { DEFAULT_HIGHLIGHT_COLOR } from './highlight-colors.js'
 
-export type HighlightStyleKind = 'highlight' | 'underline' | 'strikethrough' | 'squiggly' | 'replace' | 'insert' | 'textbox'
+export type HighlightStyleKind =
+  | 'highlight'
+  | 'underline'
+  | 'strikethrough'
+  | 'squiggly'
+  | 'replace'
+  | 'insert'
+  | 'textbox'
+  // PDF shapes (pdf_shape_tools.md)
+  | 'rectangle'
+  | 'ellipse'
+  | 'line'
+  | 'arrow'
 
 /**
  * The format-independent part of a renderer-side highlight row — everything the shared

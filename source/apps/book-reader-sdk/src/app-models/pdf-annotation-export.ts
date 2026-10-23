@@ -7,7 +7,8 @@
  * writer, which knows each page's viewport, maps them to PDF user space.
  */
 
-import type { PdfAnnotation } from '../domain/index.js'
+import type { PdfAnnotation, PdfShapeGeometry } from '../domain/index.js'
+import { isShapeStyleKind, shapeOpacityOf, shapeStrokeHex } from './pdf-shape.js'
 import { DEFAULT_HIGHLIGHT_COLOR } from './highlight-colors.js'
 import type { HighlightStyleKind } from './highlight-location.js'
 import {
@@ -18,7 +19,7 @@ import {
   type ScannedPdfAnnotation,
 } from './pdf-embedded-annotations.js'
 
-export type PdfWriteSubtype = 'Highlight' | 'Underline' | 'Squiggly' | 'StrikeOut' | 'Text'
+export type PdfWriteSubtype = 'Highlight' | 'Underline' | 'Squiggly' | 'StrikeOut' | 'Text' | 'Square' | 'Circle' | 'Line'
 
 /** One annotation to write on one page. */
 export type PdfWriteAnnotation = {
@@ -35,6 +36,13 @@ export type PdfWriteAnnotation = {
   opacity: number
   /** `/Contents`. */
   contents?: string
+  /**
+   * Shapes (`Square` / `Circle` / `Line`): pen width (fraction of the page width) and, for a `Line`, its
+   * endpoints, normalized like `rects` (which hold the shape's bounding box = `/Rect`).
+   */
+  shape?: PdfShapeGeometry
+  /** `Line` only: an arrow head at the END (`/LE [/None /OpenArrow]`). */
+  arrow?: true
   /** `/T`. */
   author: string
   /** ISO-8601 → `/CreationDate`, `/M`. */
@@ -63,6 +71,11 @@ const SUBTYPE_FOR_STYLE: Partial<Record<HighlightStyleKind, PdfWriteSubtype>> = 
   squiggly: 'Squiggly',
   strikethrough: 'StrikeOut',
   textbox: 'Text',
+  // Shapes: standard Square / Circle / Line annotations (an arrow is a Line with an arrow end).
+  rectangle: 'Square',
+  ellipse: 'Circle',
+  line: 'Line',
+  arrow: 'Line',
 }
 
 /** Whether a row of this style can be written into a PDF file. */
@@ -111,6 +124,29 @@ export function pdfWriteAnnotationsFromHighlight(row: ExportableHighlight, first
   const { color, opacity } = pdfColorFromHex(row.colorHex)
   const subtype = SUBTYPE_FOR_STYLE[row.styleKind]
   if (!subtype) return []
+  if (isShapeStyleKind(row.styleKind)) {
+    // A shape is ONE annotation on ONE page, named after its row (`readmate:<id>`).
+    const shape = annotation.shape
+    if (!shape || annotation.rects.length !== 1 || (subtype === 'Line' && !shape.line)) return []
+    const rect = annotation.rects[0]!
+    const stroke = pdfColorFromHex(shapeStrokeHex(row.colorHex)).color
+    const write: PdfWriteAnnotation = {
+      nm: firstName ?? readmateAnnotationName(row.id, annotation.pageIndex, annotation.pageIndex),
+      subtype,
+      pageIndex: rect.pageIndex ?? annotation.pageIndex,
+      rects: [{ x: rect.x, y: rect.y, width: rect.width, height: rect.height }],
+      color: stroke,
+      opacity: shapeOpacityOf(row.colorHex),
+      shape,
+      author: READMATE_PDF_AUTHOR,
+      createdAt: row.createdAt,
+      modifiedAt: row.updatedAt,
+    }
+    if (row.styleKind === 'arrow') write.arrow = true
+    const note = row.note?.trim()
+    if (note) write.contents = note
+    return [write]
+  }
   const byPage = new Map<number, PdfWriteAnnotation['rects']>()
   for (const r of annotation.rects) {
     const page = r.pageIndex ?? annotation.pageIndex

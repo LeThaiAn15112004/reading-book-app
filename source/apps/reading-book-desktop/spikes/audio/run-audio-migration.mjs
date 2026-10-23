@@ -195,12 +195,34 @@ check('ON DELETE CASCADE still works from the new books (children + FTS triggers
   assert.equal(n('txt_documents', 'b-txt'), 1)
   assert.equal(n('pdf_embedded_annotations', 'b-pdf'), 1)
 })
+// ---- apply 027 (more audio formats) on top ----
+assert.ok(files.includes('027_books_more_audio_formats.sql') && migrateSource.includes('./migrations/027_books_more_audio_formats.sql?raw'), '027 exists and is listed')
+const before27 = snapshot() // earlier checks changed rows (cascade test), so compare against the state right before 027
+applyMigration(db, '027_books_more_audio_formats.sql')
+console.log('after 027')
+const after27 = snapshot()
+check('027: every table keeps its row count and content; indexes, triggers and FTS intact', () => {
+  assert.deepEqual(after27.counts, before27.counts)
+  assert.deepEqual(after27.hashes, before27.hashes)
+  assert.equal(JSON.stringify(after27.schema.indexes), JSON.stringify(before27.schema.indexes))
+  assert.equal(JSON.stringify(after27.schema.triggers), JSON.stringify(before27.schema.triggers))
+  assert.deepEqual(after27.fts, before27.fts)
+  assert.deepEqual(db.pragma('foreign_key_check'), [])
+  assert.deepEqual(db.pragma('integrity_check'), [{ integrity_check: 'ok' }])
+})
+check('027: m4a m4b aac wav flac ogg opus insert; aiff / aif / zip / xyz are still refused', () => {
+  let i = 0
+  const row = (fmt) => ({ id: `n27-${fmt}`, title: 't', fp: `p${i}`, np: null, fmt, cover: null, sha: `s27-${i++}-${fmt}`, fav: 0, status: 'reading', prov: null, ext: null, url: null, meta: '{}', genres: '[]', state: '{}', added: 'a', upd: 'u' })
+  for (const f of ['m4a', 'm4b', 'aac', 'wav', 'flac', 'ogg', 'opus']) insBook.run(row(f))
+  for (const f of ['aiff', 'aif', 'zip', 'xyz']) assert.throws(() => insBook.run(row(f)), /CHECK constraint/, f)
+  db.prepare(`DELETE FROM books WHERE id LIKE 'n27-%'`).run()
+})
 check('the runner is idempotent: schema_migrations has 026 once', () => {
   const applied = db.prepare(`SELECT name FROM schema_migrations WHERE name LIKE '026%'`).all()
   assert.equal(applied.length, 1)
   assert.throws(() => applyMigration(db, '026_books_audio_format.sql'), /UNIQUE/) // a second run is refused by schema_migrations, as migrate() skips it
 })
-check('a fresh database migrated 001–026 in one go ends in the same schema', () => {
+check('a fresh database migrated through the latest in one go ends in the same schema', () => {
   const fresh = new Database(':memory:')
   fresh.exec('CREATE TABLE schema_migrations (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL UNIQUE, applied_at TEXT NOT NULL)')
   for (const f of files) applyMigration(fresh, f)

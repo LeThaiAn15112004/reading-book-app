@@ -8,11 +8,11 @@
  * a text selection.
  */
 import type { CSSProperties, PointerEvent as ReactPointerEvent, ReactNode } from 'react'
-import { INK_RESIZE_HANDLES, inkHandlePosition, inkToolbarSide, type InkBox, type InkResizeHandle } from '@reading-book/book-reader-sdk'
+import { INK_RESIZE_HANDLES, inkHandlePosition, inkToolbarSide, type InkBox } from '@reading-book/book-reader-sdk'
 
 const HANDLE_PX = 10
 
-const HANDLE_CURSOR: Record<InkResizeHandle, string> = {
+const HANDLE_CURSOR: Record<string, string> = {
   nw: 'nwse-resize',
   se: 'nwse-resize',
   ne: 'nesw-resize',
@@ -28,7 +28,8 @@ function boxStyle(box: InkBox): CSSProperties {
 }
 
 export type PdfInkResizeEvents = {
-  onHandleDown: (handle: InkResizeHandle, event: ReactPointerEvent<HTMLElement>) => void
+  /** `handle`: a box handle (`nw` … `w`) or, for a line / arrow, an end (`start` / `end`). */
+  onHandleDown: (handle: string, event: ReactPointerEvent<HTMLElement>) => void
   onHandleMove: (event: ReactPointerEvent<HTMLElement>) => void
   onHandleUp: (event: ReactPointerEvent<HTMLElement>, commit: boolean) => void
 }
@@ -36,13 +37,16 @@ export type PdfInkResizeEvents = {
 /** An object to outline: its id and its outline box (normalized over the page), as painted — previews included. */
 export type PdfOutlineTarget = { id: string; box: InkBox }
 
+/** A handle at a page position (normalized) instead of on the box — the two ends of a line / arrow. */
+export type PdfCustomHandle = { key: string; x: number; y: number }
+
 type PdfInkSelectionOverlayProps = PdfInkResizeEvents & {
   /** Rendered page height in CSS px (decides which side the toolbar opens on). */
   pageHeightPx: number
   /** Object under the pointer on this page (never the selected one). */
   hovered: PdfOutlineTarget | null
   /** Selected object on this page; `resizable` = it offers resize handles. */
-  selected: (PdfOutlineTarget & { resizable: boolean }) | null
+  selected: (PdfOutlineTarget & { resizable: boolean; handles?: readonly PdfCustomHandle[] }) | null
   /** The compact toolbar for the selected object. */
   toolbar: ReactNode
 }
@@ -68,8 +72,10 @@ export function PdfInkSelectionOverlay({ pageHeightPx, hovered, selected, toolba
       {selected && selectedBox ? (
         <div data-pdf-ink-selection={selected.id} style={{ ...boxStyle(selectedBox), border: '1.5px solid var(--lib-accent, #3b82f6)', borderRadius: 2 }}>
           {resizable
-            ? INK_RESIZE_HANDLES.map((handle) => {
-                const [hx, hy] = inkHandlePosition(selectedBox, handle)
+            ? (selected?.handles ?? INK_RESIZE_HANDLES.map((key) => {
+                const [x, y] = inkHandlePosition(selectedBox, key)
+                return { key, x, y }
+              })).map(({ key: handle, x: hx, y: hy }) => {
                 return (
                   <div
                     key={handle}
@@ -91,7 +97,7 @@ export function PdfInkSelectionOverlay({ pageHeightPx, hovered, selected, toolba
                       background: 'var(--lib-surface-strong, #fff)',
                       border: '1.5px solid var(--lib-accent, #3b82f6)',
                       borderRadius: 2,
-                      cursor: HANDLE_CURSOR[handle],
+                      cursor: HANDLE_CURSOR[handle] ?? 'crosshair',
                       pointerEvents: 'auto',
                       touchAction: 'none',
                     }}

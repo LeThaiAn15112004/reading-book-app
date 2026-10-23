@@ -95,8 +95,8 @@ check('placeholder is a strict subset of EPUB, apart from Page layout', () => {
   for (const c of placeholder) if (c !== 'pageLayout') assert.ok(epub.has(c), c)
   assert.ok(placeholder.size - 1 < epub.size)
 })
-check('PDF = placeholder + search + text markup + freehand ink + attachments − Aa (no audio / translate yet)', () => {
-  const expected = [...placeholder, 'search', 'markupAnnotations', 'inkAnnotations', 'attachments'].filter((c) => c !== 'readingSettings')
+check('PDF = placeholder + search + text markup + freehand ink + shapes + attachments − Aa (no audio / translate yet)', () => {
+  const expected = [...placeholder, 'search', 'markupAnnotations', 'inkAnnotations', 'shapeAnnotations', 'attachments'].filter((c) => c !== 'readingSettings')
   assert.deepEqual([...pdf].sort(), expected.sort())
 })
 check('Aa (readingSettings) stays on EPUB and the placeholder, not PDF', () => {
@@ -137,11 +137,11 @@ check('only renderer-independent tools', () => {
   ])
 })
 
-check('PDF layout: Search in the navigate group, the inline Annotation icons, the Freehand group (Freehand + Eraser), no Settings group', () => {
+check('PDF layout: Search in the navigate group, the inline Annotation icons, the Freehand group (Freehand + Shapes + Eraser), no Settings group', () => {
   assert.deepEqual(shape(resolveToolbarLayout(pdf, 0)), [
     'navigate:inline[hand,select,search]',
     'annotation:inline[highlight,underline,squiggly,strikethrough,replace,insert]',
-    'freehand:inline[pen,eraser]',
+    'freehand:inline[pen,shape,eraser]',
     'tools:inline[snapshot,wordCount]',
   ])
 })
@@ -307,7 +307,19 @@ check('Eraser mode lives in ReaderScreen state (survives switching tools); the E
   assert.doesNotMatch(screen, /setEraserMode\([^)]*\)[^\n]*setActiveTool/)
 })
 check('Eraser stays PDF-only (capability inkAnnotations) and is left when the surface is not a PDF', () => {
-  assert.match(screen, /activeTool === 'pen' \|\| activeTool === 'eraser'\)\) setActiveTool\('select'\)/)
+  assert.match(screen, /activeTool === 'pen' \|\| activeTool === 'eraser' \|\| activeTool === 'shape'\)\) setActiveTool\('select'\)/)
+})
+
+console.log('7b. shape tools')
+check('Shapes: PDF-only (capability shapeAnnotations), sits between Freehand and Eraser, with its own settings arrow that never arms the tool', () => {
+  assert.deepEqual(registry.toolsForGroup('freehand', pdf).map((t) => t.id), ['pen', 'shape', 'eraser'])
+  assert.deepEqual(registry.toolsForGroup('freehand', epub).map((t) => t.id), [])
+  assert.match(toolsMenu, /tool\.id === 'shape' \? \(\s*<div key=\{tool\.id\} className="contents">\s*\{renderButton\(tool, resolved\.group\.iconOnly\)\}\s*<FreehandSettingsButton hidden=\{hidden\} shapes \/>/)
+  assert.match(screen, /case 'shape':\s+case 'eraser':\s+\/\/ Click the armed tool again/)
+  assert.match(screen, /shape: \{ active: activeTool === 'shape' \}/)
+})
+check('Escape backs a Shape tool out to Select like the pen', () => {
+  assert.match(screen, /activeToolRef\.current !== 'shape'\) return false/)
 })
 
 console.log(`\n${passed} checks passed`)

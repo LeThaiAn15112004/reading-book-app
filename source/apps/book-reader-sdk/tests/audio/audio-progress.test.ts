@@ -13,13 +13,13 @@ describe('audio formats', () => {
     expect(audioMimeForFormat('mp3')).toBe('audio/mpeg')
   })
 
-  it('formats that are not verified stay out', () => {
-    for (const f of ['m4a', 'm4b', 'aac', 'wav', 'flac', 'ogg', 'opus', 'aiff', 'aif', 'zip']) {
+  it('formats the runtime cannot play, and ZIP, stay out', () => {
+    for (const f of ['aiff', 'aif', 'zip']) {
       expect(isDocumentFormat(f)).toBe(false)
       expect(isAudioFormat(f)).toBe(false)
       expect(audioMimeForFormat(f)).toBeUndefined()
     }
-    expect(() => parseDocumentFormat('m4b')).toThrow()
+    expect(() => parseDocumentFormat('aiff')).toThrow()
   })
 
   it('text formats are not audio (and "toString"-style keys do not leak through the lookup)', () => {

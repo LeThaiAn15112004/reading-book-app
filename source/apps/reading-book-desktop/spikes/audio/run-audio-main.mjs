@@ -28,7 +28,10 @@ import path from 'node:path'
 import {
   Book,
   DocumentFormat,
+  audioFormatFromExtension,
   audioMimeForFormat,
+  audioPlaybackStatus,
+  isAudioFormat,
   parseAudioProgress,
   parseReadingState,
   resolveRestorePosition,
@@ -41,7 +44,7 @@ const { registerOverlayIpc } = await import('../../electron/ipc/overlay.ipc.ts')
 const { getOverlayStore } = await import('../../electron/persistence/sqlite-overlay-store.ts')
 const { getLibraryStore } = await import('../../electron/persistence/sqlite-library-store.ts')
 const { resolveBookFile } = await import('../../electron/files/sandbox.ts')
-const { createMp3Adapter } = await import('../../electron/adapters/mp3.adapter.ts')
+const { createAudioAdapter } = await import('../../electron/adapters/audio.adapter.ts')
 const { createAudioStreamHandler, parseAudioRequestUrl } = await import('../../electron/audio/audio-stream-handler.ts')
 const { assertSupportedExtension, UnsupportedFormatError } = await import('../../electron/files/format-guard.ts')
 const { isChunkableFormat } = await import('../../electron/chunking/extract-book-text.ts')
@@ -101,14 +104,34 @@ await check('existing formats keep their mapping', () => {
   for (const [ext, fmt] of [['.epub', 'epub'], ['.pdf', 'pdf'], ['.txt', 'txt'], ['.md', 'md']])
     assert.equal(config.resolveFormatFromExtension(ext), fmt)
 })
-await check('unverified audio extensions and ZIP are rejected by the import guard', () => {
-  for (const ext of ['.m4a', '.m4b', '.aac', '.wav', '.flac', '.ogg', '.opus', '.aiff', '.aif', '.zip', '.mp3.exe', ''])
+await check('every requested audio extension maps to its format (case-insensitive); the app owns each MIME', () => {
+  const expected = { '.mp3': 'audio/mpeg', '.m4a': 'audio/mp4', '.m4b': 'audio/mp4', '.aac': 'audio/aac', '.wav': 'audio/wav', '.flac': 'audio/flac', '.ogg': 'audio/ogg', '.opus': 'audio/ogg' }
+  for (const [ext, mime] of Object.entries(expected)) {
+    const fmt = ext.slice(1)
+    assert.equal(config.resolveFormatFromExtension(ext.toUpperCase()), fmt, ext)
+    assert.equal(assertSupportedExtension(path.join(tmp, `book${ext.toUpperCase()}`)), fmt, ext)
+    assert.equal(isAudioFormat(fmt), true, ext)
+    assert.equal(audioMimeForFormat(fmt), mime, ext)
+  }
+  for (const f of ['mp3', 'm4a', 'm4b', 'aac', 'wav', 'flac', 'ogg', 'opus']) assert.equal(audioPlaybackStatus(f), 'verified', f)
+})
+await check('.aif is an alias of AIFF, and AIFF is refused with an explanation (Chromium cannot decode it)', () => {
+  assert.equal(audioFormatFromExtension('.AIF'), 'aiff')
+  assert.equal(audioFormatFromExtension('aiff'), 'aiff')
+  assert.equal(audioPlaybackStatus('aiff'), 'unsupported')
+  assert.equal(isAudioFormat('aiff'), false)
+  assert.equal(audioMimeForFormat('aiff'), undefined)
+  for (const ext of ['.aiff', '.aif'])
+    assert.throws(() => assertSupportedExtension(path.join(tmp, `book${ext}`)), (e) => e instanceof UnsupportedFormatError && /AIFF.*WAV or FLAC/.test(e.message), ext)
+})
+await check('ZIP and look-alike extensions are still rejected by the import guard', () => {
+  for (const ext of ['.zip', '.mp3.exe', '.mp4', '.wma', ''])
     assert.throws(() => assertSupportedExtension(path.join(tmp, `book${ext}`)), UnsupportedFormatError, ext)
 })
 
 // ---- 2. import ----
 console.log('2. import (MP3 importer + library store)')
-const adapter = createMp3Adapter({ coversDir: () => coversDir })
+const adapter = createAudioAdapter('mp3', { coversDir: () => coversDir })
 const db = getDatabase()
 db.exec('PRAGMA foreign_keys = ON')
 // node:sqlite has no better-sqlite3 `.transaction()`; the library store uses it.
@@ -130,6 +153,45 @@ await check('canHandle only .mp3', () => {
   assert.equal(adapter.canHandle('a/b/c.MP3'), true)
   assert.equal(adapter.canHandle('a/b/c.m4a'), false)
   assert.equal(adapter.canHandle('a/b/c.txt'), false)
+  assert.equal(createAudioAdapter('aac', { coversDir: () => coversDir }).canHandle('x.AAC'), true)
+  assert.equal(createAudioAdapter('wav', { coversDir: () => coversDir }).canHandle('x.mp3'), false)
+})
+
+// Structure-only files generated here (NOT encoder output): they prove the importer's container/codec
+// gate and tag handling, never playback.
+const wavFile = (name) => {
+  const data = Buffer.alloc(8000 * 2) // 1 s, 8 kHz, mono, 16-bit silence
+  const h = Buffer.alloc(44)
+  h.write('RIFF', 0); h.writeUInt32LE(36 + data.length, 4); h.write('WAVEfmt ', 8); h.writeUInt32LE(16, 16)
+  h.writeUInt16LE(1, 20); h.writeUInt16LE(1, 22); h.writeUInt32LE(8000, 24); h.writeUInt32LE(16000, 28)
+  h.writeUInt16LE(2, 32); h.writeUInt16LE(16, 34); h.write('data', 36); h.writeUInt32LE(data.length, 40)
+  return write(name, Buffer.concat([h, data]))
+}
+const aiffFile = (name) => {
+  const data = Buffer.alloc(8000 * 2)
+  const comm = Buffer.alloc(26); comm.write('COMM', 0); comm.writeUInt32BE(18, 4); comm.writeUInt16BE(1, 8)
+  comm.writeUInt32BE(8000, 10); comm.writeUInt16BE(16, 14)
+  Buffer.from([0x40, 0x0b, 0xfa, 0, 0, 0, 0, 0, 0, 0]).copy(comm, 16) // 8000 Hz as 80-bit extended
+  const ssnd = Buffer.concat([Buffer.from('SSND'), u32(8 + data.length), Buffer.alloc(8), data])
+  const body = Buffer.concat([Buffer.from('AIFF'), comm, ssnd])
+  return write(name, Buffer.concat([Buffer.from('FORM'), u32(body.length), body]))
+}
+await check('per-format importer: a real WAV container imports as wav; the same bytes under another extension are refused', async () => {
+  const wav = createAudioAdapter('wav', { coversDir: () => coversDir })
+  const r = await wav.import(wavFile('clip.wav'))
+  assert.equal(r.format, 'wav')
+  assert.equal(r.title, 'clip')
+  await assert.rejects(createAudioAdapter('flac', { coversDir: () => coversDir }).import(wavFile('fake.flac')))
+  await assert.rejects(createAudioAdapter('mp3', { coversDir: () => coversDir }).import(wavFile('fake.mp3')), /Not a (readable|playable) MP3/)
+})
+await check('text renamed to every new extension is rejected, not imported', async () => {
+  for (const f of ['m4a', 'm4b', 'aac', 'wav', 'flac', 'ogg', 'opus'])
+    await assert.rejects(createAudioAdapter(f, { coversDir: () => coversDir }).import(write(`garbage.${f}`, Buffer.from('this is not audio '.repeat(40)))), undefined, f)
+  for (const f of ['m4a', 'flac', 'wav', 'opus'])
+    await assert.rejects(createAudioAdapter(f, { coversDir: () => coversDir }).import(write(`empty.${f}`, Buffer.alloc(0))), undefined, f)
+})
+await check('AIFF content is never accepted by any audio importer (even when renamed .wav)', async () => {
+  await assert.rejects(createAudioAdapter('wav', { coversDir: () => coversDir }).import(aiffFile('is-aiff.wav')))
 })
 
 let tagged
@@ -394,6 +456,73 @@ await check('only formats with a registered MIME are served', async () => {
   const h = createAudioStreamHandler(async () => ({ ok: true, path: f, format: 'epub' }))
   assert.equal((await h(req('x'))).status, 404)
 })
+
+await check('every importable format streams with its own Content-Type, Range → 206, and AIFF is never served', async () => {
+  const mimes = { mp3: 'audio/mpeg', m4a: 'audio/mp4', m4b: 'audio/mp4', aac: 'audio/aac', wav: 'audio/wav', flac: 'audio/flac', ogg: 'audio/ogg', opus: 'audio/ogg' }
+  for (const [fmt, mime] of Object.entries(mimes)) {
+    const f = write(`stream.${fmt}`, Buffer.alloc(1000, 7))
+    const h = createAudioStreamHandler(async () => ({ ok: true, path: f, format: fmt }))
+    const full = await h(req('x'))
+    assert.equal(full.status, 200, fmt)
+    assert.equal(full.headers.get('content-type'), mime, fmt)
+    const part = await h(req('x', { range: 'bytes=100-199' }))
+    assert.equal(part.status, 206, fmt)
+    assert.equal(part.headers.get('content-range'), 'bytes 100-199/1000', fmt)
+    assert.equal(part.headers.get('content-type'), mime, fmt)
+    assert.equal((await part.arrayBuffer()).byteLength, 100, fmt)
+  }
+  const f = write('stream.aiff', Buffer.alloc(100))
+  assert.equal((await createAudioStreamHandler(async () => ({ ok: true, path: f, format: 'aiff' }))(req('x'))).status, 404)
+})
+
+await check('books of the new formats persist, and their listening progress saves (SQL guard widened)', async () => {
+  let i = 0
+  for (const fmt of ['m4a', 'm4b', 'aac', 'wav', 'flac', 'ogg', 'opus']) {
+    const file = fmt === 'wav' ? wavFile(`pers.${fmt}`) : write(`pers.${fmt}`, Buffer.alloc(64, 1))
+    const id = `n-${fmt}`
+    const now = '2026-10-23T00:00:00.000Z'
+    library.persistImportedBook(new Book({ id, title: id, filePath: file, format: fmt, sha256: sha(`n-${++i}-${fmt}`), fileSizeBytes: 64, addedAt: now, updatedAt: now }), [], [])
+    assert.equal((await library.findById(id)).format, fmt)
+    const saved = await getOverlayStore().saveAudioProgress(id, { positionSeconds: 12.5, durationSeconds: 100, playbackRate: 1.25 })
+    assert.equal(saved, true, fmt)
+    assert.equal((await getOverlayStore().getAudioProgress(id))?.positionSeconds, 12.5, fmt)
+  }
+  assert.throws(() => db.prepare(`UPDATE books SET file_format = 'aiff' WHERE id = 'n-wav'`).run(), /CHECK/)
+})
+
+// Optional: genuine encoder-made files. READMATE_AUDIO_PACK points at a folder of real files named by
+// extension (e.g. .m4a .m4b .aac .wav .flac .ogg .opus .mp3); each is imported by the real importer and
+// streamed by the real handler (200, Range 206, identical bytes). Never copied into the repo.
+if (process.env.READMATE_AUDIO_PACK) {
+  const root = process.env.READMATE_AUDIO_PACK
+  const found = []
+  const walk = (d) => { for (const e of fs.readdirSync(d, { withFileTypes: true })) { const f = path.join(d, e.name); e.isDirectory() ? walk(f) : found.push(f) } }
+  walk(root)
+  for (const file of found) {
+    const fmt = audioFormatFromExtension(path.extname(file))
+    if (!fmt) continue
+    if (fmt === 'aiff') {
+      await check(`real ${path.basename(file)}: AIFF is refused at the import guard`, () =>
+        assert.throws(() => assertSupportedExtension(file), UnsupportedFormatError))
+      continue
+    }
+    await check(`real ${path.basename(file)}: imported as ${fmt}, streamed with Range, bytes identical`, async () => {
+      const r = await createAudioAdapter(fmt, { coversDir: () => coversDir }).import(file)
+      assert.equal(r.format, fmt)
+      assert.ok(r.title)
+      const h = createAudioStreamHandler(async () => ({ ok: true, path: file, format: fmt }))
+      const size = fs.statSync(file).size
+      const full = await h(req('x'))
+      assert.equal(full.status, 200)
+      assert.equal(full.headers.get('content-type'), audioMimeForFormat(fmt))
+      assert.equal(sha(Buffer.from(await full.arrayBuffer())), sha(fs.readFileSync(file)))
+      const mid = Math.floor(size / 2)
+      const part = await h(req('x', { range: `bytes=${mid}-${mid + 999}` }))
+      assert.equal(part.status, 206)
+      assert.deepEqual(Buffer.from(await part.arrayBuffer()), fs.readFileSync(file).subarray(mid, mid + 1000))
+    })
+  }
+}
 
 // ---- 4. large file ----
 console.log('4. large file (512 MB, sparse — streamed, never buffered)')

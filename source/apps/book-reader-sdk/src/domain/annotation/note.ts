@@ -65,6 +65,20 @@ export interface PdfAnnotation {
    * the text line), not a selected run. Absent on every other annotation and on older `insert` rows.
    */
   caret?: true;
+  /** Shape annotations (rectangle / ellipse / line / arrow) only: what `rects` alone cannot say. */
+  shape?: PdfShapeGeometry;
+}
+
+/**
+ * Extra geometry of a PDF shape annotation (docs/implementation_plan/pdf_shape_tools.md). `rects` of the
+ * annotation hold its bounding box (rectangle / ellipse: exactly the shape; line / arrow: the endpoints'
+ * box grown by the pen and arrowhead); this holds the rest. Normalized 0–1 like every PDF geometry.
+ */
+export interface PdfShapeGeometry {
+  /** Pen width as a fraction of the page WIDTH (zoom-independent), like `PdfInkStroke.width`. */
+  strokeWidth: number;
+  /** Line / arrow only: `[x1, y1, x2, y2]` from the start to the END (the arrow head sits at the end). */
+  line?: [number, number, number, number];
 }
 
 /**
@@ -134,6 +148,10 @@ export type NoteType =
   | 'textbox'
   | 'stamp'
   | 'ink'
+  | 'rectangle'
+  | 'ellipse'
+  | 'line'
+  | 'arrow'
   | 'bookmark';
 
 export type NoteStatus = 'None' | 'Review' | 'Done';

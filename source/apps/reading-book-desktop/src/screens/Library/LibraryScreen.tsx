@@ -1,5 +1,6 @@
 // @refresh reset
 import {
+  AudiobookZipImportDialog,
   ImportConflictDialog,
   ImportProgressDialog,
   ImportToast,
@@ -173,6 +174,8 @@ export function LibraryScreen() {
         onClose={closeUrlDialog}
         onSubmit={(url) => void handleUrlSubmit(url)}
       />
+
+      <AudiobookZipImportDialog />
 
       <ImportProgressDialog
         open={progress !== null}

@@ -1,6 +1,20 @@
 /** Narrow Desktop API exposed to the renderer via contextBridge (`window.api`). */
 
-export type DocumentFormatDto = 'epub' | 'pdf' | 'txt' | 'md' | 'mp3'
+import type { ZipImportPreview, ZipImportSelection } from '@reading-book/book-reader-sdk'
+
+export type DocumentFormatDto =
+  | 'epub'
+  | 'pdf'
+  | 'txt'
+  | 'md'
+  | 'mp3'
+  | 'm4a'
+  | 'm4b'
+  | 'aac'
+  | 'wav'
+  | 'flac'
+  | 'ogg'
+  | 'opus'
 
 export interface AppInfo {
   name: string
@@ -532,7 +546,7 @@ export interface HighlightDto {
   id: string
   bookId: string
   locatorRef: string
-  styleKind: 'highlight' | 'underline' | 'strikethrough' | 'squiggly' | 'replace' | 'insert' | 'textbox'
+  styleKind: import('@reading-book/book-reader-sdk').HighlightStyleKind
   colorHex: string
   note?: string
   tags: string[]
@@ -561,7 +575,7 @@ export interface SaveHighlightInput {
   bookId: string
   id?: string
   locatorRef: string
-  styleKind: 'highlight' | 'underline' | 'strikethrough' | 'squiggly' | 'replace' | 'insert' | 'textbox'
+  styleKind: import('@reading-book/book-reader-sdk').HighlightStyleKind
   colorHex: string
   note?: string
   tags?: string[]
@@ -910,6 +924,20 @@ export interface DesktopApi {
     /** Separate, explicit Save As (Main-owned dialog) — the way out for a file the policy will not open. */
     saveAs(input: { bookId: string; attachmentId: string }): Promise<AttachmentActionResult>
   }
+  zipImport: {
+    /** Native ZIP picker + inspection in Main. `cancelled` = picker dismissed. */
+    pick(): Promise<ZipImportPickResult>
+    /** Data-URL preview of one cover candidate (null when too large / not previewable). */
+    coverPreview(input: { sessionId: string; entryId: string }): Promise<ZipImportCoverResult>
+    /** Re-validates the selection in Main and hands it to the import stage. */
+    confirm(input: { sessionId: string; selection: ZipImportSelection }): Promise<ZipImportConfirmResult>
+    /** Drop the preview session (cancel). */
+    discard(sessionId: string): Promise<OkResult>
+    /** Abort a running inspection. */
+    cancelInspect(): Promise<OkResult>
+    /** Fires once a ZIP is picked and inspection starts. Returns unsubscribe. */
+    onInspecting(handler: (info: { archiveName: string }) => void): () => void
+  }
   audio: {
     /** Chapters the file declares (`[]` for none / unreadable). Never guessed. */
     getChapters(bookId: string): Promise<AudioChaptersResult>
@@ -1152,3 +1180,29 @@ export interface TxtCommitResult {
   errorCode?: TxtCommitErrorCode
   errorMessage?: string
 }
+
+export type ZipImportErrorCodeDto =
+  | 'invalid_zip'
+  | 'empty_zip'
+  | 'too_many_entries'
+  | 'too_large'
+  | 'unsafe_path'
+  | 'path_too_deep'
+  | 'duplicate_path'
+  | 'unreadable'
+  | 'cancelled'
+  | 'session_expired'
+  | 'archive_changed'
+  | 'invalid_selection'
+  | 'import_not_available'
+  | 'import_failed'
+
+export interface ZipImportFailureDto {
+  ok: false
+  errorCode: ZipImportErrorCodeDto
+  errorMessage: string
+}
+
+export type ZipImportPickResult = { ok: true; preview: ZipImportPreview } | ZipImportFailureDto
+export type ZipImportCoverResult = { ok: true; dataUrl: string | null } | ZipImportFailureDto
+export type ZipImportConfirmResult = { ok: true; bookId: string } | ZipImportFailureDto

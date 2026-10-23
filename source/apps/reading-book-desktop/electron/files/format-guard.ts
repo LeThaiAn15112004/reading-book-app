@@ -3,7 +3,7 @@ import {
   resolveFormatFromExtension,
   SUPPORTED_FORMATS,
 } from '@reading-book/config'
-import type { DocumentFormat } from '@reading-book/book-reader-sdk'
+import { audioFormatFromExtension, type DocumentFormat } from '@reading-book/book-reader-sdk'
 import path from 'node:path'
 
 /** Stable code mapped to ImportErrorCode.unsupported_format. */
@@ -24,6 +24,9 @@ function extensionOf(filePathOrName: string): string {
 
 function unsupportedMessage(ext: string): string {
   const shown = ext || '(none)'
+  if (audioFormatFromExtension(ext) === 'aiff') {
+    return `AIFF audio (${shown}) cannot be played by this app's media engine. Convert it to WAV or FLAC first.`
+  }
   return `Unsupported format '${shown}'. Supported: ${SUPPORTED_LABEL}.`
 }
 

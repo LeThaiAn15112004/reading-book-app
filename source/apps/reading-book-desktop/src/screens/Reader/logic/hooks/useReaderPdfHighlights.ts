@@ -1,3 +1,4 @@
+import { isShapeStyleKind } from '@reading-book/book-reader-sdk'
 import { useEffect, type MutableRefObject } from 'react'
 import { overlayApi } from '../../../../bridge'
 import type { PdfRendererApi } from '../../../../reader/renderers/pdf'
@@ -77,7 +78,11 @@ export function useReaderPdfHighlights({
   }, [bookId, isPdfSurface, applyEmbeddedSync, loadConflicts, resetSignedWrite])
 
   useEffect(() => {
-    closeEditPopup()
+    // A zoom closes the open menu, but a SELECTED shape stays selected (its handles follow the page).
+    const { focusedHighlightId, highlights, focusHighlight } = usePdfHighlightsStore.getState()
+    const focused = focusedHighlightId ? highlights.find((h) => h.id === focusedHighlightId) : undefined
+    if (focused && isShapeStyleKind(focused.styleKind)) focusHighlight(focused.id)
+    else closeEditPopup()
     cancelInsert()
   }, [zoom, closeEditPopup, cancelInsert])
 
@@ -103,6 +108,9 @@ export function useReaderPdfHighlights({
     updateHighlightNote: usePdfHighlightsStore((s) => s.updateHighlightNote),
     updateHighlightTags: usePdfHighlightsStore((s) => s.updateHighlightTags),
     deleteHighlight: usePdfHighlightsStore((s) => s.deleteHighlight),
+    focusHighlight: usePdfHighlightsStore((s) => s.focusHighlight),
+    createShape: usePdfHighlightsStore((s) => s.createShape),
+    updateShapeGeometry: usePdfHighlightsStore((s) => s.updateShapeGeometry),
     jumpToHighlight: usePdfHighlightsStore((s) => s.jumpToHighlight),
     undo: usePdfHighlightsStore((s) => s.undo),
     redo: usePdfHighlightsStore((s) => s.redo),

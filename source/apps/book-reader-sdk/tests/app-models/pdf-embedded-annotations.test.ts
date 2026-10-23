@@ -95,6 +95,10 @@ describe('readPdfJsAnnotation', () => {
       Squiggly: 'squiggly',
       StrikeOut: 'strikethrough',
       Text: 'textbox',
+      // Shapes (only Readmate's own `readmate:*` ones are ever scanned in Main)
+      Square: 'rectangle',
+      Circle: 'ellipse',
+      Line: 'line',
     })
   })
 
@@ -107,7 +111,7 @@ describe('readPdfJsAnnotation', () => {
   })
 
   it('ignores types the app cannot represent, replies, and items without usable geometry', () => {
-    for (const subtype of ['Link', 'FreeText', 'Ink', 'Square', 'Stamp', 'Popup', 'Widget', 'FileAttachment']) {
+    for (const subtype of ['Link', 'FreeText', 'Ink', 'Polygon', 'Stamp', 'Popup', 'Widget', 'FileAttachment']) {
       expect(readPdfJsAnnotation(pdfjsItem({ subtype }), LETTER)).toBeNull()
     }
     expect(readPdfJsAnnotation(pdfjsItem({ inReplyTo: '9R' }), LETTER)).toBeNull()

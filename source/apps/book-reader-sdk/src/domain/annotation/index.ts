@@ -15,5 +15,6 @@ export type {
   PdfAnnotation,
   PdfAnnotationRect,
   PdfInkStroke,
+  PdfShapeGeometry,
   TxtAnnotation,
 } from './note.js';

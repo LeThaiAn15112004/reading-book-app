@@ -6,7 +6,19 @@ import type { MdAnnotation, NoteLocator, NoteSelectionText, PdfAnnotation, TxtAn
  * `openEpubjs.ts`); `'textbox'` = a sticky-note anchor with no colored mark at all, just a 📝
  * icon (see `EpubjsHandle.applyHighlight` styleKind branches). Mirrors `note_json.type`.
  */
-export type HighlightStyleKind = 'highlight' | 'underline' | 'strikethrough' | 'squiggly' | 'replace' | 'insert' | 'textbox';
+export type HighlightStyleKind =
+  | 'highlight'
+  | 'underline'
+  | 'strikethrough'
+  | 'squiggly'
+  | 'replace'
+  | 'insert'
+  | 'textbox'
+  // PDF shapes (pdf_shape_tools.md): annotations of their own kind in the same rows / list / history.
+  | 'rectangle'
+  | 'ellipse'
+  | 'line'
+  | 'arrow';
 
 /**
  * Application-facing view of one highlight/underline — a `notes` row whose `note_json.group`

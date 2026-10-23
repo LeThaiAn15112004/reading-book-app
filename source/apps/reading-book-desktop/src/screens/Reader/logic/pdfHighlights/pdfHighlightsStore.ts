@@ -16,11 +16,16 @@ import {
   pdfCaretRect,
   pdfHighlightDtoToReaderHighlight,
   pdfRectsFromAnnotation,
+  pdfShapeAnnotation,
+  isShapeStyleKind,
+  shapeColorHex,
   type HighlightHistory,
   type HighlightStyleKind,
   type MarkupInteractionTool,
   type PdfHighlightRect,
   type PdfReaderHighlight,
+  type PdfShapeGeometryResult,
+  type PdfShapeKind,
 } from '@reading-book/book-reader-sdk'
 import { overlayApi } from '../../../../bridge'
 import { usePdfSignedWriteStore } from '../pdfExport/pdfSignedWriteStore'
@@ -117,6 +122,18 @@ type PdfHighlightsStoreState = PdfHighlightsContext & {
   /** Click / right-click on a mark or note icon — focus it and open its menu (note: its popup). */
   openHighlight: (id: string, rect: PdfAnnotationAnchor) => void
   closeEditPopup: () => void
+  /**
+   * Focus a row WITHOUT opening any menu — how a shape is "selected": the PDF surface draws its handles and
+   * toolbar from the focus, the Notes list marks its card. `null` clears.
+   */
+  focusHighlight: (id: string | null) => void
+  /**
+   * Shape tools: save a finished drag as a shape annotation of `kind` (a row of the same table, list and
+   * history as every annotation). `look.opacity` is folded into the colour (`#RRGGBBAA`). Returns the row.
+   */
+  createShape: (pageIndex: number, kind: PdfShapeKind, geometry: PdfShapeGeometryResult, look: { colorHex: string; opacity: number }) => PdfReaderHighlight | null
+  /** Resize / reshape / restroke a shape: `geometry` replaces its box (and endpoints / pen width) — one history step. */
+  updateShapeGeometry: (id: string, geometry: PdfShapeGeometryResult) => void
   /** A click on blank page area (or a fresh selection menu): close the menu, drop the outline. */
   dismissAnnotationUi: () => void
   updateHighlightColor: (id: string, colorHex: string) => void
@@ -400,6 +417,57 @@ export const usePdfHighlightsStore = create<PdfHighlightsStoreState>()((set, get
 
   closeEditPopup: () => set({ activeHighlight: null, focusedHighlightId: null }),
 
+  focusHighlight: (id) => {
+    if (id !== null && !get().highlights.some((h) => h.id === id)) return
+    if (get().focusedHighlightId === id && get().activeHighlight === null) return
+    set({ focusedHighlightId: id, activeHighlight: null })
+  },
+
+  createShape: (pageIndex, kind, geometry, look) => {
+    const { bookId, onToast } = get()
+    if (!bookId) return null
+    const annotation = pdfShapeAnnotation(pageIndex, geometry.rect, geometry.shape)
+    const now = new Date().toISOString()
+    const highlight: PdfReaderHighlight = {
+      id: crypto.randomUUID(),
+      locatorRef: packPdfHighlightLocator(annotation),
+      page: pageIndex + 1,
+      chapterIndex: pageIndex,
+      rects: pdfRectsFromAnnotation(annotation),
+      shape: geometry.shape,
+      styleKind: kind,
+      colorHex: shapeColorHex(look.colorHex, look.opacity),
+      tags: [],
+      createdAt: now,
+      updatedAt: now,
+    }
+    get().history.push(highlightAdd(highlight))
+    set((s) => ({ highlights: [...s.highlights, highlight] }))
+    void overlayApi
+      .saveHighlight(toSaveInput(bookId, highlight))
+      .then((saved) => {
+        if (saved) return
+        removeHighlightRow(set, highlight.id)
+        onToast('Could not save the shape.')
+      })
+      .catch(() => {
+        removeHighlightRow(set, highlight.id)
+        onToast('Could not save the shape.')
+      })
+    return highlight
+  },
+
+  updateShapeGeometry: (id, geometry) => {
+    const current = get().highlights.find((h) => h.id === id)
+    if (!current || !isShapeStyleKind(current.styleKind)) return
+    const annotation = pdfShapeAnnotation(current.page - 1, geometry.rect, geometry.shape)
+    patchHighlight(get, set, id, {
+      locatorRef: packPdfHighlightLocator(annotation),
+      rects: pdfRectsFromAnnotation(annotation),
+      shape: geometry.shape,
+    })
+  },
+
   dismissAnnotationUi: () => {
     if (get().pendingInsert) get().cancelInsert()
     if (get().activeHighlight || get().focusedHighlightId) get().closeEditPopup()
@@ -407,7 +475,9 @@ export const usePdfHighlightsStore = create<PdfHighlightsStoreState>()((set, get
 
   updateHighlightColor: (id, colorHex) => {
     patchHighlight(get, set, id, { colorHex })
-    set({ lastUsedColorHex: colorHex })
+    // A shape's colour never becomes the colour of the next text highlight.
+    const row = get().highlights.find((h) => h.id === id)
+    if (!row || !isShapeStyleKind(row.styleKind)) set({ lastUsedColorHex: colorHex })
   },
 
   updateHighlightStyleKind: (id, styleKind) => {
@@ -450,6 +520,8 @@ export const usePdfHighlightsStore = create<PdfHighlightsStoreState>()((set, get
     api.goToPagePoint(highlight.page, first?.y)
     get().onChromeHidden(true)
     api.flashAnnotation(highlight.id)
+    // A shape is selected by the jump (handles + toolbar), like clicking it on the page.
+    if (isShapeStyleKind(highlight.styleKind)) get().focusHighlight(highlight.id)
   },
 
   undo: () => {
@@ -488,7 +560,7 @@ function toSaveInput(bookId: string, h: PdfReaderHighlight) {
     note: h.note,
     tags: h.tags,
     selectionTextRef: packSelectionTextRef(h.selectionText),
-    pdfAnnotationRef: pdfAnnotationRefForRects(h.rects, { caret: h.caret }),
+    pdfAnnotationRef: pdfAnnotationRefForRects(h.rects, { caret: h.caret, shape: h.shape }),
     createdAt: h.createdAt,
   }
 }

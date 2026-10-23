@@ -41,6 +41,11 @@ const LEGACY_ALPHA: Record<HighlightStyleKind, number> = {
   insert: 0.9,
   highlight: 0.35,
   textbox: 1,
+  // PDF shapes never reach the EPUB / text pickers; opaque like a plain pen
+  rectangle: 1,
+  ellipse: 1,
+  line: 1,
+  arrow: 1,
 }
 
 /**

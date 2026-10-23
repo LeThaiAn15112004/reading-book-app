@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef, useState } from 'react'
+import { useZipImportStore } from '../../hooks/library'
 
 export type ImportMenuProps = {
   onFromDevice: () => void
@@ -41,6 +42,26 @@ function LinkIcon({ className }: { className?: string }) {
         strokeLinecap="round"
         strokeLinejoin="round"
         d="M13.19 8.688a4.5 4.5 0 0 1 1.242 7.244l-4.5 4.5a4.5 4.5 0 0 1-6.364-6.364l1.757-1.757m13.35-.622 1.757-1.757a4.5 4.5 0 0 0-6.364-6.364l-4.5 4.5a4.5 4.5 0 0 0 1.242 7.244"
+      />
+    </svg>
+  )
+}
+
+function ZipIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      fill="none"
+      viewBox="0 0 24 24"
+      strokeWidth={2}
+      stroke="currentColor"
+      className={className}
+      aria-hidden
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M9 18V5l12-2v13M9 18a3 3 0 1 1-6 0 3 3 0 0 1 6 0Zm12-2a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"
       />
     </svg>
   )
@@ -142,6 +163,15 @@ export function ImportMenu({
           <LinkIcon className={iconClass} />
           <span>Import URL</span>
         </button>
+        <button
+          type="button"
+          className={secondaryClass}
+          aria-label="Import audiobook from a ZIP archive"
+          onClick={() => void useZipImportStore.getState().start()}
+        >
+          <ZipIcon className={iconClass} />
+          <span>Audiobook ZIP</span>
+        </button>
       </div>
     </div>
   )
@@ -225,7 +255,7 @@ function ImportDropdown({
           id={menuId}
           role="menu"
           aria-label="Import options"
-          className="absolute top-[calc(100%+6px)] right-0 z-[100] flex w-[190px] flex-col gap-1 rounded-lg border border-lib-border bg-lib-surface-strong p-1.5 shadow-[0_12px_32px_rgba(0,0,0,0.35)] backdrop-blur-md"
+          className="absolute top-[calc(100%+6px)] right-0 z-[100] flex w-[210px] flex-col gap-1 rounded-lg border border-lib-border bg-lib-surface-strong p-1.5 shadow-[0_12px_32px_rgba(0,0,0,0.35)] backdrop-blur-md"
         >
           <button
             type="button"
@@ -244,6 +274,15 @@ function ImportDropdown({
           >
             <LinkIcon className="size-4" />
             <span>Import URL</span>
+          </button>
+          <button
+            type="button"
+            role="menuitem"
+            className="flex w-full cursor-pointer items-center gap-2.5 rounded-md border-none bg-transparent px-3 py-2.5 text-left text-[13px] text-lib-text transition-colors hover:bg-white/5 hover:text-lib-text-strong [&_svg]:text-lib-muted hover:[&_svg]:text-lib-accent"
+            onClick={() => choose(() => void useZipImportStore.getState().start())}
+          >
+            <ZipIcon className="size-4" />
+            <span>Audiobook ZIP</span>
           </button>
         </div>
       ) : null}

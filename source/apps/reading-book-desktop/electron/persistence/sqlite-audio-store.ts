@@ -36,7 +36,7 @@ export class SqliteAudioStore {
         `UPDATE books
          SET reading_state_json = json_patch(reading_state_json, @patch),
              updated_at = @now
-         WHERE id = @id AND file_format = 'mp3'`,
+         WHERE id = @id AND file_format IN ('mp3', 'm4a', 'm4b', 'aac', 'wav', 'flac', 'ogg', 'opus')`,
       )
       .run({ id, patch: JSON.stringify({ audioBookmarks: clean }), now: new Date().toISOString() })
     return Number(result.changes) > 0

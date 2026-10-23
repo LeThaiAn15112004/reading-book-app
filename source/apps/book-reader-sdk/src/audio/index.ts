@@ -1,5 +1,12 @@
 export { parseByteRange, type ByteRange } from './byte-range.js'
-export { audioMimeForFormat, isAudioFormat } from './audio-formats.js'
+export {
+  AUDIO_FORMAT_KEYS,
+  audioFormatFromExtension,
+  audioMimeForFormat,
+  audioPlaybackStatus,
+  isAudioFormat,
+  type AudioPlaybackStatus,
+} from './audio-formats.js'
 export {
   MAX_PLAYBACK_RATE,
   MIN_PLAYBACK_RATE,
@@ -53,3 +60,38 @@ export {
   updateAudioBookmarkNote,
   type AudioBookmark,
 } from './audio-bookmarks.js'
+export {
+  COVER_EXTENSIONS,
+  ZIP_IMPORT_LIMITS,
+  archiveBasename,
+  archiveExtension,
+  buildZipTree,
+  canConfirmSelection,
+  classifyEntry,
+  collisionKey,
+  compareArchivePaths,
+  deselectAllTracks,
+  flattenZipTree,
+  initialSelection,
+  isJunkPath,
+  naturalCompare,
+  normalizeArchivePath,
+  orderWarnings,
+  rankCoverCandidates,
+  selectAllTracks,
+  setCover,
+  toggleTrack,
+  validateZipSelection,
+  type ArchivePathResult,
+  type SelectionCheck,
+  type ZipEntryClassification,
+  type ZipEntryKind,
+  type ZipEntryStatus,
+  type ZipImportPreview,
+  type ZipImportSelection,
+  type ZipPreviewEntry,
+  type ZipRejectCode,
+  type ZipTreeNode,
+  type ZipTreeRow,
+  type ZipWarning,
+} from './audio-zip-import.js'

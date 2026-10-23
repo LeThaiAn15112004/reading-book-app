@@ -103,6 +103,17 @@ export const OverlayChannels = {
   resolvePdfAnnotationConflict: 'overlay:resolvePdfAnnotationConflict',
 } as const
 
+export const ZipImportChannels = {
+  /** Native ZIP picker + inspection; the renderer never supplies a path. */
+  pick: 'zipImport:pick',
+  coverPreview: 'zipImport:coverPreview',
+  confirm: 'zipImport:confirm',
+  discard: 'zipImport:discard',
+  cancelInspect: 'zipImport:cancelInspect',
+  /** Main → renderer: a ZIP was picked and inspection started (never sent while the picker is open). */
+  inspecting: 'zipImport:inspecting',
+} as const
+
 export const AudioChannels = {
   /** Chapters the audio file declares about itself (unvalidated seconds). */
   getChapters: 'audio:getChapters',

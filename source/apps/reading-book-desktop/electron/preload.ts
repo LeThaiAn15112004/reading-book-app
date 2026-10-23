@@ -18,6 +18,7 @@ import {
   TxtChannels,
   UpdateChannels,
   WordCountChannels,
+  ZipImportChannels,
 } from './ipc/channels'
 
 const api: DesktopApi = {
@@ -121,6 +122,22 @@ const api: DesktopApi = {
   graphics: {
     list: (bookId) => ipcRenderer.invoke(GraphicsChannels.list, bookId),
     apply: (input) => ipcRenderer.invoke(GraphicsChannels.apply, input),
+  },
+  zipImport: {
+    pick: () => ipcRenderer.invoke(ZipImportChannels.pick),
+    coverPreview: (input) => ipcRenderer.invoke(ZipImportChannels.coverPreview, input),
+    confirm: (input) => ipcRenderer.invoke(ZipImportChannels.confirm, input),
+    discard: (sessionId) => ipcRenderer.invoke(ZipImportChannels.discard, sessionId),
+    cancelInspect: () => ipcRenderer.invoke(ZipImportChannels.cancelInspect),
+    onInspecting: (handler) => {
+      const listener = (_event: Electron.IpcRendererEvent, info: Parameters<typeof handler>[0]) => {
+        handler(info)
+      }
+      ipcRenderer.on(ZipImportChannels.inspecting, listener)
+      return () => {
+        ipcRenderer.removeListener(ZipImportChannels.inspecting, listener)
+      }
+    },
   },
   audio: {
     getChapters: (bookId) => ipcRenderer.invoke(AudioChannels.getChapters, bookId),

@@ -13,7 +13,7 @@
  * (`pdfAnnotationFromRects` / `pdfRectsFromAnnotation`).
  */
 
-import { PageRectLocation, Rect, type NoteLocator, type PdfAnnotation, type PdfAnnotationRect } from '../domain/index.js'
+import { PageRectLocation, Rect, type NoteLocator, type PdfAnnotation, type PdfAnnotationRect, type PdfShapeGeometry } from '../domain/index.js'
 import { packBookmarkLocator, parseBookmarkLocation } from './bookmark-location.js'
 import { DEFAULT_HIGHLIGHT_COLOR } from './highlight-colors.js'
 import {
@@ -54,6 +54,8 @@ export type PdfReaderHighlight = ReaderHighlightBase & {
   rects: PdfHighlightRect[]
   /** Inserted Text: `rects` is a single caret box at an insertion point (see `pdfCaretRect`). */
   caret?: true
+  /** Shape annotations (rectangle / ellipse / line / arrow): pen width and, for a line / arrow, its endpoints. */
+  shape?: PdfShapeGeometry
 }
 
 export function isPdfReaderHighlight(h: ReaderHighlightBase): h is PdfReaderHighlight {
@@ -206,7 +208,29 @@ export function parsePdfAnnotation(value: unknown): PdfAnnotation | undefined {
     if (typeof v.contents !== 'string' || v.contents.length > MAX_CONTENTS_LENGTH) return undefined
     annotation.contents = v.contents
   }
+  if (v.shape !== undefined) {
+    // A shape is ONE box (rects[0]) plus its pen; a line / arrow adds its endpoints, all on the page.
+    const shape = parseShapeGeometry(v.shape)
+    if (!shape || rects.length !== 1) return undefined
+    annotation.shape = shape
+  }
   return annotation
+}
+
+const MAX_SHAPE_STROKE = 0.1
+
+function parseShapeGeometry(value: unknown): PdfShapeGeometry | undefined {
+  if (!value || typeof value !== 'object') return undefined
+  const v = value as Record<string, unknown>
+  if (!isFiniteNumber(v.strokeWidth) || v.strokeWidth <= 0 || v.strokeWidth > MAX_SHAPE_STROKE) return undefined
+  const shape: PdfShapeGeometry = { strokeWidth: v.strokeWidth }
+  if (v.line !== undefined) {
+    if (!Array.isArray(v.line) || v.line.length !== 4) return undefined
+    const line = v.line as unknown[]
+    if (!line.every((n) => isFiniteNumber(n) && n >= -EDGE_EPSILON && n <= 1 + EDGE_EPSILON)) return undefined
+    shape.line = line as [number, number, number, number]
+  }
+  return shape
 }
 
 /** `parsePdfAnnotation` over the JSON string that crosses IPC (size-capped before parsing). */
@@ -278,6 +302,7 @@ export function pdfHighlightDtoToReaderHighlight(dto: {
     chapterIndex: annotation.pageIndex,
     rects: pdfRectsFromAnnotation(annotation),
     ...(annotation.caret ? { caret: true as const } : {}),
+    ...(annotation.shape ? { shape: annotation.shape } : {}),
     styleKind: dto.styleKind,
     colorHex: dto.colorHex?.trim() || DEFAULT_HIGHLIGHT_COLOR,
     note: dto.note?.trim() || undefined,
@@ -291,10 +316,12 @@ export function pdfHighlightDtoToReaderHighlight(dto: {
 /** Renderer rects → the `pdfAnnotation` a save sends over IPC. */
 export function pdfAnnotationRefForRects(
   rects: readonly PdfHighlightRect[],
-  options?: { caret?: boolean },
+  options?: { caret?: boolean; shape?: PdfShapeGeometry },
 ): string | undefined {
   const annotation = pdfAnnotationFromRects(rects, options)
-  return annotation ? packPdfAnnotationRef(annotation) : undefined
+  if (!annotation) return undefined
+  if (options?.shape) annotation.shape = options.shape
+  return packPdfAnnotationRef(annotation)
 }
 
 /**

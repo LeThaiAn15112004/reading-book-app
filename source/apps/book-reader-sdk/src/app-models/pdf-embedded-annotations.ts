@@ -23,7 +23,7 @@
  * rows. A move or resize without `/NM` is a delete plus an insert.
  */
 
-import type { NoteLocator, NoteSelectionText, PdfAnnotation, PdfAnnotationRect } from '../domain/index.js'
+import type { NoteLocator, NoteSelectionText, PdfAnnotation, PdfAnnotationRect, PdfShapeGeometry } from '../domain/index.js'
 import { DEFAULT_HIGHLIGHT_COLOR } from './highlight-colors.js'
 import type { HighlightStyleKind } from './highlight-location.js'
 import {
@@ -34,9 +34,10 @@ import {
   pdfAnnotationFromRects,
   type PdfHighlightRect,
 } from './pdf-highlight.js'
+import { clampShapeStroke, shapeColorHex } from './pdf-shape.js'
 
 /** PDF annotation subtypes the import understands — the ones the `notes` model can represent. */
-export const EMBEDDED_PDF_ANNOTATION_SUBTYPES = ['Highlight', 'Underline', 'Squiggly', 'StrikeOut', 'Text'] as const
+export const EMBEDDED_PDF_ANNOTATION_SUBTYPES = ['Highlight', 'Underline', 'Squiggly', 'StrikeOut', 'Text', 'Square', 'Circle', 'Line'] as const
 export type EmbeddedPdfAnnotationSubtype = (typeof EMBEDDED_PDF_ANNOTATION_SUBTYPES)[number]
 
 /**
@@ -48,6 +49,22 @@ export const EMBEDDED_PDF_ANNOTATION_STYLE: Record<EmbeddedPdfAnnotationSubtype,
   Squiggly: 'squiggly',
   StrikeOut: 'strikethrough',
   Text: 'textbox',
+  // Shapes: only the ones Readmate wrote itself (`/NM` readmate:*) are ever scanned — see `electron/pdf-sync/pdf-annotation-scan.ts`.
+  Square: 'rectangle',
+  Circle: 'ellipse',
+  Line: 'line',
+}
+
+/** Subtypes that are shapes: one box + a `shape` geometry, no text. */
+export const EMBEDDED_PDF_SHAPE_SUBTYPES: readonly EmbeddedPdfAnnotationSubtype[] = ['Square', 'Circle', 'Line']
+
+export function isEmbeddedShapeSubtype(subtype: EmbeddedPdfAnnotationSubtype): boolean {
+  return EMBEDDED_PDF_SHAPE_SUBTYPES.includes(subtype)
+}
+
+/** The row style of a scanned item: a `Line` with an arrow end is an `arrow`. */
+export function embeddedStyleOf(item: Pick<ScannedPdfAnnotation, 'subtype' | 'arrow'>): HighlightStyleKind {
+  return item.subtype === 'Line' && item.arrow ? 'arrow' : EMBEDDED_PDF_ANNOTATION_STYLE[item.subtype]
 }
 
 /** Upper bound on items one sync accepts (a scan stops collecting there too). */
@@ -98,6 +115,12 @@ export type ScannedPdfAnnotation = {
   text?: string
   /** `/NM`, the annotation's name (unique per page) — the stable identity when present. */
   nm?: string
+  /** Shapes: pen width and, for a `Line`, its endpoints (normalized like `rects`). */
+  shape?: PdfShapeGeometry
+  /** A `Line` whose end carries an arrow head (`/LE [/None /OpenArrow]`-style). */
+  arrow?: true
+  /** Shapes: `/CA`, 0–1 (absent = 1). */
+  opacity?: number
 }
 
 function isFiniteNumber(value: unknown): value is number {
@@ -187,7 +210,7 @@ export function readPdfJsAnnotation(raw: unknown, page: PdfPageViewportInfo): Sc
   if (!(page.width > 0) || !(page.height > 0)) return null
 
   let boxes: number[][]
-  if (data.subtype === 'Text') {
+  if (data.subtype === 'Text' || isEmbeddedShapeSubtype(data.subtype)) {
     const rect = numbers(data.rect)
     boxes = rect?.length === 4 ? [rect] : []
   } else {
@@ -216,6 +239,25 @@ export function readPdfJsAnnotation(raw: unknown, page: PdfPageViewportInfo): Sc
     const text = capped(data.overlaidText.replace(/\s+/g, ' ').trim(), MAX_TEXT_LENGTH)
     if (text) item.text = text
   }
+  if (isEmbeddedShapeSubtype(data.subtype)) {
+    if (rects.length !== 1) return null
+    const borderWidth = (data.borderStyle as { width?: unknown } | undefined)?.width
+    const widthUser = isFiniteNumber(borderWidth) && borderWidth > 0 ? borderWidth : 1
+    const [a, b, c, d, e, f] = page.transform as [number, number, number, number, number, number]
+    const shape: PdfShapeGeometry = { strokeWidth: clampShapeStroke((widthUser * Math.hypot(a, b)) / page.width) }
+    if (data.subtype === 'Line') {
+      const L = numbers(data.lineCoordinates)
+      if (!L || L.length !== 4) return null
+      const toDisplay = (x: number, y: number): [number, number] => [
+        Math.min(1, Math.max(0, (a * x + c * y + e) / page.width)),
+        Math.min(1, Math.max(0, (b * x + d * y + f) / page.height)),
+      ]
+      const p1 = toDisplay(L[0]!, L[1]!)
+      const p2 = toDisplay(L[2]!, L[3]!)
+      shape.line = [p1[0], p1[1], p2[0], p2[1]]
+    }
+    item.shape = shape
+  }
   return item
 }
 
@@ -235,8 +277,12 @@ export function parseScannedPdfAnnotation(value: unknown): ScannedPdfAnnotation 
   const v = value as Record<string, unknown>
   if (typeof v.objectId !== 'string' || !v.objectId || v.objectId.length > MAX_OBJECT_ID_LENGTH) return null
   if (!isSubtype(v.subtype)) return null
-  const annotation = parsePdfAnnotation({ pageIndex: v.pageIndex, rects: v.rects })
+  const annotation = parsePdfAnnotation({ pageIndex: v.pageIndex, rects: v.rects, shape: v.shape })
   if (!annotation) return null
+  if (isEmbeddedShapeSubtype(v.subtype) !== (annotation.shape !== undefined)) return null
+  if (v.subtype === 'Line' && !annotation.shape?.line) return null
+  if (v.arrow !== undefined && (v.arrow !== true || v.subtype !== 'Line')) return null
+  if (v.opacity !== undefined && (typeof v.opacity !== 'number' || !(v.opacity >= 0 && v.opacity <= 1))) return null
   if (annotation.rects.some((r) => (r.pageIndex ?? annotation.pageIndex) !== annotation.pageIndex)) return null
   const colorHex = optionalString(v.colorHex, 7)
   if (colorHex === null || (colorHex !== undefined && !/^#[0-9A-F]{6}$/.test(colorHex))) return null
@@ -257,6 +303,9 @@ export function parseScannedPdfAnnotation(value: unknown): ScannedPdfAnnotation 
   if (author) item.author = author
   if (text) item.text = text
   if (nm) item.nm = nm
+  if (annotation.shape) item.shape = annotation.shape
+  if (v.arrow === true) item.arrow = true
+  if (typeof v.opacity === 'number' && v.opacity < 1) item.opacity = v.opacity
   return item
 }
 
@@ -329,6 +378,9 @@ export function embeddedAnnotationSourceHash(item: ScannedPdfAnnotation): string
       item.contents ?? '',
       item.author ?? '',
       item.text ?? '',
+      item.shape ?? null,
+      item.arrow ?? false,
+      item.opacity ?? 1,
     ]),
   )
 }
@@ -349,7 +401,11 @@ export type HighlightContent = {
  */
 export function highlightContentHash(content: HighlightContent): string {
   const geometry = content.pdfAnnotation
-    ? [content.pdfAnnotation.pageIndex, content.pdfAnnotation.rects.map((r) => [r.pageIndex ?? null, r.x, r.y, r.width, r.height])]
+    ? [
+        content.pdfAnnotation.pageIndex,
+        content.pdfAnnotation.rects.map((r) => [r.pageIndex ?? null, r.x, r.y, r.width, r.height]),
+        ...(content.pdfAnnotation.shape ? [content.pdfAnnotation.shape] : []),
+      ]
     : null
   return hash53(
     JSON.stringify([
@@ -374,11 +430,12 @@ export function highlightFromEmbeddedAnnotation(item: ScannedPdfAnnotation): Emb
   const pdfAnnotation: PdfAnnotation = {
     pageIndex: item.pageIndex,
     rects: item.rects.map((r) => ({ pageIndex: item.pageIndex, x: r.x, y: r.y, width: r.width, height: r.height })),
+    ...(item.shape ? { shape: item.shape } : {}),
   }
   const highlight: EmbeddedAnnotationHighlight = {
     locator: JSON.parse(packPdfHighlightLocator(pdfAnnotation)) as NoteLocator,
-    styleKind: EMBEDDED_PDF_ANNOTATION_STYLE[item.subtype],
-    colorHex: item.colorHex ?? DEFAULT_HIGHLIGHT_COLOR,
+    styleKind: embeddedStyleOf(item),
+    colorHex: item.shape ? shapeColorHex(item.colorHex ?? DEFAULT_HIGHLIGHT_COLOR, item.opacity ?? 1) : (item.colorHex ?? DEFAULT_HIGHLIGHT_COLOR),
     tags: [],
     pdfAnnotation,
   }

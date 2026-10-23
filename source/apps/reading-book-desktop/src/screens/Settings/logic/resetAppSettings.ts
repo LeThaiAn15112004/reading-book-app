@@ -3,6 +3,7 @@ import { useAppAppearanceStore } from '../../../theme/appAppearanceStore'
 import { usePdfViewStore } from '../../Reader/logic/pdfView/pdfViewStore'
 import { useLibraryBrowseStore } from '../../Library/logic/libraryBrowseStore'
 import { usePdfInkPrefsStore } from '../../Reader/logic/pdfInk/pdfInkPrefsStore'
+import { usePdfShapePrefsStore } from '../../Reader/logic/pdfShapes/pdfShapePrefsStore'
 import { useBackgroundStore } from './backgroundStore'
 import { useNotificationsStore } from './notificationsStore'
 
@@ -31,6 +32,7 @@ export const APP_SETTINGS_RESETTERS: readonly AppSettingsResetter[] = [
   { id: 'library', label: 'Library', reset: () => useLibraryBrowseStore.getState().reset() },
   { id: 'pdf-view', label: 'PDF page layout', reset: () => usePdfViewStore.getState().reset() },
   { id: 'pdf-ink', label: 'PDF pen', reset: () => usePdfInkPrefsStore.getState().reset() },
+  { id: 'pdf-shape', label: 'PDF shapes', reset: () => usePdfShapePrefsStore.getState().reset() },
   {
     id: 'notifications',
     label: 'Notifications',

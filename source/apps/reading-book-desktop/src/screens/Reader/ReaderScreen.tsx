@@ -8,6 +8,10 @@ import {
   fontFamilyCss,
   formatHighlightCitation,
   isMarkupTool,
+  isShapeStyleKind,
+  shapeColorHex,
+  shapeOpacityOf,
+  shapeStrokeHex,
   resolveTxtReadingOffset,
   buildMdOutline,
   type InteractionTool,
@@ -38,6 +42,7 @@ import {
   pdfFitPageZoom,
   pdfSelectionPageLabel,
   type PdfRendererApi,
+  type PdfShapeMark,
 } from '../../reader/renderers/pdf'
 import { TxtRenderer, type TxtRendererApi } from '../../reader/renderers/txt'
 import { MdRenderer, decodeMdSource, type MdRendererApi, type MdSelectionInfo } from '../../reader/renderers/md'
@@ -111,6 +116,7 @@ import {
 import { INSERT_CARET_COLOR } from './logic/pdfHighlights/pdfHighlightsStore'
 import { useReaderPdfInk } from './logic/hooks/useReaderPdfInk'
 import { useReaderPdfGraphics } from './logic/hooks/useReaderPdfGraphics'
+import { usePdfShapePrefsStore } from './logic/pdfShapes/pdfShapePrefsStore'
 import { usePdfInkPrefsStore } from './logic/pdfInk/pdfInkPrefsStore'
 import { pdfDeleteFocused, pdfHasFocusedMark, pdfRedo, pdfUndo } from './logic/pdfInk/pdfUndoRouter'
 import { PdfInkPanel } from './components/chrome/PdfInkPanel'
@@ -333,7 +339,7 @@ export function ReaderScreen() {
   translateModeRef.current = translation.mode
   // The Pen exists on the PDF surface only: another book (or format) leaves it.
   useEffect(() => {
-    if (!isPdfSurface && (activeTool === 'pen' || activeTool === 'eraser')) setActiveTool('select')
+    if (!isPdfSurface && (activeTool === 'pen' || activeTool === 'eraser' || activeTool === 'shape')) setActiveTool('select')
   }, [isPdfSurface, activeTool])
   const selectTool = (tool: InteractionTool | ((current: InteractionTool) => InteractionTool)) => {
     if (translateModeRef.current) translation.setMode(false)
@@ -578,11 +584,12 @@ export function ReaderScreen() {
         ? txt.markup
         : highlights
   /** PDF marks as painted: the saved annotations plus the caret still being placed (Inserted Text). */
+  const pdfTextHighlights = useMemo(() => pdfHighlights.highlights.filter((h) => !isShapeStyleKind(h.styleKind)), [pdfHighlights.highlights])
   const pdfMarks = useMemo(
     () =>
       pdfHighlights.pendingInsert
         ? [
-            ...pdfHighlights.highlights,
+            ...pdfTextHighlights,
             {
               id: PENDING_INSERT_DRAFT.id,
               styleKind: 'insert' as const,
@@ -591,9 +598,27 @@ export function ReaderScreen() {
               caret: true,
             },
           ]
-        : pdfHighlights.highlights,
-    [pdfHighlights.highlights, pdfHighlights.pendingInsert],
+        : pdfTextHighlights,
+    [pdfTextHighlights, pdfHighlights.pendingInsert],
   )
+  // Shape annotations: rows of the same list / history / table as every annotation, painted and selected by their own layer
+  // (so a shape's box never swallows a click meant for the text under it). The focused row is the selected shape.
+  const pdfShapes = useMemo(
+    () =>
+      pdfHighlights.highlights.flatMap((h): PdfShapeMark[] => {
+        const rect = h.rects[0]
+        if (!isShapeStyleKind(h.styleKind) || !h.shape || !rect) return []
+        return [{ id: h.id, kind: h.styleKind, pageIndex: h.page - 1, rect: { x: rect.x, y: rect.y, width: rect.width, height: rect.height }, shape: h.shape, colorHex: h.colorHex }]
+      }),
+    [pdfHighlights.highlights],
+  )
+  const selectedShapeId = pdfShapes.some((s) => s.id === pdfHighlights.focusedHighlightId) ? pdfHighlights.focusedHighlightId : null
+  const shapePrefs = {
+    kind: usePdfShapePrefsStore((s) => s.kind),
+    colorHex: usePdfShapePrefsStore((s) => s.colorHex),
+    width: usePdfShapePrefsStore((s) => s.width),
+    opacity: usePdfShapePrefsStore((s) => s.opacity),
+  }
   /** Inserted Text being placed: PDF or Markdown (the caret exists, the annotation does not yet). */
   const pendingInsert = isPdfSurface && pdfHighlights.pendingInsert
     ? { anchor: pdfHighlights.pendingInsert.anchor, commit: pdfHighlights.commitInsert, cancel: pdfHighlights.cancelInsert }
@@ -651,7 +676,7 @@ export function ReaderScreen() {
         translation.setMode(false)
         return true
       }
-      if (!isMarkupTool(activeToolRef.current) && activeToolRef.current !== 'pen' && activeToolRef.current !== 'eraser') return false
+      if (!isMarkupTool(activeToolRef.current) && activeToolRef.current !== 'pen' && activeToolRef.current !== 'eraser' && activeToolRef.current !== 'shape') return false
       setActiveTool('select')
       return true
     },
@@ -705,6 +730,7 @@ export function ReaderScreen() {
     replace: { active: activeTool === 'replace' },
     insert: { active: activeTool === 'insert' },
     pen: { active: activeTool === 'pen' },
+    shape: { active: activeTool === 'shape' },
     eraser: { active: activeTool === 'eraser' },
     snapshot: { active: snapshot.active },
     settings: { active: chrome.settingsOpen, expanded: chrome.settingsOpen },
@@ -748,6 +774,7 @@ export function ReaderScreen() {
       case 'replace':
       case 'insert':
       case 'pen':
+      case 'shape':
       case 'eraser':
         // Click the armed tool again to disarm it (back to Select); otherwise arm it — sticky across
         // multiple highlights/underlines/strikethroughs until toggled off, Escape, or Hand/Select.
@@ -1016,6 +1043,7 @@ export function ReaderScreen() {
                     ? txtSidebarHighlights
                     : highlights.highlights
             }
+            activeHighlightId={isPdfSurface ? selectedShapeId : null}
             onJumpHighlight={(highlight) => {
               if (isMdSurface) {
                 const row = mdHighlights.highlights.find((h) => h.id === highlight.id)
@@ -1503,6 +1531,25 @@ export function ReaderScreen() {
               onInkSelect={pdfInk.select}
               onInkMove={pdfInk.moveStroke}
               onInkResize={pdfInk.resizeStroke}
+              shapes={pdfShapes}
+              selectedShapeId={selectedShapeId}
+              onShapeSelect={(id) => {
+                if (id) pdfHighlights.focusHighlight(id)
+                else if (selectedShapeId) pdfHighlights.focusHighlight(null)
+              }}
+              shapePen={shapePrefs}
+              onShapeCreate={(pageIndex, kind, geometry) => {
+                pdfHighlights.createShape(pageIndex, kind, geometry, { colorHex: shapePrefs.colorHex, opacity: shapePrefs.opacity })
+              }}
+              onShapeResize={pdfHighlights.updateShapeGeometry}
+              renderShapeToolbar={(shape) => (
+                <PdfInkQuickToolbar
+                  colorHex={shapeStrokeHex(shape.colorHex)}
+                  // The colour edit keeps the shape's opacity (they share one #RRGGBBAA string).
+                  onColor={(hex) => pdfHighlights.updateHighlightColor(shape.id, shapeColorHex(hex, shapeOpacityOf(shape.colorHex)))}
+                  onDelete={() => pdfHighlights.deleteHighlight(shape.id)}
+                />
+              )}
               graphics={pdfGraphics.objects}
               selectedGraphicId={pdfGraphics.selectedId}
               onGraphicSelect={pdfGraphics.select}

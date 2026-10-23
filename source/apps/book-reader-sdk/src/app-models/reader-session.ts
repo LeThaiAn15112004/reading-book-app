@@ -29,6 +29,8 @@ export type InteractionTool =
   | 'pen'
   /** Stroke Eraser (PDF only, capability `inkAnnotations`): a drag removes whole Readmate Ink strokes, nothing else. */
   | 'eraser'
+  /** Shape tools (PDF only, capability `shapeAnnotations`): a drag draws a rectangle / ellipse / line / arrow annotation; never a text selection. */
+  | 'shape'
 
 /** The tools whose drag over text saves a mark in that style (the `HighlightStyleKind` of the same name). */
 export const MARKUP_TOOLS = ['highlight', 'underline', 'squiggly', 'strikethrough', 'replace', 'insert'] as const

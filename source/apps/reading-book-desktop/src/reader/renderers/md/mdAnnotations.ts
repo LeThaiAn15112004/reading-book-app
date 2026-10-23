@@ -270,6 +270,9 @@ function ruleFor(mark: MdMark): string {
       return `text-decoration: underline dashed ${c} 2px;`
     case 'textbox':
       return `background-color: color-mix(in srgb, ${c} 22%, transparent); text-decoration: underline dotted ${c} 2px;`
+    // PDF shapes are never Markdown marks.
+    default:
+      return ''
   }
 }
 

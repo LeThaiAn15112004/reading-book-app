@@ -45,6 +45,10 @@ import {
   isMarkupTool,
   pdfMarkAt,
   pdfGraphicAt,
+  pdfShapeHit,
+  moveShapeEndpoint,
+  resizeShapeBox,
+  shapeFromDrag,
   pickInkTarget,
   reduceInkInteraction,
   resizePdfGraphicBox,
@@ -56,6 +60,8 @@ import {
   type InkResizeHandle,
   type PdfGraphicBox,
   type PdfGraphicObject,
+  type PdfShapeGeometryResult,
+  type PdfShapeKind,
   type InteractionTool,
   type MarkupInteractionTool,
   type TextMatcher,
@@ -74,7 +80,8 @@ import {
   pdfPageSearchRanges,
 } from './pdfSearchDom'
 import { PdfPageInk, type PdfInkLayerMark } from './PdfInkLayer'
-import { PdfInkSelectionOverlay } from './PdfInkSelectionOverlay'
+import { PdfInkSelectionOverlay, type PdfCustomHandle } from './PdfInkSelectionOverlay'
+import { PdfPageShapes, type PdfShapeDraft, type PdfShapeFlash, type PdfShapeMark } from './PdfShapeLayer'
 import { readPdfInsertionPoint, type PdfInsertionPoint } from './pdfInsertionPoint'
 import { readPdfSelection, readPdfSelectionAt, type PdfSelectionInfo } from './pdfSelection'
 import { attachTextLayerSelection, detachTextLayerSelection } from './pdfTextLayerSelection'
@@ -251,6 +258,19 @@ export interface PdfRendererProps {
   onGraphicResize?: (id: string, box: PdfGraphicBox) => void
   /** The compact toolbar for the selected file object (only what its type allows). */
   renderGraphicToolbar?: (object: PdfGraphicObject) => ReactNode
+  /** Shape annotations (rows of the app's annotation list) to paint and select; the Reader keeps them out of `annotations`. */
+  shapes?: readonly PdfShapeMark[]
+  selectedShapeId?: string | null
+  /** A click selected a shape (`id`) or hit none (`null`). */
+  onShapeSelect?: (id: string | null) => void
+  /** The Shape tool's pen: what the NEXT shape is (kind, colour, thickness, opacity). */
+  shapePen?: { kind: PdfShapeKind; colorHex: string; width: number; opacity: number }
+  /** A finished Shape-tool drag: 0-based page, kind and the normalized geometry. The Reader saves it. */
+  onShapeCreate?: (pageIndex: number, kind: PdfShapeKind, geometry: PdfShapeGeometryResult) => void
+  /** A handle drag of the SELECTED shape was released: its new geometry. */
+  onShapeResize?: (id: string, geometry: PdfShapeGeometryResult) => void
+  /** The compact toolbar for the selected shape. */
+  renderShapeToolbar?: (shape: PdfShapeMark) => ReactNode
   /** The Eraser was released: delete these saved strokes (every one the gesture touched) as one operation. */
   onInkErase?: (ids: string[]) => void
   /** Stroke (whole strokes) or Partial (only the part under the eraser). Defaults to Stroke. */
@@ -381,6 +401,13 @@ export function PdfRenderer({
   onGraphicSelect,
   onGraphicResize,
   renderGraphicToolbar,
+  shapes,
+  selectedShapeId = null,
+  onShapeSelect,
+  shapePen,
+  onShapeCreate,
+  onShapeResize,
+  renderShapeToolbar,
   onInkErase,
   eraserMode = 'stroke',
   onInkPartialErase,
@@ -428,13 +455,14 @@ export function PdfRenderer({
   /** The handle drag in progress: `offset` = pointer minus the handle's centre at press time, `paths` = the preview. */
   const inkResizeRef = useRef<{
     pointerId: number
-    kind: 'ink' | 'graphic'
+    kind: 'ink' | 'graphic' | 'shape'
     id: string
     pageIndex: number
-    handle: InkResizeHandle
+    handle: string
     offset: InkPoint
     paths: InkPoint[][] | null
     box: PdfGraphicBox | null
+    geometry: PdfShapeGeometryResult | null
   } | null>(null)
   const [inkResize, setInkResize] = useState<{ id: string; paths: InkPoint[][] } | null>(null)
   const graphicsRef = useRef(graphics)
@@ -448,6 +476,24 @@ export function PdfRenderer({
   /** Preview of a file object's box during a handle drag (the file changes on release). */
   const [graphicResize, setGraphicResize] = useState<{ id: string; box: PdfGraphicBox } | null>(null)
   const [graphicHoverId, setGraphicHoverId] = useState<string | null>(null)
+  const shapesRef = useRef(shapes)
+  shapesRef.current = shapes
+  const selectedShapeIdRef = useRef(selectedShapeId)
+  selectedShapeIdRef.current = selectedShapeId
+  const onShapeSelectRef = useRef(onShapeSelect)
+  onShapeSelectRef.current = onShapeSelect
+  const onShapeResizeRef = useRef(onShapeResize)
+  onShapeResizeRef.current = onShapeResize
+  const onShapeCreateRef = useRef(onShapeCreate)
+  onShapeCreateRef.current = onShapeCreate
+  const shapePenRef = useRef(shapePen)
+  shapePenRef.current = shapePen
+  /** Preview of a shape's geometry during a handle drag (the row changes on release). */
+  const [shapeResize, setShapeResize] = useState<{ id: string; geometry: PdfShapeGeometryResult } | null>(null)
+  const [shapeHoverId, setShapeHoverId] = useState<string | null>(null)
+  /** The Shape-tool press in progress: the page it started on and the two normalized points (never saved until release). */
+  const shapeDraftRef = useRef<{ pointerId: number; pageIndex: number; kind: PdfShapeKind; start: InkPoint; end: InkPoint } | null>(null)
+  const [shapeDraft, setShapeDraft] = useState<PdfShapeDraft | null>(null)
   /** Stroke under the pointer (outline only — UI state, never saved) and the last idle pointer position. */
   const [inkHoverId, setInkHoverId] = useState<string | null>(null)
   const lastPointerRef = useRef<{ x: number; y: number } | null>(null)
@@ -466,6 +512,20 @@ export function PdfRenderer({
     }
     return byPage
   }, [inkStrokes, inkMove, inkResize, erasePreview])
+  const shapeTool = interactionTool === 'shape'
+  const shapeToolRef = useRef(shapeTool)
+  shapeToolRef.current = shapeTool
+  /** Shapes grouped by page; the one being resized is painted at its preview geometry. */
+  const shapesByPage = useMemo(() => {
+    const byPage = new Map<number, PdfShapeMark[]>()
+    for (const mark of shapes ?? []) {
+      const shown = shapeResize?.id === mark.id ? { ...mark, rect: shapeResize.geometry.rect, shape: shapeResize.geometry.shape } : mark
+      const list = byPage.get(shown.pageIndex)
+      if (list) list.push(shown)
+      else byPage.set(shown.pageIndex, [shown])
+    }
+    return byPage
+  }, [shapes, shapeResize])
   const eraser = interactionTool === 'eraser'
   const eraserRef = useRef(eraser)
   eraserRef.current = eraser
@@ -489,7 +549,7 @@ export function PdfRenderer({
   const markupToolRef = useRef(markupTool)
   markupToolRef.current = markupTool
   /** Hover / selection chrome exists only in Hand and Select: never under a pen, the eraser or a text-markup tool. */
-  const outlinesOn = inkOutlinesAvailable({ pen, eraser, markup: markupTool != null })
+  const outlinesOn = inkOutlinesAvailable({ pen: pen || shapeTool, eraser, markup: markupTool != null })
   const outlinesOnRef = useRef(outlinesOn)
   outlinesOnRef.current = outlinesOn
   const onMarkupSelectionRef = useRef(onMarkupSelection)
@@ -1451,17 +1511,38 @@ export function PdfRenderer({
     return point ? pdfGraphicAt(objects, selectedGraphicIdRef.current, hit.index, point[0], point[1], size.h / size.w, pagePx(hit.rect, 6)) : null
   }
 
-  /** What a pointer at client (`x`, `y`) refers to: this app's strokes sit above the file's own objects. */
-  const targetAt = (x: number, y: number): { kind: 'ink'; id: string } | { kind: 'graphic'; id: string } | null => {
+  /** The shape annotation under client (`x`, `y`): the selected one wherever it is hit, else the topmost (last in the list). */
+  const shapeAt = (x: number, y: number): PdfShapeMark | null => {
+    const list = shapesRef.current
+    if (!list?.length) return null
+    const hit = slotAt(x, y)
+    const size = hit ? sizes[hit.index] : undefined
+    if (!hit || !size) return null
+    const point = clientToPageUnit(x, y, hit.rect)
+    if (!point) return null
+    const ratio = size.h / size.w
+    const slop = pagePx(hit.rect, 6)
+    const touches = (m: PdfShapeMark) => m.pageIndex === hit.index && pdfShapeHit(m.kind, m.rect, m.shape, point[0], point[1], ratio, slop)
+    const selected = selectedShapeIdRef.current ? list.find((m) => m.id === selectedShapeIdRef.current) : undefined
+    if (selected && touches(selected)) return selected
+    for (let i = list.length - 1; i >= 0; i--) if (touches(list[i]!)) return list[i]!
+    return null
+  }
+
+  /** What a pointer at client (`x`, `y`) refers to: Ink strokes first, then shape annotations, then the file's own objects. */
+  const targetAt = (x: number, y: number): { kind: 'ink' | 'graphic' | 'shape'; id: string } | null => {
     const stroke = inkAt(x, y)
     if (stroke) return { kind: 'ink', id: stroke.id }
+    const shape = shapeAt(x, y)
+    if (shape) return { kind: 'shape', id: shape.id }
     const object = graphicAt(x, y)
     return object ? { kind: 'graphic', id: object.objectId } : null
   }
 
-  /** Select what is under the pointer (or nothing): one selection across strokes and file objects. */
-  const selectTarget = (target: { kind: 'ink' | 'graphic'; id: string } | null) => {
+  /** Select what is under the pointer (or nothing): one selection across strokes, shapes and file objects. */
+  const selectTarget = (target: { kind: 'ink' | 'graphic' | 'shape'; id: string } | null) => {
     onInkSelectRef.current?.(target?.kind === 'ink' ? target.id : null)
+    onShapeSelectRef.current?.(target?.kind === 'shape' ? target.id : null)
     onGraphicSelectRef.current?.(target?.kind === 'graphic' ? target.id : null)
   }
 
@@ -1470,8 +1551,10 @@ export function PdfRenderer({
     const target = outlinesOnRef.current ? targetAt(x, y) : null
     const inkId = target?.kind === 'ink' ? target.id : null
     const graphicId = target?.kind === 'graphic' && target.id !== selectedGraphicIdRef.current ? target.id : null
+    const shapeId = target?.kind === 'shape' ? target.id : null
     setInkHoverId((prev) => (prev === inkId ? prev : reduceInkInteraction({ hoverId: prev, selectedId: selectedInkIdRef.current }, { type: 'hover', id: inkId }).hoverId))
     setGraphicHoverId((prev) => (prev === graphicId ? prev : graphicId))
+    setShapeHoverId((prev) => (prev === shapeId ? prev : shapeId))
   }
 
   /** Re-run the hover hit test at the last idle pointer position (after a scroll, zoom, page change or stroke edit). */
@@ -1481,6 +1564,7 @@ export function PdfRenderer({
     else {
       setInkHoverId(null)
       setGraphicHoverId(null)
+      setShapeHoverId(null)
     }
   }
   const refreshInkHoverRef = useRef(refreshInkHover)
@@ -1489,7 +1573,7 @@ export function PdfRenderer({
   // The page moved under a still pointer: scroll, zoom, page turn, or the strokes / tool changed.
   useEffect(() => {
     refreshInkHoverRef.current()
-  }, [cssScale, spread, sizes, inkStrokes, graphics, outlinesOn, selectedInkId, selectedGraphicId])
+  }, [cssScale, spread, sizes, inkStrokes, graphics, shapes, outlinesOn, selectedInkId, selectedGraphicId, selectedShapeId])
   useEffect(() => {
     const scrollRoot = getScrollRootRef.current()
     if (!scrollRoot) return
@@ -1510,21 +1594,42 @@ export function PdfRenderer({
 
   // Escape deselects the stroke (and closes its toolbar); hover feedback stays. A running handle drag is cancelled first.
   useEffect(() => {
-    if ((selectedInkId === null && selectedGraphicId === null) || !outlinesOn) return
+    if ((selectedInkId === null && selectedGraphicId === null && selectedShapeId === null) || !outlinesOn) return
     const onKey = (event: KeyboardEvent) => {
       if (event.key !== 'Escape') return
+      // The Freehand settings popover is open: its own Escape (one level per keypress) closes it first.
+      if (document.querySelector('[data-pdf-ink-panel=""]')) return
       event.stopPropagation()
       if (inkResizeRef.current) endInkResize(false)
       else selectTarget(null)
     }
     window.addEventListener('keydown', onKey, true)
     return () => window.removeEventListener('keydown', onKey, true)
-  }, [selectedInkId, selectedGraphicId, outlinesOn])
+  }, [selectedInkId, selectedGraphicId, selectedShapeId, outlinesOn])
 
   /** A press on a resize handle of the selected object: the page must not see it (no pan, tap or text selection). */
-  const beginInkResize = (handle: InkResizeHandle, event: ReactPointerEvent<HTMLElement>) => {
+  const beginInkResize = (handle: string, event: ReactPointerEvent<HTMLElement>) => {
     event.stopPropagation()
     if (event.button !== 0 || !event.isPrimary) return
+    const shapeId = selectedShapeIdRef.current
+    const shape = shapeId ? shapesRef.current?.find((m) => m.id === shapeId) : undefined
+    if (shape) {
+      const rect = slotsRef.current[shape.pageIndex]?.getBoundingClientRect()
+      const pointer = rect && rect.width > 0 ? clientToPageUnit(event.clientX, event.clientY, rect) : null
+      if (!rect || !pointer) return
+      event.preventDefault()
+      window.getSelection()?.removeAllRanges()
+      dwellRef.current?.disarm()
+      try {
+        event.currentTarget.setPointerCapture(event.pointerId)
+      } catch {
+        /* ignore */
+      }
+      const end = handle === 'start' || handle === 'end'
+      const anchor: InkPoint = end && shape.shape.line ? (handle === 'start' ? [shape.shape.line[0], shape.shape.line[1]] : [shape.shape.line[2], shape.shape.line[3]]) : inkHandlePosition(shape.rect, handle as InkResizeHandle)
+      inkResizeRef.current = { pointerId: event.pointerId, kind: 'shape', id: shape.id, pageIndex: shape.pageIndex, handle, offset: [pointer[0] - anchor[0], pointer[1] - anchor[1]], paths: null, box: null, geometry: null }
+      return
+    }
     const graphicId = selectedGraphicIdRef.current
     const object = graphicId ? graphicsRef.current?.find((o) => o.objectId === graphicId) : undefined
     const id = object ? object.objectId : selectedInkIdRef.current
@@ -1544,7 +1649,7 @@ export function PdfRenderer({
     } catch {
       /* ignore */
     }
-    const anchor = inkHandlePosition(box, handle)
+    const anchor = inkHandlePosition(box, handle as InkResizeHandle)
     inkResizeRef.current = {
       pointerId: event.pointerId,
       kind: object ? 'graphic' : 'ink',
@@ -1554,6 +1659,7 @@ export function PdfRenderer({
       offset: [pointer[0] - anchor[0], pointer[1] - anchor[1]],
       paths: null,
       box: null,
+      geometry: null,
     }
   }
 
@@ -1570,6 +1676,22 @@ export function PdfRenderer({
     const pointer = rect ? clientToPageUnit(event.clientX, event.clientY, rect) : null
     if (!rect || !size || !pointer) return
     const target: InkPoint = [pointer[0] - drag.offset[0], pointer[1] - drag.offset[1]]
+    if (drag.kind === 'shape') {
+      const mark = shapesRef.current?.find((m) => m.id === drag.id)
+      if (!mark) return
+      const ratio = size.h / size.w
+      let geometry: PdfShapeGeometryResult | null
+      if ((mark.kind === 'line' || mark.kind === 'arrow') && (drag.handle === 'start' || drag.handle === 'end')) {
+        geometry = moveShapeEndpoint(mark.kind, mark.shape, drag.handle, target, ratio)
+      } else {
+        geometry = { rect: resizeShapeBox(mark.rect, drag.handle, target, ratio), shape: mark.shape }
+      }
+      // A move that would collapse the shape keeps the last good geometry.
+      if (!geometry) return
+      drag.geometry = geometry
+      setShapeResize({ id: drag.id, geometry })
+      return
+    }
     if (drag.kind === 'graphic') {
       const object = graphicsRef.current?.find((o) => o.objectId === drag.id)
       if (!object) return
@@ -1580,7 +1702,7 @@ export function PdfRenderer({
     }
     const stroke = inkStrokesRef.current?.find((m) => m.id === drag.id)
     if (!stroke) return
-    const paths = resizeInkPaths(stroke.paths, stroke.width, drag.handle, target, size.h / size.w)
+    const paths = resizeInkPaths(stroke.paths, stroke.width, drag.handle as InkResizeHandle, target, size.h / size.w)
     if (!paths) return
     drag.paths = paths
     setInkResize({ id: drag.id, paths })
@@ -1592,6 +1714,7 @@ export function PdfRenderer({
     inkResizeRef.current = null
     setInkResize(null)
     setGraphicResize(null)
+    setShapeResize(null)
     if (!drag) return
     try {
       if (rootRef.current?.hasPointerCapture(drag.pointerId)) rootRef.current.releasePointerCapture(drag.pointerId)
@@ -1600,6 +1723,7 @@ export function PdfRenderer({
     }
     if (commit && drag.paths) onInkResizeRef.current?.(drag.id, drag.paths)
     if (commit && drag.box) onGraphicResizeRef.current?.(drag.id, drag.box)
+    if (commit && drag.geometry) onShapeResizeRef.current?.(drag.id, drag.geometry)
   }
 
   const releaseInkResize = (event: ReactPointerEvent<HTMLElement>, commit: boolean) => {
@@ -1783,6 +1907,79 @@ export function PdfRenderer({
     if (commit && drag.moved) onInkMoveRef.current?.(drag.id, drag.dx, drag.dy)
   }
 
+  /** Shape tool: a press starts a drag on the page under it; the preview follows, release creates the shape. */
+  const beginShape = (event: ReactPointerEvent<HTMLDivElement>) => {
+    const pen = shapePenRef.current
+    const hit = slotAt(event.clientX, event.clientY)
+    const point = hit ? clientToPageUnit(event.clientX, event.clientY, hit.rect) : null
+    if (!pen || !hit || !point) return
+    // Not a text selection, not a page turn, not a pan: the press belongs to the shape tool.
+    event.preventDefault()
+    window.getSelection()?.removeAllRanges()
+    try {
+      event.currentTarget.setPointerCapture(event.pointerId)
+    } catch {
+      /* ignore */
+    }
+    selectTarget(null)
+    onBlankClickRef.current?.()
+    shapeDraftRef.current = { pointerId: event.pointerId, pageIndex: hit.index, kind: pen.kind, start: point, end: point }
+    setShapeDraft({ pageIndex: hit.index, kind: pen.kind, start: point, end: point, colorHex: pen.colorHex, width: pen.width, opacity: pen.opacity })
+  }
+
+  const moveShape = (event: ReactPointerEvent<HTMLDivElement>) => {
+    const draft = shapeDraftRef.current
+    if (!draft || event.pointerId !== draft.pointerId) return
+    if (event.pointerType === 'mouse' && (event.buttons & 1) === 0) {
+      // Released somewhere we never heard about (outside the window): that is a release.
+      endShape(true)
+      return
+    }
+    const rect = slotsRef.current[draft.pageIndex]?.getBoundingClientRect()
+    // Clamped to the page the drag started on: a shape never leaves its page.
+    const point = rect && rect.width > 0 ? clientToPageUnit(event.clientX, event.clientY, rect) : null
+    if (!point) return
+    draft.end = point
+    setShapeDraft((prev) => (prev ? { ...prev, end: point } : prev))
+  }
+
+  /** End the drag: commit (release) creates the shape when it is big enough; otherwise (Escape, blur, cancel) nothing is created. */
+  const endShape = (commit: boolean) => {
+    const draft = shapeDraftRef.current
+    shapeDraftRef.current = null
+    setShapeDraft(null)
+    if (!draft) return
+    try {
+      if (rootRef.current?.hasPointerCapture(draft.pointerId)) rootRef.current.releasePointerCapture(draft.pointerId)
+    } catch {
+      /* element already detached */
+    }
+    if (!commit) return
+    const rect = slotsRef.current[draft.pageIndex]?.getBoundingClientRect()
+    const pen = shapePenRef.current
+    if (!rect || !pen || rect.width <= 0) return
+    const geometry = shapeFromDrag(draft.kind, draft.start, draft.end, pen.width, rect.height / rect.width)
+    if (geometry) onShapeCreateRef.current?.(draft.pageIndex, draft.kind, geometry)
+  }
+
+  // Escape (back to Select is the Reader's), window blur or leaving the tool mid-drag: nothing is created.
+  useEffect(() => {
+    if (!shapeTool) return
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape' || !shapeDraftRef.current) return
+      event.stopPropagation()
+      endShape(false)
+    }
+    const onBlur = () => endShape(false)
+    window.addEventListener('keydown', onKey, true)
+    window.addEventListener('blur', onBlur)
+    return () => {
+      window.removeEventListener('keydown', onKey, true)
+      window.removeEventListener('blur', onBlur)
+      endShape(false)
+    }
+  }, [shapeTool])
+
   const onPointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
     if (event.button !== 0 || !event.isPrimary) return
     if (penRef.current) {
@@ -1791,6 +1988,10 @@ export function PdfRenderer({
     }
     if (eraserRef.current) {
       beginErase(event)
+      return
+    }
+    if (shapeToolRef.current) {
+      beginShape(event)
       return
     }
     if (beginInkMove(event)) return
@@ -1830,6 +2031,10 @@ export function PdfRenderer({
       moveErase(event)
       return
     }
+    if (shapeDraftRef.current) {
+      moveShape(event)
+      return
+    }
     if (inkMoveRef.current) {
       moveInkDrag(event)
       return
@@ -1855,6 +2060,7 @@ export function PdfRenderer({
     reportAnnotationHover(null)
     setInkHoverId(null)
     setGraphicHoverId(null)
+    setShapeHoverId(null)
     if (event.pointerId !== gesture.pointerId) return
     if ((event.buttons & 1) === 0) {
       // Released somewhere we never heard about (e.g. outside the window while selecting).
@@ -1890,6 +2096,10 @@ export function PdfRenderer({
     }
     if (eraseRef.current) {
       if (event.pointerId === eraseRef.current.pointerId) endErase(true)
+      return
+    }
+    if (shapeDraftRef.current) {
+      if (event.pointerId === shapeDraftRef.current.pointerId) endShape(true)
       return
     }
     if (inkMoveRef.current) {
@@ -1987,11 +2197,24 @@ export function PdfRenderer({
     const size = sizes[index]
     return size ? inkSelectionBox(mark.paths, mark.width, size.h / size.w) : null
   }
+  const shapeOn = (id: string | null, index: number) => (id === null ? null : (shapesByPage.get(index)?.find((m) => m.id === id) ?? null))
   const graphicOn = (id: string | null, index: number) => (id === null ? null : (graphics?.find((o) => o.objectId === id && o.pageIndex === index) ?? null))
   const selectedTargetOn = (index: number) => {
     const mark = markOn(selectedInkId, index)
     const markBox = mark ? inkBoxOf(mark, index) : null
     if (mark && markBox) return { id: mark.id, box: markBox, resizable: canResizeInk(mark.paths, sizes[index] ? sizes[index]!.h / sizes[index]!.w : 1) }
+    const shapeMark = shapeOn(selectedShapeId, index)
+    if (shapeMark) {
+      const line = shapeMark.shape.line
+      const handles: PdfCustomHandle[] | undefined =
+        (shapeMark.kind === 'line' || shapeMark.kind === 'arrow') && line
+          ? [
+              { key: 'start', x: line[0], y: line[1] },
+              { key: 'end', x: line[2], y: line[3] },
+            ]
+          : undefined
+      return { id: shapeMark.id, box: shapeMark.rect, resizable: true, handles }
+    }
     const object = graphicOn(selectedGraphicId, index)
     if (!object) return null
     return { id: object.objectId, box: graphicResize?.id === object.objectId ? graphicResize.box : object.box, resizable: object.caps.resize }
@@ -2000,12 +2223,16 @@ export function PdfRenderer({
     const mark = markOn(inkHoverId !== selectedInkId ? inkHoverId : null, index)
     const markBox = mark ? inkBoxOf(mark, index) : null
     if (mark && markBox) return { id: mark.id, box: markBox }
+    const shapeMark = shapeOn(shapeHoverId !== selectedShapeId ? shapeHoverId : null, index)
+    if (shapeMark) return { id: shapeMark.id, box: shapeMark.rect }
     const object = graphicOn(graphicHoverId !== selectedGraphicId ? graphicHoverId : null, index)
     return object ? { id: object.objectId, box: object.box } : null
   }
   const toolbarOn = (index: number): ReactNode => {
     const mark = markOn(selectedInkId, index)
     if (mark) return renderInkToolbar ? renderInkToolbar(mark) : null
+    const shapeMark = shapeOn(selectedShapeId, index)
+    if (shapeMark) return renderShapeToolbar ? renderShapeToolbar(shapeMark) : null
     const object = graphicOn(selectedGraphicId, index)
     return object && renderGraphicToolbar ? renderGraphicToolbar(object) : null
   }
@@ -2048,6 +2275,14 @@ export function PdfRenderer({
                   marks={marksByPage.get(index + 1)!}
                   focusedId={focusedAnnotationId}
                   flash={flash}
+                />
+              ) : null}
+              {shapesByPage.has(index) || shapeDraft?.pageIndex === index ? (
+                <PdfPageShapes
+                  heightRatio={size.h / size.w}
+                  marks={shapesByPage.get(index) ?? []}
+                  draft={shapeDraft?.pageIndex === index ? shapeDraft : null}
+                  flash={flash as PdfShapeFlash | null}
                 />
               ) : null}
               {inkByPage.has(index) || inkDraft?.pageIndex === index ? (
@@ -2094,12 +2329,12 @@ export function PdfRenderer({
       // Cursor + text selection per tool come from `[data-pdf-tool]` rules in index.css (they must
       // beat pdf_viewer.css, and `ReaderShell` is `select-none` for the whole reader).
       className="flex flex-col items-center"
-      style={{ gap, padding: pad, touchAction: pen || eraser ? 'none' : undefined }}
+      style={{ gap, padding: pad, touchAction: pen || eraser || shapeTool ? 'none' : undefined }}
       data-pdf-status={status.kind}
       data-pdf-pages={sizes.length}
       data-pdf-flow={flow}
       data-pdf-per-view={pagesPerView}
-      data-pdf-tool={pen ? 'pen' : eraser ? 'eraser' : hand ? 'hand' : 'select'}
+      data-pdf-tool={pen ? 'pen' : eraser ? 'eraser' : shapeTool ? 'shape' : hand ? 'hand' : 'select'}
       // Pen cursor per drawing style (index.css).
       data-pdf-ink-style={pen ? (inkPen?.penStyle ?? 'pen') : undefined}
       // Highlight / Underline / Strikethrough: Select's surface with the tool's pen cursor.
@@ -2110,6 +2345,7 @@ export function PdfRenderer({
       onPointerCancel={() => {
         finishInk()
         endErase(false)
+        endShape(false)
         endInkMove(false)
         endInkResize(false)
         void endGesture()
@@ -2118,6 +2354,7 @@ export function PdfRenderer({
       onLostPointerCapture={() => {
         if (inkDraftRef.current) finishInk()
         if (eraseRef.current) endErase(false)
+        if (shapeDraftRef.current) endShape(false)
         if (inkMoveRef.current) endInkMove(false)
         if (gestureRef.current?.pan) endGesture()
       }}
@@ -2125,6 +2362,7 @@ export function PdfRenderer({
         lastPointerRef.current = null
         setInkHoverId(null)
         setGraphicHoverId(null)
+        setShapeHoverId(null)
         reportAnnotationHover(null)
         if (!gestureRef.current) dwellRef.current?.update(false)
       }}

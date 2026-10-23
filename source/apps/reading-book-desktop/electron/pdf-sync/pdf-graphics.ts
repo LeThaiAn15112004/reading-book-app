@@ -9,6 +9,7 @@
  */
 import {
   PDF_GRAPHIC_MAX_OBJECTS,
+  READMATE_NM_PREFIX,
   pdfGraphicAllows,
   readPdfJsGraphic,
   type PdfGraphicBox,
@@ -16,7 +17,7 @@ import {
   type PdfGraphicOp,
 } from '@reading-book/book-reader-sdk'
 import { loadPdfjs } from '../chunking/pdf-text'
-import { PdfRawObjects, parsePdfJsRef } from './pdf-raw-objects'
+import { PdfRawObjects, parsePdfJsRef, readAnnotationNames } from './pdf-raw-objects'
 import { appearanceStreamBody, appendAnnotationUpdate, appendRawObjects, pdfDateNow, PdfWriteError, type PageGeometry } from './pdf-incremental-writer'
 import { dictValue, num, parseDict, patchDict, refText } from './pdf-syntax'
 
@@ -127,6 +128,17 @@ async function scanGraphics(bytes: Uint8Array): Promise<GraphicScan> {
     }
   } finally {
     await task.destroy()
+  }
+  // Annotations Readmate wrote itself (`readmate:<id>`: shapes, markup) are rows of the app — never "foreign" objects.
+  const names = readAnnotationNames(bytes, objects.map((o) => o.objectId))
+  const own = new Set(objects.filter((o) => names.get(o.objectId)?.startsWith(READMATE_NM_PREFIX)).map((o) => o.objectId))
+  if (own.size > 0) {
+    for (let i = objects.length - 1; i >= 0; i--) {
+      if (own.has(objects[i]!.objectId)) {
+        raws.delete(objects[i]!.objectId)
+        objects.splice(i, 1)
+      }
+    }
   }
   return { objects, raws, pages, complete }
 }

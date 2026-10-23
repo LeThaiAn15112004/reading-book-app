@@ -1,6 +1,8 @@
 import { useCallback, useRef, useState, type ReactNode, type Ref } from 'react'
 import { createPortal } from 'react-dom'
 import { FreehandSettingsPopover } from './FreehandSettingsPopover'
+import { ShapeKindIcon, ShapeSettingsPopover } from './ShapeSettingsPopover'
+import { usePdfShapePrefsStore } from '../../logic/pdfShapes/pdfShapePrefsStore'
 import type { ReaderCapability } from '../../../../reader/capabilities'
 import { effectiveShortcutKeys, useShortcutsStore } from '../../../../shortcuts/shortcutsStore'
 import { formatShortcutKey } from '../../../../shortcuts/shortcutKeys'
@@ -146,6 +148,8 @@ function ToolIcon({ tool }: { tool: ToolIconId }) {
           />
         </svg>
       )
+    case 'shape':
+      return <ShapeToolIcon />
     case 'pen':
       return (
         <svg className={cls} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor" aria-hidden>
@@ -270,8 +274,14 @@ function menuTriggerClass(active: boolean): string {
   return active ? `${menuTriggerBtn} border-lib-accent bg-lib-accent-soft text-lib-accent` : menuTriggerBtn
 }
 
-/** Dropdown arrow beside Freehand: opens its settings; never arms the tool. */
-function FreehandSettingsButton({ hidden }: { hidden: boolean }) {
+/** The Shapes button shows the kind the tool will draw. */
+function ShapeToolIcon() {
+  const kind = usePdfShapePrefsStore((s) => s.kind)
+  return <ShapeKindIcon kind={kind} />
+}
+
+/** Dropdown arrow beside Freehand / Shapes: opens its settings; never arms the tool. */
+function FreehandSettingsButton({ hidden, shapes = false }: { hidden: boolean; shapes?: boolean }) {
   const [open, setOpen] = useState(false)
   const btnRef = useRef<HTMLButtonElement | null>(null)
   const close = useCallback((refocus: boolean) => {
@@ -285,8 +295,8 @@ function FreehandSettingsButton({ hidden }: { hidden: boolean }) {
         ref={btnRef}
         type="button"
         className="-ml-0.5 inline-flex h-[52px] w-5 shrink-0 cursor-pointer items-center justify-center rounded-lg border border-transparent text-lib-muted transition-colors hover:border-lib-accent-ring hover:bg-lib-accent-soft hover:text-lib-text-strong sm:h-[56px]"
-        title="Freehand settings"
-        aria-label="Freehand settings"
+        title={shapes ? 'Shape settings' : 'Freehand settings'}
+        aria-label={shapes ? 'Shape settings' : 'Freehand settings'}
         aria-haspopup="dialog"
         aria-expanded={showPopover}
         onClick={() => setOpen((v) => !v)}
@@ -295,7 +305,7 @@ function FreehandSettingsButton({ hidden }: { hidden: boolean }) {
           <path d="m6 9 6 6 6-6" />
         </svg>
       </button>
-      {showPopover ? createPortal(<FreehandSettingsPopover anchorRef={btnRef} onClose={close} />, document.body) : null}
+      {showPopover ? createPortal(shapes ? <ShapeSettingsPopover anchorRef={btnRef} onClose={close} /> : <FreehandSettingsPopover anchorRef={btnRef} onClose={close} />, document.body) : null}
     </>
   )
 }
@@ -472,6 +482,11 @@ export function ToolsStrip({ capabilities, toolStates, onTool, toolRefs, hidden 
                     <div key={tool.id} className="contents">
                       {renderButton(tool, resolved.group.iconOnly)}
                       <FreehandSettingsButton hidden={hidden} />
+                    </div>
+                  ) : tool.id === 'shape' ? (
+                    <div key={tool.id} className="contents">
+                      {renderButton(tool, resolved.group.iconOnly)}
+                      <FreehandSettingsButton hidden={hidden} shapes />
                     </div>
                   ) : tool.id === 'eraser' && onEraserMode ? (
                     <div key={tool.id} className="contents">

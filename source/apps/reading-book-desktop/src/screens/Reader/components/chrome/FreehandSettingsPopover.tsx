@@ -3,6 +3,7 @@ import { INK_PEN_PRESETS } from '@reading-book/book-reader-sdk'
 import { usePdfInkPrefsStore } from '../../logic/pdfInk/pdfInkPrefsStore'
 import { useDismissOnOutsideOrEscape } from '../../logic/highlights/useDismissOnOutsideOrEscape'
 import { InkStyleControls } from './InkStyleControls'
+import { isInkColorPickerOpen } from './inkColorPickerState'
 
 type FreehandSettingsPopoverProps = {
   anchorRef: RefObject<HTMLElement | null>
@@ -35,7 +36,9 @@ export function FreehandSettingsPopover({ anchorRef, onClose }: FreehandSettings
   }, [anchorRef])
 
   useEffect(() => {
-    const dismiss = () => onClose(false)
+    const dismiss = () => {
+      if (!isInkColorPickerOpen()) onClose(false)
+    }
     window.addEventListener('resize', dismiss)
     window.addEventListener('blur', dismiss)
     return () => {
@@ -59,6 +62,7 @@ export function FreehandSettingsPopover({ anchorRef, onClose }: FreehandSettings
     >
       <InkStyleControls
         idPrefix="freehand"
+        liveColor
         style={tool}
         colorHex={settings.colorHex}
         width={settings.width}

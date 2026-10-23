@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { INK_PEN_PRESETS, INK_PEN_STYLES, type InkPenStyle } from '@reading-book/book-reader-sdk'
+import { pickerEventAction, setInkColorPickerOpen } from './inkColorPickerState'
 import { inkWidthToPoints, parseHexInput } from '../../logic/pdfInk/pdfInkPrefsStore'
 
 const STYLE_ICONS: Record<InkPenStyle, ReactNode> = {
@@ -11,8 +12,104 @@ const STYLE_ICONS: Record<InkPenStyle, ReactNode> = {
 
 const sectionLabel = 'text-[11px] font-semibold uppercase tracking-wide text-lib-muted'
 
+/** The colour row — the system picker plus a `#RRGGBB` field. Shared by the Freehand and Shape settings. */
+export function InkColorControl({ colorHex, onColor, live = false }: { colorHex: string; onColor: (colorHex: string) => void; live?: boolean }) {
+  const hex = colorHex.toUpperCase()
+  const [hexDraft, setHexDraft] = useState(hex)
+  useEffect(() => setHexDraft(hex), [hex])
+  const hexValid = parseHexInput(hexDraft) !== null
+
+  // The system colour picker fires `input` while dragging and `change` when it closes: only the latter is a commit.
+  const pickerRef = useRef<HTMLInputElement | null>(null)
+  const onColorRef = useRef(onColor)
+  onColorRef.current = onColor
+  const [pickerLive, setPickerLive] = useState<string | null>(null)
+  useEffect(() => {
+    const el = pickerRef.current
+    if (!el) return
+    const apply = (event: 'input' | 'change') => {
+      const action = pickerEventAction(event, live)
+      const value = el.value.toUpperCase()
+      setPickerLive(action.preview ? value : null)
+      if (action.commit) onColorRef.current(value)
+    }
+    const onInput = () => apply('input')
+    const done = () => {
+      setInkColorPickerOpen(false)
+      apply('change')
+    }
+    const opened = () => {
+      setInkColorPickerOpen(true)
+    }
+    // The window regains focus when the dialog closes (with or without a change): leave the guard a moment later.
+    const refocused = () => {
+      setTimeout(() => {
+        setInkColorPickerOpen(false)
+      }, 300)
+    }
+    el.addEventListener('click', opened)
+    el.addEventListener('input', onInput)
+    el.addEventListener('change', done)
+    window.addEventListener('focus', refocused)
+    return () => {
+      el.removeEventListener('click', opened)
+      el.removeEventListener('input', onInput)
+      el.removeEventListener('change', done)
+      window.removeEventListener('focus', refocused)
+    }
+  }, [live])
+
+  return (
+    <div className="flex flex-col gap-1.5">
+      <span className={sectionLabel}>Color</span>
+      <div className="flex items-center gap-2">
+        <label
+          title="Pick a color"
+          className="relative h-7 w-7 shrink-0 cursor-pointer overflow-hidden rounded-full border border-lib-border"
+          style={{ backgroundColor: pickerLive ?? hex }}
+        >
+          <input
+            ref={pickerRef}
+            type="color"
+            aria-label="Pick a color"
+            // Controlled by the LIVE pick too: re-rendering with the saved colour while the picker is open
+            // would put the old value back before its `change` event reads it (the colour never changed).
+            value={(pickerLive ?? hex).toLowerCase()}
+            onChange={() => {}}
+            className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+          />
+        </label>
+        <input
+          type="text"
+          aria-label="Hex color"
+          aria-invalid={!hexValid}
+          spellCheck={false}
+          maxLength={7}
+          value={pickerLive ?? hexDraft}
+          onChange={(e) => {
+            setHexDraft(e.target.value)
+            // Applied live once all six digits are there; `RGB` shorthand is applied on blur.
+            if (/^#?[0-9a-f]{6}$/i.test(e.target.value.trim())) onColor(parseHexInput(e.target.value)!)
+          }}
+          onBlur={() => {
+            const parsed = parseHexInput(hexDraft)
+            if (parsed) onColor(parsed)
+            setHexDraft((parsed ?? hex).toUpperCase())
+          }}
+          className="h-8 w-[96px] rounded-md border border-lib-border-soft bg-transparent px-2 font-mono text-[13px] text-lib-text-strong outline-none focus:border-lib-accent aria-[invalid=true]:border-red-500"
+        />
+        {!hexValid ? (
+          <span role="alert" className="text-[11px] text-red-500">
+            Use #RRGGBB
+          </span>
+        ) : null}
+      </div>
+    </div>
+  )
+}
+
 /** Slider that shows the value live but only reports it on release (one commit, not one per pixel). */
-function CommitSlider({
+export function CommitSlider({
   id,
   min,
   max,
@@ -67,6 +164,8 @@ type InkStyleControlsProps = {
   onColor: (colorHex: string) => void
   onWidth: (width: number) => void
   onOpacity: (opacity: number) => void
+  /** The colour edits the NEXT drawing's settings (applied as it is picked) rather than one existing object. */
+  liveColor?: boolean
 }
 
 /**
@@ -74,35 +173,10 @@ type InkStyleControlsProps = {
  * opacity. Used by the Freehand dropdown (settings of the NEXT stroke) and by the selected-stroke panel
  * (edit of that one stroke); the caller decides what each change applies to.
  */
-export function InkStyleControls({ idPrefix, style, colorHex, width, opacity, onStyle, onColor, onWidth, onOpacity }: InkStyleControlsProps) {
+export function InkStyleControls({ idPrefix, style, colorHex, width, opacity, onStyle, onColor, onWidth, onOpacity, liveColor = false }: InkStyleControlsProps) {
   const preset = INK_PEN_PRESETS[style]
-  const hex = colorHex.toUpperCase()
-  const [hexDraft, setHexDraft] = useState(hex)
-  useEffect(() => setHexDraft(hex), [hex])
-  const hexValid = parseHexInput(hexDraft) !== null
   const [widthLive, setWidthLive] = useState<number | null>(null)
   const [opacityLive, setOpacityLive] = useState<number | null>(null)
-
-  // The system colour picker fires `input` while dragging and `change` when it closes: only the latter is a commit.
-  const pickerRef = useRef<HTMLInputElement | null>(null)
-  const onColorRef = useRef(onColor)
-  onColorRef.current = onColor
-  const [pickerLive, setPickerLive] = useState<string | null>(null)
-  useEffect(() => {
-    const el = pickerRef.current
-    if (!el) return
-    const live = () => setPickerLive(el.value.toUpperCase())
-    const done = () => {
-      setPickerLive(null)
-      onColorRef.current(el.value.toUpperCase())
-    }
-    el.addEventListener('input', live)
-    el.addEventListener('change', done)
-    return () => {
-      el.removeEventListener('input', live)
-      el.removeEventListener('change', done)
-    }
-  }, [])
 
   return (
     <div className="flex flex-col gap-3">
@@ -127,49 +201,7 @@ export function InkStyleControls({ idPrefix, style, colorHex, width, opacity, on
         </div>
       </div>
 
-      <div className="flex flex-col gap-1.5">
-        <span className={sectionLabel}>Color</span>
-        <div className="flex items-center gap-2">
-          <label
-            title="Pick a color"
-            className="relative h-7 w-7 shrink-0 cursor-pointer overflow-hidden rounded-full border border-lib-border"
-            style={{ backgroundColor: pickerLive ?? hex }}
-          >
-            <input
-              ref={pickerRef}
-              type="color"
-              aria-label="Pick a color"
-              value={hex.toLowerCase()}
-              onChange={() => {}}
-              className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
-            />
-          </label>
-          <input
-            type="text"
-            aria-label="Hex color"
-            aria-invalid={!hexValid}
-            spellCheck={false}
-            maxLength={7}
-            value={pickerLive ?? hexDraft}
-            onChange={(e) => {
-              setHexDraft(e.target.value)
-              // Applied live once all six digits are there; `RGB` shorthand is applied on blur.
-              if (/^#?[0-9a-f]{6}$/i.test(e.target.value.trim())) onColor(parseHexInput(e.target.value)!)
-            }}
-            onBlur={() => {
-              const parsed = parseHexInput(hexDraft)
-              if (parsed) onColor(parsed)
-              setHexDraft((parsed ?? hex).toUpperCase())
-            }}
-            className="h-8 w-[96px] rounded-md border border-lib-border-soft bg-transparent px-2 font-mono text-[13px] text-lib-text-strong outline-none focus:border-lib-accent aria-[invalid=true]:border-red-500"
-          />
-          {!hexValid ? (
-            <span role="alert" className="text-[11px] text-red-500">
-              Use #RRGGBB
-            </span>
-          ) : null}
-        </div>
-      </div>
+      <InkColorControl colorHex={colorHex} onColor={onColor} live={liveColor} />
 
       <div className="flex flex-col gap-1.5">
         <div className="flex items-baseline justify-between">

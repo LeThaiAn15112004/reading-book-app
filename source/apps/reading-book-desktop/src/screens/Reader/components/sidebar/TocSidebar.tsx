@@ -1,5 +1,5 @@
 import { Component, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import type { ReaderBookmark, ReaderHighlightBase } from '@reading-book/book-reader-sdk'
+import { isShapeStyleKind, type ReaderBookmark, type ReaderHighlightBase } from '@reading-book/book-reader-sdk'
 
 /**
  * A highlight / note card in the sidebar — EPUB (`ReaderHighlight`) and PDF (`PdfReaderHighlight`)
@@ -65,6 +65,8 @@ type TocSidebarProps = {
   onDeleteBookmark?: (id: string) => void
   highlights?: SidebarHighlight[]
   onJumpHighlight?: (highlight: SidebarHighlight) => void
+  /** The annotation currently selected on the page (a shape's selection marks its card). */
+  activeHighlightId?: string | null
   onDeleteHighlight?: (id: string) => void
   onChangeHighlightColor?: (id: string, colorHex: string) => void
   onChangeHighlightNote?: (id: string, note: string) => void
@@ -130,6 +132,14 @@ function highlightTypeLabel(styleKind: SidebarHighlight['styleKind']): string {
       return 'Insert'
     case 'textbox':
       return 'Note'
+    case 'rectangle':
+      return 'Rectangle'
+    case 'ellipse':
+      return 'Ellipse'
+    case 'line':
+      return 'Line'
+    case 'arrow':
+      return 'Arrow'
     default:
       return 'Highlight'
   }
@@ -160,6 +170,10 @@ const NOTE_TYPE_OPTIONS: { value: NotesTypeFilter; label: string }[] = [
   { value: 'strikethrough', label: 'Strikethrough' },
   { value: 'replace', label: 'Replace' },
   { value: 'insert', label: 'Insert' },
+  { value: 'rectangle', label: 'Rectangle' },
+  { value: 'ellipse', label: 'Ellipse' },
+  { value: 'line', label: 'Line' },
+  { value: 'arrow', label: 'Arrow' },
 ]
 
 /** Case-insensitive substring match over a highlight's excerpt, note and tags. */
@@ -329,6 +343,8 @@ function TocTree({
 
 type HighlightListItemProps = {
   highlight: SidebarHighlight
+  /** Selected on the page: the card gets the accent border. */
+  active?: boolean
   pageTotal: number
   onJump?: (highlight: SidebarHighlight) => void
   onDelete?: (id: string) => void
@@ -342,6 +358,7 @@ type HighlightListItemProps = {
  *  layouts so the two sort modes stay visually identical. */
 function HighlightListItem({
   highlight: h,
+  active = false,
   pageTotal,
   onJump,
   onDelete,
@@ -353,7 +370,11 @@ function HighlightListItem({
   const progressLabel = bookmarkProgressLabel(h.chapterIndex, pageTotal)
   const dateLabel = safeDateLabel(h.createdAt)
   return (
-    <div className="flex items-start gap-2 rounded-lg border border-lib-border-soft bg-lib-surface p-3">
+    <div
+      className={`flex items-start gap-2 rounded-lg border bg-lib-surface p-3 ${active ? 'border-lib-accent' : 'border-lib-border-soft'}`}
+      data-note-id={h.id}
+      data-active={active ? '' : undefined}
+    >
       <button
         className="flex min-w-0 flex-1 cursor-pointer items-start gap-2 border-none bg-transparent p-0 text-left outline-none focus:outline-none focus-visible:outline-none"
         type="button"
@@ -397,7 +418,7 @@ function HighlightListItem({
             <span className="line-clamp-2 mt-1 text-[13px] leading-snug text-lib-text">
               “{h.selectionText.highlight}”
             </span>
-          ) : (
+          ) : isShapeStyleKind(h.styleKind) ? null : (
             <span className="mt-1 block text-[13px] text-lib-faint italic">(no excerpt)</span>
           )}
           {h.note ? (
@@ -460,6 +481,7 @@ export function TocSidebar({
   onDeleteBookmark,
   highlights = [],
   onJumpHighlight,
+  activeHighlightId = null,
   onDeleteHighlight,
   onChangeHighlightColor,
   onChangeHighlightNote,
@@ -853,6 +875,7 @@ export function TocSidebar({
                         <HighlightListItem
                           key={h.id}
                           highlight={h}
+                          active={h.id === activeHighlightId}
                           pageTotal={pageTotal}
                           onJump={onJumpHighlight}
                           onDelete={onDeleteHighlight}
@@ -910,6 +933,7 @@ export function TocSidebar({
                                   <HighlightListItem
                                     key={h.id}
                                     highlight={h}
+                                    active={h.id === activeHighlightId}
                                     pageTotal={pageTotal}
                                     onJump={onJumpHighlight}
                                     onDelete={onDeleteHighlight}

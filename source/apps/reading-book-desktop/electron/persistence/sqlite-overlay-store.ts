@@ -213,7 +213,7 @@ const DEFAULT_HIGHLIGHT_COLOR = '#FFEB3B'
  */
 const HIGHLIGHT_TYPE_PREDICATE = `
   (json_extract(note_json, '$.group') IS NULL OR json_extract(note_json, '$.group') = 'annotation')
-  AND json_extract(note_json, '$.type') IN ('highlight', 'underline', 'strikethrough', 'squiggly', 'replace', 'insert', 'textbox')
+  AND json_extract(note_json, '$.type') IN ('highlight', 'underline', 'strikethrough', 'squiggly', 'replace', 'insert', 'textbox', 'rectangle', 'ellipse', 'line', 'arrow')
 `
 
 /**
@@ -275,6 +275,11 @@ const HIGHLIGHT_STYLE_KINDS: HighlightStyleKind[] = [
   'replace',
   'insert',
   'textbox',
+  // PDF shapes: rows of the same kind of table, list and history (pdf_shape_tools.md)
+  'rectangle',
+  'ellipse',
+  'line',
+  'arrow',
 ]
 
 function rowToHighlightRecord(row: NoteRow): HighlightRecord | undefined {
@@ -410,7 +415,7 @@ export class SqliteOverlayStore implements OverlayStore {
         `UPDATE books
          SET reading_state_json = json_patch(reading_state_json, @patch),
              updated_at = @now
-         WHERE id = @id AND file_format = 'mp3'`,
+         WHERE id = @id AND file_format IN ('mp3', 'm4a', 'm4b', 'aac', 'wav', 'flac', 'ogg', 'opus')`,
       )
       .run({ id, patch: JSON.stringify(audioProgressPatch(input, now)), now })
     return Number(result.changes) > 0

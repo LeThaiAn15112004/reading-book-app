@@ -11,8 +11,9 @@
 
 import type { HighlightStyleKind } from './highlight-location.js'
 import { DEFAULT_HIGHLIGHT_COLOR } from './highlight-colors.js'
+import { isShapeStyleKind, shapeColorHex } from './pdf-shape.js'
 import {
-  EMBEDDED_PDF_ANNOTATION_STYLE,
+  embeddedStyleOf,
   embeddedAnnotationIdentities,
   embeddedAnnotationSourceHash,
   highlightContentHash,
@@ -49,9 +50,32 @@ function geometrySig(rects: readonly { x: number; y: number; width: number; heig
 
 const color6 = (hex: string | undefined) => (hex ?? DEFAULT_HIGHLIGHT_COLOR).trim().slice(0, 7).toUpperCase()
 
+/** A shape's colour AND opacity as one comparable string: `#RRGGBB` + the alpha byte (`FF` = opaque). */
+const alphaByte = (opacity: number) => Math.round(Math.min(1, Math.max(0, opacity)) * 255).toString(16).padStart(2, '0').toUpperCase()
+const shapeColorSig = (hex: string | undefined, opacity: number) => `${color6(hex)}${alphaByte(opacity)}`
+function appShapeColorSig(hex: string): string {
+  const m = /^#[0-9a-f]{6}([0-9a-f]{2})$/i.exec(hex.trim())
+  return `${color6(hex)}${m ? m[1]!.toUpperCase() : 'FF'}`
+}
+
+function shapeGeometrySig(
+  rects: readonly { x: number; y: number; width: number; height: number }[],
+  shape: { strokeWidth: number; line?: readonly number[] } | undefined,
+): string {
+  return `${geometrySig(rects)}|w${(shape?.strokeWidth ?? 0).toFixed(4)}${shape?.line ? `|l${shape.line.map((n) => n.toFixed(3)).join(',')}` : ''}`
+}
+
 export function fileSide(item: ScannedPdfAnnotation): SyncSide {
+  if (item.shape) {
+    return {
+      kind: embeddedStyleOf(item),
+      color: shapeColorSig(item.colorHex, item.opacity ?? 1),
+      text: item.contents?.trim() ?? '',
+      geometry: shapeGeometrySig(item.rects, item.shape),
+    }
+  }
   return {
-    kind: EMBEDDED_PDF_ANNOTATION_STYLE[item.subtype],
+    kind: embeddedStyleOf(item),
     color: color6(item.colorHex),
     text: item.contents?.trim() ?? '',
     geometry: item.subtype === 'Text' ? '' : geometrySig(item.rects),
@@ -61,6 +85,14 @@ export function fileSide(item: ScannedPdfAnnotation): SyncSide {
 /** The row as seen from one file annotation (its rects on that annotation's page only). */
 export function appSide(row: ExportableHighlight, pageIndex: number): SyncSide {
   const rects = (row.pdfAnnotation?.rects ?? []).filter((r) => (r.pageIndex ?? row.pdfAnnotation!.pageIndex) === pageIndex)
+  if (isShapeStyleKind(row.styleKind)) {
+    return {
+      kind: row.styleKind,
+      color: appShapeColorSig(row.colorHex),
+      text: row.note?.trim() ?? '',
+      geometry: shapeGeometrySig(rects, row.pdfAnnotation?.shape),
+    }
+  }
   return {
     kind: row.styleKind,
     color: color6(row.colorHex),
@@ -81,13 +113,17 @@ function changed(base: SyncSide, now: SyncSide): SyncField[] {
 export function applyFileFields(row: ExportableHighlight, item: ScannedPdfAnnotation, fields: readonly SyncField[]): ExportableHighlight {
   const next: ExportableHighlight = { ...row }
   for (const field of fields) {
-    if (field === 'kind') next.styleKind = EMBEDDED_PDF_ANNOTATION_STYLE[item.subtype]
-    if (field === 'color') {
+    if (field === 'kind') next.styleKind = embeddedStyleOf(item)
+    if (field === 'color' && item.shape) next.colorHex = shapeColorHex(item.colorHex ?? DEFAULT_HIGHLIGHT_COLOR, item.opacity ?? 1)
+    else if (field === 'color') {
       const alpha = row.colorHex.trim().length === 9 ? row.colorHex.trim().slice(7) : ''
       next.colorHex = `${color6(item.colorHex)}${alpha}`
     }
     if (field === 'text') next.note = item.contents?.trim() || undefined
-    if (field === 'geometry' && next.styleKind !== 'textbox' && item.subtype !== 'Text' && row.pdfAnnotation) {
+    if (field === 'geometry' && item.shape && row.pdfAnnotation) {
+      const r = item.rects[0]!
+      next.pdfAnnotation = { pageIndex: item.pageIndex, rects: [{ pageIndex: item.pageIndex, x: r.x, y: r.y, width: r.width, height: r.height }], shape: item.shape }
+    } else if (field === 'geometry' && next.styleKind !== 'textbox' && item.subtype !== 'Text' && row.pdfAnnotation) {
       const others = row.pdfAnnotation.rects.filter((r) => (r.pageIndex ?? row.pdfAnnotation!.pageIndex) !== item.pageIndex)
       const rects = [...others, ...item.rects.map((r) => ({ pageIndex: item.pageIndex, x: r.x, y: r.y, width: r.width, height: r.height }))].sort(
         (a, b) => (a.pageIndex ?? 0) - (b.pageIndex ?? 0),

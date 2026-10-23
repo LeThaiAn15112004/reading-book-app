@@ -3,6 +3,7 @@ import {
   sanitizeAudioProgressInput,
   isConsistentMdHighlight,
   isConsistentPdfHighlight,
+  isShapeStyleKind,
   isConsistentPdfInk,
   isValidHexColor,
   packPdfInkRef,
@@ -328,7 +329,7 @@ export function registerOverlayIpc(): void {
       if (!locator) return null
       // TXT annotations belong to a text revision and are saved with it (txt:commit), never alone.
       if (body.txtAnnotationRef !== undefined) return null
-      const validStyleKinds = ['highlight', 'underline', 'strikethrough', 'squiggly', 'replace', 'insert', 'textbox']
+      const validStyleKinds = ['highlight', 'underline', 'strikethrough', 'squiggly', 'replace', 'insert', 'textbox', 'rectangle', 'ellipse', 'line', 'arrow']
       if (!validStyleKinds.includes(body.styleKind)) return null
       if (typeof body.colorHex !== 'string' || !body.colorHex.trim()) return null
 
@@ -339,6 +340,11 @@ export function registerOverlayIpc(): void {
         pdfAnnotation = parsePdfAnnotationRef(body.pdfAnnotationRef)
         if (!pdfAnnotation || !isConsistentPdfHighlight(locator, pdfAnnotation)) return null
       }
+      // A shape is a PDF annotation with its own geometry (a line / arrow with endpoints); nothing else may carry one.
+      if (isShapeStyleKind(body.styleKind)) {
+        if (!pdfAnnotation?.shape) return null
+        if ((body.styleKind === 'line' || body.styleKind === 'arrow') !== (pdfAnnotation.shape.line !== undefined)) return null
+      } else if (pdfAnnotation?.shape) return null
 
       // Markdown markup: same rule — a present-but-invalid anchor rejects the save.
       let mdAnnotation: MdAnnotation | undefined

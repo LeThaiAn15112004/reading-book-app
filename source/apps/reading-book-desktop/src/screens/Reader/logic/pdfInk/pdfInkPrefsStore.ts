@@ -126,7 +126,8 @@ export const usePdfInkPrefsStore = create<PdfInkPrefsState>()((set, get) => {
     },
     setStyleColor: (style, colorHex) => {
       if (!isInkPenStyle(style) || !/^#[0-9a-f]{6}$/i.test(colorHex)) return
-      patchStyle(style, { colorHex: colorHex.toUpperCase() })
+      // Applied as it is picked (the picker fires many times): an unchanged colour writes nothing.
+      if (colorHex.toUpperCase() !== get().styles[style].colorHex) patchStyle(style, { colorHex: colorHex.toUpperCase() })
     },
     setStyleWidth: (style, width) => {
       if (!isInkPenStyle(style) || !Number.isFinite(width)) return

@@ -8,7 +8,7 @@
  * Anything it can't handle is refused with a `PdfWriteError` — never written "best effort".
  * Pure Node (no Electron, no UI, no SQLite); runs in the scan worker.
  */
-import type { PdfWriteAnnotation } from '@reading-book/book-reader-sdk'
+import { shapeArrowBarbs, type PdfWriteAnnotation } from '@reading-book/book-reader-sdk'
 import { PdfRawObjects, parsePdfJsRef } from './pdf-raw-objects'
 import {
   PdfSyntaxError,
@@ -122,6 +122,91 @@ function appearanceContent(annotation: PdfWriteAnnotation, quads: Quad[]): strin
 }
 
 type NewObject = { num: number; gen: number; body: string }
+
+/** Shapes (Square / Circle / Line) are drawn by their own appearance stream and dictionary, not by quads. */
+function isShapeWrite(annotation: PdfWriteAnnotation): boolean {
+  return annotation.subtype === 'Square' || annotation.subtype === 'Circle' || annotation.subtype === 'Line'
+}
+
+const KAPPA = 0.5522847498
+
+/**
+ * A shape's `/Rect` (user space) and appearance content. Everything is computed in the displayed page's
+ * pixel space (scale 1) and mapped through the page transform point by point, so a rotated or cropped page
+ * needs no special case. The pen is drawn INSIDE the rect (half a pen inset), so BBox = Rect holds it.
+ */
+function shapeGeometry(annotation: PdfWriteAnnotation, page: PageGeometry): { rect: [number, number, number, number]; line?: [Point, Point]; content: string; width: number } {
+  const toUser = inverse(page.transform)
+  const user = (x: number, y: number): Point => toUser(x, y)
+  const shape = annotation.shape
+  const box = annotation.rects[0]
+  if (!shape || !box) throw new PdfWriteError('unsupported_pdf', 'a shape without geometry')
+  const W = page.width
+  const H = page.height
+  const width = Math.max(0.1, shape.strokeWidth * W)
+  const left = box.x * W
+  const top = box.y * H
+  const right = (box.x + box.width) * W
+  const bottom = (box.y + box.height) * H
+  const corners = [user(left, top), user(right, bottom)]
+  const rect: [number, number, number, number] = [
+    Math.min(corners[0]![0], corners[1]![0]),
+    Math.min(corners[0]![1], corners[1]![1]),
+    Math.max(corners[0]![0], corners[1]![0]),
+    Math.max(corners[0]![1], corners[1]![1]),
+  ]
+  const [r, g, b] = annotation.color.map(num)
+  const ops = ['q', '/GS0 gs', `${r} ${g} ${b} RG`, `${num(width)} w 1 J 1 j`]
+  let line: [Point, Point] | undefined
+  if (annotation.subtype === 'Square') {
+    const half = width / 2
+    const pts = [user(left + half, top + half), user(right - half, top + half), user(right - half, bottom - half), user(left + half, bottom - half)]
+    ops.push(`${pt(pts[0]!)} m ${pt(pts[1]!)} l ${pt(pts[2]!)} l ${pt(pts[3]!)} l h S`)
+  } else if (annotation.subtype === 'Circle') {
+    const half = width / 2
+    const cx = (left + right) / 2
+    const cy = (top + bottom) / 2
+    const rx = Math.max(0.1, (right - left) / 2 - half)
+    const ry = Math.max(0.1, (bottom - top) / 2 - half)
+    const c = (x: number, y: number) => pt(user(x, y))
+    ops.push(
+      `${c(cx + rx, cy)} m`,
+      `${c(cx + rx, cy + KAPPA * ry)} ${c(cx + KAPPA * rx, cy + ry)} ${c(cx, cy + ry)} c`,
+      `${c(cx - KAPPA * rx, cy + ry)} ${c(cx - rx, cy + KAPPA * ry)} ${c(cx - rx, cy)} c`,
+      `${c(cx - rx, cy - KAPPA * ry)} ${c(cx - KAPPA * rx, cy - ry)} ${c(cx, cy - ry)} c`,
+      `${c(cx + KAPPA * rx, cy - ry)} ${c(cx + rx, cy - KAPPA * ry)} ${c(cx + rx, cy)} c h S`,
+    )
+  } else {
+    const l = shape.line
+    if (!l) throw new PdfWriteError('unsupported_pdf', 'a line without endpoints')
+    const p1 = user(l[0] * W, l[1] * H)
+    const p2 = user(l[2] * W, l[3] * H)
+    line = [p1, p2]
+    ops.push(`${pt(p1)} m ${pt(p2)} l S`)
+    if (annotation.arrow) {
+      const [b1, b2] = shapeArrowBarbs(l, shape.strokeWidth, H / W)
+      ops.push(`${pt(user(b1[0] * W, b1[1] * H))} m ${pt(p2)} l ${pt(user(b2[0] * W, b2[1] * H))} l S`)
+    }
+  }
+  ops.push('Q')
+  return { rect, line, content: ops.join('\n'), width }
+}
+
+function shapeDict(annotation: PdfWriteAnnotation, page: PageGeometry, geometry: ReturnType<typeof shapeGeometry>, apRef: PdfRef, created: string, modified: string, keep: Record<string, string>): string {
+  const [r, g, b] = annotation.color.map(num)
+  const parts = [`/Type /Annot /Subtype /${annotation.subtype}`, `/Rect [${geometry.rect.map(num).join(' ')}]`, '/F 4']
+  if (geometry.line) {
+    parts.push(`/L [${geometry.line.flatMap((p) => [num(p[0]), num(p[1])]).join(' ')}]`)
+    parts.push(annotation.arrow ? '/LE [/None /OpenArrow]' : '/LE [/None /None]')
+  }
+  parts.push(`/C [${r} ${g} ${b}]`, `/BS << /W ${num(geometry.width)} /S /S >>`)
+  if (annotation.opacity < 1) parts.push(`/CA ${num(annotation.opacity)}`)
+  if (annotation.contents) parts.push(`/Contents ${textString(annotation.contents)}`)
+  parts.push(`/T ${textString(annotation.author)}`, `/NM ${textString(annotation.nm)}`, `/M ${textString(modified)}`, `/CreationDate ${textString(created)}`)
+  parts.push(`/P ${refText(page.ref)}`, `/AP << /N ${refText(apRef)} >>`)
+  for (const [key, value] of Object.entries(keep)) parts.push(`/${key} ${value}`)
+  return `<< ${parts.join(' ')} >>`
+}
 
 function streamObject(dict: string, content: string): string {
   return `<< ${dict} /Length ${Buffer.byteLength(content, 'latin1')} >>\nstream\n${content}\nendstream`
@@ -268,6 +353,21 @@ function appendUnchecked(bytes: Uint8Array, pages: ReadonlyMap<number, PageGeome
 
   const writeAnnotation = (annotation: PdfWriteAnnotation, target: PdfRef | null, keep: Record<string, string>): PdfRef => {
     const page = pageOf(annotation.pageIndex)
+    if (isShapeWrite(annotation)) {
+      const geometry = shapeGeometry(annotation, page)
+      const ap = { num: nextNum++, gen: 0 }
+      const opacity = num(annotation.opacity)
+      written.push({
+        ...ap,
+        body: streamObject(
+          `/Type /XObject /Subtype /Form /FormType 1 /BBox [${geometry.rect.map(num).join(' ')}] /Resources << /ExtGState << /GS0 << /Type /ExtGState /CA ${opacity} /ca ${opacity} >> >> >>`,
+          geometry.content,
+        ),
+      })
+      const shapeRef = target ?? { num: nextNum++, gen: 0 }
+      written.push({ ...shapeRef, body: shapeDict(annotation, page, geometry, ap, pdfDate(annotation.createdAt), pdfDate(annotation.modifiedAt), keep) })
+      return shapeRef
+    }
     let apRef: PdfRef | null = null
     if (annotation.subtype !== 'Text') {
       const quads = quadsFor(annotation, page)
