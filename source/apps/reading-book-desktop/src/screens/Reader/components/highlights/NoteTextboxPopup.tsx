@@ -12,6 +12,11 @@ type NoteTextboxPopupProps = {
   onDismiss: () => void
   /** Two-way sync conflict banner (PDF), shown first. */
   conflict?: ReactNode
+  /** Defaults to a plain note: placeholder "Note…", second button "Delete". */
+  placeholder?: string
+  ariaLabel?: string
+  /** The red second button: "Delete" for a saved note, "Cancel" for one that does not exist yet. */
+  discardLabel?: string
 }
 
 const FALLBACK_SIZE = { width: 240, height: 140 }
@@ -30,6 +35,9 @@ export function NoteTextboxPopup({
   onDelete,
   onDismiss,
   conflict,
+  placeholder = 'Note…',
+  ariaLabel = 'Note',
+  discardLabel = 'Delete',
 }: NoteTextboxPopupProps) {
   const containerRef = useRef<HTMLDivElement | null>(null)
   const [draft, setDraft] = useState(highlight.note ?? '')
@@ -62,7 +70,7 @@ export function NoteTextboxPopup({
     <div
       ref={containerRef}
       role="dialog"
-      aria-label="Note"
+      aria-label={ariaLabel}
       className="fixed z-[400] flex w-[240px] flex-col gap-2 rounded-xl border border-lib-border bg-lib-surface-strong p-2 shadow-xl"
       style={{ top, left }}
       onContextMenu={(e) => {
@@ -81,7 +89,7 @@ export function NoteTextboxPopup({
             save()
           }
         }}
-        placeholder="Note…"
+        placeholder={placeholder}
         rows={4}
         className="w-full resize-none rounded-md border border-lib-border bg-lib-bg-mid/50 p-1.5 text-[12px] text-lib-text"
       />
@@ -101,7 +109,7 @@ export function NoteTextboxPopup({
             onDelete()
           }}
         >
-          Delete
+          {discardLabel}
         </button>
       </div>
     </div>,

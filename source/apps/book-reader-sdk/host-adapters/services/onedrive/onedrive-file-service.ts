@@ -17,8 +17,6 @@ const MIME_TO_FORMAT: Record<string, string> = {
   'text/markdown': 'md',
   'application/x-mobipocket-ebook': 'mobi',
   'application/vnd.amazon.ebook': 'azw3',
-  'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'docx',
-  'application/msword': 'doc',
   'application/x-fb2': 'fb2',
   'application/vnd.comicbook+zip': 'cbz',
 };

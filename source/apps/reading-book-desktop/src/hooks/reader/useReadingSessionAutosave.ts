@@ -186,6 +186,9 @@ export function useReadingSessionAutosave({
     if (!id) return
     const latest = getLatestRef.current?.()
     if (!latest) return
+    // The reading surface may already be gone (the book is being left): it then reports no location and
+    // an empty progress. That must not replace a position that was noted while it was still there.
+    if (!latest.location && pendingRef.current?.lastReadLocation) return
     applyPending(latest.location, latest.meta, latest.theme, id)
   }, [applyPending])
 

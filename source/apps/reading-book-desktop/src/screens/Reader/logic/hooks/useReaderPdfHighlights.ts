@@ -42,6 +42,7 @@ export function useReaderPdfHighlights({
   const loadConflicts = usePdfHighlightsStore((s) => s.loadConflicts)
   const resetSignedWrite = usePdfSignedWriteStore((s) => s.reset)
   const closeEditPopup = usePdfHighlightsStore((s) => s.closeEditPopup)
+  const cancelInsert = usePdfHighlightsStore((s) => s.cancelInsert)
 
   useEffect(() => {
     setContext({
@@ -77,7 +78,8 @@ export function useReaderPdfHighlights({
 
   useEffect(() => {
     closeEditPopup()
-  }, [zoom, closeEditPopup])
+    cancelInsert()
+  }, [zoom, closeEditPopup, cancelInsert])
 
   return {
     highlights,
@@ -86,6 +88,10 @@ export function useReaderPdfHighlights({
     lastUsedColorHex,
     createFromSelection: usePdfHighlightsStore((s) => s.createFromSelection),
     commitMarkupSelection: usePdfHighlightsStore((s) => s.commitMarkupSelection),
+    pendingInsert: usePdfHighlightsStore((s) => s.pendingInsert),
+    beginInsert: usePdfHighlightsStore((s) => s.beginInsert),
+    commitInsert: usePdfHighlightsStore((s) => s.commitInsert),
+    cancelInsert: usePdfHighlightsStore((s) => s.cancelInsert),
     hiddenEmbeddedObjectIds,
     conflicts,
     resolveConflict: usePdfHighlightsStore((s) => s.resolveConflict),

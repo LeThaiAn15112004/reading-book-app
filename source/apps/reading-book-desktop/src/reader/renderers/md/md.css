@@ -4,6 +4,12 @@
  * Aa settings and the theme apply exactly as they do on the TXT surface.
  */
 
+/* The reader shell is select-none; the Markdown text is the one thing here that must be draggable. */
+[data-md-surface] {
+  user-select: text;
+  -webkit-user-select: text;
+}
+
 .md-content {
   font-family: var(--reader-font-reading);
   font-size: var(--reader-reading-size);
@@ -174,4 +180,31 @@
   overflow-wrap: anywhere;
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   font-size: 0.9em;
+}
+
+/* One rendered piece of the document: transparent to layout, only there to anchor annotations. */
+.md-seg {
+  display: contents;
+}
+
+/* The first block of the document keeps no top margin, now one level down inside its piece. */
+.md-content > .md-seg:first-child > :first-child {
+  margin-top: 0;
+}
+
+/* Inserted Text carets (an overlay in the page's own coordinates; never takes pointer events). */
+.md-annot-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.md-caret {
+  position: absolute;
+  background: var(--md-caret-color, #ec407a);
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 10' preserveAspectRatio='none'%3E%3Cpath d='M0.8 9.2 L5 1.6 L9.2 9.2' fill='none' stroke='black' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round' vector-effect='non-scaling-stroke'/%3E%3C/svg%3E") no-repeat center / 100% 100%;
+}
+
+.md-caret[data-focused] {
+  filter: drop-shadow(0 0 2px #4fc3f7) drop-shadow(0 0 2px #4fc3f7);
 }

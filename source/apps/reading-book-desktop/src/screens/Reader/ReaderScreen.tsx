@@ -4,6 +4,7 @@ import {
   CfiLocation,
   PageRectLocation,
   TextOffsetLocation,
+  parseMdReadingLocation,
   fontFamilyCss,
   formatHighlightCitation,
   isMarkupTool,
@@ -23,6 +24,7 @@ import {
   useReaderChromeMenu,
 } from '../../chrome'
 import { ReaderShell, readerChromeTopInset, readerChromeBottomInset } from '../../reader'
+import { usePdfViewStore } from './logic/pdfView/pdfViewStore'
 import { usePdfExportStore } from './logic/pdfExport/pdfExportStore'
 import { usePdfSignedWriteStore } from './logic/pdfExport/pdfSignedWriteStore'
 import { getReaderCapabilities } from '../../reader/capabilities'
@@ -32,13 +34,14 @@ import {
 } from '../../reader/renderers/epub'
 import {
   PdfRenderer,
+  PAGE_GAP_PX,
   pdfFitPageZoom,
   pdfSelectionPageLabel,
   type PdfRendererApi,
 } from '../../reader/renderers/pdf'
 import { TxtRenderer, type TxtRendererApi } from '../../reader/renderers/txt'
-import { MdRenderer, decodeMdSource, type MdRendererApi } from '../../reader/renderers/md'
-import type { EpubTocItem } from '../../reader/renderers/epub'
+import { MdRenderer, decodeMdSource, type MdRendererApi, type MdSelectionInfo } from '../../reader/renderers/md'
+import type { EpubTocItem, ViewportRectLike } from '../../reader/renderers/epub'
 import type { TextSurfaceApi } from '../../reader/renderers/textSurface'
 import { appApi } from '../../bridge/app'
 import {
@@ -49,6 +52,7 @@ import {
   NoteFloatingMenu,
   NoteTextboxPopup,
   ReaderFooter,
+  ReplacePreviewTooltip,
   ReaderOpenStatus,
   ReaderRightSidebar,
   ReaderSearchPanel,
@@ -96,12 +100,30 @@ import {
   useReadAloud,
   useReaderTranslation,
   usePdfSelectionMenu,
+  useReaderMdHighlights,
   useReaderPdfHighlights,
   useReaderTxt,
   useRightPanelStore,
   type HighlightShortcuts,
   type ReaderChromeEscapeUi,
 } from './logic'
+import { INSERT_CARET_COLOR } from './logic/pdfHighlights/pdfHighlightsStore'
+import { useReaderPdfInk } from './logic/hooks/useReaderPdfInk'
+import { usePdfInkPrefsStore } from './logic/pdfInk/pdfInkPrefsStore'
+import { pdfDeleteFocused, pdfHasFocusedMark, pdfRedo, pdfUndo } from './logic/pdfInk/pdfUndoRouter'
+import { PdfInkPanel } from './components/chrome/PdfInkPanel'
+import { MD_INSERT_CARET_COLOR } from './logic/mdHighlights/mdHighlightsStore'
+
+/** Stand-in row for the Inserted Text editor while the caret is only a draft (nothing saved yet). */
+const PENDING_INSERT_DRAFT = {
+  id: 'pending-insert',
+  locatorRef: '',
+  styleKind: 'insert' as const,
+  colorHex: INSERT_CARET_COLOR,
+  tags: [] as string[],
+  createdAt: '',
+  updatedAt: '',
+}
 
 /** SCR-03 — session wiring; layout/chrome live in ReaderShell (T3.2). */
 export function ReaderScreen() {
@@ -192,6 +214,8 @@ export function ReaderScreen() {
   )
   // Markdown outline: the headings the surface reports, as sidebar Contents entries (`md-heading:N`
   // = the N-th heading of the page). The active entry follows the scroll.
+  /** The mark the pointer rests on (Replace shows its replacement text in a tooltip). */
+  const [hoverMark, setHoverMark] = useState<{ id: string; rect: ViewportRectLike } | null>(null)
   const [mdHeadings, setMdHeadings] = useState<MdHeadingInfo[]>([])
   const [mdActiveHeading, setMdActiveHeading] = useState<number | null>(null)
   useEffect(() => {
@@ -209,6 +233,10 @@ export function ReaderScreen() {
     return buildMdOutline(mdHeadings).map(toItem)
   }, [mdHeadings])
   const isTextSurface = isTxtSurface || isMdSurface
+  // Markdown has no Hand tool (it scrolls natively): never sit on it.
+  useEffect(() => {
+    if (isMdSurface) setActiveTool((tool) => (tool === 'hand' ? 'select' : tool))
+  }, [isMdSurface])
   const textApiRef: MutableRefObject<TextSurfaceApi | null> = isMdSurface ? mdApiRef : txtApiRef
   const txtReady = isTxtSurface && txt.loadStatus === 'ready'
   const txtLoadFailed = isTxtSurface && txt.loadStatus === 'error'
@@ -227,6 +255,13 @@ export function ReaderScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [book.resumeLocation, txtReady],
   )
+  // Markdown opens where it was left, like TXT: the saved text point, read once when it mounts.
+  const mdInitialPoint = useMemo(
+    () => parseMdReadingLocation(book.resumeLocation),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [book.resumeLocation, isMdSurface],
+  )
+  const isMdLoading = isMdSurface && book.sessionLoadStatus === 'loading'
   const txtSidebarHighlights = useMemo(() => [...txt.highlights], [txt.highlights])
   const exportAnnotatedPdf = usePdfExportStore((st) => st.exportAnnotatedPdf)
   const pendingSignedExport = usePdfExportStore((st) => st.pendingSigned)
@@ -291,6 +326,10 @@ export function ReaderScreen() {
   const translation = useReaderTranslation({ bookId, setToast: chrome.setToast })
   const translateModeRef = useRef(translation.mode)
   translateModeRef.current = translation.mode
+  // The Pen exists on the PDF surface only: another book (or format) leaves it.
+  useEffect(() => {
+    if (!isPdfSurface && activeTool === 'pen') setActiveTool('select')
+  }, [isPdfSurface, activeTool])
   const selectTool = (tool: InteractionTool | ((current: InteractionTool) => InteractionTool)) => {
     if (translateModeRef.current) translation.setMode(false)
     setActiveTool(tool)
@@ -333,12 +372,24 @@ export function ReaderScreen() {
    * PDF Fit page: measure the page being read from the document, zoom so that page fills the reading
    * area (width and height), then scroll it to the top of the view and centre it horizontally.
    */
+  const pdfView = usePdfViewStore()
+  const fitPdfPageRef = useRef<() => Promise<void>>(async () => {})
+  const changePdfPagesPerView = useCallback((count: 1 | 2 | 3) => {
+    usePdfViewStore.getState().setPagesPerView(count)
+    // The page block just got wider / narrower: refit once the new layout is in place.
+    requestAnimationFrame(() => void fitPdfPageRef.current())
+  }, [])
   const fitPdfPage = useCallback(async () => {
     const api = pdfApiRef.current
     const viewport = zoomViewportRef.current?.getElement()
     if (!api || !viewport) return
     const page = api.getNavState().pageCurrent
-    const size = await api.measurePage(page)
+    const single = await api.measurePage(page)
+    // Several pages side by side fit as one wide block (pages + the gaps between them).
+    const perView = usePdfViewStore.getState().pagesPerView
+    const size = single
+      ? { width: single.width * perView + (perView - 1) * PAGE_GAP_PX, height: single.height }
+      : null
     const next = size ? pdfFitPageZoom(size, viewport.clientWidth, viewport.clientHeight) : null
     if (next === null) return
     setZoomThen(next, () => {
@@ -346,6 +397,7 @@ export function ReaderScreen() {
       viewport.scrollLeft = Math.max(0, (viewport.scrollWidth - viewport.clientWidth) / 2)
     })
   }, [setZoomThen, zoomViewportRef])
+  fitPdfPageRef.current = fitPdfPage
 
   // Immersive: tools/footer stay hidden unless an edge reveal is active. Left sidebar is disabled in fullscreen.
   const toolsHidden = immersive
@@ -494,8 +546,54 @@ export function ReaderScreen() {
     setToast: chrome.setToast,
     setChromeHidden: chrome.setChromeHidden,
   })
+  // PDF freehand Ink (strokes are their own `notes` type; the Pen tool lives in the toolbar's Annotation group).
+  const pdfInk = useReaderPdfInk({ bookId, isPdfSurface, setToast: chrome.setToast })
+  const inkPen = usePdfInkPrefsStore((s) => s.pen)
   /** The open surface's annotation store: drives the shared popups, sidebar actions and shortcuts. */
-  const markup = isPdfSurface ? pdfHighlights : isTxtSurface ? txt.markup : highlights
+  // Markdown annotations — the Markdown counterpart of `pdfHighlights` (piece + offset anchors, no CFI).
+  const mdHighlights = useReaderMdHighlights({
+    bookId,
+    isMdSurface,
+    mdApiRef,
+    setToast: chrome.setToast,
+    setChromeHidden: chrome.setChromeHidden,
+  })
+  /** Right-click inside a Markdown text selection: the same menu as the other formats. */
+  const [mdSelectionMenu, setMdSelectionMenu] = useState<{ selection: MdSelectionInfo; point: { x: number; y: number } } | null>(null)
+  const markup = isPdfSurface
+    ? pdfHighlights
+    : isMdSurface
+      ? mdHighlights
+      : isTxtSurface
+        ? txt.markup
+        : highlights
+  /** PDF marks as painted: the saved annotations plus the caret still being placed (Inserted Text). */
+  const pdfMarks = useMemo(
+    () =>
+      pdfHighlights.pendingInsert
+        ? [
+            ...pdfHighlights.highlights,
+            {
+              id: PENDING_INSERT_DRAFT.id,
+              styleKind: 'insert' as const,
+              colorHex: INSERT_CARET_COLOR,
+              rects: [pdfHighlights.pendingInsert.rect],
+              caret: true,
+            },
+          ]
+        : pdfHighlights.highlights,
+    [pdfHighlights.highlights, pdfHighlights.pendingInsert],
+  )
+  /** Inserted Text being placed: PDF or Markdown (the caret exists, the annotation does not yet). */
+  const pendingInsert = isPdfSurface && pdfHighlights.pendingInsert
+    ? { anchor: pdfHighlights.pendingInsert.anchor, commit: pdfHighlights.commitInsert, cancel: pdfHighlights.cancelInsert }
+    : isMdSurface && mdHighlights.pendingInsert
+      ? { anchor: mdHighlights.pendingInsert.anchor, commit: mdHighlights.commitInsert, cancel: mdHighlights.cancelInsert }
+      : null
+  const hoverReplace =
+    hoverMark && !markup.activeHighlight
+      ? (markup.highlights.find((h) => h.id === hoverMark.id && (h.styleKind === 'replace' || h.styleKind === 'insert') && h.note?.trim()) ?? null)
+      : null
   /** Two-way sync conflict banner for a PDF annotation's popup (undefined when there is none). */
   const conflictBannerFor = (id: string) => {
     const conflict = isPdfSurface ? pdfHighlights.conflicts[id] : undefined
@@ -522,11 +620,20 @@ export function ReaderScreen() {
     pdfHighlights.createFromSelection(menu.selection, styleKind, new DOMRect(menu.point.x, menu.point.y, 0, 0))
   }
 
+  /** Markdown selection menu → mark that selection (`textbox` = a note, its popup opens at the click). */
+  function markMdSelection(styleKind: 'highlight' | 'underline' | 'strikethrough' | 'squiggly' | 'replace' | 'insert' | 'textbox') {
+    const menu = mdSelectionMenu
+    if (!menu) return
+    setMdSelectionMenu(null)
+    mdHighlights.createFromSelection(menu.selection, styleKind, new DOMRect(menu.point.x, menu.point.y, 0, 0))
+  }
+
   highlightShortcutsRef.current = {
-    undo: markup.undo,
-    redo: markup.redo,
-    deleteFocused: markup.deleteFocused,
-    hasFocusedHighlight: markup.hasFocusedHighlight,
+    // A PDF has two histories (text markup and Ink strokes): the newest edit is undone first.
+    undo: isPdfSurface ? pdfUndo : markup.undo,
+    redo: isPdfSurface ? pdfRedo : markup.redo,
+    deleteFocused: isPdfSurface ? pdfDeleteFocused : markup.deleteFocused,
+    hasFocusedHighlight: isPdfSurface ? pdfHasFocusedMark : markup.hasFocusedHighlight,
     // Escape while Highlight/Underline/Strikethrough is armed: drop back to Select instead of
     // leaving the reader (matches Foxit/Adobe — Escape backs a modal tool out one level at a time).
     cancelAnnotationTool: () => {
@@ -534,7 +641,7 @@ export function ReaderScreen() {
         translation.setMode(false)
         return true
       }
-      if (!isMarkupTool(activeToolRef.current)) return false
+      if (!isMarkupTool(activeToolRef.current) && activeToolRef.current !== 'pen') return false
       setActiveTool('select')
       return true
     },
@@ -587,6 +694,9 @@ export function ReaderScreen() {
     strikethrough: { active: activeTool === 'strikethrough' },
     replace: { active: activeTool === 'replace' },
     insert: { active: activeTool === 'insert' },
+    pen: { active: activeTool === 'pen' },
+    // Eraser is not built yet: shown, disabled, never active.
+    eraser: { disabled: true },
     snapshot: { active: snapshot.active },
     settings: { active: chrome.settingsOpen, expanded: chrome.settingsOpen },
   }
@@ -628,6 +738,7 @@ export function ReaderScreen() {
       case 'strikethrough':
       case 'replace':
       case 'insert':
+      case 'pen':
         // Click the armed tool again to disarm it (back to Select); otherwise arm it — sticky across
         // multiple highlights/underlines/strikethroughs until toggled off, Escape, or Hand/Select.
         selectTool((current) => (current === tool ? 'select' : tool))
@@ -639,6 +750,8 @@ export function ReaderScreen() {
       case 'wordCount':
         chrome.closeFloating()
         chrome.setWordCountOpen(true)
+        return
+      case 'eraser':
         return
       case 'settings':
         if (toolsHidden) return
@@ -748,7 +861,10 @@ export function ReaderScreen() {
             )
           }
           layout={book.prefs.layout}
-          // PDF has no 1-page / 2-page spread (yet) — no toggle that the renderer would ignore.
+          // PDF has its own 1 / 2 / 3 pages-per-view toggle (below); TXT / MD have no spread.
+          pagesPerView={isPdfSurface ? pdfView.pagesPerView : undefined}
+          onPagesPerViewChange={isPdfSurface ? changePdfPagesPerView : undefined}
+          pageControlsInScroll={isPdfSurface}
           onLayoutChange={
             isPdfSurface || isTextSurface
               ? undefined
@@ -757,13 +873,23 @@ export function ReaderScreen() {
                   book.setPrefs((p) => ({ ...p, layout }))
                 }
           }
-          // PDF is always one continuous scroll with real page numbers — no paginated/scroll toggle.
+          // PDF: page-turn or scroll, both with real page numbers (kept in `pdfViewStore`).
           // TXT is one continuous scroll with a progress readout instead of page numbers.
-          viewMode={isPdfSurface ? 'paginated' : isTextSurface ? 'scroll' : book.prefs.viewMode}
+          viewMode={
+            isPdfSurface
+              ? pdfView.flow === 'paged'
+                ? 'paginated'
+                : 'scroll'
+              : isTextSurface
+                ? 'scroll'
+                : book.prefs.viewMode
+          }
           onViewModeChange={
-            isPdfSurface || isTextSurface
+            isTextSurface
               ? undefined
-              : (viewMode) => {
+              : isPdfSurface
+                ? (viewMode) => pdfView.setFlow(viewMode === 'scroll' ? 'scroll' : 'paged')
+                : (viewMode) => {
                   book.prefsDirtyRef.current = true
                   book.setPrefs((p) => ({ ...p, viewMode }))
                 }
@@ -818,6 +944,7 @@ export function ReaderScreen() {
           />
 
           <TocSidebar
+            bookId={bookId}
             immersive={immersive}
             open={!immersive && chrome.sidebarOpen}
             tab={sidebarTab}
@@ -871,9 +998,20 @@ export function ReaderScreen() {
             }}
             onDeleteBookmark={bookmarks.deleteBookmarkById}
             highlights={
-              isPdfSurface ? pdfHighlights.highlights : isTxtSurface ? txtSidebarHighlights : highlights.highlights
+              isPdfSurface
+                ? pdfHighlights.highlights
+                : isMdSurface
+                  ? mdHighlights.highlights
+                  : isTxtSurface
+                    ? txtSidebarHighlights
+                    : highlights.highlights
             }
             onJumpHighlight={(highlight) => {
+              if (isMdSurface) {
+                const row = mdHighlights.highlights.find((h) => h.id === highlight.id)
+                if (row) mdHighlights.jumpToHighlight(row)
+                return
+              }
               if (isTxtSurface) {
                 const row = txt.highlights.find((h) => h.id === highlight.id)
                 if (row) txt.jumpToHighlight(row)
@@ -964,6 +1102,8 @@ export function ReaderScreen() {
             onConfirm={() => void confirmSignedExport(chrome.setToast)}
           />
 
+          {isPdfSurface && pdfInk.selectedId ? <PdfInkPanel onDeleteSelected={pdfInk.deleteSelected} /> : null}
+
           {chrome.toast ? (
             <div className="pointer-events-none fixed top-6 left-1/2 z-[999] -translate-x-1/2 rounded-full border border-lib-border bg-lib-surface-strong px-[18px] py-2.5 text-[13px] font-semibold text-lib-text-strong shadow-xl">
               {chrome.toast}
@@ -1046,6 +1186,31 @@ export function ReaderScreen() {
             />
           ) : null}
 
+          {mdSelectionMenu ? (
+            <HighlightContextMenu
+              point={mdSelectionMenu.point}
+              selectedText={mdSelectionMenu.selection.text}
+              onHighlight={() => markMdSelection('highlight')}
+              onUnderline={() => markMdSelection('underline')}
+              onStrikethrough={() => markMdSelection('strikethrough')}
+              onAddNote={() => markMdSelection('textbox')}
+              onBookmarkHere={bookmarks.toggleBookmark}
+              onCopy={() => copyHighlightText(mdSelectionMenu.selection.text)}
+              onTranslate={() => translation.openForSelection({ text: mdSelectionMenu.selection.text, lang: '' })}
+              onCopyWithCitation={() =>
+                copyHighlightText(
+                  formatHighlightCitation({
+                    text: mdSelectionMenu.selection.text,
+                    bookTitle: book.bookTitle,
+                    author: book.author,
+                    locationLabel: undefined,
+                  }),
+                )
+              }
+              onDismiss={() => setMdSelectionMenu(null)}
+            />
+          ) : null}
+
           {pdfSelectionMenu.menu ? (
             <HighlightContextMenu
               point={pdfSelectionMenu.menu.point}
@@ -1076,6 +1241,29 @@ export function ReaderScreen() {
                 )
               }}
               onDismiss={pdfSelectionMenu.close}
+            />
+          ) : null}
+
+          {pendingInsert ? (
+            // Inserted Text, not saved yet: Save with text creates the annotation, Cancel / Esc / empty
+            // text leaves nothing behind.
+            <NoteTextboxPopup
+              anchorRect={pendingInsert.anchor}
+              highlight={PENDING_INSERT_DRAFT}
+              placeholder="Text to insert…"
+              ariaLabel="Insert text"
+              discardLabel="Cancel"
+              onSave={pendingInsert.commit}
+              onDelete={pendingInsert.cancel}
+              onDismiss={pendingInsert.cancel}
+            />
+          ) : null}
+
+          {hoverMark && hoverReplace ? (
+            <ReplacePreviewTooltip
+              anchorRect={hoverMark.rect}
+              original={hoverReplace.styleKind === 'replace' ? hoverReplace.selectionText?.highlight : undefined}
+              replacement={hoverReplace.note!.trim()}
             />
           ) : null}
 
@@ -1176,6 +1364,7 @@ export function ReaderScreen() {
       book.contentStatus === 'idle' ||
       book.isEpubSessionLoading ||
       isPdfSessionLoading ||
+      isMdLoading ||
       isTxtLoading ? (
         <ReaderOpenStatus
           status={book.contentStatus === 'ready' ? 'loading' : book.contentStatus}
@@ -1239,6 +1428,7 @@ export function ReaderScreen() {
               onTranslateDragEnd={(info) => translation.openForSelection(info)}
               onHighlightContextMenu={(info) => highlights.openHighlightContextMenu(info)}
               onHighlightClick={(info) => highlights.focusHighlightFromClick(info)}
+              onHighlightHover={(info) => setHoverMark(info ? { id: info.id, rect: info.rect } : null)}
               onSurfaceClick={() => {
                 highlights.dismissAnnotationUi()
               }}
@@ -1263,13 +1453,15 @@ export function ReaderScreen() {
                 book.resumeLocation instanceof PageRectLocation ? book.resumeLocation.page : 1
               }
               interactionTool={activeTool}
+              pagesPerView={pdfView.pagesPerView}
+              flow={pdfView.flow}
               onHandPanBy={zoom.handleHandPanBy}
               onCenterTap={chrome.handleCenterTap}
               onSelectionContextMenu={(selection, x, y) => {
                 pdfHighlights.dismissAnnotationUi()
                 pdfSelectionMenu.open(selection, x, y)
               }}
-              annotations={pdfHighlights.highlights}
+              annotations={pdfMarks}
               focusedAnnotationId={pdfHighlights.focusedHighlightId}
               onAnnotationClick={(hit) => {
                 pdfSelectionMenu.close()
@@ -1280,11 +1472,19 @@ export function ReaderScreen() {
                 pdfHighlights.openHighlight(hit.id, hit.rect)
               }}
               onBlankClick={pdfHighlights.dismissAnnotationUi}
+              onInsertPoint={pdfHighlights.beginInsert}
+              onAnnotationHover={(hit) => setHoverMark(hit ? { id: hit.id, rect: hit.rect } : null)}
               onMarkupSelection={(selection, tool) => {
                 pdfSelectionMenu.close()
                 pdfHighlights.commitMarkupSelection(selection, tool)
               }}
               hiddenEmbeddedAnnotationIds={pdfHighlights.hiddenEmbeddedObjectIds}
+              inkStrokes={pdfInk.strokes}
+              selectedInkId={pdfInk.selectedId}
+              inkPen={{ colorHex: inkPen.colorHex, width: inkPen.width, opacity: 1 }}
+              onInkStroke={pdfInk.commitStroke}
+              onInkSelect={pdfInk.select}
+              onInkMove={pdfInk.moveStroke}
               apiRef={pdfApiRef}
               onNavState={(state) => {
                 nav.setPdfNav(state)
@@ -1302,13 +1502,50 @@ export function ReaderScreen() {
               chromeHidden={immersive || chrome.chromeHidden}
               onMarginClick={chrome.handleCenterTap}
               onProgress={(fraction) => setTxtPercent(Math.round(fraction * 100))}
+              initialPoint={mdInitialPoint}
+              onLocation={session.handleMdLocation}
               onHeadings={setMdHeadings}
               onActiveHeading={setMdActiveHeading}
+              onAnchorNotFound={() => chrome.setToast('That section was not found in this document.')}
               onOpenExternal={(url) => {
                 void appApi.openExternalLink(url).then((result) => {
                   if (!result.ok) chrome.setToast('That link could not be opened.')
                 })
               }}
+              annotations={mdHighlights.highlights}
+              draftCaret={
+                mdHighlights.pendingInsert
+                  ? { point: mdHighlights.pendingInsert.point, colorHex: MD_INSERT_CARET_COLOR }
+                  : null
+              }
+              focusedAnnotationId={mdHighlights.focusedHighlightId}
+              markupTool={activeAnnotationTool}
+              onMarkupSelection={(selection, tool) => {
+                setMdSelectionMenu(null)
+                mdHighlights.commitMarkupSelection(selection, tool)
+              }}
+              onInsertPoint={(info) => {
+                setMdSelectionMenu(null)
+                mdHighlights.beginInsert(info)
+              }}
+              onSelectionContextMenu={(selection, x, y) => {
+                mdHighlights.dismissAnnotationUi()
+                setMdSelectionMenu({ selection, point: { x, y } })
+              }}
+              onAnnotationClick={(hit) => {
+                setMdSelectionMenu(null)
+                mdHighlights.openHighlight(hit.id, hit.rect)
+              }}
+              onAnnotationContextMenu={(hit) => {
+                setMdSelectionMenu(null)
+                mdHighlights.openHighlight(hit.id, hit.rect)
+              }}
+              onAnnotationHover={(hit) => setHoverMark(hit ? { id: hit.id, rect: hit.rect } : null)}
+              onBlankClick={() => {
+                setMdSelectionMenu(null)
+                mdHighlights.dismissAnnotationUi()
+              }}
+              onScrolled={() => setMdSelectionMenu(null)}
               apiRef={mdApiRef}
             />
           ) : book.bookFormat === 'txt' ? (
@@ -1343,6 +1580,7 @@ export function ReaderScreen() {
                 txt.closeSelectionMenu()
                 txt.openHighlight(hit.id, hit.box)
               }}
+              onReplaceHover={(hit) => setHoverMark(hit ? { id: hit.id, rect: hit.box } : null)}
               onBlankClick={() => {
                 txt.closeSelectionMenu()
                 txt.dismissAnnotationUi()

@@ -4,8 +4,8 @@ export enum DocumentFormat {
   Pdf = 'pdf',
   Txt = 'txt',
   Md = 'md',
-  Docx = 'docx',
-  Doc = 'doc',
+  /** Audiobook: one MP3 file, played through `<audio>` (see src/audio/). */
+  Mp3 = 'mp3',
 }
 
 const ALL_FORMATS: readonly DocumentFormat[] = [
@@ -13,8 +13,7 @@ const ALL_FORMATS: readonly DocumentFormat[] = [
   DocumentFormat.Pdf,
   DocumentFormat.Txt,
   DocumentFormat.Md,
-  DocumentFormat.Docx,
-  DocumentFormat.Doc,
+  DocumentFormat.Mp3,
 ];
 
 export function isDocumentFormat(value: string): value is DocumentFormat {

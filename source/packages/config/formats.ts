@@ -33,18 +33,11 @@ export const SUPPORTED_FORMATS: readonly FormatDescriptor[] = [
     displayName: 'Markdown',
   },
   {
-    format: DocumentFormat.Docx,
-    extensions: ['.docx'],
-    mimeTypes: [
-      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-    ],
-    displayName: 'Word Document',
-  },
-  {
-    format: DocumentFormat.Doc,
-    extensions: ['.doc'],
-    mimeTypes: ['application/msword'],
-    displayName: 'Word Document (legacy)',
+    // Audiobook. Playback verified for MP3 only (docs/implementation_plan/audiobook_implementation_plan.md).
+    format: DocumentFormat.Mp3,
+    extensions: ['.mp3'],
+    mimeTypes: ['audio/mpeg'],
+    displayName: 'MP3 Audio',
   },
 ] as const;
 

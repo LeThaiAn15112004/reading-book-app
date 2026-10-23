@@ -83,6 +83,10 @@ export const OverlayChannels = {
   listHighlights: 'overlay:listHighlights',
   saveHighlight: 'overlay:saveHighlight',
   deleteHighlight: 'overlay:deleteHighlight',
+  /** PDF freehand Ink strokes (`notes` rows of type `ink`) — never mixed with highlights. */
+  listInk: 'overlay:listInk',
+  saveInk: 'overlay:saveInk',
+  deleteInk: 'overlay:deleteInk',
   /** Renderer → main: watch the open PDF's file and sync its embedded annotations (now + on change). */
   watchPdfEmbeddedAnnotations: 'overlay:watchPdfEmbeddedAnnotations',
   /** Renderer → main: stop watching (book closed / switched). */
@@ -97,6 +101,22 @@ export const OverlayChannels = {
   listPdfAnnotationConflicts: 'overlay:listPdfAnnotationConflicts',
   /** Renderer → main: resolve one conflict (keep Readmate's version / use the PDF's). */
   resolvePdfAnnotationConflict: 'overlay:resolvePdfAnnotationConflict',
+} as const
+
+export const AudioChannels = {
+  /** Chapters the audio file declares about itself (unvalidated seconds). */
+  getChapters: 'audio:getChapters',
+  getBookmarks: 'audio:getBookmarks',
+  saveBookmarks: 'audio:saveBookmarks',
+} as const
+
+export const AttachmentChannels = {
+  /** Files embedded in the book's PDF (descriptors only, never bytes or paths). */
+  list: 'attachments:list',
+  /** Extract one attachment in Main and hand it to the OS (or refuse by policy). */
+  open: 'attachments:open',
+  /** Explicit Save As of one attachment through a Main-owned save dialog. */
+  saveAs: 'attachments:saveAs',
 } as const
 
 export const BookIndexChannels = {

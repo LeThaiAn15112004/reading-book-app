@@ -39,6 +39,7 @@ export { NoOpAiProvider, NoOpExternalLibraryConnector } from './domain-ports/ind
 export * from './cfi/index.js'
 export * from './annotations/colors.js'
 export * from './annotations/history.js'
+export * from './ink/index.js'
 export * from './annotations/citation.js'
 export {
   compareAnchors,
@@ -98,6 +99,7 @@ export * from './app-utils/index.js'
 export * from './constants/index.js'
 export * from './readers/index.js'
 export * from './audio/index.js'
+export * from './attachments/index.js'
 
 // Reference adapters
 export {

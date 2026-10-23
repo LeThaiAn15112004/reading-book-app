@@ -40,8 +40,12 @@ export interface ReadingStateJson {
     positionSeconds: number
     durationSeconds?: number | null
     playbackRate?: number | null
+    scope?: string | null
+    chapterId?: string | null
     updatedAt?: string | null
   } | null
+  /** Audiobook bookmarks (src/audio/audio-bookmarks.ts). */
+  audioBookmarks?: unknown[] | null
 }
 
 function parseObject<T extends object>(raw: string | null | undefined): T {

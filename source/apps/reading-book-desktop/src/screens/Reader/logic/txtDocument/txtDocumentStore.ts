@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { markupToast } from '../markupToast'
+import { opensNotePopup } from '../noteKinds'
 import type { MutableRefObject } from 'react'
 import {
   DEFAULT_HIGHLIGHT_COLOR,
@@ -467,7 +468,7 @@ export const useTxtDocumentStore = create<TxtDocumentStoreState>()((set, get) =>
       }
       replaceDoc(addTxtHighlight(doc, highlight), {
         focusedHighlightId: highlight.id,
-        activeHighlight: styleKind === 'textbox' && anchor ? { highlight, rect: anchor } : null,
+        activeHighlight: opensNotePopup(styleKind) && anchor ? { highlight, rect: anchor } : null,
         selectionMenu: null,
       })
       get().txtApiRef?.current?.clearSelection()
@@ -476,7 +477,7 @@ export const useTxtDocumentStore = create<TxtDocumentStoreState>()((set, get) =>
     },
 
     commitMarkupSelection: (selection, tool) => {
-      if (!get().createFromSelection(selection, tool)) return
+      if (!get().createFromSelection(selection, tool, selection.box ?? undefined)) return
       get().onToast(
         markupToast(tool),
       )

@@ -10,6 +10,7 @@ export type SidebarHighlight = ReaderHighlightBase & { chapterIndex: number }
 import type { EpubTocItem } from '../../../../reader/renderers/epub'
 import type { FakeChapter } from '../../logic'
 import { useNotesFilterStore, type NotesTypeFilter } from '../../logic/highlights/notesFilterStore'
+import { AttachmentsPanel } from './AttachmentsPanel'
 import { NoteItemMenu } from './NoteItemMenu'
 import { PageLayoutPanel, type PageThumbnailRenderer } from './PageLayoutPanel'
 import {
@@ -22,6 +23,8 @@ import { readerChromeTopInset } from '../../../../reader/chrome'
 export type SidebarTab = 'chapters' | 'bookmarks' | 'highlights' | 'layout' | 'attachments'
 
 type TocSidebarProps = {
+  /** The open book — the Attachment panel (PDF) lists its embedded files. */
+  bookId?: string
   open: boolean
   tab: SidebarTab
   panelWidth: number
@@ -433,6 +436,7 @@ export function TocSidebar({
   isResizing = false,
   chromeHidden = true,
   onResizePointerDown,
+  bookId,
   chapters,
   chapterIndex,
   tocItems,
@@ -937,11 +941,7 @@ export function TocSidebar({
             />
           ) : null}
 
-          {tab === 'attachments' ? (
-            <p className="m-0 px-2 py-6 text-center text-[13px] leading-relaxed text-lib-faint">
-              No attachments for this book yet.
-            </p>
-          ) : null}
+          {tab === 'attachments' && bookId ? <AttachmentsPanel bookId={bookId} /> : null}
         </div>
 
       {open && onResizePointerDown ? (

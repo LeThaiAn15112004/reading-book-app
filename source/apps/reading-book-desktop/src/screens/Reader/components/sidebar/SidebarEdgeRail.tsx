@@ -19,6 +19,8 @@ type SidebarEdgeRailProps = {
   immersiveHidden?: boolean
   /** Marks the Bookmark tab when the current place is bookmarked (FR-11). */
   bookmarkActive?: boolean
+  /** Space kept free at the bottom: the Reader footer's height by default, 0 for a screen without a footer. */
+  bottomInsetPx?: number
   onOpenTab: (tab: SidebarTab) => void
   onToggle: () => void
 }
@@ -32,6 +34,7 @@ export function SidebarEdgeRail({
   chromeHidden = true,
   immersiveHidden = false,
   bookmarkActive = false,
+  bottomInsetPx = READER_FOOTER_HEIGHT_PX,
   onOpenTab,
   onToggle,
 }: SidebarEdgeRailProps) {
@@ -59,7 +62,7 @@ export function SidebarEdgeRail({
         style={{
           width: SIDEBAR_RAIL_WIDTH_PX,
           top: chromeTopInset,
-          bottom: READER_FOOTER_HEIGHT_PX,
+          bottom: bottomInsetPx,
         }}
         aria-label="Sidebar navigation"
       >
@@ -103,7 +106,7 @@ export function SidebarEdgeRail({
         style={{
           left: handleLeft,
           top: chromeTopInset,
-          bottom: READER_FOOTER_HEIGHT_PX,
+          bottom: bottomInsetPx,
         }}
         type="button"
         title={open ? undefined : 'Open sidebar'}

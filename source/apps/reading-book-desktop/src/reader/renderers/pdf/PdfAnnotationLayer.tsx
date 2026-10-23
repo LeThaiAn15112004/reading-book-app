@@ -18,6 +18,8 @@ export type PdfAnnotationMark = {
   colorHex: string
   /** 1-based pages, normalized rects; may span several pages. */
   rects: readonly PdfHighlightRect[]
+  /** Inserted Text: the one rect is a caret box, painted as a small `^` under the text line. */
+  caret?: boolean
 }
 
 /** A short-lived pulse on one mark (jump from the sidebar); `nonce` restarts the animation. */
@@ -61,6 +63,7 @@ export function PdfPageAnnotations({ page, marks, focusedId, flash }: PdfPageAnn
                     className="rb-pdf-annot"
                     data-pdf-annot-id={mark.id}
                     data-kind={mark.styleKind}
+                    data-caret={mark.caret ? '' : undefined}
                     data-focused={focusedId === mark.id ? '' : undefined}
                     data-flash={flash?.id === mark.id ? '' : undefined}
                     style={boxStyle(rect, mark.colorHex)}

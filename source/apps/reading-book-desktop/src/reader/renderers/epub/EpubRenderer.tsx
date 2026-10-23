@@ -152,6 +152,8 @@ type EpubRendererProps = {
    * about whether a given click did or didn't land on a mark.
    */
   onHighlightClick?: (info: EpubHighlightClickInfo) => void
+  /** The pointer moved onto (info) or off (null) an existing mark — drives the Replace preview. */
+  onHighlightHover?: (info: EpubHighlightClickInfo | null) => void
   /**
    * A plain left click landed somewhere in the reading surface that is NOT an existing highlight/
    * underline mark (margin, plain text, empty space). Used to dismiss an open highlight popup/
@@ -479,6 +481,7 @@ export function EpubRenderer({
   onTranslateDragEnd,
   onHighlightContextMenu,
   onHighlightClick,
+  onHighlightHover,
   onSurfaceClick,
   onNavState,
   onLocationChange,
@@ -659,6 +662,8 @@ export function EpubRenderer({
   onHighlightContextMenuRef.current = onHighlightContextMenu
   const onHighlightClickRef = useRef(onHighlightClick)
   onHighlightClickRef.current = onHighlightClick
+  const onHighlightHoverRef = useRef(onHighlightHover)
+  onHighlightHoverRef.current = onHighlightHover
   const onSurfaceClickRef = useRef(onSurfaceClick)
   onSurfaceClickRef.current = onSurfaceClick
   const coverUrlRef = useRef(coverUrl)
@@ -924,6 +929,29 @@ export function EpubRenderer({
             }, HAND_HOVER_CURSOR_DELAY_MS)
           }
 
+          /** Hover preview (Replace): report the mark under the pointer whenever it changes. */
+          let hoveredMarkId: string | null = null
+          const reportMarkHover = (info: EpubHighlightClickInfo | null) => {
+            const id = info?.id ?? null
+            if (id === hoveredMarkId) return
+            hoveredMarkId = id
+            onHighlightHoverRef.current?.(info)
+          }
+          const onMarkHoverMove = (event: PointerEvent) => {
+            if ((event.buttons & 1) !== 0) {
+              reportMarkHover(null)
+              return
+            }
+            const win = doc.defaultView
+            const frameEl = win?.frameElement as HTMLIFrameElement | null
+            const point =
+              frameEl && win
+                ? toOuterPoint(event.clientX, event.clientY, frameEl, win)
+                : { x: event.clientX, y: event.clientY }
+            reportMarkHover(handleRef.current?.getHighlightAtPoint(point.x, point.y) ?? null)
+          }
+          const onMarkHoverLeave = () => reportMarkHover(null)
+
           // Keyboard page/section nav lives on ReaderScreen (window + iframe capture).
           // Always suppress the native context menu inside the reading surface — a right-click
           // over a live text selection instead opens the highlights context menu (Highlight /
@@ -1151,6 +1179,8 @@ export function EpubRenderer({
           doc.addEventListener('pointerdown', onPointerDown, { capture: true })
           doc.addEventListener('pointermove', onPointerHoverMove, { capture: true })
           doc.addEventListener('pointermove', onPointerMove, { capture: true })
+          doc.addEventListener('pointermove', onMarkHoverMove, { capture: true })
+          doc.documentElement.addEventListener('pointerleave', onMarkHoverLeave)
           doc.addEventListener('pointerup', onPointerUp, { capture: true })
           doc.addEventListener('pointercancel', onPointerCancel, { capture: true })
           doc.addEventListener('click', onClick)
@@ -1160,6 +1190,8 @@ export function EpubRenderer({
             doc.removeEventListener('pointerdown', onPointerDown, true)
             doc.removeEventListener('pointermove', onPointerHoverMove, true)
             doc.removeEventListener('pointermove', onPointerMove, true)
+            doc.removeEventListener('pointermove', onMarkHoverMove, true)
+            doc.documentElement.removeEventListener('pointerleave', onMarkHoverLeave)
             doc.removeEventListener('pointerup', onPointerUp, true)
             doc.removeEventListener('pointercancel', onPointerCancel, true)
             doc.removeEventListener('click', onClick)

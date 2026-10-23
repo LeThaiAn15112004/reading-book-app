@@ -489,6 +489,15 @@ a[ref='epubjs-mk'].rb-hl-focused {
   -webkit-user-select: text;
 }
 
+/* Pen (freehand Ink): crosshair everywhere, nothing can be selected — a press draws. */
+[data-pdf-tool='pen'],
+[data-pdf-tool='pen'] .textLayer,
+[data-pdf-tool='pen'] .textLayer :is(span, br) {
+  cursor: crosshair;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
 /* Hand: grab everywhere, even over text — a quick drag across text pans… */
 [data-pdf-tool='hand'],
 [data-pdf-tool='hand'] .textLayer,
@@ -496,6 +505,13 @@ a[ref='epubjs-mk'].rb-hl-focused {
   cursor: var(--cursor-hand-tool);
   user-select: none;
   -webkit-user-select: none;
+}
+
+/* Hand over the SELECTED freehand stroke: dragging it moves it (PdfRenderer sets the flag). */
+[data-pdf-tool='hand'][data-pdf-ink-hover],
+[data-pdf-tool='hand'][data-pdf-ink-hover] .textLayer,
+[data-pdf-tool='hand'][data-pdf-ink-hover] .textLayer :is(span, br) {
+  cursor: move;
 }
 
 /* …until the pointer rests on text (hover dwell): I-beam, and a press there selects. */
@@ -608,6 +624,21 @@ a[ref='epubjs-mk'].rb-hl-focused {
 
 .rb-pdf-annot[data-kind='insert']::after {
   bottom: 0;
+}
+
+/*
+ * Inserted Text caret: the box is a small square under the text line (see pdfCaretRect in the SDK);
+ * the `^` is the annotation color painted through a chevron mask, so it stays thin at any zoom and
+ * never covers the glyphs above it. Overrides the dashed line older `insert` selections still use.
+ */
+.rb-pdf-annot[data-kind='insert'][data-caret]::after {
+  top: 0;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: auto;
+  background: var(--rb-annot-color);
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 10' preserveAspectRatio='none'%3E%3Cpath d='M0.8 9.2 L5 1.6 L9.2 9.2' fill='none' stroke='black' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round' vector-effect='non-scaling-stroke'/%3E%3C/svg%3E") no-repeat center / 100% 100%;
 }
 
 /* Squiggly: a zigzag along the bottom edge — the line color painted through a repeating zigzag mask. */

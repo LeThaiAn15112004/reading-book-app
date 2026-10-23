@@ -1,0 +1,17 @@
+export {
+  ATTACHMENT_MAX_BYTES,
+  ATTACHMENT_MAX_COUNT,
+  attachmentExtension,
+  buildAttachmentId,
+  checkAttachmentSize,
+  classifyAttachment,
+  describeAttachmentBlock,
+  isAttachmentId,
+  looksLikeActiveContent,
+  sanitizeAttachmentFileName,
+  type AttachmentBlockReason,
+  type AttachmentSizeVerdict,
+  type AttachmentSource,
+  type AttachmentVerdict,
+  type BookAttachment,
+} from './attachment-policy.js'

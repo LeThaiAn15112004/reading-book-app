@@ -24,6 +24,7 @@ import {
   boxForOffsets,
   lineTopAt,
   offsetAtClientY,
+  rectsForOffsets,
   type ClientBox,
 } from './txtGeometry'
 import { txtMarkStyle } from './txtMarkStyle'
@@ -85,6 +86,8 @@ export type TxtRendererProps = {
   onMarkupSelection: (selection: TxtSelectionInfo, tool: TxtMarkupTool) => void
   onHighlightClick: (hit: TxtHighlightHit) => void
   onHighlightContextMenu: (hit: TxtHighlightHit) => void
+  /** The pointer moved onto (hit) or off (null) a Replace mark — drives the Replace preview. */
+  onReplaceHover?: (hit: TxtHighlightHit | null) => void
   /** A plain click in the text (no annotation under it, no selection). */
   onBlankClick: () => void
   /** A tap in the margins around the text: toggle the chrome. */
@@ -449,6 +452,36 @@ export function TxtRenderer(props: TxtRendererProps) {
     window.addEventListener('pointerup', (up) => finishPress(press, up), { once: true })
   }
 
+  /** Hover preview: the Replace mark whose painted text is under the pointer (a textarea hides the backdrop from hit-testing). */
+  const hoveredReplaceRef = useRef<string | null>(null)
+  const reportReplaceHover = (hit: TxtHighlightHit | null) => {
+    if ((hit?.id ?? null) === hoveredReplaceRef.current) return
+    hoveredReplaceRef.current = hit?.id ?? null
+    propsRef.current.onReplaceHover?.(hit)
+  }
+  const onPointerMove = (event: ReactPointerEvent<HTMLTextAreaElement>) => {
+    const m = measure()
+    if (!m || (event.buttons & 1) !== 0) {
+      reportReplaceHover(null)
+      return
+    }
+    const current = modelTextRef.current
+    for (const mark of propsRef.current.highlights) {
+      if (mark.styleKind !== 'replace' && mark.styleKind !== 'insert') continue
+      const rects = rectsForOffsets(m.backdrop, mark.startOffset, mark.endOffset, current)
+      const over = rects.some(
+        (r) => event.clientX >= r.left && event.clientX <= r.right && event.clientY >= r.top && event.clientY <= r.bottom,
+      )
+      if (!over) continue
+      const box = boxForOffsets(m.backdrop, mark.startOffset, mark.endOffset, current)
+      if (box) {
+        reportReplaceHover({ id: mark.id, box })
+        return
+      }
+    }
+    reportReplaceHover(null)
+  }
+
   const onContextMenu = (event: ReactMouseEvent<HTMLTextAreaElement>) => {
     event.preventDefault()
     const selection = readSelection()
@@ -589,6 +622,8 @@ export function TxtRenderer(props: TxtRendererProps) {
             autoComplete="off"
             defaultValue={text}
             onPointerDown={onPointerDown}
+            onPointerMove={onPointerMove}
+            onPointerLeave={() => reportReplaceHover(null)}
             onContextMenu={onContextMenu}
           />
         </div>

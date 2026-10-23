@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, type MutableRefObject, type RefObject } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { PageRectLocation, txtReadingLocation, type CfiLocation } from '@reading-book/book-reader-sdk'
+import { PageRectLocation, mdReadingLocation, txtReadingLocation, type CfiLocation, type MdPoint } from '@reading-book/book-reader-sdk'
 import type { EpubRendererApi } from '../../../../reader/renderers/epub'
 import type { PdfNavState, PdfRendererApi } from '../../../../reader/renderers/pdf'
 import type { TextSurfaceApi } from '../../../../reader/renderers/textSurface'
@@ -144,6 +144,15 @@ export function useReaderSessionBridge({
     [getLatestSessionSnapshot, noteLocation],
   )
 
+  /** Markdown scrolled to a new top line: the position is a (piece, offset) text point; the autosave debounces. */
+  const handleMdLocation = useCallback(
+    (point: MdPoint) => {
+      const latest = getLatestSessionSnapshot()
+      noteLocation(mdReadingLocation(point), latest?.meta ?? txtSessionMeta(0), latest?.theme ?? {})
+    },
+    [getLatestSessionSnapshot, noteLocation],
+  )
+
   useEffect(() => {
     lastPdfPageRef.current = null
   }, [bookId])
@@ -166,6 +175,7 @@ export function useReaderSessionBridge({
     handleEpubLocationChange,
     handlePdfNavState,
     handleTxtLocation,
+    handleMdLocation,
     leaveToLibrary,
   }
 }

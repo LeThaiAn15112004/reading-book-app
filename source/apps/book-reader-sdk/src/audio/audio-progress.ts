@@ -1,5 +1,6 @@
 import type { ReadingStateJson } from '../persistence/books-json.js'
 import { audioProgressPercent, clampPlaybackRate, knownDuration } from './audio-playback.js'
+import { isProgressScope, type ProgressScope } from './audio-timeline.js'
 
 /**
  * Listening progress, stored under `reading_state_json.audioProgress`.
@@ -13,6 +14,10 @@ export interface AudioProgress {
   /** Known only once the element has reported a finite duration. */
   durationSeconds?: number
   playbackRate: number
+  /** How the timeline is shown (Book / Chapter). Display only — the position above is canonical. */
+  scope?: ProgressScope
+  /** The chapter the position was in when saved (informational; restore uses the position). */
+  chapterId?: string
   /** ISO-8601, assigned by Main when the progress is written. */
   updatedAt: string
 }
@@ -21,6 +26,9 @@ export interface AudioProgressInput {
   positionSeconds: number
   durationSeconds?: number
   playbackRate: number
+  scope?: ProgressScope
+  /** A string sets it, `null` clears it (the position left the chapters), absent keeps what is stored. */
+  chapterId?: string | null
 }
 
 /** Upper bound for a position / duration we accept (≈ 115 days) — guards against garbage values. */
@@ -41,6 +49,9 @@ export function sanitizeAudioProgressInput(raw: unknown): AudioProgressInput | u
   const out: AudioProgressInput = { positionSeconds: position, playbackRate: clampPlaybackRate(rate) }
   const duration = knownDuration(o.durationSeconds)
   if (duration !== null && duration <= MAX_SECONDS) out.durationSeconds = duration
+  if (isProgressScope(o.scope)) out.scope = o.scope
+  if (o.chapterId === null) out.chapterId = null
+  else if (typeof o.chapterId === 'string' && o.chapterId.trim() && o.chapterId.length <= 100) out.chapterId = o.chapterId
   return out
 }
 
@@ -48,7 +59,7 @@ export function sanitizeAudioProgressInput(raw: unknown): AudioProgressInput | u
 export function parseAudioProgress(state: ReadingStateJson | null | undefined): AudioProgress | undefined {
   const raw = state?.audioProgress
   if (!raw || typeof raw !== 'object') return undefined
-  const { positionSeconds, durationSeconds, playbackRate, updatedAt } = raw as Record<string, unknown>
+  const { positionSeconds, durationSeconds, playbackRate, updatedAt, scope, chapterId } = raw as Record<string, unknown>
   if (!isFiniteNumber(positionSeconds) || positionSeconds < 0) return undefined
   const out: AudioProgress = {
     positionSeconds,
@@ -57,6 +68,8 @@ export function parseAudioProgress(state: ReadingStateJson | null | undefined): 
   }
   const duration = knownDuration(durationSeconds)
   if (duration !== null) out.durationSeconds = duration
+  if (isProgressScope(scope)) out.scope = scope
+  if (typeof chapterId === 'string' && chapterId) out.chapterId = chapterId
   return out
 }
 
@@ -68,13 +81,16 @@ export function parseAudioProgress(state: ReadingStateJson | null | undefined): 
 export function audioProgressPatch(
   input: AudioProgressInput,
   nowIso: string,
-): { audioProgress: AudioProgress; percent?: number } {
-  const audioProgress: AudioProgress = {
+): { audioProgress: Record<string, unknown>; percent?: number } {
+  const audioProgress: Record<string, unknown> = {
     positionSeconds: input.positionSeconds,
     playbackRate: input.playbackRate,
     updatedAt: nowIso,
   }
   if (input.durationSeconds !== undefined) audioProgress.durationSeconds = input.durationSeconds
+  if (input.scope !== undefined) audioProgress.scope = input.scope
+  // `null` is a merge-patch delete: the position is no longer inside any chapter.
+  if (input.chapterId !== undefined) audioProgress.chapterId = input.chapterId
   const percent = audioProgressPercent(input.positionSeconds, input.durationSeconds)
   return percent === undefined ? { audioProgress } : { audioProgress, percent }
 }

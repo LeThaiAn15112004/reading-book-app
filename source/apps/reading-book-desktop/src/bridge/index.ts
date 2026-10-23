@@ -2,6 +2,8 @@ export { appApi, type SnapshotRegion } from './app'
 export { libraryApi } from './library'
 export { importApi } from './import'
 export { overlayApi } from './overlay'
+export { audioApi } from './audio'
+export { attachmentsApi, type AttachmentItem } from './attachments'
 export { cloudApi } from './cloud'
 export { bookIndexApi } from './bookIndex'
 export {

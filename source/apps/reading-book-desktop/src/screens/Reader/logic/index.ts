@@ -21,6 +21,7 @@ export {
   useReadAloud,
   useReaderTranslation,
   usePdfSelectionMenu,
+  useReaderMdHighlights,
   useReaderPdfHighlights,
   useReaderTxt,
   type HighlightShortcuts,

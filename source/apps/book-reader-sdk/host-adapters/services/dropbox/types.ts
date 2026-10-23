@@ -22,8 +22,6 @@ export const SUPPORTED_BOOK_EXTENSIONS = [
   'pdf',
   'txt',
   'md',
-  'docx',
-  'doc',
 ] as const;
 
 export type SupportedBookExtension = (typeof SUPPORTED_BOOK_EXTENSIONS)[number];

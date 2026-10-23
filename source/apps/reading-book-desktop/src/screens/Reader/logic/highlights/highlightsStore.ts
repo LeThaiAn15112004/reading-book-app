@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { markupToast } from '../markupToast'
+import { opensNotePopup } from '../noteKinds'
 import type { MutableRefObject } from 'react'
 import { CfiLocation } from '@reading-book/book-reader-sdk'
 import {
@@ -257,7 +258,7 @@ export const useHighlightsStore = create<HighlightsStoreState>()((set, get) => (
     if (!found) return
     get().focusHighlight(info.id)
     set({ pendingSelection: null })
-    if (found.styleKind === 'textbox') {
+    if (opensNotePopup(found.styleKind)) {
       set({ activeHighlight: { highlight: found, rect: info.rect } })
     }
   },
@@ -324,7 +325,7 @@ export const useHighlightsStore = create<HighlightsStoreState>()((set, get) => (
     // though, as feedback that it landed. A `textbox` note is the opposite: its whole point is
     // the note text, so it opens `NoteTextboxPopup` (via `activeHighlight`) right away instead.
     get().focusHighlight(highlight.id)
-    if (styleKind === 'textbox') {
+    if (opensNotePopup(styleKind)) {
       set({ activeHighlight: { highlight, rect: pendingSelection.rect } })
     }
 

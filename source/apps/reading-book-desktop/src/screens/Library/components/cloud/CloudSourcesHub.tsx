@@ -21,7 +21,7 @@ const FORMAT_LABELS: Record<string, string> = {
 }
 
 const GOOGLE_DRIVE_FORMATS = ['epub', 'pdf', 'mobi', 'azw3', 'fb2', 'txt', 'md'] as const
-const DROPBOX_FORMATS = ['epub', 'pdf', 'txt', 'md', 'docx', 'doc'] as const
+const DROPBOX_FORMATS = ['epub', 'pdf', 'txt', 'md'] as const
 const ONEDRIVE_FORMATS = [
   'epub',
   'pdf',

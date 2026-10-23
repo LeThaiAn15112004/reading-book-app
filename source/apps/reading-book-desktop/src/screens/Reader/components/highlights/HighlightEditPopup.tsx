@@ -116,7 +116,13 @@ export function HighlightEditPopup({
         onBlur={() => {
           if (noteDraft !== (highlight.note ?? '')) onChangeNote(noteDraft)
         }}
-        placeholder="Add a note…"
+        placeholder={
+          highlight.styleKind === 'replace'
+            ? 'Replace with…'
+            : highlight.styleKind === 'insert'
+              ? 'Text to insert…'
+              : 'Add a note…'
+        }
         rows={3}
         className="w-full resize-none rounded-md border border-lib-border bg-lib-bg-mid/50 p-2 text-[12px] text-lib-text"
       />

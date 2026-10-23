@@ -1,4 +1,4 @@
-import type { NoteLocator, NoteSelectionText, PdfAnnotation, TxtAnnotation } from './note.js';
+import type { MdAnnotation, NoteLocator, NoteSelectionText, PdfAnnotation, TxtAnnotation } from './note.js';
 
 /**
  * `'highlight'` = background fill; `'underline'` = underline stroke; `'strikethrough'` = a line
@@ -31,6 +31,8 @@ export interface HighlightRecord {
   pdfAnnotation?: PdfAnnotation;
   /** TXT markup range (`note_json.txtAnnotation`); absent for every other format. */
   txtAnnotation?: TxtAnnotation;
+  /** Markdown markup anchor (`note_json.mdAnnotation`); absent for every other format. */
+  mdAnnotation?: MdAnnotation;
   createdAt: string;
   updatedAt: string;
 }

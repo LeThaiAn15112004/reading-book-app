@@ -1,3 +1,4 @@
+export { AttachmentsPanel } from './AttachmentsPanel'
 export { NoteFloatingMenu } from './NoteFloatingMenu'
 export { PageLayoutPanel, type PageThumbnailRenderer } from './PageLayoutPanel'
 export { SidebarEdgeRail } from './SidebarEdgeRail'

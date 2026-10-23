@@ -1,5 +1,5 @@
 /** MVP format chips shown on SCR-01 (SDS / library mockup). */
-const MVP_FORMAT_CHIPS = ['EPUB', 'PDF', 'TXT', 'MD', 'DOCX', 'DOC'] as const
+const MVP_FORMAT_CHIPS = ['EPUB', 'PDF', 'TXT', 'MD'] as const
 
 /** Local-library hint + supported format chips. */
 export function LibraryHint() {

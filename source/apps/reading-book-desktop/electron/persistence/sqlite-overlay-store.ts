@@ -9,8 +9,11 @@ import {
   type NoteSelectionText,
   type OverlayStore,
   type PdfAnnotation,
+  type PdfInkRecord,
+  type PdfInkStroke,
   type SaveBookmarkInput,
   type SaveHighlightInput,
+  type MdAnnotation,
   type TxtAnnotation,
 } from '@reading-book/book-reader-sdk'
 import type { Database as SqliteDatabase } from 'better-sqlite3'
@@ -18,6 +21,13 @@ import { randomUUID } from 'node:crypto'
 import {
   parseReadingState,
   type ReadingStateJson,
+} from '@reading-book/book-reader-sdk'
+import {
+  audioProgressPatch,
+  isAudioFormat,
+  parseAudioProgress,
+  type AudioProgress,
+  type AudioProgressInput,
 } from '@reading-book/book-reader-sdk'
 import { getDatabase } from './db'
 import {
@@ -34,6 +44,8 @@ import {
   type TwoWayPlan,
   packSessionLocation,
   parsePdfAnnotation,
+  parsePdfInk,
+  parseMdAnnotation,
   parseTxtAnnotation,
   planEmbeddedAnnotationSync,
   unpackSessionLocation,
@@ -204,6 +216,57 @@ const HIGHLIGHT_TYPE_PREDICATE = `
   AND json_extract(note_json, '$.type') IN ('highlight', 'underline', 'strikethrough', 'squiggly', 'replace', 'insert', 'textbox')
 `
 
+/**
+ * PDF freehand Ink rows: `notes` rows of type `ink`. Deliberately NOT part of `HIGHLIGHT_TYPE_PREDICATE`,
+ * so a stroke never reaches highlight queries, the planner, the sidebar or exports (and a highlight
+ * delete/save can never touch one). docs/implementation_plan/pdf_freehand_ink_eraser_plan.md.
+ */
+const INK_TYPE_PREDICATE = `json_extract(note_json, '$.type') = 'ink'`
+
+function rowToInkRecord(row: NoteRow): PdfInkRecord | undefined {
+  let note: INoteState
+  try {
+    note = JSON.parse(row.note_json) as INoteState
+  } catch {
+    return undefined
+  }
+  const locator = note.locatorExtended?.locator
+  // Re-validated so a hand-edited / corrupt row can't reach the renderer.
+  const ink = note.pdfInk ? parsePdfInk(note.pdfInk) : undefined
+  if (!locator || !ink) return undefined
+  return {
+    id: row.id,
+    bookId: row.book_id,
+    locator,
+    colorHex: note.style?.colorHex?.trim() || '#1E88E5',
+    opacity: typeof note.style?.opacity === 'number' ? note.style.opacity : 1,
+    ink,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  }
+}
+
+function buildInkNoteJson(input: {
+  locator: NoteLocator
+  colorHex: string
+  opacity: number
+  ink: PdfInkStroke
+  createdAt: string
+  modifiedAt: string
+}): string {
+  const note: INoteState = {
+    schemaVersion: 1,
+    type: 'ink',
+    group: 'annotation',
+    locatorExtended: { locator: input.locator },
+    pdfInk: input.ink,
+    style: { colorHex: input.colorHex, opacity: input.opacity },
+    created: input.createdAt,
+    modified: input.modifiedAt,
+  }
+  return JSON.stringify(note)
+}
+
 const HIGHLIGHT_STYLE_KINDS: HighlightStyleKind[] = [
   'highlight',
   'underline',
@@ -241,6 +304,8 @@ function rowToHighlightRecord(row: NoteRow): HighlightRecord | undefined {
     pdfAnnotation: note.pdfAnnotation ? parsePdfAnnotation(note.pdfAnnotation) : undefined,
     // TXT markup range; same re-validation.
     txtAnnotation: note.txtAnnotation ? parseTxtAnnotation(note.txtAnnotation) : undefined,
+    // Markdown markup anchor; same re-validation.
+    mdAnnotation: note.mdAnnotation ? parseMdAnnotation(note.mdAnnotation) : undefined,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   }
@@ -255,6 +320,7 @@ function buildHighlightNoteJson(input: {
   selectionText?: NoteSelectionText
   pdfAnnotation?: PdfAnnotation
   txtAnnotation?: TxtAnnotation
+  mdAnnotation?: MdAnnotation
   createdAt: string
   modifiedAt: string
 }): string {
@@ -265,6 +331,7 @@ function buildHighlightNoteJson(input: {
     locatorExtended: { locator: input.locator, text: input.selectionText },
     pdfAnnotation: input.pdfAnnotation,
     txtAnnotation: input.txtAnnotation,
+    mdAnnotation: input.mdAnnotation,
     textualValue: input.selectionText?.highlight,
     note: input.note ?? null,
     style: { colorHex: input.colorHex },
@@ -315,6 +382,38 @@ export class SqliteOverlayStore implements OverlayStore {
     const found = this.readState(id)
     if (!found) return undefined
     return recordFromState(id, found.state, found.bookUpdatedAt)
+  }
+
+  /** Audiobook position / rate of one book; `undefined` when none is saved (or it is not an audiobook). */
+  async getAudioProgress(bookId: string): Promise<AudioProgress | undefined> {
+    const id = bookId.trim()
+    if (!id) return undefined
+    const row = this.db
+      .prepare('SELECT file_format, reading_state_json FROM books WHERE id = ?')
+      .get(id) as { file_format: string; reading_state_json: string } | undefined
+    if (!row || !isAudioFormat(row.file_format)) return undefined
+    return parseAudioProgress(parseReadingState(row.reading_state_json))
+  }
+
+  /**
+   * Record listening progress. A `json_patch` merge: only `audioProgress` and `percent` change, so
+   * the location, typography and any other key of the reading state survive. Restricted to audio
+   * books in SQL itself — a non-audio id matches no row (returns false) and its state is untouched.
+   * The book file is never touched.
+   */
+  async saveAudioProgress(bookId: string, input: AudioProgressInput): Promise<boolean> {
+    const id = bookId.trim()
+    if (!id) return false
+    const now = new Date().toISOString()
+    const result = this.db
+      .prepare(
+        `UPDATE books
+         SET reading_state_json = json_patch(reading_state_json, @patch),
+             updated_at = @now
+         WHERE id = @id AND file_format = 'mp3'`,
+      )
+      .run({ id, patch: JSON.stringify(audioProgressPatch(input, now)), now })
+    return Number(result.changes) > 0
   }
 
   /**
@@ -553,6 +652,7 @@ export class SqliteOverlayStore implements OverlayStore {
       selectionText: input.selectionText,
       pdfAnnotation: input.pdfAnnotation,
       txtAnnotation: input.txtAnnotation,
+      mdAnnotation: input.mdAnnotation,
       createdAt,
       modifiedAt: now,
     })
@@ -591,9 +691,66 @@ export class SqliteOverlayStore implements OverlayStore {
       selectionText: input.selectionText,
       pdfAnnotation: input.pdfAnnotation,
       txtAnnotation: input.txtAnnotation,
+      mdAnnotation: input.mdAnnotation,
       createdAt,
       updatedAt: now,
     }
+  }
+
+  async listInk(bookId: string): Promise<PdfInkRecord[]> {
+    const id = bookId.trim()
+    if (!id) return []
+    const rows = this.db
+      .prepare(`SELECT ${NOTE_COLUMNS} FROM notes WHERE book_id = ? AND ${INK_TYPE_PREDICATE} ORDER BY created_at ASC, rowid ASC`)
+      .all(id) as NoteRow[]
+    return rows.map(rowToInkRecord).filter((r): r is PdfInkRecord => r !== undefined)
+  }
+
+  /** Insert or update one stroke. Null when `id` belongs to a row that is not an Ink stroke (never converted). */
+  async saveInk(input: {
+    id?: string
+    bookId: string
+    locator: NoteLocator
+    colorHex: string
+    opacity: number
+    ink: PdfInkStroke
+    createdAt?: string
+  }): Promise<PdfInkRecord | null> {
+    const bookId = input.bookId.trim()
+    if (!bookId) return null
+    const now = new Date().toISOString()
+    const existingId = input.id?.trim()
+    const id = existingId || randomUUID()
+    const existingCreatedAt = existingId
+      ? (this.db.prepare(`SELECT created_at FROM notes WHERE id = ? AND book_id = ?`).get(existingId, bookId) as { created_at: string } | undefined)?.created_at
+      : undefined
+    const createdAt = input.createdAt?.trim() || existingCreatedAt || now
+    const result = this.db
+      .prepare(
+        `INSERT INTO notes (id, book_id, note_json, created_at, updated_at)
+         VALUES (@id, @book_id, @note_json, @created_at, @updated_at)
+         ON CONFLICT(id) DO UPDATE SET
+           note_json = @note_json,
+           updated_at = @updated_at
+         -- An ink write must never convert another kind of row (highlight, bookmark) into a stroke.
+         WHERE ${INK_TYPE_PREDICATE} AND book_id = @book_id`,
+      )
+      .run({
+        id,
+        book_id: bookId,
+        note_json: buildInkNoteJson({ locator: input.locator, colorHex: input.colorHex, opacity: input.opacity, ink: input.ink, createdAt, modifiedAt: now }),
+        created_at: createdAt,
+        updated_at: now,
+      })
+    if (result.changes === 0) return null
+    return { id, bookId, locator: input.locator, colorHex: input.colorHex, opacity: input.opacity, ink: input.ink, createdAt, updatedAt: now }
+  }
+
+  async deleteInk(bookId: string, id: string): Promise<boolean> {
+    const book = bookId.trim()
+    const noteId = id.trim()
+    if (!book || !noteId) return false
+    return this.db.prepare(`DELETE FROM notes WHERE id = ? AND book_id = ? AND ${INK_TYPE_PREDICATE}`).run(noteId, book).changes > 0
   }
 
   async deleteHighlight(bookId: string, id: string): Promise<boolean> {

@@ -1,6 +1,6 @@
 /** Narrow Desktop API exposed to the renderer via contextBridge (`window.api`). */
 
-export type DocumentFormatDto = 'epub' | 'pdf' | 'txt' | 'md' | 'docx' | 'doc'
+export type DocumentFormatDto = 'epub' | 'pdf' | 'txt' | 'md' | 'mp3'
 
 export interface AppInfo {
   name: string
@@ -381,6 +381,93 @@ export interface ReadingSessionStateDto {
   updatedAt: string
 }
 
+/** A file embedded in a PDF (document-level or a page's FileAttachment annotation). No bytes, no path. */
+export interface AttachmentDto {
+  id: string
+  name: string
+  size: number | null
+  description: string | null
+  /** 1-based; null for document-level attachments. */
+  page: number | null
+  source: 'document' | 'page'
+}
+
+export type AttachmentErrorCodeDto =
+  | 'invalid_request'
+  | 'not_found'
+  | 'attachment_not_found'
+  | 'missing_file'
+  | 'read_failed'
+  | 'extract_failed'
+  | 'empty'
+  | 'too_large'
+  | 'blocked'
+  | 'write_failed'
+  | 'access_denied'
+  | 'open_failed'
+  | 'busy'
+  | 'canceled'
+
+export interface AttachmentFailureDto {
+  ok: false
+  errorCode: AttachmentErrorCodeDto
+  errorMessage: string
+  fileName?: string
+}
+
+export type ListAttachmentsResult =
+  | { ok: true; items: AttachmentDto[]; truncated: boolean }
+  | AttachmentFailureDto
+
+export type AttachmentActionResult = { ok: true; fileName: string } | AttachmentFailureDto
+
+/** Listening progress of an audiobook (`reading_state_json.audioProgress`); seconds, not a Location. */
+export interface AudioProgressDto {
+  positionSeconds: number
+  /** Present once the player has seen a finite duration. */
+  durationSeconds?: number
+  playbackRate: number
+  /** How the timeline was shown (display only — the position is canonical). */
+  scope?: 'book' | 'chapter'
+  chapterId?: string
+  updatedAt: string
+}
+
+/** Input for overlay:saveAudioProgress. Main validates it and stamps `updatedAt` itself. */
+export interface SaveAudioProgressInput {
+  bookId: string
+  positionSeconds: number
+  durationSeconds?: number
+  playbackRate: number
+  scope?: 'book' | 'chapter'
+  /** String sets it, null clears it, absent keeps what is stored. */
+  chapterId?: string | null
+}
+
+/** A chapter exactly as the file declares it (seconds, unvalidated — the renderer validates against the duration). */
+export interface AudioChapterDto {
+  id?: string
+  title?: string
+  startSeconds: number
+  endSeconds?: number
+}
+
+export interface AudioChaptersResult {
+  ok: boolean
+  chapters: AudioChapterDto[]
+}
+
+export interface AudioBookmarkDto {
+  id: string
+  label: string
+  positionSeconds: number
+  /** The user's own text; absent = a plain marker. */
+  note?: string
+  chapterId?: string
+  chapterOffsetSeconds?: number
+  createdAt: string
+}
+
 /** Input for overlay:saveSessionState — location and typography/layout are independent. */
 export interface SaveReadingSessionStateInput {
   bookId: string
@@ -453,6 +540,11 @@ export interface HighlightDto {
    * text (see `txt/txt-text.ts`). Absent on EPUB / PDF highlights.
    */
   txtAnnotationRef?: string
+  /**
+   * Markdown markup only: JSON `MdAnnotation` — `{ startSegment, startOffset, endSegment, endOffset, caret? }`
+   * (see `md/md-annotations.ts`). Absent on every other format.
+   */
+  mdAnnotationRef?: string
   createdAt: string
   updatedAt: string
 }
@@ -477,10 +569,46 @@ export interface SaveHighlightInput {
    * transaction as the text revision they refer to — `overlay:saveHighlight` refuses them.
    */
   txtAnnotationRef?: string
+  /**
+   * Markdown markup only (JSON `MdAnnotation`). Validated in Main: whole non-negative indices, a start
+   * before the end (equal for a caret), and a `text-offset` `locatorRef` (`blockId` `md`) at the start.
+   */
+  mdAnnotationRef?: string
   createdAt?: string
 }
 
 export interface DeleteHighlightInput {
+  bookId: string
+  id: string
+}
+
+/** One PDF freehand Ink stroke (a `notes` row of type `ink`). */
+export interface InkDto {
+  id: string
+  bookId: string
+  /** `page-rect` locator JSON on the stroke's page. */
+  locatorRef: string
+  colorHex: string
+  /** 0–1. */
+  opacity: number
+  /** JSON `PdfInkStroke` (normalized points, width as a fraction of the page width). */
+  pdfInkRef: string
+  createdAt: string
+  updatedAt: string
+}
+
+/** Input for overlay:saveInk — omit `id` to insert, pass it to update that stroke. Validated in Main. */
+export interface SaveInkInput {
+  bookId: string
+  id?: string
+  locatorRef: string
+  colorHex: string
+  opacity?: number
+  pdfInkRef: string
+  createdAt?: string
+}
+
+export interface DeleteInkInput {
   bookId: string
   id: string
 }
@@ -761,9 +889,28 @@ export interface DesktopApi {
     /** Subscribe to step / byte progress of the running import. Returns unsubscribe. */
     onProgress(handler: (progress: ImportProgressDto) => void): () => void
   }
+  attachments: {
+    /** Embedded files of a PDF book; read lazily, when the Attachment panel opens. */
+    list(bookId: string): Promise<ListAttachmentsResult>
+    /** Extract in Main, apply the security policy, open with the OS default app. Renderer sends ids only. */
+    open(input: { bookId: string; attachmentId: string }): Promise<AttachmentActionResult>
+    /** Separate, explicit Save As (Main-owned dialog) — the way out for a file the policy will not open. */
+    saveAs(input: { bookId: string; attachmentId: string }): Promise<AttachmentActionResult>
+  }
+  audio: {
+    /** Chapters the file declares (`[]` for none / unreadable). Never guessed. */
+    getChapters(bookId: string): Promise<AudioChaptersResult>
+    getBookmarks(bookId: string): Promise<AudioBookmarkDto[]>
+    /** Replaces the whole list; `ok: false` for a non-audio book or bad input. */
+    saveBookmarks(input: { bookId: string; bookmarks: AudioBookmarkDto[] }): Promise<OkResult>
+  }
   overlay: {
     getSessionState(bookId: string): Promise<ReadingSessionStateDto | null>
     saveSessionState(input: SaveReadingSessionStateInput): Promise<OkResult>
+    /** Audiobook position / rate. Null for a book that is not an audiobook or has none saved. */
+    getAudioProgress(bookId: string): Promise<AudioProgressDto | null>
+    /** Merges `audioProgress` into the reading state; `ok: false` for a non-audio book or bad input. */
+    saveAudioProgress(input: SaveAudioProgressInput): Promise<OkResult>
     listBookmarks(bookId: string): Promise<BookmarkDto[]>
     /** Resolves to null when the input is rejected (bad book id or unparsable locator). */
     saveBookmark(input: SaveBookmarkInput): Promise<BookmarkDto | null>
@@ -772,6 +919,10 @@ export interface DesktopApi {
     /** Resolves to null when the input is rejected (bad book id or unparsable locator). */
     saveHighlight(input: SaveHighlightInput): Promise<HighlightDto | null>
     deleteHighlight(input: DeleteHighlightInput): Promise<OkResult>
+    listInk(bookId: string): Promise<InkDto[]>
+    /** Resolves to null when the input is rejected (bad book id, locator, colour or stroke). */
+    saveInk(input: SaveInkInput): Promise<InkDto | null>
+    deleteInk(input: DeleteInkInput): Promise<OkResult>
     /**
      * Sync the embedded annotations of the open PDF now and whenever its file settles after a change
      * in another app (read-only on the file). One watched book per window; watching another replaces it.

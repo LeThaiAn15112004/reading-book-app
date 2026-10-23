@@ -1,15 +1,25 @@
 import {
   Location,
+  sanitizeAudioProgressInput,
+  isConsistentMdHighlight,
   isConsistentPdfHighlight,
+  isConsistentPdfInk,
+  isValidHexColor,
+  packPdfInkRef,
+  parsePdfInkRef,
   planTwoWaySync,
+  packMdAnnotationRef,
   packPdfAnnotationRef,
   packTxtAnnotationRef,
+  parseMdAnnotationRef,
   parsePdfAnnotationRef,
   type BookmarkRecord,
   type HighlightRecord,
   type NoteLocator,
   type NoteSelectionText,
+  type MdAnnotation,
   type PdfAnnotation,
+  type PdfInkRecord,
 } from '@reading-book/book-reader-sdk'
 import { BrowserWindow, app, dialog, ipcMain, type WebContents } from 'electron'
 import path from 'node:path'
@@ -35,14 +45,18 @@ import {
   type SessionRecord,
 } from '../persistence/sqlite-overlay-store'
 import type {
+  AudioProgressDto,
   BookmarkDto,
   DeleteBookmarkInput,
   DeleteHighlightInput,
+  DeleteInkInput,
   HighlightDto,
+  InkDto,
   OkResult,
   ReadingSessionStateDto,
   SaveBookmarkInput,
   SaveHighlightInput,
+  SaveInkInput,
   SaveReadingSessionStateInput,
   ExportAnnotatedPdfResult,
   PdfAnnotationConflictDto,
@@ -124,7 +138,21 @@ function toHighlightDto(highlight: HighlightRecord): HighlightDto {
   if (highlight.selectionText) dto.selectionTextRef = JSON.stringify(highlight.selectionText)
   if (highlight.pdfAnnotation) dto.pdfAnnotationRef = packPdfAnnotationRef(highlight.pdfAnnotation)
   if (highlight.txtAnnotation) dto.txtAnnotationRef = packTxtAnnotationRef(highlight.txtAnnotation)
+  if (highlight.mdAnnotation) dto.mdAnnotationRef = packMdAnnotationRef(highlight.mdAnnotation)
   return dto
+}
+
+function toInkDto(record: PdfInkRecord): InkDto {
+  return {
+    id: record.id,
+    bookId: record.bookId,
+    locatorRef: JSON.stringify(record.locator),
+    colorHex: record.colorHex,
+    opacity: record.opacity,
+    pdfInkRef: packPdfInkRef(record.ink),
+    createdAt: record.createdAt,
+    updatedAt: record.updatedAt,
+  }
 }
 
 /**
@@ -183,6 +211,35 @@ export function registerOverlayIpc(): void {
         const state = inputToSessionRecord(body)
         await overlays.saveSessionPreferences(state)
         return { ok: true }
+      } catch {
+        return { ok: false }
+      }
+    },
+  )
+
+  ipcMain.removeHandler(OverlayChannels.getAudioProgress)
+  ipcMain.handle(
+    OverlayChannels.getAudioProgress,
+    async (_event, bookId: unknown): Promise<AudioProgressDto | null> => {
+      void _event
+      if (typeof bookId !== 'string' || !bookId.trim()) return null
+      const progress = await overlays.getAudioProgress(bookId.trim())
+      return progress ?? null
+    },
+  )
+
+  ipcMain.removeHandler(OverlayChannels.saveAudioProgress)
+  ipcMain.handle(
+    OverlayChannels.saveAudioProgress,
+    async (_event, input: unknown): Promise<OkResult> => {
+      void _event
+      if (!input || typeof input !== 'object') return { ok: false }
+      const { bookId } = input as { bookId?: unknown }
+      if (typeof bookId !== 'string' || !bookId.trim()) return { ok: false }
+      const progress = sanitizeAudioProgressInput(input)
+      if (!progress) return { ok: false }
+      try {
+        return { ok: await overlays.saveAudioProgress(bookId.trim(), progress) }
       } catch {
         return { ok: false }
       }
@@ -283,6 +340,14 @@ export function registerOverlayIpc(): void {
         if (!pdfAnnotation || !isConsistentPdfHighlight(locator, pdfAnnotation)) return null
       }
 
+      // Markdown markup: same rule — a present-but-invalid anchor rejects the save.
+      let mdAnnotation: MdAnnotation | undefined
+      if (body.mdAnnotationRef !== undefined) {
+        mdAnnotation = parseMdAnnotationRef(body.mdAnnotationRef)
+        if (!mdAnnotation || !isConsistentMdHighlight(locator, mdAnnotation)) return null
+        if (pdfAnnotation) return null
+      }
+
       try {
         const saved = await overlays.saveHighlight({
           id: body.id?.trim() || undefined,
@@ -294,6 +359,7 @@ export function registerOverlayIpc(): void {
           tags: body.tags,
           selectionText: parseSelectionTextRef(body.selectionTextRef),
           pdfAnnotation,
+          mdAnnotation,
           createdAt: body.createdAt?.trim() || undefined,
         })
         pdfAnnotationSync().notifyAppChange(saved.bookId)
@@ -323,6 +389,58 @@ export function registerOverlayIpc(): void {
       }
     },
   )
+
+  // PDF freehand Ink (docs/implementation_plan/pdf_freehand_ink_eraser_plan.md). SQLite only: nothing is
+  // written into the PDF file yet, so these handlers deliberately never wake the annotation sync.
+  ipcMain.removeHandler(OverlayChannels.listInk)
+  ipcMain.handle(OverlayChannels.listInk, async (_event, bookId: unknown): Promise<InkDto[]> => {
+    void _event
+    if (typeof bookId !== 'string' || !bookId.trim()) return []
+    return (await overlays.listInk(bookId.trim())).map(toInkDto)
+  })
+
+  ipcMain.removeHandler(OverlayChannels.saveInk)
+  ipcMain.handle(OverlayChannels.saveInk, async (_event, input: unknown): Promise<InkDto | null> => {
+    void _event
+    if (!input || typeof input !== 'object') return null
+    const body = input as SaveInkInput
+    if (typeof body.bookId !== 'string' || !body.bookId.trim()) return null
+    const locator = parseLocatorRef(body.locatorRef)
+    if (!locator) return null
+    // A present-but-invalid stroke rejects the save rather than storing a mark that can't paint.
+    const ink = parsePdfInkRef(body.pdfInkRef)
+    if (!ink || !isConsistentPdfInk(locator, ink)) return null
+    if (typeof body.colorHex !== 'string' || !isValidHexColor(body.colorHex.trim())) return null
+    const opacity = body.opacity === undefined ? 1 : body.opacity
+    if (typeof opacity !== 'number' || !Number.isFinite(opacity) || opacity <= 0 || opacity > 1) return null
+    try {
+      const saved = await overlays.saveInk({
+        id: body.id?.trim() || undefined,
+        bookId: body.bookId.trim(),
+        locator,
+        colorHex: body.colorHex.trim(),
+        opacity,
+        ink,
+        createdAt: body.createdAt?.trim() || undefined,
+      })
+      return saved ? toInkDto(saved) : null
+    } catch {
+      return null
+    }
+  })
+
+  ipcMain.removeHandler(OverlayChannels.deleteInk)
+  ipcMain.handle(OverlayChannels.deleteInk, async (_event, input: unknown): Promise<OkResult> => {
+    void _event
+    if (!input || typeof input !== 'object') return { ok: false }
+    const body = input as DeleteInkInput
+    if (typeof body.bookId !== 'string' || typeof body.id !== 'string') return { ok: false }
+    try {
+      return { ok: await overlays.deleteInk(body.bookId, body.id) }
+    } catch {
+      return { ok: false }
+    }
+  })
 
   ipcMain.removeHandler(OverlayChannels.watchPdfEmbeddedAnnotations)
   ipcMain.handle(
@@ -481,7 +599,7 @@ function ensureScanWorker(): Worker {
  * so it isn't copied twice): callers keep theirs — the two-way cycle scans and then writes the same
  * bytes, and a transferred buffer would be detached on the caller's side.
  */
-function runInScanWorker<T>(input: Record<string, unknown> & { bytes: Uint8Array }): Promise<T> {
+export function runInScanWorker<T>(input: Record<string, unknown> & { bytes: Uint8Array }): Promise<T> {
   const request = { ...input, bytes: input.bytes.slice() }
   return new Promise((resolve, reject) => {
     const worker = ensureScanWorker()

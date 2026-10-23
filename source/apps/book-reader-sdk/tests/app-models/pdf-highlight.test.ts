@@ -19,6 +19,7 @@ import {
   parsePdfAnnotationRef,
   pdfAnnotationFromRects,
   pdfAnnotationRefForRects,
+  pdfCaretRect,
   pdfHighlightDtoToReaderHighlight,
   pdfMarkAt,
   pdfRectsFromAnnotation,
@@ -258,5 +259,110 @@ describe('generic highlight history for PDF rows', () => {
     applyHighlightHistoryStep(history.undo()!, 'undo', handlers)
     applyHighlightHistoryStep(history.redo()!, 'redo', handlers)
     expect(log).toEqual(['restore #ffeb3b', 'remove h1', 'restore #ffeb3b'])
+  })
+})
+
+describe('Inserted Text caret', () => {
+  const caret = pdfCaretRect(2, 0.4, 0.51, 0.02, 0.77)!
+  const dto = (rect: PdfHighlightRect, extra: Partial<Parameters<typeof pdfHighlightDtoToReaderHighlight>[0]> = {}) => {
+    const annotation = pdfAnnotationFromRects([rect], { caret: true })!
+    return {
+      id: 'c1',
+      locatorRef: packPdfHighlightLocator(annotation),
+      styleKind: 'insert' as const,
+      colorHex: '#f48fb1',
+      tags: [],
+      pdfAnnotationRef: pdfAnnotationRefForRects([rect], { caret: true }),
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+      ...extra,
+    }
+  }
+
+  it('builds one small box centered on the insertion x, hanging under the line bottom', () => {
+    expect(caret.page).toBe(2)
+    expect(caret.x + caret.width / 2).toBeCloseTo(0.4, 4)
+    // Starts a little above the line's bottom edge and ends below it.
+    expect(caret.y).toBeLessThan(0.51)
+    expect(caret.y + caret.height).toBeGreaterThan(0.51)
+    // Small: well under one text line wide / tall.
+    expect(caret.height).toBeLessThan(0.02)
+  })
+
+  it('is anchored in page fractions: the same inputs give the same box at any zoom', () => {
+    expect(pdfCaretRect(2, 0.4, 0.51, 0.02, 0.77)).toEqual(caret)
+  })
+
+  it('keeps the box roughly square on screen for a wide and a narrow page', () => {
+    for (const aspect of [0.5, 0.77, 1.4]) {
+      const r = pdfCaretRect(1, 0.5, 0.5, 0.02, aspect)!
+      expect((r.width * aspect) / r.height).toBeCloseTo(1.1, 1)
+    }
+  })
+
+  it('rejects invalid coordinates', () => {
+    expect(pdfCaretRect(1, Number.NaN, 0.5, 0.02, 0.77)).toBeUndefined()
+    expect(pdfCaretRect(1, 0.5, 0.5, 0, 0.77)).toBeUndefined()
+    expect(pdfCaretRect(1, 0.5, 0.5, -0.02, 0.77)).toBeUndefined()
+    expect(pdfCaretRect(1, 1.5, 0.5, 0.02, 0.77)).toBeUndefined()
+    expect(pdfCaretRect(1, 0.5, -0.1, 0.02, 0.77)).toBeUndefined()
+    expect(pdfCaretRect(1, 0.5, 0.5, 0.02, 0)).toBeUndefined()
+  })
+
+  it('clamps a caret at the page edge instead of leaving the page', () => {
+    const edge = pdfCaretRect(1, 0.0, 0.995, 0.02, 0.77)!
+    expect(edge.x).toBeGreaterThanOrEqual(0)
+    expect(edge.y + edge.height).toBeLessThanOrEqual(1)
+  })
+
+  it('round-trips through the stored payload and the IPC row, with the text kept apart in the note', () => {
+    const row = pdfHighlightDtoToReaderHighlight(dto(caret, { note: 'the missing words' }))!
+    expect(row.caret).toBe(true)
+    expect(row.styleKind).toBe('insert')
+    expect(row.note).toBe('the missing words')
+    expect(row.rects).toEqual([caret])
+    expect(row.page).toBe(2)
+    const stored = parsePdfAnnotationRef(pdfAnnotationRefForRects(row.rects, { caret: true }))
+    expect(stored?.caret).toBe(true)
+  })
+
+  it('leaves older insert rows (a selection, no flag) unflagged', () => {
+    const selection = pdfHighlightDtoToReaderHighlight(dtoFor(MULTI_PAGE, { styleKind: 'insert' }))!
+    expect(selection.caret).toBeUndefined()
+    expect(parsePdfAnnotation({ pageIndex: 0, rects: [{ x: 0.1, y: 0.1, width: 0.2, height: 0.02 }] })?.caret).toBeUndefined()
+  })
+
+  it('never flags a multi-rect selection as a caret', () => {
+    expect(pdfAnnotationFromRects(MULTI_PAGE, { caret: true })?.caret).toBeUndefined()
+  })
+
+  it('rejects a caret flag that is not true or sits on several rects', () => {
+    const rect = { x: 0.1, y: 0.1, width: 0.02, height: 0.01 }
+    expect(parsePdfAnnotation({ pageIndex: 0, rects: [rect], caret: false })).toBeUndefined()
+    expect(parsePdfAnnotation({ pageIndex: 0, rects: [rect], caret: 'yes' })).toBeUndefined()
+    expect(parsePdfAnnotation({ pageIndex: 0, rects: [rect, rect], caret: true })).toBeUndefined()
+    expect(parsePdfAnnotation({ pageIndex: 0, rects: [rect], caret: true })?.caret).toBe(true)
+  })
+
+  it('survives repeated create / delete cycles without sharing state', () => {
+    const history = createHighlightHistory<PdfReaderHighlight>()
+    const log: string[] = []
+    const handlers = {
+      restore: (h: PdfReaderHighlight) => log.push(`restore ${h.id}`),
+      remove: (id: string) => log.push(`remove ${id}`),
+    }
+    for (let i = 0; i < 3; i++) {
+      const row = pdfHighlightDtoToReaderHighlight(dto(caret, { id: `c${i}` }))!
+      history.push(highlightAdd(row))
+      applyHighlightHistoryStep(history.undo()!, 'undo', handlers)
+    }
+    expect(log).toEqual(['remove c0', 'remove c1', 'remove c2'])
+  })
+
+  it('is found by pdfMarkAt at its own box and not elsewhere', () => {
+    const row = pdfHighlightDtoToReaderHighlight(dto(caret))!
+    expect(pdfMarkAt([row], 2, caret.x + caret.width / 2, caret.y + caret.height / 2)).toBe(row)
+    expect(pdfMarkAt([row], 2, 0.9, 0.9)).toBeNull()
+    expect(pdfMarkAt([row], 1, caret.x, caret.y)).toBeNull()
   })
 })

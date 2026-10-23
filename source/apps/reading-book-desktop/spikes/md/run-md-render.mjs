@@ -142,6 +142,14 @@ try {
     assert.equal((html.match(/md-link-blocked/g) ?? []).length, 4)
     assert.ok(!/javascript:/i.test(html.replace(/>[^<]*</g, '><')), 'no javascript: in attributes')
   })
+  await check('a multi-level table of contents keeps every in-document link as a navigable (href-less) link', () => {
+    const html = render(
+      '- [A](#a)\n  - [A1 (31–60)](#a1-31-60)\n    - [日本語](#%E6%97%A5%E6%9C%AC%E8%AA%9E)\n- [Web](https://example.com)\n\n# A\n\n## A1 (31–60)\n\n### 日本語\n',
+    )
+    assert.equal((html.match(/role="link"/g) ?? []).length, 4)
+    assert.ok(!/href=/i.test(html), html)
+    assert.equal((html.match(/<h[1-6]>/g) ?? []).length, 3)
+  })
   await check('remote and escaping images are not rendered as <img>', () => {
     const html = render(
       '![r](https://example.com/a.png) ![p](//example.com/a.png) ![t](../secret.png) ![a](/etc/a.png) ![d](data:image/png;base64,AAAA) ![f](file:///C:/a.png) ![w](C:\\a.png)',

@@ -13,8 +13,12 @@
 import assert from 'node:assert/strict'
 import {
   highlightDtoToReaderHighlight,
+  mdAnnotationOf,
+  mdHighlightDtoToReaderHighlight,
+  packMdHighlightLocator,
   packPdfHighlightLocator,
   pdfAnnotationFromRects,
+  pdfCaretRect,
   pdfHighlightDtoToReaderHighlight,
 } from '@reading-book/book-reader-sdk'
 import { invoke } from './electron-stub.mjs'
@@ -234,6 +238,140 @@ await check('a hand-broken pdfAnnotation is dropped on read instead of reaching 
   assert.equal(dto.pdfAnnotationRef, undefined)
   assert.equal(pdfHighlightDtoToReaderHighlight(dto), null)
   assert.equal(highlightDtoToReaderHighlight(dto), null)
+})
+
+console.log('6. Inserted Text caret')
+const caretRect = pdfCaretRect(5, 0.42, 0.61, 0.018, 0.77)
+const caretAnnotation = pdfAnnotationFromRects([caretRect], { caret: true })
+const caretInput = {
+  ...baseInput,
+  id: 'pdf-caret',
+  locatorRef: packPdfHighlightLocator(caretAnnotation),
+  styleKind: 'insert',
+  colorHex: '#ec407a',
+  note: 'the missing words',
+  selectionTextRef: undefined,
+  pdfAnnotationRef: JSON.stringify(caretAnnotation),
+}
+await check('a caret saves as ONE flagged rect; the inserted text is the note, apart from the point', async () => {
+  assert.ok(await invoke(OverlayChannels.saveHighlight, caretInput))
+  const json = JSON.parse(noteRow('pdf-caret').note_json)
+  assert.equal(json.type, 'insert')
+  assert.equal(json.pdfAnnotation.caret, true)
+  assert.equal(json.pdfAnnotation.rects.length, 1)
+  assert.equal(json.note, 'the missing words')
+})
+await check('after a restart (list again) the caret point and its text are restored', async () => {
+  const dto = (await invoke(OverlayChannels.listHighlights, 'pdf-a')).find((r) => r.id === 'pdf-caret')
+  const row = pdfHighlightDtoToReaderHighlight(dto)
+  assert.ok(row)
+  assert.equal(row.caret, true)
+  assert.equal(row.styleKind, 'insert')
+  assert.equal(row.note, 'the missing words')
+  assert.deepEqual(row.rects, [caretRect])
+})
+await check('editing the text keeps the point; a flag on a multi-rect payload is refused', async () => {
+  assert.ok(await invoke(OverlayChannels.saveHighlight, { ...caretInput, note: 'edited' }))
+  const row = pdfHighlightDtoToReaderHighlight((await invoke(OverlayChannels.listHighlights, 'pdf-a')).find((r) => r.id === 'pdf-caret'))
+  assert.equal(row.note, 'edited')
+  assert.deepEqual(row.rects, [caretRect])
+  const forged = { ...caretAnnotation, rects: [...caretAnnotation.rects, ...caretAnnotation.rects] }
+  const refused = await invoke(OverlayChannels.saveHighlight, { ...caretInput, id: 'pdf-caret-bad', pdfAnnotationRef: JSON.stringify(forged) })
+  assert.equal(refused, null)
+  assert.equal(noteRow('pdf-caret-bad'), undefined)
+})
+await check('an older insert row (a selection, no flag) still lists unflagged', async () => {
+  assert.ok(await invoke(OverlayChannels.saveHighlight, { ...baseInput, id: 'pdf-insert-old', styleKind: 'insert' }))
+  const row = pdfHighlightDtoToReaderHighlight((await invoke(OverlayChannels.listHighlights, 'pdf-a')).find((r) => r.id === 'pdf-insert-old'))
+  assert.equal(row.caret, undefined)
+  assert.equal(row.rects.length, 3)
+})
+await check('repeated create / delete leaves no row; the other annotations stay', async () => {
+  const count = notesCount()
+  for (let i = 0; i < 3; i++) {
+    assert.ok(await invoke(OverlayChannels.saveHighlight, { ...caretInput, id: `pdf-caret-${i}` }))
+    assert.deepEqual(await invoke(OverlayChannels.deleteHighlight, { bookId: 'pdf-a', id: `pdf-caret-${i}` }), { ok: true })
+  }
+  assert.equal(notesCount(), count)
+  assert.ok(noteRow('pdf-caret'))
+})
+
+console.log('7. Markdown annotations')
+insertBook.run('md-a', 'MD A', '/a.md', 'md', 'sha-md')
+const mdRange = { startSegment: 1, startOffset: 10, endSegment: 2, endOffset: 4 }
+const mdCaret = { startSegment: 0, startOffset: 7, endSegment: 0, endOffset: 7, caret: true }
+const mdInput = (id, annotation, extra = {}) => ({
+  bookId: 'md-a',
+  id,
+  locatorRef: packMdHighlightLocator(annotation),
+  styleKind: 'highlight',
+  colorHex: '#ffeb3b',
+  tags: [],
+  selectionTextRef: JSON.stringify({ highlight: 'quoted words' }),
+  mdAnnotationRef: JSON.stringify(annotation),
+  createdAt: '2026-10-15T01:00:00.000Z',
+  ...extra,
+})
+const mdBefore = notesCount()
+await check('a Markdown range saves, lists after a restart, and maps back to the same anchor', async () => {
+  assert.ok(await invoke(OverlayChannels.saveHighlight, mdInput('md-h1', mdRange, { note: 'a note' })))
+  const json = JSON.parse(noteRow('md-h1').note_json)
+  assert.deepEqual(json.mdAnnotation, mdRange)
+  assert.equal(json.locatorExtended.locator.kind, 'text-offset')
+  assert.equal(json.locatorExtended.locator.blockId, 'md')
+  assert.equal(json.pdfAnnotation, undefined)
+  const row = mdHighlightDtoToReaderHighlight((await invoke(OverlayChannels.listHighlights, 'md-a'))[0])
+  assert.ok(row)
+  assert.deepEqual(mdAnnotationOf(row), mdRange)
+  assert.equal(row.note, 'a note')
+  assert.equal(row.selectionText.highlight, 'quoted words')
+  // …and no other format's mapper claims it.
+  assert.equal(pdfHighlightDtoToReaderHighlight((await invoke(OverlayChannels.listHighlights, 'md-a'))[0]), null)
+})
+await check('an Inserted Text caret keeps its flag and its text apart from the point', async () => {
+  assert.ok(await invoke(OverlayChannels.saveHighlight, mdInput('md-c1', mdCaret, { styleKind: 'insert', note: 'the missing words', selectionTextRef: undefined })))
+  const row = mdHighlightDtoToReaderHighlight((await invoke(OverlayChannels.listHighlights, 'md-a')).find((r) => r.id === 'md-c1'))
+  assert.equal(row.caret, true)
+  assert.equal(row.styleKind, 'insert')
+  assert.equal(row.note, 'the missing words')
+})
+const badMd = {
+  'a backwards range': mdInput('md-bad1', mdRange, { mdAnnotationRef: JSON.stringify({ ...mdRange, endSegment: 0 }) }),
+  'an empty range': mdInput('md-bad2', mdRange, { mdAnnotationRef: JSON.stringify({ ...mdRange, endSegment: 1, endOffset: 10 }) }),
+  'a flagged range': mdInput('md-bad3', mdRange, { mdAnnotationRef: JSON.stringify({ ...mdRange, caret: true }) }),
+  'a negative offset': mdInput('md-bad4', mdRange, { mdAnnotationRef: JSON.stringify({ ...mdRange, startOffset: -1 }) }),
+  'unparseable JSON': mdInput('md-bad5', mdRange, { mdAnnotationRef: '{oops' }),
+  'a locator at another offset': mdInput('md-bad6', mdRange, { locatorRef: packMdHighlightLocator({ ...mdRange, startOffset: 11 }) }),
+  'a PDF locator': mdInput('md-bad7', mdRange, { locatorRef: JSON.stringify({ kind: 'page-rect', page: 1, chapterIndex: 0 }) }),
+  'both a PDF and a Markdown anchor': mdInput('md-bad8', mdRange, { pdfAnnotationRef: JSON.stringify(pdfAnnotationFromRects([{ page: 2, x: 0.1, y: 0.1, width: 0.2, height: 0.02 }])) }),
+}
+const mdCountBefore = notesCount()
+for (const [label, input] of Object.entries(badMd)) {
+  await check(`refuses ${label}`, async () => {
+    assert.equal(await invoke(OverlayChannels.saveHighlight, input), null)
+  })
+}
+await check('…and none of the refused saves wrote a row', () => {
+  assert.equal(notesCount(), mdCountBefore)
+})
+await check('repeated create / delete leaves nothing; other books and rows are untouched', async () => {
+  for (let i = 0; i < 3; i++) {
+    assert.ok(await invoke(OverlayChannels.saveHighlight, mdInput(`md-r${i}`, mdRange)))
+    assert.deepEqual(await invoke(OverlayChannels.deleteHighlight, { bookId: 'md-a', id: `md-r${i}` }), { ok: true })
+  }
+  assert.equal(notesCount(), mdCountBefore)
+  assert.equal((await invoke(OverlayChannels.listHighlights, 'md-a')).length, 2)
+  assert.equal(notesCount() - mdBefore, 2)
+  assert.equal((await invoke(OverlayChannels.listHighlights, 'epub-c')).length, 1)
+})
+await check('a hand-broken mdAnnotation is dropped on read instead of reaching the renderer', async () => {
+  const json = JSON.parse(noteRow('md-h1').note_json)
+  json.mdAnnotation.endOffset = -5
+  db.prepare(`UPDATE notes SET note_json = ? WHERE id = ?`).run(JSON.stringify(json), 'md-h1')
+  const dto = (await invoke(OverlayChannels.listHighlights, 'md-a')).find((r) => r.id === 'md-h1')
+  assert.ok(dto)
+  assert.equal(dto.mdAnnotationRef, undefined)
+  assert.equal(mdHighlightDtoToReaderHighlight(dto), null)
 })
 
 console.log(`\n${passed} checks passed`)

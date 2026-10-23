@@ -1,4 +1,6 @@
-import { useRef, type ReactNode, type Ref } from 'react'
+import { useCallback, useRef, useState, type ReactNode, type Ref } from 'react'
+import { createPortal } from 'react-dom'
+import { FreehandSettingsPopover } from './FreehandSettingsPopover'
 import type { ReaderCapability } from '../../../../reader/capabilities'
 import { effectiveShortcutKeys, useShortcutsStore } from '../../../../shortcuts/shortcutsStore'
 import { formatShortcutKey } from '../../../../shortcuts/shortcutKeys'
@@ -22,6 +24,8 @@ export type ToolState = {
   active?: boolean
   /** Its menu / panel is open (`aria-expanded`, for tools with `popup`). */
   expanded?: boolean
+  /** Shown but not usable (tool not built yet) — never active. */
+  disabled?: boolean
 }
 
 export type ToolStates = Partial<Record<ToolId, ToolState>>
@@ -138,6 +142,18 @@ function ToolIcon({ tool }: { tool: ToolIconId }) {
           />
         </svg>
       )
+    case 'pen':
+      return (
+        <svg className={cls} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor" aria-hidden>
+          <path strokeLinecap="round" strokeLinejoin="round" d="m16.9 3.6 3.5 3.5a1.4 1.4 0 0 1 0 2L8.6 20.9 3 21l.1-5.6L14.9 3.6a1.4 1.4 0 0 1 2 0ZM13.5 5l5.5 5.5" />
+        </svg>
+      )
+    case 'eraser':
+      return (
+        <svg className={cls} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor" aria-hidden>
+          <path strokeLinecap="round" strokeLinejoin="round" d="m8.2 19.5-4.4-4.4a1.6 1.6 0 0 1 0-2.3l8.5-8.5a1.6 1.6 0 0 1 2.3 0l4.4 4.4a1.6 1.6 0 0 1 0 2.3l-8.5 8.5ZM8.2 19.5H20M7.5 9.5l7 7" />
+        </svg>
+      )
     case 'underline':
       return (
         <svg className={cls} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor" aria-hidden>
@@ -250,6 +266,36 @@ function menuTriggerClass(active: boolean): string {
   return active ? `${menuTriggerBtn} border-lib-accent bg-lib-accent-soft text-lib-accent` : menuTriggerBtn
 }
 
+/** Dropdown arrow beside Freehand: opens its settings; never arms the tool. */
+function FreehandSettingsButton({ hidden }: { hidden: boolean }) {
+  const [open, setOpen] = useState(false)
+  const btnRef = useRef<HTMLButtonElement | null>(null)
+  const close = useCallback((refocus: boolean) => {
+    setOpen(false)
+    if (refocus) btnRef.current?.focus()
+  }, [])
+  const showPopover = open && !hidden
+  return (
+    <>
+      <button
+        ref={btnRef}
+        type="button"
+        className="-ml-0.5 inline-flex h-[52px] w-5 shrink-0 cursor-pointer items-center justify-center rounded-lg border border-transparent text-lib-muted transition-colors hover:border-lib-accent-ring hover:bg-lib-accent-soft hover:text-lib-text-strong sm:h-[56px]"
+        title="Freehand settings"
+        aria-label="Freehand settings"
+        aria-haspopup="dialog"
+        aria-expanded={showPopover}
+        onClick={() => setOpen((v) => !v)}
+      >
+        <svg viewBox="0 0 24 24" className={`size-3 transition-transform ${showPopover ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+          <path d="m6 9 6 6 6-6" />
+        </svg>
+      </button>
+      {showPopover ? createPortal(<FreehandSettingsPopover anchorRef={btnRef} onClose={close} />, document.body) : null}
+    </>
+  )
+}
+
 /** Tooltip: description (or label) plus the tool's current shortcut, e.g. `Search in book (Ctrl+F)`. */
 function useToolTitle(): (tool: ToolDef) => string {
   const overrides = useShortcutsStore((s) => s.overrides)
@@ -275,7 +321,8 @@ export function ToolsStrip({ capabilities, toolStates, onTool, toolRefs, hidden 
 
   function renderButton(tool: ToolDef, iconOnly = false) {
     const state = toolStates[tool.id]
-    const active = state?.active ?? false
+    const disabled = state?.disabled ?? false
+    const active = !disabled && (state?.active ?? false)
     if (iconOnly) {
       return (
         <button
@@ -296,8 +343,9 @@ export function ToolsStrip({ capabilities, toolStates, onTool, toolRefs, hidden 
       <button
         key={tool.id}
         ref={toolRefs?.[tool.id]}
-        className={`relative ${modeButtonClass(active)}`}
+        className={`relative ${modeButtonClass(active)}${disabled ? ' cursor-not-allowed opacity-50' : ''}`}
         type="button"
+        disabled={disabled}
         title={toolTitle(tool)}
         aria-label={tool.label}
         aria-pressed={tool.popup ? undefined : active}
@@ -348,7 +396,16 @@ export function ToolsStrip({ capabilities, toolStates, onTool, toolRefs, hidden 
           <ToolGroup aria-label={resolved.group.label} twoRows={resolved.mode === 'inline' && resolved.group.iconOnly}>
             {resolved.mode === 'menu'
               ? renderMenu(resolved)
-              : resolved.tools.map((tool) => renderButton(tool, resolved.group.iconOnly))}
+              : resolved.tools.map((tool) =>
+                  tool.id === 'pen' ? (
+                    <div key={tool.id} className="contents">
+                      {renderButton(tool, resolved.group.iconOnly)}
+                      <FreehandSettingsButton hidden={hidden} />
+                    </div>
+                  ) : (
+                    renderButton(tool, resolved.group.iconOnly)
+                  ),
+                )}
           </ToolGroup>
         </div>
       ))}

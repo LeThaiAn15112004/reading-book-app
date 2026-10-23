@@ -3,6 +3,8 @@ export type HistoryAction<T> =
   | { kind: 'add'; value: T }
   | { kind: 'remove'; value: T }
   | { kind: 'replace'; before: T; after: T }
+  /** Several actions undone / redone as ONE step (e.g. one eraser sweep). Applied in order, undone in reverse. */
+  | { kind: 'batch'; actions: HistoryAction<T>[] }
 
 export interface UndoHistory<T> {
   push(action: HistoryAction<T>): void
@@ -73,5 +75,10 @@ export function applyHistoryStep<T>(
       return
     case 'replace':
       handlers.restore(direction === 'undo' ? action.before : action.after)
+      return
+    case 'batch': {
+      const ordered = direction === 'undo' ? [...action.actions].reverse() : action.actions
+      for (const step of ordered) applyHistoryStep(step, direction, handlers)
+    }
   }
 }

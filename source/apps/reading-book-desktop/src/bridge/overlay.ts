@@ -23,6 +23,9 @@ export const overlayApi = {
   deleteHighlight: (
     ...args: Parameters<typeof window.api.overlay.deleteHighlight>
   ) => window.api.overlay.deleteHighlight(...args),
+  listInk: (bookId: string) => window.api.overlay.listInk(bookId),
+  saveInk: (...args: Parameters<typeof window.api.overlay.saveInk>) => window.api.overlay.saveInk(...args),
+  deleteInk: (...args: Parameters<typeof window.api.overlay.deleteInk>) => window.api.overlay.deleteInk(...args),
   watchPdfEmbeddedAnnotations: (bookId: string) => window.api.overlay.watchPdfEmbeddedAnnotations(bookId),
   unwatchPdfEmbeddedAnnotations: (bookId: string) => window.api.overlay.unwatchPdfEmbeddedAnnotations(bookId),
   onPdfEmbeddedAnnotationsChanged: (

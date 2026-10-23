@@ -52,6 +52,8 @@ export type PdfReaderHighlight = ReaderHighlightBase & {
   chapterIndex: number
   /** Every rect, possibly across several pages, in reading order. */
   rects: PdfHighlightRect[]
+  /** Inserted Text: `rects` is a single caret box at an insertion point (see `pdfCaretRect`). */
+  caret?: true
 }
 
 export function isPdfReaderHighlight(h: ReaderHighlightBase): h is PdfReaderHighlight {
@@ -96,14 +98,53 @@ export function normalizePdfHighlightRects(rects: readonly PdfHighlightRect[]): 
 }
 
 /** 1-based renderer rects → stored `PdfAnnotation` (0-based). Undefined when nothing is left. */
-export function pdfAnnotationFromRects(rects: readonly PdfHighlightRect[]): PdfAnnotation | undefined {
+export function pdfAnnotationFromRects(
+  rects: readonly PdfHighlightRect[],
+  options?: { caret?: boolean },
+): PdfAnnotation | undefined {
   const clean = normalizePdfHighlightRects(rects)
   if (clean.length === 0) return undefined
   const firstPage = Math.min(...clean.map((r) => r.page))
-  return {
+  const annotation: PdfAnnotation = {
     pageIndex: firstPage - 1,
     rects: clean.map((r) => ({ pageIndex: r.page - 1, x: r.x, y: r.y, width: r.width, height: r.height })),
   }
+  // A caret is ONE box: more would be a selection, which the flag must never describe.
+  if (options?.caret && clean.length === 1) annotation.caret = true
+  return annotation
+}
+
+/** Caret box size, as fractions of the line height / of the page width (see `pdfCaretRect`). */
+const CARET_HEIGHT_OF_LINE = 0.55
+const CARET_WIDTH_OF_HEIGHT = 1.1
+/** How far above the line's bottom edge the caret starts (fraction of the line height). */
+const CARET_RISE_OF_LINE = 0.2
+
+/**
+ * The Inserted Text caret box for an insertion point: centered on `x` and starting just above the
+ * bottom of the text line (`lineBottom`), so the `^` hangs under the baseline without covering glyphs.
+ * Every input is normalized to the page box (0–1) on 1-based `page`; `lineHeight` is the line's height
+ * as a fraction of the page height and `pageAspect` the page's width / height, which keeps the box
+ * square-ish on screen. Undefined for non-finite input or a point off the page.
+ */
+export function pdfCaretRect(
+  page: number,
+  x: number,
+  lineBottom: number,
+  lineHeight: number,
+  pageAspect: number,
+): PdfHighlightRect | undefined {
+  if (![x, lineBottom, lineHeight, pageAspect].every(isFiniteNumber)) return undefined
+  if (lineHeight <= 0 || pageAspect <= 0) return undefined
+  if (x < 0 || x > 1 || lineBottom < 0 || lineBottom > 1) return undefined
+  const height = lineHeight * CARET_HEIGHT_OF_LINE
+  // Width as a share of the page width: height (of the page) × aspect = the same length on screen.
+  const width = height * CARET_WIDTH_OF_HEIGHT / pageAspect
+  const top = lineBottom - lineHeight * CARET_RISE_OF_LINE
+  const [left, bottom] = [x - width / 2, top + height]
+  const [cl, cr, ct, cb] = [clamp01(left), clamp01(left + width), clamp01(top), clamp01(bottom)]
+  if (cr - cl <= 0 || cb - ct <= 0) return undefined
+  return { page, x: round(cl), y: round(ct), width: round(cr - cl), height: round(cb - ct) }
 }
 
 /** Stored `PdfAnnotation` (0-based) → 1-based renderer rects. */
@@ -156,6 +197,11 @@ export function parsePdfAnnotation(value: unknown): PdfAnnotation | undefined {
     rects.push(rect)
   }
   const annotation: PdfAnnotation = { pageIndex: v.pageIndex, rects }
+  if (v.caret !== undefined) {
+    // Only ever `true`, and only on exactly one rect.
+    if (v.caret !== true || rects.length !== 1) return undefined
+    annotation.caret = true
+  }
   if (v.contents !== undefined) {
     if (typeof v.contents !== 'string' || v.contents.length > MAX_CONTENTS_LENGTH) return undefined
     annotation.contents = v.contents
@@ -231,6 +277,7 @@ export function pdfHighlightDtoToReaderHighlight(dto: {
     page: location.page,
     chapterIndex: annotation.pageIndex,
     rects: pdfRectsFromAnnotation(annotation),
+    ...(annotation.caret ? { caret: true as const } : {}),
     styleKind: dto.styleKind,
     colorHex: dto.colorHex?.trim() || DEFAULT_HIGHLIGHT_COLOR,
     note: dto.note?.trim() || undefined,
@@ -242,8 +289,11 @@ export function pdfHighlightDtoToReaderHighlight(dto: {
 }
 
 /** Renderer rects → the `pdfAnnotation` a save sends over IPC. */
-export function pdfAnnotationRefForRects(rects: readonly PdfHighlightRect[]): string | undefined {
-  const annotation = pdfAnnotationFromRects(rects)
+export function pdfAnnotationRefForRects(
+  rects: readonly PdfHighlightRect[],
+  options?: { caret?: boolean },
+): string | undefined {
+  const annotation = pdfAnnotationFromRects(rects, options)
   return annotation ? packPdfAnnotationRef(annotation) : undefined
 }
 

@@ -122,8 +122,8 @@ await check('EPUB -> unsupported (never claimed signed or unsigned)', () => {
   assert.equal(verifySignature('epub', zipMagic).status, 'unsupported')
 })
 
-await check('formats with no verifier (txt, md, docx, doc) -> unsupported', () => {
-  for (const format of ['txt', 'md', 'docx', 'doc']) {
+await check('formats with no verifier (txt, md) -> unsupported', () => {
+  for (const format of ['txt', 'md']) {
     assert.equal(verifySignature(format, Buffer.from('hello')).status, 'unsupported', format)
   }
 })

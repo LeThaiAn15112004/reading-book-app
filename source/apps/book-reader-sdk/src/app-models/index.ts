@@ -45,6 +45,7 @@ export {
   parsePdfAnnotation,
   parsePdfAnnotationRef,
   pdfAnnotationFromRects,
+  pdfCaretRect,
   pdfAnnotationLocation,
   pdfAnnotationRefForRects,
   pdfHighlightDtoToReaderHighlight,

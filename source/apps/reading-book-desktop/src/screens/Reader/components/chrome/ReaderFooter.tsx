@@ -75,7 +75,7 @@ function ViewModeIcon({ mode }: { mode: ReadingViewMode }) {
   )
 }
 
-function PageCountIcon({ count }: { count: 1 | 2 }) {
+function PageCountIcon({ count }: { count: 1 | 2 | 3 }) {
   return (
     <span className="flex items-center gap-[2px]" aria-hidden>
       {Array.from({ length: count }).map((_, index) => (
@@ -106,9 +106,14 @@ type ReaderFooterProps = {
   layout: PageLayout
   /** Omitted when the surface has no 1-page / 2-page layout (PDF) — the toggle is hidden. */
   onLayoutChange?: (layout: PageLayout) => void
+  /** PDF only: pages side by side (1 / 2 / 3). Replaces the 1-page / 2-page toggle when set. */
+  pagesPerView?: 1 | 2 | 3
+  onPagesPerViewChange?: (count: 1 | 2 | 3) => void
   /** Paginated (default) vs. continuous vertical scroll within a section. */
   viewMode?: ReadingViewMode
   onViewModeChange?: (viewMode: ReadingViewMode) => void
+  /** Scroll view still has real page numbers and prev / next (PDF), instead of a percentage readout. */
+  pageControlsInScroll?: boolean
   zoom: number
   onZoomChange: (scale: number) => void
   onZoomStep: (direction: 1 | -1) => void
@@ -158,8 +163,11 @@ export function ReaderFooter({
   onGoToPageUnavailable,
   layout,
   onLayoutChange,
+  pagesPerView,
+  onPagesPerViewChange,
   viewMode = 'paginated',
   onViewModeChange,
+  pageControlsInScroll = false,
   zoom,
   onZoomChange,
   onZoomStep,
@@ -200,7 +208,8 @@ export function ReaderFooter({
     onGoToPage(page)
   }
 
-  const isScrollMode = viewMode === 'scroll'
+  const isScrollMode = viewMode === 'scroll' && !pageControlsInScroll
+  const viewModeIsScroll = viewMode === 'scroll'
 
   // "Go to Page" shortcut: focus (and select) the page box. Without one — scroll view only shows a
   // percentage, or the page count isn't known yet — say so instead of doing nothing.
@@ -374,6 +383,30 @@ export function ReaderFooter({
           </button>
         ) : null}
 
+        {onPagesPerViewChange ? (
+          <span className={modeGroupClass} aria-label="Page count">
+            {(
+              [
+                [1, 'Single page'],
+                [2, 'Double page'],
+                [3, 'Triple page'],
+              ] as const
+            ).map(([count, label]) => (
+              <button
+                key={count}
+                type="button"
+                className={`${modeButtonClass} ${pagesPerView === count ? modeButtonActiveClass : ''}`}
+                title={label}
+                aria-label={label}
+                aria-pressed={pagesPerView === count}
+                onClick={() => onPagesPerViewChange(count)}
+              >
+                <PageCountIcon count={count} />
+              </button>
+            ))}
+          </span>
+        ) : null}
+
         {onLayoutChange ? (
           <span className={modeGroupClass} aria-label="Page count">
             {layoutOptions.map((option) => (
@@ -398,20 +431,20 @@ export function ReaderFooter({
           <span className={modeGroupClass} aria-label="View mode">
             <button
               type="button"
-              className={`${modeButtonClass} ${!isScrollMode ? modeButtonActiveClass : ''}`}
+              className={`${modeButtonClass} ${!viewModeIsScroll ? modeButtonActiveClass : ''}`}
               title="Lật trang"
               aria-label="Lật trang"
-              aria-pressed={!isScrollMode}
+              aria-pressed={!viewModeIsScroll}
               onClick={() => onViewModeChange('paginated')}
             >
               <ViewModeIcon mode="paginated" />
             </button>
             <button
               type="button"
-              className={`${modeButtonClass} ${isScrollMode ? modeButtonActiveClass : ''}`}
+              className={`${modeButtonClass} ${viewModeIsScroll ? modeButtonActiveClass : ''}`}
               title="Cuộn dọc"
               aria-label="Cuộn dọc"
-              aria-pressed={isScrollMode}
+              aria-pressed={viewModeIsScroll}
               onClick={() => onViewModeChange('scroll')}
             >
               <ViewModeIcon mode="scroll" />

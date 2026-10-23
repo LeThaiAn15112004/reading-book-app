@@ -232,3 +232,65 @@ describe('buildMdOutline', () => {
     expect(buildMdOutline([h(0, 'z'), h(99, 'y'), h(Number.NaN, 'n')]).map((n) => n.label)).toEqual(['z', 'n'])
   })
 })
+
+describe('findHeadingForAnchor: anchors as real documents write them', () => {
+  // The report: a table of contents inside the book links to `#63-bo-sung-list-60-muc-31-60`, a slug
+  // with the diacritics stripped, written by a tool whose rules differ from GitHub's.
+  const heads = [
+    'Mục lục',
+    '6.2 Tổng quan danh sách',
+    '6.3 Bổ sung list 60 mục (31–60)',
+    '6.4 Kết luận',
+  ]
+
+  it('finds a Vietnamese heading from an ASCII (diacritics-stripped) anchor', () => {
+    expect(findHeadingForAnchor(heads, '63-bo-sung-list-60-muc-31-60')).toBe(2)
+    expect(findHeadingForAnchor(heads, '62-tong-quan-danh-sach')).toBe(1)
+    expect(findHeadingForAnchor(heads, 'muc-luc')).toBe(0)
+    expect(findHeadingForAnchor(heads, '64-ket-luan')).toBe(3)
+  })
+
+  it('still finds it with the GitHub form (diacritics kept, punctuation dropped)', () => {
+    expect(findHeadingForAnchor(heads, '63-bổ-sung-list-60-mục-3160')).toBe(2)
+    expect(findHeadingForAnchor(heads, '63-b%E1%BB%95-sung-list-60-m%E1%BB%A5c-3160')).toBe(2)
+  })
+
+  it('handles d-stroke, case, spaces and brackets', () => {
+    const list = ['Đường dẫn (Path)', 'Chương  2: [Mở đầu]']
+    expect(findHeadingForAnchor(list, 'duong-dan-path')).toBe(0)
+    expect(findHeadingForAnchor(list, 'đường-dẫn-path')).toBe(0)
+    expect(findHeadingForAnchor(list, 'CHUONG-2-MO-DAU')).toBe(1)
+    expect(findHeadingForAnchor(list, 'chuong--2-mo-dau')).toBe(1)
+  })
+
+  it('handles Japanese headings, raw or percent-encoded, without merging voiced and unvoiced kana', () => {
+    const list = ['日本語の見出し', 'がぎぐ', 'かきく', 'はじめに（概要）']
+    expect(findHeadingForAnchor(list, '日本語の見出し')).toBe(0)
+    expect(findHeadingForAnchor(list, encodeURIComponent('日本語の見出し'))).toBe(0)
+    expect(findHeadingForAnchor(list, 'がぎぐ')).toBe(1)
+    expect(findHeadingForAnchor(list, 'かきく')).toBe(2)
+    expect(findHeadingForAnchor(list, 'はじめに概要')).toBe(3)
+  })
+
+  it('numbers repeated headings in both slug styles', () => {
+    const list = ['Sử dụng', 'Sử dụng', 'Sử dụng']
+    expect(findHeadingForAnchor(list, 'su-dung')).toBe(0)
+    expect(findHeadingForAnchor(list, 'su-dung-1')).toBe(1)
+    expect(findHeadingForAnchor(list, 'su-dung-2')).toBe(2)
+    expect(findHeadingForAnchor(list, 'sử-dụng-2')).toBe(2)
+  })
+
+  it('prefers an exact slug over a looser match', () => {
+    const list = ['A-B', 'A B', 'AB']
+    expect(findHeadingForAnchor(list, 'a-b')).toBe(0)
+    expect(findHeadingForAnchor(list, 'ab')).toBe(2)
+  })
+
+  it('returns -1 for anchors that match nothing, are empty, or are punctuation only', () => {
+    expect(findHeadingForAnchor(heads, 'khong-ton-tai')).toBe(-1)
+    expect(findHeadingForAnchor(heads, '')).toBe(-1)
+    expect(findHeadingForAnchor(heads, '---')).toBe(-1)
+    expect(findHeadingForAnchor([], 'x')).toBe(-1)
+    expect(findHeadingForAnchor(heads, '%E0%A4%A')).toBe(-1)
+  })
+})

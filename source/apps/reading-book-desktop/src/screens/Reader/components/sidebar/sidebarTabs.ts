@@ -14,7 +14,7 @@ export const SIDEBAR_TABS: SidebarTabDef[] = [
   { id: 'bookmarks', label: 'Bookmark', icon: '🔖' },
   { id: 'highlights', label: 'Notes', icon: '🖍️' },
   { id: 'layout', label: 'Page layout', icon: '📄', requires: 'pageLayout' },
-  { id: 'attachments', label: 'Attachment', icon: '📎' },
+  { id: 'attachments', label: 'Attachment', icon: '📎', requires: 'attachments' },
 ]
 
 /** True when `tab` can be shown for a surface with `capabilities`. */

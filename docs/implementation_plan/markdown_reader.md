@@ -298,3 +298,37 @@ Theo yêu cầu sau Giai đoạn 2 (kế hoạch ban đầu để M9): sidebar *
 - `MdRendererApi.scrollToHeading(N)`: heading chưa mount → mount phần còn lại rồi cuộn (cùng cơ chế anchor `#...`).
 - Mục đang đọc: heading cuối cùng có đỉnh đã chạm đỉnh vùng đọc (tìm nhị phân trên danh sách heading đã cache, mỗi khung hình khi cuộn).
 - Test: SDK `buildMdOutline` (4 test, tổng SDK 308 pass); E2E D trong `md-reader.spec.ts` (tài liệu dài tách mảnh: mục lục đủ 4 entry, nhảy tới heading cuối, entry hiện tại đổi theo cuộn, cuộn về đầu) — **chưa chạy**: `npm run e2e:md`.
+
+### 12.7 Sửa: link mục lục nằm trong nội dung (`#anchor`) không cuộn tới heading (2026-10-19)
+
+**Nguyên nhân gốc.** Link `#anchor` đã được render đúng (thẻ `<a role="link">` không `href`, click đi vào `findHeadingForAnchor`) nhưng việc **khớp anchor với heading** quá hẹp: chỉ nhận slug kiểu GitHub (giữ dấu tiếng Việt, bỏ dấu câu). Tài liệu thực tế viết anchor bằng công cụ khác: `#63-bo-sung-list-60-muc-31-60` cho heading `6.3 Bổ sung list 60 mục (31–60)` (bỏ dấu, `–` thành `-`, dấu chấm bị bỏ). Hai slug khác nhau → không tìm thấy → hàm trả -1 → **không làm gì, không báo gì**. Đã tái hiện bằng test trước khi sửa (3 test fail). Vùng cuộn đúng là `main[data-md-surface]` (`overflow-y: auto`); cơ chế mount dần không phải nguyên nhân (anchor tới phần chưa mount đã mount hết rồi mới cuộn, nhưng cũng chỉ khi tìm thấy).
+
+**Cách hoạt động sau sửa.**
+- `findHeadingForAnchor` (SDK) thử hai lượt, chặt trước:
+  1. slug GitHub (`slugifyHeading`, heading trùng thêm `-1`, `-2`);
+  2. `looseAnchorKey`: bỏ dấu Latin (`ổ`→`o`, `đ`→`d`; kana/chữ Hán giữ nguyên nên `が` ≠ `か`), chữ thường, bỏ mọi ký tự không phải chữ/số. Đánh số trùng tên tương tự. Anchor giải mã `%XX` (tiếng Nhật, tiếng Việt).
+  Anchor rỗng / chỉ dấu câu / không khớp → -1.
+- Cuộn bằng `scrollElementToTop` trong `MdRenderer`: chỉ dịch `scrollTop` của vùng đọc (tính từ `getBoundingClientRect`, chia cho hệ số zoom của viewport), không dùng `scrollIntoView` / `window.scrollTo` nên không thể cuộn tổ tiên hay cửa sổ. Dùng chung cho anchor và mục lục sidebar.
+- Đích nằm ở mảnh chưa mount: mount hết các mảnh rồi tìm lại và cuộn (như trước).
+- Không tìm thấy (kể cả sau khi mount hết): không cuộn, không điều hướng, `onAnchorNotFound` → toast "That section was not found in this document." Link ngoài vẫn qua `app:openExternalLink`; chính sách link/HTML không đổi.
+- Giới hạn: chỉ heading là đích (HTML nhúng `<a id=...>` bị bỏ theo chính sách nên không có đích); loose match có thể nhập nhằng nếu hai heading chỉ khác dấu câu (lượt 1 ưu tiên khớp chính xác trước).
+
+**Test.**
+
+| Mức | Test | Lệnh | Kết quả |
+|---|---|---|---|
+| Unit | `tests/md/md-policy.test.ts`: anchor ASCII ↔ heading có dấu (đúng ví dụ báo lỗi), dạng GitHub, `đ`, hoa/thường, khoảng trắng/ngoặc, tiếng Nhật thô và percent-encoded (không gộp kana đục/trong), heading trùng tên ở cả hai kiểu, ưu tiên khớp chính xác, anchor không tồn tại/rỗng/dấu câu | `cd source/apps/book-reader-sdk && npm test` | 315 pass (7 test mới; 3 test trong số đó fail trước khi sửa) |
+| Integration (renderer) | `spike:md:render`: mục lục nhiều cấp giữ đủ link `role="link"`, không `href` | `npm run spike:md:render` | 20 / 20 |
+| E2E | `md-reader.spec.ts` E: tài liệu > 200 000 ký tự, mục lục lồng 3 cấp; click liền sau khi mở (đích chưa mount), heading tiếng Việt kiểu ASCII, `(31–60)`, tiếng Nhật, trùng tên (cái thứ nhất / thứ hai), anchor kiểu GitHub; heading phải lên đầu vùng đọc, URL không đổi; anchor không tồn tại → toast, không cuộn; link `https://` gọi `shell.openExternal` (stub, không mở thật) | `npm run e2e:md` (chạy tay, cửa sổ ẩn, `userData` tạm) | **chưa chạy**, đã `e2e:typecheck` |
+
+---
+
+## Annotation đã làm (2026-10-20) — khác §5 ở chỗ nào
+
+Cả 6 tool (Highlight, Underline, Squiggly, Strikethrough, Replace Text, Insert Text) và Note đều chạy trên MD.
+
+- **Neo vị trí theo (mảnh, offset)**, không dùng plain text toàn tài liệu: mỗi mảnh `splitMdSource` được bọc `data-md-seg`, offset = độ dài UTF-16 của text tính từ đầu mảnh (`Range#toString`). Không cần plugin rehype `data-mdo`, không phụ thuộc font / chiều rộng / theme. Kiểu: `MdAnnotation` (`startSegment, startOffset, endSegment, endOffset, caret?`) trong `note_json.mdAnnotation`, locator `text-offset` `blockId 'md'` với `chapterIndex` = mảnh bắt đầu. Không migration.
+- **Khôi phục có kiểm chứng**: quote lưu ở `locatorExtended.text`; nếu text tại vị trí không còn bắt đầu bằng quote (file bị sửa ngoài app) thì mark bị ẩn, không xoá, không dời sang chữ giống. **Chưa làm relocate theo before+quote+after** (§5.4 bước 2).
+- **Vẽ** bằng CSS Custom Highlight API (`::highlight`), không chèn gì vào DOM; Insert Text vẽ caret `^` bằng lớp overlay định vị theo Range.
+- **Main**: `overlay:saveHighlight` kiểm `mdAnnotationRef` (số nguyên, start < end, caret chỉ khi start = end, locator khớp điểm bắt đầu, không đi cùng `pdfAnnotationRef`).
+- **Kiểm chứng**: SDK `tests/md/md-annotations.test.ts`; `spike:pdf:annotations` mục 7 (IPC + SQLite thật); E2E `md-annotations.spec.ts`. Chưa có: relocate, Copy with Citation theo heading, mark chồng nhau kiểm riêng, tài liệu rất dài (>1 mảnh) cho mark qua nhiều mảnh.

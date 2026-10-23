@@ -194,3 +194,132 @@ test('D: the Contents sidebar lists the headings, jumps to them, and follows the
   await tocEntry(page, 'Chương giữa').click()
   await expect(activeTocEntry(page)).toHaveAccessibleName('Chương giữa')
 })
+
+test('E: links of a table of contents inside the book scroll to their heading (Vietnamese, Japanese, repeats, long document); a missing target and external links are safe', async ({
+  reader,
+}) => {
+  test.setTimeout(180_000)
+  const { page, app } = reader
+  const filler = 'Đoạn văn dài để tạo khoảng cuộn, có tiếng Việt, 日本語 và emoji 🌳.\n\n'.repeat(450)
+  const text = [
+    '# Tài liệu',
+    '',
+    '## Mục lục',
+    '',
+    // Anchors the way another tool writes them: ASCII slugs, punctuation turned into hyphens.
+    '- [1. Giới thiệu](#1-gioi-thieu)',
+    '  - [1.1 Bổ sung list 60 mục (31–60)](#11-bo-sung-list-60-muc-31-60)',
+    '    - [Phần tiếng Nhật](#日本語の見出し)',
+    '- [Trùng tên](#trung-ten)',
+    '- [Trùng tên, lần hai](#trung-ten-1)',
+    '- [Kết thúc (GitHub kiểu)](#kết-thúc)',
+    '- [Không có đích](#khong-co-dich-nay)',
+    '- [Trang web](https://example.com/page)',
+    '',
+    filler,
+    '## 1. Giới thiệu',
+    '',
+    filler,
+    '### 1.1 Bổ sung list 60 mục (31–60)',
+    '',
+    filler,
+    '#### 日本語の見出し',
+    '',
+    filler,
+    '## Trùng tên',
+    '',
+    filler,
+    '## Trùng tên',
+    '',
+    filler,
+    '## Kết thúc',
+    '',
+    'Hết.',
+    '',
+  ].join('\n')
+  expect(text.length).toBeGreaterThan(200_000) // split into many pieces, mounted one by one
+  const file = reader.writeFixture('toc.md', Buffer.from(text, 'utf8'))
+  await reader.importBook(file)
+  await page.getByRole('button', { name: 'Open', exact: true }).click()
+  await expect(surface(page)).toBeVisible({ timeout: 20_000 })
+
+  const content = page.locator('[data-md-content]')
+  const scrollTop = () => surface(page).evaluate((el) => el.scrollTop)
+  const toTop = () => surface(page).evaluate((el) => { el.scrollTop = 0 })
+  const urlBefore = page.url()
+  // Links in the text are not real anchors: no href anywhere.
+  await expect(content.locator('a[href]')).toHaveCount(0)
+
+  // Click the link, then expect the heading at the top of the reading area, inside THE surface.
+  async function followLink(linkName: string, headingName: string, nth = 0) {
+    await toTop()
+    await content.getByRole('link', { name: linkName, exact: true }).click()
+    const heading = content.getByRole('heading', { name: headingName, exact: true }).nth(nth)
+    await expect
+      .poll(async () => {
+        const box = await heading.boundingBox().catch(() => null)
+        return box ? Math.round(box.y) : 99_999
+      }, { timeout: 30_000 })
+      .toBeLessThan(260)
+    expect(await scrollTop()).toBeGreaterThan(0)
+    expect(page.url()).toBe(urlBefore)
+  }
+
+  // First click right after opening: the target is far down, probably not mounted yet.
+  await followLink('1. Giới thiệu', '1. Giới thiệu')
+  // Nested levels of the in-book table of contents.
+  await followLink('1.1 Bổ sung list 60 mục (31–60)', '1.1 Bổ sung list 60 mục (31–60)')
+  await followLink('Phần tiếng Nhật', '日本語の見出し')
+  // Repeated heading names: the second link goes to the second heading.
+  await followLink('Trùng tên', 'Trùng tên', 0)
+  await followLink('Trùng tên, lần hai', 'Trùng tên', 1)
+  // GitHub-style anchor with diacritics kept.
+  await followLink('Kết thúc (GitHub kiểu)', 'Kết thúc')
+
+  // A target that does not exist: nothing moves, nothing navigates, the reader says so.
+  await toTop()
+  await content.getByRole('link', { name: 'Không có đích', exact: true }).click()
+  await expect(page.getByText('That section was not found in this document.')).toBeVisible()
+  expect(await scrollTop()).toBe(0)
+  expect(page.url()).toBe(urlBefore)
+  await expect(surface(page)).toBeVisible()
+
+  // Regression: an external link still goes through Main (stubbed here, nothing is opened).
+  await app.evaluate(({ shell }) => {
+    const opened: string[] = []
+    ;(globalThis as unknown as { __opened: string[] }).__opened = opened
+    shell.openExternal = async (url: string) => {
+      opened.push(url)
+    }
+  })
+  await toTop()
+  await content.getByRole('link', { name: 'Trang web', exact: true }).click()
+  await expect
+    .poll(() => app.evaluate(() => (globalThis as unknown as { __opened?: string[] }).__opened ?? []))
+    .toEqual(['https://example.com/page'])
+  expect(page.url()).toBe(urlBefore)
+})
+
+test('F: there is no Hand tool, and text can be selected by dragging', async ({ reader }) => {
+  test.setTimeout(120_000)
+  const { page } = reader
+  const file = reader.writeFixture('select.md', Buffer.from('# Tiêu đề\n\nĐoạn văn đầu tiên để kéo chọn.\n\nĐoạn thứ hai.\n', 'utf8'))
+  await reader.importBook(file)
+  await page.getByRole('button', { name: 'Open', exact: true }).click()
+  await expect(surface(page)).toBeVisible({ timeout: 20_000 })
+
+  const tools = page.getByRole('navigation', { name: 'Main navigation' }).getByRole('button', { name: 'Tools', exact: true })
+  if ((await tools.getAttribute('aria-expanded')) !== 'true') await tools.click()
+  await expect(page.getByRole('button', { name: 'Select', exact: true })).toHaveAttribute('aria-pressed', 'true')
+  await expect(page.getByRole('button', { name: 'Hand', exact: true })).toHaveCount(0)
+
+  const para = page.locator('[data-md-content] p', { hasText: 'Đoạn văn đầu tiên' })
+  const box = (await para.boundingBox())!
+  await page.mouse.move(box.x + 2, box.y + box.height / 2)
+  await page.mouse.down()
+  await page.mouse.move(box.x + box.width * 0.6, box.y + box.height / 2, { steps: 8 })
+  await page.mouse.up()
+  const selected = await page.evaluate(() => window.getSelection()?.toString() ?? '')
+  expect(selected.length).toBeGreaterThan(5)
+  expect('Đoạn văn đầu tiên để kéo chọn.').toContain(selected.trim())
+})

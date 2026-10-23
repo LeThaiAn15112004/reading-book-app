@@ -1,6 +1,6 @@
 import { useEffect, useId, useRef, useState, type FormEvent } from 'react'
 
-const FORMAT_TAGS = ['EPUB', 'PDF', 'TXT', 'MD', 'DOCX', 'DOC'] as const
+const FORMAT_TAGS = ['EPUB', 'PDF', 'TXT', 'MD'] as const
 
 export type ImportUrlDialogProps = {
   open: boolean

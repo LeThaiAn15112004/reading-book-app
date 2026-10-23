@@ -51,8 +51,6 @@ export const ONEDRIVE_SUPPORTED_BOOK_EXTENSIONS = [
   'txt',
   'mobi',
   'md',
-  'docx',
-  'doc',
   'azw3',
   'fb2',
   'cbz',

@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { markupToast } from '../markupToast'
+import { opensNotePopup } from '../noteKinds'
 import type { MutableRefObject } from 'react'
 import {
   DEFAULT_HIGHLIGHT_COLOR,
@@ -12,16 +13,18 @@ import {
   packSelectionTextRef,
   pdfAnnotationFromRects,
   pdfAnnotationRefForRects,
+  pdfCaretRect,
   pdfHighlightDtoToReaderHighlight,
   pdfRectsFromAnnotation,
   type HighlightHistory,
   type HighlightStyleKind,
   type MarkupInteractionTool,
+  type PdfHighlightRect,
   type PdfReaderHighlight,
 } from '@reading-book/book-reader-sdk'
 import { overlayApi } from '../../../../bridge'
 import { usePdfSignedWriteStore } from '../pdfExport/pdfSignedWriteStore'
-import type { PdfRendererApi, PdfSelectionInfo } from '../../../../reader/renderers/pdf'
+import type { PdfInsertionPoint, PdfRendererApi, PdfSelectionInfo } from '../../../../reader/renderers/pdf'
 
 /** Derived from the bridge: the renderer never imports from electron/. */
 type PdfEmbeddedAnnotationsChangedDto = Parameters<Parameters<typeof overlayApi.onPdfEmbeddedAnnotationsChanged>[0]>[0]
@@ -40,6 +43,12 @@ export type PdfAnnotationAnchor = {
 export type ActivePdfHighlight = { highlight: PdfReaderHighlight; rect: PdfAnnotationAnchor }
 
 export type PdfMarkupTool = MarkupInteractionTool
+
+/** Caret color for Inserted Text (pink, like Foxit's) — changeable per mark afterwards. */
+export const INSERT_CARET_COLOR = '#ec407a'
+
+/** An Inserted Text caret that has been placed but not saved: nothing exists until it gets text. */
+export type PendingPdfInsert = { rect: PdfHighlightRect; anchor: PdfAnnotationAnchor }
 
 /** Inputs `useReaderPdfHighlights` threads in from ReaderScreen — not UI state anything renders. */
 type PdfHighlightsContext = {
@@ -73,6 +82,8 @@ type PdfHighlightsStoreState = PdfHighlightsContext & {
   hiddenEmbeddedObjectIds: string[]
   /** Two-way sync conflicts by note id (both Readmate and another app changed the annotation). */
   conflicts: Record<string, PdfAnnotationConflict>
+  /** The caret being placed (editor open, not saved). Never persisted; cancel leaves no trace. */
+  pendingInsert: PendingPdfInsert | null
 
   setContext: (patch: Partial<PdfHighlightsContext>) => void
   resetForNewBook: () => void
@@ -98,6 +109,11 @@ type PdfHighlightsStoreState = PdfHighlightsContext & {
   ) => PdfReaderHighlight | null
   /** A markup tool's press ended with text selected — mark it with the last-used color. */
   commitMarkupSelection: (selection: PdfSelectionInfo, tool: PdfMarkupTool) => void
+  /** Insert Text tool: place a caret at `point` and open its editor. Saves nothing yet. */
+  beginInsert: (point: PdfInsertionPoint) => void
+  /** Save the pending caret with the text typed; empty text cancels instead (no empty annotation). */
+  commitInsert: (text: string) => void
+  cancelInsert: () => void
   /** Click / right-click on a mark or note icon — focus it and open its menu (note: its popup). */
   openHighlight: (id: string, rect: PdfAnnotationAnchor) => void
   closeEditPopup: () => void
@@ -132,12 +148,20 @@ export const usePdfHighlightsStore = create<PdfHighlightsStoreState>()((set, get
   history: createHighlightHistory<PdfReaderHighlight>(),
   hiddenEmbeddedObjectIds: [],
   conflicts: {},
+  pendingInsert: null,
 
   setContext: (patch) => set(patch),
 
   resetForNewBook: () => {
     get().history.clear()
-    set({ highlights: [], activeHighlight: null, focusedHighlightId: null, hiddenEmbeddedObjectIds: [], conflicts: {} })
+    set({
+      highlights: [],
+      activeHighlight: null,
+      focusedHighlightId: null,
+      hiddenEmbeddedObjectIds: [],
+      conflicts: {},
+      pendingInsert: null,
+    })
   },
 
   loadHighlights: async () => {
@@ -275,7 +299,7 @@ export const usePdfHighlightsStore = create<PdfHighlightsStoreState>()((set, get
     set((s) => ({
       highlights: [...s.highlights, highlight],
       focusedHighlightId: highlight.id,
-      activeHighlight: styleKind === 'textbox' && anchor ? { highlight, rect: anchor } : null,
+      activeHighlight: opensNotePopup(styleKind) && anchor ? { highlight, rect: anchor } : null,
     }))
     pdfApiRef?.current?.clearSelection()
 
@@ -294,10 +318,78 @@ export const usePdfHighlightsStore = create<PdfHighlightsStoreState>()((set, get
   },
 
   commitMarkupSelection: (selection, tool) => {
-    if (!get().createFromSelection(selection, tool)) return
+    const highlight = get().createFromSelection(selection, tool)
+    if (!highlight) return
     get().onToast(
       markupToast(tool),
     )
+    if (opensNotePopup(tool)) {
+      // A tool drag has no click point: anchor the editor to the new mark once the layer has painted it.
+      requestAnimationFrame(() => {
+        const rect = unionClientRect(document.querySelectorAll(`[data-pdf-annot-id="${CSS.escape(highlight.id)}"]`))
+        if (!rect || get().focusedHighlightId !== highlight.id) return
+        set({ activeHighlight: { highlight, rect } })
+      })
+    }
+  },
+
+  beginInsert: (point) => {
+    const rect = pdfCaretRect(point.page, point.x, point.lineBottom, point.lineHeight, point.aspect)
+    if (!rect) {
+      get().onToast('Could not place the insertion point.')
+      return
+    }
+    const { x, bottom } = point.client
+    set({
+      pendingInsert: { rect, anchor: { top: bottom, bottom, left: x, right: x, width: 0, height: 0 } },
+      activeHighlight: null,
+      focusedHighlightId: null,
+    })
+  },
+
+  commitInsert: (text) => {
+    const { bookId, pendingInsert, onToast } = get()
+    if (!pendingInsert) return
+    set({ pendingInsert: null })
+    const note = text.trim()
+    if (!bookId || !note) return
+    const annotation = pdfAnnotationFromRects([pendingInsert.rect], { caret: true })
+    if (!annotation?.caret) {
+      onToast('Could not mark this insertion point.')
+      return
+    }
+    const now = new Date().toISOString()
+    const highlight: PdfReaderHighlight = {
+      id: crypto.randomUUID(),
+      locatorRef: packPdfHighlightLocator(annotation),
+      page: annotation.pageIndex + 1,
+      chapterIndex: annotation.pageIndex,
+      rects: pdfRectsFromAnnotation(annotation),
+      caret: true,
+      styleKind: 'insert',
+      colorHex: INSERT_CARET_COLOR,
+      note,
+      tags: [],
+      createdAt: now,
+      updatedAt: now,
+    }
+    get().history.push(highlightAdd(highlight))
+    set((s) => ({ highlights: [...s.highlights, highlight], focusedHighlightId: highlight.id }))
+    void overlayApi
+      .saveHighlight(toSaveInput(bookId, highlight))
+      .then((saved) => {
+        if (saved) return
+        removeHighlightRow(set, highlight.id)
+        onToast('Could not save highlight.')
+      })
+      .catch(() => {
+        removeHighlightRow(set, highlight.id)
+        onToast('Could not save highlight.')
+      })
+  },
+
+  cancelInsert: () => {
+    if (get().pendingInsert) set({ pendingInsert: null })
   },
 
   openHighlight: (id, rect) => {
@@ -309,6 +401,7 @@ export const usePdfHighlightsStore = create<PdfHighlightsStoreState>()((set, get
   closeEditPopup: () => set({ activeHighlight: null, focusedHighlightId: null }),
 
   dismissAnnotationUi: () => {
+    if (get().pendingInsert) get().cancelInsert()
     if (get().activeHighlight || get().focusedHighlightId) get().closeEditPopup()
   },
 
@@ -395,7 +488,7 @@ function toSaveInput(bookId: string, h: PdfReaderHighlight) {
     note: h.note,
     tags: h.tags,
     selectionTextRef: packSelectionTextRef(h.selectionText),
-    pdfAnnotationRef: pdfAnnotationRefForRects(h.rects),
+    pdfAnnotationRef: pdfAnnotationRefForRects(h.rects, { caret: h.caret }),
     createdAt: h.createdAt,
   }
 }
@@ -455,4 +548,20 @@ function historyHandlers(get: Get, set: Set) {
       void overlayApi.deleteHighlight({ bookId, id }).catch(() => onToast('Could not undo.'))
     },
   }
+}
+
+/** The union of the client boxes of `elements`, or null when there are none. */
+function unionClientRect(elements: Iterable<Element>): DOMRect | null {
+  let left = Infinity
+  let top = Infinity
+  let right = -Infinity
+  let bottom = -Infinity
+  for (const el of elements) {
+    const r = el.getBoundingClientRect()
+    left = Math.min(left, r.left)
+    top = Math.min(top, r.top)
+    right = Math.max(right, r.right)
+    bottom = Math.max(bottom, r.bottom)
+  }
+  return Number.isFinite(left) ? new DOMRect(left, top, right - left, bottom - top) : null
 }

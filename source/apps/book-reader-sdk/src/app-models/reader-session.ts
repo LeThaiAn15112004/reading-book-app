@@ -25,6 +25,8 @@ export type InteractionTool =
   | 'squiggly'
   | 'replace'
   | 'insert'
+  /** Freehand Ink pen (PDF only, capability `inkAnnotations`): a drag draws a stroke; never a text selection. */
+  | 'pen'
 
 /** The tools whose drag over text saves a mark in that style (the `HighlightStyleKind` of the same name). */
 export const MARKUP_TOOLS = ['highlight', 'underline', 'squiggly', 'strikethrough', 'replace', 'insert'] as const

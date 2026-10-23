@@ -7,6 +7,8 @@
 export type ReaderCapability =
   /** Hand / Select interaction tools on the reading surface. */
   | 'interaction'
+  /** Hand tool: drag the page to pan / turn it. Not where the surface scrolls natively (TXT, Markdown). */
+  | 'pan'
   /** The text box itself is live: click = caret, typing edits (TXT). */
   | 'textEdit'
   /** Full-text search that can jump to and paint hits in the rendered book. */
@@ -28,6 +30,10 @@ export type ReaderCapability =
    * Contents (TOC) tab is the navigation surface.
    */
   | 'pageLayout'
+  /** Sidebar "Attachment" panel: files embedded in the document (PDF only — docs/implementation_plan/pdf_attachments.md). */
+  | 'attachments'
+  /** Freehand Ink pen over the page (PDF only — docs/implementation_plan/pdf_freehand_ink_eraser_plan.md). */
+  | 'inkAnnotations'
 
 /**
  * Which surface renders a format: EPUB (`renderers/epub`), PDF (`renderers/pdf`), TXT
@@ -38,6 +44,7 @@ export type ReaderSurface = 'epub' | 'pdf' | 'txt' | 'md' | 'placeholder'
 const SURFACE_CAPABILITIES: Record<ReaderSurface, readonly ReaderCapability[]> = {
   epub: [
     'interaction',
+    'pan',
     'search',
     'readAloud',
     'translate',
@@ -51,16 +58,17 @@ const SURFACE_CAPABILITIES: Record<ReaderSurface, readonly ReaderCapability[]> =
   // normalized rects (docs/implementation_plan/pdf_text_annotations.md). No `readingSettings`: every
   // Aa option is EPUB reflow (font, size, margins…) and does nothing to a fixed-layout page; zoom
   // lives in the footer.
-  pdf: ['interaction', 'search', 'markupAnnotations', 'snapshot', 'wordCount', 'pageLayout'],
+  pdf: ['interaction', 'pan', 'search', 'markupAnnotations', 'snapshot', 'wordCount', 'pageLayout', 'inkAnnotations', 'attachments'],
   // TXT: one continuous, editable text. No Hand / Select tools (the text box is live: click = caret,
   // drag = selection); the Edit tool is the way back from a markup tool, no page layout (there are no pages), no search painting / read aloud /
   // translate (out of scope). Markup is stored as offsets into the text
   // (docs/implementation_plan/txt_reader.md).
   txt: ['textEdit', 'search', 'translate', 'markupAnnotations', 'snapshot', 'wordCount', 'readingSettings'],
-  // Markdown: read-only, one continuous scroll. No annotations, search painting, read aloud or
+  // Markdown: read-only, one continuous scroll — no Hand (nothing to drag-pan; it scrolls natively), so it
+  // opens on Select. No annotations, search painting, read aloud or
   // translate yet (docs/implementation_plan/markdown_reader.md); Aa applies font / size / spacing.
   md: ['interaction', 'search', 'translate', 'markupAnnotations', 'snapshot', 'wordCount', 'readingSettings'],
-  placeholder: ['interaction', 'snapshot', 'wordCount', 'readingSettings', 'pageLayout'],
+  placeholder: ['interaction', 'pan', 'snapshot', 'wordCount', 'readingSettings', 'pageLayout'],
 }
 
 export function readerSurfaceForFormat(format: string | null | undefined): ReaderSurface {

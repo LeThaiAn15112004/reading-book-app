@@ -60,6 +60,11 @@ export interface PdfAnnotation {
   /** Every selected glyph run (multi-line / multi-page selections keep all of them). */
   rects: PdfAnnotationRect[];
   contents?: string;
+  /**
+   * Inserted Text only: `rects` hold ONE small box around an insertion point (a caret drawn under
+   * the text line), not a selected run. Absent on every other annotation and on older `insert` rows.
+   */
+  caret?: true;
 }
 
 /**
@@ -67,9 +72,45 @@ export interface PdfAnnotation {
  * book's canonical text (BOM stripped, `\n` line breaks — `txt/txt-text.ts`). A TXT note's locator is
  * a `text-offset` at `startOffset`; this holds the whole range.
  */
+/**
+ * Markdown-only markup anchor. The document is rendered piece by piece (`splitMdSource`); a point is
+ * `(segment, offset)` where `offset` is a UTF-16 index into the concatenation of that piece's rendered
+ * text nodes in document order (layout-independent: font, width and theme never change it). The range
+ * runs from the start point to the end point (possibly in a later piece). `caret` marks Inserted
+ * Text: start and end are the same point.
+ */
+export interface MdAnnotation {
+  startSegment: number;
+  startOffset: number;
+  endSegment: number;
+  endOffset: number;
+  caret?: true;
+}
+
 export interface TxtAnnotation {
   startOffset: number;
   endOffset: number;
+}
+
+/** Pen presets of a freehand stroke (presets over colour / width / opacity — all stored as `/Ink`). */
+export type InkPenStyle = 'pen' | 'marker' | 'pencil';
+
+/**
+ * PDF-only freehand stroke (`NoteType` `'ink'`; docs/implementation_plan/pdf_freehand_ink_eraser_plan.md).
+ * Points are NORMALIZED 0–1 in the displayed page box (same space as `PdfAnnotationRect`: `/Rotate` and
+ * crop box applied, top-left origin, y down). Colour / opacity live in `NoteStyle`.
+ */
+export interface PdfInkStroke {
+  /** 0-based page. A stroke never spans pages. */
+  pageIndex: number;
+  /** One or more polylines of `[x, y]` points. */
+  paths: Array<Array<[number, number]>>;
+  penStyle: InkPenStyle;
+  /**
+   * Stroke width as a fraction of the page WIDTH (zoom-independent). Both axes of a page are drawn
+   * in page-width units, so the pen stays round on a non-square page.
+   */
+  width: number;
 }
 
 /** Presentation attributes, open-ended so each `NoteType` can add its own keys. */
@@ -92,6 +133,7 @@ export type NoteType =
   | 'freehand'
   | 'textbox'
   | 'stamp'
+  | 'ink'
   | 'bookmark';
 
 export type NoteStatus = 'None' | 'Review' | 'Done';
@@ -128,8 +170,12 @@ export interface INoteState {
   locatorExtended?: LocatorExtended;
   /** PDF-only markup geometry (page + normalized rects) — absent for text-based notes. */
   pdfAnnotation?: PdfAnnotation;
+  /** PDF-only freehand stroke (`type: 'ink'`) — absent for every other note. */
+  pdfInk?: PdfInkStroke;
   /** TXT-only markup range (offsets into the canonical text) — absent for every other format. */
   txtAnnotation?: TxtAnnotation;
+  /** Markdown-only markup anchor — absent for every other format. */
+  mdAnnotation?: MdAnnotation;
   textualValue?: string;
   note?: string | null;
   style?: NoteStyle;

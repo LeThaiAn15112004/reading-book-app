@@ -2,6 +2,7 @@ import {
   Author,
   Book,
   BookAuthor,
+  isDocumentFormat,
   parseDocumentFormat,
   type LibraryStore,
 } from '@reading-book/book-reader-sdk'
@@ -433,7 +434,9 @@ export class SqliteLibraryStore implements LibraryStore {
       )
       .all() as BookRow[]
 
-    return rows.map((row) => ({
+    // A row whose format the app no longer supports (e.g. an old DOC/DOCX import) is left out of
+    // the list — one such row must not hide the whole library. Its data stays in the database.
+    return rows.filter((row) => isDocumentFormat(row.file_format)).map((row) => ({
       book: rowToBook(row),
       readingStatus: row.reading_status,
       authorNames: this.authorNamesForBook(row.id),

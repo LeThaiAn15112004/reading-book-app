@@ -1,6 +1,8 @@
 import { useShortcutsStore } from '../../../shortcuts/shortcutsStore'
 import { useAppAppearanceStore } from '../../../theme/appAppearanceStore'
+import { usePdfViewStore } from '../../Reader/logic/pdfView/pdfViewStore'
 import { useLibraryBrowseStore } from '../../Library/logic/libraryBrowseStore'
+import { usePdfInkPrefsStore } from '../../Reader/logic/pdfInk/pdfInkPrefsStore'
 import { useBackgroundStore } from './backgroundStore'
 import { useNotificationsStore } from './notificationsStore'
 
@@ -27,6 +29,8 @@ export type AppSettingsResetter = {
 export const APP_SETTINGS_RESETTERS: readonly AppSettingsResetter[] = [
   { id: 'appearance', label: 'Appearance', reset: () => useAppAppearanceStore.getState().reset() },
   { id: 'library', label: 'Library', reset: () => useLibraryBrowseStore.getState().reset() },
+  { id: 'pdf-view', label: 'PDF page layout', reset: () => usePdfViewStore.getState().reset() },
+  { id: 'pdf-ink', label: 'PDF pen', reset: () => usePdfInkPrefsStore.getState().reset() },
   {
     id: 'notifications',
     label: 'Notifications',

@@ -8,6 +8,8 @@ import {
   ImportChannels,
   LibraryChannels,
   NotificationChannels,
+  AttachmentChannels,
+  AudioChannels,
   OverlayChannels,
   SearchChannels,
   StorageChannels,
@@ -110,6 +112,16 @@ const api: DesktopApi = {
       }
     },
   },
+  attachments: {
+    list: (bookId) => ipcRenderer.invoke(AttachmentChannels.list, bookId),
+    open: (input) => ipcRenderer.invoke(AttachmentChannels.open, input),
+    saveAs: (input) => ipcRenderer.invoke(AttachmentChannels.saveAs, input),
+  },
+  audio: {
+    getChapters: (bookId) => ipcRenderer.invoke(AudioChannels.getChapters, bookId),
+    getBookmarks: (bookId) => ipcRenderer.invoke(AudioChannels.getBookmarks, bookId),
+    saveBookmarks: (input) => ipcRenderer.invoke(AudioChannels.saveBookmarks, input),
+  },
   overlay: {
     getSessionState: (bookId) =>
       ipcRenderer.invoke(OverlayChannels.getSessionState, bookId),
@@ -131,6 +143,9 @@ const api: DesktopApi = {
       ipcRenderer.invoke(OverlayChannels.saveHighlight, input),
     deleteHighlight: (input) =>
       ipcRenderer.invoke(OverlayChannels.deleteHighlight, input),
+    listInk: (bookId) => ipcRenderer.invoke(OverlayChannels.listInk, bookId),
+    saveInk: (input) => ipcRenderer.invoke(OverlayChannels.saveInk, input),
+    deleteInk: (input) => ipcRenderer.invoke(OverlayChannels.deleteInk, input),
     watchPdfEmbeddedAnnotations: (bookId) =>
       ipcRenderer.invoke(OverlayChannels.watchPdfEmbeddedAnnotations, bookId),
     unwatchPdfEmbeddedAnnotations: (bookId) =>

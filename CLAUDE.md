@@ -82,7 +82,12 @@ Desktop app (`cd source/apps/reading-book-desktop`):
   `spike:pdf:export` (incremental writer + export flow, pdf.js read-back), `spike:pdf:two-way` (two-way coordinator on
   real files), `spike:pdf:compat-kit -- <dir>` (manual cross-reader test kit),
   `spike:txt:main` (TXT reader, Main side: codec, edited copy, `txt:*` IPC, SQLite incl. migration 025, on real temp files),
-  `spike:txt:store` (the real renderer TXT store against the real Main service: save loop, failures, switching books)
+  `spike:txt:store` (the real renderer TXT store against the real Main service: save loop, failures, switching books),
+  `spike:audio:main` (audiobook MP3, Main side: importer, `rb-audio` stream handler Range/416/path checks, 512 MB streaming, progress),
+  `spike:pdf:attachments` (PDF embedded attachments: real pdf.js on generated PDFs, Main service on temp files, the real renderer store; OS opener / save dialog mocked),
+  `spike:audio:store` (the real renderer audio player store with a scriptable `Audio`),
+  `spike:audio:migration` (migration 026 on a populated DB with the real better-sqlite3 + FTS5; re-launches itself with the app's
+  Electron binary in `ELECTRON_RUN_AS_NODE` mode — no window — because better-sqlite3 is built for Electron's ABI)
 
 SDK (`cd source/apps/book-reader-sdk`): `npm run typecheck`, `npm test` (vitest, single file:
 `npx vitest run tests/text/chunk-text.test.ts`), `npm run test:watch`, `npm run typecheck:tests`, `npm run build`,
@@ -146,7 +151,7 @@ DTOs in `api-types.ts` (suffixed `Dto`) are separate, structured-clone-safe plai
 
 ### Document format adapters
 
-Each supported format (epub, pdf, txt, md, docx, doc) is a `DocumentImporter` implementation in
+Each supported format (epub, pdf, txt, md) is a `DocumentImporter` implementation in
 `electron/adapters/<fmt>.adapter.ts` (TXT's importer is still the filename stub; its text is read by `electron/txt/`), registered by `DocumentFormat` enum key in
 `electron/adapters/importer-registry.ts`. Adding a format means: new adapter file + registry entry, a matching
 renderer under `src/reader/renderers/<fmt>/`, and a `SUPPORTED_FORMATS` entry in `packages/config/formats.ts`.
@@ -155,9 +160,9 @@ Domain/port code only ever deals with `DocumentImporter` / `DocumentRenderer` / 
 ### Persistence & the read-only/overlay invariant
 
 `better-sqlite3`, schema versioned as numbered SQL files in `electron/persistence/migrations/` (currently
-001–025: books, genres, comments, collections, reading sessions, notes/annotations, reading status, cloud
+001–026: books, genres, comments, collections, reading sessions, notes/annotations, reading status, cloud
 provenance, FTS chunks, signature status, embedded PDF annotation ledger, two-way sync base/conflict + write-back,
-TXT edited-copy revisions), run through `migrate.ts`. `sqlite-library-store.ts` and
+TXT edited-copy revisions, `books.file_format` accepts `mp3`), run through `migrate.ts`. `sqlite-library-store.ts` and
 `sqlite-overlay-store.ts` implement the domain's `LibraryStore`/`CollectionStore`/`OverlayStore` ports.
 
 **Signature status (verification only):** `books.metadata_json.signatureStatus` (`unsigned|valid|invalid|unsupported`;
@@ -203,6 +208,26 @@ annotation's text removes it, one entirely before moves it, one entirely after l
 annotation rows in ONE transaction (`SqliteTxtStore.commit`); TXT rows are never written through `overlay:saveHighlight`.
 Reading position is a `text-offset` `Location` in `reading_state_json`. Text above `TXT_EDIT_MAX_CHARS` opens read-only.
 See `docs/implementation_plan/txt_reader.md`.
+
+**Audiobooks (MP3 only)** (`electron/audio/`, `electron/adapters/mp3.adapter.ts`, `src/screens/AudioBook/`, SDK `src/audio/`): an `mp3`
+book is imported like any referenced file (tags/cover via `music-metadata`), is never read through `library:openBookContent`
+(it returns an empty buffer after the path check, which doubles as the player's preflight) and never enters chunking / FTS / word
+count / cover generation. `/reader/:bookId` is dispatched by `src/screens/ReaderRoute.tsx` (format → `AudioBookScreen` or the
+unchanged `ReaderScreen`). The `<audio>` element streams from `rb-audio://local/{bookId}`; `createAudioStreamHandler` answers
+single `Range` requests with `206` + `Content-Range` (`416` past EOF) from an `fs.createReadStream` — a plain `200` makes Chromium's
+seeking fail, and `net.fetch(file://)` does not produce proper `206`s, so do not "simplify" it. Listening progress is seconds in
+`reading_state_json.audioProgress` (merge-patched by `overlay:saveAudioProgress`, audio books only; `percent` mirrors it), never a
+`Location`. The player has ONE canonical position (`currentTime`); the Book / Chapter scope only changes how the timeline is derived from it (SDK `timelineView` / `absoluteFromScoped`). Chapters are read from the file itself (ID3 `CHAP`/`CTOC` via `audio:getChapters`) and validated against the real duration (`normalizeChapters`: all-or-nothing); none → no chapters, never a guess. Audio **Notes** (the UI word; storage keeps the key `audioBookmarks`, channels `audio:*Bookmarks`) are a marked position in seconds + optional text + chapter ref, not the EPUB/PDF bookmark model; ONE list in `audioPlayerStore.notes` feeds both the sidebar and the timeline markers, and every entry point opens the same `AudioNoteMenu` via `audioNoteMenuStore`. The chapters panel is on the LEFT (resizable, slide-over below 960 px). Other audio extensions (M4A, M4B, AAC, WAV, FLAC, OGG, Opus, AIFF) and ZIP-of-MP3 are NOT supported until verified with
+real encoder-made files; see `docs/implementation_plan/audiobook_implementation_plan.md`. `music-metadata` is `external` in `vite.config.ts`: bundled, its CommonJS deps make the Main bundle throw at load (the app would not start).
+
+**PDF attachments** (Attachment sidebar tab, PDF only — capability `attachments`): files embedded in the PDF (`/EmbeddedFiles`
+and page `FileAttachment` annotations) are listed lazily (`attachments:list`) and opened by double-click → confirmation →
+`attachments:open`. The renderer sends only `bookId` + `attachmentId`; Main re-reads the PDF, finds the attachment in those
+bytes (scan worker, kinds `attachments-list` / `attachment-extract`), enforces 100 MB on the extracted data, applies the SDK
+policy (`book-reader-sdk/src/attachments/`: sanitised names, prohibited / extension-less / disguised executables are
+blocked) and opens a Main-owned temp copy with `shell.openPath` — never a shell command. Blocked files offer a separate
+`attachments:saveAs`. Attachments are not imported into the Library; internal opening is not built. See
+`docs/implementation_plan/pdf_attachments.md`.
 
 Per-book reading state (position, percent, and that book's font/size/line-height/align/layout/margin overrides)
 lives in `books.reading_state_json`, written via `overlay:saveSessionState`.

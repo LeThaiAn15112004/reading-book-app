@@ -14,14 +14,17 @@ export type ModeTool = 'hand' | 'select' | 'edit'
 export type CompanionTool = 'search' | 'speech' | 'translate'
 
 /** Markup tools — armed one at a time, sticky until toggled off / Escape / Hand / Select. */
-export type AnnotationTool = 'highlight' | 'underline' | 'squiggly' | 'strikethrough' | 'replace' | 'insert'
+export type AnnotationTool = 'highlight' | 'underline' | 'squiggly' | 'strikethrough' | 'replace' | 'insert' | 'pen'
+
+/** Freehand Ink tools next to the markup tools (`pen` is armed like a markup tool; `eraser` is not built yet). */
+export type FreehandTool = 'pen' | 'eraser'
 
 /** Utility tools. */
 export type MiscTool = 'snapshot' | 'wordCount'
 
-export type ToolId = ModeTool | CompanionTool | AnnotationTool | MiscTool | 'settings'
+export type ToolId = ModeTool | CompanionTool | AnnotationTool | FreehandTool | MiscTool | 'settings'
 
-export type ToolGroupId = 'navigate' | 'annotation' | 'view' | 'tools' | 'settings'
+export type ToolGroupId = 'navigate' | 'annotation' | 'freehand' | 'view' | 'tools' | 'settings'
 
 /** Icon names understood by `ToolIcon` — every tool id plus the group triggers. */
 export type ToolIconId = ToolId | 'view' | 'tools'
@@ -55,8 +58,9 @@ export type ToolGroupDef = {
 export const TOOL_GROUPS: readonly ToolGroupDef[] = [
   { id: 'navigate', label: 'Navigate', icon: 'hand', collapse: 'never' },
   { id: 'annotation', label: 'Annotation', icon: 'highlight', collapse: 'never', iconOnly: true },
-  { id: 'view', label: 'View', icon: 'view', collapse: 'auto' },
+  { id: 'freehand', label: 'Freehand', icon: 'pen', collapse: 'never' },
   { id: 'tools', label: 'Tools', icon: 'tools', collapse: 'never' },
+  { id: 'view', label: 'View', icon: 'view', collapse: 'auto' },
   { id: 'settings', label: 'Settings', icon: 'settings', collapse: 'never' },
 ]
 
@@ -68,7 +72,7 @@ export const FOLD_ORDER: readonly ToolGroupId[] = ['view', 'annotation']
 
 /** Order within a group is toolbar / menu order. */
 export const TOOL_REGISTRY: readonly ToolDef[] = [
-  { id: 'hand', label: 'Hand', group: 'navigate', description: 'Hand — pan and turn pages', requires: ['interaction'] },
+  { id: 'hand', label: 'Hand', group: 'navigate', description: 'Hand — pan and turn pages', requires: ['interaction', 'pan'] },
   { id: 'edit', label: 'Edit', group: 'navigate', description: 'Edit text — type in the document', requires: ['textEdit'] },
   { id: 'select', label: 'Select', group: 'navigate', description: 'Select text', requires: ['interaction'] },
   { id: 'search', label: 'Search', group: 'navigate', description: 'Search in book', requires: ['search'], shortcutId: 'general.searchBook' },
@@ -80,6 +84,8 @@ export const TOOL_REGISTRY: readonly ToolDef[] = [
   { id: 'strikethrough', label: 'Strikethrough', group: 'annotation', description: 'Strikethrough — drag over text', requires: ['markupAnnotations'] },
   { id: 'replace', label: 'Replace Text', group: 'annotation', description: 'Replace text — strike out the selection; the note holds the new text', requires: ['markupAnnotations'] },
   { id: 'insert', label: 'Insert Text', group: 'annotation', description: 'Insert text — mark a place; the note holds the text to add', requires: ['markupAnnotations'] },
+  { id: 'pen', label: 'Freehand', group: 'freehand', description: 'Freehand — draw on the page', requires: ['inkAnnotations'] },
+  { id: 'eraser', label: 'Eraser', group: 'freehand', description: 'Eraser — not available yet', requires: ['inkAnnotations'] },
   { id: 'snapshot', label: 'Snapshot', group: 'tools', description: 'Snapshot — copy an area as an image', requires: ['snapshot'] },
   { id: 'wordCount', label: 'Word Count', group: 'tools', description: 'Word count and reading time', requires: ['wordCount'] },
   { id: 'settings', label: 'Settings', group: 'settings', description: 'Reading settings', requires: ['readingSettings'], popup: 'dialog' },

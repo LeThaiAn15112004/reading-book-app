@@ -18,6 +18,7 @@ import {
   useRef,
   useState,
   type MutableRefObject,
+  type ReactNode,
   type MouseEvent as ReactMouseEvent,
   type PointerEvent as ReactPointerEvent,
 } from 'react'
@@ -31,8 +32,14 @@ import {
 } from 'pdfjs-dist'
 import {
   PageRectLocation,
+  clientToPageUnit,
+  filterMinDistance,
+  inkStrokeAt,
   isMarkupTool,
   pdfMarkAt,
+  simplifyInkPoints,
+  translateInkPaths,
+  type InkPoint,
   type InteractionTool,
   type MarkupInteractionTool,
   type TextMatcher,
@@ -50,6 +57,8 @@ import {
   paintPdfSearchHighlights,
   pdfPageSearchRanges,
 } from './pdfSearchDom'
+import { PdfPageInk, type PdfInkLayerMark } from './PdfInkLayer'
+import { readPdfInsertionPoint, type PdfInsertionPoint } from './pdfInsertionPoint'
 import { readPdfSelection, readPdfSelectionAt, type PdfSelectionInfo } from './pdfSelection'
 import { attachTextLayerSelection, detachTextLayerSelection } from './pdfTextLayerSelection'
 import {
@@ -75,9 +84,13 @@ const TEXT_LAYER_WAIT_MS = 4000
 /** How long a jumped-to annotation pulses. */
 const ANNOTATION_FLASH_MS = 1200
 /** Extra reach around an annotation rect for a click, in CSS px. */
-const ANNOTATION_HIT_SLOP_PX = 2
+const ANNOTATION_HIT_SLOP_PX = 3
+/** Stable empty list, so a page that only has a draft does not re-render its saved strokes. */
+const NO_INK: readonly PdfInkLayerMark[] = []
 /** Assumed page size (A4) until the first page is measured. */
 const FALLBACK_SIZE: PageSize = { w: 595, h: 842 }
+/** Duration of one page-turn in paged flow. */
+const PAGE_TURN_MS = 480
 
 type PageSize = { w: number; h: number }
 
@@ -170,6 +183,8 @@ export interface PdfRendererProps {
   focusedAnnotationId?: string | null
   /** A plain click (no drag, no selection) on an annotation's mark / note icon. */
   onAnnotationClick?: (hit: PdfAnnotationHit) => void
+  /** The pointer moved onto (hit) or off (null) an annotation — drives the Replace preview. */
+  onAnnotationHover?: (hit: PdfAnnotationHit | null) => void
   /** Right-click on an annotation (outside any live text selection). */
   onAnnotationContextMenu?: (hit: PdfAnnotationHit) => void
   /** A plain click that hit no annotation (anywhere on the pages) — dismisses annotation UI. */
@@ -179,15 +194,33 @@ export interface PdfRendererProps {
    * selected — the selection to mark with that tool.
    */
   onMarkupSelection?: (selection: PdfSelectionInfo, tool: MarkupTool) => void
+  /** Insert Text tool: a click (or the end of a drag) at an insertion point between glyphs. */
+  onInsertPoint?: (point: PdfInsertionPoint) => void
   /**
    * PDF.js ids of annotations embedded in the file that the app paints itself (imported into
    * `notes`, see pdf_embedded_annotation_import.md): their own appearance is not drawn on the canvas,
    * so a mark isn't painted twice and an edit / delete in the app shows. In-memory only.
    */
   hiddenEmbeddedAnnotationIds?: readonly string[]
+  /** Pages shown side by side (1 single, 2 double, 3 triple). */
+  pagesPerView?: 1 | 2 | 3
+  /** `paged`: one spread at a time, turned with an animation; `scroll`: all spreads in one scroll. */
+  flow?: 'paged' | 'scroll'
   apiRef?: MutableRefObject<PdfRendererApi | null>
   onNavState?: (state: PdfNavState) => void
   onOutline?: (items: PdfOutlineItem[]) => void
+  /** Freehand Ink strokes to paint (normalized points; see PdfInkLayer). */
+  inkStrokes?: readonly PdfInkLayerMark[]
+  /** The selected stroke (halo). */
+  selectedInkId?: string | null
+  /** Pen settings shown on the stroke being drawn; a saved stroke takes its look from the store. */
+  inkPen?: { colorHex: string; width: number; opacity: number }
+  /** A finished pen drag: 0-based `pageIndex` and the decimated page points. The Reader saves it. */
+  onInkStroke?: (pageIndex: number, points: InkPoint[]) => void
+  /** A click selected a stroke (`id`) or hit none (`null`). */
+  onInkSelect?: (id: string | null) => void
+  /** The Hand tool dragged the SELECTED stroke: shift it by (`dx`, `dy`) normalized page units (already clamped to the page). */
+  onInkMove?: (id: string, dx: number, dy: number) => void
 }
 
 /** One primary-button press on the pages, from pointerdown to pointerup. */
@@ -218,7 +251,7 @@ function selectionChangedSince(before: Range | null): boolean {
 }
 
 /** Surface flags set imperatively (not through React) so CSS applies before the next event. */
-type SurfaceFlag = 'data-pdf-hover-text' | 'data-pdf-grabbing' | 'data-pdf-has-selection'
+type SurfaceFlag = 'data-pdf-hover-text' | 'data-pdf-grabbing' | 'data-pdf-has-selection' | 'data-pdf-ink-hover'
 
 function hasTextSelection(): boolean {
   const selection = window.getSelection()
@@ -288,13 +321,23 @@ export function PdfRenderer({
   annotations,
   focusedAnnotationId = null,
   onAnnotationClick,
+  onAnnotationHover,
   onAnnotationContextMenu,
   onBlankClick,
   onMarkupSelection,
+  onInsertPoint,
   hiddenEmbeddedAnnotationIds,
+  pagesPerView = 1,
+  flow = 'scroll',
   apiRef,
   onNavState,
   onOutline,
+  inkStrokes,
+  selectedInkId = null,
+  inkPen,
+  onInkStroke,
+  onInkSelect,
+  onInkMove,
 }: PdfRendererProps) {
   const [doc, setDoc] = useState<PDFDocumentProxy | null>(null)
   const [sizes, setSizes] = useState<PageSize[]>([])
@@ -312,13 +355,56 @@ export function PdfRenderer({
   onCenterTapRef.current = onCenterTap
   const onSelectionContextMenuRef = useRef(onSelectionContextMenu)
   onSelectionContextMenuRef.current = onSelectionContextMenu
+  const pen = interactionTool === 'pen'
+  const penRef = useRef(pen)
+  penRef.current = pen
+  const inkStrokesRef = useRef(inkStrokes)
+  inkStrokesRef.current = inkStrokes
+  const onInkStrokeRef = useRef(onInkStroke)
+  onInkStrokeRef.current = onInkStroke
+  const onInkSelectRef = useRef(onInkSelect)
+  onInkSelectRef.current = onInkSelect
+  /** The pen press in progress: the page it started on, its points so far (normalized, that page's box). */
+  const inkDraftRef = useRef<{ pointerId: number; pageIndex: number; points: InkPoint[] } | null>(null)
+  const [inkDraft, setInkDraft] = useState<{ pageIndex: number; points: InkPoint[] } | null>(null)
+  const inkFrameRef = useRef<number | null>(null)
+  const onInkMoveRef = useRef(onInkMove)
+  onInkMoveRef.current = onInkMove
+  const selectedInkIdRef = useRef(selectedInkId)
+  selectedInkIdRef.current = selectedInkId
+  /** The Hand drag of the selected stroke in progress; `dx` / `dy` are the (clamped) shift so far, page units. */
+  const inkMoveRef = useRef<{ pointerId: number; id: string; pageIndex: number; startX: number; startY: number; dx: number; dy: number; moved: boolean } | null>(null)
+  const [inkMove, setInkMove] = useState<{ id: string; dx: number; dy: number } | null>(null)
+  const inkMoveFrameRef = useRef<number | null>(null)
+  const inkByPage = useMemo(() => {
+    const byPage = new Map<number, PdfInkLayerMark[]>()
+    for (const stroke of inkStrokes ?? []) {
+      // The stroke being dragged is painted at its preview position (the saved one moves on release).
+      const mark = inkMove?.id === stroke.id ? { ...stroke, paths: translateInkPaths(stroke.paths, inkMove.dx, inkMove.dy).paths } : stroke
+      const list = byPage.get(mark.pageIndex)
+      if (list) list.push(mark)
+      else byPage.set(mark.pageIndex, [mark])
+    }
+    return byPage
+  }, [inkStrokes, inkMove])
   const markupTool = markupToolOf(interactionTool)
   const markupToolRef = useRef(markupTool)
   markupToolRef.current = markupTool
   const onMarkupSelectionRef = useRef(onMarkupSelection)
   onMarkupSelectionRef.current = onMarkupSelection
+  const onInsertPointRef = useRef(onInsertPoint)
+  onInsertPointRef.current = onInsertPoint
   const onAnnotationClickRef = useRef(onAnnotationClick)
   onAnnotationClickRef.current = onAnnotationClick
+  const onAnnotationHoverRef = useRef(onAnnotationHover)
+  onAnnotationHoverRef.current = onAnnotationHover
+  const hoveredAnnotationIdRef = useRef<string | null>(null)
+  const reportAnnotationHover = (hit: PdfAnnotationHit | null) => {
+    const id = hit?.id ?? null
+    if (id === hoveredAnnotationIdRef.current) return
+    hoveredAnnotationIdRef.current = id
+    onAnnotationHoverRef.current?.(hit)
+  }
   const onAnnotationContextMenuRef = useRef(onAnnotationContextMenu)
   onAnnotationContextMenuRef.current = onAnnotationContextMenu
   const onBlankClickRef = useRef(onBlankClick)
@@ -371,6 +457,21 @@ export function PdfRenderer({
   const pageCountRef = useRef(0)
   pageCountRef.current = sizes.length
 
+  const paged = flow === 'paged'
+  const pagedRef = useRef(paged)
+  pagedRef.current = paged
+  const perViewRef = useRef(pagesPerView)
+  perViewRef.current = pagesPerView
+  /** Paged flow: index of the spread (row of `pagesPerView` pages) on screen. */
+  const [spread, setSpread] = useState(0)
+  const spreadRef = useRef(0)
+  /** The spread being turned away from (still shown for the length of the animation). */
+  const [leaving, setLeaving] = useState<number | null>(null)
+  const rowsRef = useRef<(HTMLDivElement | null)[]>([])
+  const turnRef = useRef<{ from: number; to: number } | null>(null)
+  const animRef = useRef<Animation | null>(null)
+  const finishedAnimRef = useRef<Animation | null>(null)
+
   const cssScale = PDF_TO_CSS * zoom
   const gap = Math.round(PAGE_GAP_PX * zoom)
   const pad = Math.round(PAD_PX * zoom)
@@ -379,6 +480,28 @@ export function PdfRenderer({
     currentRef.current = index
     onNavStateRef.current?.({ pageCurrent: index + 1, pageTotal: pageCountRef.current })
   }, [])
+
+  /**
+   * Paged flow: show spread `target` (clamped). `animate` plays the page-turn from the spread on
+   * screen; `page` (0-based) is what to report as current (default: the spread's first page).
+   */
+  const goToSpread = useCallback(
+    (target: number, animate = true, page?: number) => {
+      const per = perViewRef.current
+      const count = Math.max(1, Math.ceil(pageCountRef.current / per))
+      const next = Math.min(Math.max(target, 0), count - 1)
+      const from = spreadRef.current
+      reportCurrent(page ?? next * per)
+      if (next === from) return
+      animRef.current?.cancel()
+      animRef.current = null
+      spreadRef.current = next
+      turnRef.current = animate ? { from, to: next } : null
+      setLeaving(animate ? from : null)
+      setSpread(next)
+    },
+    [reportCurrent],
+  )
 
   /**
    * Repaint search hits over every page that currently has a text layer. Returns the current hit's
@@ -552,6 +675,20 @@ export function PdfRenderer({
     const slots = slotsRef.current
     const count = pageCountRef.current
     if (!root || !docRef.current || count === 0) return
+
+    if (pagedRef.current) {
+      // Only the spread on screen (and the turn's other side) matters; its neighbours are warmed.
+      const per = perViewRef.current
+      const shown = spreadRef.current * per
+      const lo = Math.max(0, shown - per)
+      const hi = Math.min(count - 1, shown + 2 * per - 1)
+      const scale = PDF_TO_CSS * zoomRef.current
+      for (let i = lo; i <= hi; i++) ensureRendered(i, scale)
+      for (const index of [...renderedRef.current.keys()]) {
+        if (index < lo - per || index > hi + per) release(index)
+      }
+      return
+    }
     const rootRect = root.getBoundingClientRect()
     const top = rootRect.top
     const bottom = rootRect.top + root.clientHeight
@@ -631,6 +768,11 @@ export function PdfRenderer({
       const count = pageCountRef.current
       if (!root || count === 0) return
       const target = Math.min(Math.max(index, 0), count - 1)
+      if (pagedRef.current) {
+        goToSpread(Math.floor(target / perViewRef.current), true, target)
+        scheduleUpdate()
+        return
+      }
       const slot = slotsRef.current[target]
       if (!slot) return
       const offset = slot.getBoundingClientRect().top - root.getBoundingClientRect().top
@@ -639,7 +781,16 @@ export function PdfRenderer({
       reportCurrent(target)
       scheduleUpdate()
     },
-    [reportCurrent, scheduleUpdate],
+    [goToSpread, reportCurrent, scheduleUpdate],
+  )
+
+  /** Next / previous spread (row of `pagesPerView` pages), turned in paged flow, scrolled to otherwise. */
+  const stepSpread = useCallback(
+    (direction: 1 | -1) => {
+      const per = perViewRef.current
+      scrollToIndex((Math.floor(currentRef.current / per) + direction) * per)
+    },
+    [scrollToIndex],
   )
 
   /** Serialises thumbnail renders so a scrolled Page layout grid never floods PDF.js. */
@@ -693,18 +844,24 @@ export function PdfRenderer({
       goToPage: (page) => scrollToIndex(page - 1),
       goToPagePoint: (page, y) => {
         scrollToIndex(page - 1)
-        const root = getScrollRootRef.current()
-        const slot = slotsRef.current[page - 1]
-        if (y === undefined || !root || !slot) return
-        // The page top is now at the top of the view; bring a point lower down to the upper third
-        // (a point already in the upper third keeps the page top visible).
-        const rect = slot.getBoundingClientRect()
-        const shift = rect.top + y * rect.height - root.getBoundingClientRect().top - root.clientHeight / 3
-        if (shift > 0) root.scrollTop += shift
+        if (y === undefined) return
+        const shiftToPoint = () => {
+          const root = getScrollRootRef.current()
+          const slot = slotsRef.current[page - 1]
+          if (!root || !slot) return
+          // The page top is now at the top of the view; bring a point lower down to the upper third
+          // (a point already in the upper third keeps the page top visible).
+          const rect = slot.getBoundingClientRect()
+          const shift = rect.top + y * rect.height - root.getBoundingClientRect().top - root.clientHeight / 3
+          if (shift > 0) root.scrollTop += shift
+        }
+        // Paged flow shows the target spread on the next render, so measure after it.
+        if (pagedRef.current) requestAnimationFrame(shiftToPoint)
+        else shiftToPoint()
       },
       flashAnnotation: (id) => setFlash({ id, nonce: Date.now() }),
-      nextPage: () => scrollToIndex(currentRef.current + 1),
-      prevPage: () => scrollToIndex(currentRef.current - 1),
+      nextPage: () => stepSpread(1),
+      prevPage: () => stepSpread(-1),
       getNavState: () => ({ pageCurrent: currentRef.current + 1, pageTotal: pageCountRef.current }),
       getCurrentLocation: () =>
         pageCountRef.current > 0 ? new PageRectLocation(currentRef.current + 1) : undefined,
@@ -740,7 +897,7 @@ export function PdfRenderer({
     return () => {
       apiRef.current = null
     }
-  }, [apiRef, scrollToIndex, repaintSearch, waitForTextLayer, renderThumbnail])
+  }, [apiRef, scrollToIndex, stepSpread, repaintSearch, waitForTextLayer, renderThumbnail])
 
   // Open the document. PDF.js transfers the buffer to its worker, so hand it a copy and keep the
   // caller's ArrayBuffer intact.
@@ -835,10 +992,12 @@ export function PdfRenderer({
     if (!restoredRef.current) {
       restoredRef.current = true
       const start = Math.min(Math.max(initialPageRef.current, 1), sizes.length) - 1
-      if (start > 0) scrollToIndex(start)
+      if (pagedRef.current) goToSpread(Math.floor(start / perViewRef.current), false, start)
+      else if (start > 0) scrollToIndex(start)
       else reportCurrent(0)
       return
     }
+    if (pagedRef.current) return
     const anchor = anchorRef.current
     anchorRef.current = null
     const root = getScrollRootRef.current()
@@ -847,7 +1006,7 @@ export function PdfRenderer({
       const rect = slot.getBoundingClientRect()
       root.scrollTop += rect.top + anchor.fraction * rect.height - root.getBoundingClientRect().top
     }
-  }, [doc, sizes, reportCurrent, scrollToIndex])
+  }, [doc, sizes, reportCurrent, scrollToIndex, goToSpread])
 
   // Scroll / resize of the container, zoom and layout changes → recompute what's on screen.
   useEffect(() => {
@@ -865,7 +1024,76 @@ export function PdfRenderer({
 
   useEffect(() => {
     scheduleUpdate()
-  }, [zoom, sizes, scheduleUpdate])
+  }, [zoom, sizes, spread, leaving, paged, pagesPerView, scheduleUpdate])
+
+  // Switching flow or pages-per-view keeps the page being read.
+  const layoutModeRef = useRef({ paged, pagesPerView })
+  useLayoutEffect(() => {
+    const previous = layoutModeRef.current
+    if (previous.paged === paged && previous.pagesPerView === pagesPerView) return
+    layoutModeRef.current = { paged, pagesPerView }
+    // The page slots were rebuilt under new parents (rows / grid), so every canvas and text layer
+    // sits in a detached slot: drop them and let the next update render into the new ones.
+    for (const index of [...renderedRef.current.keys()]) release(index)
+    if (!restoredRef.current) return
+    animRef.current?.cancel()
+    animRef.current = null
+    turnRef.current = null
+    setLeaving(null)
+    const page = currentRef.current
+    spreadRef.current = Math.floor(page / pagesPerView)
+    setSpread(spreadRef.current)
+    if (!paged) scrollToIndex(page)
+  }, [paged, pagesPerView, scrollToIndex, release])
+
+  // Paged flow: a new spread starts at the top of the view, and the page-turn plays on the row
+  // that moves — the outgoing one when going forward, the incoming one when going back.
+  useLayoutEffect(() => {
+    const turn = turnRef.current
+    turnRef.current = null
+    if (!pagedRef.current) return
+    const root = getScrollRootRef.current()
+    if (root) root.scrollTop = 0
+    if (!turn) return
+    const forward = turn.to > turn.from
+    const row = rowsRef.current[forward ? turn.from : turn.to]
+    const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+    if (!row || reduced || typeof row.animate !== 'function') {
+      setLeaving(null)
+      return
+    }
+    const shadow = '0 0 48px rgba(0, 0, 0, 0.45)'
+    const animation = row.animate(
+      [
+        { transform: 'rotateY(0deg)', opacity: 1, boxShadow: '0 0 0 rgba(0, 0, 0, 0)', zIndex: 2 },
+        { offset: 0.8, transform: 'rotateY(-80deg)', opacity: 1, boxShadow: shadow, zIndex: 2 },
+        { transform: 'rotateY(-100deg)', opacity: 0, boxShadow: shadow, zIndex: 2 },
+      ],
+      { duration: PAGE_TURN_MS, easing: 'ease-in-out', fill: 'forwards', direction: forward ? 'normal' : 'reverse' },
+    )
+    animRef.current = animation
+    animation.onfinish = () => {
+      if (animRef.current !== animation) return
+      animRef.current = null
+      finishedAnimRef.current = animation
+      setLeaving(null)
+    }
+  }, [spread])
+
+  // The turned-away row is hidden by now: release its finished animation.
+  useEffect(() => {
+    if (leaving !== null) return
+    finishedAnimRef.current?.cancel()
+    finishedAnimRef.current = null
+  }, [leaving])
+
+  useEffect(
+    () => () => {
+      animRef.current?.cancel()
+      finishedAnimRef.current?.cancel()
+    },
+    [],
+  )
 
   const setSurfaceFlag = useCallback((flag: SurfaceFlag, on: boolean) => {
     rootRef.current?.toggleAttribute(flag, on)
@@ -993,8 +1221,188 @@ export function PdfRenderer({
     return () => window.removeEventListener('blur', onBlur)
   }, [endGesture])
 
+  /** The page slot (0-based index + box) under a client point, or null off the pages. */
+  const slotAt = (x: number, y: number): { index: number; rect: DOMRect } | null => {
+    const slots = slotsRef.current
+    for (let index = 0; index < slots.length; index++) {
+      const rect = slots[index]?.getBoundingClientRect()
+      if (rect && rect.width > 0 && rect.height > 0 && x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom) {
+        return { index, rect }
+      }
+    }
+    return null
+  }
+
+  /** `px` screen pixels in page-width units on a page `rect` wide (capture filter, hit slop). */
+  const pagePx = (rect: DOMRect, px: number) => px / rect.width
+
+  const beginInk = (event: ReactPointerEvent<HTMLDivElement>) => {
+    const hit = slotAt(event.clientX, event.clientY)
+    if (!hit) return
+    const point = clientToPageUnit(event.clientX, event.clientY, hit.rect)
+    if (!point) return
+    // Not a text selection, not a page turn, not a pan: the press belongs to the pen.
+    event.preventDefault()
+    window.getSelection()?.removeAllRanges()
+    try {
+      event.currentTarget.setPointerCapture(event.pointerId)
+    } catch {
+      /* ignore */
+    }
+    onInkSelectRef.current?.(null)
+    onBlankClickRef.current?.()
+    inkDraftRef.current = { pointerId: event.pointerId, pageIndex: hit.index, points: [point] }
+    setInkDraft({ pageIndex: hit.index, points: [point] })
+  }
+
+  const moveInk = (event: ReactPointerEvent<HTMLDivElement>) => {
+    const draft = inkDraftRef.current
+    if (!draft || event.pointerId !== draft.pointerId) return
+    if (event.pointerType === 'mouse' && (event.buttons & 1) === 0) {
+      finishInk()
+      return
+    }
+    const rect = slotsRef.current[draft.pageIndex]?.getBoundingClientRect()
+    if (!rect) return
+    const native = event.nativeEvent
+    // Every sample the device produced since the last event (a stylus reports far faster than frames).
+    const coalesced = typeof native.getCoalescedEvents === 'function' ? native.getCoalescedEvents() : []
+    const samples: PointerEvent[] = coalesced.length > 0 ? coalesced : [native]
+    const minStep = pagePx(rect, 0.5)
+    const ratio = rect.height / rect.width
+    let added = false
+    for (const sample of samples) {
+      const point = clientToPageUnit(sample.clientX, sample.clientY, rect)
+      const last = draft.points[draft.points.length - 1]
+      if (!point || !last) continue
+      if (Math.hypot(point[0] - last[0], (point[1] - last[1]) * ratio) < minStep) continue
+      draft.points.push(point)
+      added = true
+    }
+    if (added && inkFrameRef.current === null) {
+      inkFrameRef.current = requestAnimationFrame(() => {
+        inkFrameRef.current = null
+        const current = inkDraftRef.current
+        if (current) setInkDraft({ pageIndex: current.pageIndex, points: [...current.points] })
+      })
+    }
+  }
+
+  /** End the pen press and hand the stroke over (a press that produced a point always saves: a tap is a dot). */
+  const finishInk = () => {
+    const draft = inkDraftRef.current
+    inkDraftRef.current = null
+    if (inkFrameRef.current !== null) {
+      cancelAnimationFrame(inkFrameRef.current)
+      inkFrameRef.current = null
+    }
+    setInkDraft(null)
+    if (!draft) return
+    const el = rootRef.current
+    try {
+      if (el?.hasPointerCapture(draft.pointerId)) el.releasePointerCapture(draft.pointerId)
+    } catch {
+      /* element already detached */
+    }
+    const rect = slotsRef.current[draft.pageIndex]?.getBoundingClientRect()
+    if (!rect || rect.width <= 0 || draft.points.length === 0) return
+    const ratio = rect.height / rect.width
+    const points = simplifyInkPoints(filterMinDistance(draft.points, pagePx(rect, 0.5), ratio), pagePx(rect, 0.35), ratio)
+    onInkStrokeRef.current?.(draft.pageIndex, points)
+  }
+
+  // Window blur / leaving the pen tool / unmounting mid-stroke: no pointerup will come, so keep what was drawn.
+  useEffect(() => {
+    const onBlur = () => {
+      finishInk()
+      endInkMove(false)
+    }
+    window.addEventListener('blur', onBlur)
+    return () => {
+      window.removeEventListener('blur', onBlur)
+      finishInk()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- finishInk only reads refs and stable setters
+  }, [pen])
+
+  /** The stroke under client (`x`, `y`), if any (topmost first). */
+  const inkAt = (x: number, y: number): PdfInkLayerMark | null => {
+    const strokes = inkStrokesRef.current
+    if (!strokes?.length) return null
+    const hit = slotAt(x, y)
+    const size = hit ? sizes[hit.index] : undefined
+    if (!hit || !size) return null
+    const point = clientToPageUnit(x, y, hit.rect)
+    return point ? inkStrokeAt(strokes, hit.index, point[0], point[1], size.h / size.w, pagePx(hit.rect, 6)) : null
+  }
+
+  /** Hand + a press on the SELECTED stroke: drag it. (An unselected stroke is only selected, by the click.) */
+  const beginInkMove = (event: ReactPointerEvent<HTMLDivElement>): boolean => {
+    const selected = selectedInkIdRef.current
+    if (!handRef.current || !selected) return false
+    const hit = inkAt(event.clientX, event.clientY)
+    if (!hit || hit.id !== selected) return false
+    dwellRef.current?.disarm()
+    event.preventDefault()
+    window.getSelection()?.removeAllRanges()
+    try {
+      event.currentTarget.setPointerCapture(event.pointerId)
+    } catch {
+      /* ignore */
+    }
+    inkMoveRef.current = { pointerId: event.pointerId, id: hit.id, pageIndex: hit.pageIndex, startX: event.clientX, startY: event.clientY, dx: 0, dy: 0, moved: false }
+    return true
+  }
+
+  const moveInkDrag = (event: ReactPointerEvent<HTMLDivElement>) => {
+    const drag = inkMoveRef.current
+    if (!drag || event.pointerId !== drag.pointerId) return
+    if (event.pointerType === 'mouse' && (event.buttons & 1) === 0) {
+      endInkMove(false)
+      return
+    }
+    const rect = slotsRef.current[drag.pageIndex]?.getBoundingClientRect()
+    const stroke = inkStrokesRef.current?.find((m) => m.id === drag.id)
+    if (!rect || rect.width <= 0 || !stroke) return
+    if (!drag.moved && !exceedsDragThreshold(drag.startX, drag.startY, event.clientX, event.clientY)) return
+    drag.moved = true
+    const shift = translateInkPaths(stroke.paths, (event.clientX - drag.startX) / rect.width, (event.clientY - drag.startY) / rect.height)
+    drag.dx = shift.dx
+    drag.dy = shift.dy
+    if (inkMoveFrameRef.current === null) {
+      inkMoveFrameRef.current = requestAnimationFrame(() => {
+        inkMoveFrameRef.current = null
+        const current = inkMoveRef.current
+        if (current) setInkMove({ id: current.id, dx: current.dx, dy: current.dy })
+      })
+    }
+  }
+
+  /** End the stroke drag; `commit` hands the shift over (release), otherwise the stroke snaps back (cancel / blur). */
+  const endInkMove = (commit: boolean) => {
+    const drag = inkMoveRef.current
+    inkMoveRef.current = null
+    if (inkMoveFrameRef.current !== null) {
+      cancelAnimationFrame(inkMoveFrameRef.current)
+      inkMoveFrameRef.current = null
+    }
+    setInkMove(null)
+    if (!drag) return
+    try {
+      if (rootRef.current?.hasPointerCapture(drag.pointerId)) rootRef.current.releasePointerCapture(drag.pointerId)
+    } catch {
+      /* element already detached */
+    }
+    if (commit && drag.moved) onInkMoveRef.current?.(drag.id, drag.dx, drag.dy)
+  }
+
   const onPointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
     if (event.button !== 0 || !event.isPrimary) return
+    if (penRef.current) {
+      beginInk(event)
+      return
+    }
+    if (beginInkMove(event)) return
     // Hand: a press on text the dwell has armed selects natively; every other press pans.
     const pan =
       handRef.current &&
@@ -1023,14 +1431,29 @@ export function PdfRenderer({
   }
 
   const onPointerMove = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (inkDraftRef.current) {
+      moveInk(event)
+      return
+    }
+    if (inkMoveRef.current) {
+      moveInkDrag(event)
+      return
+    }
     const gesture = gestureRef.current
     if (!gesture) {
+      // Hand over the selected stroke: the move cursor says it can be dragged.
+      setSurfaceFlag(
+        'data-pdf-ink-hover',
+        handRef.current && (event.buttons & 1) === 0 && selectedInkIdRef.current != null && inkAt(event.clientX, event.clientY)?.id === selectedInkIdRef.current,
+      )
       // Hover (no button): feed the dwell. Never while a press is in progress.
       if (handRef.current && (event.buttons & 1) === 0) {
         dwellRef.current?.update(isTextAt(event.clientX, event.clientY))
       }
+      reportAnnotationHover((event.buttons & 1) === 0 ? annotationAt(event.clientX, event.clientY) : null)
       return
     }
+    reportAnnotationHover(null)
     if (event.pointerId !== gesture.pointerId) return
     if ((event.buttons & 1) === 0) {
       // Released somewhere we never heard about (e.g. outside the window while selecting).
@@ -1060,12 +1483,34 @@ export function PdfRenderer({
   }
 
   const onPointerUp = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (inkDraftRef.current) {
+      if (event.pointerId === inkDraftRef.current.pointerId) finishInk()
+      return
+    }
+    if (inkMoveRef.current) {
+      if (event.pointerId === inkMoveRef.current.pointerId) endInkMove(true)
+      return
+    }
     const gesture = gestureRef.current
     if (!gesture || event.pointerId !== gesture.pointerId) return
     endGesture()
     if (event.button !== 0) return
     // Markup tool armed: a press that leaves text selected (drag, double / triple click) marks it.
     const tool = markupToolRef.current
+    // Insert Text: the press marks a point, never a selection. A saved caret under the pointer opens
+    // its editor instead of stacking a second one.
+    if (tool === 'insert' && !gesture.pan && rootRef.current) {
+      window.getSelection()?.removeAllRanges()
+      const existing = annotationAt(event.clientX, event.clientY)
+      if (existing) {
+        onAnnotationClickRef.current?.(existing)
+        return
+      }
+      const point = readPdfInsertionPoint(rootRef.current, event.clientX, event.clientY)
+      if (point) onInsertPointRef.current?.(point)
+      else onBlankClickRef.current?.()
+      return
+    }
     // Only a selection THIS press made: a press that landed on non-selectable space (a gap, the
     // `.endOfContent` filler) leaves an older selection untouched, and committing that one would
     // mark text the user never dragged.
@@ -1082,13 +1527,27 @@ export function PdfRenderer({
     if (!gesture.pan && hasTextSelection()) return
     const hit = annotationAt(event.clientX, event.clientY)
     if (hit) {
+      onInkSelectRef.current?.(null)
       onAnnotationClickRef.current?.(hit)
       return
     }
+    // A click on a freehand stroke selects it (Delete removes it); the text-markup UI closes.
+    const inkHit = inkAt(event.clientX, event.clientY)
+    if (inkHit) {
+      onBlankClickRef.current?.()
+      onInkSelectRef.current?.(inkHit.id)
+      return
+    }
+    onInkSelectRef.current?.(null)
     onBlankClickRef.current?.()
     const root = getScrollRootRef.current()
-    if (root && isInCenterTapZone(event.clientX, root.getBoundingClientRect())) {
+    if (!root) return
+    const rect = root.getBoundingClientRect()
+    if (isInCenterTapZone(event.clientX, rect)) {
       onCenterTapRef.current?.()
+    } else if (pagedRef.current) {
+      // Paged flow: a tap on the outer quarters turns the page, like a book's edges.
+      stepSpread(event.clientX > rect.left + rect.width / 2 ? 1 : -1)
     }
   }
 
@@ -1117,53 +1576,112 @@ export function PdfRenderer({
     )
   }
 
+  const pageRows: ReactNode[] = []
+  for (let first = 0; first < sizes.length; first += pagesPerView) {
+    const row = first / pagesPerView
+    const shown = !paged || row === spread || row === leaving
+    pageRows.push(
+      <div
+        key={row}
+        ref={(el) => {
+          rowsRef.current[row] = el
+        }}
+        className="relative items-start justify-center"
+        style={{
+          display: shown ? 'flex' : 'none',
+          gap,
+          ...(paged ? { gridArea: '1 / 1', transformOrigin: '0% 50%' } : null),
+        }}
+        data-pdf-row={row}
+      >
+        {sizes.slice(first, first + pagesPerView).map((size, offset) => {
+          const index = first + offset
+          return (
+            <div
+              key={index}
+              ref={(el) => {
+                slotsRef.current[index] = el
+              }}
+              className="relative shrink-0 bg-white shadow"
+              style={{ width: Math.floor(size.w * cssScale), height: Math.floor(size.h * cssScale) }}
+              data-page-number={index + 1}
+              // Ctrl+wheel / toolbar zoom anchors to the page under the focal point (ReaderZoomViewport).
+              data-zoom-anchor=""
+            >
+              {marksByPage.has(index + 1) ? (
+                <PdfPageAnnotations
+                  page={index + 1}
+                  marks={marksByPage.get(index + 1)!}
+                  focusedId={focusedAnnotationId}
+                  flash={flash}
+                />
+              ) : null}
+              {inkByPage.has(index) || inkDraft?.pageIndex === index ? (
+                <PdfPageInk
+                  heightRatio={size.h / size.w}
+                  strokes={inkByPage.get(index) ?? NO_INK}
+                  draft={
+                    inkDraft?.pageIndex === index
+                      ? {
+                          pageIndex: index,
+                          points: inkDraft.points,
+                          width: inkPen?.width ?? 0.004,
+                          colorHex: inkPen?.colorHex ?? '#1E88E5',
+                          opacity: inkPen?.opacity ?? 1,
+                        }
+                      : null
+                  }
+                  selectedId={selectedInkId}
+                />
+              ) : null}
+            </div>
+          )
+        })}
+      </div>,
+    )
+  }
+
   return (
     <div
       ref={rootRef}
       // Cursor + text selection per tool come from `[data-pdf-tool]` rules in index.css (they must
       // beat pdf_viewer.css, and `ReaderShell` is `select-none` for the whole reader).
       className="flex flex-col items-center"
-      style={{ gap, padding: pad }}
+      style={{ gap, padding: pad, touchAction: pen ? 'none' : undefined }}
       data-pdf-status={status.kind}
       data-pdf-pages={sizes.length}
-      data-pdf-tool={hand ? 'hand' : 'select'}
+      data-pdf-flow={flow}
+      data-pdf-per-view={pagesPerView}
+      data-pdf-tool={pen ? 'pen' : hand ? 'hand' : 'select'}
       // Highlight / Underline / Strikethrough: Select's surface with the tool's pen cursor.
       data-pdf-markup={markupTool ?? undefined}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
-      onPointerCancel={() => void endGesture()}
+      onPointerCancel={() => {
+        finishInk()
+        endInkMove(false)
+        void endGesture()
+      }}
       onContextMenu={onContextMenu}
       onLostPointerCapture={() => {
+        if (inkDraftRef.current) finishInk()
+        if (inkMoveRef.current) endInkMove(false)
         if (gestureRef.current?.pan) endGesture()
       }}
       onPointerLeave={() => {
+        reportAnnotationHover(null)
         if (!gestureRef.current) dwellRef.current?.update(false)
       }}
     >
       {status.kind === 'loading' ? <p className="mt-6 text-sm">Loading PDF…</p> : null}
-      {sizes.map((size, index) => (
-        <div
-          key={index}
-          ref={(el) => {
-            slotsRef.current[index] = el
-          }}
-          className="relative shrink-0 bg-white shadow"
-          style={{ width: Math.floor(size.w * cssScale), height: Math.floor(size.h * cssScale) }}
-          data-page-number={index + 1}
-          // Ctrl+wheel / toolbar zoom anchors to the page under the focal point (ReaderZoomViewport).
-          data-zoom-anchor=""
-        >
-          {marksByPage.has(index + 1) ? (
-            <PdfPageAnnotations
-              page={index + 1}
-              marks={marksByPage.get(index + 1)!}
-              focusedId={focusedAnnotationId}
-              flash={flash}
-            />
-          ) : null}
+      {paged ? (
+        <div className="grid" style={{ perspective: '2400px' }}>
+          {pageRows}
         </div>
-      ))}
+      ) : (
+        pageRows
+      )}
     </div>
   )
 }

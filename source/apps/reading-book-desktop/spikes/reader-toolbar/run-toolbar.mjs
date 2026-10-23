@@ -49,8 +49,8 @@ const shape = (layout) =>
 
 const epub = caps.getReaderCapabilities('epub')
 const pdf = caps.getReaderCapabilities('pdf')
-// The placeholder surface is whatever has no renderer: DOCX stands in (TXT and Markdown have their own surfaces now).
-const placeholder = caps.getReaderCapabilities('docx')
+// The placeholder surface is whatever has no renderer: an unknown format (null) stands in (TXT and Markdown have their own surfaces now).
+const placeholder = caps.getReaderCapabilities(null)
 const txt = caps.getReaderCapabilities('txt')
 const md = caps.getReaderCapabilities('md')
 
@@ -70,7 +70,7 @@ check('shortcut ids exist in the shortcut registry', () => {
 })
 check('every tool is shown by at least one surface', () => {
   for (const t of TOOL_REGISTRY) {
-    assert.ok([epub, txt, placeholder].some((set) => t.requires.every((c) => set.has(c))), t.id)
+    assert.ok([epub, pdf, txt, placeholder].some((set) => t.requires.every((c) => set.has(c))), t.id)
   }
 })
 
@@ -80,7 +80,7 @@ check('epub, pdf, txt and md map to their own surfaces, everything else to the p
   assert.equal(caps.readerSurfaceForFormat('pdf'), 'pdf')
   assert.equal(caps.readerSurfaceForFormat('txt'), 'txt')
   assert.equal(caps.readerSurfaceForFormat('md'), 'md')
-  for (const f of ['docx', 'doc', null, undefined]) {
+  for (const f of [null, undefined]) {
     assert.equal(caps.readerSurfaceForFormat(f), 'placeholder', String(f))
   }
 })
@@ -95,8 +95,8 @@ check('placeholder is a strict subset of EPUB, apart from Page layout', () => {
   for (const c of placeholder) if (c !== 'pageLayout') assert.ok(epub.has(c), c)
   assert.ok(placeholder.size - 1 < epub.size)
 })
-check('PDF = placeholder + search + text markup − Aa (no audio / translate yet)', () => {
-  const expected = [...placeholder, 'search', 'markupAnnotations'].filter((c) => c !== 'readingSettings')
+check('PDF = placeholder + search + text markup + freehand ink + attachments − Aa (no audio / translate yet)', () => {
+  const expected = [...placeholder, 'search', 'markupAnnotations', 'inkAnnotations', 'attachments'].filter((c) => c !== 'readingSettings')
   assert.deepEqual([...pdf].sort(), expected.sort())
 })
 check('Aa (readingSettings) stays on EPUB and the placeholder, not PDF', () => {
@@ -137,10 +137,11 @@ check('only renderer-independent tools', () => {
   ])
 })
 
-check('PDF layout: Search in the navigate group, the inline Annotation icons, no Settings group', () => {
+check('PDF layout: Search in the navigate group, the inline Annotation icons (incl. the Pen), no Settings group', () => {
   assert.deepEqual(shape(resolveToolbarLayout(pdf, 0)), [
     'navigate:inline[hand,select,search]',
     'annotation:inline[highlight,underline,squiggly,strikethrough,replace,insert]',
+    'freehand:inline[pen,eraser]',
     'tools:inline[snapshot,wordCount]',
   ])
 })
@@ -231,26 +232,31 @@ check('Page layout capability: PDF and placeholder only', () => {
 check('rail: PDF keeps every tab including Page layout', () => {
   assert.deepEqual(railIds(pdf), ['chapters', 'bookmarks', 'highlights', 'layout', 'attachments'])
 })
-check('rail: EPUB hides only Page layout', () => {
-  assert.deepEqual(railIds(epub), ['chapters', 'bookmarks', 'highlights', 'attachments'])
+check('rail: EPUB hides Page layout and Attachment (PDF-only)', () => {
+  assert.deepEqual(railIds(epub), ['chapters', 'bookmarks', 'highlights'])
 })
-check('rail: TXT hides Page layout like EPUB (no pages)', () => {
-  assert.deepEqual(railIds(txt), ['chapters', 'bookmarks', 'highlights', 'attachments'])
+check('rail: TXT hides Page layout and Attachment like EPUB', () => {
+  assert.deepEqual(railIds(txt), ['chapters', 'bookmarks', 'highlights'])
 })
-check('rail: MD hides Page layout like EPUB (no pages)', () => {
-  assert.deepEqual(railIds(md), ['chapters', 'bookmarks', 'highlights', 'attachments'])
+check('rail: MD hides Page layout and Attachment like EPUB', () => {
+  assert.deepEqual(railIds(md), ['chapters', 'bookmarks', 'highlights'])
 })
-check('rail: other formats unchanged (placeholder keeps Page layout)', () => {
-  for (const f of ['docx', 'doc', null]) {
-    assert.deepEqual(railIds(caps.getReaderCapabilities(f)), sidebarTabs.SIDEBAR_TABS.map((t) => t.id), String(f))
+check('rail: placeholder keeps Page layout, has no Attachment tab', () => {
+  for (const f of [null]) {
+    assert.deepEqual(railIds(caps.getReaderCapabilities(f)), sidebarTabs.SIDEBAR_TABS.map((t) => t.id).filter((id) => id !== 'attachments'), String(f))
   }
+})
+check('Attachment capability: PDF only', () => {
+  assert.ok(pdf.has('attachments'))
+  for (const other of [epub, txt, md, placeholder]) assert.ok(!other.has('attachments'))
 })
 check('opening / showing Page layout on EPUB resolves to Contents; other tabs untouched', () => {
   assert.equal(sidebarTabs.resolveSidebarTab('layout', epub), 'chapters')
   assert.equal(sidebarTabs.isSidebarTabAvailable('layout', epub), false)
-  for (const tab of ['chapters', 'bookmarks', 'highlights', 'attachments']) {
+  for (const tab of ['chapters', 'bookmarks', 'highlights']) {
     assert.equal(sidebarTabs.resolveSidebarTab(tab, epub), tab)
   }
+  assert.equal(sidebarTabs.resolveSidebarTab('attachments', epub), 'chapters')
 })
 check('PDF -> EPUB -> PDF: a stale Page layout selection is hidden on EPUB, usable again on PDF', () => {
   const stale = 'layout'

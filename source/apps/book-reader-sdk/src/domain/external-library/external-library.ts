@@ -110,5 +110,5 @@ export function isSupportedExternalFormat(formatOrExt: string): boolean {
   if (isDocumentFormat(clean)) {
     return true;
   }
-  return ['epub', 'pdf', 'txt', 'md', 'docx', 'doc', 'mobi', 'azw3', 'fb2', 'cbz'].includes(clean);
+  return ['epub', 'pdf', 'txt', 'md', 'mobi', 'azw3', 'fb2', 'cbz'].includes(clean);
 }

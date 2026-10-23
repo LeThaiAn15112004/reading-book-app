@@ -4,7 +4,7 @@ const COVER_W = 400
 const COVER_H = 560
 
 /** Formats whose first page can be rendered here (an EPUB only when Main found no cover image). */
-const RENDERABLE = new Set(['pdf', 'docx', 'txt', 'md', 'epub'])
+const RENDERABLE = new Set(['pdf', 'txt', 'md', 'epub'])
 
 /** Books already tried this session (success or not) — a failing file is never retried in a loop. */
 const attempted = new Set<string>()
@@ -140,11 +140,6 @@ async function renderCover(bookId: string, format: string): Promise<HTMLCanvasEl
     case 'md': {
       const text = new TextDecoder('utf-8').decode(content.data).slice(0, 4000)
       return text.trim() ? renderTextPage(text.replace(/^[#>*\-\s`]+/gm, '')) : null
-    }
-    case 'docx': {
-      const mammoth = await import('mammoth')
-      const { value } = await mammoth.extractRawText({ arrayBuffer: content.data })
-      return value.trim() ? renderTextPage(value.slice(0, 4000)) : null
     }
     default:
       return null
