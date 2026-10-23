@@ -57,6 +57,7 @@ export function useReaderBookOpen({
     isEpubSurface,
     isEpubSessionLoading,
     retryOpen,
+    refreshBookBytes,
   } = useSharedReaderBookOpen({
     bookId,
     ensureTab,
@@ -98,5 +99,6 @@ export function useReaderBookOpen({
     isEpubSurface,
     isEpubSessionLoading,
     retryOpen,
+    refreshBookBytes,
   }
 }

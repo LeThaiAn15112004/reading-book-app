@@ -110,6 +110,7 @@ import {
 } from './logic'
 import { INSERT_CARET_COLOR } from './logic/pdfHighlights/pdfHighlightsStore'
 import { useReaderPdfInk } from './logic/hooks/useReaderPdfInk'
+import { useReaderPdfGraphics } from './logic/hooks/useReaderPdfGraphics'
 import { usePdfInkPrefsStore } from './logic/pdfInk/pdfInkPrefsStore'
 import { pdfDeleteFocused, pdfHasFocusedMark, pdfRedo, pdfUndo } from './logic/pdfInk/pdfUndoRouter'
 import { PdfInkPanel } from './components/chrome/PdfInkPanel'
@@ -552,6 +553,8 @@ export function ReaderScreen() {
   })
   // PDF freehand Ink (strokes are their own `notes` type; the Pen tool lives in the toolbar's Annotation group).
   const pdfInk = useReaderPdfInk({ bookId, isPdfSurface, setToast: chrome.setToast })
+  // Graphic objects inside the PDF that other readers made (shapes, lines, text boxes): edits are written into the file.
+  const pdfGraphics = useReaderPdfGraphics({ bookId, isPdfSurface, setToast: chrome.setToast, refreshFile: () => void book.refreshBookBytes() })
   const selectedInkStroke = useMemo(() => pdfInk.strokes.find((m) => m.id === pdfInk.selectedId) ?? null, [pdfInk.strokes, pdfInk.selectedId])
   const inkTool = usePdfInkPrefsStore((s) => s.tool)
   const inkStyles = usePdfInkPrefsStore((s) => s.styles)
@@ -1500,6 +1503,17 @@ export function ReaderScreen() {
               onInkSelect={pdfInk.select}
               onInkMove={pdfInk.moveStroke}
               onInkResize={pdfInk.resizeStroke}
+              graphics={pdfGraphics.objects}
+              selectedGraphicId={pdfGraphics.selectedId}
+              onGraphicSelect={pdfGraphics.select}
+              onGraphicResize={(id, box) => void pdfGraphics.apply(id, { kind: 'resize', box })}
+              renderGraphicToolbar={(object) => (
+                <PdfInkQuickToolbar
+                  colorHex={object.caps.color ? (object.colorHex ?? '#000000') : undefined}
+                  onColor={object.caps.color ? (colorHex) => void pdfGraphics.apply(object.objectId, { kind: 'color', colorHex }) : undefined}
+                  onDelete={object.caps.delete ? pdfGraphics.deleteSelected : undefined}
+                />
+              )}
               renderInkToolbar={(stroke) => (
                 <PdfInkQuickToolbar
                   colorHex={stroke.colorHex}

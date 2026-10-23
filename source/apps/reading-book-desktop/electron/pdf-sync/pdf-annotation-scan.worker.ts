@@ -34,10 +34,14 @@ import {
   type PdfAnnotationWriteOutput,
 } from './pdf-annotation-write'
 import { PdfWriteError } from './pdf-incremental-writer'
+import { PdfGraphicError, editPdfGraphicBytes, listPdfGraphicsBytes, type PdfGraphicEditResult, type PdfGraphicListResult } from './pdf-graphics'
+import type { PdfGraphicOp } from '@reading-book/book-reader-sdk'
 
 export type ScanWorkerRequest =
   | { id: number; kind: 'scan'; bytes: Uint8Array }
   | { id: number; kind: 'attachments-list'; bytes: Uint8Array }
+  | { id: number; kind: 'graphics-list'; bytes: Uint8Array }
+  | { id: number; kind: 'graphic-edit'; bytes: Uint8Array; objectId: string; op: PdfGraphicOp }
   | { id: number; kind: 'attachment-extract'; bytes: Uint8Array; attachmentId: string }
   | ({ id: number; kind: 'write' } & PdfAnnotationWriteInput)
   | ({ id: number; kind: 'apply' } & PdfAnnotationApplyInput)
@@ -46,6 +50,8 @@ export type WorkerResult =
   | PdfAnnotationScanResult
   | PdfAnnotationWriteOutput
   | PdfAnnotationApplyOutput
+  | PdfGraphicListResult
+  | PdfGraphicEditResult
   | PdfAttachmentListResult
   | PdfAttachmentExtractResult
 
@@ -56,6 +62,7 @@ export type ScanWorkerReply =
 function codeOf(err: unknown): string | undefined {
   if (err instanceof PdfWriteError) return err.code
   if (err instanceof PdfVerifyError) return 'verify_failed'
+  if (err instanceof PdfGraphicError) return err.code
   return undefined
 }
 
@@ -65,7 +72,11 @@ parentPort?.on('message', (request: ScanWorkerRequest) => {
       ? writeAnnotationsToPdf(request)
       : request.kind === 'apply'
         ? applyAnnotationOps(request)
-        : request.kind === 'attachments-list'
+        : request.kind === 'graphics-list'
+          ? listPdfGraphicsBytes(request.bytes)
+          : request.kind === 'graphic-edit'
+            ? editPdfGraphicBytes(request.bytes, request.objectId, request.op)
+            : request.kind === 'attachments-list'
           ? listPdfAttachmentBytes(request.bytes)
           : request.kind === 'attachment-extract'
             ? extractPdfAttachmentBytes(request.bytes, request.attachmentId)

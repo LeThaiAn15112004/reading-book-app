@@ -38,6 +38,7 @@
     "spike:pdf:live": "npm run build --prefix ../book-reader-sdk && node --experimental-transform-types --import ./spikes/pdf-annotations/register-alias.mjs spikes/pdf-annotations/run-pdf-embedded-live.mjs",
     "spike:pdf:ink": "npm run build --prefix ../book-reader-sdk && node --experimental-transform-types --import ./spikes/pdf-annotations/register-alias.mjs spikes/pdf-annotations/run-pdf-ink.mjs",
     "spike:pdf:ink-store": "npm run build --prefix ../book-reader-sdk && node --experimental-transform-types --import ./spikes/txt/register-alias.mjs spikes/pdf-annotations/run-pdf-ink-store.mjs",
+    "spike:pdf:graphics": "npm run build --prefix ../book-reader-sdk && node --experimental-transform-types --import ./spikes/pdf-annotations/register-alias.mjs spikes/pdf-annotations/run-pdf-graphics.mjs",
     "spike:pdf:export": "npm run build --prefix ../book-reader-sdk && node --experimental-transform-types --import ./spikes/pdf-annotations/register-alias.mjs spikes/pdf-annotations/run-pdf-annotation-export.mjs",
     "spike:pdf:two-way": "npm run build --prefix ../book-reader-sdk && node --experimental-transform-types --import ./spikes/pdf-annotations/register-alias.mjs spikes/pdf-annotations/run-pdf-two-way.mjs",
     "spike:pdf:compat-kit": "npm run build --prefix ../book-reader-sdk && node --experimental-transform-types --import ./spikes/pdf-annotations/register-alias.mjs spikes/pdf-annotations/build-compat-kit.mjs",

@@ -221,6 +221,39 @@ export function appendAnnotationUpdate(bytes: Uint8Array, pages: ReadonlyMap<num
   }
 }
 
+export type { NewObject as RawObjectWrite }
+
+/**
+ * `bytes` + one incremental update made of exactly the objects `build` returns (rewritten objects keep
+ * their number; `allocate` hands out fresh ones). For edits of annotations this app did not create
+ * (graphic objects): the caller patches the dictionary, this only appends and serializes. Throws
+ * `PdfWriteError` (encrypted / unsupported structure) — nothing is produced then.
+ */
+export function appendRawObjects(bytes: Uint8Array, build: (context: { objects: PdfRawObjects; allocate: () => PdfRef }) => NewObject[]): Uint8Array {
+  try {
+    const objects = new PdfRawObjects(bytes)
+    if (objects.encrypted) throw new PdfWriteError('encrypted', 'the PDF is encrypted')
+    const trailer = readTrailer(objects)
+    let nextNum = trailer.size
+    const written = build({ objects, allocate: () => ({ num: nextNum++, gen: 0 }) })
+    if (written.length === 0) return new Uint8Array(bytes)
+    return serialize(objects.text, trailer, written, nextNum)
+  } catch (err) {
+    if (err instanceof PdfSyntaxError) throw new PdfWriteError('unsupported_pdf', err.message)
+    throw err
+  }
+}
+
+/** A PDF date string for "now" (`/M` of a rewritten annotation). */
+export function pdfDateNow(): string {
+  return pdfDate(new Date().toISOString())
+}
+
+/** An appearance-stream object body (`<< dict /Length n >> stream … endstream`). */
+export function appearanceStreamBody(dict: string, content: string): string {
+  return streamObject(dict, content)
+}
+
 function appendUnchecked(bytes: Uint8Array, pages: ReadonlyMap<number, PageGeometry>, update: AnnotationUpdate): Uint8Array {
   const objects = new PdfRawObjects(bytes)
   if (objects.encrypted) throw new PdfWriteError('encrypted', 'the PDF is encrypted')

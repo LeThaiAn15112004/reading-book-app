@@ -9,6 +9,7 @@ import {
   LibraryChannels,
   NotificationChannels,
   AttachmentChannels,
+  GraphicsChannels,
   AudioChannels,
   OverlayChannels,
   SearchChannels,
@@ -116,6 +117,10 @@ const api: DesktopApi = {
     list: (bookId) => ipcRenderer.invoke(AttachmentChannels.list, bookId),
     open: (input) => ipcRenderer.invoke(AttachmentChannels.open, input),
     saveAs: (input) => ipcRenderer.invoke(AttachmentChannels.saveAs, input),
+  },
+  graphics: {
+    list: (bookId) => ipcRenderer.invoke(GraphicsChannels.list, bookId),
+    apply: (input) => ipcRenderer.invoke(GraphicsChannels.apply, input),
   },
   audio: {
     getChapters: (bookId) => ipcRenderer.invoke(AudioChannels.getChapters, bookId),

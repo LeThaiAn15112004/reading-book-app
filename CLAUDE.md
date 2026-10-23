@@ -86,6 +86,7 @@ Desktop app (`cd source/apps/reading-book-desktop`):
   `spike:audio:main` (audiobook MP3, Main side: importer, `rb-audio` stream handler Range/416/path checks, 512 MB streaming, progress),
   `spike:pdf:attachments` (PDF embedded attachments: real pdf.js on generated PDFs, Main service on temp files, the real renderer store; OS opener / save dialog mocked),
   `spike:audio:store` (the real renderer audio player store with a scriptable `Audio`),
+  `spike:pdf:graphics` (graphic objects inside a PDF — Square/Circle/Ink/Line/FreeText made by other readers: real scan, resize/colour/delete as one incremental update, read-back verified),
   `spike:audio:migration` (migration 026 on a populated DB with the real better-sqlite3 + FTS5; re-launches itself with the app's
   Electron binary in `ELECTRON_RUN_AS_NODE` mode — no window — because better-sqlite3 is built for Electron's ABI)
 

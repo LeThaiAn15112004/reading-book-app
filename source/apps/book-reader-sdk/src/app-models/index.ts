@@ -78,6 +78,24 @@ export {
   type ScannedPdfAnnotation,
 } from './pdf-embedded-annotations.js'
 export {
+  PDF_GRAPHIC_MAX_OBJECTS,
+  PDF_GRAPHIC_MIN_EXTENT,
+  PDF_GRAPHIC_SUBTYPES,
+  parsePdfGraphicObject,
+  parsePdfGraphicOp,
+  pdfGraphicAllows,
+  pdfGraphicAt,
+  pdfGraphicCaps,
+  pdfGraphicHit,
+  readPdfJsGraphic,
+  resizePdfGraphicBox,
+  type PdfGraphicBox,
+  type PdfGraphicCaps,
+  type PdfGraphicObject,
+  type PdfGraphicOp,
+  type PdfGraphicSubtype,
+} from './pdf-graphic-objects.js'
+export {
   READMATE_NM_PREFIX,
   READMATE_PDF_AUTHOR,
   noteIdFromReadmateName,

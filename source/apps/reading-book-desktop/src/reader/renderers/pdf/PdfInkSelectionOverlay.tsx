@@ -8,16 +8,7 @@
  * a text selection.
  */
 import type { CSSProperties, PointerEvent as ReactPointerEvent, ReactNode } from 'react'
-import {
-  INK_RESIZE_HANDLES,
-  canResizeInk,
-  inkHandlePosition,
-  inkSelectionBox,
-  inkToolbarSide,
-  type InkBox,
-  type InkResizeHandle,
-} from '@reading-book/book-reader-sdk'
-import type { PdfInkLayerMark } from './PdfInkLayer'
+import { INK_RESIZE_HANDLES, inkHandlePosition, inkToolbarSide, type InkBox, type InkResizeHandle } from '@reading-book/book-reader-sdk'
 
 const HANDLE_PX = 10
 
@@ -42,26 +33,27 @@ export type PdfInkResizeEvents = {
   onHandleUp: (event: ReactPointerEvent<HTMLElement>, commit: boolean) => void
 }
 
+/** An object to outline: its id and its outline box (normalized over the page), as painted — previews included. */
+export type PdfOutlineTarget = { id: string; box: InkBox }
+
 type PdfInkSelectionOverlayProps = PdfInkResizeEvents & {
-  /** Page height / page width. */
-  heightRatio: number
   /** Rendered page height in CSS px (decides which side the toolbar opens on). */
   pageHeightPx: number
-  /** Stroke under the pointer on this page (never the selected one). */
-  hovered: PdfInkLayerMark | null
-  /** Selected stroke on this page, as painted (move / resize preview included). */
-  selected: PdfInkLayerMark | null
-  /** The compact toolbar for the selected stroke. */
+  /** Object under the pointer on this page (never the selected one). */
+  hovered: PdfOutlineTarget | null
+  /** Selected object on this page; `resizable` = it offers resize handles. */
+  selected: (PdfOutlineTarget & { resizable: boolean }) | null
+  /** The compact toolbar for the selected object. */
   toolbar: ReactNode
 }
 
 const stop = (event: { stopPropagation: () => void }) => event.stopPropagation()
 
-export function PdfInkSelectionOverlay({ heightRatio, pageHeightPx, hovered, selected, toolbar, onHandleDown, onHandleMove, onHandleUp }: PdfInkSelectionOverlayProps) {
-  const hoverBox = hovered ? inkSelectionBox(hovered.paths, hovered.width, heightRatio) : null
-  const selectedBox = selected ? inkSelectionBox(selected.paths, selected.width, heightRatio) : null
+export function PdfInkSelectionOverlay({ pageHeightPx, hovered, selected, toolbar, onHandleDown, onHandleMove, onHandleUp }: PdfInkSelectionOverlayProps) {
+  const hoverBox = hovered?.box ?? null
+  const selectedBox = selected?.box ?? null
   if (!hoverBox && !selectedBox) return null
-  const resizable = selected ? canResizeInk(selected.paths, heightRatio) : false
+  const resizable = selected?.resizable ?? false
   const side = selectedBox ? inkToolbarSide(selectedBox.y * pageHeightPx) : 'above'
   const rightAligned = selectedBox ? selectedBox.x + selectedBox.width / 2 > 0.5 : false
 

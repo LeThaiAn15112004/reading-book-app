@@ -4,6 +4,7 @@ export { importApi } from './import'
 export { overlayApi } from './overlay'
 export { audioApi } from './audio'
 export { attachmentsApi, type AttachmentItem } from './attachments'
+export { graphicsApi } from './graphics'
 export { cloudApi } from './cloud'
 export { bookIndexApi } from './bookIndex'
 export {

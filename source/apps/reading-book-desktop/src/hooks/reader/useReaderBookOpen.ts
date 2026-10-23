@@ -267,5 +267,15 @@ export function useReaderBookOpen({
     isEpubSurface,
     isEpubSessionLoading,
     retryOpen: () => setOpenAttempt((n) => n + 1),
+    /** Re-read the file's bytes in place (status, position and prefs stay): after an edit written into the file. */
+    refreshBookBytes: async () => {
+      if (!bookId) return
+      try {
+        const result = await client.openBookContent(bookId)
+        if (result.ok && result.data) setBookBytes(toArrayBuffer(result.data))
+      } catch {
+        // The old bytes stay on screen.
+      }
+    },
   }
 }

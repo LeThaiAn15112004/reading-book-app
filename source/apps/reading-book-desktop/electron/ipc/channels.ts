@@ -119,6 +119,13 @@ export const AttachmentChannels = {
   saveAs: 'attachments:saveAs',
 } as const
 
+export const GraphicsChannels = {
+  /** Graphic objects inside the book's PDF (Square / Circle / Ink / Line / FreeText …): descriptors only. */
+  list: 'graphics:list',
+  /** Resize / recolour / delete ONE of them, written into the PDF as an incremental update. */
+  apply: 'graphics:apply',
+} as const
+
 export const BookIndexChannels = {
   /** Renderer → main: make sure a book's text is chunked (background; returns immediately). */
   ensure: 'bookIndex:ensure',

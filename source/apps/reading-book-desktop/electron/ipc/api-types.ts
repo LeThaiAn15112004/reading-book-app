@@ -421,6 +421,13 @@ export type ListAttachmentsResult =
 
 export type AttachmentActionResult = { ok: true; fileName: string } | AttachmentFailureDto
 
+/** A graphic object inside the PDF (validated shape: `parsePdfGraphicObject` in the SDK). */
+export type PdfGraphicObjectDto = import('@reading-book/book-reader-sdk').PdfGraphicObject
+export type PdfGraphicOpDto = import('@reading-book/book-reader-sdk').PdfGraphicOp
+export type PdfGraphicFailureCodeDto = 'not_found' | 'not_allowed' | 'managed_copy' | 'read_only' | 'encrypted' | 'unsupported_pdf' | 'signed' | 'locked' | 'changed' | 'verify_failed' | 'failed'
+export type ListPdfGraphicsResult = { ok: true; objects: PdfGraphicObjectDto[]; complete: boolean } | { ok: false; errorCode: PdfGraphicFailureCodeDto }
+export type ApplyPdfGraphicResult = { ok: true; objects: PdfGraphicObjectDto[]; sha256: string } | { ok: false; errorCode: PdfGraphicFailureCodeDto; signerName?: string }
+
 /** Listening progress of an audiobook (`reading_state_json.audioProgress`); seconds, not a Location. */
 export interface AudioProgressDto {
   positionSeconds: number
@@ -888,6 +895,12 @@ export interface DesktopApi {
     cancel(): Promise<OkResult>
     /** Subscribe to step / byte progress of the running import. Returns unsubscribe. */
     onProgress(handler: (progress: ImportProgressDto) => void): () => void
+  }
+  graphics: {
+    /** Graphic objects inside a PDF book (read-only scan; descriptors only). */
+    list(bookId: string): Promise<ListPdfGraphicsResult>
+    /** One edit (resize / colour / delete) written into the PDF; the renderer sends ids + a validated op, never bytes or paths. */
+    apply(input: { bookId: string; objectId: string; op: PdfGraphicOpDto }): Promise<ApplyPdfGraphicResult>
   }
   attachments: {
     /** Embedded files of a PDF book; read lazily, when the Attachment panel opens. */

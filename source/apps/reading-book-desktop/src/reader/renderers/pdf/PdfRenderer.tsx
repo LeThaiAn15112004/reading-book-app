@@ -36,6 +36,7 @@ import {
   filterMinDistance,
   INK_ERASER_RADIUS_PX,
   erasePathsWithSweeps,
+  canResizeInk,
   inkHandlePosition,
   inkOutlinesAvailable,
   inkSelectionBox,
@@ -43,14 +44,18 @@ import {
   type InkEraseSweep,
   isMarkupTool,
   pdfMarkAt,
+  pdfGraphicAt,
   pickInkTarget,
   reduceInkInteraction,
+  resizePdfGraphicBox,
   resizeInkPaths,
   simplifyInkPoints,
   translateInkPaths,
   type InkPenStyle,
   type InkPoint,
   type InkResizeHandle,
+  type PdfGraphicBox,
+  type PdfGraphicObject,
   type InteractionTool,
   type MarkupInteractionTool,
   type TextMatcher,
@@ -237,6 +242,15 @@ export interface PdfRendererProps {
   onInkResize?: (id: string, paths: InkPoint[][]) => void
   /** The compact contextual toolbar (colour + Delete) shown next to the selected stroke. */
   renderInkToolbar?: (stroke: PdfInkLayerMark) => ReactNode
+  /** Graphic objects that live inside the PDF file (made by another reader): hover, select, resize. */
+  graphics?: readonly PdfGraphicObject[]
+  selectedGraphicId?: string | null
+  /** A click selected a file object (`id`) or hit none (`null`). */
+  onGraphicSelect?: (id: string | null) => void
+  /** A handle drag of the SELECTED file object was released: its new box (normalized, on the page). */
+  onGraphicResize?: (id: string, box: PdfGraphicBox) => void
+  /** The compact toolbar for the selected file object (only what its type allows). */
+  renderGraphicToolbar?: (object: PdfGraphicObject) => ReactNode
   /** The Eraser was released: delete these saved strokes (every one the gesture touched) as one operation. */
   onInkErase?: (ids: string[]) => void
   /** Stroke (whole strokes) or Partial (only the part under the eraser). Defaults to Stroke. */
@@ -362,6 +376,11 @@ export function PdfRenderer({
   onInkMove,
   onInkResize,
   renderInkToolbar,
+  graphics,
+  selectedGraphicId = null,
+  onGraphicSelect,
+  onGraphicResize,
+  renderGraphicToolbar,
   onInkErase,
   eraserMode = 'stroke',
   onInkPartialErase,
@@ -407,8 +426,28 @@ export function PdfRenderer({
   const onInkResizeRef = useRef(onInkResize)
   onInkResizeRef.current = onInkResize
   /** The handle drag in progress: `offset` = pointer minus the handle's centre at press time, `paths` = the preview. */
-  const inkResizeRef = useRef<{ pointerId: number; id: string; pageIndex: number; handle: InkResizeHandle; offset: InkPoint; paths: InkPoint[][] | null } | null>(null)
+  const inkResizeRef = useRef<{
+    pointerId: number
+    kind: 'ink' | 'graphic'
+    id: string
+    pageIndex: number
+    handle: InkResizeHandle
+    offset: InkPoint
+    paths: InkPoint[][] | null
+    box: PdfGraphicBox | null
+  } | null>(null)
   const [inkResize, setInkResize] = useState<{ id: string; paths: InkPoint[][] } | null>(null)
+  const graphicsRef = useRef(graphics)
+  graphicsRef.current = graphics
+  const selectedGraphicIdRef = useRef(selectedGraphicId)
+  selectedGraphicIdRef.current = selectedGraphicId
+  const onGraphicSelectRef = useRef(onGraphicSelect)
+  onGraphicSelectRef.current = onGraphicSelect
+  const onGraphicResizeRef = useRef(onGraphicResize)
+  onGraphicResizeRef.current = onGraphicResize
+  /** Preview of a file object's box during a handle drag (the file changes on release). */
+  const [graphicResize, setGraphicResize] = useState<{ id: string; box: PdfGraphicBox } | null>(null)
+  const [graphicHoverId, setGraphicHoverId] = useState<string | null>(null)
   /** Stroke under the pointer (outline only — UI state, never saved) and the last idle pointer position. */
   const [inkHoverId, setInkHoverId] = useState<string | null>(null)
   const lastPointerRef = useRef<{ x: number; y: number } | null>(null)
@@ -968,6 +1007,8 @@ export function PdfRenderer({
     setStatus({ kind: 'loading' })
     setDoc(null)
     setSizes([])
+    // Same book re-read after an edit written into the file: come back to the page being read.
+    if (restoredRef.current) initialPageRef.current = currentRef.current + 1
     restoredRef.current = false
     const task = getDocument({ data: new Uint8Array(data.slice(0)) })
     let cancelled = false
@@ -1312,7 +1353,7 @@ export function PdfRenderer({
     } catch {
       /* ignore */
     }
-    onInkSelectRef.current?.(null)
+    selectTarget(null)
     onBlankClickRef.current?.()
     inkDraftRef.current = { pointerId: event.pointerId, pageIndex: hit.index, points: [point] }
     setInkDraft({ pageIndex: hit.index, points: [point] })
@@ -1399,17 +1440,48 @@ export function PdfRenderer({
     return point ? pickInkTarget(strokes, selectedInkIdRef.current, hit.index, point[0], point[1], size.h / size.w, pagePx(hit.rect, 6)) : null
   }
 
-  /** Hover feedback for the stroke under client (`x`, `y`): outline only, never selects or changes anything. */
+  /** The file object (made by another reader) under client (`x`, `y`): the selected one wherever it is hit, else the topmost. */
+  const graphicAt = (x: number, y: number): PdfGraphicObject | null => {
+    const objects = graphicsRef.current
+    if (!objects?.length) return null
+    const hit = slotAt(x, y)
+    const size = hit ? sizes[hit.index] : undefined
+    if (!hit || !size) return null
+    const point = clientToPageUnit(x, y, hit.rect)
+    return point ? pdfGraphicAt(objects, selectedGraphicIdRef.current, hit.index, point[0], point[1], size.h / size.w, pagePx(hit.rect, 6)) : null
+  }
+
+  /** What a pointer at client (`x`, `y`) refers to: this app's strokes sit above the file's own objects. */
+  const targetAt = (x: number, y: number): { kind: 'ink'; id: string } | { kind: 'graphic'; id: string } | null => {
+    const stroke = inkAt(x, y)
+    if (stroke) return { kind: 'ink', id: stroke.id }
+    const object = graphicAt(x, y)
+    return object ? { kind: 'graphic', id: object.objectId } : null
+  }
+
+  /** Select what is under the pointer (or nothing): one selection across strokes and file objects. */
+  const selectTarget = (target: { kind: 'ink' | 'graphic'; id: string } | null) => {
+    onInkSelectRef.current?.(target?.kind === 'ink' ? target.id : null)
+    onGraphicSelectRef.current?.(target?.kind === 'graphic' ? target.id : null)
+  }
+
+  /** Hover feedback for what is under client (`x`, `y`): outline only, never selects or changes anything. */
   const updateInkHover = (x: number, y: number) => {
-    const id = outlinesOnRef.current ? (inkAt(x, y)?.id ?? null) : null
-    setInkHoverId((prev) => (prev === id ? prev : reduceInkInteraction({ hoverId: prev, selectedId: selectedInkIdRef.current }, { type: 'hover', id }).hoverId))
+    const target = outlinesOnRef.current ? targetAt(x, y) : null
+    const inkId = target?.kind === 'ink' ? target.id : null
+    const graphicId = target?.kind === 'graphic' && target.id !== selectedGraphicIdRef.current ? target.id : null
+    setInkHoverId((prev) => (prev === inkId ? prev : reduceInkInteraction({ hoverId: prev, selectedId: selectedInkIdRef.current }, { type: 'hover', id: inkId }).hoverId))
+    setGraphicHoverId((prev) => (prev === graphicId ? prev : graphicId))
   }
 
   /** Re-run the hover hit test at the last idle pointer position (after a scroll, zoom, page change or stroke edit). */
   const refreshInkHover = () => {
     const last = lastPointerRef.current
     if (last) updateInkHover(last.x, last.y)
-    else setInkHoverId(null)
+    else {
+      setInkHoverId(null)
+      setGraphicHoverId(null)
+    }
   }
   const refreshInkHoverRef = useRef(refreshInkHover)
   refreshInkHoverRef.current = refreshInkHover
@@ -1417,7 +1489,7 @@ export function PdfRenderer({
   // The page moved under a still pointer: scroll, zoom, page turn, or the strokes / tool changed.
   useEffect(() => {
     refreshInkHoverRef.current()
-  }, [cssScale, spread, sizes, inkStrokes, outlinesOn, selectedInkId])
+  }, [cssScale, spread, sizes, inkStrokes, graphics, outlinesOn, selectedInkId, selectedGraphicId])
   useEffect(() => {
     const scrollRoot = getScrollRootRef.current()
     if (!scrollRoot) return
@@ -1438,27 +1510,30 @@ export function PdfRenderer({
 
   // Escape deselects the stroke (and closes its toolbar); hover feedback stays. A running handle drag is cancelled first.
   useEffect(() => {
-    if (selectedInkId === null || !outlinesOn) return
+    if ((selectedInkId === null && selectedGraphicId === null) || !outlinesOn) return
     const onKey = (event: KeyboardEvent) => {
       if (event.key !== 'Escape') return
       event.stopPropagation()
       if (inkResizeRef.current) endInkResize(false)
-      else onInkSelectRef.current?.(null)
+      else selectTarget(null)
     }
     window.addEventListener('keydown', onKey, true)
     return () => window.removeEventListener('keydown', onKey, true)
-  }, [selectedInkId, outlinesOn])
+  }, [selectedInkId, selectedGraphicId, outlinesOn])
 
-  /** A press on a resize handle of the selected stroke: the page must not see it (no pan, tap or text selection). */
+  /** A press on a resize handle of the selected object: the page must not see it (no pan, tap or text selection). */
   const beginInkResize = (handle: InkResizeHandle, event: ReactPointerEvent<HTMLElement>) => {
     event.stopPropagation()
     if (event.button !== 0 || !event.isPrimary) return
-    const id = selectedInkIdRef.current
-    const stroke = id ? inkStrokesRef.current?.find((m) => m.id === id) : undefined
-    const rect = stroke ? slotsRef.current[stroke.pageIndex]?.getBoundingClientRect() : undefined
-    if (!id || !stroke || !rect || rect.width <= 0) return
-    const size = sizes[stroke.pageIndex]
-    const box = size ? inkSelectionBox(stroke.paths, stroke.width, size.h / size.w) : null
+    const graphicId = selectedGraphicIdRef.current
+    const object = graphicId ? graphicsRef.current?.find((o) => o.objectId === graphicId) : undefined
+    const id = object ? object.objectId : selectedInkIdRef.current
+    const stroke = !object && id ? inkStrokesRef.current?.find((m) => m.id === id) : undefined
+    const pageIndex = object ? object.pageIndex : stroke?.pageIndex
+    const rect = pageIndex !== undefined ? slotsRef.current[pageIndex]?.getBoundingClientRect() : undefined
+    if (!id || pageIndex === undefined || (!object && !stroke) || !rect || rect.width <= 0) return
+    const size = sizes[pageIndex]
+    const box = object ? object.box : size && stroke ? inkSelectionBox(stroke.paths, stroke.width, size.h / size.w) : null
     const pointer = clientToPageUnit(event.clientX, event.clientY, rect)
     if (!box || !pointer) return
     event.preventDefault()
@@ -1470,7 +1545,16 @@ export function PdfRenderer({
       /* ignore */
     }
     const anchor = inkHandlePosition(box, handle)
-    inkResizeRef.current = { pointerId: event.pointerId, id, pageIndex: stroke.pageIndex, handle, offset: [pointer[0] - anchor[0], pointer[1] - anchor[1]], paths: null }
+    inkResizeRef.current = {
+      pointerId: event.pointerId,
+      kind: object ? 'graphic' : 'ink',
+      id,
+      pageIndex,
+      handle,
+      offset: [pointer[0] - anchor[0], pointer[1] - anchor[1]],
+      paths: null,
+      box: null,
+    }
   }
 
   const moveInkResize = (event: ReactPointerEvent<HTMLElement>) => {
@@ -1483,10 +1567,20 @@ export function PdfRenderer({
     }
     const rect = slotsRef.current[drag.pageIndex]?.getBoundingClientRect()
     const size = sizes[drag.pageIndex]
-    const stroke = inkStrokesRef.current?.find((m) => m.id === drag.id)
     const pointer = rect ? clientToPageUnit(event.clientX, event.clientY, rect) : null
-    if (!rect || !size || !stroke || !pointer) return
-    const paths = resizeInkPaths(stroke.paths, stroke.width, drag.handle, [pointer[0] - drag.offset[0], pointer[1] - drag.offset[1]], size.h / size.w)
+    if (!rect || !size || !pointer) return
+    const target: InkPoint = [pointer[0] - drag.offset[0], pointer[1] - drag.offset[1]]
+    if (drag.kind === 'graphic') {
+      const object = graphicsRef.current?.find((o) => o.objectId === drag.id)
+      if (!object) return
+      const box = resizePdfGraphicBox(object.box, drag.handle, target, size.h / size.w)
+      drag.box = box
+      setGraphicResize({ id: drag.id, box })
+      return
+    }
+    const stroke = inkStrokesRef.current?.find((m) => m.id === drag.id)
+    if (!stroke) return
+    const paths = resizeInkPaths(stroke.paths, stroke.width, drag.handle, target, size.h / size.w)
     if (!paths) return
     drag.paths = paths
     setInkResize({ id: drag.id, paths })
@@ -1497,6 +1591,7 @@ export function PdfRenderer({
     const drag = inkResizeRef.current
     inkResizeRef.current = null
     setInkResize(null)
+    setGraphicResize(null)
     if (!drag) return
     try {
       if (rootRef.current?.hasPointerCapture(drag.pointerId)) rootRef.current.releasePointerCapture(drag.pointerId)
@@ -1504,6 +1599,7 @@ export function PdfRenderer({
       /* element already detached */
     }
     if (commit && drag.paths) onInkResizeRef.current?.(drag.id, drag.paths)
+    if (commit && drag.box) onGraphicResizeRef.current?.(drag.id, drag.box)
   }
 
   const releaseInkResize = (event: ReactPointerEvent<HTMLElement>, commit: boolean) => {
@@ -1572,7 +1668,7 @@ export function PdfRenderer({
     } catch {
       /* ignore */
     }
-    onInkSelectRef.current?.(null)
+    selectTarget(null)
     onBlankClickRef.current?.()
     eraseRef.current = { pointerId: event.pointerId, last: null, ids: new Set(), sweeps: new Map(), preview: new Map() }
     eraseSample(event.clientX, event.clientY)
@@ -1758,6 +1854,7 @@ export function PdfRenderer({
     }
     reportAnnotationHover(null)
     setInkHoverId(null)
+    setGraphicHoverId(null)
     if (event.pointerId !== gesture.pointerId) return
     if ((event.buttons & 1) === 0) {
       // Released somewhere we never heard about (e.g. outside the window while selecting).
@@ -1835,18 +1932,18 @@ export function PdfRenderer({
     if (!gesture.pan && hasTextSelection()) return
     const hit = annotationAt(event.clientX, event.clientY)
     if (hit) {
-      onInkSelectRef.current?.(null)
+      selectTarget(null)
       onAnnotationClickRef.current?.(hit)
       return
     }
     // A click on a freehand stroke selects it (Delete removes it); the text-markup UI closes.
-    const inkHit = outlinesOnRef.current ? inkAt(event.clientX, event.clientY) : null
-    if (inkHit) {
+    const target = outlinesOnRef.current ? targetAt(event.clientX, event.clientY) : null
+    if (target) {
       onBlankClickRef.current?.()
-      onInkSelectRef.current?.(inkHit.id)
+      selectTarget(target)
       return
     }
-    onInkSelectRef.current?.(null)
+    selectTarget(null)
     onBlankClickRef.current?.()
     const root = getScrollRootRef.current()
     if (!root) return
@@ -1884,10 +1981,34 @@ export function PdfRenderer({
     )
   }
 
-  /** The selected stroke / the hover-outlined one on page `index`, as painted (previews included). The selected stroke is never hover-outlined. */
+  /** The outline target (id + box, as painted — previews included) of the selected / hover-outlined object on page `index`. The selected one is never hover-outlined. */
   const markOn = (id: string | null, index: number) => (id === null ? null : (inkByPage.get(index)?.find((m) => m.id === id) ?? null))
-  const selectedMarkOn = (index: number) => markOn(selectedInkId, index)
-  const hoverMarkOn = (index: number) => markOn(inkHoverId !== selectedInkId ? inkHoverId : null, index)
+  const inkBoxOf = (mark: PdfInkLayerMark, index: number) => {
+    const size = sizes[index]
+    return size ? inkSelectionBox(mark.paths, mark.width, size.h / size.w) : null
+  }
+  const graphicOn = (id: string | null, index: number) => (id === null ? null : (graphics?.find((o) => o.objectId === id && o.pageIndex === index) ?? null))
+  const selectedTargetOn = (index: number) => {
+    const mark = markOn(selectedInkId, index)
+    const markBox = mark ? inkBoxOf(mark, index) : null
+    if (mark && markBox) return { id: mark.id, box: markBox, resizable: canResizeInk(mark.paths, sizes[index] ? sizes[index]!.h / sizes[index]!.w : 1) }
+    const object = graphicOn(selectedGraphicId, index)
+    if (!object) return null
+    return { id: object.objectId, box: graphicResize?.id === object.objectId ? graphicResize.box : object.box, resizable: object.caps.resize }
+  }
+  const hoverTargetOn = (index: number) => {
+    const mark = markOn(inkHoverId !== selectedInkId ? inkHoverId : null, index)
+    const markBox = mark ? inkBoxOf(mark, index) : null
+    if (mark && markBox) return { id: mark.id, box: markBox }
+    const object = graphicOn(graphicHoverId !== selectedGraphicId ? graphicHoverId : null, index)
+    return object ? { id: object.objectId, box: object.box } : null
+  }
+  const toolbarOn = (index: number): ReactNode => {
+    const mark = markOn(selectedInkId, index)
+    if (mark) return renderInkToolbar ? renderInkToolbar(mark) : null
+    const object = graphicOn(selectedGraphicId, index)
+    return object && renderGraphicToolbar ? renderGraphicToolbar(object) : null
+  }
 
   const pageRows: ReactNode[] = []
   for (let first = 0; first < sizes.length; first += pagesPerView) {
@@ -1949,13 +2070,12 @@ export function PdfRenderer({
                   erasingIds={erasingIds}
                 />
               ) : null}
-              {outlinesOn && (selectedMarkOn(index) || hoverMarkOn(index)) ? (
+              {outlinesOn && (selectedTargetOn(index) || hoverTargetOn(index)) ? (
                 <PdfInkSelectionOverlay
-                  heightRatio={size.h / size.w}
                   pageHeightPx={Math.floor(size.h * cssScale)}
-                  hovered={hoverMarkOn(index)}
-                  selected={selectedMarkOn(index)}
-                  toolbar={selectedMarkOn(index) && renderInkToolbar ? renderInkToolbar(selectedMarkOn(index)!) : null}
+                  hovered={hoverTargetOn(index)}
+                  selected={selectedTargetOn(index)}
+                  toolbar={toolbarOn(index)}
                   onHandleDown={beginInkResize}
                   onHandleMove={moveInkResize}
                   onHandleUp={releaseInkResize}
@@ -2004,6 +2124,7 @@ export function PdfRenderer({
       onPointerLeave={() => {
         lastPointerRef.current = null
         setInkHoverId(null)
+        setGraphicHoverId(null)
         reportAnnotationHover(null)
         if (!gestureRef.current) dwellRef.current?.update(false)
       }}

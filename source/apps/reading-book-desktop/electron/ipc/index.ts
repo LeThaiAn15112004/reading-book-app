@@ -4,6 +4,7 @@ import { registerAudioIpc } from './audio.ipc'
 import { registerBackgroundIpc } from './background.ipc'
 import { registerBookIndexIpc } from './book-index.ipc'
 import { registerCloudIpc } from './cloud.ipc'
+import { registerGraphicsIpc } from './graphics.ipc'
 import { registerImportIpc } from './import.ipc'
 import { registerLibraryIpc } from './library.ipc'
 import { registerNotificationsIpc } from './notifications.ipc'
@@ -23,6 +24,7 @@ export function registerAllIpcHandlers(): void {
   registerOverlayIpc()
   registerAudioIpc()
   registerAttachmentsIpc()
+  registerGraphicsIpc()
   registerTxtIpc()
   registerCloudIpc()
   registerBookIndexIpc()
