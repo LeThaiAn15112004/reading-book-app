@@ -55,8 +55,11 @@ export interface ImportDeps {
   bookFileAvailable(bookId: string): Promise<boolean>
   /** TXT target: its current canonical text (the edited copy when there is one), for quote re-anchoring; null when unavailable. */
   txtText?(bookId: string): Promise<string | null>
-  /** PDF target: identity keys of the annotations found in a scan of the target file; null when it cannot be scanned. */
-  scanPdfKeys(bookId: string): Promise<ReadonlySet<string> | null>
+  /**
+   * PDF target: identity keys of the annotations found in a scan of the target file and the file's own page count (used when the
+   * library does not know it); null when it cannot be scanned.
+   */
+  scanPdfKeys(bookId: string): Promise<{ keys: ReadonlySet<string>; pageCount?: number } | null>
   // ---- synchronous reads / writes (used inside the transaction) ----
   listRows(bookId: string): TransferNoteRow[]
   /** Cheap fingerprint of the book's annotation rows (ids + last-change times): the preview's freshness proof. */
@@ -161,14 +164,15 @@ export function createImportService(deps: ImportDeps): ImportService {
     const txt = book.format === 'txt' ? deps.txtState(book.id) : undefined
     const scan = book.format === 'pdf' ? await deps.scanPdfKeys(book.id).catch(() => null) : null
     const scanKeys = new Set<string>()
-    if (scan) for (const k of scan) scanKeys.add(k)
+    if (scan) for (const k of scan.keys) scanKeys.add(k)
+    const pageCount = book.pageCount ?? scan?.pageCount
 
     const placement = decidePlacement(file, {
       title: book.title,
       author: book.author,
       format: book.format,
       sha256: book.sha256,
-      pageCount: book.pageCount,
+      pageCount,
       txtContentSha256: txt?.contentSha256,
     })
     // A TXT file that is not the text the annotations were made on is searched for each quote (FR-011); no text, nothing placed.
@@ -180,7 +184,7 @@ export function createImportService(deps: ImportDeps): ImportService {
       existingKeys,
       scanKeys,
       placement,
-      targetPageCount: book.pageCount,
+      targetPageCount: pageCount,
       targetText,
       isUsableId: (id) => !taken.has(id),
     })

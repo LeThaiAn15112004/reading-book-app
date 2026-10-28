@@ -40,6 +40,8 @@ export interface ExportDeps {
   ledger(bookId: string): EmbeddedAnnotationLedgerEntry[]
   /** TXT: `txt_documents.content_sha256` of the edited copy, when there is one. */
   txtContentSha256(bookId: string): string | undefined
+  /** PDF whose library record has no page count: the page count read from the file itself (undefined when it cannot be read). */
+  pdfPageCount?(bookId: string): Promise<number | undefined>
   /** Native save dialog (`kind` picks the file filter); resolves to the chosen path or null when the user cancelled. */
   chooseTarget(defaultFileName: string, kind: 'restore' | 'readable'): Promise<string | null>
   /** True when the chosen path must not be written (inside the app's own data folder). */
@@ -110,7 +112,10 @@ async function buildFileFor(bookId: string, deps: ExportDeps): Promise<BuiltFile
 
   const header: TransferBook = { title: book.title, format, sha256: book.sha256 }
   if (book.author) header.author = book.author
-  if (format === 'pdf' && book.pageCount && book.pageCount > 0) header.pageCount = book.pageCount
+  // The page count lets the file be restored into the same PDF after the app's own write-back changed its fingerprint, so it
+  // is looked up in the file when the library does not know it (found by the manual pass: without it that restore failed).
+  const pageCount = format === 'pdf' ? (book.pageCount && book.pageCount > 0 ? book.pageCount : await deps.pdfPageCount?.(book.id).catch(() => undefined)) : undefined
+  if (pageCount && pageCount > 0) header.pageCount = pageCount
 
   const built = buildAnnotationFile({
     book: header,

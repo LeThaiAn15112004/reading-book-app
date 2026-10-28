@@ -52,6 +52,14 @@ function exportDeps(event: Electron.IpcMainInvokeEvent): ExportDeps {
     listRows: (id) => overlays.listAnnotationsForTransfer(id),
     ledger: (id) => overlays.listEmbeddedLedger(id),
     txtContentSha256: (id) => getTxtStore().getDocument(id)?.contentSha256,
+    pdfPageCount: async (id) => {
+      const book = await getLibraryStore().findById(id)
+      if (!book) return undefined
+      const file = await resolveBookFile(book)
+      if (!file.ok) return undefined
+      const result = await runInScanWorker<PdfAnnotationScanResult>({ kind: 'scan', bytes: await fsp.readFile(file.path) })
+      return result.pageCount
+    },
     chooseTarget: async (defaultFileName, kind) => {
       const parent = BrowserWindow.fromWebContents(event.sender) ?? undefined
       const options: Electron.SaveDialogOptions = {
@@ -123,7 +131,7 @@ function importDeps(): ImportDeps {
       if (!file.ok) return null
       const bytes = await fsp.readFile(file.path)
       const result = await runInScanWorker<PdfAnnotationScanResult>({ kind: 'scan', bytes })
-      return scanKeysOf(result.items)
+      return { keys: scanKeysOf(result.items), pageCount: result.pageCount }
     },
     listRows: (id) => overlays.listAnnotationsForTransfer(id),
     annotationStamp: (id) => overlays.annotationStamp(id),

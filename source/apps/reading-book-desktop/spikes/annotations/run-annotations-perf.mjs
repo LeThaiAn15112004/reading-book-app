@@ -138,7 +138,7 @@ function importService() {
     library,
     findBook: exportDeps.findBook,
     bookFileAvailable: async (id) => fs.existsSync((await library.findById(id)).filePath),
-    scanPdfKeys: async () => new Set(),
+    scanPdfKeys: async () => ({ keys: new Set() }),
     listRows: (id) => overlays.listAnnotationsForTransfer(id),
     annotationStamp: (id) => overlays.annotationStamp(id),
     existingNoteIds: (ids) => overlays.existingNoteIds(ids),

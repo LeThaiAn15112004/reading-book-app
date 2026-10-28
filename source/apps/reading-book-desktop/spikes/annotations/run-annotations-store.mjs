@@ -84,7 +84,7 @@ function importDeps() {
       const b = await library.findById(id)
       return !!b && fs.existsSync(b.filePath)
     },
-    scanPdfKeys: async () => scanKeys,
+    scanPdfKeys: async () => ({ keys: scanKeys }),
     listRows: (id) => overlays.listAnnotationsForTransfer(id),
     annotationStamp: (id) => overlays.annotationStamp(id),
     existingNoteIds: (ids) => overlays.existingNoteIds(ids),

@@ -147,6 +147,8 @@ rawNote.run('ink1', books.pdf.id, JSON.stringify({ schemaVersion: 1, type: 'ink'
 
 // ---- the service under test, with a stubbed dialog ------------------------------------------------------------
 const dialogCalls = []
+/** What reading the PDF file itself says about its page count (export fallback). */
+let pdfFilePageCount
 let pick = null
 function deps(over = {}) {
   return {
@@ -157,6 +159,7 @@ function deps(over = {}) {
     listRows: (id) => overlays.listAnnotationsForTransfer(id),
     ledger: (id) => overlays.listEmbeddedLedger(id),
     txtContentSha256: (id) => txtStore.getDocument(id)?.contentSha256,
+    pdfPageCount: async () => pdfFilePageCount,
     chooseTarget: async (name) => {
       dialogCalls.push(name)
       return pick
@@ -362,6 +365,8 @@ const events = []
 let nextImportFile = null
 let scanKeys = new Set()
 let scanThrows = false
+/** What a scan of the PDF reports as its page count (undefined: the file cannot say). */
+let scanPageCount
 let failOnWrite = 0
 let writes = 0
 let newIdCounter = 0
@@ -384,7 +389,7 @@ function importDeps(over = {}) {
     txtText: async (id) => txtTexts[id] ?? null,
     scanPdfKeys: async () => {
       if (scanThrows) throw new Error('encrypted')
-      return scanKeys
+      return { keys: scanKeys, pageCount: scanPageCount }
     },
     listRows: (id) => overlays.listAnnotationsForTransfer(id),
     annotationStamp: (id) => overlays.annotationStamp(id),
@@ -865,6 +870,39 @@ await check('PDF of another file: placed by page only with known, equal page cou
   setSha(books.pdf.id, books.pdf.hash)
   const d = await preview(outFile('rt-PDF.readmate-notes.json'), books.pdf.id)
   assert.equal(d.preview.toAdd, 4, 'identical bytes: exact')
+})
+
+await check('a PDF the library has no page count for: the count is read from the file at export and at import, so a restore still works after the fingerprint changed', async () => {
+  const meta = db.prepare('SELECT metadata_json FROM books WHERE id = ?').get(books.pdf.id).metadata_json
+  db.prepare('UPDATE books SET metadata_json = ? WHERE id = ?').run('{}', books.pdf.id)
+  wipe(books.pdf.id)
+  note({ id: 'pc1', bookId: books.pdf.id, styleKind: 'highlight', locator: { kind: 'page-rect', page: 3 }, pdfAnnotation: { pageIndex: 2, rects: [{ x: 0.1, y: 0.2, width: 0.3, height: 0.02 }] }, selectionText: { highlight: 'trang ba' } })
+  // (a) the file cannot say either: no page count in the file, and a restore into a changed PDF is refused as a different edition
+  pdfFilePageCount = undefined
+  const without = await exportTo(books.pdf.id, 'pc-none.readmate-notes.json')
+  assert.equal(JSON.parse(fs.readFileSync(without, 'utf8')).book.pageCount, undefined)
+  // (b) the file says 120 pages: the export header carries it
+  pdfFilePageCount = 120
+  const withCount = await exportTo(books.pdf.id, 'pc-120.readmate-notes.json')
+  assert.equal(JSON.parse(fs.readFileSync(withCount, 'utf8')).book.pageCount, 120)
+  // the app's own write-back changes the PDF's fingerprint; the scan of the target reports the same 120 pages
+  wipe(books.pdf.id)
+  setSha(books.pdf.id, '4'.repeat(64))
+  scanKeys = new Set()
+  scanPageCount = 120
+  const ok = await preview(withCount, books.pdf.id)
+  assert.equal(ok.ok, true)
+  assert.equal(ok.preview.toAdd, 1, 'same document, 120 pages on both sides')
+  assert.equal(ok.preview.target.matchedBy, 'title')
+  const no = await preview(without, books.pdf.id)
+  assert.equal(no.preview.toAdd, 0, 'a file that could not say its page count is still not placed on a changed PDF')
+  scanPageCount = 90
+  const other = await preview(withCount, books.pdf.id)
+  assert.equal(other.preview.toAdd, 0, 'a different page count is a different document')
+  scanPageCount = undefined
+  pdfFilePageCount = undefined
+  setSha(books.pdf.id, books.pdf.hash)
+  db.prepare('UPDATE books SET metadata_json = ? WHERE id = ?').run(meta, books.pdf.id)
 })
 
 await check('book files are still untouched after the identity and edition checks', () => {
