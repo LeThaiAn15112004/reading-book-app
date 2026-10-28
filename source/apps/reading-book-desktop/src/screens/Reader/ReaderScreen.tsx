@@ -30,7 +30,9 @@ import {
 import { ReaderShell, readerChromeTopInset, readerChromeBottomInset } from '../../reader'
 import { usePdfViewStore } from './logic/pdfView/pdfViewStore'
 import { usePdfExportStore } from './logic/pdfExport/pdfExportStore'
-import { supportsAnnotationTransfer, useAnnotationTransferStore } from './logic/annotationTransferStore'
+import { createAnnotationReloader } from './logic/annotationReload'
+import { registerAnnotationReloader, supportsAnnotationTransfer, useAnnotationTransferStore } from './logic/annotationTransferStore'
+import { ImportPreviewDialog } from '../../components/annotation-transfer/ImportPreviewDialog'
 import { usePdfSignedWriteStore } from './logic/pdfExport/pdfSignedWriteStore'
 import { getReaderCapabilities } from '../../reader/capabilities'
 import {
@@ -284,6 +286,12 @@ export function ReaderScreen() {
   const annotationCount = useAnnotationTransferStore((st) => (st.countBookId === bookId ? st.count : 0))
   const refreshAnnotationCount = useAnnotationTransferStore((st) => st.refreshCount)
   const exportAnnotations = useAnnotationTransferStore((st) => st.exportRestore)
+  const startAnnotationImport = useAnnotationTransferStore((st) => st.startImport)
+  // After a committed import the open book shows its new annotations at once (the store only calls this on success).
+  useEffect(() => {
+    if (!canTransferAnnotations || !bookId) return
+    return registerAnnotationReloader(bookId, createAnnotationReloader(bookId, book.bookFormat))
+  }, [canTransferAnnotations, bookId, book.bookFormat])
   useEffect(() => {
     if (canTransferAnnotations && bookId && chrome.moreOpen) void refreshAnnotationCount(bookId)
   }, [canTransferAnnotations, bookId, chrome.moreOpen, refreshAnnotationCount])
@@ -887,6 +895,14 @@ export function ReaderScreen() {
               : undefined
           }
           exportAnnotationsDisabled={annotationCount === 0}
+          onImportAnnotations={
+            canTransferAnnotations && bookId
+              ? () => {
+                  chrome.closeFloating()
+                  void startAnnotationImport(bookId)
+                }
+              : undefined
+          }
           onExportPdf={
             isPdfSurface && bookId
               ? () => {
@@ -1149,6 +1165,8 @@ export function ReaderScreen() {
             onCancel={() => declineSignedWrite(chrome.setToast)}
             onConfirm={() => void confirmSignedWrite(chrome.setToast)}
           />
+
+          <ImportPreviewDialog onToast={chrome.setToast} />
 
           <SignedPdfWriteDialog
             open={pendingSignedExport !== null}

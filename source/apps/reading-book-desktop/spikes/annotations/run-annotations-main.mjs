@@ -8,7 +8,10 @@
  *   2. refusal  empty book (no dialog), cancelled dialog (nothing written), audiobook / unknown id, forbidden folder
  *   3. safety   a failing target leaves no temp file, the book file is never read or changed, a moved / deleted book
  *               file does not stop the export
- *   (import, identity, readable copy and performance checks are added by tasks T027, T033, T037, T041)
+ *   4. import   round trip per format (restore, second import adds nothing, created time kept), a failure mid-write rolls back,
+ *               stale preview, source ids of other books, refused files, a missing book file, the target choice, PDF sync
+ *               duplicates, a PDF that cannot be scanned, a PDF whose bytes changed
+ *   (identity by title and different editions, the readable copy and performance checks come with tasks T033, T037, T041)
  *
  * Run: npm run spike:annotations:main   (builds the SDK bundle first)
  */
@@ -99,7 +102,7 @@ note({
 })
 note({
   id: 'pdf-shape', bookId: books.pdf.id, styleKind: 'rectangle', colorHex: '#1E88E5CC',
-  locator: { kind: 'page-rect', page: 1 }, pdfAnnotation: { pageIndex: 0, rects: [{ x: 0.2, y: 0.4, width: 0.3, height: 0.1 }], shape: { kind: 'rectangle' } },
+  locator: { kind: 'page-rect', page: 1 }, pdfAnnotation: { pageIndex: 0, rects: [{ x: 0.2, y: 0.4, width: 0.3, height: 0.1 }], shape: { strokeWidth: 0.004 } },
 })
 const typewriterText = '  Dòng đầu\n   dòng hai  '
 note({
@@ -130,7 +133,7 @@ note({
 const mdAnchor = { startSegment: 4, startOffset: 0, endSegment: 4, endOffset: 38 }
 note({
   id: 'md1', bookId: books.md.id, styleKind: 'highlight',
-  locator: { kind: 'text-offset', offset: 0, blockId: 'md' }, mdAnnotation: mdAnchor,
+  locator: { kind: 'text-offset', offset: 0, blockId: 'md', chapterIndex: 4 }, mdAnnotation: mdAnchor,
   selectionText: { highlight: 'Cách tra cứu (Ctrl + click):' },
 })
 // Rows that are NOT annotations: a bookmark and a freehand ink stroke must never be exported or counted.
@@ -343,6 +346,356 @@ await check('book files are never changed (hash, size and modification time)', (
 await check('the database rows are unchanged by exports', () => {
   assert.equal(overlays.countAnnotationsForTransfer(books.epub.id), 2)
   assert.equal(db.prepare(`SELECT COUNT(*) AS n FROM notes`).get().n, 10, "2 EPUB + bookmark + 4 PDF + ink + TXT + Markdown")
+})
+
+// =================================================================================================================
+// 4. import — the real import service on the same stores, the dialog / file read / PDF scan stubbed
+// =================================================================================================================
+const { createImportService } = await import('../../electron/annotation-transfer/import-service.ts')
+const { planTwoWaySync } = await import('@reading-book/book-reader-sdk')
+
+const events = []
+let nextImportFile = null
+let scanKeys = new Set()
+let scanThrows = false
+let failOnWrite = 0
+let writes = 0
+let newIdCounter = 0
+
+function importDeps(over = {}) {
+  return {
+    pickFilePath: async () => nextImportFile,
+    readText: async (p) => fs.readFileSync(p, 'utf8'),
+    library,
+    findBook: async (id) => {
+      const b = await library.findById(id)
+      return b ? { id: b.id, title: b.title, author: b.authorNames() || undefined, format: b.format, sha256: b.sha256, pageCount: b.pageCount } : null
+    },
+    bookFileAvailable: async (id) => {
+      const b = await library.findById(id)
+      return !!b && fs.existsSync(b.filePath)
+    },
+    scanPdfKeys: async () => {
+      if (scanThrows) throw new Error('encrypted')
+      return scanKeys
+    },
+    listRows: (id) => overlays.listAnnotationsForTransfer(id),
+    existingNoteIds: (ids) => overlays.existingNoteIds(ids),
+    bookSha256: (id) => db.prepare('SELECT sha256 FROM books WHERE id = ?').get(id)?.sha256,
+    txtState: (id) => {
+      const d = txtStore.getDocument(id)
+      return { revision: d?.revision ?? 0, contentSha256: d?.contentSha256 }
+    },
+    writeRow: (input) => {
+      writes += 1
+      if (failOnWrite && writes >= failOnWrite) throw new Error('disk full (injected)')
+      overlays.writeHighlight(input)
+    },
+    db,
+    newId: () => `new-${++newIdCounter}`,
+    progress: (e) => events.push(e),
+    ...over,
+  }
+}
+const service = () => createImportService(importDeps())
+
+/** Content of a book's annotation rows in a comparable form (ids and times left out). */
+function contentOf(bookId) {
+  return overlays
+    .listAnnotationsForTransfer(bookId)
+    .map((r) => JSON.stringify({ t: r.note.type, l: r.note.locatorExtended?.locator, q: r.note.locatorExtended?.text, n: r.note.note ?? null, c: r.note.style?.colorHex, p: r.note.pdfAnnotation ?? null, x: r.note.txtAnnotation ?? null, m: r.note.mdAnnotation ?? null }))
+    .sort()
+}
+const noteRows = (bookId) => db.prepare('SELECT id, note_json FROM notes WHERE book_id = ? ORDER BY id').all(bookId).map((r) => `${r.id}:${r.note_json}`)
+function wipe(bookId) {
+  db.prepare(`DELETE FROM notes WHERE book_id = ? AND json_extract(note_json, '$.type') NOT IN ('bookmark', 'ink')`).run(bookId)
+  db.prepare('DELETE FROM pdf_embedded_annotations WHERE book_id = ?').run(bookId)
+}
+async function exportTo(bookId, name) {
+  pick = outFile(name)
+  const r = await run(bookId)
+  assert.equal(r.ok, true, `export ${bookId}`)
+  return pick
+}
+const writeFile = (name, text) => {
+  const p = outFile(name)
+  fs.writeFileSync(p, text)
+  return p
+}
+async function preview(file, bookId) {
+  nextImportFile = file
+  return service().pickFile({ bookId })
+}
+
+// the Markdown book's file was deleted in section 3: put it back (same bytes, same hash)
+fs.writeFileSync(books.md.file, Buffer.from('# Từ vựng N3\n\nCách tra cứu'))
+books.md.gone = false
+
+console.log('4. import — restore')
+for (const [name, bookId, expected] of [['EPUB', books.epub.id, 2], ['PDF', books.pdf.id, 4], ['TXT', books.txt.id, 1], ['Markdown', books.md.id, 1]]) {
+  await check(`${name}: export, wipe, import restores the same annotations; a second import adds nothing`, async () => {
+    const file = await exportTo(bookId, `rt-${name}.readmate-notes.json`)
+    const before = contentOf(bookId)
+    const beforeIds = overlays.listAnnotationsForTransfer(bookId).map((r) => r.id).sort()
+    wipe(bookId)
+    assert.deepEqual(contentOf(bookId), [])
+    scanKeys = new Set()
+    const svc = service()
+    nextImportFile = file
+    const pre = await svc.pickFile({ bookId })
+    assert.equal(pre.ok, true, JSON.stringify(pre))
+    assert.equal(pre.preview.toAdd, expected, JSON.stringify(pre.preview.notPlaced))
+    assert.equal(pre.preview.present, 0)
+    assert.equal(pre.preview.notPlaced.length, 0)
+    assert.equal(pre.preview.requiresChoice, false)
+    assert.equal(pre.preview.target.bookId, bookId)
+    assert.equal(pre.preview.target.matchedBy, 'sha256')
+    assert.equal(pre.preview.startedFrom.bookId, bookId)
+    const done = await svc.confirm(pre.preview.sessionId)
+    assert.deepEqual(done, { ok: true, added: expected, present: 0, notPlaced: 0 })
+    assert.deepEqual(contentOf(bookId), before, 'same type, location, quote, comment, colour and payload')
+    assert.deepEqual(overlays.listAnnotationsForTransfer(bookId).map((r) => r.id).sort(), beforeIds, 'free source ids are reused')
+    // second import: nothing new (SC-003)
+    const rowsAfter = noteRows(bookId)
+    const svc2 = service()
+    nextImportFile = file
+    const p2 = await svc2.pickFile({ bookId })
+    assert.equal(p2.preview.toAdd, 0)
+    assert.equal(p2.preview.present, expected)
+    assert.deepEqual(await svc2.confirm(p2.preview.sessionId), { ok: true, added: 0, present: expected, notPlaced: 0 })
+    assert.deepEqual(noteRows(bookId), rowsAfter, 'the second import changed no row')
+  })
+}
+
+await check('created time is restored, the modified time is the import time', async () => {
+  const rows = overlays.listAnnotationsForTransfer(books.epub.id)
+  assert.ok(rows.every((r) => r.createdAt === T0), 'created time restored')
+  assert.ok(rows.every((r) => r.updatedAt > T0), 'modified = import time')
+})
+
+await check('PDF typewriter text, shape colour and Vietnamese survive the round trip byte for byte', () => {
+  const byId = Object.fromEntries(overlays.listAnnotationsForTransfer(books.pdf.id).map((r) => [r.id, r.note]))
+  assert.equal(byId['pdf-tw'].note, typewriterText)
+  assert.equal(byId['pdf-shape'].style.colorHex, '#1E88E5CC')
+  assert.equal(byId['pdf-app'].locatorExtended.text.highlight, 'đoạn trong PDF')
+  const epubQuote = overlays.listAnnotationsForTransfer(books.epub.id).find((r) => r.id === 'e1').note
+  assert.equal(epubQuote.note, 'Câu chủ đề của cuốn sách — “ế, ộ, ữ”')
+})
+
+console.log('5. import — safety')
+await check('an injected failure in the middle of the write rolls everything back', async () => {
+  const file = await exportTo(books.epub.id, 'fail.readmate-notes.json')
+  wipe(books.epub.id)
+  const before = noteRows(books.epub.id)
+  const svc = createImportService(importDeps())
+  nextImportFile = file
+  const pre = await svc.pickFile({ bookId: books.epub.id })
+  assert.equal(pre.preview.toAdd, 2)
+  writes = 0
+  failOnWrite = 2
+  const result = await svc.confirm(pre.preview.sessionId)
+  failOnWrite = 0
+  assert.equal(result.ok, false)
+  assert.equal(result.errorCode, 'write_failed')
+  assert.deepEqual(noteRows(books.epub.id), before, 'the first row written was rolled back too')
+  // the connection is not left inside a transaction, and the session survives for a retry
+  db.exec('BEGIN IMMEDIATE')
+  db.exec('ROLLBACK')
+  const retry = await svc.confirm(pre.preview.sessionId)
+  assert.deepEqual(retry, { ok: true, added: 2, present: 0, notPlaced: 0 })
+})
+
+await check('a book that changed between preview and confirm gives stale_preview and writes nothing; a new preview then works', async () => {
+  const file = await exportTo(books.epub.id, 'stale.readmate-notes.json')
+  wipe(books.epub.id)
+  const svc = service()
+  nextImportFile = file
+  const pre = await svc.pickFile({ bookId: books.epub.id })
+  // (a) an annotation appears in the book after the preview
+  overlays.writeHighlight({ bookId: books.epub.id, id: 'late', styleKind: 'highlight', colorHex: '#FFEB3B', locator: { kind: 'cfi', cfi: 'epubcfi(/6/99)', chapterIndex: 1 }, selectionText: { highlight: 'late' } })
+  const before = noteRows(books.epub.id)
+  const stale = await svc.confirm(pre.preview.sessionId)
+  assert.equal(stale.errorCode, 'stale_preview')
+  assert.deepEqual(noteRows(books.epub.id), before)
+  const fresh = await svc.setTarget(pre.preview.sessionId, books.epub.id)
+  assert.equal(fresh.ok, true)
+  assert.equal(fresh.preview.toAdd, 2)
+  assert.deepEqual(await svc.confirm(pre.preview.sessionId), { ok: true, added: 2, present: 0, notPlaced: 0 })
+  // (b) the book's fingerprint changes after the preview
+  overlays.deleteHighlightRow(books.epub.id, 'late')
+  wipe(books.epub.id)
+  nextImportFile = file
+  const pre2 = await svc.pickFile({ bookId: books.epub.id })
+  db.prepare('UPDATE books SET sha256 = ? WHERE id = ?').run('f'.repeat(64), books.epub.id)
+  const stale2 = await svc.confirm(pre2.preview.sessionId)
+  assert.equal(stale2.errorCode, 'stale_preview')
+  assert.deepEqual(contentOf(books.epub.id), [])
+  db.prepare('UPDATE books SET sha256 = ? WHERE id = ?').run(books.epub.hash, books.epub.id)
+  const back = await svc.setTarget(pre2.preview.sessionId, books.epub.id)
+  assert.equal(back.preview.toAdd, 2)
+  assert.equal((await svc.confirm(pre2.preview.sessionId)).ok, true)
+})
+
+await check('a source id that exists in another book is never overwritten', async () => {
+  const before = db.prepare(`SELECT note_json FROM notes WHERE id = 'pdf-app'`).get().note_json
+  const sample = JSON.parse(fs.readFileSync(await exportTo(books.epub.id, 'clash-src.readmate-notes.json'), 'utf8'))
+  const clash = { ...sample, annotations: [{ ...sample.annotations[0], sourceId: 'pdf-app', note: 'khác hẳn', selectionText: { highlight: 'clash quote' } }] }
+  const file = writeFile('clash.readmate-notes.json', JSON.stringify(clash))
+  const svc = service()
+  nextImportFile = file
+  const pre = await svc.pickFile({ bookId: books.epub.id })
+  assert.equal(pre.preview.toAdd, 1)
+  assert.deepEqual(await svc.confirm(pre.preview.sessionId), { ok: true, added: 1, present: 0, notPlaced: 0 })
+  assert.equal(db.prepare(`SELECT note_json FROM notes WHERE id = 'pdf-app'`).get().note_json, before, 'the PDF row is untouched')
+  const row = overlays.listAnnotationsForTransfer(books.epub.id).find((r) => r.note.locatorExtended?.text?.highlight === 'clash quote')
+  assert.ok(row && row.id.startsWith('new-'), 'stored under a new id')
+  db.prepare('DELETE FROM notes WHERE id = ?').run(row.id)
+})
+
+await check('refused files change nothing: damaged, not ours, readable copy, newer version', async () => {
+  const good = fs.readFileSync(await exportTo(books.epub.id, 'good.readmate-notes.json'), 'utf8')
+  const rowsBefore = noteRows(books.epub.id)
+  const cases = [
+    ['truncated', writeFile('t.readmate-notes.json', good.slice(0, good.length - 30)), 'damaged'],
+    ['not JSON', writeFile('notes.txt', 'just some words'), 'not_annotation_file'],
+    ['other JSON', writeFile('other.json', '{"a":1}'), 'not_annotation_file'],
+    ['readable copy', writeFile('Nhà Giả Kim.md', '# Nhà Giả Kim — Paulo Coelho\n\n## Chương 3\n> quote\n'), 'not_annotation_file'],
+    ['newer version', writeFile('v2.readmate-notes.json', JSON.stringify({ ...JSON.parse(good), fileVersion: 2 })), 'newer_version'],
+  ]
+  for (const [label, file, code] of cases) {
+    const r = await preview(file, books.epub.id)
+    assert.equal(r.ok, false, label)
+    assert.equal(r.errorCode, code, label)
+  }
+  const md = await preview(outFile('Nhà Giả Kim.md'), books.epub.id)
+  assert.match(md.message, /readable copy/i, 'the .md answer says it cannot be imported')
+  assert.deepEqual(noteRows(books.epub.id), rowsBefore)
+  nextImportFile = null
+  assert.deepEqual(await service().pickFile({ bookId: books.epub.id }), { ok: false, errorCode: 'cancelled', message: undefined })
+})
+
+await check('a target whose book file is missing gives file_unavailable and writes nothing; after relinking it imports', async () => {
+  const file = await exportTo(books.epub.id, 'moved.readmate-notes.json')
+  wipe(books.epub.id)
+  fs.renameSync(books.epub.file, `${books.epub.file}.moved`)
+  const r = await preview(file, books.epub.id)
+  assert.equal(r.ok, false)
+  assert.equal(r.errorCode, 'file_unavailable')
+  assert.match(r.message, /relink/i)
+  assert.deepEqual(contentOf(books.epub.id), [])
+  fs.renameSync(`${books.epub.file}.moved`, books.epub.file)
+  const svc = service()
+  nextImportFile = file
+  const ok = await svc.pickFile({ bookId: books.epub.id })
+  assert.equal(ok.ok, true)
+  assert.deepEqual(await svc.confirm(ok.preview.sessionId), { ok: true, added: 2, present: 0, notPlaced: 0 })
+})
+
+await check('a file from another book needs a deliberate target choice; confirm before the choice writes nothing', async () => {
+  // restore the EPUB rows removed above, then use the TXT book's file from the EPUB book's menu
+  const txtFile = await exportTo(books.txt.id, 'txt-from-epub.readmate-notes.json')
+  const rowsBefore = noteRows(books.epub.id)
+  const svc = service()
+  nextImportFile = txtFile
+  const pre = await svc.pickFile({ bookId: books.epub.id })
+  assert.equal(pre.ok, true)
+  assert.equal(pre.preview.requiresChoice, true)
+  assert.equal(pre.preview.startedFrom.bookId, books.epub.id)
+  assert.equal(pre.preview.target.bookId, books.txt.id, 'the file\'s own book is proposed')
+  assert.equal((await svc.confirm(pre.preview.sessionId)).errorCode, 'target_not_confirmed')
+  assert.deepEqual(noteRows(books.epub.id), rowsBefore)
+  // choosing the EPUB book (a different format) is refused
+  const mismatch = await svc.setTarget(pre.preview.sessionId, books.epub.id)
+  assert.equal(mismatch.ok, false)
+  assert.equal(mismatch.errorCode, 'format_mismatch')
+  assert.equal((await svc.confirm(pre.preview.sessionId)).errorCode, 'target_not_confirmed', 'still not chosen')
+  // choosing the proposed book works and is explicit
+  const chosen = await svc.setTarget(pre.preview.sessionId, books.txt.id)
+  assert.equal(chosen.ok, true)
+  assert.equal(chosen.preview.requiresChoice, false)
+  assert.equal(chosen.preview.target.matchedBy, 'chosen')
+  assert.equal(chosen.preview.present, 1, 'the TXT book already holds that annotation')
+})
+
+await check('a file whose book is not in the library names it and cannot be imported until a book is chosen', async () => {
+  const sample = JSON.parse(fs.readFileSync(outFile('rt-EPUB.readmate-notes.json'), 'utf8'))
+  const missing = { ...sample, book: { ...sample.book, title: 'Sách không có', sha256: 'a'.repeat(64) } }
+  const file = writeFile('missing.readmate-notes.json', JSON.stringify(missing))
+  const svc = service()
+  nextImportFile = file
+  const pre = await svc.pickFile({ bookId: books.epub.id })
+  assert.equal(pre.ok, true)
+  assert.equal(pre.preview.target, null)
+  assert.equal(pre.preview.requiresChoice, true)
+  assert.deepEqual(pre.preview.fileBookMissing, { title: 'Sách không có', author: undefined })
+  assert.equal((await svc.confirm(pre.preview.sessionId)).errorCode, 'book_missing')
+  // a deliberate choice of the EPUB book works: a different edition, so nothing can be placed
+  const chosen = await svc.setTarget(pre.preview.sessionId, books.epub.id)
+  assert.equal(chosen.ok, true)
+  assert.equal(chosen.preview.toAdd, 0)
+  assert.equal(chosen.preview.notPlaced.length, 2)
+  assert.equal(chosen.preview.notPlaced[0].reason, 'different edition of the book')
+})
+
+console.log('6. import — PDF')
+await check('a PDF that still holds an annotation read from the file does not get a duplicate row or a duplicate in the sync plan', async () => {
+  const file = outFile('rt-PDF.readmate-notes.json')
+  wipe(books.pdf.id)
+  // what a scan of the target PDF finds: the Foxit-style markup and the one Readmate wrote earlier
+  const foxit = { objectId: '7R', subtype: 'Underline', pageIndex: 2, rects: [{ x: 0.1, y: 0.2, width: 0.3, height: 0.02 }], colorHex: '#00E676', nm: 'Foxit-1234', text: 'markup from Foxit' }
+  const ours = { objectId: '9R', subtype: 'Highlight', pageIndex: 11, rects: [pdfRect], colorHex: '#FFEB3B', nm: 'readmate:pdf-app', text: 'đoạn trong PDF', contents: 'ghi chú PDF' }
+  scanKeys = new Set([...embeddedAnnotationIdentities([foxit, ours]).flatMap((i) => [i.key, i.legacyKey])])
+  const svc = service()
+  nextImportFile = file
+  const pre = await svc.pickFile({ bookId: books.pdf.id })
+  assert.equal(pre.ok, true)
+  assert.equal(pre.preview.present, 1, 'the Foxit annotation is still in the file')
+  assert.equal(pre.preview.toAdd, 3)
+  assert.equal((await svc.confirm(pre.preview.sessionId)).ok, true)
+  assert.ok(!overlays.listAnnotationsForTransfer(books.pdf.id).some((r) => r.id === 'pdf-file'), 'no row for the annotation the file already carries')
+  // the two-way plan on the same scan: our own annotation is linked to the imported row (same id), the Foxit one is imported once
+  const rows = (await overlays.listHighlights(books.pdf.id)).map((h) => ({ ...h, createdAt: h.createdAt, updatedAt: h.updatedAt }))
+  const plan = planTwoWaySync({ items: [foxit, ours], complete: true, ledger: [], rows })
+  assert.deepEqual(plan.links.map((l) => l.noteId), ['pdf-app'], 'readmate:<id> finds the row under its reused id')
+  assert.equal(plan.inserts.length, 1, 'only the Foxit annotation becomes a new row')
+  assert.equal(plan.inserts[0].item.nm, 'Foxit-1234')
+  assert.ok(!plan.writtenRows.some((w) => w.noteId === 'pdf-app'), 'the imported row is not written into the file a second time')
+  assert.deepEqual(plan.writtenRows.map((w) => w.noteId).sort(), ['pdf-shape', 'pdf-tw'], 'only rows the file does not hold yet are written')
+})
+
+await check('a PDF that cannot be scanned (encrypted, broken) still stores the annotations in the app', async () => {
+  const file = outFile('rt-PDF.readmate-notes.json')
+  wipe(books.pdf.id)
+  scanThrows = true
+  const svc = service()
+  nextImportFile = file
+  const pre = await svc.pickFile({ bookId: books.pdf.id })
+  scanThrows = false
+  assert.equal(pre.ok, true)
+  assert.equal(pre.preview.toAdd, 4)
+  assert.equal((await svc.confirm(pre.preview.sessionId)).ok, true)
+  assert.equal(overlays.countAnnotationsForTransfer(books.pdf.id), 4)
+})
+
+await check('a PDF whose bytes changed after the export still imports when title, author and page count match', async () => {
+  const file = outFile('rt-PDF.readmate-notes.json')
+  wipe(books.pdf.id)
+  db.prepare('UPDATE books SET sha256 = ? WHERE id = ?').run('9'.repeat(64), books.pdf.id)
+  scanKeys = new Set()
+  const pre = await preview(file, books.pdf.id)
+  assert.equal(pre.ok, true)
+  assert.equal(pre.preview.target.matchedBy, 'title')
+  assert.equal(pre.preview.toAdd, 4, 'same document, 120 pages on both sides')
+  db.prepare('UPDATE books SET sha256 = ? WHERE id = ?').run(books.pdf.hash, books.pdf.id)
+})
+
+await check('import never touches a book file', () => {
+  for (const b of bookFiles) {
+    if (b.gone) continue
+    assert.equal(sha(fs.readFileSync(b.file)), b.hash, `${b.id} content`)
+    assert.equal(fs.statSync(b.file).size, b.size, `${b.id} size`)
+  }
+  assert.ok(events.some((e) => e.phase === 'reading') && events.some((e) => e.phase === 'planning') && events.some((e) => e.phase === 'committing'), 'progress events were sent')
 })
 
 fs.rmSync(tmp, { recursive: true, force: true })
