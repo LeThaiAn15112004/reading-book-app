@@ -1,5 +1,6 @@
 import type { Ref } from 'react'
 import type { ReaderCapability } from '../../../../reader/capabilities'
+import { AnnotationTransferButtons } from './AnnotationTransferButtons'
 import { MoreMenu } from './MoreMenu'
 import { ToolsStrip, type EraserMode, type ToolId, type ToolStates } from './ToolsMenu'
 
@@ -15,7 +16,6 @@ type ReaderTopbarProps = {
   onExportPdf?: () => void
   /** EPUB / PDF / TXT / Markdown: "Export annotations (backup)…" in the More menu. */
   onExportAnnotations?: () => void
-  exportAnnotationsDisabled?: boolean
   /** EPUB / PDF / TXT / Markdown: "Import annotations…" in the More menu. */
   onImportAnnotations?: () => void
   /** EPUB / PDF / TXT / Markdown: "Export readable copy…" in the More menu. */
@@ -44,7 +44,6 @@ export function ReaderTopbar({
   onTrash,
   onExportPdf,
   onExportAnnotations,
-  exportAnnotationsDisabled,
   onImportAnnotations,
   onExportReadable,
   capabilities,
@@ -73,6 +72,13 @@ export function ReaderTopbar({
         onEraserMode={onEraserMode}
         toolRefs={{ speech: audioButtonRef }}
         hidden={chromeHidden}
+      />
+
+      <AnnotationTransferButtons
+        onExportPdf={onExportPdf}
+        onExportAnnotations={onExportAnnotations}
+        onExportReadable={onExportReadable}
+        onImportAnnotations={onImportAnnotations}
       />
 
       <div className="relative flex shrink-0 items-center gap-1.5 sm:gap-2">
@@ -110,11 +116,6 @@ export function ReaderTopbar({
           onFavorites={onFavorites}
           onBookInfo={onBookInfo}
           onTrash={onTrash}
-          onExportPdf={onExportPdf}
-          onExportAnnotations={onExportAnnotations}
-          exportAnnotationsDisabled={exportAnnotationsDisabled}
-          onImportAnnotations={onImportAnnotations}
-          onExportReadable={onExportReadable}
         />
       </div>
     </header>

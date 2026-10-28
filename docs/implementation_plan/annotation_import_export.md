@@ -33,7 +33,7 @@ audiobook, DOCX/DOC. Không gồm đồng bộ ngoài (app khác, cloud, tự đ
 SDK `book-reader-sdk/src/annotation-transfer/` (`file-format`, `content-key`, `export-build`, `import-plan`, `quote-match`, `readable-markdown`);
 Main `electron/annotation-transfer/` (`export-service`, `import-service`, `identify-book`) và `electron/ipc/annotation-transfer.ipc.ts`;
 renderer `screens/Reader/logic/annotationTransferStore.ts`, `annotationReload.ts`, `components/annotation-transfer/ImportPreviewDialog.tsx`;
-lối vào: menu More của Reader, menu sách và thanh trên của Library.
+lối vào: bốn nút biểu tượng trên thanh công cụ của Reader (`AnnotationTransferButtons.tsx`: xuất PDF kèm annotation cho PDF, xuất sao lưu, bản đọc, nhập), menu sách và thanh trên của Library.
 
 ## Kiểm tra
 

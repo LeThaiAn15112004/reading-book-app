@@ -283,8 +283,6 @@ export function ReaderScreen() {
   const cancelSignedExport = usePdfExportStore((st) => st.cancelSigned)
   // "Export annotations (backup)…" (specs/006-annotation-import-export): EPUB / PDF / TXT / Markdown only.
   const canTransferAnnotations = book.contentStatus === 'ready' && supportsAnnotationTransfer(book.bookFormat)
-  const annotationCount = useAnnotationTransferStore((st) => (st.countBookId === bookId ? st.count : 0))
-  const refreshAnnotationCount = useAnnotationTransferStore((st) => st.refreshCount)
   const exportAnnotations = useAnnotationTransferStore((st) => st.exportRestore)
   const startAnnotationImport = useAnnotationTransferStore((st) => st.startImport)
   const exportReadableCopy = useAnnotationTransferStore((st) => st.exportReadable)
@@ -293,9 +291,6 @@ export function ReaderScreen() {
     if (!canTransferAnnotations || !bookId) return
     return registerAnnotationReloader(bookId, createAnnotationReloader(bookId, book.bookFormat))
   }, [canTransferAnnotations, bookId, book.bookFormat])
-  useEffect(() => {
-    if (canTransferAnnotations && bookId && chrome.moreOpen) void refreshAnnotationCount(bookId)
-  }, [canTransferAnnotations, bookId, chrome.moreOpen, refreshAnnotationCount])
   const pendingSignedWrite = usePdfSignedWriteStore((st) => st.pending)
   const confirmSignedWrite = usePdfSignedWriteStore((st) => st.confirm)
   const declineSignedWrite = usePdfSignedWriteStore((st) => st.decline)
@@ -895,7 +890,6 @@ export function ReaderScreen() {
                 }
               : undefined
           }
-          exportAnnotationsDisabled={annotationCount === 0}
           onExportReadable={
             canTransferAnnotations && bookId
               ? () => {
