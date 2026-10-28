@@ -287,6 +287,7 @@ export function ReaderScreen() {
   const refreshAnnotationCount = useAnnotationTransferStore((st) => st.refreshCount)
   const exportAnnotations = useAnnotationTransferStore((st) => st.exportRestore)
   const startAnnotationImport = useAnnotationTransferStore((st) => st.startImport)
+  const exportReadableCopy = useAnnotationTransferStore((st) => st.exportReadable)
   // After a committed import the open book shows its new annotations at once (the store only calls this on success).
   useEffect(() => {
     if (!canTransferAnnotations || !bookId) return
@@ -895,6 +896,14 @@ export function ReaderScreen() {
               : undefined
           }
           exportAnnotationsDisabled={annotationCount === 0}
+          onExportReadable={
+            canTransferAnnotations && bookId
+              ? () => {
+                  chrome.closeFloating()
+                  void exportReadableCopy(bookId, chrome.setToast)
+                }
+              : undefined
+          }
           onImportAnnotations={
             canTransferAnnotations && bookId
               ? () => {

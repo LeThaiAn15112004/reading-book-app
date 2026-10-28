@@ -49,6 +49,7 @@ Yes, by carrying the stored fields verbatim (see data-model): EPUB `{kind:'cfi',
 - Decision: distinguished by extension and content. `pickFile` filters `*.readmate-notes.json`; a picked `.md` or any file without `fileVersion`/`book`/`annotations` answers `not_annotation_file`, and for `.md` the message says the readable copy is not importable (spec Story 4 scenario 3). Schema, `ipc.md` and `readable-markdown.md` use the same two names; Reader/Library menu labels: "Export annotations (backup)…" and "Export readable copy…".
 
 ## R9 — Readable copy
+- Result of T048 (checked in code): the SDK exposes only the paths of the EPUB navigation document (`navPath` / `ncxPath` in `src/epub/opf.ts`) and `spineIndexOfPath`; there is no reader of TOC titles, and Main has none. EPUB headings are therefore `Chapter N` (stored chapter index + 1) and no parser was written.
 - Pure function over the same file object; grouped by chapter title (EPUB: "Chapter N" from `chapterIndex`; a TOC lookup only if task T048 finds an existing parser), page (PDF), section by position (TXT, Markdown); order by locator; strikethrough quotes `~~…~~`.
 
 ## R10 — Spec / document conflicts found

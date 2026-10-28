@@ -13,7 +13,9 @@
  *               duplicates, a PDF that cannot be scanned, a PDF whose bytes changed
  *   7. identity and different editions   by fingerprint and by title, the Library flow, TXT quote re-anchoring (exact / ambiguous /
  *               missing), Markdown and EPUB of another edition, a PDF of another file (page counts, page beyond the end)
- *   (the readable copy and performance checks come with tasks T037, T041)
+ *   8. readable copy   the Markdown copy of the four formats (headings, quote, kind, colour, time, comment, Vietnamese), refusals, and
+ *               importing it is refused with the "cannot be imported" hint
+ *   (the performance checks come with task T041)
  *
  * Run: npm run spike:annotations:main   (builds the SDK bundle first)
  */
@@ -865,6 +867,124 @@ await check('PDF of another file: placed by page only with known, equal page cou
 })
 
 await check('book files are still untouched after the identity and edition checks', () => {
+  for (const b of bookFiles) {
+    if (b.gone) continue
+    assert.equal(sha(fs.readFileSync(b.file)), b.hash, `${b.id} content`)
+  }
+})
+
+// =================================================================================================================
+// 8. readable copy (T037)
+// =================================================================================================================
+console.log('8. readable copy')
+const { exportReadableAnnotations, defaultReadableFileName, withReadableExtension } = await import('../../electron/annotation-transfer/export-service.ts')
+const runReadable = (bookId, over) => exportReadableAnnotations(bookId, deps(over))
+
+// fresh, known annotations for every format (the earlier sections left the rows in various states)
+for (const id of [books.epub.id, books.pdf.id, books.txt.id, books.md.id]) wipe(id)
+note({ id: 'r-e1', bookId: books.epub.id, styleKind: 'highlight', locator: { kind: 'cfi', cfi: 'epubcfi(/6/14!/4/2/6,/1:0,/1:63)', chapterIndex: 6 }, selectionText: { highlight: 'Khi bạn muốn một điều gì, cả vũ trụ sẽ hợp lực giúp bạn đạt được.' }, note: 'Câu chủ đề — “ế, ộ, ữ”' })
+note({ id: 'r-e2', bookId: books.epub.id, styleKind: 'strikethrough', colorHex: '#F48FB1', locator: { kind: 'cfi', cfi: 'epubcfi(/6/20!/4/2/10,/1:12,/1:23)', chapterIndex: 9 }, selectionText: { highlight: 'đã quá muộn' } })
+note({ id: 'r-p12', bookId: books.pdf.id, styleKind: 'highlight', locator: { kind: 'page-rect', page: 12 }, pdfAnnotation: { pageIndex: 11, rects: [pdfRect] }, selectionText: { highlight: 'đoạn trong PDF' }, note: 'dòng một\ndòng hai' })
+note({ id: 'r-p1', bookId: books.pdf.id, styleKind: 'rectangle', colorHex: '#1E88E5CC', locator: { kind: 'page-rect', page: 1 }, pdfAnnotation: { pageIndex: 0, rects: [{ x: 0.2, y: 0.4, width: 0.3, height: 0.1 }], shape: { strokeWidth: 0.004 } } })
+note({ id: 'r-p5', bookId: books.pdf.id, styleKind: 'typewriter', locator: { kind: 'page-rect', page: 5 }, pdfAnnotation: { pageIndex: 4, rects: [{ x: 0.1, y: 0.5, width: 0.5, height: 0.2 }] }, note: typewriterText })
+note({ id: 'r-t1', bookId: books.txt.id, styleKind: 'highlight', locator: { kind: 'text-offset', offset: 0, blockId: 'txt' }, txtAnnotation: { startOffset: 0, endOffset: 9 }, selectionText: { highlight: 'Trăm năm ' }, note: 'câu mở đầu' })
+note({ id: 'r-m1', bookId: books.md.id, styleKind: 'highlight', locator: { kind: 'text-offset', offset: 0, blockId: 'md', chapterIndex: 4 }, mdAnnotation: mdAnchor, selectionText: { highlight: 'Cách tra cứu (Ctrl + click):' } })
+
+const readFileText = (p) => fs.readFileSync(p, 'utf8')
+const TIME = /\d{4}-\d{2}-\d{2} \d{2}:\d{2}/
+
+await check('names: the default file name and the .md rule', () => {
+  assert.equal(defaultReadableFileName('Nhà Giả Kim'), 'Nhà Giả Kim.md')
+  assert.equal(defaultReadableFileName('a:b*c?d'), 'a b c d.md')
+  assert.equal(withReadableExtension('x'), 'x.md')
+  assert.equal(withReadableExtension('x.md'), 'x.md')
+  assert.equal(withReadableExtension('X.MD'), 'X.MD')
+  assert.equal(withReadableExtension('x.json'), 'x.json.md')
+})
+
+await check('EPUB: title, count, chapter headings in order, quote, kind, colour, time, comment, Vietnamese intact', async () => {
+  const target = outFile('epub-readable.md')
+  pick = target
+  dialogCalls.length = 0
+  assert.deepEqual(await runReadable(books.epub.id), { ok: true, exported: 2 })
+  assert.deepEqual(dialogCalls, ['Nhà Giả Kim.md'])
+  const md = readFileText(target)
+  const lines = md.split('\n')
+  assert.equal(lines[0], '# Nhà Giả Kim')
+  assert.match(lines[1], /^Exported \d{4}-\d{2}-\d{2} · 2 annotations$/)
+  assert.ok(md.indexOf('## Chapter 7') < md.indexOf('## Chapter 10'), 'reading order')
+  assert.ok(md.includes('> Khi bạn muốn một điều gì, cả vũ trụ sẽ hợp lực giúp bạn đạt được.'))
+  assert.ok(md.includes('Note: Câu chủ đề — “ế, ộ, ữ”'))
+  assert.ok(md.includes('> ~~đã quá muộn~~'))
+  assert.match(md, new RegExp(`\\*\\*Highlight\\*\\* · Yellow · ${TIME.source}`))
+  assert.match(md, new RegExp(`\\*\\*Strikethrough\\*\\* · Pink · ${TIME.source}`))
+  assert.ok(md.endsWith('\n'))
+})
+
+await check('PDF: page headings in order, a shape and a typewriter note without a quote, a two-line comment', async () => {
+  const target = outFile('pdf-readable.md')
+  pick = target
+  assert.deepEqual(await runReadable(books.pdf.id), { ok: true, exported: 3 })
+  const md = readFileText(target)
+  assert.ok(md.indexOf('## Page 1') < md.indexOf('## Page 5') && md.indexOf('## Page 5') < md.indexOf('## Page 12'))
+  assert.ok(md.includes('> [Rectangle on page 1]'))
+  assert.ok(md.includes('>   Dòng đầu\n>    dòng hai  '), 'typewriter text, spaces kept')
+  assert.ok(!/Typewriter note\*\* .*\nNote:/.test(md))
+  assert.ok(md.includes('> đoạn trong PDF'))
+  assert.ok(md.includes('Note: dòng một  \ndòng hai'))
+})
+
+await check('TXT and Markdown: sections by position', async () => {
+  pick = outFile('txt-readable.md')
+  assert.deepEqual(await runReadable(books.txt.id), { ok: true, exported: 1 })
+  assert.ok(readFileText(pick).includes('## Section 1\n\n> Trăm năm '))
+  pick = outFile('md-readable.md')
+  assert.deepEqual(await runReadable(books.md.id), { ok: true, exported: 1 })
+  assert.ok(readFileText(pick).includes('## Section 5\n\n> Cách tra cứu (Ctrl + click):'))
+})
+
+await check('a path without .md is saved with .md, and the readable copy is not an annotations file', async () => {
+  pick = outFile('chosen-readable')
+  assert.equal((await runReadable(books.epub.id)).ok, true)
+  assert.ok(fs.existsSync(outFile('chosen-readable.md')))
+  assert.ok(!fs.existsSync(outFile('chosen-readable')))
+  assert.equal(parseAnnotationFile(readFileText(outFile('chosen-readable.md'))).ok, false)
+})
+
+await check('refusals: empty book (no dialog), cancelled dialog, audiobook / unknown id, the app data folder, an unwritable target', async () => {
+  dialogCalls.length = 0
+  pick = outFile('never.md')
+  assert.equal((await runReadable(books.empty.id)).errorCode, 'empty')
+  assert.deepEqual(dialogCalls, [])
+  pick = null
+  assert.deepEqual(await runReadable(books.epub.id), { ok: false, errorCode: 'cancelled' })
+  assert.deepEqual(await runReadable(books.audio.id), { ok: false, errorCode: 'not_found' })
+  assert.deepEqual(await runReadable('missing'), { ok: false, errorCode: 'not_found' })
+  pick = path.join(userData, 'x.md')
+  assert.equal((await runReadable(books.epub.id)).errorCode, 'write_failed')
+  assert.deepEqual(fs.readdirSync(userData), [])
+  pick = path.join(books.epub.file, 'x.md')
+  assert.equal((await runReadable(books.epub.id)).errorCode, 'write_failed')
+  assert.ok(!fs.existsSync(outFile('never.md')))
+})
+
+await check('importing the readable copy is refused with the "cannot be imported" hint and nothing changes', async () => {
+  const rowsBefore = noteRows(books.epub.id)
+  const r = await preview(outFile('epub-readable.md'), books.epub.id)
+  assert.equal(r.ok, false)
+  assert.equal(r.errorCode, 'not_annotation_file')
+  assert.match(r.message, /readable copy/i)
+  assert.match(r.message, /cannot be imported/i)
+  assert.deepEqual(noteRows(books.epub.id), rowsBefore)
+  // also when the picker returned it under another name
+  fs.copyFileSync(outFile('epub-readable.md'), outFile('renamed.readmate-notes.json'))
+  const renamed = await preview(outFile('renamed.readmate-notes.json'), books.epub.id)
+  assert.equal(renamed.ok, false)
+  assert.equal(renamed.errorCode, 'not_annotation_file', 'the content decides, not the extension')
+})
+
+await check('exporting the readable copy changes no book file and no row', () => {
+  assert.equal(overlays.countAnnotationsForTransfer(books.epub.id), 2)
   for (const b of bookFiles) {
     if (b.gone) continue
     assert.equal(sha(fs.readFileSync(b.file)), b.hash, `${b.id} content`)

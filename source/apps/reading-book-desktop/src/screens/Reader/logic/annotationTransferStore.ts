@@ -48,6 +48,8 @@ type AnnotationTransferState = {
   progress: AnnotationTransferProgressDto | null
   refreshCount: (bookId: string) => Promise<void>
   exportRestore: (bookId: string, onToast: (message: string | null) => void) => Promise<void>
+  /** Save the readable Markdown copy (quotes and comments in reading order; it cannot be imported). */
+  exportReadable: (bookId: string, onToast: (message: string | null) => void) => Promise<void>
   /** Open the file dialog and show the preview. `bookId` = the book the import was started from (Reader menu). */
   startImport: (bookId?: string) => Promise<void>
   /** The user's explicit choice of target book. */
@@ -111,6 +113,19 @@ export const useAnnotationTransferStore = create<AnnotationTransferState>()((set
         if (shown) onToast(shown.message)
       } catch {
         onToast('Could not export the annotations.')
+      } finally {
+        set({ exporting: false })
+      }
+    },
+
+    exportReadable: async (bookId, onToast) => {
+      if (get().exporting) return
+      set({ exporting: true })
+      try {
+        const shown = annotationExportMessage(await annotationTransferApi.exportReadable(bookId), 'readable copy')
+        if (shown) onToast(shown.message)
+      } catch {
+        onToast('Could not export the readable copy.')
       } finally {
         set({ exporting: false })
       }

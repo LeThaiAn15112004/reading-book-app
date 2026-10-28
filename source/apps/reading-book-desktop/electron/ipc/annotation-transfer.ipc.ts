@@ -9,7 +9,7 @@ import { randomUUID } from 'node:crypto'
 import fsp from 'node:fs/promises'
 import path from 'node:path'
 import { isPathInsideUserData, resolveBookFile } from '../files/sandbox'
-import { exportRestoreAnnotations, type ExportDeps } from '../annotation-transfer/export-service'
+import { exportReadableAnnotations, exportRestoreAnnotations, type ExportDeps } from '../annotation-transfer/export-service'
 import { createImportService, scanKeysOf, type ImportDeps, type ImportService } from '../annotation-transfer/import-service'
 import { writeFileSafely } from '../pdf-sync/pdf-annotation-export'
 import type { PdfAnnotationScanResult } from '../pdf-sync/pdf-annotation-scan'
@@ -52,12 +52,15 @@ function exportDeps(event: Electron.IpcMainInvokeEvent): ExportDeps {
     listRows: (id) => overlays.listAnnotationsForTransfer(id),
     ledger: (id) => overlays.listEmbeddedLedger(id),
     txtContentSha256: (id) => getTxtStore().getDocument(id)?.contentSha256,
-    chooseTarget: async (defaultFileName) => {
+    chooseTarget: async (defaultFileName, kind) => {
       const parent = BrowserWindow.fromWebContents(event.sender) ?? undefined
       const options: Electron.SaveDialogOptions = {
-        title: 'Export annotations',
+        title: kind === 'readable' ? 'Export readable copy' : 'Export annotations',
         defaultPath: path.join(app.getPath('documents'), defaultFileName),
-        filters: [{ name: 'Readmate annotations (*.readmate-notes.json)', extensions: ['json'] }],
+        filters:
+          kind === 'readable'
+            ? [{ name: 'Markdown (*.md)', extensions: ['md'] }]
+            : [{ name: 'Readmate annotations (*.readmate-notes.json)', extensions: ['json'] }],
         properties: ['showOverwriteConfirmation', 'createDirectory'],
       }
       const picked = parent ? await dialog.showSaveDialog(parent, options) : await dialog.showSaveDialog(options)
@@ -161,9 +164,10 @@ export function registerAnnotationTransferIpc(): void {
   })
 
   ipcMain.removeHandler(AnnotationTransferChannels.exportReadable)
-  ipcMain.handle(AnnotationTransferChannels.exportReadable, async (_event, bookId: unknown): Promise<AnnotationExportResult> => {
-    if (!(await findTransferBook(bookId))) return NOT_FOUND
-    return NOT_FOUND // T035
+  ipcMain.handle(AnnotationTransferChannels.exportReadable, async (event, bookId: unknown): Promise<AnnotationExportResult> => {
+    const book = await findTransferBook(bookId)
+    if (!book) return NOT_FOUND
+    return exportReadableAnnotations(book.id, exportDeps(event))
   })
 
   ipcMain.removeHandler(AnnotationTransferChannels.pickFile)

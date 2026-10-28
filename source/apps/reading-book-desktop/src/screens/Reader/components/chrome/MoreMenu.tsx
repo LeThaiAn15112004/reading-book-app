@@ -12,6 +12,8 @@ type MoreMenuProps = {
   exportAnnotationsDisabled?: boolean
   /** EPUB / PDF / TXT / Markdown: pick a `.readmate-notes.json` file and import its annotations into this book. Hidden when absent. */
   onImportAnnotations?: () => void
+  /** EPUB / PDF / TXT / Markdown: save a readable Markdown copy (quotes and comments in reading order). Hidden when absent. */
+  onExportReadable?: () => void
 }
 
 const itemClass =
@@ -27,6 +29,7 @@ export function MoreMenu({
   onExportAnnotations,
   exportAnnotationsDisabled,
   onImportAnnotations,
+  onExportReadable,
 }: MoreMenuProps) {
   if (!open) return null
 
@@ -70,6 +73,18 @@ export function MoreMenu({
           onClick={onExportAnnotations}
         >
           Export annotations (backup)…
+        </button>
+      ) : null}
+      {onExportReadable ? (
+        <button
+          className={`${itemClass} disabled:cursor-default disabled:opacity-45`}
+          type="button"
+          role="menuitem"
+          disabled={exportAnnotationsDisabled}
+          title={exportAnnotationsDisabled ? 'This book has no annotations to export yet.' : undefined}
+          onClick={onExportReadable}
+        >
+          Export readable copy…
         </button>
       ) : null}
       {onImportAnnotations ? (

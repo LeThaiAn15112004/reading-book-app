@@ -7,8 +7,10 @@
  */
 import {
   FILE_EXTENSION,
+  type AnnotationFile,
   buildAnnotationFile,
   isReadmateAuthoredKey,
+  renderReadableMarkdown,
   serializeAnnotationFile,
   type ExportRow,
   type TransferBook,
@@ -38,8 +40,8 @@ export interface ExportDeps {
   ledger(bookId: string): EmbeddedAnnotationLedgerEntry[]
   /** TXT: `txt_documents.content_sha256` of the edited copy, when there is one. */
   txtContentSha256(bookId: string): string | undefined
-  /** Native save dialog; resolves to the chosen path or null when the user cancelled. */
-  chooseTarget(defaultFileName: string): Promise<string | null>
+  /** Native save dialog (`kind` picks the file filter); resolves to the chosen path or null when the user cancelled. */
+  chooseTarget(defaultFileName: string, kind: 'restore' | 'readable'): Promise<string | null>
   /** True when the chosen path must not be written (inside the app's own data folder). */
   isForbiddenTarget(target: string): boolean
   /** Atomic write (temp file + rename): no partial file is left on failure. */
@@ -52,6 +54,17 @@ export interface ExportDeps {
 export function defaultRestoreFileName(title: string): string {
   const safe = title.replace(/[\\/:*?"<>|]+/g, ' ').replace(/\s+/g, ' ').trim() || 'book'
   return `${safe}${FILE_EXTENSION}`
+}
+
+/** `<title>.md` for the readable copy. */
+export function defaultReadableFileName(title: string): string {
+  const safe = title.replace(/[\\/:*?"<>|]+/g, ' ').replace(/\s+/g, ' ').trim() || 'book'
+  return `${safe}.md`
+}
+
+/** The path the user picked, ending in `.md` (anything else gets `.md` appended). */
+export function withReadableExtension(target: string): string {
+  return target.toLowerCase().endsWith('.md') ? target : `${target}.md`
 }
 
 /** The path the user picked, ending in `.readmate-notes.json` (a plain `.json` is converted, anything else is appended). */
@@ -77,7 +90,10 @@ function pdfOrigins(rows: readonly TransferNoteRow[], ledger: readonly EmbeddedA
   return out
 }
 
-export async function exportRestoreAnnotations(bookId: string, deps: ExportDeps): Promise<AnnotationExportResult> {
+type BuiltFile = { ok: true; file: AnnotationFile; exported: number } | { ok: false; errorCode: 'not_found' | 'empty'; message?: string }
+
+/** Read the book's annotation rows (SQLite only — never the book file) and build the annotations file. */
+async function buildFileFor(bookId: string, deps: ExportDeps): Promise<BuiltFile> {
   const book = await deps.findBook(bookId)
   if (!book || !TRANSFER_FORMATS.includes(book.format)) return { ok: false, errorCode: 'not_found' }
   const format = book.format as TransferFormat
@@ -105,18 +121,43 @@ export async function exportRestoreAnnotations(bookId: string, deps: ExportDeps)
   })
   // Nothing to export: say so before any dialog is shown and write nothing.
   if (!built.ok) return { ok: false, errorCode: 'empty', message: 'This book has no annotations to export.' }
+  return { ok: true, file: built.file, exported: built.exported }
+}
 
-  const picked = await deps.chooseTarget(defaultRestoreFileName(book.title))
+/** Ask for a target, refuse the app's own data folder, write atomically. */
+async function saveText(
+  text: string,
+  defaultName: string,
+  kind: 'restore' | 'readable',
+  deps: ExportDeps,
+  withExtension: (target: string) => string,
+): Promise<{ ok: true } | { ok: false; errorCode: 'cancelled' | 'write_failed'; message?: string }> {
+  const picked = await deps.chooseTarget(defaultName, kind)
   if (!picked) return { ok: false, errorCode: 'cancelled' }
-  const target = withRestoreExtension(picked)
+  const target = withExtension(picked)
   if (deps.isForbiddenTarget(target)) {
     return { ok: false, errorCode: 'write_failed', message: "Choose a folder outside the app's own data folder." }
   }
-
   try {
-    await deps.write(target, new TextEncoder().encode(serializeAnnotationFile(built.file)))
+    await deps.write(target, new TextEncoder().encode(text))
   } catch (err) {
     return { ok: false, errorCode: 'write_failed', message: err instanceof Error ? err.message : 'The file could not be written.' }
   }
-  return { ok: true, exported: built.exported }
+  return { ok: true }
+}
+
+export async function exportRestoreAnnotations(bookId: string, deps: ExportDeps): Promise<AnnotationExportResult> {
+  const built = await buildFileFor(bookId, deps)
+  if (!built.ok) return built
+  const saved = await saveText(serializeAnnotationFile(built.file), defaultRestoreFileName(built.file.book.title), 'restore', deps, withRestoreExtension)
+  return saved.ok ? { ok: true, exported: built.exported } : saved
+}
+
+/** The readable Markdown copy: quotes and comments in reading order. It cannot be imported. */
+export async function exportReadableAnnotations(bookId: string, deps: ExportDeps): Promise<AnnotationExportResult> {
+  const built = await buildFileFor(bookId, deps)
+  if (!built.ok) return built
+  // EPUB headings are `Chapter N` from the stored chapter index: Main has no EPUB table-of-contents reader (research R9, T048).
+  const saved = await saveText(renderReadableMarkdown(built.file), defaultReadableFileName(built.file.book.title), 'readable', deps, withReadableExtension)
+  return saved.ok ? { ok: true, exported: built.exported } : saved
 }
