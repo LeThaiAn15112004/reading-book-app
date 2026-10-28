@@ -1,0 +1,19 @@
+{
+  "fileVersion": 1,
+  "exportedBy": "Readmate 1.0.0",
+  "exportedAt": "2026-10-28T09:15:00+07:00",
+  "book": { "title": "Nhà Giả Kim", "author": "Paulo Coelho", "format": "epub", "sha256": "0000000000000000000000000000000000000000000000000000000000000000" },
+  "annotations": [
+    {
+      "sourceId": "b1d0c9f0-0000-0000-0000-000000000001",
+      "type": "highlight",
+      "locator": { "kind": "cfi", "cfi": "epubcfi(/6/14!/4/2/6,/1:0,/1:63)", "chapterIndex": 6 },
+      "selectionText": { "before": "…", "highlight": "Khi bạn muốn một điều gì, cả vũ trụ sẽ hợp lực giúp bạn đạt được.", "after": "…" },
+      "note": "Câu chủ đề của cuốn sách",
+      "colorHex": "#FFEB3B",
+      "createdAt": "2026-10-20T20:01:12+07:00",
+      "modifiedAt": "2026-10-21T08:30:00+07:00",
+      "origin": "app"
+    }
+  ]
+}

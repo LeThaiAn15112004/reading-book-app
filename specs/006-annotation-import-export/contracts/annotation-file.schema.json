@@ -1,0 +1,58 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Readmate annotations file (.readmate-notes.json)",
+  "type": "object",
+  "required": ["fileVersion", "exportedBy", "exportedAt", "book", "annotations"],
+  "properties": {
+    "fileVersion": { "const": 1 },
+    "exportedBy": { "type": "string" },
+    "exportedAt": { "type": "string" },
+    "book": {
+      "type": "object",
+      "required": ["title", "format", "sha256"],
+      "properties": {
+        "title": { "type": "string" },
+        "author": { "type": "string" },
+        "format": { "enum": ["epub", "pdf", "txt", "md"] },
+        "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "pageCount": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "txt": {
+      "type": "object",
+      "required": ["contentSha256"],
+      "properties": { "contentSha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" } }
+    },
+    "annotations": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["sourceId", "type", "locator", "colorHex", "createdAt", "origin"],
+        "properties": {
+          "sourceId": { "type": "string" },
+          "type": { "enum": ["highlight", "underline", "squiggly", "strikethrough", "replace", "insert", "textbox", "rectangle", "ellipse", "line", "arrow", "typewriter"] },
+          "locator": {
+            "description": "Stored NoteLocator verbatim.",
+            "oneOf": [
+              { "type": "object", "required": ["kind", "cfi"], "properties": { "kind": { "const": "cfi" }, "cfi": { "type": "string" }, "chapterIndex": { "type": "integer" } } },
+              { "type": "object", "required": ["kind", "page"], "properties": { "kind": { "const": "page-rect" }, "page": { "type": "integer", "minimum": 1 }, "rect": { "type": "object" }, "chapterIndex": { "type": "integer" } } },
+              { "type": "object", "required": ["kind", "offset"], "properties": { "kind": { "const": "text-offset" }, "offset": { "type": "integer", "minimum": 0 }, "blockId": { "enum": ["txt", "md"] }, "chapterIndex": { "type": "integer" } } }
+            ]
+          },
+          "selectionText": { "type": "object", "properties": { "before": { "type": "string" }, "highlight": { "type": "string" }, "after": { "type": "string" } } },
+          "note": { "type": "string" },
+          "tags": { "type": "array", "items": { "type": "string" } },
+          "colorHex": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}([0-9A-Fa-f]{2})?$" },
+          "pdfAnnotation": { "type": "object" },
+          "txtAnnotation": { "type": "object", "required": ["startOffset", "endOffset"] },
+          "mdAnnotation": { "type": "object" },
+          "createdAt": { "type": "string" },
+          "modifiedAt": { "type": "string" },
+          "origin": { "enum": ["app", "file"] },
+          "nm": { "type": "string" }
+        }
+      }
+    }
+  }
+}
