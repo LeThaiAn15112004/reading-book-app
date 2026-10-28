@@ -33,6 +33,7 @@ Yes, by carrying the stored fields verbatim (see data-model): EPUB `{kind:'cfi',
 ## R5 — PDF annotations from other readers (Q4)
 - They are ordinary `notes` rows, created by `planEmbeddedAnnotationSync` / the two-way plan from a pdf.js scan and tracked in `pdf_embedded_annotations` (migrations 023/024; `note_id`, `source_key`, `base_json`, `conflict_json`). They exist in SQLite, so export is complete from SQLite alone and the PDF is not read or written.
 - Blocker for import (see audit B1): a row inserted without a ledger entry is seen by `planTwoWaySync` as (a) a "row the file doesn't hold" -> `file.add`, and (b) the same annotation, if the target PDF already contains it, as an unknown scan item -> `inserts` = a second row. Result: duplicates in SQLite and in the file.
+- Implementation note (T013): the ledger stores only the hashed name, so `file`-origin annotations are exported with `sourceKeys` (the ledger keys) rather than `nm`; the preview matches them against the keys of a scan of the target.
 - Decision: for PDF, preview runs the existing scan (`electron/pdf-sync` worker) on the target; a file-origin annotation whose `/NM` key is in the scan is "present" and not inserted; one whose `/NM` is `readmate:<id>` with a reused id is picked up by `plan.links` (no duplicate). Annotations not in the target file are inserted as ordinary rows and are written into the file by the existing sync like any app-made annotation. Import does not touch the ledger.
 
 ## R6 — Preview/confirm consistency (Q5)

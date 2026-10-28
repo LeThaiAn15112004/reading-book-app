@@ -13,6 +13,9 @@ type ReaderTopbarProps = {
   onTrash: () => void
   /** PDF only: "Export PDF with annotations…" in the More menu. */
   onExportPdf?: () => void
+  /** EPUB / PDF / TXT / Markdown: "Export annotations (backup)…" in the More menu. */
+  onExportAnnotations?: () => void
+  exportAnnotationsDisabled?: boolean
   /** What the open book's reader surface supports; unsupported tools are not rendered. */
   capabilities: ReadonlySet<ReaderCapability>
   /** Active / expanded state per tool (see `ToolsStrip`). */
@@ -36,6 +39,8 @@ export function ReaderTopbar({
   onBookInfo,
   onTrash,
   onExportPdf,
+  onExportAnnotations,
+  exportAnnotationsDisabled,
   capabilities,
   toolStates,
   onTool,
@@ -100,6 +105,8 @@ export function ReaderTopbar({
           onBookInfo={onBookInfo}
           onTrash={onTrash}
           onExportPdf={onExportPdf}
+          onExportAnnotations={onExportAnnotations}
+          exportAnnotationsDisabled={exportAnnotationsDisabled}
         />
       </div>
     </header>

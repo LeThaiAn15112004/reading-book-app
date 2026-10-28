@@ -50,7 +50,8 @@
           "createdAt": { "type": "string" },
           "modifiedAt": { "type": "string" },
           "origin": { "enum": ["app", "file"] },
-          "nm": { "type": "string" }
+          "nm": { "type": "string" },
+          "sourceKeys": { "type": "array", "items": { "type": "string" } }
         }
       }
     }

@@ -30,7 +30,8 @@ No schema migration. Import and export read and write existing `notes` rows. Fie
 | createdAt | `created` / row `created_at` | restored on import |
 | modifiedAt | `modified` | informational: `writeHighlight` always stamps "now", so an imported row's modified time is the import time |
 | origin | derived | `file` when the row came from a scan of the PDF and the ledger key is not the key of `readmate:<id>`; else `app`. See research R3b (unverified derivation) |
-| nm | ledger | PDF `file`-origin only: the annotation's `/NM`, needed to recognise it in a scan |
+| nm | not stored by the app | PDF `file`-origin only, optional: the annotation's `/NM` when it is known (the sync ledger keeps only its hash, so the exporter normally cannot fill this) |
+| sourceKeys | `pdf_embedded_annotations.source_key` | PDF `file`-origin only: the ledger identity keys (`nm1:<pageIndex>:<hash53(nm)>#n`, or `pdf1:...` before `/NM` support), one per page the annotation touches. Equal to the keys `embeddedAnnotationIdentities` gives a scan of the target PDF, so an importer can recognise the same annotation there (found while implementing T013: the ledger has no `/NM`) |
 
 Import re-validates every payload with the existing parsers (`parsePdfAnnotation`, `parseTxtAnnotation`,
 `parseMdAnnotation`, the locator parsers) — an invalid annotation counts as "not placed", never written.

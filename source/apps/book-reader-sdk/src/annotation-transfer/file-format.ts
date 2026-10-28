@@ -61,8 +61,14 @@ export interface TransferAnnotation {
   createdAt: string
   modifiedAt?: string
   origin: TransferOrigin
-  /** PDF `file`-origin only: the annotation's `/NM`. */
+  /** PDF `file`-origin only: the annotation's `/NM`, when known. */
   nm?: string
+  /**
+   * PDF `file`-origin only: the identity keys the app's sync ledger holds for this annotation (`nm1:<page>:<hash>#n`
+   * or `pdf1:...`, one per page it touches). The ledger stores only the hashed name, so this — not `nm` — is what lets
+   * an importer recognise the same annotation in a scan of the target PDF.
+   */
+  sourceKeys?: string[]
 }
 
 export interface AnnotationFile {
@@ -164,6 +170,7 @@ function parseAnnotation(raw: unknown): { ok: true; value: TransferAnnotation } 
   if (raw.note !== undefined && typeof raw.note !== 'string') return fail('invalid comment')
   if (raw.tags !== undefined && !(Array.isArray(raw.tags) && raw.tags.every((t) => typeof t === 'string'))) return fail('invalid tags')
   if (raw.nm !== undefined && typeof raw.nm !== 'string') return fail('invalid name')
+  if (raw.sourceKeys !== undefined && !(Array.isArray(raw.sourceKeys) && raw.sourceKeys.every((k) => typeof k === 'string'))) return fail('invalid source keys')
   for (const key of ['pdfAnnotation', 'txtAnnotation', 'mdAnnotation'] as const) {
     if (raw[key] !== undefined && !isObject(raw[key])) return fail(`invalid ${key}`)
   }
@@ -181,6 +188,7 @@ function parseAnnotation(raw: unknown): { ok: true; value: TransferAnnotation } 
   if (Array.isArray(raw.tags) && raw.tags.length) value.tags = raw.tags as string[]
   if (typeof raw.modifiedAt === 'string') value.modifiedAt = raw.modifiedAt
   if (typeof raw.nm === 'string') value.nm = raw.nm
+  if (Array.isArray(raw.sourceKeys) && raw.sourceKeys.length) value.sourceKeys = raw.sourceKeys as string[]
   if (isObject(raw.pdfAnnotation)) value.pdfAnnotation = raw.pdfAnnotation
   if (isObject(raw.txtAnnotation)) value.txtAnnotation = raw.txtAnnotation
   if (isObject(raw.mdAnnotation)) value.mdAnnotation = raw.mdAnnotation

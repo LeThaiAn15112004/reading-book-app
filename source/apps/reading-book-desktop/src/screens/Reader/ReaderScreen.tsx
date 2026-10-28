@@ -30,6 +30,7 @@ import {
 import { ReaderShell, readerChromeTopInset, readerChromeBottomInset } from '../../reader'
 import { usePdfViewStore } from './logic/pdfView/pdfViewStore'
 import { usePdfExportStore } from './logic/pdfExport/pdfExportStore'
+import { supportsAnnotationTransfer, useAnnotationTransferStore } from './logic/annotationTransferStore'
 import { usePdfSignedWriteStore } from './logic/pdfExport/pdfSignedWriteStore'
 import { getReaderCapabilities } from '../../reader/capabilities'
 import {
@@ -278,6 +279,14 @@ export function ReaderScreen() {
   const pendingSignedExport = usePdfExportStore((st) => st.pendingSigned)
   const confirmSignedExport = usePdfExportStore((st) => st.confirmSigned)
   const cancelSignedExport = usePdfExportStore((st) => st.cancelSigned)
+  // "Export annotations (backup)…" (specs/006-annotation-import-export): EPUB / PDF / TXT / Markdown only.
+  const canTransferAnnotations = book.contentStatus === 'ready' && supportsAnnotationTransfer(book.bookFormat)
+  const annotationCount = useAnnotationTransferStore((st) => (st.countBookId === bookId ? st.count : 0))
+  const refreshAnnotationCount = useAnnotationTransferStore((st) => st.refreshCount)
+  const exportAnnotations = useAnnotationTransferStore((st) => st.exportRestore)
+  useEffect(() => {
+    if (canTransferAnnotations && bookId && chrome.moreOpen) void refreshAnnotationCount(bookId)
+  }, [canTransferAnnotations, bookId, chrome.moreOpen, refreshAnnotationCount])
   const pendingSignedWrite = usePdfSignedWriteStore((st) => st.pending)
   const confirmSignedWrite = usePdfSignedWriteStore((st) => st.confirm)
   const declineSignedWrite = usePdfSignedWriteStore((st) => st.decline)
@@ -869,6 +878,15 @@ export function ReaderScreen() {
             chrome.closeFloating()
             chrome.setTrashOpen(true)
           }}
+          onExportAnnotations={
+            canTransferAnnotations && bookId
+              ? () => {
+                  chrome.closeFloating()
+                  void exportAnnotations(bookId, chrome.setToast)
+                }
+              : undefined
+          }
+          exportAnnotationsDisabled={annotationCount === 0}
           onExportPdf={
             isPdfSurface && bookId
               ? () => {
