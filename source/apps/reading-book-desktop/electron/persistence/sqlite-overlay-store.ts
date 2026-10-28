@@ -17,7 +17,7 @@ import {
   type TxtAnnotation,
 } from '@reading-book/book-reader-sdk'
 import type { Database as SqliteDatabase } from 'better-sqlite3'
-import { randomUUID } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 import {
   parseReadingState,
   type ReadingStateJson,
@@ -665,6 +665,23 @@ export class SqliteOverlayStore implements OverlayStore {
       .prepare(`SELECT COUNT(*) AS n FROM notes WHERE book_id = ? AND ${HIGHLIGHT_TYPE_PREDICATE}`)
       .get(id) as { n: number }
     return row.n
+  }
+
+  /**
+   * A fingerprint of a book's annotation rows — their ids and last-change times, read straight from the columns (no JSON
+   * parsing, so it is cheap even for thousands of rows). `writeHighlight` stamps `updated_at` on every save and the sync paths
+   * save through it, so an added, removed or edited annotation changes the stamp. The import compares it inside its transaction
+   * to prove that nothing changed since the preview.
+   */
+  annotationStamp(bookId: string): string {
+    const id = bookId.trim()
+    const hash = createHash('sha256')
+    if (!id) return hash.digest('hex')
+    const rows = this.db
+      .prepare(`SELECT id, updated_at FROM notes WHERE book_id = ? AND ${HIGHLIGHT_TYPE_PREDICATE} ORDER BY id`)
+      .all(id) as Array<{ id: string; updated_at: string }>
+    for (const r of rows) hash.update(r.id).update('\u0000').update(r.updated_at).update('\n')
+    return `${rows.length}:${hash.digest('hex')}`
   }
 
   /** Which of these note ids already exist in ANY book (a reused id would be overwritten by `writeHighlight`'s upsert). */

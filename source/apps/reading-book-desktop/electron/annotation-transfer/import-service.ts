@@ -11,7 +11,6 @@
  * The dialog, the file read, the stores and the PDF scan are injected: `annotation-transfer.ipc.ts` passes the real
  * ones, the Main spike passes the real stores with a stubbed dialog.
  */
-import { createHash } from 'node:crypto'
 import {
   contentKeyOfNote,
   decidePlacement,
@@ -60,6 +59,8 @@ export interface ImportDeps {
   scanPdfKeys(bookId: string): Promise<ReadonlySet<string> | null>
   // ---- synchronous reads / writes (used inside the transaction) ----
   listRows(bookId: string): TransferNoteRow[]
+  /** Cheap fingerprint of the book's annotation rows (ids + last-change times): the preview's freshness proof. */
+  annotationStamp(bookId: string): string
   existingNoteIds(ids: readonly string[]): Set<string>
   bookSha256(bookId: string): string | undefined
   txtState(bookId: string): { revision: number; contentSha256?: string }
@@ -73,7 +74,8 @@ export interface ImportDeps {
 interface Freshness {
   sha256: string
   txt?: { revision: number; contentSha256?: string }
-  keysSignature: string
+  /** `annotationStamp` of the target when the preview was made. */
+  rowsStamp: string
 }
 
 interface Session {
@@ -106,14 +108,6 @@ const MESSAGES: Partial<Record<AnnotationTransferErrorCode, string>> = {
 
 function fail(errorCode: AnnotationTransferErrorCode, message?: string): { ok: false; errorCode: AnnotationTransferErrorCode; message?: string } {
   return { ok: false, errorCode, message: message ?? MESSAGES[errorCode] }
-}
-
-/** A stable signature of a set of content keys (order-independent). */
-function signature(keys: Iterable<string>): string {
-  const sorted = [...keys].sort()
-  const hash = createHash('sha256')
-  for (const k of sorted) hash.update(k).update('\n')
-  return `${sorted.length}:${hash.digest('hex')}`
 }
 
 function keysOf(rows: readonly TransferNoteRow[]): Set<string> {
@@ -190,7 +184,7 @@ export function createImportService(deps: ImportDeps): ImportService {
       targetText,
       isUsableId: (id) => !taken.has(id),
     })
-    return { ok: true, plan, freshness: { sha256: book.sha256, txt, keysSignature: signature(existingKeys) } }
+    return { ok: true, plan, freshness: { sha256: book.sha256, txt, rowsStamp: deps.annotationStamp(book.id) } }
   }
 
   return {
@@ -287,7 +281,7 @@ export function createImportService(deps: ImportDeps): ImportService {
         const stale =
           sha !== freshness.sha256 ||
           (freshness.txt && (txt?.revision !== freshness.txt.revision || txt?.contentSha256 !== freshness.txt.contentSha256)) ||
-          signature(keysOf(deps.listRows(book.id))) !== freshness.keysSignature
+          deps.annotationStamp(book.id) !== freshness.rowsStamp
         if (stale) {
           deps.db.exec('ROLLBACK')
           return fail('stale_preview')

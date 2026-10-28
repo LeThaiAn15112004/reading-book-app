@@ -1,6 +1,6 @@
 # Ma trận hỗ trợ annotation theo định dạng
 
-Cập nhật: 2026-10-19 (khảo sát bằng cách đọc code, chưa chạy app thử từng ô).
+Cập nhật: 2026-10-28 (khảo sát bằng cách đọc code, chưa chạy app thử từng ô). Dòng MD sửa lại: bản ghi ngày 2026-10-19 nói MD chỉ có nút, nhưng code đã có tạo và vẽ annotation.
 
 Sáu tool markup nằm trong nhóm **Annotation** của thanh công cụ Reader
 (`src/screens/Reader/components/chrome/toolRegistry.ts`). Một tool chỉ hiện khi bề mặt đọc khai báo
@@ -17,10 +17,10 @@ Hàng ngang: loại annotation. Hàng dọc: định dạng.
 | **EPUB** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | **PDF** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | **TXT** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| **MD** | ⚠️ chỉ nút | ⚠️ chỉ nút | ⚠️ chỉ nút | ⚠️ chỉ nút | ⚠️ chỉ nút | ⚠️ chỉ nút |
+| **MD** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | **DOCX / DOC** | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
 
-Chú giải: ✅ có code tạo và vẽ annotation. ⚠️ nút hiện trên thanh công cụ nhưng chưa có xử lý nào.
+Chú giải: ✅ có code tạo và vẽ annotation. ⚠️ nút hiện trên thanh công cụ nhưng chưa có xử lý nào (hiện không còn ô nào như vậy).
 ❌ định dạng chưa có renderer nên thanh công cụ không hiện tool nào.
 
 ## Chi tiết theo định dạng
@@ -33,14 +33,18 @@ Chú giải: ✅ có code tạo và vẽ annotation. ⚠️ nút hiện trên th
   ghi ra file hay không.
 - **TXT**: vẽ trên backdrop bằng `renderers/txt/txtMarkStyle.ts`, lưu theo offset UTF-16
   (xem `txt_reader.md`).
-- **MD**: `capabilities.ts` khai báo `markupAnnotations` cho surface `md`, nhưng `renderers/md` không có
-  code tạo hay vẽ annotation. Bấm tool thì tool sáng lên, kéo chọn chữ không tạo gì
-  (xem `markdown_reader.md`, commit "TXT và MD hiện đủ thanh công cụ như EPUB, chỉ giao diện").
+- **MD**: `renderers/md/mdAnnotations.ts` (neo `(đoạn, offset)` theo `data-md-seg`, vẽ bằng CSS Custom Highlight API, không chèn gì vào
+  văn bản), `MdRenderer.tsx`, `screens/Reader/logic/mdHighlights/mdHighlightsStore.ts` và `hooks/useReaderMdHighlights.ts`. Lưu dạng `notes` với
+  `note_json.mdAnnotation` (SDK `md/md-annotations.ts`). Bản ghi cũ ghi sai là "chỉ nút"; ảnh chụp màn hình ngày 2026-10-28 cho thấy highlight và
+  underline vẽ được. Chưa chạy từng loại trong sáu loại để xem hiển thị.
 - **DOCX / DOC**: dùng canvas giữ chỗ (`placeholder`), capability chỉ có `interaction`, `snapshot`,
   `wordCount`, `readingSettings`, `pageLayout`.
 
 ## Việc còn lại
 
-- MD: làm annotation thật (chọn cách lưu locator, vẽ mark) hoặc ẩn 6 nút cho tới khi làm.
 - PDF: kiểm tra Replace và Insert có ghi ngược vào file PDF.
 - DOCX / DOC: cần renderer trước khi nói tới annotation.
+
+## Xuất / nhập annotation
+
+EPUB, PDF, TXT và Markdown đều xuất và nhập được annotation (file `.readmate-notes.json`, và bản đọc `.md`): xem `annotation_import_export.md`. DOCX / DOC chưa có annotation nên không có gì để xuất.

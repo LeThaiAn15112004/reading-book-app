@@ -126,6 +126,7 @@ function importDeps(): ImportDeps {
       return scanKeysOf(result.items)
     },
     listRows: (id) => overlays.listAnnotationsForTransfer(id),
+    annotationStamp: (id) => overlays.annotationStamp(id),
     existingNoteIds: (ids) => overlays.existingNoteIds(ids),
     bookSha256: (id) => (getDatabase().prepare('SELECT sha256 FROM books WHERE id = ?').get(id) as { sha256: string } | undefined)?.sha256,
     txtState: (id) => {
