@@ -6,6 +6,7 @@ import {
   embeddedAnnotationSourceHash,
   highlightContentHash,
   highlightFromEmbeddedAnnotation,
+  isReadmateAuthoredKey,
   parseScannedPdfAnnotation,
   planEmbeddedAnnotationSync,
   readPdfJsAnnotation,
@@ -561,5 +562,21 @@ describe('live sync rules', () => {
     for (let i = 0; i < 5; i++) model.open(items, { complete: true })
     expect(model.notes.size).toBe(4)
     expect(model.ledger.size).toBe(4)
+  })
+})
+
+describe('isReadmateAuthoredKey', () => {
+  const key = (page: number, nm: string) =>
+    embeddedAnnotationIdentities([{ subtype: 'Highlight', pageIndex: page, rects: [], nm } as unknown as ScannedPdfAnnotation])[0]!.key
+
+  it('recognises the key of a Readmate-written annotation, first and later pages', () => {
+    expect(isReadmateAuthoredKey('abc', key(2, 'readmate:abc'))).toBe(true)
+    expect(isReadmateAuthoredKey('abc', key(4, 'readmate:abc:p5'))).toBe(true)
+  })
+
+  it('does not take a foreign name, another row or a pre-NM key for Readmate-authored', () => {
+    expect(isReadmateAuthoredKey('abc', key(2, 'Foxit-12'))).toBe(false)
+    expect(isReadmateAuthoredKey('abc', key(2, 'readmate:other'))).toBe(false)
+    expect(isReadmateAuthoredKey('abc', 'pdf1:Highlight:2:00000000000000#0')).toBe(false)
   })
 })

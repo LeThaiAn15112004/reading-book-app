@@ -89,6 +89,7 @@ export {
   isEmbeddedShapeSubtype,
   EMBEDDED_PDF_SCAN_MAX_ANNOTATIONS,
   embeddedAnnotationIdentities,
+  isReadmateAuthoredKey,
   embeddedAnnotationKeys,
   embeddedAnnotationSourceHash,
   highlightContentHash,

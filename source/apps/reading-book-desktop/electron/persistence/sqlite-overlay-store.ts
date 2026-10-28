@@ -152,6 +152,15 @@ interface NoteRow {
 
 const NOTE_COLUMNS = `id, book_id, note_json, created_at, updated_at`
 
+/** One annotation row as stored, for the annotations file export. */
+export interface TransferNoteRow {
+  id: string
+  bookId: string
+  createdAt: string
+  updatedAt: string
+  note: INoteState
+}
+
 /**
  * Bookmark rows are `notes` rows whose `note_json.group` is `'bookmark'` (migration 019).
  * A missing `group` means `'annotation'` by convention, and `json_extract` yields NULL there —
@@ -619,6 +628,51 @@ export class SqliteOverlayStore implements OverlayStore {
     return rows
       .map(rowToHighlightRecord)
       .filter((h): h is HighlightRecord => h !== undefined)
+  }
+
+  /**
+   * Annotation rows of a book exactly as stored (parsed `note_json`), for export — the same rows as
+   * `listHighlights` but without re-validation or reshaping, so every stored field can be carried into
+   * the annotations file (specs/006-annotation-import-export). Read-only; rows with unreadable JSON are skipped.
+   */
+  listAnnotationsForTransfer(bookId: string): TransferNoteRow[] {
+    const id = bookId.trim()
+    if (!id) return []
+    const rows = this.db
+      .prepare(
+        `SELECT ${NOTE_COLUMNS}
+         FROM notes
+         WHERE book_id = ? AND ${HIGHLIGHT_TYPE_PREDICATE}
+         ORDER BY created_at ASC`,
+      )
+      .all(id) as NoteRow[]
+    const out: TransferNoteRow[] = []
+    for (const row of rows) {
+      try {
+        out.push({ id: row.id, bookId: row.book_id, createdAt: row.created_at, updatedAt: row.updated_at, note: JSON.parse(row.note_json) as INoteState })
+      } catch {
+        // A row whose JSON cannot be read cannot be exported; it stays in the database untouched.
+      }
+    }
+    return out
+  }
+
+  /** How many annotation rows a book has (what Export would write) — enables or disables the menu item. */
+  countAnnotationsForTransfer(bookId: string): number {
+    const id = bookId.trim()
+    if (!id) return 0
+    const row = this.db
+      .prepare(`SELECT COUNT(*) AS n FROM notes WHERE book_id = ? AND ${HIGHLIGHT_TYPE_PREDICATE}`)
+      .get(id) as { n: number }
+    return row.n
+  }
+
+  /** Which of these note ids already exist in ANY book (a reused id would be overwritten by `writeHighlight`'s upsert). */
+  existingNoteIds(ids: readonly string[]): Set<string> {
+    const found = new Set<string>()
+    const select = this.db.prepare(`SELECT id FROM notes WHERE id = ?`)
+    for (const id of ids) if (select.get(id)) found.add(id)
+    return found
   }
 
   async saveHighlight(input: SaveHighlightInput): Promise<HighlightRecord> {

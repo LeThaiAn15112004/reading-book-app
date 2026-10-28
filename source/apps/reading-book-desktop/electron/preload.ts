@@ -1,6 +1,7 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import type { DesktopApi } from './ipc/api-types'
 import {
+  AnnotationTransferChannels,
   AppChannels,
   BackgroundChannels,
   BookIndexChannels,
@@ -136,6 +137,25 @@ const api: DesktopApi = {
       ipcRenderer.on(ZipImportChannels.inspecting, listener)
       return () => {
         ipcRenderer.removeListener(ZipImportChannels.inspecting, listener)
+  annotationTransfer: {
+    count: (bookId) => ipcRenderer.invoke(AnnotationTransferChannels.count, bookId),
+    exportRestore: (bookId) => ipcRenderer.invoke(AnnotationTransferChannels.exportRestore, bookId),
+    exportReadable: (bookId) => ipcRenderer.invoke(AnnotationTransferChannels.exportReadable, bookId),
+    pickFile: (input) => ipcRenderer.invoke(AnnotationTransferChannels.pickFile, input),
+    setTarget: (sessionId, bookId) => ipcRenderer.invoke(AnnotationTransferChannels.setTarget, sessionId, bookId),
+    confirm: (sessionId) => ipcRenderer.invoke(AnnotationTransferChannels.confirm, sessionId),
+    discard: (sessionId) => ipcRenderer.invoke(AnnotationTransferChannels.discard, sessionId),
+    cancel: (sessionId) => ipcRenderer.invoke(AnnotationTransferChannels.cancel, sessionId),
+    onProgress: (handler) => {
+      const listener = (_event: Electron.IpcRendererEvent, progress: Parameters<typeof handler>[0]) => {
+        handler(progress)
+      }
+      ipcRenderer.on(AnnotationTransferChannels.progress, listener)
+      return () => {
+        ipcRenderer.removeListener(AnnotationTransferChannels.progress, listener)
+      }
+    },
+  },
       }
     },
   },

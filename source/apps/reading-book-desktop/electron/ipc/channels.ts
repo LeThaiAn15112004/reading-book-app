@@ -214,3 +214,23 @@ export const TxtChannels = {
   /** Renderer → main: atomically save edited text + annotation changes against a revision. */
   commit: 'txt:commit',
 } as const
+
+/** Annotation import / export (specs/006-annotation-import-export). The renderer sends only `bookId` / `sessionId`, never a path. */
+export const AnnotationTransferChannels = {
+  /** How many annotations a book has (enables or disables the Export menu items). */
+  count: 'annotationTransfer:count',
+  /** Save the restorable `.readmate-notes.json` (save dialog in Main). */
+  exportRestore: 'annotationTransfer:exportRestore',
+  /** Save the readable Markdown copy (save dialog in Main). */
+  exportReadable: 'annotationTransfer:exportReadable',
+  /** Open dialog in Main + validate the file + build the import preview (a Main-held session). */
+  pickFile: 'annotationTransfer:pickFile',
+  /** The user's explicit choice of target book for a preview. */
+  setTarget: 'annotationTransfer:setTarget',
+  /** Re-validate and write the previewed import in one transaction. */
+  confirm: 'annotationTransfer:confirm',
+  discard: 'annotationTransfer:discard',
+  cancel: 'annotationTransfer:cancel',
+  /** Main → renderer: reading / planning / committing progress of an import. */
+  progress: 'annotationTransfer:progress',
+} as const

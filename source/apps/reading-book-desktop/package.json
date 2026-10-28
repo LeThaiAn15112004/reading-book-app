@@ -52,6 +52,8 @@
     "spike:txt:main": "npm run build --prefix ../book-reader-sdk && node --experimental-transform-types --import ./spikes/pdf-annotations/register-alias.mjs spikes/txt/run-txt-document.mjs",
     "spike:txt:store": "npm run build --prefix ../book-reader-sdk && node --experimental-transform-types --import ./spikes/txt/register-alias.mjs spikes/txt/run-txt-store.mjs",
     "spike:audio:main": "npm run build --prefix ../book-reader-sdk && node --experimental-transform-types --import ./spikes/pdf-annotations/register-alias.mjs spikes/audio/run-audio-main.mjs",
+    "spike:annotations:main": "npm run build --prefix ../book-reader-sdk && node --experimental-transform-types --import ./spikes/pdf-annotations/register-alias.mjs spikes/annotations/run-annotations-main.mjs",
+    "spike:annotations:store": "npm run build --prefix ../book-reader-sdk && node --experimental-transform-types --import ./spikes/txt/register-alias.mjs spikes/annotations/run-annotations-store.mjs",
     "spike:audio:zip": "npm run build --prefix ../book-reader-sdk && node --experimental-transform-types --import ./spikes/pdf-annotations/register-alias.mjs spikes/audio/run-audio-zip.mjs",
     "spike:audio:store": "npm run build --prefix ../book-reader-sdk && node --experimental-transform-types --import ./spikes/txt/register-alias.mjs spikes/audio/run-audio-store.mjs",
     "spike:audio:migration": "node spikes/audio/run-audio-migration.mjs",

@@ -46,3 +46,12 @@ export {
   type TestReminderResult,
 } from './notifications'
 export { updatesApi, type UpdateChannel, type UpdateCheckResult } from './updates'
+export { annotationTransferApi } from './annotationTransfer'
+export type {
+  AnnotationExportResult,
+  AnnotationImportPreviewDto,
+  AnnotationImportPreviewResult,
+  AnnotationImportResult,
+  AnnotationTransferErrorCode,
+  AnnotationTransferProgressDto,
+} from '../../electron/ipc/api-types'

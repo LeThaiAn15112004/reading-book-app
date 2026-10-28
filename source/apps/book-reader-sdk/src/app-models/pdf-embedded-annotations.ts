@@ -326,6 +326,22 @@ function hash53(input: string): string {
 function geometrySignature(rects: readonly PdfAnnotationRect[]): string {
   return rects.map((r) => [r.x, r.y, r.width, r.height].map((n) => n.toFixed(KEY_DECIMALS)).join(',')).join(';')
 }
+/** The prefix of a name Readmate gives its own annotations (kept equal to `READMATE_NM_PREFIX` in pdf-annotation-export.ts, which imports this module). */
+const READMATE_NAME_PREFIX = 'readmate:'
+
+/**
+ * Whether a ledger `sourceKey` is the key of an annotation Readmate wrote itself (its `/NM` is `readmate:<noteId>`
+ * for the first page, `readmate:<noteId>:p<page>` for the others) rather than one read from the file. The ledger
+ * keeps only the hashed name (`nm1:<pageIndex>:<hash>#n`), so the hash is recomputed for both name forms.
+ */
+export function isReadmateAuthoredKey(noteId: string, sourceKey: string): boolean {
+  const m = /^nm1:(\d+):([0-9a-f]+)#\d+$/.exec(sourceKey)
+  if (!m) return false
+  const pageIndex = Number(m[1])
+  const names = [`${READMATE_NAME_PREFIX}${noteId}`, `${READMATE_NAME_PREFIX}${noteId}:p${pageIndex + 1}`]
+  return names.some((name) => hash53(name) === m[2])
+}
+
 
 /**
  * Identity key of each item within its file, in scan order: `pdf1:<subtype>:<pageIndex>:<geometry

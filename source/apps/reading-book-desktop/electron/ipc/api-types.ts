@@ -872,6 +872,58 @@ export interface DesktopApi {
     /**
      * Remove the database record and the app-owned sandbox copy. Refused (`ok: false`) for
      * `referenced` books: the user's own file is never deleted by the app.
+/** Annotation import / export (specs/006-annotation-import-export/data-model.md "Results"). */
+export type AnnotationTransferErrorCode =
+  | 'not_found'
+  | 'empty'
+  | 'cancelled'
+  | 'not_annotation_file'
+  | 'damaged'
+  | 'newer_version'
+  | 'format_mismatch'
+  | 'book_missing'
+  | 'file_unavailable'
+  | 'target_not_confirmed'
+  | 'stale_preview'
+  | 'write_failed'
+
+export type AnnotationTransferFailure = { ok: false; errorCode: AnnotationTransferErrorCode; message?: string }
+
+export type AnnotationExportResult = { ok: true; exported: number } | AnnotationTransferFailure
+
+export interface AnnotationNotPlacedDto {
+  type?: string
+  quote?: string
+  reason: string
+}
+
+export interface AnnotationImportPreviewDto {
+  sessionId: string
+  /** The book the file was exported from, as the file says. */
+  fileBook: { title: string; author?: string; format: 'epub' | 'pdf' | 'txt' | 'md' }
+  /** The book the import was started from (Reader menu), when any. */
+  startedFrom?: { bookId: string; title: string }
+  /** The proposed or chosen target; null while the file's book is missing and nothing was chosen. */
+  target: { bookId: string; title: string; author?: string; matchedBy: 'sha256' | 'title' | 'chosen' } | null
+  /** True until the user calls `setTarget`: the file's book differs from `startedFrom`, or is not in the library. */
+  requiresChoice: boolean
+  fileBookMissing?: { title: string; author?: string }
+  toAdd: number
+  present: number
+  notPlaced: AnnotationNotPlacedDto[]
+}
+
+export type AnnotationImportPreviewResult = { ok: true; preview: AnnotationImportPreviewDto } | AnnotationTransferFailure
+
+export type AnnotationImportResult = { ok: true; added: number; present: number; notPlaced: number } | AnnotationTransferFailure
+
+export interface AnnotationTransferProgressDto {
+  sessionId: string
+  phase: 'reading' | 'planning' | 'committing'
+  done: number
+  total: number
+}
+
      */
     deleteBookFile(id: string): Promise<OkResult>
     /**
@@ -975,6 +1027,23 @@ export interface DesktopApi {
     /**
      * Save a NEW PDF (native save dialog) holding the book's annotations as standard PDF annotations.
      * The book's own file is never written. A signed source needs `acknowledgeSignature`.
+  annotationTransfer: {
+    /** Number of annotations of a book that Export would write (0 for audiobooks and unknown ids). */
+    count(bookId: string): Promise<{ count: number }>
+    /** Save the restorable `.readmate-notes.json` (native save dialog in Main). */
+    exportRestore(bookId: string): Promise<AnnotationExportResult>
+    /** Save the readable Markdown copy (native save dialog in Main). */
+    exportReadable(bookId: string): Promise<AnnotationExportResult>
+    /** Native open dialog + validation + preview; `bookId` = the book the import was started from. */
+    pickFile(input: { bookId?: string }): Promise<AnnotationImportPreviewResult>
+    /** The user's explicit choice of target; clears `requiresChoice`. */
+    setTarget(sessionId: string, bookId: string): Promise<AnnotationImportPreviewResult>
+    /** Re-validates inside the write transaction; `stale_preview` when the book or its annotations changed. */
+    confirm(sessionId: string): Promise<AnnotationImportResult>
+    discard(sessionId: string): Promise<OkResult>
+    cancel(sessionId: string): Promise<OkResult>
+    onProgress(handler: (progress: AnnotationTransferProgressDto) => void): () => void
+  }
      */
     exportAnnotatedPdf(bookId: string, options?: { acknowledgeSignature?: boolean }): Promise<ExportAnnotatedPdfResult>
     /**

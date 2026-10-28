@@ -1,3 +1,4 @@
+import { registerAnnotationTransferIpc } from './annotation-transfer.ipc'
 import { registerAppIpc } from './app.ipc'
 import { registerAttachmentsIpc } from './attachments.ipc'
 import { registerAudioIpc } from './audio.ipc'
@@ -24,6 +25,7 @@ export function registerAllIpcHandlers(): void {
   registerImportIpc()
   registerOverlayIpc()
   registerAudioIpc()
+  registerAnnotationTransferIpc()
   registerZipImportIpc()
   registerAttachmentsIpc()
   registerGraphicsIpc()
