@@ -20,6 +20,8 @@ export interface AppInfo {
   name: string
   version: string
   platform: NodeJS.Platform
+  /** FR-017: a verified audio decoder ships for this OS + CPU architecture; false hides audiobook transcription. */
+  transcriptionSupported: boolean
 }
 
 /**
@@ -142,6 +144,8 @@ export interface BookSummaryDto {
    * by path — the app never deletes it, and it can go missing if the user moves it.
    */
   fileStorage: BookFileStorageDto
+  /** Multi-chapter audiobook: number of chapter files (absent for every other book). */
+  chapterCount?: number
 }
 
 export type BookFileStorageDto = 'managed' | 'referenced'
@@ -209,6 +213,14 @@ export interface TranslationModelDto {
   bytes: number
 }
 
+/** One downloaded speech model for audiobook transcription (`{userData}/transcription-models/<id>`). */
+export interface SpeechModelDto {
+  /** `whisper-tiny` | `whisper-base` | `whisper-small`. */
+  id: string
+  label: string
+  bytes: number
+}
+
 /** Settings → Storage usage. Sizes in bytes; computed in Main. */
 export interface StorageUsageDto {
   /** Managed-books folder, for display only (Open Folder goes through Main, not this string). */
@@ -221,10 +233,13 @@ export interface StorageUsageDto {
   /** book_chunks + FTS5 inside the database; null when it could not be measured. */
   searchIndexBytes: number | null
   translationModelsBytes: number
+  /** Downloaded speech (transcription) models. */
+  speechModelsBytes: number
   /** Everything else in the app data folder (database, covers, settings…). */
   otherBytes: number
   totalBytes: number
   translationModels: TranslationModelDto[]
+  speechModels: SpeechModelDto[]
 }
 
 export interface ClearCacheResult {
@@ -238,6 +253,9 @@ export interface RemoveTranslationModelResult {
   errorCode?: 'busy' | 'not_found' | 'failed'
   errorMessage?: string
 }
+
+/** Same shape as removing a translation model: `busy` while a transcription is queued or running. */
+export type RemoveSpeechModelResult = RemoveTranslationModelResult
 
 export interface CloudConnectResult {
   ok: boolean
@@ -346,6 +364,8 @@ export type ImportErrorCode =
   | 'missing_file'
   /** Picked file lives inside the app's own data folder. */
   | 'inside_app_data'
+  /** An audiobook ZIP was picked: the renderer opens the ZIP import preview (`zipImport:inspectPicked`). */
+  | 'audiobook_zip'
   /** Copying into the library sandbox or writing the database row failed. Retryable. */
   | 'save_failed'
   /** Cloud provider is not linked, or its token could not be refreshed. */
@@ -451,6 +471,8 @@ export interface AudioProgressDto {
   /** How the timeline was shown (display only — the position is canonical). */
   scope?: 'book' | 'chapter'
   chapterId?: string
+  /** Multi-chapter audiobooks: the track the position belongs to. Absent = the single-file meaning. */
+  trackId?: string
   updatedAt: string
 }
 
@@ -463,6 +485,8 @@ export interface SaveAudioProgressInput {
   scope?: 'book' | 'chapter'
   /** String sets it, null clears it, absent keeps what is stored. */
   chapterId?: string | null
+  /** Multi-chapter audiobooks: the track being played (`positionSeconds` is then within that track). Main rejects it for single-file books and requires it for multi-chapter ones. */
+  trackId?: string
 }
 
 /** A chapter exactly as the file declares it (seconds, unvalidated — the renderer validates against the duration). */
@@ -478,6 +502,19 @@ export interface AudioChaptersResult {
   chapters: AudioChapterDto[]
 }
 
+/** One track of a multi-chapter audiobook. Deliberately no file name, source path or file path. */
+export interface AudioTrackDto {
+  id: string
+  title: string
+  /** `null` when it could not be determined. */
+  durationSeconds: number | null
+}
+
+export interface AudioTracksResult {
+  ok: boolean
+  tracks: AudioTrackDto[]
+}
+
 export interface AudioBookmarkDto {
   id: string
   label: string
@@ -487,6 +524,8 @@ export interface AudioBookmarkDto {
   chapterId?: string
   chapterOffsetSeconds?: number
   createdAt: string
+  /** Multi-track audiobook Notes only: the stable track id (`book_audio_chapters.id`); `positionSeconds` is then seconds inside that track. */
+  trackId?: string
 }
 
 /** Input for overlay:saveSessionState — location and typography/layout are independent. */
@@ -655,6 +694,8 @@ export interface ExportAnnotatedPdfResult {
   fileName?: string
   /** Annotations added / rewritten / removed / kept as they were in the source. */
   summary?: { added: number; replaced: number; removed: number; kept: number }
+  /** Typewriter notes left out of the file because they cannot be drawn (see the note's "not in the file" reason); they stay in the app. */
+  skippedTypewriter?: number
   errorCode?: ExportAnnotatedPdfErrorCode
   message?: string
   /** For `signed_needs_confirmation`: the source's signature verdict and signer. */
@@ -686,6 +727,14 @@ export type PdfWriteStatusDto =
   | 'encrypted'
   | 'unsupported_pdf'
   | 'signed'
+
+/** Where a Typewriter note stands in the PDF file (specs/005-typewriter-note, contracts §3). `in_file` = written. */
+export interface TypewriterFileStatusDto {
+  id: string
+  code: 'in_file' | 'file_not_writable' | 'unsupported_characters' | 'font_unavailable' | 'does_not_fit'
+  /** `unsupported_characters`: the characters no shipped font can draw. */
+  characters?: string[]
+}
 
 /** overlay:resolvePdfAnnotationConflict */
 export interface ResolvePdfAnnotationConflictResult {
@@ -727,6 +776,8 @@ export interface PdfEmbeddedAnnotationsChangedDto {
   writeStatus?: PdfWriteStatusDto
   /** For `writeStatus: 'signed'`: the signer, when known. */
   signerName?: string
+  /** Typewriter notes this cycle tried to write, with the result for each (a note not listed was not touched). */
+  typewriterStatus?: TypewriterFileStatusDto[]
   /** Diagnostics: ms from the first file event (null for the open sync) and of the scan. */
   timing: { totalMs: number; scanMs: number }
 }
@@ -823,55 +874,6 @@ export type WordCountStatsDto =
   | { state: 'noText' }
   | { state: 'error'; message: string }
 
-export interface DesktopApi {
-  ping(): Promise<'pong'>
-  getAppInfo(): Promise<AppInfo>
-  /** Sanitized Google OAuth client config loaded from local client_secret_*.json. */
-  getGoogleOAuthConfig(): Promise<GoogleOAuthClientConfigDto | null>
-  /** Update Windows/Linux caption button colors to match app theme. */
-  setChromeTheme(theme: 'night' | 'sepia' | 'paper' | string): Promise<OkResult>
-  /** Whether the app window is currently fullscreen. */
-  getFullscreen(): Promise<boolean>
-  /** Enter or leave OS-level window fullscreen. */
-  setFullscreen(value: boolean): Promise<{ ok: boolean; fullscreen: boolean }>
-  /** Toggle OS-level window fullscreen. */
-  toggleFullscreen(): Promise<{ ok: boolean; fullscreen: boolean }>
-  /**
-   * Subscribe to fullscreen enter/leave (F11, Esc, button, or OS chrome).
-   * Returns unsubscribe.
-   */
-  onFullscreenChanged(handler: (fullscreen: boolean) => void): () => void
-  /**
-   * Subscribe to Main's pre-close flush request (T4.2).
-   * Handler should await session flush; preload acks when the promise settles.
-   * Returns unsubscribe.
-   */
-  onRequestFlushSession(handler: () => void | Promise<void>): () => void
-  /** Crops `region` from the reader window (via `webContents.capturePage`) and copies the result
-   *  to the OS clipboard as an image — the Snapshot tool. Works uniformly across formats since it
-   *  captures composited pixels, not the underlying DOM/canvas. */
-  captureSnapshot(region: SnapshotRegionDto): Promise<OkResult>
-  /** Opens an http(s) / mailto link from a document in the OS default handler. Main re-validates
-   *  the URL; anything else is refused (`ok: false`). */
-  openExternalLink(url: string): Promise<OkResult>
-  library: {
-    listBooks(): Promise<BookSummaryDto[]>
-    getBook(id: string): Promise<BookSummaryDto | null>
-    openBookContent(id: string): Promise<OpenBookContentResult>
-    /** After user opens Reader — book appears on Reading shelf. */
-    markAsReading(id: string): Promise<OkResult>
-    markAsCompleted(id: string): Promise<OkResult>
-    setFavorite(id: string, value: boolean): Promise<OkResult>
-    /** Store a PNG rendered by the renderer as the cover; refused when the book already has one. */
-    setGeneratedCover(id: string, png: ArrayBuffer): Promise<OkResult>
-    updateMetadata(input: UpdateBookMetadataInput): Promise<OkResult>
-    showInFolder(id: string): Promise<OkResult>
-    copyFilePath(id: string): Promise<OkResult>
-    /** Remove the database record; the book file (sandbox copy or the user's own) is kept. */
-    removeBook(id: string): Promise<OkResult>
-    /**
-     * Remove the database record and the app-owned sandbox copy. Refused (`ok: false`) for
-     * `referenced` books: the user's own file is never deleted by the app.
 /** Annotation import / export (specs/006-annotation-import-export/data-model.md "Results"). */
 export type AnnotationTransferErrorCode =
   | 'not_found'
@@ -924,8 +926,59 @@ export interface AnnotationTransferProgressDto {
   total: number
 }
 
+export interface DesktopApi {
+  ping(): Promise<'pong'>
+  getAppInfo(): Promise<AppInfo>
+  /** Sanitized Google OAuth client config loaded from local client_secret_*.json. */
+  getGoogleOAuthConfig(): Promise<GoogleOAuthClientConfigDto | null>
+  /** Update Windows/Linux caption button colors to match app theme. */
+  setChromeTheme(theme: 'night' | 'sepia' | 'paper' | string): Promise<OkResult>
+  /** Whether the app window is currently fullscreen. */
+  getFullscreen(): Promise<boolean>
+  /** Enter or leave OS-level window fullscreen. */
+  setFullscreen(value: boolean): Promise<{ ok: boolean; fullscreen: boolean }>
+  /** Toggle OS-level window fullscreen. */
+  toggleFullscreen(): Promise<{ ok: boolean; fullscreen: boolean }>
+  /**
+   * Subscribe to fullscreen enter/leave (F11, Esc, button, or OS chrome).
+   * Returns unsubscribe.
+   */
+  onFullscreenChanged(handler: (fullscreen: boolean) => void): () => void
+  /**
+   * Subscribe to Main's pre-close flush request (T4.2).
+   * Handler should await session flush; preload acks when the promise settles.
+   * Returns unsubscribe.
+   */
+  onRequestFlushSession(handler: () => void | Promise<void>): () => void
+  /** Crops `region` from the reader window (via `webContents.capturePage`) and copies the result
+   *  to the OS clipboard as an image — the Snapshot tool. Works uniformly across formats since it
+   *  captures composited pixels, not the underlying DOM/canvas. */
+  captureSnapshot(region: SnapshotRegionDto): Promise<OkResult>
+  /** Opens an http(s) / mailto link from a document in the OS default handler. Main re-validates
+   *  the URL; anything else is refused (`ok: false`). */
+  openExternalLink(url: string): Promise<OkResult>
+  library: {
+    listBooks(): Promise<BookSummaryDto[]>
+    getBook(id: string): Promise<BookSummaryDto | null>
+    openBookContent(id: string): Promise<OpenBookContentResult>
+    /** After user opens Reader — book appears on Reading shelf. */
+    markAsReading(id: string): Promise<OkResult>
+    markAsCompleted(id: string): Promise<OkResult>
+    setFavorite(id: string, value: boolean): Promise<OkResult>
+    /** Store a PNG rendered by the renderer as the cover; refused when the book already has one. */
+    setGeneratedCover(id: string, png: ArrayBuffer): Promise<OkResult>
+    updateMetadata(input: UpdateBookMetadataInput): Promise<OkResult>
+    showInFolder(id: string): Promise<OkResult>
+    copyFilePath(id: string): Promise<OkResult>
+    /** Remove the database record; the book file (sandbox copy or the user's own) is kept. */
+    removeBook(id: string): Promise<OkResult>
+    /**
+     * Remove the database record and the app-owned sandbox copy. Refused (`ok: false`) for
+     * `referenced` books: the user's own file is never deleted by the app.
      */
     deleteBookFile(id: string): Promise<OkResult>
+    /** Multi-chapter audiobook: delete its chapter folder, rows and cover (the original ZIP is never touched). `ok: false` keeps the record. */
+    removeAudiobook(id: string): Promise<OkResult>
     /**
      * "Locate file": Main opens a file dialog, and re-attaches the book to the chosen file only if
      * its SHA-256 matches the one recorded for `id`. Annotations, progress and search data are keyed
@@ -976,9 +1029,28 @@ export interface AnnotationTransferProgressDto {
     /** Separate, explicit Save As (Main-owned dialog) — the way out for a file the policy will not open. */
     saveAs(input: { bookId: string; attachmentId: string }): Promise<AttachmentActionResult>
   }
+  annotationTransfer: {
+    /** Number of annotations of a book that Export would write (0 for audiobooks and unknown ids). */
+    count(bookId: string): Promise<{ count: number }>
+    /** Save the restorable `.readmate-notes.json` (native save dialog in Main). */
+    exportRestore(bookId: string): Promise<AnnotationExportResult>
+    /** Save the readable Markdown copy (native save dialog in Main). */
+    exportReadable(bookId: string): Promise<AnnotationExportResult>
+    /** Native open dialog + validation + preview; `bookId` = the book the import was started from. */
+    pickFile(input: { bookId?: string }): Promise<AnnotationImportPreviewResult>
+    /** The user's explicit choice of target; clears `requiresChoice`. */
+    setTarget(sessionId: string, bookId: string): Promise<AnnotationImportPreviewResult>
+    /** Re-validates inside the write transaction; `stale_preview` when the book or its annotations changed. */
+    confirm(sessionId: string): Promise<AnnotationImportResult>
+    discard(sessionId: string): Promise<OkResult>
+    cancel(sessionId: string): Promise<OkResult>
+    onProgress(handler: (progress: AnnotationTransferProgressDto) => void): () => void
+  }
   zipImport: {
     /** Native ZIP picker + inspection in Main. `cancelled` = picker dismissed. */
     pick(): Promise<ZipImportPickResult>
+    /** Inspect the ZIP the user just chose in the ordinary "Add file" dialog (Main holds its path; nothing is passed in). */
+    inspectPicked(): Promise<ZipImportPickResult>
     /** Data-URL preview of one cover candidate (null when too large / not previewable). */
     coverPreview(input: { sessionId: string; entryId: string }): Promise<ZipImportCoverResult>
     /** Re-validates the selection in Main and hands it to the import stage. */
@@ -987,12 +1059,18 @@ export interface AnnotationTransferProgressDto {
     discard(sessionId: string): Promise<OkResult>
     /** Abort a running inspection. */
     cancelInspect(): Promise<OkResult>
+    /** Abort a running import (until the database write). */
+    cancelImport(): Promise<OkResult>
+    /** Chapters written so far while an import runs. Returns unsubscribe. */
+    onProgress(handler: (progress: ZipImportProgressDto) => void): () => void
     /** Fires once a ZIP is picked and inspection starts. Returns unsubscribe. */
     onInspecting(handler: (info: { archiveName: string }) => void): () => void
   }
   audio: {
     /** Chapters the file declares (`[]` for none / unreadable). Never guessed. */
     getChapters(bookId: string): Promise<AudioChaptersResult>
+    /** The tracks of a multi-chapter audiobook in playback order; `[]` for a single-file book. */
+    getTracks(bookId: string): Promise<AudioTracksResult>
     getBookmarks(bookId: string): Promise<AudioBookmarkDto[]>
     /** Replaces the whole list; `ok: false` for a non-audio book or bad input. */
     saveBookmarks(input: { bookId: string; bookmarks: AudioBookmarkDto[] }): Promise<OkResult>
@@ -1027,23 +1105,6 @@ export interface AnnotationTransferProgressDto {
     /**
      * Save a NEW PDF (native save dialog) holding the book's annotations as standard PDF annotations.
      * The book's own file is never written. A signed source needs `acknowledgeSignature`.
-  annotationTransfer: {
-    /** Number of annotations of a book that Export would write (0 for audiobooks and unknown ids). */
-    count(bookId: string): Promise<{ count: number }>
-    /** Save the restorable `.readmate-notes.json` (native save dialog in Main). */
-    exportRestore(bookId: string): Promise<AnnotationExportResult>
-    /** Save the readable Markdown copy (native save dialog in Main). */
-    exportReadable(bookId: string): Promise<AnnotationExportResult>
-    /** Native open dialog + validation + preview; `bookId` = the book the import was started from. */
-    pickFile(input: { bookId?: string }): Promise<AnnotationImportPreviewResult>
-    /** The user's explicit choice of target; clears `requiresChoice`. */
-    setTarget(sessionId: string, bookId: string): Promise<AnnotationImportPreviewResult>
-    /** Re-validates inside the write transaction; `stale_preview` when the book or its annotations changed. */
-    confirm(sessionId: string): Promise<AnnotationImportResult>
-    discard(sessionId: string): Promise<OkResult>
-    cancel(sessionId: string): Promise<OkResult>
-    onProgress(handler: (progress: AnnotationTransferProgressDto) => void): () => void
-  }
      */
     exportAnnotatedPdf(bookId: string, options?: { acknowledgeSignature?: boolean }): Promise<ExportAnnotatedPdfResult>
     /**
@@ -1126,6 +1187,7 @@ export interface AnnotationTransferProgressDto {
     /** Clears Chromium's cache and the rebuildable search index — never books, notes or models. */
     clearCache(): Promise<ClearCacheResult>
     removeTranslationModel(modelId: string): Promise<RemoveTranslationModelResult>
+    removeSpeechModel(modelId: string): Promise<RemoveSpeechModelResult>
     openBooksFolder(): Promise<OkResult>
   }
   translation: {
@@ -1137,6 +1199,8 @@ export interface AnnotationTransferProgressDto {
     /** Subscribe to model download/load progress for this window's requests. Returns unsubscribe. */
     onProgress(handler: (progress: TranslationProgressDto) => void): () => void
   }
+  /** Audiobook transcription (spec 004). */
+  transcription: TranscriptionApi
 }
 
 export interface TranslateRequestDto {
@@ -1265,13 +1329,188 @@ export type ZipImportErrorCodeDto =
   | 'invalid_selection'
   | 'import_not_available'
   | 'import_failed'
+  | 'duplicate'
+  | 'invalid_track'
+  | 'insufficient_space'
 
 export interface ZipImportFailureDto {
   ok: false
   errorCode: ZipImportErrorCodeDto
   errorMessage: string
+  /** For `duplicate`: the library book that already has these tracks. */
+  bookId?: string
+}
+
+export interface ZipImportProgressDto {
+  stage: 'extracting' | 'saving'
+  done: number
+  total: number
+  name?: string
 }
 
 export type ZipImportPickResult = { ok: true; preview: ZipImportPreview } | ZipImportFailureDto
 export type ZipImportCoverResult = { ok: true; dataUrl: string | null } | ZipImportFailureDto
 export type ZipImportConfirmResult = { ok: true; bookId: string } | ZipImportFailureDto
+
+// ---------------------------------------------------------------------------------------------------------------------
+// Audiobook transcription (spec 004-audiobook-transcription, contracts/ipc-transcription.md).
+// Times are milliseconds inside the passage's own audio file. The renderer only ever passes a `bookId` / `trackId`.
+// ---------------------------------------------------------------------------------------------------------------------
+
+export type TranscriptionErrorCodeDto =
+  | 'MODEL_MISSING'
+  | 'DISK_FULL'
+  | 'FILE_MISSING'
+  | 'UNSUPPORTED_LANGUAGE'
+  | 'NO_SPEECH'
+  | 'DECODE_FAILED'
+  | 'INVALID_ARGUMENT'
+  | 'ABORTED'
+  | 'INTERRUPTED'
+  | 'INTEGRITY_FAILED'
+  /** `features.audiobookTranscriptionEnabled` is off: `start` / `downloadModel` are refused before anything happens. */
+  | 'FEATURE_DISABLED'
+
+export type TranscriptionScopeDto =
+  | { kind: 'whole' }
+  | { kind: 'track'; trackId: string }
+  | { kind: 'range'; trackId?: string; startMs: number; endMs: number }
+
+export interface TranscriptPassageDto {
+  id: number
+  /** Chapter id of a multi-track audiobook; absent for a single-file one. */
+  trackId?: string
+  startMs: number
+  endMs: number
+  text: string
+}
+
+export interface TranscriptSummaryDto {
+  status: 'partial' | 'complete' | 'failed' | 'cancelled'
+  /** `INTERRUPTED` after the app quit/crashed mid-job: the UI offers Resume. */
+  lastError?: TranscriptionErrorCodeDto
+  /** What the last job was asked to transcribe; absent for older transcripts. Resume starts the same scope again. */
+  scope?: TranscriptionScopeDto
+  language: string
+  modelId: string
+  coveredMs: number
+  /** Duration of the whole audiobook when known, else 0. */
+  totalMs: number
+  passageCount: number
+}
+
+export interface TranscriptionJobDto {
+  jobId: string
+  bookId: string
+  state: 'queued' | 'preparing' | 'running' | 'done' | 'failed' | 'cancelled'
+  /** Whole-job progress over the requested scope. */
+  doneMs: number
+  totalMs: number
+  /** Multi-track books only: the track being processed and its own progress. */
+  trackId?: string
+  trackDoneMs?: number
+  trackTotalMs?: number
+  error?: TranscriptionErrorCodeDto
+}
+
+export interface TranscriptionModelDto {
+  id: string
+  label: string
+  sizeBytes: number
+  installed: boolean
+}
+
+/** Whether the audio decoder can run on this system; the dialog does not offer a model download when it cannot. */
+export interface TranscriptionDecoderStatusDto {
+  available: boolean
+  /** `UNSUPPORTED_PLATFORM` | `NOT_BUNDLED` | `INTEGRITY_FAILED` | `NOT_RUNNABLE` | `UNKNOWN` when `available` is false. */
+  reason?: string
+}
+
+export interface TranscriptionInfoDto {
+  decoder: TranscriptionDecoderStatusDto
+  transcript: TranscriptSummaryDto | null
+  job: TranscriptionJobDto | null
+  models: TranscriptionModelDto[]
+  /** Language the dialog starts with: the audiobook's own tag when mapped, else the app language, else `auto`. */
+  defaultLanguage: string
+}
+
+export interface TranscriptionStartRequestDto {
+  bookId: string
+  scope: TranscriptionScopeDto
+  /** Whisper language code, or `auto`. */
+  language: string
+  modelId: string
+  /** Discard the existing transcript first (the UI asks for confirmation). */
+  replace?: boolean
+}
+
+export interface TranscriptionFailureDto {
+  ok: false
+  errorCode: TranscriptionErrorCodeDto
+  errorMessage: string
+}
+
+export type TranscriptionStartResult = { ok: true; jobId: string } | TranscriptionFailureDto
+export type TranscriptionDownloadModelResult = { ok: true } | TranscriptionFailureDto
+
+export interface TranscriptionPassagesRequestDto {
+  bookId: string
+  trackId?: string
+  fromMs?: number
+  toMs?: number
+  /** Default 500, at most 2000. */
+  limit?: number
+  /** Passages to skip in playback order (paging through a long transcript); default 0. */
+  offset?: number
+}
+
+export interface TranscriptionSearchHitDto {
+  passageId: number
+  trackId?: string
+  startMs: number
+  snippet: string
+}
+
+export interface TranscriptionExportOptionsDto {
+  /** Prefix every passage with `[hh:mm:ss]` (its start inside its track). Default false. */
+  timestamps?: boolean
+}
+
+/** `saved: false` with no error = the person cancelled the dialog. Never carries a path. */
+export interface TranscriptionExportResult {
+  saved: boolean
+  errorCode?: TranscriptionErrorCodeDto
+  errorMessage?: string
+}
+
+export interface TranscriptionPassagesAddedDto {
+  bookId: string
+  trackId?: string
+  fromMs: number
+  toMs: number
+}
+
+export interface TranscriptionModelProgressDto {
+  modelId: string
+  loadedBytes: number
+  totalBytes: number
+}
+
+export interface TranscriptionApi {
+  /** `appLanguage` (a BCP 47 tag such as `vi` or `en`) lets Main resolve the default language (FR-005). */
+  getInfo(bookId: string, appLanguage?: string): Promise<TranscriptionInfoDto>
+  start(request: TranscriptionStartRequestDto): Promise<TranscriptionStartResult>
+  cancel(jobId: string): Promise<OkResult>
+  downloadModel(modelId: string): Promise<TranscriptionDownloadModelResult>
+  getPassages(request: TranscriptionPassagesRequestDto): Promise<TranscriptPassageDto[]>
+  /** Full-text search inside one transcript (hits in playback order, each with the start to jump to). */
+  search(bookId: string, query: string, limit?: number): Promise<TranscriptionSearchHitDto[]>
+  /** Main-owned save dialog and file write; the renderer never sees the path. `saved` is false when the person cancelled. */
+  export(bookId: string, options?: TranscriptionExportOptionsDto): Promise<TranscriptionExportResult>
+  delete(bookId: string): Promise<OkResult>
+  onProgress(handler: (job: TranscriptionJobDto) => void): () => void
+  onPassagesAdded(handler: (added: TranscriptionPassagesAddedDto) => void): () => void
+  onModelProgress(handler: (progress: TranscriptionModelProgressDto) => void): () => void
+}

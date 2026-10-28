@@ -4,6 +4,9 @@ import {
   isConsistentMdHighlight,
   isConsistentPdfHighlight,
   isShapeStyleKind,
+  isTypewriterColor,
+  isValidTypewriterBox,
+  isValidTypewriterText,
   isConsistentPdfInk,
   isValidHexColor,
   packPdfInkRef,
@@ -329,7 +332,7 @@ export function registerOverlayIpc(): void {
       if (!locator) return null
       // TXT annotations belong to a text revision and are saved with it (txt:commit), never alone.
       if (body.txtAnnotationRef !== undefined) return null
-      const validStyleKinds = ['highlight', 'underline', 'strikethrough', 'squiggly', 'replace', 'insert', 'textbox', 'rectangle', 'ellipse', 'line', 'arrow']
+      const validStyleKinds = ['highlight', 'underline', 'strikethrough', 'squiggly', 'replace', 'insert', 'textbox', 'rectangle', 'ellipse', 'line', 'arrow', 'typewriter']
       if (!validStyleKinds.includes(body.styleKind)) return null
       if (typeof body.colorHex !== 'string' || !body.colorHex.trim()) return null
 
@@ -337,7 +340,7 @@ export function registerOverlayIpc(): void {
       // present-but-invalid payload rejects the save rather than storing a mark that can't paint.
       let pdfAnnotation: PdfAnnotation | undefined
       if (body.pdfAnnotationRef !== undefined) {
-        pdfAnnotation = parsePdfAnnotationRef(body.pdfAnnotationRef)
+        pdfAnnotation = parsePdfAnnotationRef(body.pdfAnnotationRef, body.note)
         if (!pdfAnnotation || !isConsistentPdfHighlight(locator, pdfAnnotation)) return null
       }
       // A shape is a PDF annotation with its own geometry (a line / arrow with endpoints); nothing else may carry one.
@@ -345,6 +348,13 @@ export function registerOverlayIpc(): void {
         if (!pdfAnnotation?.shape) return null
         if ((body.styleKind === 'line' || body.styleKind === 'arrow') !== (pdfAnnotation.shape.line !== undefined)) return null
       } else if (pdfAnnotation?.shape) return null
+      // A Typewriter note is ONE box with a valid rich-text doc over the row's plain text (blank text,
+      // a box off the page or narrower than the minimum, or no doc rejects the save).
+      if (body.styleKind === 'typewriter') {
+        if (!pdfAnnotation?.typewriter || !isValidTypewriterText(body.note ?? '')) return null
+        if (!isValidTypewriterBox(pdfAnnotation.rects[0]!)) return null
+        if (!isTypewriterColor(body.colorHex.trim())) return null
+      } else if (pdfAnnotation?.typewriter) return null
 
       // Markdown markup: same rule — a present-but-invalid anchor rejects the save.
       let mdAnnotation: MdAnnotation | undefined
@@ -361,7 +371,7 @@ export function registerOverlayIpc(): void {
           locator,
           styleKind: body.styleKind,
           colorHex: body.colorHex.trim(),
-          note: body.note?.trim() || undefined,
+          note: body.styleKind === 'typewriter' ? body.note : body.note?.trim() || undefined,
           tags: body.tags,
           selectionText: parseSelectionTextRef(body.selectionTextRef),
           pdfAnnotation,
@@ -636,6 +646,7 @@ function toChangedDto(event: PdfAnnotationSyncEvent): PdfEmbeddedAnnotationsChan
     conflicts: event.outcome.conflicts.map(({ noteId, conflict }) => ({ noteId, kind: conflict.kind, fields: conflict.fields })),
     writeStatus: event.writeStatus,
     signerName: event.signerName,
+    typewriterStatus: event.typewriterStatus,
     timing: { totalMs: event.timing.totalMs, scanMs: event.timing.scanMs },
   }
 }

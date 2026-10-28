@@ -7,6 +7,7 @@ import {
   useLibraryImportStore,
   type ImportToastAction,
 } from './libraryImportStore.js'
+import { useZipImportStore } from './zipImportStore.js'
 
 /** Step / byte progress pushed by the platform while an import runs. */
 export type LibraryImportProgress = {
@@ -127,6 +128,11 @@ export function useLibraryImport({
       const result = await client.fromFile()
       if (await handleCommonResult(result)) return
       if (result.errorCode === 'cancelled') return // picker dismissed — silent
+      if (result.errorCode === 'audiobook_zip') {
+        // An audiobook ZIP was picked in the ordinary dialog: not a failure — open its import preview (Main holds the path).
+        void useZipImportStore.getState().startFromPicked()
+        return
+      }
       if (result.errorMessage) {
         useLibraryImportStore.getState().showToast(result.errorMessage, 'error')
       }

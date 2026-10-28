@@ -4,7 +4,7 @@ import { create } from 'zustand'
  * Panels that can occupy the reader's docked right sidebar. Only one is shown at a time; add an
  * id here (and its content in `ReaderScreen`) to reuse the sidebar for another feature.
  */
-export type RightPanelId = 'settings'
+export type RightPanelId = 'settings' | 'typewriter'
 
 type RightPanelState = {
   /** Panel currently docked on the right, or null when the sidebar is closed. */

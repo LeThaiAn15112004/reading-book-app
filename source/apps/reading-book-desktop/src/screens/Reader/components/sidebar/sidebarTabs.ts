@@ -15,6 +15,7 @@ export const SIDEBAR_TABS: SidebarTabDef[] = [
   { id: 'highlights', label: 'Notes', icon: '🖍️' },
   { id: 'layout', label: 'Page layout', icon: '📄', requires: 'pageLayout' },
   { id: 'attachments', label: 'Attachment', icon: '📎', requires: 'attachments' },
+  { id: 'transcript', label: 'Transcript', icon: '📝', requires: 'transcript' },
 ]
 
 /** True when `tab` can be shown for a surface with `capabilities`. */
@@ -48,6 +49,7 @@ export const SIDEBAR_TAB_LABEL: Record<SidebarTab, string> = {
   highlights: 'Notes',
   layout: 'Page layout',
   attachments: 'Attachment',
+  transcript: 'Transcript',
 }
 
 /** Icon rail only — panel sits flush on the right edge. */

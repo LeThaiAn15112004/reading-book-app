@@ -14,6 +14,7 @@
  */
 
 import { PageRectLocation, Rect, type NoteLocator, type PdfAnnotation, type PdfAnnotationRect, type PdfShapeGeometry } from '../domain/index.js'
+import { parseTypewriterDoc, type PdfTypewriterDoc } from '../typewriter/typewriter-doc.js'
 import { packBookmarkLocator, parseBookmarkLocation } from './bookmark-location.js'
 import { DEFAULT_HIGHLIGHT_COLOR } from './highlight-colors.js'
 import {
@@ -56,6 +57,7 @@ export type PdfReaderHighlight = ReaderHighlightBase & {
   caret?: true
   /** Shape annotations (rectangle / ellipse / line / arrow): pen width and, for a line / arrow, its endpoints. */
   shape?: PdfShapeGeometry
+  typewriter?: PdfTypewriterDoc
 }
 
 export function isPdfReaderHighlight(h: ReaderHighlightBase): h is PdfReaderHighlight {
@@ -185,7 +187,7 @@ function parseRect(value: unknown, pageIndex: number): PdfAnnotationRect | undef
  * whole page indices in range, 1…`PDF_ANNOTATION_MAX_RECTS` rects, every rect finite with a
  * positive size and inside the 0–1 page box. Any bad rect rejects the whole payload.
  */
-export function parsePdfAnnotation(value: unknown): PdfAnnotation | undefined {
+export function parsePdfAnnotation(value: unknown, rowText?: string): PdfAnnotation | undefined {
   if (!value || typeof value !== 'object') return undefined
   const v = value as Record<string, unknown>
   if (!isWholePage(v.pageIndex, 0, PDF_ANNOTATION_MAX_PAGE_INDEX)) return undefined
@@ -214,6 +216,13 @@ export function parsePdfAnnotation(value: unknown): PdfAnnotation | undefined {
     if (!shape || rects.length !== 1) return undefined
     annotation.shape = shape
   }
+  if (v.typewriter !== undefined) {
+    // A Typewriter note is ONE box (rects[0]); its rich text is checked against the row's plain `note`.
+    if (rects.length !== 1 || rowText === undefined) return undefined
+    const typewriter = parseTypewriterDoc(v.typewriter, rowText)
+    if (!typewriter) return undefined
+    annotation.typewriter = typewriter
+  }
   return annotation
 }
 
@@ -234,10 +243,10 @@ function parseShapeGeometry(value: unknown): PdfShapeGeometry | undefined {
 }
 
 /** `parsePdfAnnotation` over the JSON string that crosses IPC (size-capped before parsing). */
-export function parsePdfAnnotationRef(raw: unknown): PdfAnnotation | undefined {
+export function parsePdfAnnotationRef(raw: unknown, rowText?: string): PdfAnnotation | undefined {
   if (typeof raw !== 'string' || !raw.trim() || raw.length > PDF_ANNOTATION_MAX_REF_LENGTH) return undefined
   try {
-    return parsePdfAnnotation(JSON.parse(raw))
+    return parsePdfAnnotation(JSON.parse(raw), rowText)
   } catch {
     return undefined
   }
@@ -292,7 +301,7 @@ export function pdfHighlightDtoToReaderHighlight(dto: {
   if (!locatorRef) return null
   const location = parseBookmarkLocation(locatorRef)
   if (!(location instanceof PageRectLocation)) return null
-  const annotation = parsePdfAnnotationRef(dto.pdfAnnotationRef)
+  const annotation = parsePdfAnnotationRef(dto.pdfAnnotationRef, dto.note)
   if (!annotation || annotation.pageIndex + 1 !== location.page) return null
 
   return {
@@ -303,9 +312,11 @@ export function pdfHighlightDtoToReaderHighlight(dto: {
     rects: pdfRectsFromAnnotation(annotation),
     ...(annotation.caret ? { caret: true as const } : {}),
     ...(annotation.shape ? { shape: annotation.shape } : {}),
+    ...(annotation.typewriter ? { typewriter: annotation.typewriter } : {}),
     styleKind: dto.styleKind,
     colorHex: dto.colorHex?.trim() || DEFAULT_HIGHLIGHT_COLOR,
-    note: dto.note?.trim() || undefined,
+    // A Typewriter note's text is the document its style runs index into: never trimmed.
+    note: annotation.typewriter ? dto.note : dto.note?.trim() || undefined,
     tags: dto.tags ?? [],
     selectionText: parseSelectionTextRef(dto.selectionTextRef),
     createdAt: dto.createdAt,
@@ -316,11 +327,12 @@ export function pdfHighlightDtoToReaderHighlight(dto: {
 /** Renderer rects → the `pdfAnnotation` a save sends over IPC. */
 export function pdfAnnotationRefForRects(
   rects: readonly PdfHighlightRect[],
-  options?: { caret?: boolean; shape?: PdfShapeGeometry },
+  options?: { caret?: boolean; shape?: PdfShapeGeometry; typewriter?: PdfTypewriterDoc },
 ): string | undefined {
   const annotation = pdfAnnotationFromRects(rects, options)
   if (!annotation) return undefined
   if (options?.shape) annotation.shape = options.shape
+  if (options?.typewriter) annotation.typewriter = options.typewriter
   return packPdfAnnotationRef(annotation)
 }
 

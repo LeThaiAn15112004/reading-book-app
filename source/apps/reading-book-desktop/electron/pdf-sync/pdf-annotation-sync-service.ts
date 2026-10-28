@@ -46,6 +46,13 @@ export type SyncReason = 'open' | 'file-change' | 'app-change'
 export type WriteStatus = 'written' | 'locked' | 'failed' | WriteBlockReason
 
 /** Pushed to the renderer after a sync that changed something (and always after the open sync). */
+/** Where one Typewriter note stands in the file after a cycle (contracts §3). `in_file`: written. */
+export type TypewriterFileStatus = {
+  id: string
+  code: 'in_file' | 'file_not_writable' | 'unsupported_characters' | 'font_unavailable' | 'does_not_fit'
+  characters?: string[]
+}
+
 export type PdfAnnotationSyncEvent = {
   bookId: string
   reason: SyncReason
@@ -56,6 +63,8 @@ export type PdfAnnotationSyncEvent = {
   writeStatus?: WriteStatus
   /** For `writeStatus: 'signed'`: the signer, when known. */
   signerName?: string
+  /** The Typewriter notes this cycle tried to write, and the result for each (a note not listed was not touched). */
+  typewriterStatus?: TypewriterFileStatus[]
   /** PDF.js ids of the scanned items, aligned with `outcome.managedIndices`. */
   items: readonly ScannedPdfAnnotation[]
   /**
@@ -103,7 +112,7 @@ export type PdfAnnotationSyncDeps = {
     /** The store's `applyTwoWaySync`. */
     apply: (bookId: string, plan: TwoWayPlan, items: readonly ScannedPdfAnnotation[], after: readonly ScannedPdfAnnotation[] | null) => TwoWaySyncOutcome | null
     /** Append + verify in the worker. */
-    applyOps: (bytes: Uint8Array, ops: AnnotationUpdate) => Promise<{ output: Uint8Array; after: { items: ScannedPdfAnnotation[] } }>
+    applyOps: (bytes: Uint8Array, ops: AnnotationUpdate) => Promise<{ output: Uint8Array; after: { items: ScannedPdfAnnotation[] }; skipped?: { nm: string; code: TypewriterFileStatus['code']; characters?: string[] }[] }>
     /** Replace the file safely (temp + rename). */
     writeFile: (filePath: string, bytes: Uint8Array) => Promise<void>
   }
@@ -235,6 +244,8 @@ export function createPdfAnnotationSyncService(deps: PdfAnnotationSyncDeps) {
     let signerName: string | undefined
     let newSha = sha
     let newSize = bytes.length
+    const twRows = plan.writtenRows.filter((w) => w.row.styleKind === 'typewriter')
+    let typewriterStatus: TypewriterFileStatus[] | undefined
     if (hasFileWrites(plan)) {
       const eligibility = await twoWay.checkWritable(session.bookId, filePath, bytes, session.allowSigned)
       if (session.disposed) return
@@ -243,13 +254,15 @@ export function createPdfAnnotationSyncService(deps: PdfAnnotationSyncDeps) {
         writeStatus = eligibility.reason
         signerName = eligibility.signerName
         log(`[pdf-sync] not writing into the file (${eligibility.reason}); Readmate's changes stay pending`)
+        typewriterStatus = twRows.map((w) => ({ id: w.noteId, code: 'file_not_writable' as const }))
       } else {
-        let written: { output: Uint8Array; after: { items: ScannedPdfAnnotation[] } } | null = null
+        let written: Awaited<ReturnType<typeof twoWay.applyOps>> | null = null
         try {
           written = await twoWay.applyOps(bytes, plan.file)
         } catch (err) {
           log('[pdf-sync] write-back could not be prepared; the file is untouched', err)
           writeStatus = 'failed'
+          typewriterStatus = twRows.map((w) => ({ id: w.noteId, code: 'file_not_writable' as const }))
         }
         if (session.disposed) return
         if (written) {
@@ -271,12 +284,21 @@ export function createPdfAnnotationSyncService(deps: PdfAnnotationSyncDeps) {
             newSha = sha256Hex(written.output)
             newSize = written.output.length
             writeStatus = 'written'
+            // A Typewriter note that cannot be drawn was left out of the update (the rest was written): it stays in the app, pending, and says why.
+            const skipped = written.skipped ?? []
+            typewriterStatus = twRows.map((w) => {
+              const miss = skipped.find((k) => w.names.includes(k.nm))
+              return miss ? { id: w.noteId, code: miss.code, ...(miss.characters ? { characters: miss.characters } : {}) } : { id: w.noteId, code: 'in_file' as const }
+            })
+            const skippedRows = new Set(typewriterStatus.filter((t) => t.code !== 'in_file').map((t) => t.id))
+            if (skippedRows.size > 0) plan.writtenRows = plan.writtenRows.filter((w) => !skippedRows.has(w.noteId))
           } catch (err) {
             const code = errnoCode(err)
             // EBUSY / EPERM: another app holds the file — retried a bounded number of times.
             // EACCES and the rest: retrying can't help; the next trigger tries again.
             const locked = code === 'EBUSY' || code === 'EPERM'
             writeStatus = locked ? 'locked' : code === 'EACCES' || code === 'EROFS' ? 'read_only' : 'failed'
+            typewriterStatus = twRows.map((w) => ({ id: w.noteId, code: 'file_not_writable' as const }))
             log(`[pdf-sync] write-back failed (${code || 'error'}); Readmate's changes stay pending`, err)
             if (locked) scheduleRetry(session, reason, firstEventAt, true)
           }
@@ -320,6 +342,7 @@ export function createPdfAnnotationSyncService(deps: PdfAnnotationSyncDeps) {
       outcome: { ...outcome, managedIndices: scanned.items.map((_, i) => i) },
       writeStatus,
       signerName,
+      typewriterStatus,
       items: scanned.items,
       matchesDisplayedFile: reason === 'open' && deps.servedSha256(session.bookId) === sha,
       complete: scanned.complete,

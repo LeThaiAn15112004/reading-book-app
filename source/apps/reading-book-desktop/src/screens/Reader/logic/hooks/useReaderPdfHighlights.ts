@@ -81,7 +81,7 @@ export function useReaderPdfHighlights({
     // A zoom closes the open menu, but a SELECTED shape stays selected (its handles follow the page).
     const { focusedHighlightId, highlights, focusHighlight } = usePdfHighlightsStore.getState()
     const focused = focusedHighlightId ? highlights.find((h) => h.id === focusedHighlightId) : undefined
-    if (focused && isShapeStyleKind(focused.styleKind)) focusHighlight(focused.id)
+    if (focused && (isShapeStyleKind(focused.styleKind) || focused.styleKind === 'typewriter')) focusHighlight(focused.id)
     else closeEditPopup()
     cancelInsert()
   }, [zoom, closeEditPopup, cancelInsert])
@@ -110,6 +110,9 @@ export function useReaderPdfHighlights({
     deleteHighlight: usePdfHighlightsStore((s) => s.deleteHighlight),
     focusHighlight: usePdfHighlightsStore((s) => s.focusHighlight),
     createShape: usePdfHighlightsStore((s) => s.createShape),
+    createTypewriter: usePdfHighlightsStore((s) => s.createTypewriter),
+    updateTypewriter: usePdfHighlightsStore((s) => s.updateTypewriter),
+    formatTypewriter: usePdfHighlightsStore((s) => s.formatTypewriter),
     updateShapeGeometry: usePdfHighlightsStore((s) => s.updateShapeGeometry),
     jumpToHighlight: usePdfHighlightsStore((s) => s.jumpToHighlight),
     undo: usePdfHighlightsStore((s) => s.undo),

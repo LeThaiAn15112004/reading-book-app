@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import { type ExportableHighlight, type PdfWriteAnnotation } from '../../src/app-models/pdf-annotation-export.js'
+import { applyAlign, applyStyle, emptyTypewriterDoc } from '../../src/typewriter/index.js'
 import {
+  applyFileFields,
+  fileSide,
   planTwoWaySync,
   syncBase,
   type TwoWayLedgerEntry,
@@ -31,7 +34,7 @@ const hex = (c: readonly number[]) => `#${c.map((v) => Math.round(v * 255).toStr
 function scannedFromWrite(a: PdfWriteAnnotation, objectId: string): ScannedPdfAnnotation {
   const item: ScannedPdfAnnotation = {
     objectId,
-    subtype: a.subtype,
+    subtype: a.subtype as ScannedPdfAnnotation['subtype'],
     pageIndex: a.pageIndex,
     rects: a.subtype === 'Text' ? [{ pageIndex: a.pageIndex, x: 0.6, y: 0.1, width: 0.03, height: 0.03 }] : a.rects.map((r) => ({ pageIndex: a.pageIndex, ...r })),
     colorHex: hex(a.color),
@@ -305,5 +308,93 @@ describe('planTwoWaySync — identity and recovery', () => {
     expect(w.cycle().file.add.map((a) => a.nm)).toEqual(['readmate:m', 'readmate:m:p2'])
     expect(writes(w.cycle())).toBe(0)
     expect(w.file).toHaveLength(2)
+  })
+})
+
+describe('planTwoWaySync — Typewriter notes (FreeText)', () => {
+  const TEXT = 'Xin chào thế giới'
+  const twRow = (id: string, doc = emptyTypewriterDoc(), extra: Partial<ExportableHighlight> = {}): ExportableHighlight =>
+    appRow(id, { styleKind: 'typewriter', note: TEXT, colorHex: doc.base.color, pdfAnnotation: { pageIndex: 0, rects: [R(0, 0.2)], typewriter: doc }, ...extra })
+
+  it('a Typewriter row is written once as a FreeText named after it; later cycles write nothing', () => {
+    const w = world()
+    w.rows.set('t', twRow('t'))
+    const first = w.cycle()
+    expect(first.file.add.map((a) => [a.nm, a.subtype, a.contents])).toEqual([['readmate:t', 'FreeText', TEXT]])
+    expect(first.file.add[0]!.typewriter?.text).toBe(TEXT)
+    for (let i = 0; i < 3; i++) expect(writes(w.cycle())).toBe(0)
+    expect(w.rows.size).toBe(1)
+  })
+
+  it('a formatting change in the app (a bold word) is rewritten into the file; the file side has no colour to compare', () => {
+    const w = world()
+    w.rows.set('t', twRow('t'))
+    w.cycle()
+    const doc = applyStyle(emptyTypewriterDoc(), TEXT, { start: 0, end: 3 }, { bold: true, color: '#FF0000' })
+    w.rows.set('t', twRow('t', doc))
+    const plan = w.cycle()
+    expect(plan.file.replace).toHaveLength(1)
+    expect(plan.file.replace[0]!.annotation.typewriter?.doc.runs).toHaveLength(1)
+    expect(writes(w.cycle())).toBe(0)
+  })
+
+  it('the sync fields are kind / colour / text / geometry; the file never changes the kind or the colour', () => {
+    const item: ScannedPdfAnnotation = { objectId: '9R', subtype: 'FreeText', pageIndex: 0, rects: [R(0, 0.2)], contents: TEXT, nm: 'readmate:t', colorHex: '#00FF00' }
+    expect(fileSide(item)).toEqual({ kind: 'typewriter', color: '', text: TEXT, geometry: '0.100,0.200,0.500,0.020' })
+    const row = twRow('t')
+    const next = applyFileFields(row, { ...item, colorHex: '#00FF00' }, ['kind', 'color'])
+    expect(next.styleKind).toBe('typewriter')
+    expect(next.colorHex).toBe(row.colorHex)
+    expect(next.pdfAnnotation?.typewriter).toEqual(row.pdfAnnotation?.typewriter)
+  })
+
+  it('a box moved in the file moves the note and keeps its document', () => {
+    const w = world()
+    const doc = applyStyle(emptyTypewriterDoc(), TEXT, { start: 0, end: 3 }, { bold: true })
+    w.rows.set('t', twRow('t', doc))
+    w.cycle()
+    w.file = [{ ...w.file[0]!, rects: [R(0, 0.5, 0.2)] }]
+    w.cycle()
+    const row = w.rows.get('t')!
+    expect(row.pdfAnnotation?.rects[0]).toMatchObject({ x: 0.2, y: 0.5 })
+    expect(row.pdfAnnotation?.typewriter).toEqual(doc)
+  })
+
+  it('a different /Contents in the file is a conflict: the document and text stay untouched, nothing is written', () => {
+    const w = world()
+    const doc = applyStyle(emptyTypewriterDoc(), TEXT, { start: 0, end: 3 }, { bold: true })
+    w.rows.set('t', twRow('t', doc))
+    w.cycle()
+    w.file = [{ ...w.file[0]!, contents: 'edited elsewhere' }]
+    const plan = w.cycle()
+    expect(plan.conflicts).toHaveLength(1)
+    expect(plan.conflicts[0]!.conflict).toMatchObject({ kind: 'both-changed', fields: ['text'] })
+    expect(writes(plan)).toBe(0)
+    expect(w.rows.get('t')!.note).toBe(TEXT)
+    expect(w.rows.get('t')!.pdfAnnotation?.typewriter).toEqual(doc)
+  })
+
+  it('choosing the file text keeps the box and base style but restarts the rich text (old offsets are meaningless)', () => {
+    const doc = applyAlign(applyStyle(emptyTypewriterDoc(), TEXT, { start: 0, end: 3 }, { bold: true }), TEXT, null, 'center')
+    const item: ScannedPdfAnnotation = { objectId: '9R', subtype: 'FreeText', pageIndex: 0, rects: [R(0, 0.2)], contents: 'từ file\r\nhai', nm: 'readmate:t' }
+    const next = applyFileFields(twRow('t', doc), item, ['text'])
+    expect(next.note).toBe('từ file\nhai')
+    expect(next.pdfAnnotation?.typewriter?.runs).toEqual([])
+    expect(next.pdfAnnotation?.typewriter?.align).toEqual([])
+    expect(next.pdfAnnotation?.typewriter?.base).toEqual(doc.base)
+  })
+
+  it('a Readmate FreeText whose row is gone comes back as a plain Typewriter row; a foreign or empty one is never imported', () => {
+    const w = world()
+    w.file = [{ objectId: '9R', subtype: 'FreeText', pageIndex: 0, rects: [R(0, 0.2)], contents: TEXT, nm: 'readmate:lost' }]
+    const plan = w.cycle()
+    expect(plan.inserts).toHaveLength(1)
+    const imported = [...w.rows.values()][0]!
+    expect(imported.styleKind).toBe('typewriter')
+    expect(imported.note).toBe(TEXT)
+    expect(imported.pdfAnnotation?.typewriter).toBeDefined()
+    const empty = world()
+    empty.file = [{ objectId: '9R', subtype: 'FreeText', pageIndex: 0, rects: [R(0, 0.2)], nm: 'readmate:blank' }]
+    expect(empty.cycle().inserts).toHaveLength(0)
   })
 })

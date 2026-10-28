@@ -10,6 +10,7 @@
  */
 import { shapeArrowBarbs, type PdfWriteAnnotation } from '@reading-book/book-reader-sdk'
 import { PdfRawObjects, parsePdfJsRef } from './pdf-raw-objects'
+import { buildTypewriterObjects } from './typewriter-pdf'
 import {
   PdfSyntaxError,
   dictValue,
@@ -353,6 +354,12 @@ function appendUnchecked(bytes: Uint8Array, pages: ReadonlyMap<number, PageGeome
 
   const writeAnnotation = (annotation: PdfWriteAnnotation, target: PdfRef | null, keep: Record<string, string>): PdfRef => {
     const page = pageOf(annotation.pageIndex)
+    if (annotation.subtype === 'FreeText') {
+      // Typewriter note: annotation + appearance + embedded fonts (throws TypewriterWriteError, writes nothing then).
+      const built = buildTypewriterObjects(annotation, page, () => ({ num: nextNum++, gen: 0 }), target, pdfDate(annotation.createdAt), pdfDate(annotation.modifiedAt), keep)
+      written.push(...built.objects)
+      return built.ref
+    }
     if (isShapeWrite(annotation)) {
       const geometry = shapeGeometry(annotation, page)
       const ap = { num: nextNum++, gen: 0 }

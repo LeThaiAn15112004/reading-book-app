@@ -13,6 +13,7 @@
  *   4. large      a 512 MB file is streamed without being buffered (RSS, bytes actually read)
  *   5. progress   json_patch merge keeps other state, audio-only, validation, restore rules
  *   6. isolation  non-audio books untouched; audio never enters chunking / open-book-content reads
+ *   7. multi-track (Stage B1) per-track stream URLs / MIME / containment, `audio:getTracks`, progress + Notes guards
  *
  * Synthetic MP3 frames are used for structure only: this spike proves the plumbing, NOT codec
  * playback (that was measured separately with a real MP3 in the PoC report). If
@@ -682,6 +683,354 @@ if (sample && fs.existsSync(sample)) {
     assert.equal(tail.status, 206)
     assert.equal(sha(await bodyOf(tail)), sha(real.subarray(real.length - 1000)))
     console.log(`      (title "${r.title}", ${real.length} B)`)
+  })
+}
+
+// ---- 7. multi-track audiobooks (Stage B1): per-track URLs, the track list, Main-layer guards ----
+console.log('7. multi-track audiobooks: per-track stream URLs, track list, progress + Notes guards')
+{
+  const { randomUUID } = await import('node:crypto')
+  const { chapterFileName } = await import('@reading-book/book-reader-sdk')
+  const { createBookAudioLookup } = await import('../../electron/audio/audio-lookup.ts')
+  const { parseAudioRequestTarget } = await import('../../electron/audio/audio-stream-handler.ts')
+  const { registerAudioIpc } = await import('../../electron/ipc/audio.ipc.ts')
+  const { ensureBooksSandbox, bookFileStorage } = await import('../../electron/files/sandbox.ts')
+  const { AudioChannels } = await import('../../electron/ipc/channels.ts')
+  registerAudioIpc()
+
+  const insChapter = db.prepare(
+    `INSERT INTO book_audio_chapters (id, book_id, position, title, file_name, source_path, file_format, size_bytes, sha256, duration_seconds)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+  )
+  const mp3Bytes = mp3({ frames: 40 })
+  const wavBytes = fs.readFileSync(wavFile('mt-source.wav'))
+  /** A multi-track book whose files live in the app-owned books folder, like a real import. */
+  function addMultiBook(bookId, tracks) {
+    const dir = path.join(ensureBooksSandbox(), randomUUID())
+    fs.mkdirSync(dir)
+    const ids = tracks.map(() => randomUUID())
+    tracks.forEach((t, i) => fs.writeFileSync(path.join(dir, chapterFileName(i, ids[i], t.format)), t.bytes))
+    db.prepare(
+      `INSERT INTO books (id, title, file_path, file_format, sha256, reading_status, reading_state_json, added_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, 'not-started', '{}', '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z')`,
+    ).run(bookId, `Book ${bookId}`, path.join(dir, chapterFileName(0, ids[0], tracks[0].format)), tracks[0].format, `sha-${bookId}`)
+    tracks.forEach((t, i) =>
+      insChapter.run(ids[i], bookId, i, t.title, chapterFileName(i, ids[i], t.format), `CD${i}/x.${t.format}`, t.format, t.bytes.length, `${i}`.padStart(64, '0'), t.duration),
+    )
+    return { dir, ids }
+  }
+  const mt = addMultiBook('mt-book', [
+    { format: 'mp3', bytes: mp3Bytes, title: 'First (mp3)', duration: 12.5 },
+    { format: 'wav', bytes: wavBytes, title: 'Second (wav)', duration: null },
+  ])
+  const other = addMultiBook('mt-other', [
+    { format: 'mp3', bytes: mp3({ frames: 10 }), title: 'Other 1', duration: 3 },
+    { format: 'mp3', bytes: mp3({ frames: 12 }), title: 'Other 2', duration: 4 },
+  ])
+  const lookup = createBookAudioLookup({
+    findBook: (id) => library.findById(id),
+    getChapter: (b, t) => library.getAudioChapter(b, t),
+    isManaged: (p) => bookFileStorage(p) === 'managed',
+    resolveFile: async (b) => {
+      const f = await resolveBookFile(b)
+      return f.ok ? { ok: true, path: f.path } : { ok: false }
+    },
+  })
+  const mh = createAudioStreamHandler(lookup)
+  const url = (b, t) => `rb-audio://local/${b}${t ? `/${t}` : ''}`
+  const get = (u, headers = {}) => mh(new Request(u, { headers }))
+
+  await check('URL target: {bookId} or {bookId}/{uuid}; anything else (non-UUID, extra segment, encoded separator, NUL, other host) is refused; the old parser is unchanged', () => {
+    const id = mt.ids[0]
+    assert.deepEqual(parseAudioRequestTarget('rb-audio://local/b1'), { bookId: 'b1' })
+    assert.deepEqual(parseAudioRequestTarget(`rb-audio://local/a%20b/${id}`), { bookId: 'a b', trackId: id })
+    for (const bad of ['rb-audio://local/b1/not-a-uuid', `rb-audio://local/b1/${id}/extra`, `rb-audio://local/b1%2F../${id}`, `rb-audio://local/b1/${id.replace(/.$/, '%00')}`, `rb-audio://other/b1/${id}`, 'rb-audio://local/', 'rb-audio://local/b1/%5C', 'not a url']) {
+      assert.equal(parseAudioRequestTarget(bad), null, bad)
+    }
+    assert.equal(parseAudioRequestUrl(`rb-audio://local/b1/${id}`), null, 'the book-only parser still refuses a nested path')
+    assert.equal(parseAudioRequestUrl('rb-audio://local/a-main'), 'a-main')
+  })
+  await check('per-track streaming: each track answers with ITS OWN format\'s MIME (mp3 / wav in one book), Range → 206 with the right bytes, 416 past the end', async () => {
+    const r0 = await get(url('mt-book', mt.ids[0]), { Range: 'bytes=10-29' })
+    assert.deepEqual([r0.status, r0.headers.get('content-type'), r0.headers.get('content-range')], [206, 'audio/mpeg', `bytes 10-29/${mp3Bytes.length}`])
+    assert.ok((await bodyOf(r0)).equals(mp3Bytes.subarray(10, 30)))
+    const r1 = await get(url('mt-book', mt.ids[1]))
+    assert.deepEqual([r1.status, r1.headers.get('content-type')], [200, 'audio/wav'])
+    assert.ok((await bodyOf(r1)).equals(wavBytes))
+    const past = await get(url('mt-book', mt.ids[1]), { Range: `bytes=${wavBytes.length + 5}-` })
+    assert.equal(past.status, 416)
+  })
+  await check('the book-only URL still serves the book\'s own file = chapter 0 (preflight / old URLs keep working)', async () => {
+    const r = await get(url('mt-book'), { Range: 'bytes=0-3' })
+    assert.deepEqual([r.status, r.headers.get('content-type')], [206, 'audio/mpeg'])
+    assert.ok((await bodyOf(r)).equals(mp3Bytes.subarray(0, 4)))
+  })
+  await check('forged ids are 404: unknown track, another book\'s track, a track under another book, a track of a single-file book, a malformed id', async () => {
+    for (const u of [
+      url('mt-book', randomUUID()),
+      url('mt-book', other.ids[0]), // another book's track id under this book
+      url('mt-other', mt.ids[0]), // this book's track id under another book
+      url('a-tagged', mt.ids[0]), // a single-file audiobook has no tracks
+      url('mt-book', 'not-a-uuid'),
+      url('no-such-book', mt.ids[0]),
+    ]) {
+      assert.equal((await get(u)).status, 404, u)
+    }
+  })
+  await check('a chapter row with a non-canonical file name, a book outside the app folder, or a symbolic link as the file is refused', async () => {
+    const row = db.prepare('SELECT file_name n FROM book_audio_chapters WHERE id = ?').get(mt.ids[1])
+    fs.copyFileSync(path.join(mt.dir, row.n), path.join(mt.dir, 'evil.mp3'))
+    db.prepare('UPDATE book_audio_chapters SET file_name = ? WHERE id = ?').run('evil.mp3', mt.ids[1]) // passes the SQL CHECK, is not a chapter name
+    assert.equal((await get(url('mt-book', mt.ids[1]))).status, 404)
+    db.prepare('UPDATE book_audio_chapters SET file_name = ? WHERE id = ?').run(row.n, mt.ids[1])
+    assert.equal((await get(url('mt-book', mt.ids[1]))).status, 200)
+    // the book is registered outside the app-owned books folder
+    const original = db.prepare('SELECT file_path f FROM books WHERE id = ?').get('mt-book').f
+    const outside = path.join(tmp, path.basename(original))
+    fs.copyFileSync(original, outside)
+    db.prepare('UPDATE books SET file_path = ? WHERE id = ?').run(outside, 'mt-book')
+    assert.equal((await get(url('mt-book', mt.ids[0]))).status, 404)
+    db.prepare('UPDATE books SET file_path = ? WHERE id = ?').run(original, 'mt-book')
+    assert.equal((await get(url('mt-book', mt.ids[0]))).status, 200)
+    // a symbolic link in the book's folder is never followed
+    const target = path.join(mt.dir, row.n)
+    const secret = path.join(tmp, 'secret.txt')
+    fs.writeFileSync(secret, 'top secret')
+    fs.rmSync(target)
+    let linked = true
+    try {
+      fs.symlinkSync(secret, target, 'file')
+    } catch (e) {
+      linked = false
+      fs.writeFileSync(target, wavBytes)
+      console.log(`      (symlink not created: ${e.code} — symlink check skipped)`)
+    }
+    if (linked) assert.equal((await get(url('mt-book', mt.ids[1]))).status, 404)
+    fs.rmSync(target, { force: true })
+    fs.writeFileSync(target, wavBytes)
+  })
+  await check('audio:getTracks → ids, titles, durations in order and NOTHING else (no file name, source path or filesystem path); [] for a single-file book; ok:false for unknown', async () => {
+    const r = await invoke(AudioChannels.getTracks, 'mt-book')
+    assert.deepEqual(r, {
+      ok: true,
+      tracks: [
+        { id: mt.ids[0], title: 'First (mp3)', durationSeconds: 12.5 },
+        { id: mt.ids[1], title: 'Second (wav)', durationSeconds: null },
+      ],
+    })
+    assert.ok(!JSON.stringify(r).includes(mt.dir) && !JSON.stringify(r).includes('CD0') && !/\.(mp3|wav)/.test(JSON.stringify(r)))
+    assert.deepEqual(await invoke(AudioChannels.getTracks, 'a-tagged'), { ok: true, tracks: [] })
+    assert.deepEqual(await invoke(AudioChannels.getTracks, 'no-such-book'), { ok: false, tracks: [] })
+    assert.deepEqual(await invoke(AudioChannels.getTracks, 7), { ok: false, tracks: [] })
+  })
+  await check('audio:getChapters is empty (ok) for a multi-track book — embedded chapters are ignored — and unchanged for a single-file book', async () => {
+    assert.deepEqual(await invoke(AudioChannels.getChapters, 'mt-book'), { ok: true, chapters: [] })
+    const single = await invoke(AudioChannels.getChapters, 'a-tagged')
+    assert.equal(single.ok, true)
+  })
+  await check('PROGRESS guard: a multi-track book needs a trackId of ITS OWN; a single-file book must not carry one', async () => {
+    const save = (bookId, extra) => invoke(OverlayChannels.saveAudioProgress, { bookId, positionSeconds: 5, playbackRate: 1, ...extra })
+    assert.deepEqual(await save('mt-book', {}), { ok: false }, 'no trackId')
+    assert.deepEqual(await save('mt-book', { trackId: randomUUID() }), { ok: false }, 'unknown trackId')
+    assert.deepEqual(await save('mt-book', { trackId: other.ids[0] }), { ok: false }, 'another book\'s trackId')
+    assert.deepEqual(await save('mt-book', { trackId: mt.ids[1] }), { ok: true })
+    const stored = JSON.parse(db.prepare('SELECT reading_state_json j FROM books WHERE id = ?').get('mt-book').j)
+    assert.equal(stored.audioProgress.trackId, mt.ids[1])
+    assert.equal(stored.audioProgress.positionSeconds, 5)
+    assert.equal('percent' in stored, false)
+    // single-file book: unchanged without a trackId, refused with one
+    assert.deepEqual(await save('a-tagged', { trackId: mt.ids[0] }), { ok: false })
+    assert.deepEqual(await save('a-tagged', { durationSeconds: 100 }), { ok: true })
+    const single = JSON.parse(db.prepare('SELECT reading_state_json j FROM books WHERE id = ?').get('a-tagged').j)
+    assert.equal(single.audioProgress.durationSeconds, 100)
+    assert.equal('trackId' in single.audioProgress, false)
+    assert.equal(single.percent, 5)
+    // reading it back carries the trackId
+    const back = await invoke(OverlayChannels.getAudioProgress, 'mt-book')
+    assert.equal(back.trackId, mt.ids[1])
+  })
+  await check('NOTES guard (single-file half, unchanged): a single-file book\'s Notes round trip', async () => {
+    const note = { id: 'n1', label: 'x', positionSeconds: 3, createdAt: '2026-01-01T00:00:00Z' }
+    assert.deepEqual(await invoke(AudioChannels.saveBookmarks, { bookId: 'a-tagged', bookmarks: [note] }), { ok: true })
+    assert.deepEqual((await invoke(AudioChannels.getBookmarks, 'a-tagged')).map((n) => n.id), ['n1'])
+  })
+
+  // ---- Notes for multi-track audiobooks: ownership, orphans, cap, other keys ----
+  const rawState = (bookId) => db.prepare('SELECT reading_state_json j FROM books WHERE id = ?').get(bookId).j
+  const storedNotes = (bookId) => JSON.parse(rawState(bookId)).audioBookmarks
+  const noteOf = (id, trackId, positionSeconds = 3, extra = {}) => ({
+    id,
+    label: `L-${id}`,
+    positionSeconds,
+    createdAt: '2026-01-01T00:00:00Z',
+    ...extra,
+    ...(trackId ? { trackId } : {}),
+  })
+  const saveNotes = (bookId, bookmarks) => invoke(AudioChannels.saveBookmarks, { bookId, bookmarks })
+
+  await check('NOTES ownership (multi-track): a save is accepted only if EVERY Note names a track of THIS book; otherwise refused whole and nothing is written', async () => {
+    assert.equal(storedNotes('mt-book'), undefined)
+    for (const bad of [
+      [noteOf('n1')], // no trackId
+      [noteOf('n1', randomUUID())], // unknown track
+      [noteOf('n1', other.ids[0])], // another book's track
+      [noteOf('n1', mt.ids[0]), noteOf('n2', randomUUID())], // mixed list
+    ]) {
+      assert.deepEqual(await saveNotes('mt-book', bad), { ok: false })
+      assert.equal(storedNotes('mt-book'), undefined, 'nothing written')
+    }
+    assert.deepEqual(await saveNotes('mt-book', [noteOf('n1', mt.ids[0], 3), noteOf('n2', mt.ids[1], 4)]), { ok: true })
+    const back = await invoke(AudioChannels.getBookmarks, 'mt-book')
+    assert.deepEqual(back.map((n) => [n.id, n.trackId, n.positionSeconds]), [['n1', mt.ids[0], 3], ['n2', mt.ids[1], 4]])
+    // a refused save over existing Notes leaves the stored state byte-identical
+    const before = rawState('mt-book')
+    assert.deepEqual(await saveNotes('mt-book', [noteOf('n1', mt.ids[0]), noteOf('bad', randomUUID())]), { ok: false })
+    assert.equal(rawState('mt-book'), before)
+    // single-file: a Note with a trackId is refused and nothing is written
+    const singleBefore = rawState('a-tagged')
+    assert.deepEqual(await saveNotes('a-tagged', [noteOf('n1', mt.ids[0])]), { ok: false })
+    assert.equal(rawState('a-tagged'), singleBefore)
+    assert.deepEqual((await invoke(AudioChannels.getBookmarks, 'a-tagged')).map((n) => n.id), ['n1'])
+    assert.equal('trackId' in (await invoke(AudioChannels.getBookmarks, 'a-tagged'))[0], false)
+  })
+
+  await check('NOTES orphans (multi-track): foreign / track-less stored entries are never returned, and survive add, edit and delete (canonical form); an incoming id wins over a foreign duplicate', async () => {
+    const o = addMultiBook('mt-orph', [
+      { format: 'mp3', bytes: mp3({ frames: 10 }), title: 'O1', duration: 3 },
+      { format: 'mp3', bytes: mp3({ frames: 12 }), title: 'O2', duration: 4 },
+    ])
+    const foreign = noteOf('f-foreign', randomUUID(), 50, { note: 'orphan text' })
+    const trackless = noteOf('f-none', undefined, 60)
+    const own1 = noteOf('own1', o.ids[0], 5)
+    db.prepare('UPDATE books SET reading_state_json = ? WHERE id = ?').run(JSON.stringify({ futureKey: 1, audioBookmarks: [foreign, trackless, own1] }), 'mt-orph')
+    const ids = async () => (await invoke(AudioChannels.getBookmarks, 'mt-orph')).map((n) => n.id)
+    const foreignKept = () => {
+      const s = storedNotes('mt-orph')
+      assert.deepEqual(s.find((n) => n.id === 'f-foreign'), foreign)
+      assert.deepEqual(s.find((n) => n.id === 'f-none'), trackless)
+    }
+    assert.deepEqual(await ids(), ['own1'], 'foreign entries are not returned')
+    // add
+    assert.deepEqual(await saveNotes('mt-orph', [own1, noteOf('own2', o.ids[1], 7)]), { ok: true })
+    assert.deepEqual(await ids(), ['own1', 'own2'])
+    foreignKept()
+    // edit
+    assert.deepEqual(await saveNotes('mt-orph', [noteOf('own1', o.ids[0], 5, { note: 'edited' }), noteOf('own2', o.ids[1], 7)]), { ok: true })
+    assert.equal((await invoke(AudioChannels.getBookmarks, 'mt-orph'))[0].note, 'edited')
+    foreignKept()
+    // delete (all visible Notes)
+    assert.deepEqual(await saveNotes('mt-orph', []), { ok: true })
+    assert.deepEqual(await ids(), [])
+    foreignKept()
+    assert.equal(JSON.parse(rawState('mt-orph')).futureKey, 1, 'other keys kept')
+    // an incoming Note with the id of a foreign entry wins; the foreign duplicate is dropped
+    assert.deepEqual(await saveNotes('mt-orph', [noteOf('f-foreign', o.ids[0], 9)]), { ok: true })
+    const dupes = storedNotes('mt-orph').filter((n) => n.id === 'f-foreign')
+    assert.equal(dupes.length, 1)
+    assert.equal(dupes[0].trackId, o.ids[0])
+  })
+
+  await check('NOTES cap (multi-track): 500 owned + foreign entries — all 500 returned; editing one keeps every foreign entry; exactly 500 is accepted, 501 is refused whole, orphans do not count', async () => {
+    const c = addMultiBook('mt-cap', [
+      { format: 'mp3', bytes: mp3({ frames: 10 }), title: 'C1', duration: 3 },
+      { format: 'mp3', bytes: mp3({ frames: 12 }), title: 'C2', duration: 4 },
+    ])
+    const owned = Array.from({ length: 500 }, (_, i) => noteOf(`o${i}`, c.ids[i % 2], i))
+    const foreigns = [noteOf('x-foreign-1', randomUUID(), 1), noteOf('x-foreign-2', randomUUID(), 2), noteOf('x-none', undefined, 3)]
+    // stored order: the 500 owned first, then the foreign tail (this is what a plain "sanitize the whole array" would cut)
+    db.prepare('UPDATE books SET reading_state_json = ? WHERE id = ?').run(JSON.stringify({ audioBookmarks: [...owned, ...foreigns] }), 'mt-cap')
+    assert.equal((await invoke(AudioChannels.getBookmarks, 'mt-cap')).length, 500, 'all 500 visible Notes are returned')
+    const edited = owned.map((n) => (n.id === 'o10' ? { ...n, note: 'edited' } : n))
+    assert.deepEqual(await saveNotes('mt-cap', edited), { ok: true }, 'exactly 500 is accepted')
+    const s = storedNotes('mt-cap')
+    assert.equal(s.length, 503)
+    for (const f of foreigns) assert.deepEqual(s.find((n) => n.id === f.id), f, `${f.id} survives`)
+    assert.equal((await invoke(AudioChannels.getBookmarks, 'mt-cap')).find((n) => n.id === 'o10').note, 'edited')
+    const before = rawState('mt-cap')
+    assert.deepEqual(await saveNotes('mt-cap', [...edited, noteOf('o500', c.ids[0], 500)]), { ok: false }, '501 is refused whole')
+    assert.equal(rawState('mt-cap'), before, 'nothing written, nothing truncated')
+  })
+
+  await check('NOTES vs other state (multi-track and single-file): add / edit / delete change only audioBookmarks; audioProgress is byte-identical and gains no percent; a progress save leaves the Notes identical; the text cap applies', async () => {
+    const m = addMultiBook('mt-matrix', [
+      { format: 'mp3', bytes: mp3({ frames: 10 }), title: 'M1', duration: 3 },
+      { format: 'mp3', bytes: mp3({ frames: 12 }), title: 'M2', duration: 4 },
+    ])
+    const seed = {
+      lastReadLocation: { k: 1 },
+      fontSize: 18,
+      futureKey: { a: [1, { b: 2 }] },
+      audioProgress: { trackId: m.ids[1], positionSeconds: 42, playbackRate: 1.25, scope: 'book', updatedAt: '2026-01-01T00:00:00Z' },
+    }
+    db.prepare('UPDATE books SET reading_state_json = ? WHERE id = ?').run(JSON.stringify(seed), 'mt-matrix')
+    const assertOthersUntouched = (step) => {
+      const parsed = JSON.parse(rawState('mt-matrix'))
+      const { audioBookmarks: _n, ...rest } = parsed
+      void _n
+      assert.deepEqual(rest, seed, `${step}: everything except audioBookmarks equals the seed`)
+      assert.equal(JSON.stringify(parsed.audioProgress), JSON.stringify(seed.audioProgress), `${step}: audioProgress byte-identical`)
+      assert.equal('percent' in parsed, false, `${step}: no percent appeared`)
+    }
+    assert.deepEqual(await saveNotes('mt-matrix', [noteOf('m1', m.ids[0], 2)]), { ok: true })
+    assertOthersUntouched('add')
+    assert.deepEqual(await saveNotes('mt-matrix', [noteOf('m1', m.ids[0], 2, { note: 'edited' })]), { ok: true })
+    assertOthersUntouched('edit')
+    assert.equal(storedNotes('mt-matrix')[0].note, 'edited')
+    assert.deepEqual(await saveNotes('mt-matrix', [noteOf('m1', m.ids[0], 2, { note: 'x'.repeat(2500) })]), { ok: true })
+    assert.equal(storedNotes('mt-matrix')[0].note.length, 2000, 'text cap')
+    assert.deepEqual(await saveNotes('mt-matrix', []), { ok: true })
+    assertOthersUntouched('delete')
+    // reverse: a progress save leaves the Notes identical (multi-track)
+    assert.deepEqual(await saveNotes('mt-matrix', [noteOf('m1', m.ids[0], 2)]), { ok: true })
+    const notesBefore = JSON.stringify(storedNotes('mt-matrix'))
+    assert.deepEqual(await invoke(OverlayChannels.saveAudioProgress, { bookId: 'mt-matrix', trackId: m.ids[0], positionSeconds: 7, playbackRate: 1 }), { ok: true })
+    assert.equal(JSON.stringify(storedNotes('mt-matrix')), notesBefore)
+    assert.equal(JSON.parse(rawState('mt-matrix')).audioProgress.trackId, m.ids[0])
+    // reverse: single-file
+    const singleNotes = JSON.stringify(storedNotes('a-tagged'))
+    assert.deepEqual(await invoke(OverlayChannels.saveAudioProgress, { bookId: 'a-tagged', positionSeconds: 9, playbackRate: 1 }), { ok: true })
+    assert.equal(JSON.stringify(storedNotes('a-tagged')), singleNotes)
+  })
+
+  // ---- CHARACTERIZATION GOLDEN (Notes for Multi-Track Audiobooks, task T002) ----
+  // Expected values were captured from the implementation as it was BEFORE that feature. They pin the
+  // single-file Notes persistence (IPC handler → SqliteAudioStore → json_patch) and must keep passing,
+  // unmodified, after multi-track Notes are added.
+  await check('GOLDEN single-file Notes: exact stored JSON and getBookmarks result for a fixed save; 501 entries keep the first 500 in input order (silent)', async () => {
+    const r = await adapter.import(write('golden-notes.mp3', mp3({ frames: 50 })))
+    addAudioBook(r, 'a-golden')
+    const stored = () => db.prepare('SELECT reading_state_json j FROM books WHERE id = ?').get('a-golden').j
+    const seed = JSON.stringify({ lastReadLocation: { k: 1 }, futureKey: { a: [1, 2] } })
+    db.prepare('UPDATE books SET reading_state_json = ? WHERE id = ?').run(seed, 'a-golden')
+
+    const input = [
+      { id: 'g-b', label: 'B', positionSeconds: 90, note: '  text  ', chapterId: 'c1', chapterOffsetSeconds: 12.5, createdAt: '2026-01-01T00:00:02Z' },
+      { id: 'g-a', label: '', positionSeconds: 10, createdAt: '2026-01-01T00:00:01Z', junk: true },
+      { id: 'g-c', label: '  padded  ', positionSeconds: 90.5, createdAt: '2026-01-01T00:00:03Z' },
+    ]
+    assert.deepEqual(await invoke(AudioChannels.saveBookmarks, { bookId: 'a-golden', bookmarks: input }), { ok: true })
+    // other reading-state keys are kept; the stored string is exactly this (key order included)
+    assert.equal(
+      stored(),
+      '{"lastReadLocation":{"k":1},"futureKey":{"a":[1,2]},"audioBookmarks":[{"id":"g-a","label":"Bookmark at 0:10","positionSeconds":10,"createdAt":"2026-01-01T00:00:01Z"},{"id":"g-b","label":"B","positionSeconds":90,"createdAt":"2026-01-01T00:00:02Z","note":"text","chapterId":"c1","chapterOffsetSeconds":12.5},{"id":"g-c","label":"padded","positionSeconds":90.5,"createdAt":"2026-01-01T00:00:03Z"}]}',
+    )
+    assert.deepEqual(await invoke(AudioChannels.getBookmarks, 'a-golden'), [
+      { id: 'g-a', label: 'Bookmark at 0:10', positionSeconds: 10, createdAt: '2026-01-01T00:00:01Z' },
+      { id: 'g-b', label: 'B', positionSeconds: 90, createdAt: '2026-01-01T00:00:02Z', note: 'text', chapterId: 'c1', chapterOffsetSeconds: 12.5 },
+      { id: 'g-c', label: 'padded', positionSeconds: 90.5, createdAt: '2026-01-01T00:00:03Z' },
+    ])
+
+    const many = Array.from({ length: 501 }, (_, i) => ({ id: `g${i}`, label: `n${i}`, positionSeconds: 500 - i, createdAt: '2026-01-01T00:00:00Z' }))
+    assert.deepEqual(await invoke(AudioChannels.saveBookmarks, { bookId: 'a-golden', bookmarks: many }), { ok: true })
+    const after = JSON.parse(stored())
+    // 501 entries: ok:true, the FIRST 500 in input order are stored (the 501st is dropped silently), sorted by position
+    assert.equal(after.audioBookmarks.length, 500)
+    assert.equal(after.audioBookmarks[0].id, 'g499')
+    assert.equal(after.audioBookmarks[499].id, 'g0')
+    assert.equal(after.audioBookmarks.some((n) => n.id === 'g500'), false)
+    assert.equal(createHash('sha256').update(JSON.stringify(after.audioBookmarks)).digest('hex'), 'c61bbc6231cbf3a9b799df4977b81c9acc7ead7ca458c18c5e4883df0b258a79')
+    assert.equal(Object.keys(after).join(','), 'lastReadLocation,futureKey,audioBookmarks')
+    assert.equal((await invoke(AudioChannels.getBookmarks, 'a-golden')).length, 500)
   })
 }
 

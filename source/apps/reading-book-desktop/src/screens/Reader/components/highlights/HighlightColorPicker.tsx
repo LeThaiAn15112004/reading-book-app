@@ -28,6 +28,7 @@ const LEGACY_ALPHA: Record<HighlightStyleKind, number> = {
   ellipse: 1,
   line: 1,
   arrow: 1,
+  typewriter: 1,
 }
 
 /**

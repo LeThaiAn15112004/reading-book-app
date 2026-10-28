@@ -16,6 +16,7 @@ import {
   removeManagedBookDir,
 } from '../files/sandbox'
 import { getLibraryStore } from '../persistence/sqlite-library-store'
+import { cancelTranscriptionOfBook } from '../transcription/transcription-runtime'
 import { removeTxtData } from '../txt/txt-runtime'
 import type {
   BookSummaryDto,
@@ -36,8 +37,10 @@ function toSummaryDto(
   genreNames: string[] = [],
   session?: { lastReadLocation?: string; lastReadAt?: string; progressPercent?: number },
   readingStatus: ReadingStatusDto = 'not-started',
+  chapterCount = 0,
 ): BookSummaryDto {
-  const fileName = path.basename(book.filePath)
+  // A multi-chapter audiobook's `file_path` is its first chapter file: that name says nothing about the whole book.
+  const fileName = chapterCount > 0 ? book.title : path.basename(book.filePath)
   const dto: BookSummaryDto = {
     id: book.id,
     title: book.title,
@@ -49,6 +52,7 @@ function toSummaryDto(
     readingStatus,
     fileStorage: bookFileStorage(book.filePath),
   }
+  if (chapterCount > 0) dto.chapterCount = chapterCount
   if (book.coverPath) dto.coverUrl = coverUrlForBookId(book.id)
   if (authorNames.trim()) dto.author = authorNames
   if (book.fileSizeBytes != null) dto.fileSizeBytes = book.fileSizeBytes
@@ -72,9 +76,11 @@ function toSummaryDto(
 export function registerLibraryIpc(): void {
   ipcMain.removeHandler(LibraryChannels.listBooks)
   ipcMain.handle(LibraryChannels.listBooks, async (): Promise<BookSummaryDto[]> => {
-    const rows = await getLibraryStore().listAll()
+    const store = getLibraryStore()
+    const rows = await store.listAll()
+    const chapterCounts = store.audioChapterCounts()
     return rows.map(({ book, authorNames, genreNames, session, readingStatus }) =>
-      toSummaryDto(book, authorNames, genreNames, session, readingStatus),
+      toSummaryDto(book, authorNames, genreNames, session, readingStatus, chapterCounts.get(book.id) ?? 0),
     )
   })
 
@@ -90,7 +96,8 @@ export function registerLibraryIpc(): void {
       const genreNames = store.genreNamesForBook(book.id)
       const session = store.getReadingSessionSummary(book.id)
       const readingStatus = store.readingStatusForBook(book.id)
-      return toSummaryDto(book, authorNames, genreNames, session, readingStatus)
+      const chapterCount = store.audioChapterCounts().get(book.id) ?? 0
+      return toSummaryDto(book, authorNames, genreNames, session, readingStatus, chapterCount)
     },
   )
 
@@ -247,7 +254,8 @@ export function registerLibraryIpc(): void {
       if (!book) return { ok: false }
       const checked = checkRegisteredBookPath(book.filePath, book.format)
       if (!checked.ok) return { ok: false }
-      clipboard.writeText(checked.path)
+      // A multi-chapter audiobook is a folder of files: copying chapter 0's path would name only a part of it.
+      clipboard.writeText(getLibraryStore().hasAudioChapters(book.id) ? path.dirname(checked.path) : checked.path)
       return { ok: true }
     },
   )
@@ -260,6 +268,11 @@ export function registerLibraryIpc(): void {
       const store = getLibraryStore()
       const book = await store.findById(id.trim())
       if (!book) return { ok: false }
+      // A multi-chapter audiobook's files are all app-owned: dropping only the record would orphan them.
+      // The UI offers `removeAudiobook` for it instead.
+      if (store.hasAudioChapters(book.id)) return { ok: false }
+      // A queued or running transcription of this audiobook is stopped first (FR-015): it must not keep reading a book that is gone.
+      await cancelTranscriptionOfBook(book.id)
       await store.deleteCascade(book.id)
       // The book file is kept (sandbox copy or the user's own); only app-owned data goes: the cover
       // and, for TXT, the edited copy.
@@ -277,13 +290,40 @@ export function registerLibraryIpc(): void {
       const store = getLibraryStore()
       const book = await store.findById(id.trim())
       if (!book) return { ok: false }
+      if (store.hasAudioChapters(book.id)) return { ok: false } // see removeAudiobook
       // Only app-owned copies are ever deleted. A referenced book's file — and its parent
       // folder — belong to the user; removeManagedBookDir enforces that a second time.
       if (bookFileStorage(book.filePath) !== 'managed') return { ok: false }
+      await cancelTranscriptionOfBook(book.id) // before the file goes: a running transcription reads it
       if (!(await removeManagedBookDir(book.filePath))) return { ok: false }
       await store.deleteCascade(book.id)
       await removeCoverFile(book.coverPath)
       await removeTxtData(book.id)
+      return { ok: true }
+    },
+  )
+
+  ipcMain.removeHandler(LibraryChannels.removeAudiobook)
+  ipcMain.handle(
+    LibraryChannels.removeAudiobook,
+    async (_event, id: unknown): Promise<OkResult> => {
+      if (typeof id !== 'string' || !id.trim()) return { ok: false }
+      const store = getLibraryStore()
+      const book = await store.findById(id.trim())
+      if (!book || !store.hasAudioChapters(book.id)) return { ok: false }
+      // Folder first, record second: if the files cannot be removed the record stays (nothing becomes unreachable)
+      // and the user can retry. removeManagedBookDir refuses anything but `{sandbox}/{uuid}/{file}`. The user's
+      // original ZIP is not referenced anywhere after the import and is never touched.
+      try {
+        if (bookFileStorage(book.filePath) !== 'managed') return { ok: false }
+        // A transcription of this audiobook reads these very files: stop it (and wait for it) before they are removed.
+        await cancelTranscriptionOfBook(book.id)
+        if (!(await removeManagedBookDir(book.filePath))) return { ok: false }
+      } catch {
+        return { ok: false }
+      }
+      await store.deleteCascade(book.id) // chapter rows cascade
+      await removeCoverFile(book.coverPath)
       return { ok: true }
     },
   )
@@ -300,6 +340,14 @@ export function registerLibraryIpc(): void {
       if (typeof id !== 'string' || !id.trim()) return notFound
       const book = await getLibraryStore().findById(id.trim())
       if (!book) return notFound
+      if (getLibraryStore().hasAudioChapters(book.id)) {
+        // Its identity is the hash of an ordered list of files, not of one file: there is nothing to match a picked file against.
+        return {
+          ok: false,
+          errorCode: 'wrong_file',
+          errorMessage: 'An audiobook made of several chapter files cannot be relinked.',
+        }
+      }
 
       // The renderer only ever names a book id — the path comes from this native dialog.
       const descriptor = SUPPORTED_FORMATS.find((d) => d.format === book.format)

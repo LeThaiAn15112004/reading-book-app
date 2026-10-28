@@ -27,6 +27,8 @@ export type HighlightStyleKind =
   | 'ellipse'
   | 'line'
   | 'arrow'
+  // PDF Typewriter note (specs/005-typewriter-note)
+  | 'typewriter'
 
 /**
  * The format-independent part of a renderer-side highlight row — everything the shared

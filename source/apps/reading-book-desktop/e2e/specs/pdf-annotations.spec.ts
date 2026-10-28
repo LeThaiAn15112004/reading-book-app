@@ -132,8 +132,7 @@ test('PDF: highlight / underline / strikethrough / note — create, render, navi
   await expect(marks(page, 1, 'strikethrough')).toHaveCount(1)
 
   await showToolbar(page)
-  await page.getByRole('button', { name: 'Annotation', exact: true }).click()
-  await page.getByRole('menuitemcheckbox', { name: /Underline/ }).click()
+  await page.getByRole('button', { name: 'Underline', exact: true }).click() // an icon button of the annotation group
   const line6 = (await lineSpan(page, 1, 6).boundingBox())!
   await page.mouse.move(line6.x + 2, line6.y + line6.height / 2)
   await page.mouse.down()

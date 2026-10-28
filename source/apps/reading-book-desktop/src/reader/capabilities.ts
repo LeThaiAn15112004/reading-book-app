@@ -32,10 +32,14 @@ export type ReaderCapability =
   | 'pageLayout'
   /** Sidebar "Attachment" panel: files embedded in the document (PDF only — docs/implementation_plan/pdf_attachments.md). */
   | 'attachments'
+  /** Sidebar "Transcript" tab (audiobooks only — specs/004-audiobook-transcription). No text surface has it: the audiobook screen builds its own rail. */
+  | 'transcript'
   /** Freehand Ink pen over the page (PDF only — docs/implementation_plan/pdf_freehand_ink_eraser_plan.md). */
   | 'inkAnnotations'
   /** Rectangle / ellipse / line / arrow annotations over the page (PDF only — docs/implementation_plan/pdf_shape_tools.md). */
   | 'shapeAnnotations'
+  /** Typewriter note: a text box typed on the page (PDF only — specs/005-typewriter-note). */
+  | 'typewriterAnnotations'
 
 /**
  * Which surface renders a format: EPUB (`renderers/epub`), PDF (`renderers/pdf`), TXT
@@ -60,7 +64,7 @@ const SURFACE_CAPABILITIES: Record<ReaderSurface, readonly ReaderCapability[]> =
   // normalized rects (docs/implementation_plan/pdf_text_annotations.md). No `readingSettings`: every
   // Aa option is EPUB reflow (font, size, margins…) and does nothing to a fixed-layout page; zoom
   // lives in the footer.
-  pdf: ['interaction', 'pan', 'search', 'markupAnnotations', 'snapshot', 'wordCount', 'pageLayout', 'inkAnnotations', 'shapeAnnotations', 'attachments'],
+  pdf: ['interaction', 'pan', 'search', 'markupAnnotations', 'snapshot', 'wordCount', 'pageLayout', 'inkAnnotations', 'shapeAnnotations', 'typewriterAnnotations', 'attachments'],
   // TXT: one continuous, editable text. No Hand / Select tools (the text box is live: click = caret,
   // drag = selection); the Edit tool is the way back from a markup tool, no page layout (there are no pages), no search painting / read aloud /
   // translate (out of scope). Markup is stored as offsets into the text

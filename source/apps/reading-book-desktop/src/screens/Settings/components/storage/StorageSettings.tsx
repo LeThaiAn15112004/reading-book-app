@@ -24,6 +24,7 @@ const SEGMENTS = [
   { key: 'books', label: 'Books', color: 'var(--lib-accent)' },
   { key: 'cache', label: 'Cache', color: '#38bdf8' },
   { key: 'models', label: 'Translation Models', color: '#a78bfa' },
+  { key: 'speech', label: 'Speech Models', color: '#34d399' },
   { key: 'other', label: 'Other', color: 'var(--lib-faint)' },
 ] as const
 
@@ -41,9 +42,11 @@ export function StorageSettings() {
   const load = useStorageStore((s) => s.load)
   const clearCache = useStorageStore((s) => s.clearCache)
   const removeTranslationModel = useStorageStore((s) => s.removeTranslationModel)
+  const removeSpeechModel = useStorageStore((s) => s.removeSpeechModel)
   const openBooksFolder = useStorageStore((s) => s.openBooksFolder)
   const [confirmClear, setConfirmClear] = useState(false)
   const [confirmRemoveModel, setConfirmRemoveModel] = useState<string | null>(null)
+  const [confirmRemoveSpeech, setConfirmRemoveSpeech] = useState<string | null>(null)
 
   useEffect(() => {
     void load()
@@ -53,6 +56,7 @@ export function StorageSettings() {
     books: usage?.booksBytes ?? 0,
     cache: usage?.cacheBytes ?? 0,
     models: usage?.translationModelsBytes ?? 0,
+    speech: usage?.speechModelsBytes ?? 0,
     other: usage?.otherBytes ?? 0,
   }
   const total = usage?.totalBytes ?? 0
@@ -165,6 +169,45 @@ export function StorageSettings() {
         )}
       </SettingsCard>
 
+      <SettingsCard
+        title="Speech Models"
+        description="Models downloaded for audiobook transcription. Transcripts you already made are kept; remove a model to free space and it downloads again the next time you choose it. A model cannot be removed while a transcription is running."
+      >
+        {usage && usage.speechModels.length > 0 ? (
+          <ul className="m-0 list-none divide-y divide-lib-border-soft overflow-hidden rounded-lg border border-lib-border-soft p-0">
+            {usage.speechModels.map((model) => (
+              <li
+                key={model.id}
+                className="flex min-h-[var(--ui-density-row)] items-center justify-between gap-3 px-3 py-1.5"
+              >
+                <span className="min-w-0 truncate text-[12px] text-lib-text-strong" title={model.id}>
+                  {model.label}
+                  <span className="ml-2 font-mono text-lib-faint">{model.id}</span>
+                </span>
+                <span className="flex shrink-0 items-center gap-3">
+                  <span className="text-[12px] text-lib-muted tabular-nums">
+                    {formatBytes(model.bytes)}
+                  </span>
+                  <button
+                    type="button"
+                    className="inline-flex h-7 cursor-pointer items-center rounded-md border border-lib-border bg-transparent px-2.5 text-[12px] font-semibold text-lib-muted transition-colors hover:border-red-400 hover:text-red-400 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-lib-accent disabled:cursor-not-allowed disabled:opacity-60"
+                    aria-label={`Remove ${model.id}`}
+                    disabled={removingModelId !== null}
+                    onClick={() => setConfirmRemoveSpeech(model.id)}
+                  >
+                    {removingModelId === model.id ? 'Removing…' : 'Remove'}
+                  </button>
+                </span>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="m-0 text-[13px] text-lib-faint">
+            {usage ? 'No speech models downloaded.' : loading ? 'Loading…' : '—'}
+          </p>
+        )}
+      </SettingsCard>
+
       <SettingsCard title="Storage Usage" description="Space used by Readmate Reader's own data.">
         <div
           className="flex h-2.5 w-full overflow-hidden rounded-full bg-lib-chip"
@@ -221,6 +264,21 @@ export function StorageSettings() {
           onConfirm={() => {
             setConfirmClear(false)
             void clearCache()
+          }}
+        />
+      ) : null}
+
+      {confirmRemoveSpeech ? (
+        <ConfirmBookActionDialog
+          title="Remove speech model?"
+          message={`${confirmRemoveSpeech} will be deleted from this device. Your transcripts are kept; the model downloads again the next time you transcribe with it.`}
+          confirmLabel="Remove"
+          destructive
+          onCancel={() => setConfirmRemoveSpeech(null)}
+          onConfirm={() => {
+            const id = confirmRemoveSpeech
+            setConfirmRemoveSpeech(null)
+            void removeSpeechModel(id)
           }}
         />
       ) : null}

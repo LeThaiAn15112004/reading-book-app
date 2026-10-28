@@ -16,6 +16,7 @@ export const libraryApi = {
   copyFilePath: (id: string) => window.api.library.copyFilePath(id),
   removeBook: (id: string) => window.api.library.removeBook(id),
   deleteBookFile: (id: string) => window.api.library.deleteBookFile(id),
+  removeAudiobook: (id: string) => window.api.library.removeAudiobook(id),
   relinkBook: (id: string) => window.api.library.relinkBook(id),
   checkSignature: (id: string) => window.api.library.checkSignature(id),
   listCollections: () => window.api.library.listCollections(),

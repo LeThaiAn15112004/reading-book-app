@@ -16,3 +16,6 @@ export function filterByNav() {
 
 // The PDF shape preferences store validates against these (import-free pure geometry module of the real SDK).
 export * from '../../../book-reader-sdk/src/app-models/pdf-shape.ts'
+
+// The PDF Typewriter preferences store validates against these (import-free pure modules of the real SDK).
+export * from '../../../book-reader-sdk/src/typewriter/index.ts'

@@ -67,6 +67,8 @@ export {
   archiveExtension,
   buildZipTree,
   canConfirmSelection,
+  importModeForSelection,
+  singleFileImportNotes,
   classifyEntry,
   collisionKey,
   compareArchivePaths,
@@ -87,6 +89,7 @@ export {
   type ZipEntryClassification,
   type ZipEntryKind,
   type ZipEntryStatus,
+  type ZipImportMode,
   type ZipImportPreview,
   type ZipImportSelection,
   type ZipPreviewEntry,
@@ -95,3 +98,36 @@ export {
   type ZipTreeRow,
   type ZipWarning,
 } from './audio-zip-import.js'
+export {
+  AUDIOBOOK_HASH_DOMAIN,
+  CHAPTER_FORMATS,
+  MIN_AUDIOBOOK_CHAPTERS,
+  audiobookHashInput,
+  audiobookParentSha256,
+  chapterFileName,
+  isChapterFileName,
+  sha256Hex,
+  validateChapterRecords,
+  type AudioChapterRecord,
+  type ChapterListCheck,
+} from './audio-book-layout.js'
+export {
+  TRACK_RESTART_THRESHOLD_SECONDS,
+  nextTrackIndex,
+  previousTrackAction,
+  resolveInitialTrack,
+  trackDurationLabel,
+  trackEyebrow,
+  trackNumberLabel,
+  type AudioTrack,
+  type InitialTrack,
+} from './audio-tracks.js'
+export {
+  canAddAnotherNote,
+  groupNotesByTrack,
+  notesForTrack,
+  orderTrackNotes,
+  trackNoteJumpTarget,
+  trackNoteLabel,
+  type TrackNoteGroup,
+} from './audio-track-notes.js'

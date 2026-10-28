@@ -42,6 +42,8 @@ export interface ReadingStateJson {
     playbackRate?: number | null
     scope?: string | null
     chapterId?: string | null
+    /** Multi-chapter audiobooks: the track being played (`positionSeconds` is then relative to it). */
+    trackId?: string | null
     updatedAt?: string | null
   } | null
   /** Audiobook bookmarks (src/audio/audio-bookmarks.ts). */

@@ -19,6 +19,8 @@ import { audioMimeForFormat, parseByteRange } from '@reading-book/book-reader-sd
  */
 export type AudioFileLookup = (
   bookId: string,
+  /** Multi-chapter audiobooks: the chapter (`book_audio_chapters.id`) to stream; absent = the book's own file. */
+  trackId?: string,
 ) => Promise<{ ok: true; path: string; format: string } | { ok: false }>
 
 export interface AudioStreamHandlerOptions {
@@ -45,6 +47,38 @@ export function parseAudioRequestUrl(rawUrl: string): string | null {
   return id
 }
 
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+/**
+ * `rb-audio://local/{bookId}` or `rb-audio://local/{bookId}/{trackId}` → the ids; anything else (other host, a third
+ * segment, empty segments, separators or NUL inside a decoded id, a `trackId` that is not a UUID) → null.
+ */
+export function parseAudioRequestTarget(rawUrl: string): { bookId: string; trackId?: string } | null {
+  let url: URL
+  try {
+    url = new URL(rawUrl)
+  } catch {
+    return null
+  }
+  if (url.hostname !== 'local') return null
+  const segments = url.pathname.replace(/^\/+/, '').split('/')
+  if (segments.length < 1 || segments.length > 2) return null
+  const decoded: string[] = []
+  for (const segment of segments) {
+    let id: string
+    try {
+      id = decodeURIComponent(segment)
+    } catch {
+      return null
+    }
+    if (!id || id.includes('/') || id.includes('\\') || id.includes('\0')) return null
+    decoded.push(id)
+  }
+  const [bookId, trackId] = decoded as [string, string | undefined]
+  if (trackId !== undefined && !UUID.test(trackId)) return null
+  return trackId === undefined ? { bookId } : { bookId, trackId }
+}
+
 const notFound = () => new Response('Not found', { status: 404 })
 
 export function createAudioStreamHandler(
@@ -55,11 +89,12 @@ export function createAudioStreamHandler(
     if (request.method !== 'GET' && request.method !== 'HEAD') {
       return new Response('Method not allowed', { status: 405, headers: { Allow: 'GET, HEAD' } })
     }
-    const bookId = parseAudioRequestUrl(request.url)
-    if (bookId === null) return notFound()
+    const target = parseAudioRequestTarget(request.url)
+    if (target === null) return notFound()
+    const { bookId, trackId } = target
 
     try {
-      const found = await lookup(bookId)
+      const found = await lookup(bookId, trackId)
       if (!found.ok) return notFound()
       const mime = audioMimeForFormat(found.format)
       if (!mime) return notFound()

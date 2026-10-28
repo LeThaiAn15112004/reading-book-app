@@ -1,4 +1,5 @@
 export { AudiobookZipImportDialog } from './AudiobookZipImportDialog'
+export { AudiobookZipJobPanel } from './AudiobookZipJobPanel'
 export { ImportConflictDialog } from './ImportConflictDialog'
 export type { ImportConflictDialogProps } from './ImportConflictDialog'
 export { ImportMenu } from './ImportMenu'

@@ -81,6 +81,9 @@ import {
 } from './pdfSearchDom'
 import { PdfPageInk, type PdfInkLayerMark } from './PdfInkLayer'
 import { PdfInkSelectionOverlay, type PdfCustomHandle } from './PdfInkSelectionOverlay'
+import { typewriterBoxAt } from '@reading-book/book-reader-sdk'
+import { PAN_DRAG_THRESHOLD_PX } from '../../interaction/interaction-hit'
+import { PdfPageTypewriters, type PdfTypewriterFlash, type PdfTypewriterMark } from './PdfTypewriterLayer'
 import { PdfPageShapes, type PdfShapeDraft, type PdfShapeFlash, type PdfShapeMark } from './PdfShapeLayer'
 import { readPdfInsertionPoint, type PdfInsertionPoint } from './pdfInsertionPoint'
 import { readPdfSelection, readPdfSelectionAt, type PdfSelectionInfo } from './pdfSelection'
@@ -271,6 +274,29 @@ export interface PdfRendererProps {
   onShapeResize?: (id: string, geometry: PdfShapeGeometryResult) => void
   /** The compact toolbar for the selected shape. */
   renderShapeToolbar?: (shape: PdfShapeMark) => ReactNode
+  /** Typewriter notes (rows of the annotation list) to paint; the Reader keeps them out of `annotations`. */
+  typewriters?: readonly PdfTypewriterMark[]
+  /** True while a note is being typed: a press elsewhere commits it instead of placing another box. */
+  typewriterEditing?: boolean
+  /** The Typewriter tool placed a box (a click: `height` 0; a drag: its rectangle) on a page. The Reader opens the editor. */
+  onTypewriterBegin?: (input: { pageIndex: number; box: { x: number; y: number; width: number; height: number }; heightRatio: number }) => void
+  /** A press outside the open editor: commit it. */
+  onTypewriterOutside?: () => void
+  /** The selected Typewriter note (the focused annotation row), or null. */
+  selectedTypewriterId?: string | null
+  /** The note being edited in place: its saved copy is not painted (the editor paints it). */
+  editingTypewriterId?: string | null
+  /** A click selected a note (`id`) or hit none (`null`). Select mode / the tool: one click; Hand: double-click. */
+  onTypewriterSelect?: (id: string | null) => void
+  /** A move / resize of the SELECTED note was released: its new box and the page's height / width. */
+  onTypewriterBox?: (id: string, box: { x: number; y: number; width: number; height: number }, heightRatio: number) => void
+  /** The selected note should be edited in place (double-click, a second click in Select, the toolbar). */
+  onTypewriterEdit?: (id: string, heightRatio: number) => void
+  onTypewriterDelete?: (id: string) => void
+  /** Right-click on a note, or its toolbar's Properties button: select it and show its properties. */
+  onTypewriterProperties?: (id: string) => void
+  /** The editor of the note being typed, for the page it is on (null elsewhere). */
+  renderTypewriterEditor?: (pageIndex: number, heightRatio: number) => ReactNode
   /** The Eraser was released: delete these saved strokes (every one the gesture touched) as one operation. */
   onInkErase?: (ids: string[]) => void
   /** Stroke (whole strokes) or Partial (only the part under the eraser). Defaults to Stroke. */
@@ -406,6 +432,18 @@ export function PdfRenderer({
   onShapeSelect,
   shapePen,
   onShapeCreate,
+  typewriters,
+  typewriterEditing = false,
+  onTypewriterBegin,
+  onTypewriterOutside,
+  renderTypewriterEditor,
+  selectedTypewriterId = null,
+  editingTypewriterId = null,
+  onTypewriterSelect,
+  onTypewriterBox,
+  onTypewriterEdit,
+  onTypewriterDelete,
+  onTypewriterProperties,
   onShapeResize,
   renderShapeToolbar,
   onInkErase,
@@ -512,6 +550,34 @@ export function PdfRenderer({
     }
     return byPage
   }, [inkStrokes, inkMove, inkResize, erasePreview])
+  const typewriterTool = interactionTool === 'typewriter'
+  const typewriterToolRef = useRef(typewriterTool)
+  typewriterToolRef.current = typewriterTool
+  const selectToolRef = useRef(interactionTool === 'select')
+  selectToolRef.current = interactionTool === 'select'
+  const onTypewriterSelectRef = useRef(onTypewriterSelect)
+  onTypewriterSelectRef.current = onTypewriterSelect
+  const [typewriterHoverId, setTypewriterHoverId] = useState<string | null>(null)
+  const typewriterEditingRef = useRef(typewriterEditing)
+  typewriterEditingRef.current = typewriterEditing
+  const onTypewriterBeginRef = useRef(onTypewriterBegin)
+  onTypewriterBeginRef.current = onTypewriterBegin
+  const onTypewriterOutsideRef = useRef(onTypewriterOutside)
+  onTypewriterOutsideRef.current = onTypewriterOutside
+  /** The Typewriter press in progress: where it started on which page, and where the pointer is now. */
+  const typewriterDragRef = useRef<{ pointerId: number; pageIndex: number; start: InkPoint; end: InkPoint; startClient: [number, number] } | null>(null)
+  const [typewriterRubber, setTypewriterRubber] = useState<{ pageIndex: number; start: InkPoint; end: InkPoint } | null>(null)
+  const typewritersByPageRef = useRef(new Map<number, PdfTypewriterMark[]>())
+  const typewritersByPage = useMemo(() => {
+    const byPage = new Map<number, PdfTypewriterMark[]>()
+    for (const mark of typewriters ?? []) {
+      const list = byPage.get(mark.pageIndex)
+      if (list) list.push(mark)
+      else byPage.set(mark.pageIndex, [mark])
+    }
+    typewritersByPageRef.current = byPage
+    return byPage
+  }, [typewriters])
   const shapeTool = interactionTool === 'shape'
   const shapeToolRef = useRef(shapeTool)
   shapeToolRef.current = shapeTool
@@ -549,7 +615,7 @@ export function PdfRenderer({
   const markupToolRef = useRef(markupTool)
   markupToolRef.current = markupTool
   /** Hover / selection chrome exists only in Hand and Select: never under a pen, the eraser or a text-markup tool. */
-  const outlinesOn = inkOutlinesAvailable({ pen: pen || shapeTool, eraser, markup: markupTool != null })
+  const outlinesOn = inkOutlinesAvailable({ pen: pen || shapeTool || typewriterTool, eraser, markup: markupTool != null })
   const outlinesOnRef = useRef(outlinesOn)
   outlinesOnRef.current = outlinesOn
   const onMarkupSelectionRef = useRef(onMarkupSelection)
@@ -567,6 +633,8 @@ export function PdfRenderer({
     hoveredAnnotationIdRef.current = id
     onAnnotationHoverRef.current?.(hit)
   }
+  const onTypewriterPropertiesRef = useRef(onTypewriterProperties)
+  onTypewriterPropertiesRef.current = onTypewriterProperties
   const onAnnotationContextMenuRef = useRef(onAnnotationContextMenu)
   onAnnotationContextMenuRef.current = onAnnotationContextMenu
   const onBlankClickRef = useRef(onBlankClick)
@@ -1962,6 +2030,80 @@ export function PdfRenderer({
     if (geometry) onShapeCreateRef.current?.(draft.pageIndex, draft.kind, geometry)
   }
 
+  /** The saved Typewriter note under the pointer (topmost), or null. */
+  const typewriterAt = (clientX: number, clientY: number): PdfTypewriterMark | null => {
+    const hit = slotAt(clientX, clientY)
+    const point = hit ? clientToPageUnit(clientX, clientY, hit.rect) : null
+    const marks = hit ? typewritersByPageRef.current.get(hit.index) : undefined
+    return point && marks ? typewriterBoxAt(marks, point[0], point[1], 0.004, 0.004) : null
+  }
+
+  /** Typewriter tool: a press places a box (click) or sizes one (drag); with a note open it only commits that note. */
+  const beginTypewriter = (event: ReactPointerEvent<HTMLDivElement>) => {
+    event.preventDefault()
+    window.getSelection()?.removeAllRanges()
+    if (typewriterEditingRef.current) {
+      onTypewriterOutsideRef.current?.()
+      return
+    }
+    // A press on a saved note selects it instead of placing another box.
+    const note = typewriterAt(event.clientX, event.clientY)
+    if (note) {
+      selectTarget(null)
+      onTypewriterSelectRef.current?.(note.id)
+      return
+    }
+    const hit = slotAt(event.clientX, event.clientY)
+    const point = hit ? clientToPageUnit(event.clientX, event.clientY, hit.rect) : null
+    if (!hit || !point) return
+    try {
+      event.currentTarget.setPointerCapture(event.pointerId)
+    } catch {
+      /* ignore */
+    }
+    selectTarget(null)
+    onBlankClickRef.current?.()
+    typewriterDragRef.current = { pointerId: event.pointerId, pageIndex: hit.index, start: point, end: point, startClient: [event.clientX, event.clientY] }
+  }
+
+  const moveTypewriter = (event: ReactPointerEvent<HTMLDivElement>) => {
+    const drag = typewriterDragRef.current
+    if (!drag || event.pointerId !== drag.pointerId) return
+    const rect = slotsRef.current[drag.pageIndex]?.getBoundingClientRect()
+    const point = rect && rect.width > 0 ? clientToPageUnit(event.clientX, event.clientY, rect) : null
+    if (!point) return
+    drag.end = point
+    if (Math.hypot(event.clientX - drag.startClient[0], event.clientY - drag.startClient[1]) > PAN_DRAG_THRESHOLD_PX) {
+      setTypewriterRubber({ pageIndex: drag.pageIndex, start: drag.start, end: point })
+    }
+  }
+
+  const endTypewriter = (commit: boolean, event?: ReactPointerEvent<HTMLDivElement>) => {
+    const drag = typewriterDragRef.current
+    typewriterDragRef.current = null
+    setTypewriterRubber(null)
+    if (!drag) return
+    try {
+      if (rootRef.current?.hasPointerCapture(drag.pointerId)) rootRef.current.releasePointerCapture(drag.pointerId)
+    } catch {
+      /* element already detached */
+    }
+    const rect = slotsRef.current[drag.pageIndex]?.getBoundingClientRect()
+    if (!commit || !rect || rect.width <= 0) return
+    const moved = event ? Math.hypot(event.clientX - drag.startClient[0], event.clientY - drag.startClient[1]) > PAN_DRAG_THRESHOLD_PX : false
+    const heightRatio = rect.height / rect.width
+    if (moved) {
+      const x = Math.min(drag.start[0], drag.end[0])
+      const y = Math.min(drag.start[1], drag.end[1])
+      const width = Math.max(0.04, Math.abs(drag.end[0] - drag.start[0]))
+      const height = Math.abs(drag.end[1] - drag.start[1])
+      onTypewriterBeginRef.current?.({ pageIndex: drag.pageIndex, box: { x: Math.min(x, 1 - width), y, width, height }, heightRatio })
+    } else {
+      const width = 0.25
+      onTypewriterBeginRef.current?.({ pageIndex: drag.pageIndex, box: { x: Math.min(drag.start[0], 1 - width), y: drag.start[1], width, height: 0 }, heightRatio })
+    }
+  }
+
   // Escape (back to Select is the Reader's), window blur or leaving the tool mid-drag: nothing is created.
   useEffect(() => {
     if (!shapeTool) return
@@ -1993,6 +2135,24 @@ export function PdfRenderer({
     if (shapeToolRef.current) {
       beginShape(event)
       return
+    }
+    if (typewriterToolRef.current) {
+      beginTypewriter(event)
+      return
+    }
+    // A press elsewhere commits a note that is being edited, then goes on as usual.
+    if (typewriterEditingRef.current) onTypewriterOutsideRef.current?.()
+    // Select and Hand mode: one click selects a note (never a text selection under it, never a pan); a press on the
+    // selected note itself is handled by its own overlay (move / resize), so this only ever selects.
+    if (selectToolRef.current || handRef.current) {
+      const note = typewriterAt(event.clientX, event.clientY)
+      if (note) {
+        event.preventDefault()
+        window.getSelection()?.removeAllRanges()
+        selectTarget(null)
+        onTypewriterSelectRef.current?.(note.id)
+        return
+      }
     }
     if (beginInkMove(event)) return
     // Hand: a press on text the dwell has armed selects natively; every other press pans.
@@ -2035,6 +2195,10 @@ export function PdfRenderer({
       moveShape(event)
       return
     }
+    if (typewriterDragRef.current) {
+      moveTypewriter(event)
+      return
+    }
     if (inkMoveRef.current) {
       moveInkDrag(event)
       return
@@ -2044,6 +2208,8 @@ export function PdfRenderer({
       if ((event.buttons & 1) === 0) {
         lastPointerRef.current = { x: event.clientX, y: event.clientY }
         updateInkHover(event.clientX, event.clientY)
+        const overNote = typewritersByPageRef.current.size > 0 ? (typewriterAt(event.clientX, event.clientY)?.id ?? null) : null
+        setTypewriterHoverId((prev) => (prev === overNote ? prev : overNote))
       }
       // Hand over the selected stroke: the move cursor says it can be dragged.
       setSurfaceFlag(
@@ -2100,6 +2266,10 @@ export function PdfRenderer({
     }
     if (shapeDraftRef.current) {
       if (event.pointerId === shapeDraftRef.current.pointerId) endShape(true)
+      return
+    }
+    if (typewriterDragRef.current) {
+      if (event.pointerId === typewriterDragRef.current.pointerId) endTypewriter(true, event)
       return
     }
     if (inkMoveRef.current) {
@@ -2175,6 +2345,11 @@ export function PdfRenderer({
     const selection = readPdfSelectionAt(root, event.clientX, event.clientY)
     if (selection) {
       onSelectionContextMenuRef.current?.(selection, event.clientX, event.clientY)
+      return
+    }
+    const note = typewritersByPageRef.current.size > 0 ? typewriterAt(event.clientX, event.clientY) : null
+    if (note) {
+      onTypewriterPropertiesRef.current?.(note.id)
       return
     }
     const hit = annotationAt(event.clientX, event.clientY)
@@ -2285,6 +2460,36 @@ export function PdfRenderer({
                   flash={flash as PdfShapeFlash | null}
                 />
               ) : null}
+              {typewritersByPage.has(index) || renderTypewriterEditor?.(index, size.h / size.w) || typewriterRubber?.pageIndex === index ? (
+                <PdfPageTypewriters
+                  marks={typewritersByPage.get(index) ?? []}
+                  heightRatio={size.h / size.w}
+                  flash={flash as PdfTypewriterFlash | null}
+                  selectedId={selectedTypewriterId}
+                  hoverId={typewriterHoverId}
+                  hiddenId={editingTypewriterId}
+                  editOnClick={selectToolRef.current}
+                  onBox={(id, box) => onTypewriterBox?.(id, box, size.h / size.w)}
+                  onEdit={(id) => onTypewriterEdit?.(id, size.h / size.w)}
+                  onDelete={(id) => onTypewriterDelete?.(id)}
+                  onProperties={(id) => onTypewriterProperties?.(id)}
+                >
+                  {renderTypewriterEditor?.(index, size.h / size.w)}
+                  {typewriterRubber?.pageIndex === index ? (
+                    <div
+                      aria-hidden
+                      style={{
+                        position: 'absolute',
+                        left: `${Math.min(typewriterRubber.start[0], typewriterRubber.end[0]) * 100}%`,
+                        top: `${Math.min(typewriterRubber.start[1], typewriterRubber.end[1]) * 100}%`,
+                        width: `${Math.abs(typewriterRubber.end[0] - typewriterRubber.start[0]) * 100}%`,
+                        height: `${Math.abs(typewriterRubber.end[1] - typewriterRubber.start[1]) * 100}%`,
+                        border: '1px dashed #1E88E5',
+                      }}
+                    />
+                  ) : null}
+                </PdfPageTypewriters>
+              ) : null}
               {inkByPage.has(index) || inkDraft?.pageIndex === index ? (
                 <PdfPageInk
                   heightRatio={size.h / size.w}
@@ -2329,12 +2534,12 @@ export function PdfRenderer({
       // Cursor + text selection per tool come from `[data-pdf-tool]` rules in index.css (they must
       // beat pdf_viewer.css, and `ReaderShell` is `select-none` for the whole reader).
       className="flex flex-col items-center"
-      style={{ gap, padding: pad, touchAction: pen || eraser || shapeTool ? 'none' : undefined }}
+      style={{ gap, padding: pad, touchAction: pen || eraser || shapeTool || typewriterTool ? 'none' : undefined }}
       data-pdf-status={status.kind}
       data-pdf-pages={sizes.length}
       data-pdf-flow={flow}
       data-pdf-per-view={pagesPerView}
-      data-pdf-tool={pen ? 'pen' : eraser ? 'eraser' : shapeTool ? 'shape' : hand ? 'hand' : 'select'}
+      data-pdf-tool={pen ? 'pen' : eraser ? 'eraser' : shapeTool ? 'shape' : typewriterTool ? 'typewriter' : hand ? 'hand' : 'select'}
       // Pen cursor per drawing style (index.css).
       data-pdf-ink-style={pen ? (inkPen?.penStyle ?? 'pen') : undefined}
       // Highlight / Underline / Strikethrough: Select's surface with the tool's pen cursor.
@@ -2346,15 +2551,25 @@ export function PdfRenderer({
         finishInk()
         endErase(false)
         endShape(false)
+        endTypewriter(false)
         endInkMove(false)
         endInkResize(false)
         void endGesture()
       }}
       onContextMenu={onContextMenu}
+      onDoubleClick={(event) => {
+        // Hand mode: a single press already selects a note (onPointerDown); this stays for a double-click that lands before the overlay exists.
+        if (!handRef.current) return
+        const note = typewriterAt(event.clientX, event.clientY)
+        if (!note) return
+        window.getSelection()?.removeAllRanges()
+        onTypewriterSelectRef.current?.(note.id)
+      }}
       onLostPointerCapture={() => {
         if (inkDraftRef.current) finishInk()
         if (eraseRef.current) endErase(false)
         if (shapeDraftRef.current) endShape(false)
+        if (typewriterDragRef.current) endTypewriter(false)
         if (inkMoveRef.current) endInkMove(false)
         if (gestureRef.current?.pan) endGesture()
       }}

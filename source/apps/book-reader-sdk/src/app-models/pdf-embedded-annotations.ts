@@ -25,6 +25,7 @@
 
 import type { NoteLocator, NoteSelectionText, PdfAnnotation, PdfAnnotationRect, PdfShapeGeometry } from '../domain/index.js'
 import { DEFAULT_HIGHLIGHT_COLOR } from './highlight-colors.js'
+import { emptyTypewriterDoc, normalizeTypewriterText } from '../typewriter/typewriter-doc.js'
 import type { HighlightStyleKind } from './highlight-location.js'
 import {
   PDF_ANNOTATION_MAX_PAGE_INDEX,
@@ -37,7 +38,7 @@ import {
 import { clampShapeStroke, shapeColorHex } from './pdf-shape.js'
 
 /** PDF annotation subtypes the import understands — the ones the `notes` model can represent. */
-export const EMBEDDED_PDF_ANNOTATION_SUBTYPES = ['Highlight', 'Underline', 'Squiggly', 'StrikeOut', 'Text', 'Square', 'Circle', 'Line'] as const
+export const EMBEDDED_PDF_ANNOTATION_SUBTYPES = ['Highlight', 'Underline', 'Squiggly', 'StrikeOut', 'Text', 'Square', 'Circle', 'Line', 'FreeText'] as const
 export type EmbeddedPdfAnnotationSubtype = (typeof EMBEDDED_PDF_ANNOTATION_SUBTYPES)[number]
 
 /**
@@ -53,6 +54,8 @@ export const EMBEDDED_PDF_ANNOTATION_STYLE: Record<EmbeddedPdfAnnotationSubtype,
   Square: 'rectangle',
   Circle: 'ellipse',
   Line: 'line',
+  // Typewriter notes: only the ones Readmate wrote itself (`/NM` readmate:*) are ever scanned (a foreign FreeText is a graphic object).
+  FreeText: 'typewriter',
 }
 
 /** Subtypes that are shapes: one box + a `shape` geometry, no text. */
@@ -210,7 +213,7 @@ export function readPdfJsAnnotation(raw: unknown, page: PdfPageViewportInfo): Sc
   if (!(page.width > 0) || !(page.height > 0)) return null
 
   let boxes: number[][]
-  if (data.subtype === 'Text' || isEmbeddedShapeSubtype(data.subtype)) {
+  if (data.subtype === 'Text' || data.subtype === 'FreeText' || isEmbeddedShapeSubtype(data.subtype)) {
     const rect = numbers(data.rect)
     boxes = rect?.length === 4 ? [rect] : []
   } else {
@@ -323,9 +326,6 @@ function hash53(input: string): string {
   return (4294967296 * (2097151 & h2) + (h1 >>> 0)).toString(16).padStart(14, '0')
 }
 
-function geometrySignature(rects: readonly PdfAnnotationRect[]): string {
-  return rects.map((r) => [r.x, r.y, r.width, r.height].map((n) => n.toFixed(KEY_DECIMALS)).join(',')).join(';')
-}
 /** The prefix of a name Readmate gives its own annotations (kept equal to `READMATE_NM_PREFIX` in pdf-annotation-export.ts, which imports this module). */
 const READMATE_NAME_PREFIX = 'readmate:'
 
@@ -342,6 +342,9 @@ export function isReadmateAuthoredKey(noteId: string, sourceKey: string): boolea
   return names.some((name) => hash53(name) === m[2])
 }
 
+function geometrySignature(rects: readonly PdfAnnotationRect[]): string {
+  return rects.map((r) => [r.x, r.y, r.width, r.height].map((n) => n.toFixed(KEY_DECIMALS)).join(',')).join(';')
+}
 
 /**
  * Identity key of each item within its file, in scan order: `pdf1:<subtype>:<pageIndex>:<geometry
@@ -421,6 +424,7 @@ export function highlightContentHash(content: HighlightContent): string {
         content.pdfAnnotation.pageIndex,
         content.pdfAnnotation.rects.map((r) => [r.pageIndex ?? null, r.x, r.y, r.width, r.height]),
         ...(content.pdfAnnotation.shape ? [content.pdfAnnotation.shape] : []),
+        ...(content.pdfAnnotation.typewriter ? [content.pdfAnnotation.typewriter] : []),
       ]
     : null
   return hash53(
@@ -448,6 +452,8 @@ export function highlightFromEmbeddedAnnotation(item: ScannedPdfAnnotation): Emb
     rects: item.rects.map((r) => ({ pageIndex: item.pageIndex, x: r.x, y: r.y, width: r.width, height: r.height })),
     ...(item.shape ? { shape: item.shape } : {}),
   }
+  // A Readmate FreeText without a row (e.g. the database was lost): its text, plain — the rich-text document is the app's.
+  if (item.subtype === 'FreeText') pdfAnnotation.typewriter = emptyTypewriterDoc()
   const highlight: EmbeddedAnnotationHighlight = {
     locator: JSON.parse(packPdfHighlightLocator(pdfAnnotation)) as NoteLocator,
     styleKind: embeddedStyleOf(item),
@@ -455,7 +461,7 @@ export function highlightFromEmbeddedAnnotation(item: ScannedPdfAnnotation): Emb
     tags: [],
     pdfAnnotation,
   }
-  if (item.contents) highlight.note = item.contents
+  if (item.contents) highlight.note = item.subtype === 'FreeText' ? normalizeTypewriterText(item.contents) : item.contents
   if (item.text) highlight.selectionText = { highlight: item.text }
   return highlight
 }

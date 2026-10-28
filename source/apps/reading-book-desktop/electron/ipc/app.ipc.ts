@@ -9,6 +9,7 @@ import type {
 import { AppChannels } from './channels'
 import { applyChromeThemeToWindow } from '../theme/titlebar-overlay'
 import { loadGoogleOAuthClientConfig } from '../config/google-oauth-config'
+import { isTranscriptionPlatformSupported } from '../transcription/ffmpeg-artifacts'
 
 function windowFromEvent(event: Electron.IpcMainInvokeEvent): BrowserWindow | null {
   return BrowserWindow.fromWebContents(event.sender)
@@ -47,6 +48,7 @@ export function registerAppIpc(): void {
     name: app.getName(),
     version: app.getVersion(),
     platform: process.platform,
+    transcriptionSupported: isTranscriptionPlatformSupported(),
   }))
 
   ipcMain.removeHandler(AppChannels.getGoogleOAuthConfig)

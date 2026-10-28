@@ -25,6 +25,19 @@ export {
   type TranslationProgress,
 } from './translation'
 export {
+  transcriptionApi,
+  type TranscriptExportResult,
+  type TranscriptPassage,
+  type TranscriptSearchHit,
+  type TranscriptionInfo,
+  type TranscriptionJob,
+  type TranscriptionModelProgress,
+  type TranscriptionPassagesAdded,
+  type TranscriptionScope,
+  type TranscriptionStartRequest,
+  type TranscriptionStartResult,
+} from './transcription'
+export {
   storageApi,
   type ClearCacheResult,
   type RemoveTranslationModelResult,

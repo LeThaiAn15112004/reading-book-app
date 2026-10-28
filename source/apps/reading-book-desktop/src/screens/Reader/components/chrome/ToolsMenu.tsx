@@ -38,6 +38,8 @@ type ToolsStripProps = {
   capabilities: ReadonlySet<ReaderCapability>
   toolStates: ToolStates
   onTool: (tool: ToolId) => void
+  /** Right-click on a tool button (the Typewriter opens its defaults panel); the default menu is always suppressed for tools that handle it. */
+  onToolContextMenu?: (tool: ToolId) => void
   /** Buttons something else anchors to (the read-aloud menu floats under Audio). */
   toolRefs?: Partial<Record<ToolId, Ref<HTMLButtonElement>>>
   /** Toolbar is hidden — open dropdowns close. */
@@ -150,6 +152,12 @@ function ToolIcon({ tool }: { tool: ToolIconId }) {
       )
     case 'shape':
       return <ShapeToolIcon />
+    case 'typewriter':
+      return (
+        <svg className={cls} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor" aria-hidden>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M4 7V5h16v2M12 5v14M9 19h6" />
+        </svg>
+      )
     case 'pen':
       return (
         <svg className={cls} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor" aria-hidden>
@@ -394,7 +402,7 @@ function useToolTitle(): (tool: ToolDef) => string {
  * open surface's capabilities; `auto` groups fold into dropdowns when the strip runs out of room.
  * See docs/implementation_plan/reader_toolbar.md.
  */
-export function ToolsStrip({ capabilities, toolStates, onTool, toolRefs, hidden = false, eraserMode = 'stroke', onEraserMode }: ToolsStripProps) {
+export function ToolsStrip({ capabilities, toolStates, onTool, onToolContextMenu, toolRefs, hidden = false, eraserMode = 'stroke', onEraserMode }: ToolsStripProps) {
   const stripRef = useRef<HTMLDivElement | null>(null)
   const foldLevel = useToolbarOverflow(stripRef, foldableGroups(capabilities).length)
   const layout = resolveToolbarLayout(capabilities, foldLevel)
@@ -415,6 +423,7 @@ export function ToolsStrip({ capabilities, toolStates, onTool, toolRefs, hidden 
           aria-label={tool.label}
           aria-pressed={active}
           onClick={() => onTool(tool.id)}
+          onContextMenu={tool.id === 'typewriter' && onToolContextMenu ? (e) => { e.preventDefault(); onToolContextMenu(tool.id) } : undefined}
         >
           <ToolIcon tool={tool.id} />
         </button>
@@ -433,6 +442,7 @@ export function ToolsStrip({ capabilities, toolStates, onTool, toolRefs, hidden 
         aria-haspopup={tool.popup}
         aria-expanded={tool.popup ? (state?.expanded ?? false) : undefined}
         onClick={() => onTool(tool.id)}
+        onContextMenu={tool.id === 'typewriter' && onToolContextMenu ? (e) => { e.preventDefault(); onToolContextMenu(tool.id) } : undefined}
       >
         <ToolIcon tool={tool.id} />
         <span className={stripLabel}>{tool.label}</span>

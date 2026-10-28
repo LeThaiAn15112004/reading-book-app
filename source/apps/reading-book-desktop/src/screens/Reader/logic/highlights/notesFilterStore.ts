@@ -45,6 +45,8 @@ const VALID_TYPE_FILTERS: ReadonlySet<NotesTypeFilter> = new Set([
   'ellipse',
   'line',
   'arrow',
+  // PDF Typewriter notes
+  'typewriter',
 ])
 
 /**

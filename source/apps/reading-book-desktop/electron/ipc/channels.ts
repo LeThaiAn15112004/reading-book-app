@@ -40,6 +40,8 @@ export const LibraryChannels = {
   copyFilePath: 'library:copyFilePath',
   removeBook: 'library:removeBook',
   deleteBookFile: 'library:deleteBookFile',
+  /** Multi-chapter audiobooks only: delete the app-owned chapter folder, rows and cover. */
+  removeAudiobook: 'library:removeAudiobook',
   /** "Locate file": re-attach a book to a moved file, verified by SHA-256. */
   relinkBook: 'library:relinkBook',
   /** Verify (or re-use a still-current cached) digital-signature status of a book file. */
@@ -106,10 +108,16 @@ export const OverlayChannels = {
 export const ZipImportChannels = {
   /** Native ZIP picker + inspection; the renderer never supplies a path. */
   pick: 'zipImport:pick',
+  /** Inspect the ZIP picked in the ordinary "Add file" dialog (its path is held in Main). */
+  inspectPicked: 'zipImport:inspectPicked',
   coverPreview: 'zipImport:coverPreview',
   confirm: 'zipImport:confirm',
   discard: 'zipImport:discard',
   cancelInspect: 'zipImport:cancelInspect',
+  /** Abort the running import (honoured until the database write). */
+  cancelImport: 'zipImport:cancelImport',
+  /** Main → renderer: chapters written so far during an import. */
+  progress: 'zipImport:progress',
   /** Main → renderer: a ZIP was picked and inspection started (never sent while the picker is open). */
   inspecting: 'zipImport:inspecting',
 } as const
@@ -117,6 +125,8 @@ export const ZipImportChannels = {
 export const AudioChannels = {
   /** Chapters the audio file declares about itself (unvalidated seconds). */
   getChapters: 'audio:getChapters',
+  /** Tracks of a multi-chapter audiobook (ids, titles, durations — never paths); `[]` for single-file books. */
+  getTracks: 'audio:getTracks',
   getBookmarks: 'audio:getBookmarks',
   saveBookmarks: 'audio:saveBookmarks',
 } as const
@@ -190,6 +200,8 @@ export const StorageChannels = {
   clearCache: 'storage:clearCache',
   /** Renderer → main: delete one downloaded translation model by id. */
   removeTranslationModel: 'storage:removeTranslationModel',
+  /** Renderer → main: delete one downloaded speech (transcription) model by id; refused while a transcription runs. */
+  removeSpeechModel: 'storage:removeSpeechModel',
   /** Renderer → main: open the managed-books folder in the OS file manager. */
   openBooksFolder: 'storage:openBooksFolder',
 } as const
@@ -213,6 +225,31 @@ export const TxtChannels = {
   open: 'txt:open',
   /** Renderer → main: atomically save edited text + annotation changes against a revision. */
   commit: 'txt:commit',
+} as const
+
+export const TranscriptionChannels = {
+  /** Renderer → main: transcript summary, the book's job (if any) and the speech models. */
+  getInfo: 'transcription:getInfo',
+  /** Renderer → main: start (or queue) a transcription of the whole book, one track or a time range. */
+  start: 'transcription:start',
+  /** Renderer → main: cancel a queued or running job. */
+  cancel: 'transcription:cancel',
+  /** Renderer → main: download one speech model (only after the user confirmed in the UI). */
+  downloadModel: 'transcription:downloadModel',
+  /** Renderer → main: transcript passages in playback order. */
+  getPassages: 'transcription:getPassages',
+  /** Renderer → main: full-text search inside one transcript. */
+  search: 'transcription:search',
+  /** Renderer → main: export the transcript as plain text through a Main-owned save dialog. */
+  export: 'transcription:export',
+  /** Renderer → main: delete a book's transcript. */
+  delete: 'transcription:delete',
+  /** Main → renderer: job progress snapshot (throttled). */
+  progress: 'transcription:progress',
+  /** Main → renderer: new passages were committed for a span of a book. */
+  passagesAdded: 'transcription:passagesAdded',
+  /** Main → renderer: speech-model download progress. */
+  modelProgress: 'transcription:modelProgress',
 } as const
 
 /** Annotation import / export (specs/006-annotation-import-export). The renderer sends only `bookId` / `sessionId`, never a path. */

@@ -28,6 +28,7 @@ export default defineConfig({
           main: 'electron/main.ts',
           'book-chunk.worker': 'electron/chunking/book-chunk.worker.ts',
           'translation.worker': 'electron/translation/translation.worker.ts',
+          'transcription.process': 'electron/transcription/transcription.process.ts',
           'pdf-annotation-scan.worker': 'electron/pdf-sync/pdf-annotation-scan.worker.ts',
         },
         vite: {

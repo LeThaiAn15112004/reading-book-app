@@ -1,5 +1,13 @@
 import { useMemo, useState, type KeyboardEvent } from 'react'
-import { formatPlaybackTime, noteMarkerFraction, resolveBookmarkTarget, timelineView, type ProgressScope } from '@reading-book/book-reader-sdk'
+import {
+  formatPlaybackTime,
+  noteMarkerFraction,
+  notesForTrack,
+  resolveBookmarkTarget,
+  timelineView,
+  trackEyebrow,
+  type ProgressScope,
+} from '@reading-book/book-reader-sdk'
 import { useNoteMenuStore } from '../logic/audioNoteMenuStore'
 import { useAudioPlayerStore } from '../logic/audioPlayerStore'
 
@@ -73,6 +81,11 @@ export function AudioTimeline() {
   const seekScoped = useAudioPlayerStore((s) => s.seekScoped)
   const notes = useAudioPlayerStore((s) => s.notes)
   const chapterStatus = useAudioPlayerStore((s) => s.chapterStatus)
+  // Multi-track: the bar spans the CURRENT track (position and duration are the track's); no chapter ticks, no note markers.
+  const trackLabel = useAudioPlayerStore((s) => trackEyebrow(s.trackIndex, s.tracks.length))
+  // Multi-track: only the CURRENT track's Notes get markers (their seconds are relative to that track).
+  const currentTrackId = useAudioPlayerStore((s) => (s.tracks.length > 0 ? s.tracks[s.trackIndex]?.id : undefined))
+  const multiTrack = useAudioPlayerStore((s) => s.tracks.length > 0)
   const openNoteMenu = useNoteMenuStore((s) => s.openFor)
   // While the slider is dragged its own value is shown; the seek is committed on release.
   const [dragValue, setDragValue] = useState<number | null>(null)
@@ -91,12 +104,19 @@ export function AudioTimeline() {
   const markers = useMemo(() => {
     if (!view) return []
     const range = view.scope === 'chapter' ? { startSeconds: view.startSeconds, endSeconds: view.endSeconds } : undefined
+    if (multiTrack) {
+      if (currentTrackId === undefined) return []
+      return notesForTrack(notes, currentTrackId).flatMap((n) => {
+        const fraction = noteMarkerFraction(n.positionSeconds, duration)
+        return fraction === null ? [] : [{ note: n, at: n.positionSeconds, fraction }]
+      })
+    }
     return notes.flatMap((n) => {
       const at = resolveBookmarkTarget(n, chapterStatus === 'ok' ? chapters : [], duration)
       const fraction = noteMarkerFraction(at, duration, range)
       return fraction === null ? [] : [{ note: n, at, fraction }]
     })
-  }, [notes, chapters, chapterStatus, duration, view])
+  }, [notes, chapters, chapterStatus, duration, view, multiTrack, currentTrackId])
 
   if (!view) {
     // Duration unknown (still loading, or the stream does not report one): nothing to seek on.
@@ -117,7 +137,7 @@ export function AudioTimeline() {
     if (dragValue !== null) seekScoped(dragValue)
     setDragValue(null)
   }
-  const label = view.scope === 'chapter' ? 'Chapter' : 'Whole book'
+  const label = trackLabel ?? (view.scope === 'chapter' ? 'Chapter' : 'Whole book')
 
   return (
     <div className="flex w-full flex-col gap-2">

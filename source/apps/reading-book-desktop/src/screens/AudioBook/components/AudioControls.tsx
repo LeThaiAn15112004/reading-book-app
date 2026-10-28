@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { PLAYBACK_RATES, formatPlaybackTime } from '@reading-book/book-reader-sdk'
 import { useNoteMenuStore } from '../logic/audioNoteMenuStore'
 import { AudioSelect, type AudioSelectOption } from './AudioSelect'
-import { SLEEP_MINUTES, useAudioPlayerStore, type SleepOption } from '../logic/audioPlayerStore'
+import { SLEEP_MINUTES, selectCanAddNote, useAudioPlayerStore, type SleepOption } from '../logic/audioPlayerStore'
 
 const ROUND =
   'inline-flex cursor-pointer items-center justify-center rounded-full border border-lib-border bg-lib-surface text-sm font-semibold text-lib-text hover:bg-lib-surface-hover disabled:cursor-not-allowed disabled:opacity-40'
@@ -17,6 +17,7 @@ function SleepTimer() {
   const sleep = useAudioPlayerStore((s) => s.sleep)
   const endsAt = useAudioPlayerStore((s) => s.sleepEndsAt)
   const hasChapters = useAudioPlayerStore((s) => s.chapterStatus === 'ok')
+  const multiTrack = useAudioPlayerStore((s) => s.tracks.length > 0)
   const setSleep = useAudioPlayerStore((s) => s.setSleep)
   const [now, setNow] = useState(() => Date.now())
 
@@ -32,7 +33,9 @@ function SleepTimer() {
   const options: AudioSelectOption[] = [
     { value: 'off', label: 'Off' },
     ...SLEEP_MINUTES.map((m) => ({ value: String(m), label: `${m} min` })),
-    { value: 'chapter', label: 'End of chapter', disabled: !hasChapters, hint: 'Needs chapter information' },
+    multiTrack
+      ? { value: 'chapter', label: 'End of track' }
+      : { value: 'chapter', label: 'End of chapter', disabled: !hasChapters, hint: 'Needs chapter information' },
   ]
   return (
     <AudioSelect
@@ -55,6 +58,9 @@ export function AudioControls() {
   const playing = useAudioPlayerStore((s) => s.playing)
   const rate = useAudioPlayerStore((s) => s.playbackRate)
   const volume = useAudioPlayerStore((s) => s.volume)
+  // Multi-track audiobooks: the two outer buttons switch TRACK (previous restarts the track when more than 3 s in).
+  const multiTrack = useAudioPlayerStore((s) => s.tracks.length > 0)
+  const onLastTrack = useAudioPlayerStore((s) => s.tracks.length > 0 && s.trackIndex >= s.tracks.length - 1)
   const hasChapters = useAudioPlayerStore((s) => s.chapterStatus === 'ok')
   const toggle = useAudioPlayerStore((s) => s.toggle)
   const skipBy = useAudioPlayerStore((s) => s.skipBy)
@@ -63,13 +69,18 @@ export function AudioControls() {
   const previousChapter = useAudioPlayerStore((s) => s.previousChapter)
   const nextChapter = useAudioPlayerStore((s) => s.nextChapter)
   const addNote = useAudioPlayerStore((s) => s.addNote)
+  // The control is always there; it is disabled when there is no valid current position (a track change in flight, a track that
+  // failed, the Notes could not be read) — see `selectCanAddNote`.
+  const canAddNote = useAudioPlayerStore(selectCanAddNote)
   const openNoteMenu = useNoteMenuStore((s) => s.openFor)
-  const noChapters = hasChapters ? undefined : 'No chapter information in this audiobook'
+  const noChapters = hasChapters || multiTrack ? undefined : 'No chapter information in this audiobook'
+  const previousLabel = multiTrack ? 'Previous track' : 'Previous chapter'
+  const nextLabel = multiTrack ? 'Next track' : 'Next chapter'
 
   return (
     <div className="flex flex-col items-center gap-4">
       <div className="flex items-center justify-center gap-3">
-        <button type="button" className={`${ROUND} size-11 border-transparent bg-transparent`} aria-label="Previous chapter" title={noChapters ?? 'Previous chapter'} disabled={!hasChapters} onClick={previousChapter}>
+        <button type="button" className={`${ROUND} size-11 border-transparent bg-transparent`} aria-label={previousLabel} title={noChapters ?? previousLabel} disabled={!hasChapters && !multiTrack} onClick={previousChapter}>
           <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden><rect x="2" y="2" width="2" height="12" fill="currentColor" /><path d="M14 2 L5 8 L14 14 Z" fill="currentColor" /></svg>
         </button>
         <button type="button" className={`${ROUND} size-14`} aria-label="Back 15 seconds" title="Back 15 seconds" onClick={() => skipBy(-15)}>
@@ -91,7 +102,7 @@ export function AudioControls() {
         <button type="button" className={`${ROUND} size-14`} aria-label="Forward 30 seconds" title="Forward 30 seconds" onClick={() => skipBy(30)}>
           +30s
         </button>
-        <button type="button" className={`${ROUND} size-11 border-transparent bg-transparent`} aria-label="Next chapter" title={noChapters ?? 'Next chapter'} disabled={!hasChapters} onClick={nextChapter}>
+        <button type="button" className={`${ROUND} size-11 border-transparent bg-transparent`} aria-label={nextLabel} title={noChapters ?? nextLabel} disabled={(!hasChapters && !multiTrack) || onLastTrack} onClick={nextChapter}>
           <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden><rect x="12" y="2" width="2" height="12" fill="currentColor" /><path d="M2 2 L11 8 L2 14 Z" fill="currentColor" /></svg>
         </button>
       </div>
@@ -108,8 +119,9 @@ export function AudioControls() {
         <SleepTimer />
         <button
           type="button"
-          className={`${PILL} cursor-pointer hover:bg-lib-surface-hover`}
-          title="Mark this position with a note"
+          className={`${PILL} cursor-pointer hover:bg-lib-surface-hover disabled:cursor-not-allowed disabled:opacity-40`}
+          title={canAddNote ? 'Mark this position with a note' : 'A Note can be added once the track is playing normally'}
+          disabled={!canAddNote}
           onClick={(e) => {
             const id = addNote()
             if (id) openNoteMenu(id, e.currentTarget, 'edit')

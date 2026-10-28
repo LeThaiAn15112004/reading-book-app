@@ -1,6 +1,7 @@
 // @refresh reset
 import {
   AudiobookZipImportDialog,
+  AudiobookZipJobPanel,
   ImportConflictDialog,
   ImportProgressDialog,
   ImportToast,
@@ -16,6 +17,11 @@ import {
   NewCollectionDialog,
   ShelfDetailView,
 } from './components'
+import { annotationTransferApi } from '../../bridge'
+import { ImportPreviewDialog } from '../../components/annotation-transfer/ImportPreviewDialog'
+import { useAnnotationTransferStore } from '../Reader/logic/annotationTransferStore'
+import { useLibraryImportStore } from '../../hooks/library'
+import { annotationExportMessage } from '../../utils/annotationTransferMessages'
 import { useShortcutAction } from '../../shortcuts'
 import { LibraryHub } from './LibraryHub'
 import { useLibraryScreen } from './logic'
@@ -176,6 +182,7 @@ export function LibraryScreen() {
       />
 
       <AudiobookZipImportDialog />
+      <AudiobookZipJobPanel onOpenBook={openReader} />
 
       <ImportProgressDialog
         open={progress !== null}
@@ -206,6 +213,7 @@ export function LibraryScreen() {
               coverUrl: bookInfoBook.coverUrl,
               genre: bookInfoBook.genre,
               genres: bookInfoBook.genres,
+              chapterCount: bookInfoBook.chapterCount,
               fileSizeBytes: bookInfoBook.fileSizeBytes,
               pageCount: bookInfoBook.pageCount,
               description: bookInfoBook.description,
@@ -238,8 +246,25 @@ export function LibraryScreen() {
           onDeleteFile={(bookId) =>
             setPendingRemoval({ bookId, kind: 'delete-file' })
           }
+          onRemoveAudiobook={(bookId) =>
+            setPendingRemoval({ bookId, kind: 'remove-audiobook' })
+          }
+          onExportAnnotations={async (bookId) => {
+            const shown = annotationExportMessage(await annotationTransferApi.exportRestore(bookId))
+            if (shown) useLibraryImportStore.getState().showToast(shown.message, shown.variant)
+          }}
+          onImportAnnotations={(bookId) => void useAnnotationTransferStore.getState().startImport(bookId)}
+          onExportReadable={async (bookId) => {
+            const shown = annotationExportMessage(await annotationTransferApi.exportReadable(bookId), 'readable copy')
+            if (shown) useLibraryImportStore.getState().showToast(shown.message, shown.variant)
+          }}
         />
       ) : null}
+
+      <ImportPreviewDialog
+        onToast={(message) => message && useLibraryImportStore.getState().showToast(message, 'success')}
+        bookChoices={(books ?? []).map((b) => ({ id: b.id, title: b.title, format: b.format }))}
+      />
 
       <EditBookMetadataDialog
         book={editMetadataBook}
@@ -252,10 +277,14 @@ export function LibraryScreen() {
           title={
             pendingRemoval.kind === 'remove'
               ? 'Remove from library?'
-              : 'Delete file permanently?'
+              : pendingRemoval.kind === 'remove-audiobook'
+                ? 'Remove audiobook?'
+                : 'Delete file permanently?'
           }
           message={
-            pendingRemoval.kind === 'remove'
+            pendingRemoval.kind === 'remove-audiobook'
+              ? `“${pendingRemovalBook.title}” and its ${pendingRemovalBook.chapterCount ?? 'imported'} chapter files will be permanently deleted from Readmate. Your original ZIP is not touched. This cannot be undone.`
+              : pendingRemoval.kind === 'remove'
               ? `“${pendingRemovalBook.title}” will disappear from the library. ${
                   pendingRemovalBook.fileStorage === 'referenced'
                     ? 'Your original file will not be touched.'
@@ -264,9 +293,9 @@ export function LibraryScreen() {
               : `“${pendingRemovalBook.title}” and its imported file will be permanently deleted. This cannot be undone.`
           }
           confirmLabel={
-            pendingRemoval.kind === 'remove' ? 'Remove' : 'Delete file'
+            pendingRemoval.kind === 'remove' ? 'Remove' : pendingRemoval.kind === 'remove-audiobook' ? 'Remove audiobook' : 'Delete file'
           }
-          destructive={pendingRemoval.kind === 'delete-file'}
+          destructive={pendingRemoval.kind !== 'remove'}
           onCancel={() => setPendingRemoval(null)}
           onConfirm={confirmPendingRemoval}
         />

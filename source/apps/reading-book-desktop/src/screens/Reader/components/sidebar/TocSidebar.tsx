@@ -12,6 +12,7 @@ import type { FakeChapter } from '../../logic'
 import { useNotesFilterStore, type NotesTypeFilter } from '../../logic/highlights/notesFilterStore'
 import { AttachmentsPanel } from './AttachmentsPanel'
 import { NoteItemMenu } from './NoteItemMenu'
+import { TypewriterNotInFile } from './TypewriterNotInFile'
 import { PageLayoutPanel, type PageThumbnailRenderer } from './PageLayoutPanel'
 import {
   READER_FOOTER_HEIGHT_PX,
@@ -20,7 +21,7 @@ import {
 } from './sidebarTabs'
 import { readerChromeTopInset } from '../../../../reader/chrome'
 
-export type SidebarTab = 'chapters' | 'bookmarks' | 'highlights' | 'layout' | 'attachments'
+export type SidebarTab = 'chapters' | 'bookmarks' | 'highlights' | 'layout' | 'attachments' | 'transcript'
 
 type TocSidebarProps = {
   /** The open book — the Attachment panel (PDF) lists its embedded files. */
@@ -140,6 +141,8 @@ function highlightTypeLabel(styleKind: SidebarHighlight['styleKind']): string {
       return 'Line'
     case 'arrow':
       return 'Arrow'
+    case 'typewriter':
+      return 'Typewriter'
     default:
       return 'Highlight'
   }
@@ -174,6 +177,7 @@ const NOTE_TYPE_OPTIONS: { value: NotesTypeFilter; label: string }[] = [
   { value: 'ellipse', label: 'Ellipse' },
   { value: 'line', label: 'Line' },
   { value: 'arrow', label: 'Arrow' },
+  { value: 'typewriter', label: 'Typewriter' },
 ]
 
 /** Case-insensitive substring match over a highlight's excerpt, note and tags. */
@@ -418,12 +422,13 @@ function HighlightListItem({
             <span className="line-clamp-2 mt-1 text-[13px] leading-snug text-lib-text">
               “{h.selectionText.highlight}”
             </span>
-          ) : isShapeStyleKind(h.styleKind) ? null : (
+          ) : isShapeStyleKind(h.styleKind) || h.styleKind === 'typewriter' ? null : (
             <span className="mt-1 block text-[13px] text-lib-faint italic">(no excerpt)</span>
           )}
           {h.note ? (
             <span className="line-clamp-2 mt-1 text-xs leading-snug text-lib-muted">{h.note}</span>
           ) : null}
+          {h.styleKind === 'typewriter' ? <TypewriterNotInFile id={h.id} /> : null}
           {h.tags.length > 0 ? (
             <span className="mt-1 flex flex-wrap gap-1">
               {h.tags.map((tag) => (

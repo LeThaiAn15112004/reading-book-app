@@ -40,11 +40,24 @@ export type ZipImportErrorCode =
   | 'invalid_selection'
   | 'import_not_available'
   | 'import_failed'
+  | 'duplicate'
+  | 'invalid_track'
+  | 'insufficient_space'
 
 export interface ZipImportFailure {
   ok: false
   errorCode: ZipImportErrorCode
   errorMessage: string
+  /** Set for `duplicate`: the library book that already has these tracks. */
+  bookId?: string
+}
+
+/** Step progress of a running import (chapters written so far). */
+export interface ZipImportProgress {
+  stage: 'extracting' | 'saving'
+  done: number
+  total: number
+  name?: string
 }
 
 /** Header bytes parsed for non-MP4 audio; MP4-family files keep `moov` anywhere, so those are probed whole. */
@@ -66,7 +79,12 @@ export interface AudiobookImportRequest {
   /** Chapters in playback order. */
   chapters: { entryId: string; path: string; entry: ZipEntryRecord }[]
   cover: { entryId: string; path: string; entry: ZipEntryRecord } | null
+  /** False when the archive had no usable cover image at all (then the first track's own picture may be used). */
+  hadCoverCandidates: boolean
   directory: ZipDirectory
+  /** Aborted by `zipImport:cancelImport`; honoured until the database write. */
+  signal?: AbortSignal
+  onProgress?: (progress: ZipImportProgress) => void
 }
 
 export type ZipAudiobookImporter = (request: AudiobookImportRequest) => Promise<{ ok: true; bookId: string } | ZipImportFailure>
@@ -92,8 +110,8 @@ interface Session {
   createdAt: number
 }
 
-export function failure(errorCode: ZipImportErrorCode, errorMessage: string): ZipImportFailure {
-  return { ok: false, errorCode, errorMessage }
+export function failure(errorCode: ZipImportErrorCode, errorMessage: string, bookId?: string): ZipImportFailure {
+  return bookId === undefined ? { ok: false, errorCode, errorMessage } : { ok: false, errorCode, errorMessage, bookId }
 }
 
 const REJECT_MESSAGES: Record<ZipRejectCode, string> = {
@@ -320,7 +338,11 @@ export class ZipImportService {
    * Confirmation: re-validate everything, then hand the chapters to the import stage. The renderer's selection is
    * checked against Main's own copy of the preview, the ZIP is re-read, and each chosen entry must still match.
    */
-  async confirm(sessionId: unknown, input: unknown): Promise<{ ok: true; bookId: string } | ZipImportFailure> {
+  async confirm(
+    sessionId: unknown,
+    input: unknown,
+    run: { signal?: AbortSignal; onProgress?: (progress: ZipImportProgress) => void } = {},
+  ): Promise<{ ok: true; bookId: string } | ZipImportFailure> {
     const session = this.get(sessionId)
     if (!session) return failure('session_expired', 'This import preview has expired. Choose the ZIP again.')
     const check = validateZipSelection(session.preview, input)
@@ -358,7 +380,10 @@ export class ZipImportService {
         // The user's selection keeps the proposed playback order; Main does not trust the renderer's array order.
         chapters: session.preview.trackOrder.filter((id) => selection.trackIds.includes(id)).map(toRef),
         cover: selection.coverId ? toRef(selection.coverId) : null,
+        hadCoverCandidates: session.preview.coverCandidates.length > 0,
         directory: fresh,
+        signal: run.signal,
+        onProgress: run.onProgress,
       }
       const result = await (this.options.importer ?? unavailableAudiobookImporter)(request)
       if (result.ok) this.discard(sessionId)

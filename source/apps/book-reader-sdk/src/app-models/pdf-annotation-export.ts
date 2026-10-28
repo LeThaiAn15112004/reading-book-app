@@ -8,6 +8,7 @@
  */
 
 import type { PdfAnnotation, PdfShapeGeometry } from '../domain/index.js'
+import type { PdfTypewriterDoc } from '../typewriter/typewriter-doc.js'
 import { isShapeStyleKind, shapeOpacityOf, shapeStrokeHex } from './pdf-shape.js'
 import { DEFAULT_HIGHLIGHT_COLOR } from './highlight-colors.js'
 import type { HighlightStyleKind } from './highlight-location.js'
@@ -19,7 +20,7 @@ import {
   type ScannedPdfAnnotation,
 } from './pdf-embedded-annotations.js'
 
-export type PdfWriteSubtype = 'Highlight' | 'Underline' | 'Squiggly' | 'StrikeOut' | 'Text' | 'Square' | 'Circle' | 'Line'
+export type PdfWriteSubtype = 'Highlight' | 'Underline' | 'Squiggly' | 'StrikeOut' | 'Text' | 'Square' | 'Circle' | 'Line' | 'FreeText'
 
 /** One annotation to write on one page. */
 export type PdfWriteAnnotation = {
@@ -41,6 +42,8 @@ export type PdfWriteAnnotation = {
    * endpoints, normalized like `rects` (which hold the shape's bounding box = `/Rect`).
    */
   shape?: PdfShapeGeometry
+  /** `FreeText` (Typewriter note): the rich-text document; `contents` is its plain text, `rects[0]` its box. */
+  typewriter?: { doc: PdfTypewriterDoc; text: string }
   /** `Line` only: an arrow head at the END (`/LE [/None /OpenArrow]`). */
   arrow?: true
   /** `/T`. */
@@ -76,6 +79,8 @@ const SUBTYPE_FOR_STYLE: Partial<Record<HighlightStyleKind, PdfWriteSubtype>> = 
   ellipse: 'Circle',
   line: 'Line',
   arrow: 'Line',
+  // Typewriter note: a FreeText whose appearance stream carries the laid-out rich text.
+  typewriter: 'FreeText',
 }
 
 /** Whether a row of this style can be written into a PDF file. */
@@ -146,6 +151,28 @@ export function pdfWriteAnnotationsFromHighlight(row: ExportableHighlight, first
     const note = row.note?.trim()
     if (note) write.contents = note
     return [write]
+  }
+  if (row.styleKind === 'typewriter') {
+    // ONE FreeText on ONE page, named after its row; the text is the row's `note`, never trimmed.
+    const doc = annotation.typewriter
+    const text = row.note
+    if (!doc || text === undefined || annotation.rects.length !== 1) return []
+    const rect = annotation.rects[0]!
+    return [
+      {
+        nm: firstName ?? readmateAnnotationName(row.id, annotation.pageIndex, annotation.pageIndex),
+        subtype,
+        pageIndex: rect.pageIndex ?? annotation.pageIndex,
+        rects: [{ x: rect.x, y: rect.y, width: rect.width, height: rect.height }],
+        color: pdfColorFromHex(row.colorHex.slice(0, 7)).color,
+        opacity: 1,
+        contents: text,
+        typewriter: { doc, text },
+        author: READMATE_PDF_AUTHOR,
+        createdAt: row.createdAt,
+        modifiedAt: row.updatedAt,
+      },
+    ]
   }
   const byPage = new Map<number, PdfWriteAnnotation['rects']>()
   for (const r of annotation.rects) {

@@ -22,6 +22,8 @@ export type ImportErrorCode =
   | 'not_connected'
   /** User cancelled an in-flight download. */
   | 'cancelled'
+  /** The picked file is an audiobook ZIP: not a failure — the platform opens the ZIP import preview instead. */
+  | 'audiobook_zip'
 
 /** Platform-agnostic import outcome for Library import UX hook. */
 export type ImportClientResult = {

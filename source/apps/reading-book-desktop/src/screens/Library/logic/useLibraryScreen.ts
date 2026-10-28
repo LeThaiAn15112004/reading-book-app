@@ -6,6 +6,7 @@ import {
   useLibraryBooks,
   useLibraryImport,
   useLibraryView,
+  useZipImportStore,
 } from '../../../hooks/library/index.js'
 import { type LibraryBook } from '@reading-book/book-reader-sdk'
 import { importApi, libraryApi } from '../../../bridge'
@@ -27,7 +28,7 @@ type LibraryLocationState = BootLocationState & {
 
 export type PendingBookRemoval = {
   bookId: string
-  kind: 'remove' | 'delete-file'
+  kind: 'remove' | 'delete-file' | 'remove-audiobook'
 }
 
 /**
@@ -145,6 +146,13 @@ export function useLibraryScreen() {
     onDuplicate: showConflict,
     onOpenBook: openReader,
   })
+
+  // An audiobook ZIP import finished (its dialog lives outside this hook): reload the list once per success.
+  const zipImportedNonce = useZipImportStore((s) => s.importedNonce)
+  useEffect(() => {
+    if (zipImportedNonce > 0) void refreshLibrary()
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- refresh only when the counter changes
+  }, [zipImportedNonce])
 
   const libraryNavRef = useRef({
     activeId: sidebarActive,
@@ -374,10 +382,14 @@ export function useLibraryScreen() {
       () =>
         action.kind === 'remove'
           ? libraryApi.removeBook(action.bookId)
-          : libraryApi.deleteBookFile(action.bookId),
+          : action.kind === 'remove-audiobook'
+            ? libraryApi.removeAudiobook(action.bookId)
+            : libraryApi.deleteBookFile(action.bookId),
       action.kind === 'remove'
         ? 'Removed from library.'
-        : 'Book file deleted.',
+        : action.kind === 'remove-audiobook'
+          ? 'Audiobook removed.'
+          : 'Book file deleted.',
     )
     if (removed) {
       await refreshCollections()

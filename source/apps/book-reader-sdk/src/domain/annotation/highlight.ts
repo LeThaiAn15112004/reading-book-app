@@ -18,7 +18,9 @@ export type HighlightStyleKind =
   | 'rectangle'
   | 'ellipse'
   | 'line'
-  | 'arrow';
+  | 'arrow'
+  // PDF Typewriter note (specs/005-typewriter-note)
+  | 'typewriter';
 
 /**
  * Application-facing view of one highlight/underline — a `notes` row whose `note_json.group`

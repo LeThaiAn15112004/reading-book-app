@@ -120,3 +120,38 @@ Consequence: three things must be built that do not exist at all: **rich text**,
 | R7 | File size growth from repeated font subsets | larger PDFs | subset per update; measure in M0; acceptable limit documented |
 | R8 | Complex scripts (RTL, Indic) | unsupported | explicitly out of scope; reported as unsupported characters |
 | R9 | `HighlightStyleKind` exhaustive switches across the codebase miss the new kind | runtime holes | typecheck with exhaustive `never` checks; grep list in tasks |
+
+## M0 result (tasks T004, T005, T008, T009 — 2026-10-27)
+
+**Decisions made**
+
+- **Fonts (D4)**: Noto Sans (Regular/Bold/Italic/BoldItalic), Noto Serif (same four), Noto Sans Mono (Regular/Bold — the family has no italic, so italic is disabled for it; never synthesized). Hinted static TTF from notofonts.github.io (`NotoSerif-Italic` from the unhinted build, the only static one published). SIL OFL 1.1, `OS/2.fsType` = 0 on every file. Files, licence and coverage record: `source/apps/reading-book-desktop/assets/fonts/typewriter/` (`COVERAGE.md`, `THIRD_PARTY_FONTS.md`, `OFL.txt`).
+- **Parser/subsetter (D5)**: in-repo module `electron/pdf-sync/pdf-font-embed.ts` (cmap 4/12, hmtx, loca/glyf with composites, glyph-ID-preserving subset, Type0/CIDFontType2 + ToUnicode). No package was added, so nothing needed approval beyond the font files. Comparison: a package (fontkit/opentype.js) would add a dependency and a Main-bundle risk (R5) to read ~10 tables we already read in ~300 lines; a glyph-ID-preserving subset keeps `/CIDToGIDMap /Identity` trivial. Limits: TrueType outlines only (no CFF, TTC or variable fonts) — all shipped faces are static TrueType.
+
+**Findings the spike surfaced**
+
+- U+00AD (soft hyphen) has no glyph in Noto Sans Mono → it is stripped by `normalizeTypewriterText` and excluded from the declared coverage.
+- pdf.js 5 reports a filled rectangle as `constructPath` with paint op `fill`, not `rectangle`; Type0 fonts ignore `Tw` (word spacing), so justified lines are emitted as one segment per word with explicit gaps (layout `justified` lines).
+
+**`npm run spike:pdf:typewriter-font`** (real parser, SDK layout, incremental writer FreeText branch, pdf.js read-back, hidden Electron/Chromium window for M0-5 and the pixel render):
+
+| Criterion | Result |
+|---|---|
+| M0-1 Vietnamese coverage | pass — 146/146 letters in all 10 faces; every declared range has a glyph in every face |
+| M0-2 text + glyphs | pass — `/Contents` and the glyphs drawn through `/ToUnicode` equal the input (36 lines, every tone × vowel) on a plain and a `/Rotate 90` page; pdf.js pixel render shows the text upright and not blank |
+| M0-3 single incremental update | pass — original bytes unchanged, two xref sections, existing scan completes |
+| M0-4 formatting in the AP | pass — bold/italic faces, underline/strike rectangles, colours, centre/right/justify lines read back |
+| M0-5 layout vs browser | pass — 12 layout lines = 12 Chromium lines, same line starts, max per-line width difference 0.44 px (≤ 1 px) |
+| M0-6 licences | pass — fsType 0, OFL texts collected |
+| M0-7 cost | pass — 10 000-character layout ≈ 3 ms (best of 20; ≈ 14 ms under load); 58 KB added per Vietnamese note (target ≤ 150 KB) |
+| M0-8 bundle | pass — in-repo module; `npx vite build` succeeds |
+
+**Not tested in M0**: any reader other than pdf.js / Chromium's own renderer (Foxit, Acrobat, SumatraPDF are not installed here) — still open for T063.
+
+## D9 — verified in the code (task T031, 2026-10-28)
+
+- `inkOutlinesAvailable` (`PdfRenderer.tsx`): hover / selection chrome for Ink, shapes and file objects exists only in Hand and Select, never under a pen, the eraser or a markup tool. Typewriter does NOT join that pipeline: its own chrome (`PdfTypewriterSelection`) owns its pointer events with pointer capture, so nothing in `targetAt` / `inkMoveRef` / `inkResizeRef` changed. `outlinesOn` only gained `typewriterTool` so the Ink hover is off while the Typewriter tool is armed.
+- Hand press (`onPointerDown`): a press pans unless the dwell armed native text selection. The selected note's body and handles stop propagation, so a press on them never pans and never starts a PDF text selection; a press elsewhere is unchanged. A single click on an unselected note in Hand does nothing (pan / center tap); the root `onDoubleClick` selects it.
+- Select text selection: a press on a saved note (`typewriterAt`, 0.4 % slop) selects it and `preventDefault`s, so the text under it is not selected; elsewhere the existing text selection runs untouched.
+- Selection = the annotation list's focused row (`focusHighlight`), like shapes: Delete / Backspace go through the shared `deleteFocused`, the Notes card is marked, a jump from the Notes list selects the note, a zoom keeps it selected. Editing a note hides its saved copy (`editingTypewriterId`) so the text is not painted twice.
+- Not done in this phase: the quick toolbar has Edit and Delete; **Properties** arrives with the sidebar (US4, T049).

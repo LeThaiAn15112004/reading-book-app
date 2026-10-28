@@ -12,9 +12,14 @@ export type HighlightAction<T = ReaderHighlight> =
   | { kind: 'replace'; before: T; after: T }
 
 const DEFAULT_LIMIT = 50
+export const COALESCE_WINDOW_MS = 1000
 
 export type HighlightHistory<T = ReaderHighlight> = {
-  push: (action: HighlightAction<T>) => void
+  /**
+   * `coalesceKey`: a `replace` pushed with the same key as the previous push, on the same row and within
+   * `COALESCE_WINDOW_MS`, merges into it (one undo step for a colour / size drag): `before` stays the first one.
+   */
+  push: (action: HighlightAction<T>, coalesceKey?: string) => void
   undo: () => HighlightAction<T> | null
   redo: () => HighlightAction<T> | null
   clear: () => void
@@ -29,26 +34,46 @@ export type HighlightHistory<T = ReaderHighlight> = {
 export function createHighlightHistory<T = ReaderHighlight>(limit = DEFAULT_LIMIT): HighlightHistory<T> {
   let undoStack: HighlightAction<T>[] = []
   let redoStack: HighlightAction<T>[] = []
+  let last: { key: string; at: number } | null = null
 
   return {
-    push(action) {
+    push(action, coalesceKey) {
+      const top = undoStack[undoStack.length - 1]
+      const now = Date.now()
+      if (
+        coalesceKey &&
+        last?.key === coalesceKey &&
+        now - last.at <= COALESCE_WINDOW_MS &&
+        top?.kind === 'replace' &&
+        action.kind === 'replace' &&
+        (top.after as { id?: unknown }).id === (action.before as { id?: unknown }).id
+      ) {
+        undoStack[undoStack.length - 1] = { kind: 'replace', before: top.before, after: action.after }
+        last = { key: coalesceKey, at: now }
+        redoStack = []
+        return
+      }
+      last = coalesceKey ? { key: coalesceKey, at: now } : null
       undoStack.push(action)
       if (undoStack.length > limit) undoStack.shift()
       redoStack = []
     },
     undo() {
+      last = null
       const action = undoStack.pop()
       if (!action) return null
       redoStack.push(action)
       return action
     },
     redo() {
+      last = null
       const action = redoStack.pop()
       if (!action) return null
       undoStack.push(action)
       return action
     },
     clear() {
+      last = null
       undoStack = []
       redoStack = []
     },

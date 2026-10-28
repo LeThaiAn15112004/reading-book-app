@@ -100,7 +100,17 @@ describe('readPdfJsAnnotation', () => {
       Square: 'rectangle',
       Circle: 'ellipse',
       Line: 'line',
+      // Typewriter notes (only Readmate's own `readmate:*` ones are ever scanned in Main; a foreign FreeText is a graphic object)
+      FreeText: 'typewriter',
     })
+  })
+
+  it('reads a FreeText (Typewriter note) from its rect and text', () => {
+    const item = scan({ subtype: 'FreeText', quadPoints: undefined, rect: [100, 500, 300, 600], contentsObj: { str: 'Xin chào' }, overlaidText: undefined })
+    expect(item.subtype).toBe('FreeText')
+    expect(item.contents).toBe('Xin chào')
+    expect(item.rects).toHaveLength(1)
+    expect(item.rects[0]!.x).toBeCloseTo(100 / 612, 5)
   })
 
   it('anchors a Text (sticky note) annotation on its icon rect', () => {
@@ -112,7 +122,7 @@ describe('readPdfJsAnnotation', () => {
   })
 
   it('ignores types the app cannot represent, replies, and items without usable geometry', () => {
-    for (const subtype of ['Link', 'FreeText', 'Ink', 'Polygon', 'Stamp', 'Popup', 'Widget', 'FileAttachment']) {
+    for (const subtype of ['Link', 'Ink', 'Polygon', 'Stamp', 'Popup', 'Widget', 'FileAttachment']) {
       expect(readPdfJsAnnotation(pdfjsItem({ subtype }), LETTER)).toBeNull()
     }
     expect(readPdfJsAnnotation(pdfjsItem({ inReplyTo: '9R' }), LETTER)).toBeNull()

@@ -7,12 +7,14 @@ import {
   compareArchivePaths,
   deselectAllTracks,
   flattenZipTree,
+  importModeForSelection,
   initialSelection,
   normalizeArchivePath,
   orderWarnings,
   rankCoverCandidates,
   selectAllTracks,
   setCover,
+  singleFileImportNotes,
   toggleTrack,
   validateZipSelection,
   ZIP_IMPORT_LIMITS,
@@ -212,5 +214,32 @@ describe('tree', () => {
     expect(open.map((r) => [r.node.name, r.depth])).toEqual([['F', 0], ['G', 1], ['b.mp3', 2], ['a.mp3', 1]])
     expect(flattenZipTree(tree, new Set(['F'])).map((r) => r.node.name)).toEqual(['F'])
     expect(flattenZipTree(tree, new Set(['F/G'])).map((r) => r.node.name)).toEqual(['F', 'G', 'a.mp3'])
+  })
+})
+
+describe('import mode (single-file vs multi-chapter) and the one-track notices', () => {
+  const sel = (n: number, coverId: string | null) => ({ trackIds: Array.from({ length: n }, (_, i) => `e${i}`), coverId })
+  it('0 / 1 / 2+ tracks', () => {
+    expect(importModeForSelection(sel(0, null))).toBe('none')
+    expect(importModeForSelection(sel(1, null))).toBe('single-file')
+    expect(importModeForSelection(sel(2, null))).toBe('multi-chapter')
+    expect(importModeForSelection(sel(68, 'e9'))).toBe('multi-chapter')
+  })
+  it('one track with a cover selected warns that the cover is not used, and that the title is the track’s', () => {
+    const n = singleFileImportNotes(sel(1, 'e5'))
+    expect(n.cover).toMatch(/cover selected here won't be used/)
+    expect(n.title).toMatch(/not from the ZIP name/)
+  })
+  it('one track without a cover: only the title notice', () => {
+    const n = singleFileImportNotes(sel(1, null))
+    expect(n.cover).toBeNull()
+    expect(n.title).not.toBeNull()
+  })
+  it('no notices for none or multi-chapter, and they follow the live selection', () => {
+    expect(singleFileImportNotes(sel(0, 'e5'))).toEqual({ cover: null, title: null })
+    expect(singleFileImportNotes(sel(3, 'e5'))).toEqual({ cover: null, title: null })
+    // untick down to one track → the notice appears; tick another → it disappears
+    expect(singleFileImportNotes(sel(1, 'e5')).cover).not.toBeNull()
+    expect(singleFileImportNotes(sel(2, 'e5')).cover).toBeNull()
   })
 })

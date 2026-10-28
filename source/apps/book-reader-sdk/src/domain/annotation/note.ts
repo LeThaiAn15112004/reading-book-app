@@ -1,3 +1,4 @@
+import type { PdfTypewriterDoc } from '../../typewriter/typewriter-doc.js';
 import type {
   CfiLocationPlain,
   PageRectLocationPlain,
@@ -67,6 +68,8 @@ export interface PdfAnnotation {
   caret?: true;
   /** Shape annotations (rectangle / ellipse / line / arrow) only: what `rects` alone cannot say. */
   shape?: PdfShapeGeometry;
+  /** Typewriter notes only: rich text over `notes.note` (specs/005-typewriter-note/data-model.md §2); `rects[0]` is the box. */
+  typewriter?: PdfTypewriterDoc;
 }
 
 /**
@@ -152,6 +155,7 @@ export type NoteType =
   | 'ellipse'
   | 'line'
   | 'arrow'
+  | 'typewriter'
   | 'bookmark';
 
 export type NoteStatus = 'None' | 'Review' | 'Done';

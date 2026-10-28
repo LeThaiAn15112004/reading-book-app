@@ -14,6 +14,7 @@ import {
 } from '@reading-book/book-reader-sdk'
 import { scanPdfAnnotationBytes, type PdfAnnotationScanResult } from './pdf-annotation-scan'
 import { appendAnnotationUpdate, PdfWriteError, type AnnotationUpdate, type PageGeometry } from './pdf-incremental-writer'
+import { TypewriterWriteError, type TypewriterWriteFailure } from './typewriter-pdf'
 
 export type PdfAnnotationWriteInput = {
   bytes: Uint8Array
@@ -26,6 +27,8 @@ export type PdfAnnotationWriteSummary = { added: number; replaced: number; remov
 export type PdfAnnotationWriteOutput = {
   output: Uint8Array
   summary: PdfAnnotationWriteSummary
+  /** Typewriter notes left out (cannot be drawn); everything else was written. */
+  skipped: TypewriterSkip[]
   plan: PdfAnnotationWritePlan
   /** The output re-scanned (what a sync would read from it next). */
   after: PdfAnnotationScanResult
@@ -34,6 +37,29 @@ export type PdfAnnotationWriteOutput = {
 }
 
 export class PdfVerifyError extends Error {}
+
+/** A Typewriter note left out of an update because it cannot be drawn (see contracts §3); its row stays in the app, untouched. */
+export type TypewriterSkip = { nm: string; code: TypewriterWriteFailure; characters?: string[] }
+
+/**
+ * `appendAnnotationUpdate`, except that a Typewriter note that cannot be written (unsupported characters, a font that
+ * failed, text that does not fit) is left out and reported — it never blocks the other annotations.
+ */
+function appendTolerant(bytes: Uint8Array, pages: ReadonlyMap<number, PageGeometry>, ops: AnnotationUpdate): { output: Uint8Array; ops: AnnotationUpdate; skipped: TypewriterSkip[] } {
+  const skipped: TypewriterSkip[] = []
+  let current = ops
+  for (let attempt = 0; attempt < 1000; attempt++) {
+    try {
+      return { output: appendAnnotationUpdate(bytes, pages, current), ops: current, skipped }
+    } catch (err) {
+      if (!(err instanceof TypewriterWriteError) || !err.nm) throw err
+      const nm = err.nm
+      skipped.push({ nm, code: err.code, ...(err.characters ? { characters: err.characters } : {}) })
+      current = { ...current, add: current.add.filter((a) => a.nm !== nm), replace: current.replace.filter((r) => r.annotation.nm !== nm) }
+    }
+  }
+  throw new PdfWriteError('unsupported_pdf', 'too many notes that cannot be written')
+}
 
 const near = (a: number, b: number) => Math.abs(a - b) < 0.01
 
@@ -77,12 +103,13 @@ export async function writeAnnotationsToPdf(input: PdfAnnotationWriteInput): Pro
   const ledger = new Map(input.ledger.map((e) => [e.sourceKey, e]))
   const plan = planPdfAnnotationWrite({ scanned: before.items, ledger, rows: input.rows })
   const pages = new Map<number, PageGeometry>(before.pages.map((p) => [p.pageIndex, p]))
-  const output = appendAnnotationUpdate(input.bytes, pages, plan)
+  const { output, ops, skipped } = appendTolerant(input.bytes, pages, plan)
   const after = await scanPdfAnnotationBytes(output)
-  verify(plan, before.items, after)
+  verify(ops, before.items, after)
   return {
     output,
-    summary: { added: plan.add.length, replaced: plan.replace.length, removed: plan.remove.length, kept: plan.kept },
+    skipped,
+    summary: { added: ops.add.length, replaced: ops.replace.length, removed: ops.remove.length, kept: plan.kept },
     plan,
     after,
     before,
@@ -90,7 +117,7 @@ export async function writeAnnotationsToPdf(input: PdfAnnotationWriteInput): Pro
 }
 
 export type PdfAnnotationApplyInput = { bytes: Uint8Array; ops: AnnotationUpdate }
-export type PdfAnnotationApplyOutput = { output: Uint8Array; after: PdfAnnotationScanResult }
+export type PdfAnnotationApplyOutput = { output: Uint8Array; after: PdfAnnotationScanResult; skipped: TypewriterSkip[] }
 
 /**
  * Apply already-planned file operations (two-way sync, phase 3): append them as one incremental
@@ -101,10 +128,10 @@ export async function applyAnnotationOps(input: PdfAnnotationApplyInput): Promis
   const before = await scanPdfAnnotationBytes(input.bytes)
   if (!before.complete) throw new PdfWriteError('unsupported_pdf', 'the file could not be read completely')
   const pages = new Map<number, PageGeometry>(before.pages.map((p) => [p.pageIndex, p]))
-  const output = appendAnnotationUpdate(input.bytes, pages, input.ops)
+  const { output, ops, skipped } = appendTolerant(input.bytes, pages, input.ops)
   const after = await scanPdfAnnotationBytes(output)
-  verify(input.ops, before.items, after)
-  return { output, after }
+  verify(ops, before.items, after)
+  return { output, after, skipped }
 }
 
 /** Identity keys of a scan's items (for ledger bookkeeping after a write). */

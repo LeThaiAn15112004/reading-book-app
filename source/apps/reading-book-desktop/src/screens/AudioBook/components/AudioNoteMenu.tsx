@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent } from 'react'
 import { createPortal } from 'react-dom'
-import { MAX_NOTE_CHARS, formatPlaybackTime } from '@reading-book/book-reader-sdk'
+import { MAX_NOTE_CHARS, formatPlaybackTime, trackNoteLabel } from '@reading-book/book-reader-sdk'
 import { useDismissOnOutsideOrEscape } from '../../Reader/logic'
 import { useNoteMenuStore } from '../logic/audioNoteMenuStore'
 import { useAudioPlayerStore } from '../logic/audioPlayerStore'
@@ -38,6 +38,8 @@ function Popover() {
   const goToNote = useAudioPlayerStore((s) => s.goToNote)
   const updateNote = useAudioPlayerStore((s) => s.updateNote)
   const removeNote = useAudioPlayerStore((s) => s.removeNote)
+  // Multi-track: which track the Note belongs to ("12 · Title"), shown next to its time; `null` for a single-file Note.
+  const trackLabel = useAudioPlayerStore((s) => trackNoteLabel(note, s.tracks))
   const ref = useRef<HTMLDivElement>(null)
   const textRef = useRef<HTMLTextAreaElement>(null)
   const [pos, setPos] = useState<{ left: number; top?: number; bottom?: number } | null>(null)
@@ -83,6 +85,7 @@ function Popover() {
 
   if (!pos) return null
   const time = formatPlaybackTime(note.positionSeconds)
+  const where = trackLabel ? `${trackLabel} · ${time}` : time
 
   return createPortal(
     <div
@@ -94,7 +97,7 @@ function Popover() {
     >
       {open.mode === 'menu' ? (
         <div role="menu" aria-label={`Note at ${time}`}>
-          <div className="px-3 pt-1.5 pb-1 text-[11px] font-bold tracking-wide text-lib-faint uppercase">Note · {time}</div>
+          <div className="px-3 pt-1.5 pb-1 text-[11px] font-bold tracking-wide text-lib-faint uppercase">Note · {where}</div>
           <button type="button" role="menuitem" className={itemClass} onClick={() => setMode('edit')}>
             {note.note ? 'Edit note' : 'Add note'}
           </button>
@@ -124,7 +127,7 @@ function Popover() {
           }}
         >
           <label className="text-[11px] font-bold tracking-wide text-lib-faint uppercase" htmlFor="audio-note-text">
-            Note · {time}
+            Note · {where}
           </label>
           <textarea
             id="audio-note-text"

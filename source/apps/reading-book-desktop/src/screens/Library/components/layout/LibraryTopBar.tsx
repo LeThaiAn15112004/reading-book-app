@@ -1,4 +1,5 @@
 import { ImportMenu } from '../../../../components/import'
+import { useAnnotationTransferStore } from '../../../Reader/logic/annotationTransferStore'
 import { LibrarySearchBox } from './LibrarySearchBox'
 
 type LibraryTopBarProps = {
@@ -37,6 +38,16 @@ export function LibraryTopBar({
         onFromDevice={onFromDevice}
         onFromUrl={onFromUrl}
       />
+
+      {/* Library-level annotation import: the file decides which book it belongs to (specs/006-annotation-import-export). */}
+      <button
+        type="button"
+        className="hidden h-[38px] shrink-0 cursor-pointer items-center rounded-lg border border-lib-border bg-transparent px-3 text-[13px] font-medium text-lib-muted transition-colors hover:border-lib-accent hover:text-lib-text-strong md:inline-flex"
+        title="Import a .readmate-notes.json file; the app finds the book it belongs to"
+        onClick={() => void useAnnotationTransferStore.getState().startImport()}
+      >
+        Import annotations file…
+      </button>
     </header>
   )
 }

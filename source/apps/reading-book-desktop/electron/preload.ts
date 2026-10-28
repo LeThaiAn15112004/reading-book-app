@@ -15,12 +15,24 @@ import {
   OverlayChannels,
   SearchChannels,
   StorageChannels,
+  TranscriptionChannels,
   TranslationChannels,
   TxtChannels,
   UpdateChannels,
   WordCountChannels,
   ZipImportChannels,
 } from './ipc/channels'
+
+/** Subscribe to a Main → renderer event; returns the unsubscribe function. */
+function subscribe<T>(channel: string, handler: (payload: T) => void): () => void {
+  const listener = (_event: Electron.IpcRendererEvent, payload: T): void => {
+    handler(payload)
+  }
+  ipcRenderer.on(channel, listener)
+  return () => {
+    ipcRenderer.removeListener(channel, listener)
+  }
+}
 
 const api: DesktopApi = {
   ping: () => ipcRenderer.invoke(AppChannels.ping),
@@ -76,6 +88,7 @@ const api: DesktopApi = {
     removeBook: (id) => ipcRenderer.invoke(LibraryChannels.removeBook, id),
     deleteBookFile: (id) =>
       ipcRenderer.invoke(LibraryChannels.deleteBookFile, id),
+    removeAudiobook: (id) => ipcRenderer.invoke(LibraryChannels.removeAudiobook, id),
     relinkBook: (id) => ipcRenderer.invoke(LibraryChannels.relinkBook, id),
     checkSignature: (id) => ipcRenderer.invoke(LibraryChannels.checkSignature, id),
     listCollections: () => ipcRenderer.invoke(LibraryChannels.listCollections),
@@ -124,19 +137,6 @@ const api: DesktopApi = {
     list: (bookId) => ipcRenderer.invoke(GraphicsChannels.list, bookId),
     apply: (input) => ipcRenderer.invoke(GraphicsChannels.apply, input),
   },
-  zipImport: {
-    pick: () => ipcRenderer.invoke(ZipImportChannels.pick),
-    coverPreview: (input) => ipcRenderer.invoke(ZipImportChannels.coverPreview, input),
-    confirm: (input) => ipcRenderer.invoke(ZipImportChannels.confirm, input),
-    discard: (sessionId) => ipcRenderer.invoke(ZipImportChannels.discard, sessionId),
-    cancelInspect: () => ipcRenderer.invoke(ZipImportChannels.cancelInspect),
-    onInspecting: (handler) => {
-      const listener = (_event: Electron.IpcRendererEvent, info: Parameters<typeof handler>[0]) => {
-        handler(info)
-      }
-      ipcRenderer.on(ZipImportChannels.inspecting, listener)
-      return () => {
-        ipcRenderer.removeListener(ZipImportChannels.inspecting, listener)
   annotationTransfer: {
     count: (bookId) => ipcRenderer.invoke(AnnotationTransferChannels.count, bookId),
     exportRestore: (bookId) => ipcRenderer.invoke(AnnotationTransferChannels.exportRestore, bookId),
@@ -156,11 +156,36 @@ const api: DesktopApi = {
       }
     },
   },
+  zipImport: {
+    pick: () => ipcRenderer.invoke(ZipImportChannels.pick),
+    inspectPicked: () => ipcRenderer.invoke(ZipImportChannels.inspectPicked),
+    coverPreview: (input) => ipcRenderer.invoke(ZipImportChannels.coverPreview, input),
+    confirm: (input) => ipcRenderer.invoke(ZipImportChannels.confirm, input),
+    discard: (sessionId) => ipcRenderer.invoke(ZipImportChannels.discard, sessionId),
+    cancelInspect: () => ipcRenderer.invoke(ZipImportChannels.cancelInspect),
+    cancelImport: () => ipcRenderer.invoke(ZipImportChannels.cancelImport),
+    onProgress: (handler) => {
+      const listener = (_event: Electron.IpcRendererEvent, progress: Parameters<typeof handler>[0]) => {
+        handler(progress)
+      }
+      ipcRenderer.on(ZipImportChannels.progress, listener)
+      return () => {
+        ipcRenderer.removeListener(ZipImportChannels.progress, listener)
+      }
+    },
+    onInspecting: (handler) => {
+      const listener = (_event: Electron.IpcRendererEvent, info: Parameters<typeof handler>[0]) => {
+        handler(info)
+      }
+      ipcRenderer.on(ZipImportChannels.inspecting, listener)
+      return () => {
+        ipcRenderer.removeListener(ZipImportChannels.inspecting, listener)
       }
     },
   },
   audio: {
     getChapters: (bookId) => ipcRenderer.invoke(AudioChannels.getChapters, bookId),
+    getTracks: (bookId) => ipcRenderer.invoke(AudioChannels.getTracks, bookId),
     getBookmarks: (bookId) => ipcRenderer.invoke(AudioChannels.getBookmarks, bookId),
     saveBookmarks: (input) => ipcRenderer.invoke(AudioChannels.saveBookmarks, input),
   },
@@ -270,6 +295,7 @@ const api: DesktopApi = {
     clearCache: () => ipcRenderer.invoke(StorageChannels.clearCache),
     removeTranslationModel: (modelId) =>
       ipcRenderer.invoke(StorageChannels.removeTranslationModel, modelId),
+    removeSpeechModel: (modelId) => ipcRenderer.invoke(StorageChannels.removeSpeechModel, modelId),
     openBooksFolder: () => ipcRenderer.invoke(StorageChannels.openBooksFolder),
   },
   translation: {
@@ -287,6 +313,19 @@ const api: DesktopApi = {
         ipcRenderer.removeListener(TranslationChannels.progress, listener)
       }
     },
+  },
+  transcription: {
+    getInfo: (bookId, appLanguage) => ipcRenderer.invoke(TranscriptionChannels.getInfo, bookId, appLanguage),
+    start: (request) => ipcRenderer.invoke(TranscriptionChannels.start, request),
+    cancel: (jobId) => ipcRenderer.invoke(TranscriptionChannels.cancel, jobId),
+    downloadModel: (modelId) => ipcRenderer.invoke(TranscriptionChannels.downloadModel, modelId),
+    getPassages: (request) => ipcRenderer.invoke(TranscriptionChannels.getPassages, request),
+    search: (bookId, query, limit) => ipcRenderer.invoke(TranscriptionChannels.search, bookId, query, limit),
+    export: (bookId, options) => ipcRenderer.invoke(TranscriptionChannels.export, bookId, options),
+    delete: (bookId) => ipcRenderer.invoke(TranscriptionChannels.delete, bookId),
+    onProgress: (handler) => subscribe(TranscriptionChannels.progress, handler),
+    onPassagesAdded: (handler) => subscribe(TranscriptionChannels.passagesAdded, handler),
+    onModelProgress: (handler) => subscribe(TranscriptionChannels.modelProgress, handler),
   },
   cloud: {
     connect: (provider) => ipcRenderer.invoke(CloudChannels.connect, provider),

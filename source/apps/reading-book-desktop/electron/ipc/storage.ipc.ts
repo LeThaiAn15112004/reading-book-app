@@ -3,6 +3,7 @@ import {
   clearCache,
   getStorageUsage,
   openBooksFolder,
+  removeSpeechModel,
   removeTranslationModel,
 } from '../storage/storage-service'
 import type { ClearCacheResult, StorageUsageDto } from './api-types'
@@ -20,6 +21,9 @@ export function registerStorageIpc(): void {
   ipcMain.handle(StorageChannels.removeTranslationModel, (_event, modelId: unknown) =>
     removeTranslationModel(modelId),
   )
+
+  ipcMain.removeHandler(StorageChannels.removeSpeechModel)
+  ipcMain.handle(StorageChannels.removeSpeechModel, (_event, modelId: unknown) => removeSpeechModel(modelId))
 
   ipcMain.removeHandler(StorageChannels.openBooksFolder)
   ipcMain.handle(StorageChannels.openBooksFolder, () => openBooksFolder())

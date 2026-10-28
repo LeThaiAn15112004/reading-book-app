@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState, type MouseEvent as ReactMouseEvent } from 'react'
+import { annotationTransferApi } from '../../../../bridge'
+import { supportsAnnotationTransfer } from '../../../Reader/logic/annotationTransferStore'
 import type {
   CollectionSummary,
   LibraryBook,
@@ -24,6 +26,14 @@ export type BookItemMenuProps = {
   onCopyFilePath: (id: string) => void | Promise<void>
   onRemove: (id: string) => void
   onDeleteFile: (id: string) => void
+  /** Multi-chapter audiobooks: the single destructive action (replaces Remove / Delete file). */
+  onRemoveAudiobook: (id: string) => void
+  /** EPUB / PDF / TXT / Markdown: save the book's annotations to a `.readmate-notes.json` file. */
+  onExportAnnotations: (id: string) => void | Promise<void>
+  /** EPUB / PDF / TXT / Markdown: pick a `.readmate-notes.json` file and import its annotations. */
+  onImportAnnotations: (id: string) => void | Promise<void>
+  /** EPUB / PDF / TXT / Markdown: save a readable Markdown copy of the book's annotations. */
+  onExportReadable: (id: string) => void | Promise<void>
 }
 
 export function MoreVertIcon({ className }: { className?: string }) {
@@ -91,9 +101,26 @@ export function BookItemMenu({
   onCopyFilePath,
   onRemove,
   onDeleteFile,
+  onRemoveAudiobook,
+  onExportAnnotations,
+  onImportAnnotations,
+  onExportReadable,
 }: BookItemMenuProps) {
   const menuRef = useRef<HTMLDivElement>(null)
   const [collectionsOpen, setCollectionsOpen] = useState(false)
+  const canExportAnnotations = supportsAnnotationTransfer(book.format)
+  const [annotationCount, setAnnotationCount] = useState(0)
+  useEffect(() => {
+    if (!canExportAnnotations) return
+    let live = true
+    void annotationTransferApi
+      .count(book.id)
+      .then((r) => live && setAnnotationCount(r.count))
+      .catch(() => {})
+    return () => {
+      live = false
+    }
+  }, [book.id, canExportAnnotations])
   const left = Math.max(8, Math.min(point.x, window.innerWidth - 282))
   const top = Math.max(8, Math.min(point.y, window.innerHeight - 390))
   const openCollectionsLeft = left + 506 <= window.innerWidth
@@ -214,6 +241,33 @@ export function BookItemMenu({
           Remove from this collection
         </button>
       ) : null}
+      {canExportAnnotations ? (
+        <button
+          className={itemClass}
+          role="menuitem"
+          disabled={annotationCount === 0}
+          title={annotationCount === 0 ? 'This book has no annotations to export yet.' : undefined}
+          onClick={() => run(() => onExportAnnotations(book.id))}
+        >
+          Export annotations (backup)…
+        </button>
+      ) : null}
+      {canExportAnnotations ? (
+        <button
+          className={itemClass}
+          role="menuitem"
+          disabled={annotationCount === 0}
+          title={annotationCount === 0 ? 'This book has no annotations to export yet.' : undefined}
+          onClick={() => run(() => onExportReadable(book.id))}
+        >
+          Export readable copy…
+        </button>
+      ) : null}
+      {canExportAnnotations ? (
+        <button className={itemClass} role="menuitem" onClick={() => run(() => onImportAnnotations(book.id))}>
+          Import annotations…
+        </button>
+      ) : null}
       <MenuSeparator />
       <button className={itemClass} role="menuitem" onClick={() => run(() => onOpenFileLocation(book.id))}>
         Open file location
@@ -222,11 +276,23 @@ export function BookItemMenu({
         Copy file path
       </button>
       <MenuSeparator />
-      <button className={itemClass} role="menuitem" onClick={() => run(() => onRemove(book.id))}>
-        Remove from library
-      </button>
+      {book.chapterCount ? (
+        // A multi-chapter audiobook's files are all app-owned copies: "remove the record, keep the files" would leave
+        // an unreachable folder, so there is one action and it says what it deletes.
+        <button
+          className={`${itemClass} text-red-400 hover:text-red-300`}
+          role="menuitem"
+          onClick={() => run(() => onRemoveAudiobook(book.id))}
+        >
+          Remove audiobook…
+        </button>
+      ) : (
+        <button className={itemClass} role="menuitem" onClick={() => run(() => onRemove(book.id))}>
+          Remove from library
+        </button>
+      )}
       {/* Only app-owned copies can be deleted; a referenced book's file is the user's own. */}
-      {book.fileStorage === 'managed' ? (
+      {!book.chapterCount && book.fileStorage === 'managed' ? (
         <button
           className={`${itemClass} text-red-400 hover:text-red-300`}
           role="menuitem"

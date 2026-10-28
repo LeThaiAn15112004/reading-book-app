@@ -37,6 +37,8 @@ export type LibraryBook = {
    * by path — never deleted by the app. Absent when the platform doesn't say.
    */
   fileStorage?: BookFileStorage
+  /** Multi-chapter audiobook: number of chapter files (absent for every other book). */
+  chapterCount?: number
   /** Reading progress 0–100 when known (Continue Reading / table progress). */
   progressPercent?: number
   /** ISO-8601 import time when known. */
@@ -76,6 +78,7 @@ export type BookSummaryInput = {
   sourceProvider?: 'google_drive' | 'dropbox' | 'onedrive'
   externalId?: string
   fileStorage?: BookFileStorage
+  chapterCount?: number
 }
 
 export const NAV_FILTERS: Record<
@@ -152,6 +155,7 @@ export function mapBookSummary(dto: BookSummaryInput): LibraryBook {
     sourceProvider: dto.sourceProvider,
     externalId: dto.externalId,
     fileStorage: dto.fileStorage,
+    chapterCount: dto.chapterCount,
     progressPercent:
       dto.progressPercent != null && Number.isFinite(dto.progressPercent)
         ? Math.min(100, Math.max(0, dto.progressPercent))

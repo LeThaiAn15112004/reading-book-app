@@ -222,7 +222,7 @@ const DEFAULT_HIGHLIGHT_COLOR = '#FFEB3B'
  */
 const HIGHLIGHT_TYPE_PREDICATE = `
   (json_extract(note_json, '$.group') IS NULL OR json_extract(note_json, '$.group') = 'annotation')
-  AND json_extract(note_json, '$.type') IN ('highlight', 'underline', 'strikethrough', 'squiggly', 'replace', 'insert', 'textbox', 'rectangle', 'ellipse', 'line', 'arrow')
+  AND json_extract(note_json, '$.type') IN ('highlight', 'underline', 'strikethrough', 'squiggly', 'replace', 'insert', 'textbox', 'rectangle', 'ellipse', 'line', 'arrow', 'typewriter')
 `
 
 /**
@@ -289,6 +289,8 @@ const HIGHLIGHT_STYLE_KINDS: HighlightStyleKind[] = [
   'ellipse',
   'line',
   'arrow',
+  // PDF Typewriter note (specs/005-typewriter-note)
+  'typewriter',
 ]
 
 function rowToHighlightRecord(row: NoteRow): HighlightRecord | undefined {
@@ -311,11 +313,12 @@ function rowToHighlightRecord(row: NoteRow): HighlightRecord | undefined {
     locator,
     styleKind,
     colorHex: note.style?.colorHex?.trim() || DEFAULT_HIGHLIGHT_COLOR,
-    note: note.note?.trim() || undefined,
+    // A Typewriter note's text is the document itself: offsets of its style runs index it, so it is never trimmed.
+    note: styleKind === 'typewriter' ? (note.note ?? undefined) : note.note?.trim() || undefined,
     tags: Array.isArray(note.tags) ? note.tags : [],
     selectionText: note.locatorExtended?.text,
     // PDF markup geometry; re-validated so a hand-edited / corrupt row can't reach the renderer.
-    pdfAnnotation: note.pdfAnnotation ? parsePdfAnnotation(note.pdfAnnotation) : undefined,
+    pdfAnnotation: note.pdfAnnotation ? parsePdfAnnotation(note.pdfAnnotation, note.note ?? undefined) : undefined,
     // TXT markup range; same re-validation.
     txtAnnotation: note.txtAnnotation ? parseTxtAnnotation(note.txtAnnotation) : undefined,
     // Markdown markup anchor; same re-validation.
@@ -418,6 +421,17 @@ export class SqliteOverlayStore implements OverlayStore {
   async saveAudioProgress(bookId: string, input: AudioProgressInput): Promise<boolean> {
     const id = bookId.trim()
     if (!id) return false
+    // A track-relative position is only meaningful together with ITS track: a multi-chapter audiobook needs a `trackId`
+    // that belongs to this very book, and a single-file audiobook must not carry one. Anything else is refused here,
+    // whatever the renderer sent.
+    const multi = this.db.prepare('SELECT 1 FROM book_audio_chapters WHERE book_id = ? LIMIT 1').get(id) !== undefined
+    if (multi) {
+      if (!input.trackId) return false
+      const owned = this.db.prepare('SELECT 1 FROM book_audio_chapters WHERE id = ? AND book_id = ?').get(input.trackId, id)
+      if (owned === undefined) return false
+    } else if (input.trackId !== undefined) {
+      return false
+    }
     const now = new Date().toISOString()
     const result = this.db
       .prepare(
@@ -718,7 +732,7 @@ export class SqliteOverlayStore implements OverlayStore {
       : undefined
     const createdAt = input.createdAt?.trim() || existingCreatedAt || now
 
-    const note = input.note?.trim() || undefined
+    const note = input.styleKind === 'typewriter' ? input.note : input.note?.trim() || undefined
     const noteJson = buildHighlightNoteJson({
       locator: input.locator,
       styleKind: input.styleKind,

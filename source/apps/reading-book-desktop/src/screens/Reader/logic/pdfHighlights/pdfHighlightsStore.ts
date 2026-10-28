@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { markupToast } from '../markupToast'
 import { opensNotePopup } from '../noteKinds'
+import { useTypewriterFileStatusStore } from '../pdfTypewriter/typewriterFileStatusStore'
 import type { MutableRefObject } from 'react'
 import {
   DEFAULT_HIGHLIGHT_COLOR,
@@ -18,6 +19,14 @@ import {
   pdfRectsFromAnnotation,
   pdfShapeAnnotation,
   isShapeStyleKind,
+  isValidTypewriterBox,
+  isValidTypewriterText,
+  parseTypewriterDoc,
+  applyAlign,
+  applyStyle,
+  type PdfTypewriterDoc,
+  type TypewriterAlign,
+  type TypewriterTextStyle,
   shapeColorHex,
   type HighlightHistory,
   type HighlightStyleKind,
@@ -132,6 +141,26 @@ type PdfHighlightsStoreState = PdfHighlightsContext & {
    * history as every annotation). `look.opacity` is folded into the colour (`#RRGGBBAA`). Returns the row.
    */
   createShape: (pageIndex: number, kind: PdfShapeKind, geometry: PdfShapeGeometryResult, look: { colorHex: string; opacity: number }) => PdfReaderHighlight | null
+  /**
+   * Typewriter: save a finished text box as an annotation row (same table, list and history). `box` is normalized
+   * over the page and already as tall as the laid-out text. Null (and a toast) when the text or box is invalid.
+   */
+  createTypewriter: (input: { pageIndex: number; box: { x: number; y: number; width: number; height: number }; text: string; doc: PdfTypewriterDoc }) => PdfReaderHighlight | null
+  /**
+   * Typewriter: replace a saved note's box / text / document in ONE history step (`box` is already as tall as the
+   * laid-out text). False (and a toast) when the result would be invalid; the stored row is then unchanged.
+   */
+  updateTypewriter: (id: string, next: { box: { x: number; y: number; width: number; height: number }; text: string; doc: PdfTypewriterDoc }) => boolean
+  /**
+   * Typewriter: change the format of the WHOLE saved note (style keys and / or alignment) — one history step,
+   * coalesced with the previous change of the same kind (a colour / size drag is one step). `fit` gives the box the
+   * re-laid-out text needs (null = does not fit the page: the change is refused, the row stays as it was).
+   */
+  formatTypewriter: (
+    id: string,
+    change: { style?: Partial<TypewriterTextStyle>; align?: TypewriterAlign },
+    fit: (doc: PdfTypewriterDoc, text: string, box: { x: number; y: number; width: number; height: number }) => { x: number; y: number; width: number; height: number } | null,
+  ) => boolean
   /** Resize / reshape / restroke a shape: `geometry` replaces its box (and endpoints / pen width) — one history step. */
   updateShapeGeometry: (id: string, geometry: PdfShapeGeometryResult) => void
   /** A click on blank page area (or a fresh selection menu): close the menu, drop the outline. */
@@ -171,6 +200,7 @@ export const usePdfHighlightsStore = create<PdfHighlightsStoreState>()((set, get
 
   resetForNewBook: () => {
     get().history.clear()
+    useTypewriterFileStatusStore.getState().reset()
     set({
       highlights: [],
       activeHighlight: null,
@@ -200,6 +230,7 @@ export const usePdfHighlightsStore = create<PdfHighlightsStoreState>()((set, get
 
   applyEmbeddedSync: (event) => {
     if (!event || event.bookId !== get().bookId) return
+    useTypewriterFileStatusStore.getState().apply(event.typewriterStatus)
     const written = [...event.inserted, ...event.updated]
       .map(pdfHighlightDtoToReaderHighlight)
       .filter((h): h is PdfReaderHighlight => h != null)
@@ -457,6 +488,95 @@ export const usePdfHighlightsStore = create<PdfHighlightsStoreState>()((set, get
     return highlight
   },
 
+  createTypewriter: ({ pageIndex, box, text, doc }) => {
+    const { bookId, onToast } = get()
+    if (!bookId) return null
+    const clean = parseTypewriterDoc(doc, text)
+    if (!clean || !isValidTypewriterText(text) || !isValidTypewriterBox(box)) {
+      onToast('The text does not fit on the page — enlarge the box or reduce the size.')
+      return null
+    }
+    const rects = [{ page: pageIndex + 1, x: box.x, y: box.y, width: box.width, height: box.height }]
+    const annotation = pdfAnnotationFromRects(rects)
+    if (!annotation) return null
+    const now = new Date().toISOString()
+    const highlight: PdfReaderHighlight = {
+      id: crypto.randomUUID(),
+      locatorRef: packPdfHighlightLocator(annotation),
+      page: pageIndex + 1,
+      chapterIndex: pageIndex,
+      rects: pdfRectsFromAnnotation(annotation),
+      typewriter: clean,
+      styleKind: 'typewriter',
+      colorHex: clean.base.color,
+      note: text,
+      tags: [],
+      createdAt: now,
+      updatedAt: now,
+    }
+    get().history.push(highlightAdd(highlight))
+    set((s) => ({ highlights: [...s.highlights, highlight] }))
+    const fail = () => {
+      removeHighlightRow(set, highlight.id)
+      onToast('Could not save the text box.')
+    }
+    void overlayApi
+      .saveHighlight(toSaveInput(bookId, highlight))
+      .then((saved) => {
+        if (!saved) fail()
+      })
+      .catch(fail)
+    return highlight
+  },
+
+  updateTypewriter: (id, { box, text, doc }) => {
+    const current = get().highlights.find((h) => h.id === id)
+    if (!current || current.styleKind !== 'typewriter') return false
+    const clean = parseTypewriterDoc(doc, text)
+    if (!clean || !isValidTypewriterText(text) || !isValidTypewriterBox(box)) {
+      get().onToast('The text does not fit on the page — enlarge the box or reduce the size.')
+      return false
+    }
+    const annotation = pdfAnnotationFromRects([{ page: current.page, x: box.x, y: box.y, width: box.width, height: box.height }])
+    if (!annotation) return false
+    patchHighlight(get, set, id, {
+      locatorRef: packPdfHighlightLocator(annotation),
+      rects: pdfRectsFromAnnotation(annotation),
+      typewriter: clean,
+      note: text,
+      colorHex: clean.base.color,
+    })
+    return true
+  },
+
+  formatTypewriter: (id, change, fit) => {
+    const current = get().highlights.find((h) => h.id === id)
+    const rect = current?.rects[0]
+    if (!current || current.styleKind !== 'typewriter' || !current.typewriter || current.note === undefined || !rect) return false
+    const text = current.note
+    let doc = current.typewriter
+    if (change.style) doc = applyStyle(doc, text, null, change.style)
+    if (change.align) doc = applyAlign(doc, text, null, change.align)
+    if (doc === current.typewriter) return true
+    const box = fit(doc, text, { x: rect.x, y: rect.y, width: rect.width, height: rect.height })
+    if (!box) {
+      get().onToast('The text does not fit on the page — enlarge the box or reduce the size.')
+      return false
+    }
+    const clean = parseTypewriterDoc(doc, text)
+    const annotation = pdfAnnotationFromRects([{ page: current.page, x: box.x, y: box.y, width: box.width, height: box.height }])
+    if (!clean || !isValidTypewriterBox(box) || !annotation) return false
+    const key = `format:${id}:${[...Object.keys(change.style ?? {}), ...(change.align ? ['align'] : [])].sort().join(',')}`
+    patchHighlight(
+      get,
+      set,
+      id,
+      { locatorRef: packPdfHighlightLocator(annotation), rects: pdfRectsFromAnnotation(annotation), typewriter: clean, colorHex: clean.base.color },
+      key,
+    )
+    return true
+  },
+
   updateShapeGeometry: (id, geometry) => {
     const current = get().highlights.find((h) => h.id === id)
     if (!current || !isShapeStyleKind(current.styleKind)) return
@@ -521,7 +641,7 @@ export const usePdfHighlightsStore = create<PdfHighlightsStoreState>()((set, get
     get().onChromeHidden(true)
     api.flashAnnotation(highlight.id)
     // A shape is selected by the jump (handles + toolbar), like clicking it on the page.
-    if (isShapeStyleKind(highlight.styleKind)) get().focusHighlight(highlight.id)
+    if (isShapeStyleKind(highlight.styleKind) || highlight.styleKind === 'typewriter') get().focusHighlight(highlight.id)
   },
 
   undo: () => {
@@ -560,7 +680,7 @@ function toSaveInput(bookId: string, h: PdfReaderHighlight) {
     note: h.note,
     tags: h.tags,
     selectionTextRef: packSelectionTextRef(h.selectionText),
-    pdfAnnotationRef: pdfAnnotationRefForRects(h.rects, { caret: h.caret, shape: h.shape }),
+    pdfAnnotationRef: pdfAnnotationRefForRects(h.rects, { caret: h.caret, shape: h.shape, typewriter: h.typewriter }),
     createdAt: h.createdAt,
   }
 }
@@ -576,11 +696,11 @@ function removeHighlightRow(set: Set, id: string): void {
 
 /** Patch one field set, record it for undo, re-persist (optimistic; a failed save only toasts,
  *  matching the EPUB store). */
-function patchHighlight(get: Get, set: Set, id: string, patch: Partial<PdfReaderHighlight>): void {
+function patchHighlight(get: Get, set: Set, id: string, patch: Partial<PdfReaderHighlight>, coalesceKey?: string): void {
   const current = get().highlights.find((h) => h.id === id)
   if (!current) return
   const next: PdfReaderHighlight = { ...current, ...patch, updatedAt: new Date().toISOString() }
-  get().history.push(highlightReplace(current, next))
+  get().history.push(highlightReplace(current, next), coalesceKey)
   replaceRow(set, next)
   persistHighlight(get, next)
 }

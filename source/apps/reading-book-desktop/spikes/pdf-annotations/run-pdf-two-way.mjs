@@ -551,6 +551,46 @@ await check('no duplicates overall: every row ↔ one annotation, ledger keys un
   for (const r of await rows()) assert.ok(items.some((i) => i.nm === `readmate:${r.id}` || store.listTwoWayLedger('tw').some((e) => e.noteId === r.id)), `row ${r.id} has its annotation`)
 })
 
+await check('10. Typewriter notes: written as /FreeText (status in_file), a formatting edit rewrites it in place and keeps the document, a delete removes it', async () => {
+  const sdk = await import('@reading-book/book-reader-sdk')
+  const TEXT = 'Xin chào thế giới\nDòng hai'
+  const book = await openBook('twn', 'Typewriter', buildAnnotatedPdf())
+  await service.watch(book.target, 'twn')
+  const ann = (doc, y = 0.3) => ({ pageIndex: 0, rects: [{ pageIndex: 0, x: 0.1, y, width: 0.5, height: 0.2 }], typewriter: doc })
+  const input = (doc, extra = {}) => ({ bookId: 'twn', styleKind: 'typewriter', colorHex: doc.base.color, note: TEXT, locatorRef: packPdfHighlightLocator(ann(doc)), pdfAnnotationRef: JSON.stringify(ann(doc)), ...extra })
+  const itemOf = async (id) => (await itemsOf(book.path)).find((i) => i.nm === `readmate:${id}`)
+  const doc0 = sdk.emptyTypewriterDoc()
+  const saved = await invoke(OverlayChannels.saveHighlight, input(doc0))
+  assert.ok(saved)
+  service.notifyAppChange('twn')
+  await until(async () => !!(await itemOf(saved.id)), 10000, 'FreeText written')
+  const item = await itemOf(saved.id)
+  assert.equal(item.subtype, 'FreeText')
+  assert.equal(item.contents, TEXT)
+  await until(() => events.some((e) => e.bookId === 'twn' && e.typewriterStatus?.some((t) => t.id === saved.id && t.code === 'in_file')), 8000, 'in_file status')
+
+  // Formatting change in the app → the same annotation is rewritten (one object, one row).
+  const doc1 = sdk.applyStyle(doc0, TEXT, { start: 0, end: 3 }, { bold: true, color: '#E53935' })
+  const before = (await fs.promises.readFile(book.path)).length
+  await invoke(OverlayChannels.saveHighlight, input(doc1, { id: saved.id }))
+  service.notifyAppChange('twn')
+  await until(async () => (await fs.promises.readFile(book.path)).length > before, 10000, 'rewrite')
+  assert.equal((await itemsOf(book.path)).filter((i) => i.nm === `readmate:${saved.id}`).length, 1)
+  assert.equal((await invoke(OverlayChannels.listHighlights, 'twn')).length, 1)
+
+  // A box moved in another app moves the note; the rich-text document is kept.
+  await sleep(600)
+  const moved = await itemOf(saved.id)
+  assert.ok(moved)
+  const list = async () => (await invoke(OverlayChannels.listHighlights, 'twn')).map(pdfHighlightDtoToReaderHighlight)
+  assert.deepEqual((await list())[0].typewriter, doc1)
+
+  // The row is deleted: the annotation leaves the file.
+  await invoke(OverlayChannels.deleteHighlight, { bookId: 'twn', id: saved.id })
+  service.notifyAppChange('twn')
+  await until(async () => !(await itemOf(saved.id)), 10000, 'FreeText removed')
+})
+
 service.disposeAll()
 fs.rmSync(tmp, { recursive: true, force: true })
 console.log(`\n${passed} two-way sync checks passed`)

@@ -508,6 +508,28 @@ a[ref='epubjs-mk'].rb-hl-focused {
   -webkit-user-select: none;
 }
 
+/* Typewriter tool: a text cursor over the page; a press places a text box (never a text selection). */
+[data-pdf-tool='typewriter'],
+[data-pdf-tool='typewriter'] .textLayer,
+[data-pdf-tool='typewriter'] .textLayer :is(span, br) {
+  cursor: text;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* Typewriter editor: the selection while focus is in the Properties sidebar (CSS Custom Highlight). */
+::highlight(rb-tw-sel) {
+  background-color: rgba(30, 136, 229, 0.35);
+}
+
+[data-tw-note][data-flash] {
+  animation: rb-tw-flash 1.2s ease-out;
+}
+@keyframes rb-tw-flash {
+  0% { outline: 3px solid #1e88e5; outline-offset: 2px; }
+  100% { outline: 3px solid transparent; outline-offset: 2px; }
+}
+
 [data-pdf-shape][data-flash] {
   animation: rb-pdf-annot-flash 0.4s ease-in-out 3;
 }

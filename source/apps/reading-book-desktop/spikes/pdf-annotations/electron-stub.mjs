@@ -29,9 +29,29 @@ export const app = {
 export const BrowserWindow = {
   fromWebContents: () => null,
   getAllWindows: () => [],
+  getFocusedWindow: () => null,
 }
 
 export const dialog = {
   showSaveDialog: async () => ({ canceled: true }),
   showOpenDialog: async () => ({ canceled: true, filePaths: [] }),
 }
+
+/** Used by the library handlers (copy path / show in folder); the checks only read what was recorded. */
+export const clipboard = {
+  text: '',
+  writeText(value) {
+    this.text = value
+  },
+}
+
+export const shell = {
+  shown: [],
+  showItemInFolder(p) {
+    this.shown.push(p)
+  },
+}
+
+/** Imported (never used) by modules the library handlers pull in, e.g. the cover protocol. */
+export const net = { fetch: async () => new Response(null, { status: 404 }) }
+export const protocol = { handle() {}, registerSchemesAsPrivileged() {} }

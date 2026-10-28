@@ -4,6 +4,8 @@ import path from 'node:path'
 import { clearBookChunkCache, isBookChunkingActive } from '../chunking/book-chunk-service'
 import { ensureBooksSandbox, getBooksSandboxPath } from '../files/sandbox'
 import { getDatabase } from '../persistence/db'
+import { listSpeechModelUsage } from '../transcription/speech-model-usage'
+import { getSpeechModelsDir, removeSpeechModel as removeSpeechModelFiles } from '../transcription/transcription-runtime'
 import {
   getTranslationModelsDir,
   releaseTranslationWorker,
@@ -11,6 +13,7 @@ import {
 import type {
   ClearCacheResult,
   OkResult,
+  RemoveSpeechModelResult,
   RemoveTranslationModelResult,
   StorageUsageDto,
   TranslationModelDto,
@@ -108,16 +111,18 @@ async function listTranslationModels(): Promise<TranslationModelDto[]> {
 
 export async function getStorageUsage(): Promise<StorageUsageDto> {
   const userData = app.getPath('userData')
-  const [totalUserData, booksBytes, browserCache, translationModels] = await Promise.all([
+  const [totalUserData, booksBytes, browserCache, translationModels, speechModels] = await Promise.all([
     directorySize(userData),
     directorySize(getBooksSandboxPath()),
     browserCacheBytes(),
     listTranslationModels(),
+    listSpeechModelUsage(getSpeechModelsDir()),
   ])
   const searchIndex = searchIndexBytes()
   const translationModelsBytes = translationModels.reduce((sum, m) => sum + m.bytes, 0)
+  const speechModelsBytes = speechModels.reduce((sum, m) => sum + m.bytes, 0)
   const cacheBytes = browserCache + (searchIndex ?? 0)
-  const otherBytes = Math.max(0, totalUserData - booksBytes - translationModelsBytes - cacheBytes)
+  const otherBytes = Math.max(0, totalUserData - booksBytes - translationModelsBytes - speechModelsBytes - cacheBytes)
 
   return {
     booksFolderPath: getBooksSandboxPath(),
@@ -126,9 +131,11 @@ export async function getStorageUsage(): Promise<StorageUsageDto> {
     browserCacheBytes: browserCache,
     searchIndexBytes: searchIndex,
     translationModelsBytes,
+    speechModelsBytes,
     otherBytes,
-    totalBytes: booksBytes + cacheBytes + translationModelsBytes + otherBytes,
+    totalBytes: booksBytes + cacheBytes + translationModelsBytes + speechModelsBytes + otherBytes,
     translationModels,
+    speechModels,
   }
 }
 
@@ -195,6 +202,23 @@ export async function removeTranslationModel(
     console.warn('[storage] removing translation model failed', err)
     return { ok: false, errorCode: 'failed', errorMessage: 'Could not remove the model.' }
   }
+}
+
+/**
+ * Delete one downloaded speech (transcription) model. The id must be a catalog id AND be on disk; the transcription service
+ * refuses while a transcription is queued or running and stops its speech process first (a loaded model file is locked on
+ * Windows). Transcripts already made are untouched: they are text in the database, not the model.
+ */
+export async function removeSpeechModel(modelId: unknown): Promise<RemoveSpeechModelResult> {
+  if (typeof modelId !== 'string') {
+    return { ok: false, errorCode: 'not_found', errorMessage: 'Unknown speech model.' }
+  }
+  const installed = await listSpeechModelUsage(getSpeechModelsDir())
+  if (!installed.some((m) => m.id === modelId)) {
+    return { ok: false, errorCode: 'not_found', errorMessage: 'This model is no longer on disk.' }
+  }
+  const result = await removeSpeechModelFiles(modelId)
+  return result.ok ? { ok: true } : { ok: false, errorCode: result.errorCode, errorMessage: result.errorMessage }
 }
 
 /** Open the managed-books folder in the OS file manager (path never comes from the renderer). */

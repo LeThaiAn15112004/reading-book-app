@@ -9,8 +9,15 @@
   },
   "files": [
     "dist",
-    "dist-electron"
+    "dist-electron",
+    // Typewriter fonts: the PDF writer reads them from {app}/assets/fonts/typewriter at run time (electron/pdf-sync/typewriter-font-files.ts).
+    "assets/fonts/typewriter/*.ttf",
+    "assets/fonts/typewriter/OFL.txt",
+    "assets/fonts/typewriter/THIRD_PARTY_FONTS.md"
   ],
+  // Fails the build when a target that has an entry in electron/transcription/ffmpeg-artifacts.json is packaged
+  // without exactly that FFmpeg (see docs/implementation_plan/ffmpeg_packaging.md).
+  "afterPack": "scripts/ffmpeg/verify-packaged-ffmpeg.mjs",
   "protocols": {
     "name": "Readmate Reader OAuth callback",
     "schemes": [
@@ -24,6 +31,14 @@
     "artifactName": "${productName}-Mac-${version}-Installer.${ext}"
   },
   "win": {
+    // Our own LGPL FFmpeg for transcription, as real files outside the asar: {resources}/ffmpeg/win32-x64/ffmpeg.exe.
+    // macOS gets the same entry ("darwin-${arch}") once a Mac build exists; nothing is shipped for macOS / Linux yet.
+    "extraResources": [
+      {
+        "from": "resources/ffmpeg/win32-x64",
+        "to": "ffmpeg/win32-x64"
+      }
+    ],
     "target": [
       {
         "target": "nsis",

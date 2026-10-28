@@ -13,6 +13,8 @@ export type LibraryBookInfoFields = {
   fileSizeBytes?: number
   pageCount?: number
   description?: string
+  /** Multi-chapter audiobook: its file name and format are those of one chapter, so the rows describe the whole book instead. */
+  chapterCount?: number
 }
 
 /** Rows shown for a book (dialog + Library table detail panel share them). */
@@ -22,7 +24,8 @@ function bookInfoRows(book: LibraryBookInfoFields): Array<[string, string]> {
     book.pageCount != null && book.pageCount > 0
       ? `${book.pageCount} ${book.pageCount === 1 ? 'page' : 'pages'}`
       : '—'
-  const formatLabel = book.format?.trim().toUpperCase() || '—'
+  const isMulti = (book.chapterCount ?? 0) > 0
+  const formatLabel = isMulti ? 'Audiobook' : book.format?.trim().toUpperCase() || '—'
   const genreLabel =
     book.genre?.trim() ||
     (book.genres && book.genres.length > 0 ? book.genres.join(', ') : undefined) ||
@@ -34,7 +37,7 @@ function bookInfoRows(book: LibraryBookInfoFields): Array<[string, string]> {
     ['Genre', genreLabel],
     ['Size', sizeLabel],
     ['Pages', pagesLabel],
-    ['File', book.fileName?.trim() || '—'],
+    isMulti ? ['Chapters', String(book.chapterCount)] : ['File', book.fileName?.trim() || '—'],
   ]
 }
 

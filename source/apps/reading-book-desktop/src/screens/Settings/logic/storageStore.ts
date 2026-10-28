@@ -15,6 +15,8 @@ type StorageState = {
   load: () => Promise<void>
   clearCache: () => Promise<void>
   removeTranslationModel: (modelId: string) => Promise<void>
+  /** Delete one downloaded speech (transcription) model; refused while a transcription is running. */
+  removeSpeechModel: (modelId: string) => Promise<void>
   openBooksFolder: () => Promise<void>
 }
 
@@ -59,6 +61,23 @@ export const useStorageStore = create<StorageState>()((set, get) => ({
     set({ removingModelId: modelId, notice: null })
     try {
       const result = await storageApi.removeTranslationModel(modelId)
+      set({
+        removingModelId: null,
+        notice: result.ok
+          ? { tone: 'success', text: `Removed ${modelId}.` }
+          : { tone: 'error', text: result.errorMessage ?? 'Could not remove the model.' },
+      })
+    } catch {
+      set({ removingModelId: null, notice: { tone: 'error', text: 'Could not remove the model.' } })
+    }
+    await get().load()
+  },
+
+  removeSpeechModel: async (modelId) => {
+    if (get().removingModelId) return
+    set({ removingModelId: modelId, notice: null })
+    try {
+      const result = await storageApi.removeSpeechModel(modelId)
       set({
         removingModelId: null,
         notice: result.ok

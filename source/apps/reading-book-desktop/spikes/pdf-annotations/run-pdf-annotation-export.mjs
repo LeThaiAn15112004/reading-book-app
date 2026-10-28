@@ -311,4 +311,38 @@ await check('9. export flow: confirmation, refused targets, safe overwrite, writ
   fs.rmSync(dir, { recursive: true, force: true })
 })
 
+await check('10. Typewriter notes are exported with the same writer; one that cannot be drawn is left out and counted, the rest is exported', async () => {
+  const sdk = await import('@reading-book/book-reader-sdk')
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'readmate-export-tw-'))
+  const sourcePath = path.join(dir, 'book.pdf')
+  fs.writeFileSync(sourcePath, plainSource)
+  const doc = sdk.applyStyle(sdk.emptyTypewriterDoc(), 'Xin chào thế giới', { start: 0, end: 3 }, { bold: true })
+  const tw = (id, text) => ({
+    id,
+    styleKind: 'typewriter',
+    colorHex: doc.base.color,
+    note: text,
+    tags: [],
+    pdfAnnotation: { pageIndex: 0, rects: [{ pageIndex: 0, x: 0.1, y: id === 'ok' ? 0.3 : 0.6, width: 0.5, height: 0.2 }], typewriter: doc },
+    createdAt: '2026-10-28T08:00:00.000Z',
+    updatedAt: '2026-10-28T09:00:00.000Z',
+  })
+  const target = path.join(dir, 'out.pdf')
+  const result = await exportAnnotatedPdf({
+    resolveSource: async () => sourcePath,
+    ledger: () => [],
+    rows: async () => [tw('ok', 'Xin chào thế giới'), tw('bad', 'Xin chào 你好')],
+    verifySignature: () => ({ status: 'unsigned' }),
+    chooseTarget: async () => target,
+    isForbiddenTarget: () => false,
+    write: (input) => writeAnnotationsToPdf(input),
+  })
+  assert.equal(result.ok, true)
+  assert.equal(result.summary.added, 1)
+  assert.equal(result.skippedTypewriter, 1)
+  const items = (await scanPdfAnnotationBytes(new Uint8Array(fs.readFileSync(target)))).items
+  assert.deepEqual(items.map((i) => [i.nm, i.subtype]), [['readmate:ok', 'FreeText']])
+  fs.rmSync(dir, { recursive: true, force: true })
+})
+
 console.log(`\n${passed} PDF annotation export checks passed`)

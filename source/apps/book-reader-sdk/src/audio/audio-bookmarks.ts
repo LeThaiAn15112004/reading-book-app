@@ -18,6 +18,11 @@ export interface AudioBookmark {
   /** Seconds into that chapter. With `chapterId` it lets the bookmark follow a chapter list that was re-read. */
   chapterOffsetSeconds?: number
   createdAt: string
+  /**
+   * Multi-track audiobooks only: the stable id of the track (`book_audio_chapters.id`) the Note belongs to.
+   * With it, `positionSeconds` is seconds INSIDE that track and no `chapterId` is set. Absent on single-file Notes.
+   */
+  trackId?: string
 }
 
 export const MAX_AUDIO_BOOKMARKS = 500
@@ -42,8 +47,27 @@ export function createAudioBookmark(input: {
   nowIso: string
   label?: string
   note?: string
+  /** A multi-track Note: the track it belongs to (the position is seconds inside that track; `chapters` is ignored). */
+  trackId?: string
+  /** 1-based track number, used only for the default label of a track Note. */
+  trackNumber?: number
 }): AudioBookmark {
   const position = clampSeekPosition(input.positionSeconds, null)
+  if (input.trackId) {
+    const time = formatPlaybackTime(position)
+    const number = input.trackNumber
+    const fallback = typeof number === 'number' && Number.isInteger(number) && number >= 1 ? `Track ${number} · ${time}` : `Bookmark at ${time}`
+    const trackNote: AudioBookmark = {
+      id: input.id,
+      label: input.label?.trim().slice(0, 200) || fallback,
+      positionSeconds: position,
+      createdAt: input.nowIso,
+      trackId: input.trackId,
+    }
+    const text = normalizeNoteText(input.note)
+    if (text) trackNote.note = text
+    return trackNote
+  }
   const index = chapterIndexAt(input.chapters, position)
   const chapter = index >= 0 ? (input.chapters[index] as AudioChapter) : undefined
   const time = formatPlaybackTime(position)
@@ -82,6 +106,7 @@ export function sanitizeAudioBookmarks(raw: unknown): AudioBookmark[] {
         bookmark.chapterOffsetSeconds = o.chapterOffsetSeconds
       }
     }
+    if (typeof o.trackId === 'string' && o.trackId && o.trackId.length <= 100) bookmark.trackId = o.trackId
     seen.add(o.id)
     out.push(bookmark)
     if (out.length >= MAX_AUDIO_BOOKMARKS) break

@@ -100,6 +100,7 @@ export * from './constants/index.js'
 export * from './readers/index.js'
 export * from './audio/index.js'
 export * from './attachments/index.js'
+export * from './transcription/index.js'
 
 // Reference adapters
 export {

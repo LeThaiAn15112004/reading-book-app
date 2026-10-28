@@ -267,6 +267,29 @@ export function canConfirmSelection(selection: ZipImportSelection): boolean {
   return selection.trackIds.length > 0
 }
 
+/**
+ * How a selection will be imported. One track goes through the ordinary single-file import (so it behaves exactly
+ * like a standalone audio file); two or more become one multi-chapter audiobook.
+ */
+export type ZipImportMode = 'none' | 'single-file' | 'multi-chapter'
+
+export function importModeForSelection(selection: ZipImportSelection): ZipImportMode {
+  const n = selection.trackIds.length
+  return n === 0 ? 'none' : n === 1 ? 'single-file' : 'multi-chapter'
+}
+
+/** What the preview must tell the user BEFORE confirming a one-track import (the cover chosen here is not applied). */
+export function singleFileImportNotes(selection: ZipImportSelection): { cover: string | null; title: string | null } {
+  if (importModeForSelection(selection) !== 'single-file') return { cover: null, title: null }
+  return {
+    cover:
+      selection.coverId !== null
+        ? "With one track this is imported as a single audio file. The cover selected here won't be used; the track's own cover (or a generated one) is used instead."
+        : null,
+    title: "The title comes from the track's own tags or file name, not from the ZIP name.",
+  }
+}
+
 export type SelectionCheck = { ok: true } | { ok: false; reason: string }
 
 /** Re-checks a selection against the preview (Main runs this again at confirmation; the renderer is not trusted). */

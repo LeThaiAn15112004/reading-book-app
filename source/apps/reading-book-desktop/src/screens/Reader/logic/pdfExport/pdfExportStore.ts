@@ -19,7 +19,8 @@ function messageFor(result: ExportResult): string | null {
   if (result.ok) {
     const s = result.summary
     const parts = s ? [`${s.added} added`, s.replaced ? `${s.replaced} updated` : '', s.removed ? `${s.removed} removed` : ''].filter(Boolean) : []
-    return `Exported “${result.fileName}”${parts.length ? ` — ${parts.join(', ')}` : ''}.`
+    const skipped = result.skippedTypewriter ? ` ${result.skippedTypewriter} Typewriter note${result.skippedTypewriter === 1 ? ' was' : 's were'} left out (see its reason in Notes).` : ''
+    return `Exported “${result.fileName}”${parts.length ? ` — ${parts.join(', ')}` : ''}.${skipped}`
   }
   switch (result.errorCode) {
     case 'cancelled':

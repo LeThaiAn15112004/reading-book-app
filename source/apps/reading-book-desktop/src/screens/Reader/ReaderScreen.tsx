@@ -120,6 +120,13 @@ import { INSERT_CARET_COLOR } from './logic/pdfHighlights/pdfHighlightsStore'
 import { useReaderPdfInk } from './logic/hooks/useReaderPdfInk'
 import { useReaderPdfGraphics } from './logic/hooks/useReaderPdfGraphics'
 import { usePdfShapePrefsStore } from './logic/pdfShapes/pdfShapePrefsStore'
+import { usePdfTypewriterPrefsStore } from './logic/pdfTypewriter/pdfTypewriterPrefsStore'
+import { useTypewriterEditorStore } from './logic/pdfTypewriter/typewriterEditorStore'
+import { TypewriterPropertiesPanel } from './components/rightPanel/TypewriterPropertiesPanel'
+import { useTypewriterPanelStore } from './logic/pdfTypewriter/typewriterPanelStore'
+import { PdfTypewriterEditor } from '../../reader/renderers/pdf/PdfTypewriterEditor'
+import type { PdfTypewriterMark } from '../../reader/renderers/pdf/PdfTypewriterLayer'
+import { fitTypewriterBox } from '../../reader/renderers/pdf/typewriterBox'
 import { usePdfInkPrefsStore } from './logic/pdfInk/pdfInkPrefsStore'
 import { pdfDeleteFocused, pdfHasFocusedMark, pdfRedo, pdfUndo } from './logic/pdfInk/pdfUndoRouter'
 import { PdfInkPanel } from './components/chrome/PdfInkPanel'
@@ -352,7 +359,7 @@ export function ReaderScreen() {
   translateModeRef.current = translation.mode
   // The Pen exists on the PDF surface only: another book (or format) leaves it.
   useEffect(() => {
-    if (!isPdfSurface && (activeTool === 'pen' || activeTool === 'eraser' || activeTool === 'shape')) setActiveTool('select')
+    if (!isPdfSurface && (activeTool === 'pen' || activeTool === 'eraser' || activeTool === 'shape' || activeTool === 'typewriter')) setActiveTool('select')
   }, [isPdfSurface, activeTool])
   const selectTool = (tool: InteractionTool | ((current: InteractionTool) => InteractionTool)) => {
     if (translateModeRef.current) translation.setMode(false)
@@ -432,7 +439,8 @@ export function ReaderScreen() {
     ? 0
     : sidebarContentInsetLeft(chrome.sidebarOpen, sidebarResize.panelWidth)
   const rightPanel = useRightPanelStore((s) => s.panel)
-  const closeRightPanel = useRightPanelStore((s) => s.close)
+  const closeRightPanelRaw = useRightPanelStore((s) => s.close)
+  const openRightPanel = useRightPanelStore((s) => s.open)
   const rightSidebarDocked = useRightSidebarDocked()
   const contentInsetRight = immersive
     ? 0
@@ -597,7 +605,7 @@ export function ReaderScreen() {
         ? txt.markup
         : highlights
   /** PDF marks as painted: the saved annotations plus the caret still being placed (Inserted Text). */
-  const pdfTextHighlights = useMemo(() => pdfHighlights.highlights.filter((h) => !isShapeStyleKind(h.styleKind)), [pdfHighlights.highlights])
+  const pdfTextHighlights = useMemo(() => pdfHighlights.highlights.filter((h) => !isShapeStyleKind(h.styleKind) && h.styleKind !== 'typewriter'), [pdfHighlights.highlights])
   const pdfMarks = useMemo(
     () =>
       pdfHighlights.pendingInsert
@@ -632,6 +640,133 @@ export function ReaderScreen() {
     width: usePdfShapePrefsStore((s) => s.width),
     opacity: usePdfShapePrefsStore((s) => s.opacity),
   }
+  // Typewriter notes: rows of the same list / history / table, painted by their own layer.
+  const pdfTypewriters = useMemo(
+    () =>
+      pdfHighlights.highlights.flatMap((h): PdfTypewriterMark[] => {
+        const box = h.rects[0]
+        if (h.styleKind !== 'typewriter' || !h.typewriter || h.note === undefined || !box) return []
+        return [{ id: h.id, pageIndex: h.page - 1, box: { x: box.x, y: box.y, width: box.width, height: box.height }, doc: h.typewriter, text: h.note }]
+      }),
+    [pdfHighlights.highlights],
+  )
+  const typewriterSession = useTypewriterEditorStore((s) => s.session)
+  const closeRightPanel = () => {
+    // Closing the Typewriter panel commits an open edit first (nothing typed is lost).
+    if (rightPanel === 'typewriter' && useTypewriterEditorStore.getState().session) commitTypewriterRef.current()
+    closeRightPanelRaw()
+  }
+  const typewriterStore = useTypewriterEditorStore
+  /** Save the note being typed (blank text is discarded); a text that cannot fit the page keeps the editor open. */
+  const commitTypewriter = () => {
+    const s = typewriterStore.getState().session
+    if (!s) return
+    if (s.text.trim().length === 0) {
+      typewriterStore.getState().end()
+      // Clearing all the text of a saved note removes the note (one undo step restores it).
+      if (s.editingId) pdfHighlights.deleteHighlight(s.editingId)
+      return
+    }
+    const box = fitTypewriterBox(s.doc, s.text, s.box, s.heightRatio)
+    if (!box) {
+      chrome.setToast('The text does not fit on the page — enlarge the box or reduce the size.')
+      return
+    }
+    typewriterStore.getState().end()
+    if (s.editingId) {
+      const before = pdfTypewriters.find((m) => m.id === s.editingId)
+      const unchanged = before && before.text === s.text && JSON.stringify(before.doc) === JSON.stringify(s.doc) && JSON.stringify(before.box) === JSON.stringify(box)
+      if (!unchanged) pdfHighlights.updateTypewriter(s.editingId, { box, text: s.text, doc: s.doc })
+      return
+    }
+    pdfHighlights.createTypewriter({ pageIndex: s.pageIndex, box, text: s.text, doc: s.doc })
+  }
+  /** Move / resize release: the box grows to the text; one that cannot fit the page is refused and the note stays as it was. */
+  const moveTypewriter = (id: string, box: { x: number; y: number; width: number; height: number }, heightRatio: number) => {
+    const mark = pdfTypewriters.find((m) => m.id === id)
+    if (!mark) return
+    const fit = fitTypewriterBox(mark.doc, mark.text, box, heightRatio)
+    if (!fit) {
+      chrome.setToast('The text does not fit on the page — enlarge the box or reduce the size.')
+      return
+    }
+    pdfHighlights.updateTypewriter(id, { box: fit, text: mark.text, doc: mark.doc })
+  }
+  /** Edit a saved note in place (an open edit of another note is committed first). */
+  const editTypewriter = (id: string, heightRatio: number) => {
+    const mark = pdfTypewriters.find((m) => m.id === id)
+    if (!mark) return
+    const open = typewriterStore.getState().session
+    if (open?.editingId === id) return // already editing it (a double-click fires the edit twice)
+    if (open) commitTypewriterRef.current()
+    typewriterStore.getState().beginEdit({ id, pageIndex: mark.pageIndex, box: mark.box, heightRatio, text: mark.text, doc: mark.doc })
+  }
+  /** Format the whole selected note (not being edited): the box grows to the re-laid-out text, or the change is refused. */
+  const formatSelectedTypewriter = (id: string, change: Parameters<typeof pdfHighlights.formatTypewriter>[1]) => {
+    const mark = pdfTypewriters.find((m) => m.id === id)
+    const page = mark ? document.querySelector<HTMLElement>(`[data-page-number="${mark.pageIndex + 1}"]`) : null
+    const rect = page?.getBoundingClientRect()
+    if (!mark || !rect || rect.width <= 0) return
+    const heightRatio = rect.height / rect.width
+    pdfHighlights.formatTypewriter(id, change, (doc, text, box) => fitTypewriterBox(doc, text, box, heightRatio))
+  }
+  const editTypewriterById = (id: string) => {
+    const mark = pdfTypewriters.find((m) => m.id === id)
+    const page = mark ? document.querySelector<HTMLElement>(`[data-page-number="${mark.pageIndex + 1}"]`) : null
+    const rect = page?.getBoundingClientRect()
+    if (mark && rect && rect.width > 0) editTypewriter(id, rect.height / rect.width)
+  }
+  /** Right-click on a note / its Properties button: select it and show its own values in the sidebar. */
+  const showTypewriterProperties = (id: string) => {
+    if (typewriterStore.getState().session?.editingId !== id) commitTypewriterRef.current()
+    pdfHighlights.focusHighlight(id)
+    useTypewriterPanelStore.getState().showNote(id)
+    openRightPanel('typewriter')
+  }
+  const commitTypewriterRef = useRef(commitTypewriter)
+  commitTypewriterRef.current = commitTypewriter
+  // Switching tool, closing the book or quitting the screen commits what was typed.
+  useEffect(() => {
+    if (typewriterStore.getState().session) commitTypewriterRef.current()
+  }, [activeTool, typewriterStore])
+  const selectedTypewriterId = pdfTypewriters.some((m) => m.id === pdfHighlights.focusedHighlightId) ? pdfHighlights.focusedHighlightId : null
+  // The open panel follows the selection: another note refreshes it, no selection returns to the defaults.
+  const lastSelectedTypewriterRef = useRef<string | null>(selectedTypewriterId)
+  useEffect(() => {
+    if (lastSelectedTypewriterRef.current === selectedTypewriterId) return
+    lastSelectedTypewriterRef.current = selectedTypewriterId
+    if (rightPanel !== 'typewriter') return
+    const panel = useTypewriterPanelStore.getState()
+    if (selectedTypewriterId) panel.showNote(selectedTypewriterId)
+    else panel.showDefaults()
+  }, [selectedTypewriterId, rightPanel])
+  // Opening the panel narrows the page: bring the selected note back into view if it is now covered.
+  useEffect(() => {
+    if (rightPanel !== 'typewriter' || !selectedTypewriterId) return
+    const t = window.setTimeout(() => {
+      document.querySelector<HTMLElement>(`[data-tw-note="${selectedTypewriterId}"]`)?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+    }, 350)
+    return () => window.clearTimeout(t)
+  }, [rightPanel, selectedTypewriterId])
+  // Enter / F2 edit the selected note; Escape (outside the editor) deselects it. Delete is the shared deleteFocused.
+  useEffect(() => {
+    if (!selectedTypewriterId) return
+    const onKey = (event: KeyboardEvent) => {
+      if (typewriterStore.getState().session) return
+      const el = event.target as HTMLElement | null
+      if (el && (el.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName))) return
+      if (event.key !== 'Enter' && event.key !== 'F2') return
+      const mark = pdfTypewriters.find((m) => m.id === selectedTypewriterId)
+      const page = mark ? document.querySelector<HTMLElement>(`[data-page-number="${mark.pageIndex + 1}"]`) : null
+      const rect = page?.getBoundingClientRect()
+      if (!mark || !rect || rect.width <= 0) return
+      event.preventDefault()
+      editTypewriter(mark.id, rect.height / rect.width)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  })
+  useEffect(() => () => commitTypewriterRef.current(), [])
   /** Inserted Text being placed: PDF or Markdown (the caret exists, the annotation does not yet). */
   const pendingInsert = isPdfSurface && pdfHighlights.pendingInsert
     ? { anchor: pdfHighlights.pendingInsert.anchor, commit: pdfHighlights.commitInsert, cancel: pdfHighlights.cancelInsert }
@@ -689,7 +824,7 @@ export function ReaderScreen() {
         translation.setMode(false)
         return true
       }
-      if (!isMarkupTool(activeToolRef.current) && activeToolRef.current !== 'pen' && activeToolRef.current !== 'eraser' && activeToolRef.current !== 'shape') return false
+      if (!isMarkupTool(activeToolRef.current) && activeToolRef.current !== 'typewriter' && activeToolRef.current !== 'pen' && activeToolRef.current !== 'eraser' && activeToolRef.current !== 'shape') return false
       setActiveTool('select')
       return true
     },
@@ -744,6 +879,7 @@ export function ReaderScreen() {
     insert: { active: activeTool === 'insert' },
     pen: { active: activeTool === 'pen' },
     shape: { active: activeTool === 'shape' },
+    typewriter: { active: activeTool === 'typewriter' },
     eraser: { active: activeTool === 'eraser' },
     snapshot: { active: snapshot.active },
     settings: { active: chrome.settingsOpen, expanded: chrome.settingsOpen },
@@ -786,6 +922,7 @@ export function ReaderScreen() {
       case 'strikethrough':
       case 'replace':
       case 'insert':
+      case 'typewriter':
       case 'pen':
       case 'shape':
       case 'eraser':
@@ -863,6 +1000,12 @@ export function ReaderScreen() {
           capabilities={readerCapabilities}
           toolStates={toolStates}
           onTool={handleTool}
+          onToolContextMenu={(tool) => {
+            // Right-click on the Typewriter tool: its defaults, without arming or disarming the tool.
+            if (tool !== 'typewriter') return
+            useTypewriterPanelStore.getState().showDefaults()
+            openRightPanel('typewriter')
+          }}
           eraserMode={eraserMode}
           onEraserMode={setEraserMode}
           audioButtonRef={audioButtonRef}
@@ -1109,7 +1252,7 @@ export function ReaderScreen() {
 
           <ReaderRightSidebar
             open={!immersive && rightPanel !== null}
-            title={rightPanel === 'settings' ? 'Reading settings' : ''}
+            title={rightPanel === 'settings' ? 'Reading settings' : rightPanel === 'typewriter' ? 'Typewriter' : ''}
             onClose={closeRightPanel}
             chromeHidden={toolsHidden}
             docked={rightSidebarDocked}
@@ -1122,6 +1265,20 @@ export function ReaderScreen() {
                   book.setPrefs((p) => ({ ...p, ...patch }))
                 }}
               />
+            ) : null}
+            {rightPanel === 'typewriter' ? (
+              <div
+                onKeyDown={(e) => {
+                  if (e.key !== 'Escape') return
+                  // Escape in the panel hands the keyboard back to the page (the open editor, if any).
+                  e.stopPropagation()
+                  const editorEl = document.querySelector<HTMLElement>('[data-tw-editor] [contenteditable]')
+                  if (editorEl) editorEl.focus()
+                  else (document.activeElement as HTMLElement | null)?.blur()
+                }}
+              >
+                <TypewriterPropertiesPanel marks={pdfTypewriters} onFormatNote={formatSelectedTypewriter} onEditNote={(id) => editTypewriterById(id)} />
+              </div>
             ) : null}
           </ReaderRightSidebar>
 
@@ -1570,6 +1727,52 @@ export function ReaderScreen() {
               onInkSelect={pdfInk.select}
               onInkMove={pdfInk.moveStroke}
               onInkResize={pdfInk.resizeStroke}
+              typewriters={pdfTypewriters}
+              typewriterEditing={typewriterSession != null}
+              selectedTypewriterId={selectedTypewriterId}
+              editingTypewriterId={typewriterSession?.editingId ?? null}
+              onTypewriterSelect={(id) => {
+                if (id) pdfHighlights.focusHighlight(id)
+                else if (selectedTypewriterId) pdfHighlights.focusHighlight(null)
+              }}
+              onTypewriterBox={moveTypewriter}
+              onTypewriterEdit={editTypewriter}
+              onTypewriterDelete={pdfHighlights.deleteHighlight}
+              onTypewriterProperties={showTypewriterProperties}
+              onTypewriterOutside={commitTypewriter}
+              onTypewriterBegin={({ pageIndex, box, heightRatio }) => {
+                const prefs = usePdfTypewriterPrefsStore.getState()
+                const line = (prefs.style.size * 1.2) / heightRatio
+                const height = Math.max(box.height, line)
+                typewriterStore.getState().begin({
+                  pageIndex,
+                  box: { ...box, height, y: Math.max(0, Math.min(box.y, 1 - height)) },
+                  heightRatio,
+                  style: prefs.style,
+                  align: prefs.align,
+                })
+              }}
+              renderTypewriterEditor={(pageIndex, heightRatio) => {
+                const s = typewriterSession
+                if (!s || s.pageIndex !== pageIndex) return null
+                const st = typewriterStore.getState()
+                return (
+                  <PdfTypewriterEditor
+                    key={s.id}
+                    box={s.box}
+                    heightRatio={heightRatio}
+                    value={s}
+                    truncated={s.truncated}
+                    onChange={st.change}
+                    onSelect={st.select}
+                    onUndo={st.undo}
+                    onRedo={st.redo}
+                    onToggleFlag={st.toggleFlag}
+                    onCommit={commitTypewriter}
+                    onRebuild={st.rebuild}
+                  />
+                )
+              }}
               shapes={pdfShapes}
               selectedShapeId={selectedShapeId}
               onShapeSelect={(id) => {

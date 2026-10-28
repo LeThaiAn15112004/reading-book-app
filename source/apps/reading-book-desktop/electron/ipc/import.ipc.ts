@@ -1,4 +1,4 @@
-import { SUPPORTED_EXTENSIONS, SUPPORTED_FORMATS } from '@reading-book/config'
+import { SUPPORTED_EXTENSIONS, SUPPORTED_FORMATS, features } from '@reading-book/config'
 import {
   Book,
   type BookSignatureInfo,
@@ -24,6 +24,7 @@ import {
 } from '../files/sandbox'
 import { getLibraryStore } from '../persistence/sqlite-library-store'
 import { verifyOnImport } from '../signature/book-signature'
+import { holdPickedZip } from '../zip-import/picked-zip'
 import type {
   ImportErrorCode,
   ImportProgressDto,
@@ -43,16 +44,21 @@ function extensionWithoutDot(ext: string): string {
   return ext.startsWith('.') ? ext.slice(1) : ext
 }
 
+/** Audiobook ZIPs are offered only while the ZIP import is switched on (`features.audiobookZipImportEnabled`). */
+const zipEnabled = (): boolean => features.audiobookZipImportEnabled
+
 function openDialogFilters(): Electron.FileFilter[] {
+  const zip = zipEnabled()
   return [
     {
       name: 'Documents',
-      extensions: SUPPORTED_EXTENSIONS.map(extensionWithoutDot),
+      extensions: [...SUPPORTED_EXTENSIONS.map(extensionWithoutDot), ...(zip ? ['zip'] : [])],
     },
     ...SUPPORTED_FORMATS.map((descriptor) => ({
       name: descriptor.displayName,
       extensions: descriptor.extensions.map(extensionWithoutDot),
     })),
+    ...(zip ? [{ name: 'Audiobook ZIP', extensions: ['zip'] }] : []),
   ]
 }
 
@@ -334,6 +340,12 @@ async function importFromFile(sender: WebContents): Promise<ImportResult> {
 
   // The path comes from the native dialog above, never from the renderer.
   const sourcePath = path.resolve(picked.filePaths[0])
+  // An audiobook ZIP is not imported here: Main keeps its path for the one follow-up call that opens the preview
+  // (the renderer never learns it) and tells the renderer to do that. No progress overlay is shown for it.
+  if (zipEnabled() && path.extname(sourcePath).toLowerCase() === '.zip') {
+    holdPickedZip(sourcePath)
+    return importFailure('audiobook_zip', 'This is an audiobook ZIP; opening its preview.')
+  }
   // Progress starts only now that a file is picked (never while the picker is open).
   sendProgress(sender, { stage: 'importing', filename: path.basename(sourcePath) })
 

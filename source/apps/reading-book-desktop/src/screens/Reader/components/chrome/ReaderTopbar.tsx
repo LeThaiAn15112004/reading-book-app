@@ -25,6 +25,7 @@ type ReaderTopbarProps = {
   /** Active / expanded state per tool (see `ToolsStrip`). */
   toolStates: ToolStates
   onTool: (tool: ToolId) => void
+  onToolContextMenu?: (tool: ToolId) => void
   eraserMode?: EraserMode
   onEraserMode?: (mode: EraserMode) => void
   /** The read-aloud menu floats under the Audio button. */
@@ -49,6 +50,7 @@ export function ReaderTopbar({
   capabilities,
   toolStates,
   onTool,
+  onToolContextMenu,
   eraserMode,
   onEraserMode,
   audioButtonRef,
@@ -68,6 +70,7 @@ export function ReaderTopbar({
         capabilities={capabilities}
         toolStates={toolStates}
         onTool={onTool}
+        onToolContextMenu={onToolContextMenu}
         eraserMode={eraserMode}
         onEraserMode={onEraserMode}
         toolRefs={{ speech: audioButtonRef }}

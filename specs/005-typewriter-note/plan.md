@@ -118,6 +118,8 @@ The feature ships once, when **M2** passes. M1 alone is not released.
 
 ### M0 — Font and writing spike (gate; no shipped feature code)
 
+**Status (2026-10-27): M0 PASSED** — all of M0-1…M0-8 hold (results in `research.md`, "M0 result"). Only other-reader compatibility (T063) is still untested.
+
 Goal: remove the two unproven technical bets before building UI on them.
 
 Scope: a standalone script (`spike:pdf:typewriter-font`) that (a) loads the candidate font files, (b) lays out the Vietnamese test corpus with the layout prototype, (c) writes one FreeText with embedded subset fonts through the real incremental writer onto the generated test PDF, (d) reads it back with pdf.js, (e) compares widths with a browser measurement of the same font files.
@@ -161,13 +163,14 @@ Acceptance: spec User Story 5; SC-003, SC-004, SC-009. If a tested reader shows 
 | Incremental writer + eligibility + read-back | file writing | present, extended |
 | Compat kit | cross-reader evidence | present, extended |
 
-## Open items and assumptions to confirm (not invented)
+## Open items and assumptions (status after implementation)
 
-1. Exact final font list and its licences (M0).
-2. Parser/subsetter: in-repo vs package (M0; a package needs your approval to install).
-3. Which external readers are available to test (none assumed; Foxit 2024.4 was seen installed earlier but was in use).
-4. Select mode: **decided** — Select Mode and the Typewriter tool: one click selects; Hand Mode: double-click selects (a single click keeps panning/tapping). Editing a selected note: double-click, Enter or F2. Open to confirm: whether a Hand Mode double-click should also start editing directly.
-5. "Edit the text in the sidebar" is implemented as an "Edit text" action that starts on-page editing, not a second text editor (spec assumption; say if you want a text field in the sidebar).
+1. Font list and licences: **done** — Noto Sans (4 faces), Noto Serif (4), Noto Sans Mono (2), all SIL OFL 1.1 (`assets/fonts/typewriter/`).
+2. Parser/subsetter: **decided** — in-repo `pdf-font-embed.ts`, no package installed.
+3. External readers: **none tested yet** — the compatibility kit exists (`spike:pdf:compat-kit`); results are to be recorded by the user (T063). Compatibility is not claimed.
+4. Select mode: **decided** — one click selects in Select Mode and with the Typewriter tool; double-click selects in Hand Mode; editing a selected note: double-click, Enter or F2.
+5. Sidebar text editing: implemented as an "Edit text" action that starts on-page editing, not a second editor.
+6. Not measured: pixel agreement between the app and the written file (SC-009), a real Vietnamese IME, PDFium rendering of Typewriter notes. See `docs/implementation_plan/pdf_typewriter.md`.
 
 ## Complexity Tracking
 

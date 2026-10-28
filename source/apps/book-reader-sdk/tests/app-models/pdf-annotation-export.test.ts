@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
+import { emptyTypewriterDoc } from '../../src/typewriter/index.js'
 import {
+  isPdfWritableStyle,
   noteIdFromReadmateName,
   pdfColorFromHex,
   pdfDateString,
@@ -98,6 +100,42 @@ describe('pdfWriteAnnotationsFromHighlight', () => {
   })
 })
 
+describe('Typewriter notes (FreeText)', () => {
+  const doc = emptyTypewriterDoc()
+  const tw = (extra: Partial<ExportableHighlight> = {}) =>
+    row('t1', {
+      styleKind: 'typewriter',
+      colorHex: '#1E88E5',
+      note: '  Xin chào\nthế giới ',
+      pdfAnnotation: { pageIndex: 1, rects: [{ x: 0.1, y: 0.2, width: 0.3, height: 0.1 }], typewriter: doc },
+      ...extra,
+    })
+
+  it('is writable and maps to one FreeText with the untrimmed text', () => {
+    expect(isPdfWritableStyle('typewriter')).toBe(true)
+    const [w, ...rest] = pdfWriteAnnotationsFromHighlight(tw())
+    expect(rest).toEqual([])
+    expect(w).toMatchObject({ nm: 'readmate:t1', subtype: 'FreeText', pageIndex: 1, opacity: 1, contents: '  Xin chào\nthế giới ', author: 'Readmate' })
+    expect(w!.typewriter).toEqual({ doc, text: '  Xin chào\nthế giới ' })
+    expect(w!.rects).toEqual([{ x: 0.1, y: 0.2, width: 0.3, height: 0.1 }])
+    expect(w!.color[2]).toBeCloseTo(0.898, 2)
+  })
+
+  it('writes nothing without a doc, text or exactly one rect', () => {
+    expect(pdfWriteAnnotationsFromHighlight(tw({ pdfAnnotation: { pageIndex: 1, rects: [rect(1, 0.1)] } }))).toEqual([])
+    expect(pdfWriteAnnotationsFromHighlight(tw({ note: undefined }))).toEqual([])
+    const two = { pageIndex: 1, rects: [rect(1, 0.1), rect(1, 0.3)], typewriter: doc }
+    expect(pdfWriteAnnotationsFromHighlight(tw({ pdfAnnotation: two }))).toEqual([])
+  })
+
+  it('plans an add for a new note and a replace after a text edit', () => {
+    const base = { scanned: [], ledger: new Map(), rows: [tw()] }
+    const plan = planPdfAnnotationWrite(base)
+    expect(plan.add.map((a) => a.subtype)).toEqual(['FreeText'])
+    expect(plan.writtenNoteIds).toEqual(['t1'])
+  })
+})
+
 describe('planPdfAnnotationWrite', () => {
   it('a file without annotations and no rows: nothing to write', () => {
     expect(planPdfAnnotationWrite({ scanned: [], ledger: new Map(), rows: [] })).toEqual({ add: [], replace: [], remove: [], kept: 0, writtenNoteIds: [] })
@@ -141,7 +179,7 @@ describe('planPdfAnnotationWrite', () => {
     const rows = [row('a'), row('b')]
     const first = planPdfAnnotationWrite({ scanned: [], ledger: new Map(), rows })
     // The file after the first write holds both, as readmate:a / readmate:b.
-    const inFile = first.add.map((a, i) => scanned(`${20 + i}R`, { nm: a.nm, subtype: a.subtype, rects: a.rects.map((r) => ({ ...r, pageIndex: 0 })) }))
+    const inFile = first.add.map((a, i) => scanned(`${20 + i}R`, { nm: a.nm, subtype: a.subtype as ScannedPdfAnnotation['subtype'], rects: a.rects.map((r) => ({ ...r, pageIndex: 0 })) }))
     const again = planPdfAnnotationWrite({ scanned: inFile, ledger: new Map(), rows })
     expect(again.add).toHaveLength(0)
     expect(again.replace.map((r) => r.objectId)).toEqual(['20R', '21R'])

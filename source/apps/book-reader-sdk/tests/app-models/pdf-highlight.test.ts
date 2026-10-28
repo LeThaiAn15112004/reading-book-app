@@ -3,6 +3,7 @@ import { CfiLocation, Location, PageRectLocation } from '../../src/domain/index.
 import { highlightDtoToReaderHighlight } from '../../src/app-models/highlight-location.js'
 import { applyHighlightHistoryStep } from '../../src/app-models/highlight-undo.js'
 import { createInMemoryStorage } from '../../src/testing/in-memory.js'
+import { emptyTypewriterDoc } from '../../src/typewriter/index.js'
 import {
   createHighlightHistory,
   highlightAdd,
@@ -14,6 +15,7 @@ import {
   isConsistentPdfHighlight,
   isPdfReaderHighlight,
   normalizePdfHighlightRects,
+  packPdfAnnotationRef,
   packPdfHighlightLocator,
   parsePdfAnnotation,
   parsePdfAnnotationRef,
@@ -364,5 +366,31 @@ describe('Inserted Text caret', () => {
     expect(pdfMarkAt([row], 2, caret.x + caret.width / 2, caret.y + caret.height / 2)).toBe(row)
     expect(pdfMarkAt([row], 2, 0.9, 0.9)).toBeNull()
     expect(pdfMarkAt([row], 1, caret.x, caret.y)).toBeNull()
+  })
+})
+
+describe('parsePdfAnnotation — Typewriter note', () => {
+  const text = 'Xin chào\nthế giới'
+  const box = { x: 0.1, y: 0.1, width: 0.3, height: 0.1 }
+  const doc = emptyTypewriterDoc()
+  const ann = (extra: object = {}, rects: object[] = [box]) => ({ pageIndex: 0, rects, typewriter: doc, ...extra })
+
+  it('accepts one rect with a valid doc and the row text', () => {
+    const parsed = parsePdfAnnotation(ann(), text)
+    expect(parsed?.typewriter).toEqual(doc)
+    expect(parsed?.rects).toHaveLength(1)
+  })
+
+  it('rejects without the row text, with several rects, or with an invalid doc', () => {
+    expect(parsePdfAnnotation(ann())).toBeUndefined()
+    expect(parsePdfAnnotation(ann({}, [box, box]), text)).toBeUndefined()
+    expect(parsePdfAnnotation(ann({ typewriter: { ...doc, runs: [{ start: 0, end: 99, style: { bold: true } }] } }), text)).toBeUndefined()
+    expect(parsePdfAnnotation(ann(), '   ')).toBeUndefined()
+  })
+
+  it('round-trips through the packed ref and the DTO mapper', () => {
+    const ref = packPdfAnnotationRef(parsePdfAnnotation(ann(), text)!)
+    expect(parsePdfAnnotationRef(ref, text)?.typewriter).toEqual(doc)
+    expect(parsePdfAnnotationRef(ref)).toBeUndefined()
   })
 })

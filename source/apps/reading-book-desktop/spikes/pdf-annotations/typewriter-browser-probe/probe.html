@@ -1,0 +1,102 @@
+<!doctype html>
+<meta charset="utf-8">
+<body style="margin:0;background:#fff">
+<div id="host" style="position:absolute;left:0;top:0"></div>
+<canvas id="cv"></canvas>
+<script>
+const { ipcRenderer } = require('electron')
+const fs = require('node:fs')
+const { pathToFileURL } = require('node:url')
+const jobPath = new URLSearchParams(location.search).get('job')
+const job = JSON.parse(fs.readFileSync(jobPath, 'utf8'))
+const cssFamily = (id) => 'tw-' + id.replace(':', '-')
+
+async function main() {
+  for (const face of job.faces) {
+    const f = new FontFace(cssFamily(face.id), `url(${pathToFileURL(job.fontsDir + '/' + face.file).href})`)
+    document.fonts.add(await f.load())
+  }
+  await document.fonts.ready
+
+  // ---- M0-5: build the same note in the DOM and compare line starts and widths with the layout engine
+  const { text, doc, boxWidth, pageWidth, lines } = job
+  const host = document.getElementById('host')
+  const box = document.createElement('div')
+  box.style.cssText = `width:${boxWidth}px;font-kerning:none;font-variant-ligatures:none;font-feature-settings:"kern" 0,"liga" 0,"clig" 0;text-rendering:optimizeSpeed;white-space:pre-wrap;overflow-wrap:anywhere;line-height:normal`
+  host.appendChild(box)
+  const styleAt = (i) => {
+    const run = doc.runs.find((r) => i >= r.start && i < r.end)
+    return { ...doc.base, ...(run ? run.style : {}) }
+  }
+  const faceId = (s) => job.faceIds[`${s.family}|${s.bold}|${s.italic}`]
+  const charNodes = []
+  let paragraph = document.createElement('div')
+  box.appendChild(paragraph)
+  for (let i = 0; i < text.length; ) {
+    const cp = text.codePointAt(i); const len = cp > 0xffff ? 2 : 1
+    if (text[i] === '\n') {
+      paragraph.appendChild(document.createElement('br'))
+      paragraph = document.createElement('div'); box.appendChild(paragraph)
+    } else {
+      const s = styleAt(i)
+      const span = document.createElement('span')
+      span.style.fontFamily = cssFamily(faceId(s))
+      span.style.fontSize = s.size * pageWidth + 'px'
+      span.textContent = text.slice(i, i + len)
+      paragraph.appendChild(span)
+      charNodes.push({ i, node: span.firstChild })
+    }
+    i += len
+  }
+  // browser line = chars sharing a rounded top; compare the first offset and width of each line
+  const browserLines = []
+  let curBottom = null
+  for (const { i, node } of charNodes) {
+    const r = document.createRange(); r.setStart(node, 0); r.setEnd(node, node.length)
+    const rects = r.getClientRects(); if (!rects.length) continue
+    const rect = rects[0]
+    const bottom = rect.bottom
+    const isSpace = text[i] === ' '
+    if (curBottom === null || Math.abs(bottom - curBottom) > 3) {
+      // a taller run on the same line shifts the bottom; only a clearly lower box starts a new line
+      browserLines.push({ start: i, left: rect.left, right: isSpace ? rect.left : rect.right })
+      curBottom = bottom
+      continue
+    }
+    const line = browserLines[browserLines.length - 1]
+    if (!isSpace) line.right = rect.right
+  }
+  // starts of paragraphs always begin a line; recompute strictly by paragraph to be safe
+  const mismatches = []
+  const ours = lines.filter((l) => l.end > l.start)
+  const theirs = browserLines
+  if (ours.length !== theirs.length) mismatches.push(`line count: layout ${ours.length}, browser ${theirs.length}`)
+  let maxWidthDiff = 0
+  for (let k = 0; k < Math.min(ours.length, theirs.length); k++) {
+    if (ours[k].start !== theirs[k].start) { mismatches.push(`line ${k + 1} starts at ${ours[k].start} vs ${theirs[k].start}`); continue }
+    if (!ours[k].justified) maxWidthDiff = Math.max(maxWidthDiff, Math.abs(ours[k].width - (theirs[k].right - theirs[k].left)))
+  }
+
+  // ---- pixel check: render the written PDF with pdf.js and count dark pixels inside the note box
+  const pdfjs = await import(pathToFileURL(job.pdfjsDir + '/pdf.mjs').href)
+  pdfjs.GlobalWorkerOptions.workerSrc = pathToFileURL(job.pdfjsDir + '/pdf.worker.mjs').href
+  const data = new Uint8Array(fs.readFileSync(job.pdfPath))
+  const pdf = await pdfjs.getDocument({ data }).promise
+  const pixels = []
+  for (const pageNumber of [1, 2]) {
+    const page = await pdf.getPage(pageNumber)
+    const viewport = page.getViewport({ scale: 1 })
+    const cv = document.getElementById('cv'); cv.width = Math.ceil(viewport.width); cv.height = Math.ceil(viewport.height)
+    const ctx = cv.getContext('2d'); ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, cv.width, cv.height)
+    await page.render({ canvasContext: ctx, viewport, annotationMode: pdfjs.AnnotationMode.ENABLE }).promise
+    const b = job.boxes[pageNumber - 1]
+    const img = ctx.getImageData(Math.floor(b.x * viewport.width), Math.floor(b.y * viewport.height), Math.ceil(b.width * viewport.width), Math.ceil(b.height * viewport.height)).data
+    let dark = 0
+    for (let p = 0; p < img.length; p += 4) if (img[p] + img[p + 1] + img[p + 2] < 600) dark++
+    pixels.push({ pageNumber, dark, total: img.length / 4 })
+    if (job.pngDir) fs.writeFileSync(`${job.pngDir}/typewriter-page${pageNumber}.png`, Buffer.from(cv.toDataURL('image/png').split(',')[1], 'base64'))
+  }
+  ipcRenderer.send('probe-result', { mismatches, maxWidthDiff, browserLines: theirs.length, layoutLines: ours.length, pixels })
+}
+main().catch((err) => ipcRenderer.send('probe-result', { error: String(err && err.stack || err) }))
+</script>

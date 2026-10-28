@@ -24,6 +24,7 @@ import { disposePdfAnnotationSync } from './ipc/overlay.ipc'
 import { disposeTranslationWorker } from './translation/translation-service'
 import { ensureBooksSandbox } from './files/sandbox'
 import { registerAllIpcHandlers } from './ipc'
+import { disposeTranscription, recoverInterruptedTranscripts } from './transcription/transcription-runtime'
 import { installFullscreenShortcuts } from './ipc/app.ipc'
 import { AppChannels, NotificationChannels } from './ipc/channels'
 import type { ReminderOpenBookDto } from './ipc/api-types'
@@ -432,6 +433,7 @@ app.on('will-quit', () => {
   disposePdfAnnotationSync()
   disposeAttachmentTemp()
   disposeTranslationWorker()
+  disposeTranscription()
   closeDatabase()
 })
 
@@ -450,6 +452,9 @@ app.whenReady().then(async () => {
   registerCoverProtocol()
   registerMdAssetProtocol()
   registerAudioProtocol()
+  // Transcripts whose job was cut short by the last quit / crash become `partial` + INTERRUPTED before `transcription:start`
+  // can be served; nothing is restarted automatically (the panel offers Resume).
+  recoverInterruptedTranscripts()
   registerAllIpcHandlers()
   // Tray + Run in Background prefs (Main-owned) before the window, so its close button knows them.
   initBackgroundMode({ showWindow: showMainWindow, publicDir: process.env.VITE_PUBLIC })

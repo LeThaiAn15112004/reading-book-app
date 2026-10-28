@@ -15,6 +15,7 @@
  */
 import fs from 'node:fs'
 import path from 'node:path'
+import { applyAlign, applyStyle, emptyTypewriterDoc } from '@reading-book/book-reader-sdk'
 import { buildAnnotatedPdf } from '../../e2e/support/build-annotated-pdf.mjs'
 
 const { writeAnnotationsToPdf } = await import('../../electron/pdf-sync/pdf-annotation-write.ts')
@@ -44,16 +45,43 @@ const rows = [
   row('hl-rot90', 'highlight', '#FFEB3B', [R(1, 0.3)], 'On a /Rotate 90 page'),
   row('ul-rot180', 'underline', '#1E88E5', [R(2, 0.3)], 'On a cropped /Rotate 180 page'),
 ]
+// Typewriter notes (FreeText): Vietnamese, mixed styles, centred / right / justified, on every kind of page.
+const VI = 'Xin chào thế giới, đây là ghi chú Typewriter của Readmate: Việt Nam, ắ ằ ẳ ẵ ặ, ơ ư đ.'
+const MIXED = 'Đậm đỏ, nghiêng gạch chân, gạch ngang serif, và chữ thường.'
+const twRow = (id, pageIndex, text, doc, y = 0.5) => ({
+  id,
+  styleKind: 'typewriter',
+  colorHex: doc.base.color,
+  note: text,
+  tags: [],
+  pdfAnnotation: { pageIndex, rects: [{ pageIndex, x: 0.11, y, width: 0.6, height: 0.2 }], typewriter: doc },
+  createdAt: '2026-10-28T08:00:00.000Z',
+  updatedAt: '2026-10-28T09:00:00.000Z',
+})
+let mixed = emptyTypewriterDoc()
+mixed = applyStyle(mixed, MIXED, { start: 0, end: 8 }, { bold: true, color: '#E53935' })
+mixed = applyStyle(mixed, MIXED, { start: 9, end: 24 }, { italic: true, underline: true })
+mixed = applyStyle(mixed, MIXED, { start: 25, end: 38 }, { strike: true, family: 'noto-serif' })
+const typewriters = [
+  twRow('tw-vi', 0, VI, emptyTypewriterDoc(), 0.6),
+  twRow('tw-mixed', 0, MIXED, mixed, 0.78),
+  twRow('tw-center', 1, VI, applyAlign(emptyTypewriterDoc(), VI, null, 'center')),
+  twRow('tw-right', 1, VI, applyAlign(emptyTypewriterDoc(), VI, null, 'right'), 0.75),
+  twRow('tw-justify', 2, VI, applyAlign(emptyTypewriterDoc(), VI, null, 'justify')),
+  twRow('tw-rot180', 2, MIXED, mixed, 0.72),
+]
+rows.push(...typewriters)
 const source = buildAnnotatedPdf({ pageBoxes: [undefined, { rotate: 90 }, { rotate: 180, cropBox: [36, 50, 576, 742] }] })
-const { output, summary } = await writeAnnotationsToPdf({ bytes: source, ledger: [], rows })
+const { output, summary, skipped } = await writeAnnotationsToPdf({ bytes: source, ledger: [], rows })
 fs.writeFileSync(path.join(out, 'readmate-written.pdf'), output)
 fs.writeFileSync(path.join(out, 'blank-for-external.pdf'), buildAnnotatedPdf())
 fs.writeFileSync(
   path.join(out, 'expected.json'),
   JSON.stringify(
-    rows.map((r) => ({ nm: `readmate:${r.id}`, type: r.styleKind, color: r.colorHex, note: r.note ?? null, pages: [...new Set(r.pdfAnnotation.rects.map((x) => x.pageIndex + 1))] })),
+    rows.map((r) => ({ nm: `readmate:${r.id}`, type: r.styleKind === 'typewriter' ? 'FreeText (Typewriter)' : r.styleKind, color: r.colorHex, note: r.note ?? null, pages: [...new Set(r.pdfAnnotation.rects.map((x) => x.pageIndex + 1))] })),
     null,
     2,
   ),
 )
-console.log(`Wrote the kit to ${out} (${summary.added} annotations written)`)
+console.log(`Wrote the kit to ${out} (${summary.added} annotations written, ${skipped.length} left out)`)
+if (skipped.length) throw new Error(`Typewriter notes left out: ${JSON.stringify(skipped)}`)

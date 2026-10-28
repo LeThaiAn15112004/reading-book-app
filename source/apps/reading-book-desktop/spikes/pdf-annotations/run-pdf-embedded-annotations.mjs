@@ -142,7 +142,7 @@ await check('2. first open imports everything as regular PDF annotation rows', a
   const rows = await pdfRows('pdf-a')
   assert.equal(rows.length, 5)
   assert.ok(rows.every(Boolean), 'every row maps to a PdfReaderHighlight')
-  assert.deepEqual(rows.map((r) => r.styleKind).sort(), ['highlight', 'strikethrough', 'textbox', 'underline', 'underline'])
+  assert.deepEqual(rows.map((r) => r.styleKind).sort(), ['highlight', 'squiggly', 'strikethrough', 'textbox', 'underline'])
   const hl = rows.find((r) => r.styleKind === 'highlight')
   assert.equal(hl.note, 'Foxit comment')
   assert.equal(hl.page, 1)

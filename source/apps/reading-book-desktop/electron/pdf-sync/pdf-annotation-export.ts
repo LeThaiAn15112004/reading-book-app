@@ -25,7 +25,7 @@ export type ExportErrorCode =
   | 'write_failed'
 
 export type ExportResult =
-  | { ok: true; fileName: string; summary: PdfAnnotationWriteSummary }
+  | { ok: true; fileName: string; summary: PdfAnnotationWriteSummary; skippedTypewriter: number }
   | { ok: false; errorCode: ExportErrorCode; message?: string; signatureStatus?: string; signerName?: string }
 
 export type ExportDeps = {
@@ -130,5 +130,5 @@ export async function exportAnnotatedPdf(deps: ExportDeps, options: { acknowledg
   } catch (err) {
     return { ok: false, errorCode: writeErrorCode(err), message: err instanceof Error ? err.message : String(err) }
   }
-  return { ok: true, fileName: path.basename(target), summary: written.summary }
+  return { ok: true, fileName: path.basename(target), summary: written.summary, skippedTypewriter: written.skipped.length }
 }

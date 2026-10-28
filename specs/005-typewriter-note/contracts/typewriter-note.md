@@ -108,8 +108,8 @@ typewriterFontFaces: readonly EmbeddedFontFaceInfo[]                // ids, styl
 | Click empty page | tool active | create draft at point |
 | Drag > 4 px | tool active | create draft with that rectangle |
 | Click note | Select / tool active | select |
-| Double-click note | Hand | select |
-| Single click note | Hand | nothing (existing pan / tap) |
+| Click note | Hand | select (changed after review: a single press on a note selects it instead of panning) |
+| Press on blank page | Hand | unchanged: pan / tap |
 | Double-click selected note | Hand / Select / tool active | edit |
 | Click the already-selected note (no drag) | Select | edit |
 | Press body of selected note + drag > 4 px | Hand / Select / tool active | move |

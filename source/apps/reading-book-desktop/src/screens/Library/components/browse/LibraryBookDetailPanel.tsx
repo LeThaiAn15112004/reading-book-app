@@ -99,6 +99,7 @@ export function LibraryBookDetailPanel({
             coverUrl: book.coverUrl,
             genre: book.genre,
             genres: book.genres,
+            chapterCount: book.chapterCount,
             fileSizeBytes: book.fileSizeBytes,
             pageCount: book.pageCount,
             description: book.description,

@@ -12,6 +12,7 @@ import { registerNotificationsIpc } from './notifications.ipc'
 import { registerOverlayIpc } from './overlay.ipc'
 import { registerSearchIpc } from './search.ipc'
 import { registerStorageIpc } from './storage.ipc'
+import { registerTranscriptionIpc } from './transcription.ipc'
 import { registerTranslationIpc } from './translation.ipc'
 import { registerTxtIpc } from './txt.ipc'
 import { registerUpdatesIpc } from './updates.ipc'
@@ -24,8 +25,8 @@ export function registerAllIpcHandlers(): void {
   registerLibraryIpc()
   registerImportIpc()
   registerOverlayIpc()
-  registerAudioIpc()
   registerAnnotationTransferIpc()
+  registerAudioIpc()
   registerZipImportIpc()
   registerAttachmentsIpc()
   registerGraphicsIpc()
@@ -35,6 +36,7 @@ export function registerAllIpcHandlers(): void {
   registerSearchIpc()
   registerWordCountIpc()
   registerTranslationIpc()
+  registerTranscriptionIpc()
   registerStorageIpc()
   registerUpdatesIpc()
   registerNotificationsIpc()

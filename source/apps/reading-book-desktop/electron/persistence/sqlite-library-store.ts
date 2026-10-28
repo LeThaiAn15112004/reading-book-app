@@ -2,12 +2,16 @@ import {
   Author,
   Book,
   BookAuthor,
+  isAudioFormat,
   isDocumentFormat,
   parseDocumentFormat,
+  validateChapterRecords,
+  type AudioChapterRecord,
   type LibraryStore,
 } from '@reading-book/book-reader-sdk'
 import type { Database as SqliteDatabase } from 'better-sqlite3'
 import { randomUUID } from 'node:crypto'
+import path from 'node:path'
 import {
   normalizeGenreNames,
   parseGenres,
@@ -162,6 +166,34 @@ function summaryFromState(state: ReadingStateJson): ReadingSessionSummary | unde
     lastReadLocation: label,
     lastReadAt: state.updatedAt ?? undefined,
     progressPercent: percent,
+  }
+}
+
+interface AudioChapterRow {
+  id: string
+  book_id: string
+  position: number
+  title: string
+  file_name: string
+  source_path: string
+  file_format: string
+  size_bytes: number
+  sha256: string
+  duration_seconds: number | null
+}
+
+function chapterRowToRecord(r: AudioChapterRow): AudioChapterRecord {
+  return {
+    id: r.id,
+    bookId: r.book_id,
+    position: r.position,
+    title: r.title,
+    fileName: r.file_name,
+    sourcePath: r.source_path,
+    fileFormat: r.file_format,
+    sizeBytes: r.size_bytes,
+    sha256: r.sha256,
+    durationSeconds: r.duration_seconds,
   }
 }
 
@@ -393,37 +425,133 @@ export class SqliteLibraryStore implements LibraryStore {
     genreNames: string[] = [],
   ): void {
     const run = this.db.transaction(() => {
-      this.db.prepare(INSERT_BOOK_SQL).run(bookToRowParams(book, genreNames))
+      this.insertBookWithAuthors(book, authorNames, genreNames)
+    })
+    run()
+  }
 
-      const authorLinks: BookAuthor[] = []
-      authorNames.forEach((name, index) => {
-        const trimmed = name.trim()
-        if (!trimmed) return
-        const author = this.findOrCreateAuthorByName(trimmed)
-        authorLinks.push(
-          new BookAuthor({
-            bookId: book.id,
-            authorId: author.id,
-            sortOrder: index,
-          }),
-        )
-      })
-
-      if (authorLinks.length > 0) {
-        const insert = this.db.prepare(
-          `INSERT OR IGNORE INTO book_authors (book_id, author_id, sort_order)
-           VALUES (@book_id, @author_id, @sort_order)`,
-        )
-        for (const link of authorLinks) {
-          insert.run({
-            book_id: book.id,
-            author_id: link.authorId,
-            sort_order: link.sortOrder,
-          })
-        }
+  /**
+   * Persist a multi-chapter audiobook atomically: the parent `books` row, its authors and EVERY chapter row in one
+   * transaction — either all of it exists afterwards or none of it (a failed insert, e.g. a duplicate `sha256`,
+   * rolls everything back). The chapter list is validated first (>= 2 chapters, positions 0..n-1, canonical file
+   * names), and the parent's `file_path` must be chapter 0's file, which is what keeps every path helper working.
+   * Files are the caller's business; nothing here touches the disk.
+   */
+  persistImportedAudiobook(
+    book: Book,
+    chapters: readonly AudioChapterRecord[],
+    authorNames: string[] = [],
+    genreNames: string[] = [],
+  ): void {
+    if (!isAudioFormat(book.format)) throw new Error('persistImportedAudiobook: the parent book is not an audio format')
+    const check = validateChapterRecords(book.id, chapters)
+    if (!check.ok) throw new Error(`persistImportedAudiobook: ${check.reason}`)
+    const first = chapters[0] as AudioChapterRecord
+    if (path.basename(book.filePath) !== first.fileName) {
+      throw new Error('persistImportedAudiobook: books.file_path must be the first chapter file')
+    }
+    if (book.format !== first.fileFormat) {
+      throw new Error('persistImportedAudiobook: books.file_format must be the first chapter format')
+    }
+    const run = this.db.transaction(() => {
+      this.insertBookWithAuthors(book, authorNames, genreNames)
+      const insert = this.db.prepare(
+        `INSERT INTO book_audio_chapters (
+           id, book_id, position, title, file_name, source_path, file_format, size_bytes, sha256, duration_seconds
+         ) VALUES (
+           @id, @book_id, @position, @title, @file_name, @source_path, @file_format, @size_bytes, @sha256, @duration_seconds
+         )`,
+      )
+      for (const c of chapters) {
+        insert.run({
+          id: c.id,
+          book_id: c.bookId,
+          position: c.position,
+          title: c.title,
+          file_name: c.fileName,
+          source_path: c.sourcePath,
+          file_format: c.fileFormat,
+          size_bytes: c.sizeBytes,
+          sha256: c.sha256,
+          duration_seconds: c.durationSeconds,
+        })
       }
     })
     run()
+  }
+
+  /** Chapters of a multi-chapter audiobook in playback order; `[]` for every other book. */
+  listAudioChapters(bookId: string): AudioChapterRecord[] {
+    const rows = this.db
+      .prepare(
+        `SELECT id, book_id, position, title, file_name, source_path, file_format, size_bytes, sha256, duration_seconds
+         FROM book_audio_chapters WHERE book_id = ? ORDER BY position`,
+      )
+      .all(bookId) as AudioChapterRow[]
+    return rows.map(chapterRowToRecord)
+  }
+
+  /** One chapter of ONE book — never a chapter of another book; `undefined` when there is none. */
+  getAudioChapter(bookId: string, chapterId: string): AudioChapterRecord | undefined {
+    const row = this.db
+      .prepare(
+        `SELECT id, book_id, position, title, file_name, source_path, file_format, size_bytes, sha256, duration_seconds
+         FROM book_audio_chapters WHERE book_id = ? AND id = ?`,
+      )
+      .get(bookId, chapterId) as AudioChapterRow | undefined
+    return row ? chapterRowToRecord(row) : undefined
+  }
+
+  /** True when the book is a multi-chapter audiobook (has chapter rows). */
+  hasAudioChapters(bookId: string): boolean {
+    return this.db.prepare('SELECT 1 FROM book_audio_chapters WHERE book_id = ? LIMIT 1').get(bookId) !== undefined
+  }
+
+  /** Chapter count per multi-chapter audiobook (books without chapters are absent). */
+  audioChapterCounts(): Map<string, number> {
+    const rows = this.db
+      .prepare('SELECT book_id, COUNT(*) AS n FROM book_audio_chapters GROUP BY book_id')
+      .all() as Array<{ book_id: string; n: number }>
+    return new Map(rows.map((r) => [r.book_id, r.n]))
+  }
+
+  /** Folder of every registered book file (startup sweep: a folder some book lives in is never "partial"). */
+  bookDirectories(): string[] {
+    const rows = this.db.prepare('SELECT file_path FROM books').all() as Array<{ file_path: string }>
+    return rows.map((r) => path.dirname(r.file_path))
+  }
+
+  /** Book row + authors; call inside a transaction. */
+  private insertBookWithAuthors(book: Book, authorNames: string[], genreNames: string[]): void {
+    this.db.prepare(INSERT_BOOK_SQL).run(bookToRowParams(book, genreNames))
+
+    const authorLinks: BookAuthor[] = []
+    authorNames.forEach((name, index) => {
+      const trimmed = name.trim()
+      if (!trimmed) return
+      const author = this.findOrCreateAuthorByName(trimmed)
+      authorLinks.push(
+        new BookAuthor({
+          bookId: book.id,
+          authorId: author.id,
+          sortOrder: index,
+        }),
+      )
+    })
+
+    if (authorLinks.length > 0) {
+      const insert = this.db.prepare(
+        `INSERT OR IGNORE INTO book_authors (book_id, author_id, sort_order)
+         VALUES (@book_id, @author_id, @sort_order)`,
+      )
+      for (const link of authorLinks) {
+        insert.run({
+          book_id: book.id,
+          author_id: link.authorId,
+          sort_order: link.sortOrder,
+        })
+      }
+    }
   }
 
   /** All books newest-first, with joined author names; genres + session come from the same row. */

@@ -12,6 +12,7 @@
 import type { HighlightStyleKind } from './highlight-location.js'
 import { DEFAULT_HIGHLIGHT_COLOR } from './highlight-colors.js'
 import { isShapeStyleKind, shapeColorHex } from './pdf-shape.js'
+import { normalizeTypewriterText } from '../typewriter/typewriter-doc.js'
 import {
   embeddedStyleOf,
   embeddedAnnotationIdentities,
@@ -65,7 +66,23 @@ function shapeGeometrySig(
   return `${geometrySig(rects)}|w${(shape?.strokeWidth ?? 0).toFixed(4)}${shape?.line ? `|l${shape.line.map((n) => n.toFixed(3)).join(',')}` : ''}`
 }
 
+/**
+ * Typewriter notes. The file holds the text and the box only: its colour cannot be read back (it is in the appearance
+ * stream), so the file side has no colour. The app side's `color` carries the colour AND the whole rich-text document (runs,
+ * alignment, sizes), so any formatting change in the app counts as a change to write into the file. Text is compared raw
+ * (never trimmed: style runs index into it).
+ */
+function docSig(doc: unknown): string {
+  const json = JSON.stringify(doc ?? null)
+  let h = 0
+  for (let i = 0; i < json.length; i++) h = (Math.imul(h, 31) + json.charCodeAt(i)) | 0
+  return `${json.length}:${(h >>> 0).toString(16)}`
+}
+
 export function fileSide(item: ScannedPdfAnnotation): SyncSide {
+  if (item.subtype === 'FreeText') {
+    return { kind: 'typewriter', color: '', text: item.contents ?? '', geometry: geometrySig(item.rects) }
+  }
   if (item.shape) {
     return {
       kind: embeddedStyleOf(item),
@@ -85,6 +102,9 @@ export function fileSide(item: ScannedPdfAnnotation): SyncSide {
 /** The row as seen from one file annotation (its rects on that annotation's page only). */
 export function appSide(row: ExportableHighlight, pageIndex: number): SyncSide {
   const rects = (row.pdfAnnotation?.rects ?? []).filter((r) => (r.pageIndex ?? row.pdfAnnotation!.pageIndex) === pageIndex)
+  if (row.styleKind === 'typewriter') {
+    return { kind: 'typewriter', color: `${color6(row.colorHex)}|${docSig(row.pdfAnnotation?.typewriter)}`, text: row.note ?? '', geometry: geometrySig(rects) }
+  }
   if (isShapeStyleKind(row.styleKind)) {
     return {
       kind: row.styleKind,
@@ -112,6 +132,24 @@ function changed(base: SyncSide, now: SyncSide): SyncField[] {
 /** `row` with the file's values for `fields` (notes never take the file's geometry). */
 export function applyFileFields(row: ExportableHighlight, item: ScannedPdfAnnotation, fields: readonly SyncField[]): ExportableHighlight {
   const next: ExportableHighlight = { ...row }
+  if (row.styleKind === 'typewriter' && row.pdfAnnotation) {
+    // The app's document is authoritative: the file never changes the kind or the colour, and only its box moves the note.
+    // A text taken from the file (the user chose it in a conflict) restarts the rich text: offsets of the old runs no longer mean anything.
+    let annotation = row.pdfAnnotation
+    if (fields.includes('geometry') && item.rects[0]) {
+      const r = item.rects[0]
+      annotation = { ...annotation, pageIndex: item.pageIndex, rects: [{ pageIndex: item.pageIndex, x: r.x, y: r.y, width: r.width, height: r.height }] }
+    }
+    if (fields.includes('text')) {
+      const text = normalizeTypewriterText(item.contents ?? '')
+      if (text.trim()) {
+        next.note = text
+        if (annotation.typewriter) annotation = { ...annotation, typewriter: { ...annotation.typewriter, runs: [], align: [] } }
+      }
+    }
+    next.pdfAnnotation = annotation
+    return next
+  }
   for (const field of fields) {
     if (field === 'kind') next.styleKind = embeddedStyleOf(item)
     if (field === 'color' && item.shape) next.colorHex = shapeColorHex(item.colorHex ?? DEFAULT_HIGHLIGHT_COLOR, item.opacity ?? 1)
@@ -252,6 +290,14 @@ export function planTwoWaySync(input: TwoWayInput): TwoWayPlan {
         if (!e.base) plan.baseRefresh.push({ key: e.sourceKey, noteId: e.noteId, item })
         continue
       }
+      // A Typewriter note's text is app-authoritative: a different text in the file is never merged silently.
+      if (row.styleKind === 'typewriter' && item.subtype === 'FreeText') {
+        fileChanged = fileChanged.filter((f) => f !== 'kind' && f !== 'color')
+        if (fileChanged.includes('text') && fileSide(item).text !== appSide(row, item.pageIndex).text) {
+          plan.conflicts.push({ key: e.sourceKey, noteId: e.noteId, conflict: { kind: 'both-changed', item, fields: ['text'] } })
+          continue
+        }
+      }
       const overlap = fileChanged.filter((f) => appChanged.includes(f))
       const conflicting = overlap.filter((f) => fileSide(item)[f] !== appSide(row, item.pageIndex)[f])
       if (conflicting.length > 0) {
@@ -318,6 +364,7 @@ export function planTwoWaySync(input: TwoWayInput): TwoWayPlan {
       linkedRows.add(noteId)
       return
     }
+    if (item.subtype === 'FreeText' && !normalizeTypewriterText(item.contents ?? '').trim()) return
     plan.inserts.push({ key, item })
   })
 

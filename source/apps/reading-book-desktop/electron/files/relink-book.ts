@@ -27,6 +27,10 @@ export async function relinkBookToFile(
   const store = getLibraryStore()
   const book = await store.findById(bookId)
   if (!book) return fail('not_found', 'Book not found.')
+  if (store.hasAudioChapters(book.id)) {
+    // Its identity is the hash of an ordered list of files, not of one file.
+    return fail('wrong_file', 'An audiobook made of several chapter files cannot be relinked.')
+  }
 
   const resolved = path.resolve(chosenPath)
   if (isPathInsideUserData(resolved)) {

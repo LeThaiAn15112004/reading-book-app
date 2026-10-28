@@ -96,7 +96,7 @@ check('placeholder is a strict subset of EPUB, apart from Page layout', () => {
   assert.ok(placeholder.size - 1 < epub.size)
 })
 check('PDF = placeholder + search + text markup + freehand ink + shapes + attachments − Aa (no audio / translate yet)', () => {
-  const expected = [...placeholder, 'search', 'markupAnnotations', 'inkAnnotations', 'shapeAnnotations', 'attachments'].filter((c) => c !== 'readingSettings')
+  const expected = [...placeholder, 'search', 'markupAnnotations', 'inkAnnotations', 'shapeAnnotations', 'typewriterAnnotations', 'attachments'].filter((c) => c !== 'readingSettings')
   assert.deepEqual([...pdf].sort(), expected.sort())
 })
 check('Aa (readingSettings) stays on EPUB and the placeholder, not PDF', () => {
@@ -141,7 +141,7 @@ check('PDF layout: Search in the navigate group, the inline Annotation icons, th
   assert.deepEqual(shape(resolveToolbarLayout(pdf, 0)), [
     'navigate:inline[hand,select,search]',
     'annotation:inline[highlight,underline,squiggly,strikethrough,replace,insert]',
-    'freehand:inline[pen,shape,eraser]',
+    'freehand:inline[pen,shape,eraser,typewriter]',
     'tools:inline[snapshot,wordCount]',
   ])
 })
@@ -307,12 +307,20 @@ check('Eraser mode lives in ReaderScreen state (survives switching tools); the E
   assert.doesNotMatch(screen, /setEraserMode\([^)]*\)[^\n]*setActiveTool/)
 })
 check('Eraser stays PDF-only (capability inkAnnotations) and is left when the surface is not a PDF', () => {
-  assert.match(screen, /activeTool === 'pen' \|\| activeTool === 'eraser' \|\| activeTool === 'shape'\)\) setActiveTool\('select'\)/)
+  assert.match(screen, /activeTool === 'pen' \|\| activeTool === 'eraser' \|\| activeTool === 'shape' \|\| activeTool === 'typewriter'\)\) setActiveTool\('select'\)/)
 })
 
 console.log('7b. shape tools')
+check('Typewriter: PDF-only (capability typewriterAnnotations), last tool of the Freehand group, armed like the other drawing tools', () => {
+  assert.ok(pdf.has('typewriterAnnotations'))
+  for (const other of [epub, txt, placeholder]) assert.ok(!other.has('typewriterAnnotations'))
+  assert.deepEqual(registry.toolsForGroup('freehand', epub).map((t) => t.id), [])
+  assert.match(screen, /case 'typewriter':\s*case 'pen':[^]*case 'eraser':\s*\/\/ Click the armed tool again/)
+  assert.match(screen, /activeTool === 'typewriter'\)\) setActiveTool\('select'\)/)
+})
+
 check('Shapes: PDF-only (capability shapeAnnotations), sits between Freehand and Eraser, with its own settings arrow that never arms the tool', () => {
-  assert.deepEqual(registry.toolsForGroup('freehand', pdf).map((t) => t.id), ['pen', 'shape', 'eraser'])
+  assert.deepEqual(registry.toolsForGroup('freehand', pdf).map((t) => t.id), ['pen', 'shape', 'eraser', 'typewriter'])
   assert.deepEqual(registry.toolsForGroup('freehand', epub).map((t) => t.id), [])
   assert.match(toolsMenu, /tool\.id === 'shape' \? \(\s*<div key=\{tool\.id\} className="contents">\s*\{renderButton\(tool, resolved\.group\.iconOnly\)\}\s*<FreehandSettingsButton hidden=\{hidden\} shapes \/>/)
   assert.match(screen, /case 'shape':\s+case 'eraser':\s+\/\/ Click the armed tool again/)
@@ -320,6 +328,14 @@ check('Shapes: PDF-only (capability shapeAnnotations), sits between Freehand and
 })
 check('Escape backs a Shape tool out to Select like the pen', () => {
   assert.match(screen, /activeToolRef\.current !== 'shape'\) return false/)
+})
+
+check('Typewriter properties: right-click on the tool opens the typewriter panel in defaults mode (no arm / disarm); RightPanelId has it', () => {
+  const rightPanelStore = readFileSync(new URL('../../src/screens/Reader/logic/rightPanel/rightPanelStore.ts', import.meta.url), 'utf8')
+  assert.match(rightPanelStore, /RightPanelId = 'settings' \| 'typewriter'/)
+  assert.match(toolsMenu, /tool\.id === 'typewriter' && onToolContextMenu \? \(e\) => \{ e\.preventDefault\(\); onToolContextMenu\(tool\.id\) \}/)
+  assert.match(screen, /onToolContextMenu=\{\(tool\) => \{[^]*if \(tool !== 'typewriter'\) return\s+useTypewriterPanelStore\.getState\(\)\.showDefaults\(\)\s+openRightPanel\('typewriter'\)/)
+  assert.doesNotMatch(screen, /onToolContextMenu=\{\(tool\) => \{[^}]*setActiveTool/)
 })
 
 console.log(`\n${passed} checks passed`)

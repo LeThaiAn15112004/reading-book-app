@@ -128,7 +128,7 @@ export async function scanPdfAnnotationBytes(bytes: Uint8Array): Promise<PdfAnno
     const nm = names.get(item.objectId)
     // A shape another reader drew stays the FILE's own graphic object (hover / select / edit in place, see
     // pdf_graphic_objects.md): only the shapes Readmate wrote itself (`readmate:<id>`) are annotations here.
-    if (isEmbeddedShapeSubtype(item.subtype) && !nm?.startsWith(READMATE_NM_PREFIX)) continue
+    if ((isEmbeddedShapeSubtype(item.subtype) || item.subtype === 'FreeText') && !nm?.startsWith(READMATE_NM_PREFIX)) continue
     const { line, width, ...more } = extras.get(item.objectId) ?? {}
     let shape = item.shape
     const page = line || width ? pages.find((p) => p.pageIndex === item.pageIndex) : undefined

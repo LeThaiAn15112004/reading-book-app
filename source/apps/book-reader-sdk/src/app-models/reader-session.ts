@@ -31,6 +31,8 @@ export type InteractionTool =
   | 'eraser'
   /** Shape tools (PDF only, capability `shapeAnnotations`): a drag draws a rectangle / ellipse / line / arrow annotation; never a text selection. */
   | 'shape'
+  /** Typewriter note (PDF only, capability `typewriterAnnotations`): a click or drag places a text box; never a text selection. */
+  | 'typewriter'
 
 /** The tools whose drag over text saves a mark in that style (the `HighlightStyleKind` of the same name). */
 export const MARKUP_TOOLS = ['highlight', 'underline', 'squiggly', 'strikethrough', 'replace', 'insert'] as const

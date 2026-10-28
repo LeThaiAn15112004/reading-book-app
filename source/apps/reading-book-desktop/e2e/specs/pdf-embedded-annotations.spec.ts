@@ -104,7 +104,7 @@ test('annotations embedded in a PDF are imported on every open, without duplicat
 
   await goToPage(page, 2)
   await expect(marks(page, 2, 'strikethrough')).toHaveCount(1)
-  await expect(marks(page, 2, 'underline')).toHaveCount(1) // the Squiggly
+  await expect(marks(page, 2, 'squiggly')).toHaveCount(1) // the Squiggly
   await expect(marks(page, 2, 'highlight')).toHaveCount(0) // the hidden one
   await goToPage(page, 3)
   await expect(noteIcons(page, 3)).toHaveCount(1)
@@ -153,7 +153,7 @@ test('annotations embedded in a PDF are imported on every open, without duplicat
     await goToPage(page, 2)
     // Removed from the file and never edited in the app → deleted too (live-sync rule, complete scan).
     await expect(marks(page, 2, 'strikethrough')).toHaveCount(0)
-    await expect(marks(page, 2, 'underline')).toHaveCount(1)
+    await expect(marks(page, 2, 'squiggly')).toHaveCount(1)
     await goToPage(page, 3)
     await expect(noteIcons(page, 3)).toHaveCount(1)
     await expect(marks(page, 3, 'underline')).toHaveCount(1) // added in the file

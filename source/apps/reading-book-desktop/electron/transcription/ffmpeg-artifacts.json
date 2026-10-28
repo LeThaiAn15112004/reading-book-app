@@ -1,0 +1,11 @@
+{
+  "win32-x64": {
+    "executable": "ffmpeg.exe",
+    "files": [
+      {
+        "name": "ffmpeg.exe",
+        "sha256": "be96e0c4e044fab7b0a5c20b3c7286d88f33a2fcb09b92d5f8a3fedff5f6829c"
+      }
+    ]
+  }
+}

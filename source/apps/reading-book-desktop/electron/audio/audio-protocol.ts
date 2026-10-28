@@ -1,11 +1,12 @@
 import { protocol } from 'electron'
-import { isAudioFormat } from '@reading-book/book-reader-sdk'
-import { resolveBookFile } from '../files/sandbox'
+import { bookFileStorage, resolveBookFile } from '../files/sandbox'
 import { getLibraryStore } from '../persistence/sqlite-library-store'
+import { createBookAudioLookup } from './audio-lookup'
 import { createAudioStreamHandler } from './audio-stream-handler'
 
 /**
- * `rb-audio://local/{bookId}` — streams an audiobook's file to the renderer's `<audio>` element.
+ * `rb-audio://local/{bookId}[/{trackId}]` — streams an audiobook's file (or one chapter of a multi-chapter audiobook,
+ * see `audio-lookup.ts`) to the renderer's `<audio>` element.
  * The renderer only ever names a book id; the library row decides the file, `resolveBookFile`
  * re-checks it on every request (absolute path, extension matches the format, symlinks resolved,
  * regular readable file), and the renderer never sees a filesystem path. See audio-stream-handler.ts.
@@ -26,11 +27,16 @@ export const AUDIO_SCHEME: Electron.CustomScheme = {
 export function registerAudioProtocol(): void {
   protocol.handle(
     AUDIO_PROTOCOL,
-    createAudioStreamHandler(async (bookId) => {
-      const book = await getLibraryStore().findById(bookId)
-      if (!book || !isAudioFormat(book.format)) return { ok: false }
-      const file = await resolveBookFile(book)
-      return file.ok ? { ok: true, path: file.path, format: book.format } : { ok: false }
-    }),
+    createAudioStreamHandler(
+      createBookAudioLookup({
+        findBook: (bookId) => getLibraryStore().findById(bookId),
+        getChapter: (bookId, trackId) => getLibraryStore().getAudioChapter(bookId, trackId),
+        isManaged: (filePath) => bookFileStorage(filePath) === 'managed',
+        resolveFile: async (book) => {
+          const file = await resolveBookFile(book)
+          return file.ok ? { ok: true, path: file.path } : { ok: false }
+        },
+      }),
+    ),
   )
 }

@@ -15,6 +15,11 @@
  *   - 'mp3' now inserts; unknown formats / bad status / invalid JSON / duplicate SHA are still rejected,
  *   - the runner is idempotent (026 is not applied twice).
  *
+ * It then applies 027 and 028 (`book_audio_chapters`, multi-chapter audiobooks) and proves for 028: no existing table
+ * changes, every CHECK / UNIQUE / FOREIGN KEY holds, deleting a book cascades its chapters, and — with the REAL
+ * better-sqlite3 `json_patch` — a multi-chapter progress save deletes a stale `percent` / `durationSeconds` /
+ * `chapterId` while single-file saves keep today's behaviour (SDK `audioProgressPatch`, built bundle).
+ *
  * Run: npm run spike:audio:migration
  */
 import assert from 'node:assert/strict'
@@ -23,7 +28,7 @@ import { createHash } from 'node:crypto'
 import fs from 'node:fs'
 import { createRequire } from 'node:module'
 import path from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
 const require = createRequire(import.meta.url)
@@ -217,12 +222,132 @@ check('027: m4a m4b aac wav flac ogg opus insert; aiff / aif / zip / xyz are sti
   for (const f of ['aiff', 'aif', 'zip', 'xyz']) assert.throws(() => insBook.run(row(f)), /CHECK constraint/, f)
   db.prepare(`DELETE FROM books WHERE id LIKE 'n27-%'`).run()
 })
+// ---- apply 028 (multi-chapter audiobooks) on top ----
+assert.ok(files.includes('028_book_audio_chapters.sql') && migrateSource.includes('./migrations/028_book_audio_chapters.sql?raw'), '028 exists and is listed')
+const before28 = snapshot()
+applyMigration(db, '028_book_audio_chapters.sql')
+console.log('after 028')
+const after28 = snapshot()
+check('028: no existing table changes (counts + content), indexes / triggers / FTS intact, integrity clean', () => {
+  assert.deepEqual(after28.counts, before28.counts)
+  assert.deepEqual(after28.hashes, before28.hashes)
+  assert.equal(JSON.stringify(after28.schema.triggers), JSON.stringify(before28.schema.triggers))
+  assert.deepEqual(after28.fts, before28.fts)
+  assert.deepEqual(db.pragma('foreign_key_check'), [])
+  assert.deepEqual(db.pragma('integrity_check'), [{ integrity_check: 'ok' }])
+})
+check('028: books keeps its format list and its indexes (it was not rebuilt)', () => {
+  const sqlOf = (d) => d.prepare(`SELECT sql FROM sqlite_master WHERE name = 'books'`).get().sql
+  assert.ok(sqlOf(db).includes("'opus'"))
+  assert.equal(after28.schema.indexes.filter((i) => i.tbl_name === 'books').length, before28.schema.indexes.filter((i) => i.tbl_name === 'books').length)
+})
+check('028: table, columns and index exist', () => {
+  const cols = db.prepare(`PRAGMA table_info(book_audio_chapters)`).all().map((c) => c.name)
+  assert.deepEqual(cols, ['id', 'book_id', 'position', 'title', 'file_name', 'source_path', 'file_format', 'size_bytes', 'sha256', 'duration_seconds'])
+  assert.ok(db.prepare(`SELECT 1 FROM sqlite_master WHERE type='index' AND name='idx_book_audio_chapters_book'`).get())
+})
+const mkAudioBook = (id, fmt = 'mp3') =>
+  insBook.run({ id, title: id, fp: `/books/${id}/0000-aaaaaaaa.${fmt}`, np: null, fmt, cover: null, sha: `mc-sha-${id}`, fav: 0, status: 'reading', prov: null, ext: null, url: null, meta: '{}', genres: '[]', state: '{}', added: 'a', upd: 'u' })
+const chapter = (over) => ({ id: `ch-${Math.random()}`, book_id: 'mc-1', position: 0, title: 'Chapter', file_name: '0000-aaaaaaaa.mp3', source_path: 'CD1/01.mp3', file_format: 'mp3', size_bytes: 10, sha256: 'h', duration_seconds: null, ...over })
+const insCh = db.prepare(`INSERT INTO book_audio_chapters (id, book_id, position, title, file_name, source_path, file_format, size_bytes, sha256, duration_seconds)
+  VALUES (@id, @book_id, @position, @title, @file_name, @source_path, @file_format, @size_bytes, @sha256, @duration_seconds)`)
+mkAudioBook('mc-1')
+mkAudioBook('mc-2', 'm4b')
+check('028: valid chapters insert — mixed formats, NULL and real durations, the same basename from different folders', () => {
+  insCh.run(chapter({ position: 0, file_name: '0000-aaaaaaaa.mp3', source_path: 'CD1/01.mp3', duration_seconds: 61.5 }))
+  insCh.run(chapter({ position: 1, file_name: '0001-bbbbbbbb.m4b', source_path: 'CD2/01.mp3', file_format: 'm4b', duration_seconds: null }))
+  for (const f of ['mp3', 'm4a', 'm4b', 'aac', 'wav', 'flac', 'ogg', 'opus']) insCh.run(chapter({ book_id: 'mc-2', position: 10 + ['mp3', 'm4a', 'm4b', 'aac', 'wav', 'flac', 'ogg', 'opus'].indexOf(f), file_name: `00${10 + ['mp3', 'm4a', 'm4b', 'aac', 'wav', 'flac', 'ogg', 'opus'].indexOf(f)}-cccccccc.${f}`, file_format: f }))
+  assert.equal(db.prepare(`SELECT count(*) n FROM book_audio_chapters WHERE book_id='mc-1'`).get().n, 2)
+  assert.equal(db.prepare(`SELECT duration_seconds d FROM book_audio_chapters WHERE book_id='mc-1' AND position=1`).get().d, null)
+})
+check('028: every CHECK rejects bad rows (format, position, size, duration, file_name not a basename)', () => {
+  const bad = (over, re = /CHECK constraint/) => assert.throws(() => insCh.run(chapter({ position: 50, file_name: 'ok-50.mp3', ...over })), re, JSON.stringify(over))
+  bad({ file_format: 'aiff' })
+  bad({ file_format: 'zip' })
+  bad({ file_format: 'epub' })
+  bad({ position: -1 })
+  bad({ size_bytes: -1 })
+  bad({ duration_seconds: 0 })
+  bad({ duration_seconds: -3 })
+  for (const name of ['', '.', '..', 'a/b.mp3', '../x.mp3', 'a\\b.mp3', '/abs.mp3', 'C:\\x.mp3']) bad({ file_name: name })
+})
+check('028: UNIQUE (book, position), UNIQUE (book, file_name), primary key, and the foreign key', () => {
+  assert.throws(() => insCh.run(chapter({ position: 0, file_name: 'other.mp3' })), /UNIQUE/)
+  assert.throws(() => insCh.run(chapter({ position: 60, file_name: '0000-aaaaaaaa.mp3' })), /UNIQUE/)
+  const id = db.prepare(`SELECT id FROM book_audio_chapters WHERE book_id='mc-1' LIMIT 1`).get().id
+  assert.throws(() => insCh.run(chapter({ id, position: 61, file_name: 'x61.mp3' })), /UNIQUE|PRIMARY/)
+  assert.throws(() => insCh.run(chapter({ book_id: 'no-such-book', position: 0 })), /FOREIGN KEY/)
+  // the same file name / position in ANOTHER book is fine (uniqueness is per book)
+  insCh.run(chapter({ book_id: 'mc-2', position: 0, file_name: '0000-aaaaaaaa.mp3' }))
+})
+check('028: deleting the parent book cascades its chapters only', () => {
+  const n = (b) => db.prepare(`SELECT count(*) n FROM book_audio_chapters WHERE book_id=?`).get(b).n
+  assert.equal(n('mc-1'), 2)
+  const other = n('mc-2')
+  db.prepare(`DELETE FROM books WHERE id='mc-1'`).run()
+  assert.equal(n('mc-1'), 0)
+  assert.equal(n('mc-2'), other)
+  assert.deepEqual(db.pragma('foreign_key_check'), [])
+})
+
+// JSON merge-patch against the real engine, driven by the SDK's own patch builder (built bundle).
+const sdk = await import(pathToFileURL(path.join(here, '../../../book-reader-sdk/dist/index.mjs')).href)
+const NOW = '2026-01-01T00:00:00.000Z'
+const stateOf = (id) => JSON.parse(db.prepare(`SELECT reading_state_json s FROM books WHERE id=?`).get(id).s)
+const applyProgress = (id, input) =>
+  db.prepare(`UPDATE books SET reading_state_json = json_patch(reading_state_json, @patch) WHERE id = @id`).run({ id, patch: JSON.stringify(sdk.audioProgressPatch(input, NOW)) })
+const seedState = () => ({
+  percent: 42,
+  lastReadLocation: 'x',
+  updatedAt: 'state-updated',
+  audioBookmarks: [{ id: 'n1', positionSeconds: 3 }],
+  audioProgress: { positionSeconds: 100, durationSeconds: 3600, playbackRate: 1.5, scope: 'book', chapterId: 'old-chapter', updatedAt: 'old' },
+})
+check('json_patch (real engine): a trackId save DELETES stale percent / durationSeconds / chapterId and keeps the rest', () => {
+  mkAudioBook('jp-multi')
+  db.prepare(`UPDATE books SET reading_state_json=? WHERE id='jp-multi'`).run(JSON.stringify(seedState()))
+  applyProgress('jp-multi', { positionSeconds: 5, playbackRate: 1, trackId: 't1', scope: 'chapter', durationSeconds: 90, chapterId: 'c9' })
+  const st = stateOf('jp-multi')
+  assert.equal('percent' in st, false)
+  assert.equal('durationSeconds' in st.audioProgress, false)
+  assert.equal('chapterId' in st.audioProgress, false)
+  assert.deepEqual(st.audioProgress, { positionSeconds: 5, playbackRate: 1, scope: 'chapter', trackId: 't1', updatedAt: NOW })
+  assert.equal(st.lastReadLocation, 'x')
+  assert.equal(st.updatedAt, 'state-updated')
+  assert.deepEqual(st.audioBookmarks, [{ id: 'n1', positionSeconds: 3 }])
+  applyProgress('jp-multi', { positionSeconds: 9, playbackRate: 1, trackId: 't2' })
+  const again = stateOf('jp-multi')
+  assert.equal('percent' in again, false)
+  assert.equal('durationSeconds' in again.audioProgress, false)
+  assert.equal(again.audioProgress.trackId, 't2')
+})
+check('json_patch (real engine): omission would have left them (why the patch uses explicit nulls)', () => {
+  mkAudioBook('jp-omit')
+  db.prepare(`UPDATE books SET reading_state_json=? WHERE id='jp-omit'`).run(JSON.stringify(seedState()))
+  db.prepare(`UPDATE books SET reading_state_json = json_patch(reading_state_json, ?) WHERE id='jp-omit'`).run(JSON.stringify({ audioProgress: { positionSeconds: 5, trackId: 't1' } }))
+  const st = stateOf('jp-omit')
+  assert.equal(st.percent, 42)
+  assert.equal(st.audioProgress.durationSeconds, 3600)
+})
+check('json_patch (real engine): a single-file save (no trackId) behaves exactly as before', () => {
+  mkAudioBook('jp-single')
+  db.prepare(`UPDATE books SET reading_state_json=? WHERE id='jp-single'`).run(JSON.stringify(seedState()))
+  applyProgress('jp-single', { positionSeconds: 30, playbackRate: 1.25, durationSeconds: 120, scope: 'book' })
+  const st = stateOf('jp-single')
+  assert.equal(st.percent, 25)
+  assert.deepEqual(st.audioProgress, { positionSeconds: 30, durationSeconds: 120, playbackRate: 1.25, scope: 'book', chapterId: 'old-chapter', updatedAt: NOW })
+  assert.equal('trackId' in st.audioProgress, false)
+  assert.deepEqual(st.audioBookmarks, [{ id: 'n1', positionSeconds: 3 }])
+})
+db.prepare(`DELETE FROM books WHERE id IN ('jp-multi','jp-omit','jp-single','mc-2')`).run()
 check('the runner is idempotent: schema_migrations has 026 once', () => {
   const applied = db.prepare(`SELECT name FROM schema_migrations WHERE name LIKE '026%'`).all()
   assert.equal(applied.length, 1)
   assert.throws(() => applyMigration(db, '026_books_audio_format.sql'), /UNIQUE/) // a second run is refused by schema_migrations, as migrate() skips it
 })
 check('a fresh database migrated through the latest in one go ends in the same schema', () => {
+  // `db` stopped at 028 for the checks above; bring it to the latest (029+, not touched by this spike) first.
+  for (const f of files.filter((f) => f.slice(0, 3) > '028')) applyMigration(db, f)
   const fresh = new Database(':memory:')
   fresh.exec('CREATE TABLE schema_migrations (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL UNIQUE, applied_at TEXT NOT NULL)')
   for (const f of files) applyMigration(fresh, f)

@@ -9,6 +9,8 @@
  *   2. persist    throttled while playing, immediate on pause / rate / end / leaving / window flush
  *   3. lifecycle  one element at a time, listeners and stream released, switching books, stale loads
  *   4. controls   seek clamping, skip, errors from the element
+ *   5. multi-track  (Stage B1) load / restore, element-per-track switching, A -> B fails -> C and the other race suites,
+ *                 play-state preservation, no writes while switching, status stays `ready`, single-file regression
  *
  * Run: npm run spike:audio:store   (builds the SDK bundle first)
  */
@@ -77,6 +79,18 @@ globalThis.Audio = FakeAudio
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'readmate-audio-store-'))
 const db = getDatabase()
 db.exec('PRAGMA foreign_keys = ON')
+// node:sqlite has no better-sqlite3 `.transaction()`, which the audio Notes store uses (a read-modify-write in one step).
+db.transaction = (fn) => () => {
+  db.exec('BEGIN')
+  try {
+    const result = fn()
+    db.exec('COMMIT')
+    return result
+  } catch (err) {
+    db.exec('ROLLBACK')
+    throw err
+  }
+}
 registerOverlayIpc()
 registerAudioIpc()
 const store_ = new Map()
@@ -96,7 +110,7 @@ function addBook(id, { state = '{}', create = true } = {}) {
 }
 const progressOf = (id) => parseAudioProgress(parseReadingState(db.prepare('SELECT reading_state_json j FROM books WHERE id = ?').get(id).j))
 
-const calls = { markAsReading: [], save: [], bookmarks: [] }
+const calls = { markAsReading: [], save: [], bookmarks: [], getBookmarks: [], delays: [] }
 globalThis.window = {
   api: {
     library: {
@@ -109,20 +123,23 @@ globalThis.window = {
     },
     audio: {
       getChapters: (id) => invoke(AudioChannels.getChapters, id),
-      getBookmarks: (id) => invoke(AudioChannels.getBookmarks, id),
+      getTracks: (id) => invoke(AudioChannels.getTracks, id),
+      getBookmarks: (id) => { calls.getBookmarks.push(id); return invoke(AudioChannels.getBookmarks, id) },
       saveBookmarks: async (input) => { calls.bookmarks.push(structuredClone(input)); return invoke(AudioChannels.saveBookmarks, input) },
     },
     overlay: {
       getAudioProgress: (id) => invoke(OverlayChannels.getAudioProgress, id),
       saveAudioProgress: async (input) => {
         calls.save.push(structuredClone(input))
+        const delay = calls.delays.shift() // a deliberately slow write, for the ordering checks
+        if (delay) await sleep(delay)
         return invoke(OverlayChannels.saveAudioProgress, input)
       },
     },
   },
 }
 
-const { useAudioPlayerStore, audioStreamUrl } = await import('../../src/screens/AudioBook/logic/audioPlayerStore.ts')
+const { useAudioPlayerStore, audioStreamUrl, selectCanAddNote } = await import('../../src/screens/AudioBook/logic/audioPlayerStore.ts')
 const { flushRegisteredSession } = await import('../../src/screens/Reader/logic/session/sessionFlushRegistry.ts')
 const store = useAudioPlayerStore
 const S = () => store.getState()
@@ -753,6 +770,1131 @@ await check('a decode / network error from the element → error state with a re
   assert.equal(S().playing, false)
   await sleep(1200)
   assert.equal(calls.save.length, 0, 'the save timer stopped')
+  await reset()
+})
+
+// ---- 5. multi-track audiobooks (Stage B1): track switching, races, errors ----
+console.log('5. multi-track: load, restore, switching, races, errors')
+const { randomUUID } = await import('node:crypto')
+const { chapterFileName } = await import('@reading-book/book-reader-sdk')
+const insertChapter = db.prepare(
+  `INSERT INTO book_audio_chapters (id, book_id, position, title, file_name, source_path, file_format, size_bytes, sha256, duration_seconds)
+   VALUES (?, ?, ?, ?, ?, ?, 'mp3', 10, ?, ?)`,
+)
+/** A multi-track book: real rows in `books` + `book_audio_chapters` (so the REAL Main IPC and guards answer). */
+function addMulti(id, durations = [60, null, 90, 30]) {
+  const dir = path.join(tmp, id)
+  fs.mkdirSync(dir)
+  const ids = durations.map(() => randomUUID())
+  const first = path.join(dir, chapterFileName(0, ids[0], 'mp3'))
+  fs.writeFileSync(first, Buffer.alloc(1000, 1))
+  insertBook.run(id, `Book ${id}`, first, `sha-${id}`, '{}')
+  durations.forEach((d, i) =>
+    insertChapter.run(ids[i], id, i, `Track ${i + 1}`, chapterFileName(i, ids[i], 'mp3'), `CD/${i + 1}.mp3`, `${i}`.padStart(64, '0'), d),
+  )
+  return ids
+}
+const url = (book, trackId) => audioStreamUrl(book, trackId)
+const settle = () => sleep(15)
+/** Open a multi-track book, finish loading its first track, and start it playing at `position` seconds. */
+async function openPlaying(id, durations, position = 12) {
+  const ids = addMulti(id, durations)
+  await S().load(id)
+  const el = current()
+  el.loaded(durations[0] ?? 60)
+  S().play()
+  await settle()
+  el.currentTime = position
+  return { ids, el }
+}
+const statusLog = []
+store.subscribe((s) => statusLog.push(s.status))
+
+await check('load: tracks come from Main (ids, titles, durations — no paths), the first track streams from its own URL, Notes are read once', async () => {
+  const ids = addMulti('mt-m1')
+  calls.getBookmarks.length = 0
+  await S().load('mt-m1')
+  assert.deepEqual(S().tracks.map((t) => [t.id, t.title, t.durationSeconds]), ids.map((id, i) => [id, `Track ${i + 1}`, [60, null, 90, 30][i]]))
+  assert.ok(S().tracks.every((t) => Object.keys(t).sort().join() === 'durationSeconds,id,title'), 'no file name / path crosses IPC')
+  const el = current()
+  assert.equal(el.src, url('mt-m1', ids[0]))
+  assert.equal(S().trackIndex, 0)
+  assert.equal(S().switching, true)
+  assert.equal(S().status, 'loading')
+  el.loaded(60)
+  assert.deepEqual([S().status, S().switching, S().durationSeconds], ['ready', false, 60])
+  assert.deepEqual(S().notes, [])
+  assert.deepEqual(calls.getBookmarks, ['mt-m1'], 'Notes are read once, after the tracks are known')
+  assert.equal(S().notesUnavailable, false)
+  assert.ok(S().addNote(), 'a Note can be added to a loaded multi-track book')
+  await reset()
+})
+
+await check('restore: a saved trackId + position resumes in THAT track (rate restored too)', async () => {
+  const ids = addMulti('mt-m2')
+  assert.deepEqual(await invoke(OverlayChannels.saveAudioProgress, { bookId: 'mt-m2', positionSeconds: 33, playbackRate: 1.5, trackId: ids[2] }), { ok: true })
+  await S().load('mt-m2')
+  const el = current()
+  assert.equal(el.src, url('mt-m2', ids[2]))
+  assert.equal(S().trackIndex, 2)
+  assert.equal(S().playbackRate, 1.5)
+  el.loaded(90)
+  assert.equal(el.currentTime, 33)
+  assert.equal(S().positionSeconds, 33)
+  await reset()
+})
+
+await check('restore: a missing, unknown or legacy-shaped trackId starts track 0 at 0 — the saved position is NEVER applied', async () => {
+  for (const [id, audioProgress] of [
+    ['mt-m3a', { positionSeconds: 500, playbackRate: 1, updatedAt: 'x' }], // legacy shape: position without a track
+    ['mt-m3b', { positionSeconds: 500, playbackRate: 1, trackId: 'not-a-track-of-this-book', updatedAt: 'x' }],
+    ['mt-m3c', { positionSeconds: 500, playbackRate: 1, trackId: 7, updatedAt: 'x' }],
+  ]) {
+    const ids = addMulti(id)
+    db.prepare('UPDATE books SET reading_state_json = ? WHERE id = ?').run(JSON.stringify({ audioProgress }), id)
+    await S().load(id)
+    const el = current()
+    assert.equal(el.src, url(id, ids[0]), id)
+    el.loaded(60)
+    assert.equal(el.currentTime, 0, id)
+    assert.equal(S().positionSeconds, 0, id)
+    assert.equal(S().trackIndex, 0, id)
+    await reset()
+  }
+})
+
+await check('saved progress of a multi-track book: trackId + the position IN the track, and no percent / duration / chapter id (real Main guard accepted it)', async () => {
+  const { ids, el } = await openPlaying('mt-m4', [60, null, 90, 30], 12)
+  calls.save.length = 0
+  el.pause()
+  await settle()
+  assert.deepEqual(calls.save[0], { bookId: 'mt-m4', positionSeconds: 12, playbackRate: 1, scope: 'book', trackId: ids[0] })
+  const state = JSON.parse(db.prepare('SELECT reading_state_json j FROM books WHERE id = ?').get('mt-m4').j)
+  assert.equal(state.audioProgress.trackId, ids[0])
+  assert.equal('percent' in state, false)
+  assert.equal('durationSeconds' in state.audioProgress, false)
+  assert.equal('chapterId' in state.audioProgress, false)
+  await reset()
+})
+
+await check('click another track while PLAYING: it plays from 0 on a new element, the old one is retired; status stays ready', async () => {
+  const { ids, el: a } = await openPlaying('mt-m5', [60, 45, 90, 30], 20)
+  const before = elements.length
+  S().goToTrack(1)
+  assert.equal(elements.length, before + 1, 'a new element per track')
+  assert.equal(a.released, true)
+  assert.equal(a.src, '')
+  const b = current()
+  assert.equal(b.src, url('mt-m5', ids[1]))
+  assert.deepEqual([S().trackIndex, S().switching, S().status, S().positionSeconds], [1, true, 'ready', 0])
+  b.loaded(45)
+  assert.deepEqual([S().switching, S().durationSeconds, S().playing], [false, 45, true], 'play state preserved')
+  assert.equal(b.paused, false)
+  await reset()
+})
+
+await check('click another track while PAUSED: it loads and STAYS paused', async () => {
+  const ids = addMulti('mt-m6')
+  await S().load('mt-m6')
+  const a = current()
+  a.loaded(60)
+  assert.equal(S().playing, false)
+  S().goToTrack(2)
+  const b = current()
+  b.loaded(90)
+  assert.deepEqual([S().trackIndex, S().playing, S().switching], [2, false, false])
+  assert.equal(b.paused, true)
+  assert.equal(b.src, url('mt-m6', ids[2]))
+  await reset()
+})
+
+await check('click the CURRENT track: nothing happens — no element, no save, no seek, no state change', async () => {
+  const { el } = await openPlaying('mt-m7', [60, 45, 90, 30], 20)
+  await settle()
+  calls.save.length = 0
+  const before = { elements: elements.length, state: { ...S() } }
+  S().goToTrack(0)
+  await settle()
+  assert.equal(elements.length, before.elements)
+  assert.equal(el.released, false)
+  assert.equal(el.currentTime, 20)
+  assert.equal(calls.save.length, 0)
+  assert.deepEqual([S().trackIndex, S().switching, S().playing, S().positionSeconds], [0, false, true, before.state.positionSeconds])
+  // out-of-range / invalid indices are ignored too
+  for (const bad of [-1, 4, 1.5, Number.NaN]) S().goToTrack(bad)
+  assert.equal(elements.length, before.elements)
+  await reset()
+})
+
+await check('RACE  A playing → B FAILS → C: stale events of B change nothing; A@12 saved once, never as B; C plays and saves as C', async () => {
+  statusLog.length = 0
+  const { ids, el: a } = await openPlaying('mt-r1', [60, 45, 90, 30], 12)
+  calls.save.length = 0
+  S().goToTrack(1) // A → B
+  // the OLD track was saved first, from the OLD element and the OLD trackId
+  assert.deepEqual([S().switching, S().trackIndex, S().status], [true, 1, 'ready'])
+  await settle()
+  assert.equal(calls.save.length, 1)
+  assert.deepEqual(calls.save[0], { bookId: 'mt-r1', positionSeconds: 12, playbackRate: 1, scope: 'book', trackId: ids[0] })
+  const b = current()
+  b.error = { code: 4 }
+  b.fire('error') // B cannot be played
+  assert.deepEqual([S().switching, S().status, S().playing], [false, 'ready', false])
+  assert.deepEqual([...S().trackErrors], [ids[1]])
+  await settle()
+  assert.equal(calls.save.length, 1, 'nothing is saved for the failed track')
+  assert.equal(JSON.parse(db.prepare('SELECT reading_state_json j FROM books WHERE id = ?').get('mt-r1').j).audioProgress.trackId, ids[0], 'last good progress is still A')
+  // the user picks C although B just failed
+  S().goToTrack(2)
+  const c = current()
+  assert.notEqual(c, b)
+  assert.equal(b.released, true)
+  assert.equal(c.src, url('mt-r1', ids[2]))
+  const snapshot = { ...S(), tracks: undefined }
+  const elementsNow = elements.length
+  const savesNow = calls.save.length
+  // B's LATE events (its element was retired): none of them may touch C or the store
+  b.duration = 777
+  b.currentTime = 99
+  for (const type of ['loadedmetadata', 'durationchange', 'canplay', 'timeupdate', 'seeking', 'seeked', 'waiting', 'playing', 'pause', 'ratechange', 'ended', 'error']) {
+    b.fire(type)
+    assert.equal(S().trackIndex, 2, type)
+    assert.equal(S().switching, true, `${type}: C is still loading`)
+    assert.equal(S().positionSeconds, snapshot.positionSeconds, type)
+    assert.equal(S().durationSeconds, 90, type)
+    assert.equal(S().playing, snapshot.playing, type)
+    assert.equal(S().ended, false, type)
+    assert.deepEqual([...S().trackErrors], [ids[1]], type)
+    assert.equal(c.currentTime, 0, `${type}: C was not seeked`)
+    assert.equal(elements.length, elementsNow, `${type}: no auto-advance / new element`)
+  }
+  await settle()
+  assert.equal(calls.save.length, savesNow, 'stale events wrote nothing')
+  c.loaded(90)
+  assert.deepEqual([S().switching, S().trackIndex], [false, 2])
+  assert.equal(c.currentTime, 0, 'C starts at its own offset (0), not B\'s 99')
+  S().play()
+  await settle()
+  assert.equal(S().playing, true, 'C can be played')
+  c.currentTime = 5
+  c.pause()
+  await settle()
+  assert.deepEqual(calls.save.at(-1), { bookId: 'mt-r1', positionSeconds: 5, playbackRate: 1, scope: 'book', trackId: ids[2] })
+  assert.ok(calls.save.every((s) => s.trackId !== ids[1]), 'no save was ever made with the failed track\'s id')
+  assert.equal(JSON.parse(db.prepare('SELECT reading_state_json j FROM books WHERE id = ?').get('mt-r1').j).audioProgress.trackId, ids[2])
+  assert.ok(a.released)
+  assert.ok(statusLog.every((s) => s === 'ready' || s === 'idle' || s === 'loading') && !statusLog.slice(statusLog.indexOf('ready')).includes('loading') && !statusLog.includes('error'), `status never left ready during the switches: ${[...new Set(statusLog)]}`)
+  await reset()
+})
+
+await check('RACE  A → B (still loading) → C: B\'s late metadata is dropped, C\'s offset applied once, ONE save in total (A)', async () => {
+  const { ids } = await openPlaying('mt-r2', [60, 45, 90, 30], 7)
+  calls.save.length = 0
+  S().goToTrack(1)
+  const b = current()
+  S().goToTrack(2) // before B ever loaded
+  const c = current()
+  assert.equal(b.released, true)
+  assert.equal(c.src, url('mt-r2', ids[2]))
+  b.duration = 45
+  b.fire('loadedmetadata') // B answers late
+  b.fire('canplay')
+  assert.deepEqual([S().switching, S().trackIndex, S().durationSeconds], [true, 2, 90], 'C is still the one loading')
+  assert.equal(c.currentTime, 0)
+  c.loaded(90)
+  assert.deepEqual([S().switching, S().trackIndex], [false, 2])
+  await settle()
+  assert.equal(calls.save.length, 1, 'exactly one save: the track the user left')
+  assert.deepEqual([calls.save[0].trackId, calls.save[0].positionSeconds], [ids[0], 7])
+  await reset()
+})
+
+await check('RACE  rapid A → B → C → D: only D is loaded and current, one save (A), and a slow save of A cannot land after later ones', async () => {
+  const { ids } = await openPlaying('mt-r3', [60, 45, 90, 30], 9)
+  calls.save.length = 0
+  calls.delays.push(60) // the first write (A) is slow
+  S().goToTrack(1)
+  S().goToTrack(2)
+  S().goToTrack(3)
+  assert.equal(elements.filter((e) => !e.released).length, 1, 'one live element')
+  const d = current()
+  assert.equal(d.src, url('mt-r3', ids[3]))
+  d.loaded(30)
+  S().play()
+  await settle()
+  d.currentTime = 3
+  d.pause() // a later write (D) while A's write is still in flight
+  await sleep(150)
+  assert.deepEqual(calls.save.map((s) => [s.trackId, s.positionSeconds]), [[ids[0], 9], [ids[3], 3]], 'saves made in order, none for B or C')
+  assert.equal(JSON.parse(db.prepare('SELECT reading_state_json j FROM books WHERE id = ?').get('mt-r3').j).audioProgress.trackId, ids[3], 'the last write wins')
+  await reset()
+})
+
+await check('NO WRITES while switching: pause/seeked on the new element and a window flush are skipped; writing resumes after metadata', async () => {
+  const { ids } = await openPlaying('mt-r4', [60, 45, 90, 30], 15)
+  S().goToTrack(1)
+  await settle()
+  calls.save.length = 0
+  const b = current()
+  b.fire('pause')
+  b.fire('seeked')
+  b.fire('ratechange')
+  await flushRegisteredSession()
+  await settle()
+  assert.equal(calls.save.length, 0)
+  b.loaded(45)
+  b.currentTime = 2
+  b.fire('pause')
+  await settle()
+  assert.deepEqual([calls.save.at(-1)?.trackId, calls.save.at(-1)?.positionSeconds], [ids[1], 2])
+  await reset()
+})
+
+await check('a track that fails to load: the player stays up (status ready), the row is marked, other tracks work; clicking it again retries', async () => {
+  const ids = addMulti('mt-r5')
+  await S().load('mt-r5')
+  const a = current()
+  a.fire('error') // the very first track cannot be opened
+  assert.deepEqual([S().status, S().switching, S().playing], ['ready', false, false])
+  assert.deepEqual([...S().trackErrors], [ids[0]])
+  S().goToTrack(1) // another track is chosen
+  const b = current()
+  b.loaded(60)
+  assert.deepEqual([S().trackIndex, S().trackErrors.size, S().switching], [1, 1, false])
+  // retry the failed track
+  const before = elements.length
+  S().goToTrack(0)
+  assert.equal(elements.length, before + 1)
+  assert.equal(S().trackErrors.has(ids[0]), false)
+  assert.equal(S().switching, true)
+  current().loaded(60)
+  assert.equal(S().switching, false)
+  // a play() rejected by the element is a per-track failure too (never the screen-level error)
+  const el = current()
+  el.play = async () => { throw new DOMException('not supported', 'NotSupportedError') }
+  S().play()
+  await settle()
+  assert.equal(S().status, 'ready')
+  assert.equal(S().trackErrors.has(ids[0]), true)
+  await reset()
+})
+
+await check('previous / next TRACK buttons: next = +1 keeping the play state and nothing after the last; previous restarts after 3 s (and on the first track), else goes back one', async () => {
+  const { ids, el: a } = await openPlaying('mt-n1', [60, 45, 90, 30], 1) // playing, 1 s in
+  S().nextChapter()
+  const b = current()
+  assert.notEqual(b, a)
+  assert.deepEqual([S().trackIndex, a.released, b.src], [1, true, url('mt-n1', ids[1])])
+  b.loaded(45)
+  assert.equal(S().playing, true, 'a playing player keeps playing on the next track')
+  b.currentTime = 1 // under 3 s: back one track
+  S().previousChapter()
+  const a2 = current()
+  assert.equal(S().trackIndex, 0)
+  a2.loaded(60)
+  a2.currentTime = 10 // over 3 s: restart this track, no new element
+  let count = elements.length
+  S().previousChapter()
+  assert.deepEqual([elements.length, a2.currentTime, S().trackIndex], [count, 0, 0])
+  a2.currentTime = 1 // first track: previous only restarts
+  S().previousChapter()
+  assert.deepEqual([elements.length, a2.currentTime, S().trackIndex], [count, 0, 0])
+  S().goToTrack(3)
+  current().loaded(30)
+  count = elements.length
+  S().nextChapter() // after the last track: nothing
+  assert.deepEqual([elements.length, S().trackIndex], [count, 3])
+  await reset()
+  // paused stays paused
+  const ids2 = addMulti('mt-n2')
+  await S().load('mt-n2')
+  current().loaded(60)
+  assert.equal(S().playing, false)
+  S().nextChapter()
+  const c = current()
+  c.loaded(45)
+  assert.deepEqual([S().trackIndex, S().playing, c.paused, c.src], [1, false, true, url('mt-n2', ids2[1])])
+  await reset()
+})
+
+await check('AUTO-ADVANCE: when a track ends the next one starts playing; the next track (not the finished one\'s end) is what gets saved; a minutes timer keeps running', async () => {
+  const { ids, el: a } = await openPlaying('mt-aa1', [60, 45, 90, 30], 59)
+  S().setSleep({ kind: 'minutes', minutes: 15 })
+  calls.save.length = 0
+  const count = elements.length
+  a.currentTime = 60
+  a.ended = true
+  a.fire('ended')
+  assert.equal(elements.length, count + 1, 'one new element for the next track')
+  const b = current()
+  assert.equal(a.released, true)
+  assert.equal(b.src, url('mt-aa1', ids[1]))
+  assert.deepEqual([S().trackIndex, S().switching, S().status, S().ended], [1, true, 'ready', false])
+  assert.equal(S().sleep.kind, 'minutes', 'the sleep timer survives the advance')
+  b.loaded(45)
+  await settle()
+  assert.deepEqual([S().playing, b.paused, S().switching], [true, false, false], 'the next track plays')
+  assert.deepEqual(calls.save.map((s) => [s.trackId, s.positionSeconds]), [[ids[1], 0]], 'saved once: the NEW track at 0 — never the finished track\'s end')
+  const stored = JSON.parse(db.prepare('SELECT reading_state_json j FROM books WHERE id = ?').get('mt-aa1').j)
+  assert.equal(stored.audioProgress.trackId, ids[1])
+  S().setSleep({ kind: 'off' })
+  await reset()
+})
+
+await check('AUTO-ADVANCE: the LAST track just stops (ended, not playing, nothing further opened) and clears the sleep timer', async () => {
+  const { ids } = await openPlaying('mt-aa2', [60, 45, 90, 30], 1)
+  S().goToTrack(3)
+  const last = current()
+  last.loaded(30)
+  await settle()
+  S().setSleep({ kind: 'minutes', minutes: 15 })
+  calls.save.length = 0
+  const count = elements.length
+  last.currentTime = 30
+  last.ended = true
+  last.fire('ended')
+  await settle()
+  assert.equal(elements.length, count, 'nothing opened after the last track')
+  assert.deepEqual([S().trackIndex, S().playing, S().ended, S().sleep.kind], [3, false, true, 'off'])
+  assert.deepEqual([calls.save.at(-1).trackId, calls.save.at(-1).positionSeconds], [ids[3], 30])
+  await reset()
+})
+
+await check('AUTO-ADVANCE: if the next track cannot be opened it is marked and playback stops there — no skipping on to a third track', async () => {
+  const { ids, el: a } = await openPlaying('mt-aa3', [60, 45, 90, 30], 59)
+  a.currentTime = 60
+  a.ended = true
+  a.fire('ended')
+  const b = current()
+  const count = elements.length
+  b.fire('error')
+  await settle()
+  assert.deepEqual([S().trackIndex, S().playing, S().status, S().switching], [1, false, 'ready', false])
+  assert.deepEqual([...S().trackErrors], [ids[1]])
+  assert.equal(elements.length, count, 'no third track was opened by itself')
+  // the user can still go on by hand
+  S().nextChapter()
+  current().loaded(90)
+  assert.equal(S().trackIndex, 2)
+  await reset()
+})
+
+await check('SLEEP "end of track": pauses at the end of the CURRENT track without advancing; a different track starts without it; no timer while the duration is unknown', async () => {
+  const { ids, el: a } = await openPlaying('mt-sl1', [60, 45, 90, 30], 10)
+  S().setSleep({ kind: 'chapter' })
+  assert.equal(S().sleep.kind, 'chapter')
+  const count = elements.length
+  a.currentTime = 59.8
+  a.fire('timeupdate')
+  assert.deepEqual([a.paused, S().sleep.kind, elements.length], [true, 'off', count], 'paused at the end of the track, timer used up, no advance')
+  assert.equal(S().trackIndex, 0)
+  // armed, then another track is chosen: the timer does not carry over to it
+  S().setSleep({ kind: 'chapter' })
+  assert.equal(S().sleep.kind, 'chapter')
+  S().goToTrack(1)
+  assert.equal(S().sleep.kind, 'off')
+  // not armed while a track is still loading (no duration yet)
+  S().setSleep({ kind: 'chapter' })
+  assert.equal(S().sleep.kind, 'off')
+  current().loaded(45)
+  S().setSleep({ kind: 'chapter' })
+  assert.equal(S().sleep.kind, 'chapter')
+  S().setSleep({ kind: 'off' })
+  void ids
+  await reset()
+})
+
+await check('status never left ready during any of the multi-track switches above (no full-screen "opening…" / error)', () => {
+  const afterFirstReady = statusLog.slice(statusLog.indexOf('ready'))
+  assert.equal(afterFirstReady.includes('error'), false)
+})
+
+await check('single-file regression: one element, no tracks, no trackId in the saved payload, Notes still work', async () => {
+  addBook('mt-s1')
+  const before = elements.length
+  await S().load('mt-s1')
+  const el = current()
+  el.loaded(100)
+  assert.equal(elements.length, before + 1)
+  assert.deepEqual([S().tracks.length, S().trackIndex, S().switching], [0, -1, false])
+  S().play()
+  await settle()
+  calls.save.length = 0
+  el.currentTime = 10
+  el.pause()
+  await settle()
+  assert.deepEqual(calls.save[0], { bookId: 'mt-s1', positionSeconds: 10, playbackRate: 1, scope: 'book', durationSeconds: 100 })
+  assert.equal('trackId' in calls.save[0], false)
+  S().goToTrack(1) // a no-op for a single-file book
+  assert.equal(elements.length, before + 1)
+  assert.ok(S().addNote())
+  await reset()
+})
+
+// ---- 6. Notes for multi-track audiobooks: add / list / edit / delete, jumps, fallback and races, limits ----
+console.log('6. multi-track Notes: add, list, edit, delete, jumps, fallback, races, limits')
+const { notesForTrack, noteMarkerFraction } = await import('@reading-book/book-reader-sdk')
+const rawState = (id) => JSON.parse(db.prepare('SELECT reading_state_json j FROM books WHERE id = ?').get(id).j)
+const mkNote = (id, trackId, positionSeconds, extra = {}) => ({ id, label: `L-${id}`, positionSeconds, createdAt: '2026-01-01T00:00:00Z', ...extra, trackId })
+/** A multi-track book seeded with Notes (`notes(ids)`), opened, track 0 loaded and PLAYING at `position`. Counters are cleared. */
+async function openJ(id, durations, notes, position = 12) {
+  const ids = addMulti(id, durations)
+  db.prepare('UPDATE books SET reading_state_json = ? WHERE id = ?').run(JSON.stringify({ audioBookmarks: notes(ids) }), id)
+  await S().load(id)
+  const el = current()
+  el.loaded(durations[0] ?? 60)
+  S().play()
+  await settle()
+  el.currentTime = position
+  calls.save.length = 0
+  calls.bookmarks.length = 0
+  return { ids, el }
+}
+const JNOTES = (ids) => [
+  mkNote('nA', ids[0], 40),
+  mkNote('nB', ids[1], 30),
+  mkNote('nC', ids[2], 85),
+  mkNote('nD', ids[3], 29),
+  mkNote('nE', ids[2], 500),
+  mkNote('nF', ids[1], 45),
+]
+const JDUR = [100, 60, 90, 30]
+const savedTrackIds = () => calls.save.map((s) => s.trackId)
+
+await check('NOTES add: current track + current second, with / without text, stored with trackId and no chapter reference; same-second Notes both kept; ZERO progress saves; other tracks later come out in track order', async () => {
+  const { ids } = await openPlaying('nt-n1', [60, 45, 90, 30], 12)
+  calls.save.length = 0
+  const plain = S().addNote()
+  const texted = S().addNote('with text')
+  assert.ok(plain && texted && plain !== texted)
+  assert.deepEqual(S().notes.map((n) => [n.trackId, n.positionSeconds]), [[ids[0], 12], [ids[0], 12]])
+  assert.equal(S().notes.find((n) => n.id === plain).label, 'Track 1 · 0:12')
+  assert.equal(S().notes.find((n) => n.id === texted).note, 'with text')
+  await sleep(30)
+  assert.equal(calls.save.length, 0, 'adding a Note issues no saveAudioProgress')
+  assert.equal(rawState('nt-n1').audioProgress, undefined, 'stored audioProgress untouched')
+  const stored = stateOf2('nt-n1').audioBookmarks
+  assert.deepEqual(stored.map((n) => n.id).sort(), [plain, texted].sort())
+  assert.ok(stored.every((n) => n.trackId === ids[0] && !('chapterId' in n) && !('chapterOffsetSeconds' in n)))
+  // a Note on a later track, made while the first track's Notes exist
+  S().goToTrack(2)
+  current().loaded(90)
+  current().currentTime = 20
+  const later = S().addNote()
+  assert.deepEqual(S().notes.map((n) => n.trackId), [ids[0], ids[0], ids[2]])
+  assert.equal(S().notes.find((n) => n.id === later).positionSeconds, 20)
+  await reset()
+})
+
+await check('NOTES add is unavailable (no Note, nothing saved) before the track is ready, while switching and on a failed track; a track of unknown length still accepts one', async () => {
+  const ids = addMulti('nt-n2', [60, 45, 90, 30])
+  calls.bookmarks.length = 0
+  await S().load('nt-n2')
+  assert.equal(selectCanAddNote(S()), false, 'not ready')
+  assert.equal(S().addNote(), null)
+  current().loaded(60)
+  assert.equal(selectCanAddNote(S()), true)
+  S().goToTrack(1) // a switch in flight
+  assert.equal(selectCanAddNote(S()), false, 'switching')
+  assert.equal(S().addNote(), null)
+  current().fire('error') // the track failed
+  assert.deepEqual([S().status, S().switching, [...S().trackErrors]], ['ready', false, [ids[1]]])
+  assert.equal(selectCanAddNote(S()), false, 'failed track')
+  assert.equal(S().addNote(), null)
+  assert.equal(S().notes.length, 0)
+  await sleep(30)
+  assert.equal(calls.bookmarks.length, 0, 'nothing was saved')
+  await reset()
+  // unknown duration (NaN from the element): the position comes from where playback is
+  addMulti('nt-n3', [null, 50])
+  await S().load('nt-n3')
+  const el = current()
+  el.loaded(NaN)
+  assert.equal(S().durationSeconds, null)
+  el.currentTime = 7
+  const id = S().addNote()
+  assert.ok(id)
+  assert.equal(S().notes[0].positionSeconds, 7)
+  assert.equal(noteMarkerFraction(7, S().durationSeconds), null, 'no marker while the duration is unknown')
+  await reset()
+})
+
+await check('NOTES list / edit / delete: order across tracks, restore after reopening, edit keeps track + second + id, zero progress saves, other state untouched; a FAILED current track keeps Notes editable and deletable while add stays blocked', async () => {
+  const { ids } = await openPlaying('nt-n4', [60, 45, 90, 30], 10)
+  const a = S().addNote('a') // track 0 @10
+  S().goToTrack(2)
+  current().loaded(90)
+  current().currentTime = 5
+  const b = S().addNote('b') // track 2 @5
+  S().goToTrack(1)
+  current().loaded(45)
+  current().currentTime = 33
+  const c = S().addNote('c') // track 1 @33
+  assert.deepEqual(S().notes.map((n) => n.id), [a, c, b], 'ordered by track, not by creation')
+  await sleep(30)
+  await S().dispose()
+  await S().load('nt-n4')
+  current().loaded(45)
+  assert.deepEqual(S().notes.map((n) => n.id), [a, c, b], 'restored in the same order after reopening')
+  assert.deepEqual(S().notes.map((n) => n.trackId), [ids[0], ids[1], ids[2]])
+  calls.save.length = 0
+  const before = S().notes.find((n) => n.id === c)
+  S().updateNote(c, 'edited')
+  const after = S().notes.find((n) => n.id === c)
+  assert.deepEqual([after.id, after.trackId, after.positionSeconds, after.createdAt, after.note], [before.id, before.trackId, before.positionSeconds, before.createdAt, 'edited'])
+  assert.equal(S().notes.length, 3, 'no duplicate')
+  await sleep(30)
+  assert.equal(stateOf2('nt-n4').audioBookmarks.find((n) => n.id === c).note, 'edited')
+  // the current track fails: its Notes (and the others') stay listed, editable and deletable; adding is blocked
+  current().fire('error')
+  assert.equal(selectCanAddNote(S()), false)
+  assert.equal(S().addNote(), null)
+  S().updateNote(a, 'a2')
+  S().removeNote(b)
+  assert.deepEqual(S().notes.map((n) => [n.id, n.note]), [[a, 'a2'], [c, 'edited']])
+  await sleep(30)
+  assert.deepEqual(stateOf2('nt-n4').audioBookmarks.map((n) => n.id).sort(), [a, c].sort())
+  assert.equal(calls.save.length, 0, 'edit and delete issue no saveAudioProgress')
+  await reset()
+})
+
+await check('NOTES mutations leave every other reading-state key and the stored audioProgress untouched (renderer path)', async () => {
+  const ids = addMulti('nt-p1')
+  const seed = {
+    lastReadLocation: { k: 1 },
+    fontSize: 18,
+    futureKey: { a: [1, { b: 2 }] },
+    audioProgress: { trackId: ids[0], positionSeconds: 0, playbackRate: 1, scope: 'book', updatedAt: '2026-01-01T00:00:00Z' },
+  }
+  db.prepare('UPDATE books SET reading_state_json = ? WHERE id = ?').run(JSON.stringify(seed), 'nt-p1')
+  await S().load('nt-p1')
+  current().loaded(60)
+  calls.save.length = 0
+  const othersUntouched = (step) => {
+    const { audioBookmarks: _n, ...rest } = rawState('nt-p1')
+    void _n
+    assert.deepEqual(rest, seed, `${step}: everything except audioBookmarks equals the seed`)
+    assert.equal(JSON.stringify(rest.audioProgress), JSON.stringify(seed.audioProgress), `${step}: audioProgress byte-identical`)
+  }
+  const id = S().addNote('x')
+  await sleep(30)
+  othersUntouched('add')
+  S().updateNote(id, 'y')
+  await sleep(30)
+  othersUntouched('edit')
+  S().removeNote(id)
+  await sleep(30)
+  othersUntouched('delete')
+  assert.equal(calls.save.length, 0)
+  await reset()
+})
+
+await check('NOTES rapid add → edit → delete → add back (no awaiting): the stored list equals the last list seen, no duplicate, nothing resurrected; saves reach Main in call order', async () => {
+  await openPlaying('nt-n5', [60, 45, 90, 30], 12)
+  calls.bookmarks.length = 0
+  const first = S().addNote('one')
+  S().updateNote(first, 'one edited')
+  S().removeNote(first)
+  const back = S().addNote('one')
+  assert.notEqual(first, back)
+  const seen = S().notes.map((n) => n.id)
+  assert.deepEqual(seen, [back])
+  await sleep(60)
+  assert.deepEqual(calls.bookmarks.map((c) => c.bookmarks.map((n) => n.id)), [[first], [first], [], [back]], 'one save per action, in order')
+  assert.equal(calls.bookmarks[1].bookmarks[0].note, 'one edited')
+  assert.deepEqual((await invoke(AudioChannels.getBookmarks, 'nt-n5')).map((n) => n.id), seen, 'stored == the last list seen')
+  assert.deepEqual(S().notes.map((n) => n.id), seen)
+  await reset()
+})
+
+await check('NOTES jump: same track = position only (no new element, no reload); other track keeps PLAYING / PAUSED; saves follow the usual rules (old track first, then only {trackId, positionSeconds})', async () => {
+  const { ids, el: a } = await openJ('nt-j1', JDUR, JNOTES)
+  const elementsBefore = elements.length
+  S().goToNote('nA') // same track
+  assert.equal(elements.length, elementsBefore, 'no new element')
+  assert.equal(a.currentTime, 40)
+  assert.deepEqual([S().trackIndex, S().switching, S().positionSeconds], [0, false, 40])
+  // other track while playing
+  calls.save.length = 0
+  a.currentTime = 12
+  S().goToNote('nC')
+  assert.deepEqual([S().trackIndex, S().switching, S().playing, S().status], [2, true, true, 'ready'])
+  const c = current()
+  assert.equal(c.src, url('nt-j1', ids[2]))
+  assert.equal(a.released, true)
+  c.loaded(90)
+  await settle()
+  assert.equal(c.currentTime, 85, 'the exact second of the Note')
+  assert.equal(S().playing, true, 'playing stays playing')
+  assert.deepEqual(calls.save, [
+    { bookId: 'nt-j1', positionSeconds: 12, playbackRate: 1, scope: 'book', trackId: ids[0] },
+    { bookId: 'nt-j1', positionSeconds: 85, playbackRate: 1, scope: 'book', trackId: ids[2] },
+  ])
+  assert.ok(calls.save.every((s) => !('percent' in s) && !('durationSeconds' in s) && !('chapterId' in s)))
+  // other track while paused
+  S().pause()
+  await settle()
+  calls.save.length = 0
+  S().goToNote('nB')
+  const b = current()
+  b.loaded(60)
+  await settle()
+  assert.equal(b.currentTime, 30)
+  assert.deepEqual([S().playing, b.paused, S().trackIndex], [false, true, 1], 'paused stays paused')
+  await reset()
+})
+
+await check('NOTES jump lands EXACTLY near the end of a track (not restarted at 0) and is clamped when the second is beyond the real length', async () => {
+  const { ids } = await openJ('nt-j2', JDUR, JNOTES)
+  S().goToNote('nD') // track 3 (30 s) @29 — inside the "restart a finished track" window
+  current().loaded(30)
+  assert.equal(current().currentTime, 29)
+  assert.equal(S().positionSeconds, 29)
+  S().goToNote('nE') // track 2 (90 s) @500
+  current().loaded(90)
+  assert.equal(current().currentTime, 90, 'clamped to the end of the track, not rejected')
+  assert.equal(S().trackIndex, 2)
+  assert.ok(ids)
+  await reset()
+})
+
+await check('NOTES jump RACE: 3 rapid jumps and a run of 12 across tracks end on the LAST Note only; every late metadata of a retired element is ignored; a second Note on the track still loading is not lost', async () => {
+  const { ids } = await openJ('nt-j3', JDUR, JNOTES)
+  S().goToNote('nB')
+  const b = current()
+  S().goToNote('nC')
+  const c = current()
+  b.loaded(60) // B's late metadata
+  assert.deepEqual([S().trackIndex, S().switching], [2, true])
+  assert.equal(c.currentTime, 0)
+  c.loaded(90)
+  assert.deepEqual([S().trackIndex, c.currentTime], [2, 85])
+  assert.equal(b.currentTime, 0, "B's second was never applied")
+  await settle()
+  assert.deepEqual(savedTrackIds(), [ids[0], ids[2]], 'one save of the old track, one of the final one — never B')
+  await reset()
+
+  const run = await openJ('nt-j4', JDUR, JNOTES)
+  const seq = ['nB', 'nC', 'nD', 'nB', 'nC', 'nD', 'nF', 'nC', 'nD', 'nB', 'nF', 'nC']
+  const made = []
+  for (const id of seq) {
+    S().goToNote(id)
+    made.push(current())
+  }
+  assert.equal(seq.length, 12)
+  assert.deepEqual([S().trackIndex, S().switching], [2, true])
+  for (const e of made.slice(0, -1)) e.loaded(60) // every earlier element answers late
+  assert.deepEqual([S().trackIndex, S().switching], [2, true], 'late answers change nothing')
+  made.at(-1).loaded(90)
+  assert.deepEqual([S().trackIndex, made.at(-1).currentTime, S().positionSeconds], [2, 85, 85])
+  assert.ok(made.slice(0, -1).every((e) => e.currentTime === 0 && e.released), 'no earlier Note second was applied to anything')
+  await settle()
+  assert.deepEqual(savedTrackIds(), [run.ids[0], run.ids[2]])
+  await reset()
+
+  // a second Note on the track that is still loading: the track is reopened at the LAST requested second
+  const { ids: ids3 } = await openJ('nt-j5', JDUR, JNOTES)
+  S().goToNote('nB') // track 1 @30
+  const first = current()
+  S().goToNote('nF') // track 1 @45, while track 1 is still loading
+  const second = current()
+  assert.notEqual(first, second)
+  first.loaded(60)
+  second.loaded(60)
+  assert.equal(second.currentTime, 45)
+  assert.equal(S().trackIndex, 1)
+  assert.ok(ids3)
+  await reset()
+})
+
+await check('NOTES jump FALLBACK (a): the target cannot be played → back on the origin track at its second, PAUSED, target marked, a notice names it, the Note stays; the target is never saved', async () => {
+  const { ids } = await openJ('nt-f1', JDUR, JNOTES, 12)
+  S().goToNote('nB') // origin: track 0 @12
+  const target = current()
+  target.fire('error')
+  assert.deepEqual([S().trackIndex, S().switching, S().playing, S().status], [0, true, false, 'ready'])
+  assert.deepEqual([...S().trackErrors], [ids[1]])
+  assert.ok(S().noteNotice?.includes('Track 2'), S().noteNotice)
+  const origin = current()
+  assert.notEqual(origin, target)
+  assert.equal(origin.src, url('nt-f1', ids[0]))
+  origin.loaded(100)
+  await settle()
+  assert.equal(origin.currentTime, 12, 'back at the origin second')
+  assert.deepEqual([S().playing, origin.paused, S().switching], [false, true, false])
+  assert.ok(S().notes.some((n) => n.id === 'nB'), 'the Note is kept')
+  assert.ok(calls.save.every((s) => s.trackId !== ids[1]), 'the failed target was never saved')
+  assert.equal(rawState('nt-f1').audioProgress.trackId, ids[0], 'stored progress ends at the origin')
+  await reset()
+})
+
+await check('NOTES jump FALLBACK (b): a failure arriving AFTER a newer Contents click or a newer Note jump never falls back — the newer action wins', async () => {
+  const { ids } = await openJ('nt-f2', JDUR, JNOTES, 12)
+  S().goToNote('nB')
+  const b = current()
+  S().goToTrack(3) // a newer, user-initiated switch
+  const d = current()
+  const elementsNow = elements.length
+  b.error = { code: 4 }
+  b.fire('error') // B's late failure
+  assert.equal(elements.length, elementsNow, 'no fallback element')
+  assert.deepEqual([S().trackIndex, S().switching, [...S().trackErrors]], [3, true, []])
+  d.loaded(30)
+  assert.equal(S().trackIndex, 3)
+  await reset()
+
+  const second = await openJ('nt-f3', JDUR, JNOTES, 12)
+  S().goToNote('nB')
+  const b2 = current()
+  S().goToNote('nC') // a newer Note jump
+  const c2 = current()
+  const n2 = elements.length
+  b2.fire('error')
+  assert.equal(elements.length, n2, 'no fallback element')
+  assert.deepEqual([S().trackIndex, [...S().trackErrors]], [2, []])
+  c2.loaded(90)
+  assert.deepEqual([S().trackIndex, c2.currentTime, S().noteNotice], [2, 85, null])
+  assert.ok(second.ids)
+  await reset()
+  assert.ok(ids)
+})
+
+await check('NOTES jump FALLBACK (c): the target AND the origin fail → the standard error state for the origin, no second fallback, no loop, nothing saved for either', async () => {
+  const { ids } = await openJ('nt-f4', JDUR, JNOTES, 12)
+  S().goToNote('nB')
+  const target = current()
+  target.fire('error')
+  const origin = current()
+  const afterFallback = elements.length
+  origin.fire('error') // the fallback fails too
+  await settle()
+  assert.equal(elements.length, afterFallback, 'no further element: no loop')
+  assert.deepEqual([S().status, S().switching, S().playing], ['ready', false, false])
+  assert.deepEqual([...S().trackErrors].sort(), [ids[0], ids[1]].sort())
+  assert.equal(S().trackIndex, 0, 'the usual error state is shown for the origin track')
+  assert.ok(savedTrackIds().every((t) => t === ids[0]), 'only the forced save of the old track, never the target')
+  await reset()
+})
+
+await check('NOTES jump FALLBACK (d, e, f): a target that already loaded never rolls back; with no settled origin a failure keeps the usual error state; a jump during a jump inherits the first origin', async () => {
+  // (d) loaded, then fails minutes later → ordinary error, no fallback
+  const d = await openJ('nt-f5', JDUR, JNOTES, 12)
+  S().goToNote('nB')
+  const b = current()
+  b.loaded(60)
+  const n = elements.length
+  b.fire('error')
+  assert.equal(elements.length, n, 'no fallback after the jump completed')
+  assert.deepEqual([S().trackIndex, [...S().trackErrors], S().noteNotice], [1, [d.ids[1]], null])
+  await reset()
+
+  // (e1) the player was mid-switch from a Contents click: no settled origin
+  const e = await openJ('nt-f6', JDUR, JNOTES, 12)
+  S().goToTrack(2)
+  S().goToNote('nB')
+  const eb = current()
+  const n2 = elements.length
+  eb.fire('error')
+  assert.equal(elements.length, n2, 'no origin → no fallback')
+  assert.deepEqual([S().trackIndex, [...S().trackErrors]], [1, [e.ids[1]]])
+  await reset()
+
+  // (e2) the current track itself had failed
+  const e2 = await openJ('nt-f7', JDUR, JNOTES, 12)
+  e2.el.fire('error')
+  S().goToNote('nB')
+  const eb2 = current()
+  const n3 = elements.length
+  eb2.fire('error')
+  assert.equal(elements.length, n3, 'the failed track is not a place to return to')
+  await reset()
+
+  // (f) Note jump during a Note jump: the second inherits the first's origin (track 0 @12)
+  const f = await openJ('nt-f8', JDUR, JNOTES, 12)
+  S().goToNote('nB')
+  S().goToNote('nC')
+  const fc = current()
+  fc.fire('error')
+  const back = current()
+  assert.equal(back.src, url('nt-f8', f.ids[0]), 'back on the track the first jump started from')
+  back.loaded(100)
+  assert.equal(back.currentTime, 12)
+  assert.deepEqual([S().trackIndex, S().playing], [0, false])
+  await reset()
+})
+
+await check('NOTES cap (multi-track only): the 501st Note is NOT created, a visible notice is set, the 500 stay; a refused save reloads the list from Main with a notice; a single-file book at the cap is exactly as before', async () => {
+  const { ids } = await openJ('nt-c1', [60, 45, 90, 30], (ids) => Array.from({ length: 500 }, (_, i) => mkNote(`o${i}`, ids[i % 4], i % 40)))
+  assert.equal(S().notes.length, 500)
+  assert.equal(S().addNote('one too many'), null)
+  assert.equal(S().notes.length, 500)
+  assert.ok(S().noteNotice?.includes('500'), S().noteNotice)
+  await sleep(30)
+  assert.equal(calls.bookmarks.length, 0, 'nothing was saved')
+  assert.equal(stateOf2('nt-c1').audioBookmarks.length, 500)
+  await reset()
+  assert.ok(ids)
+
+  // a save Main refuses: the list is reloaded and the user is told
+  await openJ('nt-c2', [60, 45, 90, 30], (ids) => [mkNote('keep', ids[0], 3)])
+  const realSave = window.api.audio.saveBookmarks
+  window.api.audio.saveBookmarks = async (input) => {
+    calls.bookmarks.push(structuredClone(input))
+    return { ok: false }
+  }
+  try {
+    assert.ok(S().addNote('refused'))
+    assert.equal(S().notes.length, 2, 'shown at once')
+    await sleep(60)
+  } finally {
+    window.api.audio.saveBookmarks = realSave
+  }
+  assert.deepEqual(S().notes.map((n) => n.id), ['keep'], 'reloaded from Main: the refused Note is gone')
+  assert.ok(S().noteNotice?.includes('could not be saved'))
+  await reset()
+
+  // single-file at the cap: no notice, nothing refused, the silent truncation of before
+  addBook('nt-c3', { state: JSON.stringify({ audioBookmarks: Array.from({ length: 500 }, (_, i) => ({ id: `s${i}`, label: 'x', positionSeconds: 100 + i, createdAt: '2026-01-01T00:00:00Z' })) }) })
+  await S().load('nt-c3')
+  current().loaded(1000)
+  assert.equal(S().notes.length, 500)
+  assert.ok(S().addNote(), 'the single-file add still returns an id')
+  assert.equal(S().noteNotice, null, 'no cap notice for a single-file book')
+  await sleep(30)
+  assert.equal(stateOf2('nt-c3').audioBookmarks.length, 500)
+  await reset()
+})
+
+await check('NOTES that cannot be read: a rejected read makes Notes UNAVAILABLE (not empty) — add / edit / delete do nothing and the stored Notes are never overwritten', async () => {
+  const ids = addMulti('nt-u1')
+  db.prepare('UPDATE books SET reading_state_json = ? WHERE id = ?').run(JSON.stringify({ audioBookmarks: [mkNote('keep', ids[0], 5)] }), 'nt-u1')
+  const realGet = window.api.audio.getBookmarks
+  window.api.audio.getBookmarks = async () => {
+    throw new Error('read failed')
+  }
+  try {
+    await S().load('nt-u1')
+  } finally {
+    window.api.audio.getBookmarks = realGet
+  }
+  current().loaded(60)
+  assert.deepEqual([S().notesUnavailable, S().notes.length, S().status], [true, 0, 'ready'])
+  assert.equal(selectCanAddNote(S()), false)
+  calls.bookmarks.length = 0
+  assert.equal(S().addNote('x'), null)
+  S().updateNote('keep', 'y')
+  S().removeNote('keep')
+  await sleep(30)
+  assert.equal(calls.bookmarks.length, 0, 'nothing was saved')
+  assert.deepEqual(stateOf2('nt-u1').audioBookmarks.map((n) => n.id), ['keep'], 'the stored Note is untouched')
+  await reset()
+})
+
+await check('NOTES markers: only the current track\'s Notes, following track changes (selector over the store state)', async () => {
+  const { ids } = await openJ('nt-k1', JDUR, JNOTES)
+  const markerIds = () => notesForTrack(S().notes, S().tracks[S().trackIndex].id).map((n) => n.id)
+  assert.deepEqual(markerIds(), ['nA'])
+  S().goToNote('nB')
+  current().loaded(60)
+  assert.deepEqual(markerIds(), ['nB', 'nF'].sort((x, y) => S().notes.findIndex((n) => n.id === x) - S().notes.findIndex((n) => n.id === y)))
+  assert.deepEqual(notesForTrack(S().notes, 'nope'), [])
+  assert.ok(ids)
+  await reset()
+})
+
+// ---- 7. Notes grouped by track (the multi-track Notes tab): rows, open / closed state, "add opens its row" ----
+console.log('7. Notes grouped by track')
+const { groupNotesByTrack } = await import('@reading-book/book-reader-sdk')
+const { useNoteGroupsStore } = await import('../../src/screens/AudioBook/logic/audioNoteGroupsStore.ts')
+const GS = () => useNoteGroupsStore.getState()
+const G = () => groupNotesByTrack(S().notes, S().tracks)
+
+await check('GROUPS rows follow the Notes: a track gets a row with its first Note and loses it with its last; counts sum to the Notes; edit changes no count; unreadable Notes give no rows', async () => {
+  const { ids } = await openPlaying('gp-1', [60, 45, 90, 30], 12)
+  assert.deepEqual(G(), [], 'no Notes, no rows')
+  const a = S().addNote()
+  S().addNote('second')
+  assert.deepEqual(G().map((g) => [g.trackId, g.count]), [[ids[0], 2]])
+  S().goToTrack(2)
+  current().loaded(90)
+  current().currentTime = 5
+  const c = S().addNote()
+  assert.deepEqual(G().map((g) => [g.trackId, g.index, g.count]), [[ids[0], 0, 2], [ids[2], 2, 1]], 'only tracks with Notes, in track order')
+  assert.equal(G().reduce((n, g) => n + g.count, 0), S().notes.length)
+  S().updateNote(c, 'edited')
+  assert.deepEqual(G().map((g) => g.count), [2, 1], 'edit changes no count')
+  S().removeNote(c)
+  assert.deepEqual(G().map((g) => g.trackId), [ids[0]], 'the last Note of a track removes its row')
+  S().removeNote(a)
+  assert.deepEqual(G().map((g) => g.count), [1])
+  await reset()
+  // Notes that could not be read: no rows (the tab shows its message instead)
+  const ids2 = addMulti('gp-1b')
+  db.prepare('UPDATE books SET reading_state_json = ? WHERE id = ?').run(JSON.stringify({ audioBookmarks: [mkNote('keep', ids2[0], 5)] }), 'gp-1b')
+  const realGet = window.api.audio.getBookmarks
+  window.api.audio.getBookmarks = async () => {
+    throw new Error('read failed')
+  }
+  try {
+    await S().load('gp-1b')
+  } finally {
+    window.api.audio.getBookmarks = realGet
+  }
+  current().loaded(60)
+  assert.deepEqual([S().notesUnavailable, G()], [true, []])
+  await reset()
+})
+
+await check('GROUPS open / closed state: the default opens the playing track once and only adds; toggling flips one row; several rows open; it survives "closing the tab"; another audiobook or a reopened one starts clean', async () => {
+  const { ids } = await openPlaying('gp-2', [60, 45, 90, 30], 12)
+  assert.deepEqual([GS().open, GS().seeded], [{}, false], 'clean for a newly opened audiobook')
+  GS().ensureSeeded(ids[0])
+  assert.deepEqual([GS().open, GS().seeded], [{ [ids[0]]: true }, true])
+  GS().ensureSeeded(ids[1]) // later calls do nothing
+  assert.deepEqual(GS().open, { [ids[0]]: true })
+  GS().toggle(ids[2])
+  assert.deepEqual(Object.keys(GS().open).sort(), [ids[0], ids[2]].sort(), 'several rows can be open')
+  GS().toggle(ids[0])
+  assert.deepEqual(GS().open, { [ids[2]]: true }, 'only the toggled row changed')
+  // nothing lives in a component: the choices are still there when the tab is "reopened" (read back)
+  assert.deepEqual(GS().open, { [ids[2]]: true })
+  // an earlier choice is kept when seeding runs for the first time
+  GS().reset()
+  GS().toggle(ids[1])
+  GS().ensureSeeded(ids[0])
+  assert.deepEqual(Object.keys(GS().open).sort(), [ids[0], ids[1]].sort())
+  // seeding without a current track marks the audiobook seeded and opens nothing
+  GS().reset()
+  GS().ensureSeeded(undefined)
+  GS().ensureSeeded(ids[0])
+  assert.deepEqual([GS().open, GS().seeded], [{}, true])
+  // another audiobook starts clean
+  GS().toggle(ids[3])
+  await S().load('gp-1')
+  assert.deepEqual([GS().open, GS().seeded], [{}, false])
+  // the same audiobook, closed and reopened, starts clean too
+  GS().ensureSeeded('x')
+  await S().dispose()
+  assert.deepEqual([GS().open, GS().seeded], [{}, false])
+  await S().load('gp-2')
+  assert.deepEqual([GS().open, GS().seeded], [{}, false])
+  await reset()
+})
+
+await check('GROUPS a Note taken from a row behaves as before: jump (other track, exact second, play state, failed-target fallback), edit keeps its place, delete updates the count and the row', async () => {
+  const { ids } = await openJ('gp-4', JDUR, JNOTES, 12)
+  const row = G().find((g) => g.trackId === ids[1])
+  assert.deepEqual(row.notes.map((n) => n.id), ['nB', 'nF'], 'time order inside the row')
+  S().goToNote(row.notes[1].id) // nF: track 1 @45
+  const b = current()
+  assert.deepEqual([S().trackIndex, S().switching, S().playing], [1, true, true])
+  b.loaded(60)
+  assert.equal(b.currentTime, 45)
+  // edit keeps track, second, id and its place in the row
+  S().updateNote('nB', 'edited text')
+  const after = G().find((g) => g.trackId === ids[1])
+  assert.deepEqual(after.notes.map((n) => [n.id, n.positionSeconds, n.note]), [['nB', 30, 'edited text'], ['nF', 45, undefined]])
+  assert.equal(after.count, 2)
+  // delete one of two: count 1, the row stays; delete the only Note of a track: the row goes
+  S().removeNote('nF')
+  assert.deepEqual(G().find((g) => g.trackId === ids[1]).count, 1)
+  S().removeNote('nA')
+  assert.equal(G().some((g) => g.trackId === ids[0]), false)
+  // a failed target still falls back to the track it came from
+  S().goToNote('nC')
+  current().fire('error')
+  const back = current()
+  assert.equal(back.src, url('gp-4', ids[1]))
+  assert.ok(S().notes.some((n) => n.id === 'nC'), 'the Note stays')
+  await reset()
+})
+
+await check('GROUPS adding a Note opens its row from the "+ Note" path (no component): also for a row that was closed or a track that had no Notes; a new signal each time', async () => {
+  const { ids } = await openJ('gp-5', JDUR, () => [], 12)
+  assert.deepEqual([GS().open, S().lastAddedNote], [{}, null])
+  const first = S().addNote('one')
+  const signal1 = S().lastAddedNote
+  assert.deepEqual(signal1, { id: first, trackId: ids[0] })
+  assert.equal(GS().open[ids[0]], true, "the new Note's row is open")
+  S().addNote('two')
+  assert.notEqual(S().lastAddedNote, signal1, 'a NEW object each add')
+  GS().toggle(ids[0]) // the listener closed the row
+  S().addNote('three')
+  assert.equal(GS().open[ids[0]], true, 'a closed row opens when a Note is added to it')
+  S().goToTrack(2) // a track that had no Notes
+  current().loaded(90)
+  current().currentTime = 20
+  assert.equal(GS().open[ids[2]], undefined)
+  S().addNote()
+  assert.equal(GS().open[ids[2]], true)
+  assert.deepEqual(G().map((g) => g.trackId), [ids[0], ids[2]])
+  await reset()
+})
+
+await check('GROUPS no false signals and no auto open / close: load, edit, delete, jumps, Contents click, next, auto-advance, fallback, a refused save and the 501st refusal leave the rows and lastAddedNote alone', async () => {
+  const { ids } = await openJ('gp-6', JDUR, JNOTES, 12)
+  assert.equal(S().lastAddedNote, null, 'load set no signal')
+  GS().ensureSeeded(ids[0])
+  const snapshot = JSON.stringify(GS().open)
+  const unchanged = (what) => {
+    assert.equal(JSON.stringify(GS().open), snapshot, `${what}: rows unchanged`)
+    assert.equal(S().lastAddedNote, null, `${what}: no signal`)
+  }
+  S().updateNote('nA', 'x')
+  S().removeNote('nE')
+  unchanged('edit / delete')
+  S().goToTrack(1)
+  current().loaded(60)
+  unchanged('Contents click')
+  S().nextChapter()
+  current().loaded(90)
+  unchanged('next track')
+  S().goToNote('nD')
+  current().loaded(30)
+  unchanged('Note jump')
+  current().fire('ended') // the last track: just stops
+  S().goToTrack(1)
+  current().loaded(60)
+  current().fire('ended') // auto-advance to track 2
+  current().loaded(90)
+  unchanged('auto-advance')
+  S().goToNote('nA')
+  current().fire('error') // the target fails → back to the origin
+  current().loaded(90)
+  unchanged('failed-jump fallback')
+  assert.equal(S().tracks[S().trackIndex].id, ids[2], 'the current track id follows the playing track')
+  await reset()
+
+  // a refused save reloads the list; it does not look like a new Note
+  await openJ('gp-7', JDUR, (i) => [mkNote('keep', i[0], 3)], 12)
+  const realSave = window.api.audio.saveBookmarks
+  window.api.audio.saveBookmarks = async () => ({ ok: false })
+  try {
+    S().addNote('refused')
+    const signal = S().lastAddedNote
+    await sleep(60)
+    assert.equal(S().lastAddedNote, signal, 'the reload did not replace the signal')
+  } finally {
+    window.api.audio.saveBookmarks = realSave
+  }
+  await reset()
+
+  // the 501st Note is refused: no Note, no signal, no row change
+  await openJ('gp-8', JDUR, (i) => Array.from({ length: 500 }, (_, k) => mkNote(`o${k}`, i[k % 4], k % 40)), 12)
+  const before = JSON.stringify(GS().open)
+  assert.equal(S().addNote(), null)
+  assert.deepEqual([S().lastAddedNote, JSON.stringify(GS().open)], [null, before])
+  await reset()
+})
+
+await check('GROUPS single-file audiobooks never touch the groups store or the signal', async () => {
+  addBook('gp-sf')
+  await S().load('gp-sf')
+  current().loaded(100)
+  assert.deepEqual([GS().open, GS().seeded, S().tracks.length], [{}, false, 0])
+  assert.ok(S().addNote('plain'), 'single-file Notes still work')
+  assert.deepEqual([S().lastAddedNote, GS().open, GS().seeded], [null, {}, false])
+  assert.equal(S().notes.every((n) => n.trackId === undefined), true)
   await reset()
 })
 
