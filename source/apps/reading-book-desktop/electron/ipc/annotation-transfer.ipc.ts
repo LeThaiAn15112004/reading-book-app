@@ -16,6 +16,7 @@ import type { PdfAnnotationScanResult } from '../pdf-sync/pdf-annotation-scan'
 import { getDatabase } from '../persistence/db'
 import { getLibraryStore } from '../persistence/sqlite-library-store'
 import { getOverlayStore } from '../persistence/sqlite-overlay-store'
+import { getTxtDocumentService } from '../txt/txt-runtime'
 import { getTxtStore } from '../persistence/sqlite-txt-store'
 import type { AnnotationExportResult, AnnotationImportPreviewResult, AnnotationImportResult, OkResult } from './api-types'
 import { AnnotationTransferChannels } from './channels'
@@ -107,6 +108,10 @@ function importDeps(): ImportDeps {
       const book = await library.findById(id)
       if (!book) return false
       return (await resolveBookFile(book)).ok
+    },
+    txtText: async (id) => {
+      const opened = await getTxtDocumentService().open(id)
+      return opened.ok && typeof opened.text === 'string' ? opened.text : null
     },
     scanPdfKeys: async (id) => {
       const book = await library.findById(id)

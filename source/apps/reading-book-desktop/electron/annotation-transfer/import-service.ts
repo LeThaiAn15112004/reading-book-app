@@ -54,6 +54,8 @@ export interface ImportDeps {
   findBook(bookId: string): Promise<ImportBookInfo | null>
   /** True when the book's own file can still be resolved (moved / deleted files are refused, nothing is written). */
   bookFileAvailable(bookId: string): Promise<boolean>
+  /** TXT target: its current canonical text (the edited copy when there is one), for quote re-anchoring; null when unavailable. */
+  txtText?(bookId: string): Promise<string | null>
   /** PDF target: identity keys of the annotations found in a scan of the target file; null when it cannot be scanned. */
   scanPdfKeys(bookId: string): Promise<ReadonlySet<string> | null>
   // ---- synchronous reads / writes (used inside the transaction) ----
@@ -175,6 +177,8 @@ export function createImportService(deps: ImportDeps): ImportService {
       pageCount: book.pageCount,
       txtContentSha256: txt?.contentSha256,
     })
+    // A TXT file that is not the text the annotations were made on is searched for each quote (FR-011); no text, nothing placed.
+    const targetText = placement === 'txt-quote' ? ((await deps.txtText?.(book.id)) ?? undefined) : undefined
     const taken = deps.existingNoteIds(file.annotations.map((a) => a.sourceId))
     const plan = planImport({
       file,
@@ -183,6 +187,7 @@ export function createImportService(deps: ImportDeps): ImportService {
       scanKeys,
       placement,
       targetPageCount: book.pageCount,
+      targetText,
       isUsableId: (id) => !taken.has(id),
     })
     return { ok: true, plan, freshness: { sha256: book.sha256, txt, keysSignature: signature(existingKeys) } }

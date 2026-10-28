@@ -1,9 +1,11 @@
-import { useEffect, useId } from 'react'
+import { useEffect, useId, useState } from 'react'
 import { useAnnotationTransferStore } from '../../screens/Reader/logic/annotationTransferStore'
 
 export type ImportPreviewDialogProps = {
   /** Receives the result message after a committed import (the host screen's toast). */
   onToast: (message: string | null) => void
+  /** The library's books, so the reader can deliberately pick another book of the file's format (the Library flow). */
+  bookChoices?: readonly { id: string; title: string; format: string }[]
 }
 
 const buttonBase =
@@ -16,7 +18,37 @@ const primaryButton = `${buttonBase} border-lib-accent bg-lib-accent-soft text-l
  * into, how many annotations are added / already there / cannot be placed, and — when the file belongs to another book than
  * the one the import was started from — the deliberate choice of target. Nothing is written until Import is pressed.
  */
-export function ImportPreviewDialog({ onToast }: ImportPreviewDialogProps) {
+/** "Choose another book…": a book of the same format as the file, chosen on purpose. */
+function BookPicker({ choices, disabled, onChoose }: { choices: readonly { id: string; title: string }[]; disabled: boolean; onChoose: (bookId: string) => void }) {
+  const [selected, setSelected] = useState('')
+  if (choices.length === 0) return null
+  return (
+    <div className="mt-2 flex flex-wrap items-center gap-2">
+      <label className="text-lib-faint" htmlFor="annotation-import-book">
+        Or choose another book:
+      </label>
+      <select
+        id="annotation-import-book"
+        className="h-[34px] max-w-[240px] rounded-lg border border-lib-border bg-lib-bg-mid/50 px-2 text-[13px] text-lib-text-strong"
+        value={selected}
+        disabled={disabled}
+        onChange={(e) => setSelected(e.target.value)}
+      >
+        <option value="">Select a book…</option>
+        {choices.map((b) => (
+          <option key={b.id} value={b.id}>
+            {b.title}
+          </option>
+        ))}
+      </select>
+      <button type="button" className={ghostButton} disabled={disabled || !selected} onClick={() => onChoose(selected)}>
+        Import into this book
+      </button>
+    </div>
+  )
+}
+
+export function ImportPreviewDialog({ onToast, bookChoices }: ImportPreviewDialogProps) {
   const titleId = useId()
   const preview = useAnnotationTransferStore((s) => s.preview)
   const failure = useAnnotationTransferStore((s) => s.importFailure)
@@ -102,6 +134,13 @@ export function ImportPreviewDialog({ onToast }: ImportPreviewDialogProps) {
                       </button>
                     ) : null}
                   </div>
+                  {bookChoices ? (
+                    <BookPicker
+                      choices={bookChoices.filter((b) => b.format === preview.fileBook.format && b.id !== preview.target?.bookId && b.id !== preview.startedFrom?.bookId)}
+                      disabled={busy}
+                      onChoose={(id) => void chooseTarget(id)}
+                    />
+                  ) : null}
                 </div>
               ) : preview.target ? (
                 <p className="m-0 mb-1">

@@ -11,7 +11,9 @@
  *   4. import   round trip per format (restore, second import adds nothing, created time kept), a failure mid-write rolls back,
  *               stale preview, source ids of other books, refused files, a missing book file, the target choice, PDF sync
  *               duplicates, a PDF that cannot be scanned, a PDF whose bytes changed
- *   (identity by title and different editions, the readable copy and performance checks come with tasks T033, T037, T041)
+ *   7. identity and different editions   by fingerprint and by title, the Library flow, TXT quote re-anchoring (exact / ambiguous /
+ *               missing), Markdown and EPUB of another edition, a PDF of another file (page counts, page beyond the end)
+ *   (the readable copy and performance checks come with tasks T037, T041)
  *
  * Run: npm run spike:annotations:main   (builds the SDK bundle first)
  */
@@ -361,6 +363,8 @@ let scanThrows = false
 let failOnWrite = 0
 let writes = 0
 let newIdCounter = 0
+/** TXT targets: the text a quote is searched in (the edited copy / the file), per book id. */
+const txtTexts = {}
 
 function importDeps(over = {}) {
   return {
@@ -375,6 +379,7 @@ function importDeps(over = {}) {
       const b = await library.findById(id)
       return !!b && fs.existsSync(b.filePath)
     },
+    txtText: async (id) => txtTexts[id] ?? null,
     scanPdfKeys: async () => {
       if (scanThrows) throw new Error('encrypted')
       return scanKeys
@@ -696,6 +701,174 @@ await check('import never touches a book file', () => {
     assert.equal(fs.statSync(b.file).size, b.size, `${b.id} size`)
   }
   assert.ok(events.some((e) => e.phase === 'reading') && events.some((e) => e.phase === 'planning') && events.some((e) => e.phase === 'committing'), 'progress events were sent')
+})
+
+// =================================================================================================================
+// 7. identity and different editions (T033)
+// =================================================================================================================
+console.log('7. identity and different editions')
+const setSha = (bookId, value) => db.prepare('UPDATE books SET sha256 = ? WHERE id = ?').run(value, bookId)
+
+await check('Library flow: the file\'s book is found by its fingerprint and proposed without a choice', async () => {
+  const file = await exportTo(books.epub.id, 'id-sha.readmate-notes.json')
+  const r = await preview(file, undefined)
+  assert.equal(r.ok, true)
+  assert.equal(r.preview.target.bookId, books.epub.id)
+  assert.equal(r.preview.target.matchedBy, 'sha256')
+  assert.equal(r.preview.requiresChoice, false)
+  assert.equal(r.preview.startedFrom, undefined)
+  assert.equal(r.preview.present, 2)
+})
+
+await check('Library flow: matched by title when only the title matches, and then nothing is placed (different edition)', async () => {
+  const file = await exportTo(books.epub.id, 'id-title.readmate-notes.json')
+  wipe(books.epub.id)
+  setSha(books.epub.id, '8'.repeat(64))
+  const r = await preview(file, undefined)
+  setSha(books.epub.id, books.epub.hash)
+  assert.equal(r.ok, true)
+  assert.equal(r.preview.target.matchedBy, 'title')
+  assert.equal(r.preview.requiresChoice, false)
+  assert.equal(r.preview.toAdd, 0, 'an EPUB of another edition is never searched')
+  assert.equal(r.preview.notPlaced.length, 2)
+  assert.deepEqual([...new Set(r.preview.notPlaced.map((n) => n.reason))], ['different edition of the book'])
+  // the same file imports normally into the book it was made from
+  const ok = await preview(file, undefined)
+  assert.equal(ok.preview.toAdd, 2)
+  assert.equal(ok.preview.target.matchedBy, 'sha256')
+})
+
+await check('Library flow: a book that is not in the library is named, nothing imports until a book of the same format is chosen', async () => {
+  const sample = JSON.parse(fs.readFileSync(outFile('id-sha.readmate-notes.json'), 'utf8'))
+  const file = writeFile('lib-missing.readmate-notes.json', JSON.stringify({ ...sample, book: { ...sample.book, title: 'Chưa có trong thư viện', sha256: '7'.repeat(64) } }))
+  const svc = service()
+  nextImportFile = file
+  const pre = await svc.pickFile({})
+  assert.equal(pre.ok, true)
+  assert.equal(pre.preview.target, null)
+  assert.equal(pre.preview.requiresChoice, true)
+  assert.equal(pre.preview.startedFrom, undefined)
+  assert.equal(pre.preview.fileBookMissing.title, 'Chưa có trong thư viện')
+  assert.equal((await svc.confirm(pre.preview.sessionId)).errorCode, 'book_missing')
+  // another format is refused, a book of the same format can be chosen on purpose
+  const wrong = await svc.setTarget(pre.preview.sessionId, books.txt.id)
+  assert.equal(wrong.ok, false)
+  assert.equal(wrong.errorCode, 'format_mismatch')
+  const right = await svc.setTarget(pre.preview.sessionId, books.epub.id)
+  assert.equal(right.ok, true)
+  assert.equal(right.preview.target.matchedBy, 'chosen')
+  assert.equal(right.preview.toAdd, 0, 'a different edition: nothing placed')
+})
+
+await check('TXT of another text: each annotation moves to its quote; ambiguous and missing quotes are reported, none is guessed (SC-008)', async () => {
+  const OLD = 'Trăm năm trong cõi người ta. Câu đã bị xóa. Trăm năm là bao lâu.\n'
+  const NEW = 'Lời mở đầu.\nTrăm năm trong cõi người ta.\nTrăm năm nữa.\n'
+  const at = (needle, from = 0) => OLD.indexOf(needle, from)
+  const seed = (id, quote, ctx = {}) =>
+    note({
+      id, bookId: books.txt.id, styleKind: 'highlight',
+      locator: { kind: 'text-offset', offset: at(quote), blockId: 'txt' },
+      txtAnnotation: { startOffset: at(quote), endOffset: at(quote) + quote.length },
+      selectionText: { highlight: quote, ...ctx }, note: `ghi chú ${id}`,
+    })
+  wipe(books.txt.id)
+  seed('tq1', 'Trăm năm', { after: ' trong cõi' })
+  seed('tq2', 'Câu đã bị xóa')
+  seed('tq3', 'cõi người ta')
+  seed('tq4', 'Trăm năm', { before: 'xóa. ', after: ' là bao' })
+  const file = await exportTo(books.txt.id, 'txt-edition.readmate-notes.json')
+  wipe(books.txt.id)
+  // the book's text changed: another fingerprint, another text
+  db.prepare('UPDATE txt_documents SET content_sha256 = ? WHERE book_id = ?').run('b'.repeat(64), books.txt.id)
+  txtTexts[books.txt.id] = NEW
+  const svc = service()
+  nextImportFile = file
+  const pre = await svc.pickFile({ bookId: books.txt.id })
+  assert.equal(pre.ok, true)
+  assert.equal(pre.preview.toAdd, 2, 'tq1 (by its context) and tq3 (unique) are placed')
+  const placed = pre.preview.toAdd
+  const reasons = pre.preview.notPlaced.map((n) => `${n.quote}|${n.reason}`).sort()
+  assert.equal(placed + pre.preview.notPlaced.length, 4)
+  assert.ok(reasons.some((r) => r.startsWith('Câu đã bị xóa|')), 'a quote that is gone is reported')
+  assert.equal(pre.preview.notPlaced.length, 2, 'the gone quote and the one whose context fits neither occurrence')
+  assert.equal((await svc.confirm(pre.preview.sessionId)).ok, true)
+  const stored = overlays.listAnnotationsForTransfer(books.txt.id)
+  assert.equal(stored.length, placed)
+  for (const row of stored) {
+    const { startOffset, endOffset } = row.note.txtAnnotation
+    assert.equal(NEW.slice(startOffset, endOffset), row.note.locatorExtended.text.highlight, 'the text at the new position is the quote')
+    assert.equal(row.note.locatorExtended.locator.offset, startOffset, 'the location follows')
+    assert.equal(row.note.locatorExtended.locator.blockId, 'txt')
+  }
+  const byId = Object.fromEntries(stored.map((r) => [r.id, r.note]))
+  assert.equal(byId.tq1.txtAnnotation.startOffset, NEW.indexOf('Trăm năm trong'), 'the context chose the first occurrence')
+  assert.equal(byId.tq3.txtAnnotation.startOffset, NEW.indexOf('cõi người ta'))
+  assert.ok(!byId.tq2, 'a quote that is gone is not imported')
+  assert.ok(!byId.tq4, 'a quote whose context fits no occurrence is not guessed')
+  assert.equal(byId.tq1.note, 'ghi chú tq1', 'comments and colours come along')
+  delete txtTexts[books.txt.id]
+  db.prepare('UPDATE txt_documents SET content_sha256 = ? WHERE book_id = ?').run(txtHash, books.txt.id)
+})
+
+await check('TXT: the exact offsets are used, and nothing is searched, when the text fingerprint is the same', async () => {
+  wipe(books.txt.id)
+  note({ id: 'tx1', bookId: books.txt.id, styleKind: 'highlight', locator: { kind: 'text-offset', offset: 0, blockId: 'txt' }, txtAnnotation: { startOffset: 0, endOffset: 9 }, selectionText: { highlight: 'Trăm năm ' } })
+  const file = await exportTo(books.txt.id, 'txt-same.readmate-notes.json')
+  wipe(books.txt.id)
+  txtTexts[books.txt.id] = 'a completely different text that is never consulted'
+  const r = await preview(file, books.txt.id)
+  delete txtTexts[books.txt.id]
+  assert.equal(r.preview.toAdd, 1)
+  assert.equal((await service().confirm(r.preview.sessionId)).errorCode, 'not_found', 'a preview belongs to the service instance that made it')
+})
+
+await check('Markdown and EPUB of another edition: everything is reported as not placed; identical bytes place normally', async () => {
+  const mdFile = await exportTo(books.md.id, 'md-ed.readmate-notes.json')
+  wipe(books.md.id)
+  setSha(books.md.id, '6'.repeat(64))
+  const other = await preview(mdFile, books.md.id)
+  assert.equal(other.preview.target.matchedBy, 'title')
+  assert.equal(other.preview.toAdd, 0)
+  assert.equal(other.preview.notPlaced.length, 1)
+  setSha(books.md.id, books.md.hash)
+  const same = await preview(mdFile, books.md.id)
+  assert.equal(same.preview.toAdd, 1)
+})
+
+await check('PDF of another file: placed by page only with known, equal page counts and a page that exists', async () => {
+  const sample = JSON.parse(fs.readFileSync(outFile('rt-PDF.readmate-notes.json'), 'utf8'))
+  const beyond = {
+    ...sample.annotations[0], sourceId: 'beyond', locator: { kind: 'page-rect', page: 130 },
+    pdfAnnotation: { pageIndex: 129, rects: [{ x: 0.1, y: 0.1, width: 0.2, height: 0.02 }] }, selectionText: { highlight: 'trang quá xa' }, note: 'x',
+  }
+  const withBeyond = { ...sample, annotations: [...sample.annotations, beyond] }
+  const fileBeyond = writeFile('pdf-beyond.readmate-notes.json', JSON.stringify(withBeyond))
+  const fileNoCount = writeFile('pdf-nocount.readmate-notes.json', JSON.stringify({ ...sample, book: { ...sample.book, pageCount: undefined } }))
+  wipe(books.pdf.id)
+  setSha(books.pdf.id, '5'.repeat(64))
+  scanKeys = new Set()
+  const a = await preview(fileBeyond, books.pdf.id)
+  assert.equal(a.preview.toAdd, 4)
+  assert.equal(a.preview.notPlaced.length, 1)
+  assert.equal(a.preview.notPlaced[0].reason, 'page is beyond the end of the target document')
+  const b = await preview(fileNoCount, books.pdf.id)
+  assert.equal(b.preview.toAdd, 0, 'the file does not say how many pages the PDF had')
+  assert.equal(b.preview.notPlaced.length, 4)
+  const meta = db.prepare('SELECT metadata_json FROM books WHERE id = ?').get(books.pdf.id).metadata_json
+  db.prepare('UPDATE books SET metadata_json = ? WHERE id = ?').run('{}', books.pdf.id)
+  const c = await preview(outFile('rt-PDF.readmate-notes.json'), books.pdf.id)
+  assert.equal(c.preview.toAdd, 0, 'the library does not know the target page count')
+  db.prepare('UPDATE books SET metadata_json = ? WHERE id = ?').run(meta, books.pdf.id)
+  setSha(books.pdf.id, books.pdf.hash)
+  const d = await preview(outFile('rt-PDF.readmate-notes.json'), books.pdf.id)
+  assert.equal(d.preview.toAdd, 4, 'identical bytes: exact')
+})
+
+await check('book files are still untouched after the identity and edition checks', () => {
+  for (const b of bookFiles) {
+    if (b.gone) continue
+    assert.equal(sha(fs.readFileSync(b.file)), b.hash, `${b.id} content`)
+  }
 })
 
 fs.rmSync(tmp, { recursive: true, force: true })

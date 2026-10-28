@@ -193,12 +193,13 @@ describe('placement', () => {
     expect(decidePlacement(header({ sha256: target.sha256 }), { ...target, format: 'epub' })).toBe('none')
   })
 
-  it('TXT: exact when the edited-text fingerprint (or the unedited original) matches, else not placed', () => {
+  it('TXT: exact when the edited-text fingerprint (or the unedited original) matches, else re-anchored by quote', () => {
     const t = { title: 'T', format: 'txt', sha256: target.sha256 }
     expect(decidePlacement(header({ format: 'txt', sha256: target.sha256 }), t)).toBe('exact')
-    expect(decidePlacement(header({ format: 'txt', sha256: target.sha256 }), { ...t, txtContentSha256: 'a'.repeat(64) })).toBe('none')
+    expect(decidePlacement(header({ format: 'txt', sha256: target.sha256 }), { ...t, txtContentSha256: 'a'.repeat(64) })).toBe('txt-quote')
     expect(decidePlacement(header({ format: 'txt' }, { contentSha256: 'a'.repeat(64) }), { ...t, txtContentSha256: 'a'.repeat(64) })).toBe('exact')
-    expect(decidePlacement(header({ format: 'txt' }, { contentSha256: 'a'.repeat(64) }), { ...t, txtContentSha256: 'b'.repeat(64) })).toBe('none')
+    expect(decidePlacement(header({ format: 'txt' }, { contentSha256: 'a'.repeat(64) }), { ...t, txtContentSha256: 'b'.repeat(64) })).toBe('txt-quote')
+    expect(decidePlacement(header({ format: 'txt' }), { ...t, sha256: 'c'.repeat(64) })).toBe('txt-quote')
   })
 
   it('planImport: none reports everything as a different edition; page position drops pages beyond the document', () => {
@@ -210,5 +211,58 @@ describe('placement', () => {
     expect(byPage.toAdd.map((a) => a.sourceId)).toEqual(['p3'])
     expect(byPage.notPlaced.map((n) => n.reason)).toEqual(['page is beyond the end of the target document'])
     expect(plan(file, { placement: 'pdf-page-position' }).toAdd).toEqual([])
+  })
+})
+
+describe('TXT quote re-anchoring (placement txt-quote)', () => {
+  const TEXT = 'Chương 1\nTrăm năm trong cõi người ta.\nChữ tài chữ mệnh khéo là ghét nhau.\nTrăm năm là bao lâu?\n'
+  const txt = (id: string, quote: string | undefined, start: number, ctx: { before?: string; after?: string } = {}): TransferAnnotation => ({
+    sourceId: id, type: 'highlight', colorHex: '#FFEB3B', createdAt: '2026-10-20T00:00:00Z', origin: 'app', note: `n ${id}`,
+    locator: { kind: 'text-offset', offset: start, blockId: 'txt' },
+    txtAnnotation: { startOffset: start, endOffset: start + (quote?.length ?? 1) },
+    selectionText: quote === undefined ? undefined : { highlight: quote, ...ctx },
+  })
+  const place = (annotations: TransferAnnotation[], over: Partial<Parameters<typeof planImport>[0]> = {}) =>
+    plan(fileOf('txt', annotations), { placement: 'txt-quote', targetText: TEXT, ...over })
+
+  it('moves an annotation to where its quote is in the new text and keeps everything else', () => {
+    const p = place([txt('a', 'Chữ tài chữ mệnh', 3)])
+    const at = TEXT.indexOf('Chữ tài chữ mệnh')
+    expect(p.toAdd).toHaveLength(1)
+    const a = p.toAdd[0]!
+    expect(a.txtAnnotation).toEqual({ startOffset: at, endOffset: at + 'Chữ tài chữ mệnh'.length })
+    expect(a.locator).toEqual({ kind: 'text-offset', offset: at, blockId: 'txt' })
+    expect(a.note).toBe('n a')
+    expect(TEXT.slice(a.txtAnnotation!.startOffset, a.txtAnnotation!.endOffset)).toBe('Chữ tài chữ mệnh')
+  })
+
+  it('uses the stored context for a quote that occurs twice, and reports the rest as not placed', () => {
+    const p = place([
+      txt('first', 'Trăm năm', 0, { after: ' trong cõi' }),
+      txt('second', 'Trăm năm', 0, { before: 'ghét nhau.\n' }),
+      txt('amb', 'Trăm năm', 0),
+      txt('gone', 'câu không còn nữa', 0),
+      txt('noquote', undefined, 0),
+    ])
+    expect(p.toAdd.map((a) => a.sourceId)).toEqual(['first', 'second'])
+    expect(p.toAdd.map((a) => a.txtAnnotation!.startOffset)).toEqual([TEXT.indexOf('Trăm năm'), TEXT.lastIndexOf('Trăm năm')])
+    expect(p.notPlaced.map((n) => n.reason)).toEqual([
+      'its text was not found exactly once in this edition',
+      'its text was not found exactly once in this edition',
+      'it has no quote to match',
+    ])
+  })
+
+  it('treats a re-anchored annotation that the book already holds as present', () => {
+    const at = TEXT.indexOf('Chữ tài chữ mệnh')
+    const same = txt('moved', 'Chữ tài chữ mệnh', at)
+    const existing = new Set([contentKeyOfNote(rowOf(same))!])
+    const p = place([txt('moved', 'Chữ tài chữ mệnh', 3)], { existingKeys: existing })
+    expect(p.present).toBe(1)
+    expect(p.toAdd).toEqual([])
+  })
+
+  it('places nothing when the target text is missing', () => {
+    expect(place([txt('a', 'Trăm năm trong', 0)], { targetText: undefined }).toAdd).toEqual([])
   })
 })

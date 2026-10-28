@@ -8,6 +8,7 @@ import { parsePdfAnnotation, isConsistentPdfHighlight } from '../app-models/pdf-
 import { isConsistentTxtHighlight, parseTxtAnnotation } from '../txt/txt-annotations.js'
 import { isConsistentMdHighlight, parseMdAnnotation } from '../md/md-annotations.js'
 import { contentKeyOf } from './content-key.js'
+import { anchorByQuote } from './quote-match.js'
 import type { AnnotationFile, RejectedAnnotation, TransferAnnotation, TransferAnnotationType } from './file-format.js'
 
 /** An annotation ready to be written to the target book. Payloads are the re-validated (normalised) ones. */
@@ -47,9 +48,11 @@ export interface ImportPlan {
  * `exact` — identical content, the stored locations are used as they are;
  * `pdf-page-position` — a PDF that is the same document (same title and author, equal known page counts) but not the same
  *   bytes: placed by page and rectangle only, never by searching, and only when the page exists;
- * `none` — a different edition: nothing can be placed (TXT quote re-anchoring is added by task T031).
+ * `txt-quote` — a TXT file that is not the text the annotations were made on: each annotation is re-anchored by its quote (and
+ *   the text around it) in the target's text, and reported as not placed when that is not unique and exact;
+ * `none` — a different edition of anything else: nothing can be placed (Markdown and EPUB are never searched).
  */
-export type PlacementMode = 'exact' | 'pdf-page-position' | 'none'
+export type PlacementMode = 'exact' | 'pdf-page-position' | 'txt-quote' | 'none'
 
 export interface PlacementTarget {
   title: string
@@ -73,8 +76,8 @@ export function decidePlacement(file: Pick<AnnotationFile, 'book' | 'txt'>, targ
   const sameBytes = book.sha256 === target.sha256
   if (book.format === 'txt') {
     // The offsets belong to the text the file was made from: the edited copy when there was one, else the original file.
-    if (file.txt) return target.txtContentSha256 === file.txt.contentSha256 ? 'exact' : 'none'
-    return sameBytes && !target.txtContentSha256 ? 'exact' : 'none'
+    if (file.txt) return target.txtContentSha256 === file.txt.contentSha256 ? 'exact' : 'txt-quote'
+    return sameBytes && !target.txtContentSha256 ? 'exact' : 'txt-quote'
   }
   if (sameBytes) return 'exact'
   if (book.format === 'pdf') {
@@ -98,6 +101,8 @@ export interface PlanImportInput {
   placement: PlacementMode
   /** `pdf-page-position`: the target's page count. */
   targetPageCount?: number
+  /** `txt-quote`: the target's current (canonical) text. */
+  targetText?: string
   /** True when no row anywhere uses this id (a reused id of another book would be overwritten by the store's upsert). */
   isUsableId: (id: string) => boolean
 }
@@ -149,7 +154,25 @@ export function planImport(input: PlanImportInput): ImportPlan {
   const seen = new Set<string>(input.existingKeys)
   const usedIds = new Set<string>()
 
-  for (const a of file.annotations) {
+  for (const original of file.annotations) {
+    let a = original
+    if (input.placement === 'txt-quote') {
+      const match = anchorByQuote(input.targetText ?? '', a.selectionText?.highlight, a.selectionText)
+      if (!match) {
+        plan.notPlaced.push({
+          type: a.type,
+          quote: a.selectionText?.highlight,
+          reason: a.selectionText?.highlight ? 'its text was not found exactly once in this edition' : 'it has no quote to match',
+        })
+        continue
+      }
+      // Same annotation at the position the quote has in this text.
+      a = {
+        ...a,
+        locator: { kind: 'text-offset', offset: match.start, blockId: 'txt', ...('chapterIndex' in a.locator && a.locator.chapterIndex !== undefined ? { chapterIndex: a.locator.chapterIndex } : {}) },
+        txtAnnotation: { startOffset: match.start, endOffset: match.end },
+      }
+    }
     if (input.placement === 'none') {
       plan.notPlaced.push({ type: a.type, quote: a.selectionText?.highlight, reason: 'different edition of the book' })
       continue
