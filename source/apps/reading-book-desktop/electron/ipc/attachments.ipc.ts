@@ -6,9 +6,13 @@ import { createAttachmentService, cleanAttachmentTemp, type AttachmentService } 
 import type { PdfAttachmentExtractResult, PdfAttachmentListResult } from '../attachments/pdf-attachments'
 import { isPathInsideUserData, resolveBookFile } from '../files/sandbox'
 import { getLibraryStore } from '../persistence/sqlite-library-store'
-import type { AttachmentActionResult, ListAttachmentsResult } from './api-types'
+import { getOverlayStore } from '../persistence/sqlite-overlay-store'
+import type { AttachmentVerifyResult } from '../pdf-sync/pdf-annotation-scan'
+import { createPdfAttachment, type AttachmentOperationDeps } from '../pdf-sync/pdf-attachment-operations'
+import type { AttachmentUpdatePlan } from '../pdf-sync/pdf-incremental-writer'
+import type { AttachmentActionResult, CreatePdfAttachmentResultDto, ListAttachmentsResult } from './api-types'
 import { AttachmentChannels } from './channels'
-import { runInScanWorker } from './overlay.ipc'
+import { pdfFileOperations, runInScanWorker, toHighlightDto } from './overlay.ipc'
 
 /** Main-owned folder for attachments handed to the OS: `{userData}/attachment-tmp/{uuid}/{name}`. */
 function attachmentTempRoot(): string {
@@ -62,7 +66,35 @@ function attachmentService(senderWindow: () => BrowserWindow | undefined): Attac
   return service
 }
 
-/** Handlers for attachments:* — list / open / saveAs of a PDF's embedded files (pdf_attachments.md). */
+async function resolvePdfPath(bookId: string): Promise<string | null> {
+  const book = await getLibraryStore().findById(bookId)
+  if (!book || book.format !== 'pdf') return null
+  const file = await resolveBookFile(book)
+  return file.ok ? file.path : null
+}
+
+/** The real dependencies of the file-attachment operations (specs/007-pdf-file-attachment), for one request. */
+function attachmentOperationDeps(sender: Electron.WebContents): AttachmentOperationDeps {
+  return {
+    resolvePdfPath,
+    runFileOperation: (bookId, op) => pdfFileOperations.run(bookId, op, sender),
+    checkWritable: pdfFileOperations.checkWritable,
+    chooseFile: async () => {
+      const parent = BrowserWindow.fromWebContents(sender) ?? undefined
+      const options: Electron.OpenDialogOptions = { title: 'Attach a file to this page', properties: ['openFile'] }
+      const picked = parent ? await dialog.showOpenDialog(parent, options) : await dialog.showOpenDialog(options)
+      return picked.canceled || !picked.filePaths[0] ? null : picked.filePaths[0]
+    },
+    scan: pdfFileOperations.scan,
+    plan: (bytes, page, annotation, file) => runInScanWorker<AttachmentUpdatePlan>({ kind: 'attachment-plan', bytes, page, annotation, file }),
+    verify: (bytes, expect) => runInScanWorker<AttachmentVerifyResult>({ kind: 'attachment-verify', bytes, expect }),
+    saveRow: (input) => getOverlayStore().writeHighlight(input),
+    stagingRoot: attachmentStagingRoot(),
+    log: (message, detail) => console.warn(message, detail ?? ''),
+  }
+}
+
+/** Handlers for attachments:* — list / open / saveAs of a PDF's embedded files (pdf_attachments.md); create of a page attachment (specs/007). */
 export function registerAttachmentsIpc(): void {
   // Leftovers of the previous run. A file an application still holds open survives (and is retried
   // next start); an error here is never fatal.
@@ -84,6 +116,17 @@ export function registerAttachmentsIpc(): void {
     currentWindow = BrowserWindow.fromWebContents(event.sender) ?? undefined
     const { bookId, attachmentId } = (input && typeof input === 'object' ? input : {}) as Record<string, unknown>
     return svc().open(bookId, attachmentId)
+  })
+
+  ipcMain.removeHandler(AttachmentChannels.create)
+  ipcMain.handle(AttachmentChannels.create, async (event, input: unknown): Promise<CreatePdfAttachmentResultDto> => {
+    try {
+      const result = await createPdfAttachment(attachmentOperationDeps(event.sender), input)
+      return result.ok ? { ok: true, highlight: toHighlightDto(result.highlight) } : result
+    } catch (err) {
+      console.warn('[attachments] create failed', err)
+      return { ok: false, code: 'write_failed' }
+    }
   })
 
   ipcMain.removeHandler(AttachmentChannels.saveAs)

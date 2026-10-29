@@ -128,7 +128,7 @@ function toBookmarkDto(bookmark: BookmarkRecord): BookmarkDto {
   return dto
 }
 
-function toHighlightDto(highlight: HighlightRecord): HighlightDto {
+export function toHighlightDto(highlight: HighlightRecord): HighlightDto {
   const dto: HighlightDto = {
     id: highlight.id,
     bookId: highlight.bookId,
