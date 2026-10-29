@@ -40,6 +40,8 @@ export type ReaderCapability =
   | 'shapeAnnotations'
   /** Typewriter note: a text box typed on the page (PDF only — specs/005-typewriter-note). */
   | 'typewriterAnnotations'
+  /** File Attachment tool: place a file on a page, embedded in the PDF (PDF only — specs/007-pdf-file-attachment). */
+  | 'fileAttachments'
 
 /**
  * Which surface renders a format: EPUB (`renderers/epub`), PDF (`renderers/pdf`), TXT
@@ -64,7 +66,7 @@ const SURFACE_CAPABILITIES: Record<ReaderSurface, readonly ReaderCapability[]> =
   // normalized rects (docs/implementation_plan/pdf_text_annotations.md). No `readingSettings`: every
   // Aa option is EPUB reflow (font, size, margins…) and does nothing to a fixed-layout page; zoom
   // lives in the footer.
-  pdf: ['interaction', 'pan', 'search', 'markupAnnotations', 'snapshot', 'wordCount', 'pageLayout', 'inkAnnotations', 'shapeAnnotations', 'typewriterAnnotations', 'attachments'],
+  pdf: ['interaction', 'pan', 'search', 'markupAnnotations', 'snapshot', 'wordCount', 'pageLayout', 'inkAnnotations', 'shapeAnnotations', 'typewriterAnnotations', 'fileAttachments', 'attachments'],
   // TXT: one continuous, editable text. No Hand / Select tools (the text box is live: click = caret,
   // drag = selection); the Edit tool is the way back from a markup tool, no page layout (there are no pages), no search painting / read aloud /
   // translate (out of scope). Markup is stored as offsets into the text

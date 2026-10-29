@@ -6,7 +6,17 @@ import { isShapeStyleKind, type ReaderBookmark, type ReaderHighlightBase } from 
  * rows alike. `chapterIndex` is the grouping key: the spine section for EPUB, the 0-based page for
  * PDF (so its group label comes from `sectionLabels`, i.e. "Page N").
  */
-export type SidebarHighlight = ReaderHighlightBase & { chapterIndex: number }
+export type SidebarHighlight = ReaderHighlightBase & {
+  chapterIndex: number
+  /** PDF file attachments only (specs/007): the embedded file's name and size. */
+  attachment?: { name: string; sizeBytes: number }
+}
+
+function attachmentSizeLabel(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+}
 import type { EpubTocItem } from '../../../../reader/renderers/epub'
 import type { FakeChapter } from '../../logic'
 import { useNotesFilterStore, type NotesTypeFilter } from '../../logic/highlights/notesFilterStore'
@@ -143,6 +153,8 @@ function highlightTypeLabel(styleKind: SidebarHighlight['styleKind']): string {
       return 'Arrow'
     case 'typewriter':
       return 'Typewriter'
+    case 'attachment':
+      return 'Attachment'
     default:
       return 'Highlight'
   }
@@ -178,11 +190,12 @@ const NOTE_TYPE_OPTIONS: { value: NotesTypeFilter; label: string }[] = [
   { value: 'line', label: 'Line' },
   { value: 'arrow', label: 'Arrow' },
   { value: 'typewriter', label: 'Typewriter' },
+  { value: 'attachment', label: 'Attachment' },
 ]
 
 /** Case-insensitive substring match over a highlight's excerpt, note and tags. */
 function highlightMatchesSearch(highlight: SidebarHighlight, needle: string): boolean {
-  const haystack = [highlight.selectionText?.highlight, highlight.note, ...(highlight.tags ?? [])]
+  const haystack = [highlight.selectionText?.highlight, highlight.note, highlight.attachment?.name, ...(highlight.tags ?? [])]
     .filter((part): part is string => typeof part === 'string' && part.length > 0)
     .join('\n')
     .toLowerCase()
@@ -393,9 +406,9 @@ function HighlightListItem({
           e.currentTarget.blur()
         }}
       >
-        {h.styleKind === 'textbox' ? (
+        {h.styleKind === 'textbox' || h.styleKind === 'attachment' ? (
           <span className="mt-0.5 shrink-0 text-[13px] leading-none" aria-hidden>
-            📝
+            {h.styleKind === 'attachment' ? '📎' : '📝'}
           </span>
         ) : (
           <span
@@ -422,7 +435,11 @@ function HighlightListItem({
             <span className="line-clamp-2 mt-1 text-[13px] leading-snug text-lib-text">
               “{h.selectionText.highlight}”
             </span>
-          ) : isShapeStyleKind(h.styleKind) || h.styleKind === 'typewriter' ? null : (
+          ) : h.attachment ? (
+            <span className="mt-1 block truncate text-[13px] leading-snug text-lib-text" title={h.attachment.name}>
+              {h.attachment.name} <span className="text-lib-faint">· {attachmentSizeLabel(h.attachment.sizeBytes)}</span>
+            </span>
+          ) : isShapeStyleKind(h.styleKind) || h.styleKind === 'typewriter' || h.styleKind === 'attachment' ? null : (
             <span className="mt-1 block text-[13px] text-lib-faint italic">(no excerpt)</span>
           )}
           {h.note ? (

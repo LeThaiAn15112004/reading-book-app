@@ -60,3 +60,73 @@ export function clampAttachmentBox(box: NormalizedBox): NormalizedBox {
   const y = Math.min(1 - height, Math.max(0, Number.isFinite(box.y) ? box.y : 0))
   return { x, y, width, height }
 }
+
+/** A size as people read it: bytes below 1 KB, then KB / MB with one decimal (1 MB = 1024 × 1024 bytes). */
+export function formatAttachmentSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+}
+
+/** A refused / failed attachments:create or attachments:change, as the renderer gets it (contracts §1–2). */
+export type AttachFailure =
+  | { code: 'cancelled' }
+  | { code: 'blocked'; reason: string; signerName?: string }
+  | { code: 'empty' | 'read_failed' | 'source_changed'; fileName?: string }
+  | { code: 'too_large'; sizeBytes: number; limitBytes: number; fileName?: string }
+  | { code: 'too_large_for_pdf'; sizeBytes: number; pdfSizeBytes: number; limitBytes: number; fileName?: string }
+  | { code: 'write_failed'; errno?: string }
+  | { code: 'verify_failed' | 'unsupported_pdf' | 'encrypted' | 'not_found' | 'not_editable' | 'invalid_request' | 'busy' }
+
+const BLOCK_REASON_TEXT: Record<string, string> = {
+  managed_copy: 'this PDF is a copy Readmate keeps itself (downloaded from a link or a cloud service), not your own file',
+  read_only: 'the PDF file or its folder is read-only',
+  encrypted: 'the PDF is encrypted',
+  unsupported_pdf: 'the PDF’s structure does not allow adding to it safely',
+  signed: 'the PDF is digitally signed',
+  changed: 'another program changed the PDF meanwhile — try again',
+}
+
+/**
+ * What to tell the user about a refused or failed attachment (FR-011, FR-012). The 100 MB limit is Readmate's own
+ * choice and is worded as such — never as a limit of PDF or of another reader. Null for a cancelled picker.
+ */
+export function describeAttachFailure(failure: AttachFailure): string | null {
+  const named = (text: string, fileName?: string) => (fileName ? `“${fileName}”: ${text}` : text)
+  switch (failure.code) {
+    case 'cancelled':
+      return null
+    case 'blocked':
+      return `Readmate can’t add a file to this PDF: ${BLOCK_REASON_TEXT[failure.reason] ?? 'the file cannot be written'}.`
+    case 'empty':
+      return named('the file is empty, so there is nothing to attach.', failure.fileName)
+    case 'read_failed':
+      return named('the file could not be read, so nothing was attached.', failure.fileName)
+    case 'source_changed':
+      return named('the file changed while it was being read, so nothing was attached. Try again.', failure.fileName)
+    case 'too_large':
+      return named(`the file is ${formatAttachmentSize(failure.sizeBytes)} — Readmate attaches files up to ${formatAttachmentSize(failure.limitBytes)}.`, failure.fileName)
+    case 'too_large_for_pdf':
+      return named(
+        `this PDF (${formatAttachmentSize(failure.pdfSizeBytes)}) and the file (${formatAttachmentSize(failure.sizeBytes)}) together are larger than Readmate can write in one go (${formatAttachmentSize(failure.limitBytes)}).`,
+        failure.fileName,
+      )
+    case 'write_failed':
+      return failure.errno === 'ENOSPC' || failure.errno === 'EDQUOT'
+        ? 'There is not enough disk space to write the PDF. Nothing was changed.'
+        : 'The PDF could not be written. Nothing was changed.'
+    case 'verify_failed':
+      return 'The written PDF did not check out, so it was not kept. Nothing was changed.'
+    case 'unsupported_pdf':
+      return 'This PDF’s structure does not allow adding to it safely. Nothing was changed.'
+    case 'encrypted':
+      return 'This PDF is encrypted, so nothing can be added to it.'
+    case 'not_found':
+      return 'The attachment or the PDF could not be found.'
+    case 'not_editable':
+      return 'This attachment was made in another app; Readmate can open or save it, but not move or delete it.'
+    case 'invalid_request':
+    case 'busy':
+      return 'That did not work. Nothing was changed.'
+  }
+}

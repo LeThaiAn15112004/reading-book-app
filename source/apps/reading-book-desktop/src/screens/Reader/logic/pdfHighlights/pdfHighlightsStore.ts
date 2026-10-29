@@ -619,6 +619,8 @@ export const usePdfHighlightsStore = create<PdfHighlightsStoreState>()((set, get
     if (!bookId) return
     const current = get().highlights.find((h) => h.id === id)
     if (!current) return
+    // A file attachment is removed from the PDF by its own operation (confirmed, attachments:change), never here.
+    if (current.styleKind === 'attachment') return
     get().history.push(highlightRemove(current))
     removeHighlightRow(set, id)
     const restore = () => {

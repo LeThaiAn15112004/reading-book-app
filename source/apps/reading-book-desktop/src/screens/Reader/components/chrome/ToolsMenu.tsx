@@ -158,6 +158,12 @@ function ToolIcon({ tool }: { tool: ToolIconId }) {
           <path strokeLinecap="round" strokeLinejoin="round" d="M4 7V5h16v2M12 5v14M9 19h6" />
         </svg>
       )
+    case 'fileAttachment':
+      return (
+        <svg className={cls} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor" aria-hidden>
+          <path strokeLinecap="round" strokeLinejoin="round" d="m18.4 11.6-6.8 6.8a4.5 4.5 0 0 1-6.4-6.4l7.6-7.6a3 3 0 0 1 4.3 4.2l-7.6 7.6a1.5 1.5 0 0 1-2.1-2.1l6.8-6.8" />
+        </svg>
+      )
     case 'pen':
       return (
         <svg className={cls} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor" aria-hidden>

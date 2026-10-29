@@ -8,6 +8,7 @@ export {
   type PdfSearchTarget,
 } from './PdfRenderer'
 export { type PdfAnnotationMark } from './PdfAnnotationLayer'
+export { type PdfAttachmentPin } from './attachmentPins'
 export { type PdfInkLayerMark } from './PdfInkLayer'
 export { type PdfShapeMark } from './PdfShapeLayer'
 export { type PdfInsertionPoint } from './pdfInsertionPoint'

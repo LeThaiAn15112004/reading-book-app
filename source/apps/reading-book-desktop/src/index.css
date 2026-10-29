@@ -517,6 +517,15 @@ a[ref='epubjs-mk'].rb-hl-focused {
   -webkit-user-select: none;
 }
 
+/* File Attachment tool: a press places an attachment icon (never a text selection). */
+[data-pdf-tool='fileAttachment'],
+[data-pdf-tool='fileAttachment'] .textLayer,
+[data-pdf-tool='fileAttachment'] .textLayer :is(span, br) {
+  cursor: copy;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
 /* Typewriter editor: the selection while focus is in the Properties sidebar (CSS Custom Highlight). */
 ::highlight(rb-tw-sel) {
   background-color: rgba(30, 136, 229, 0.35);

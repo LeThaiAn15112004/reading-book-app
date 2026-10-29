@@ -47,6 +47,8 @@ const VALID_TYPE_FILTERS: ReadonlySet<NotesTypeFilter> = new Set([
   'arrow',
   // PDF Typewriter notes
   'typewriter',
+  // PDF file attachments (specs/007)
+  'attachment',
 ])
 
 /**

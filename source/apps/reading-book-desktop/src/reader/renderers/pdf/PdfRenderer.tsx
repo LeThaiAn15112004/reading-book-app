@@ -93,6 +93,8 @@ import {
   type PdfAnnotationFlash,
   type PdfAnnotationMark,
 } from './PdfAnnotationLayer'
+import { PdfPageAttachments } from './PdfAttachmentLayer'
+import { attachmentPinAt, type PdfAttachmentPin } from './attachmentPins'
 import { PAD_PX, PAGE_GAP_PX, PDF_TO_CSS, type PdfPageCssSize } from './pdfLayout'
 // `?url` makes Vite emit the worker as a local asset in dist/ — never loaded from a CDN.
 import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
@@ -274,6 +276,10 @@ export interface PdfRendererProps {
   onShapeResize?: (id: string, geometry: PdfShapeGeometryResult) => void
   /** The compact toolbar for the selected shape. */
   renderShapeToolbar?: (shape: PdfShapeMark) => ReactNode
+  /** File attachments to draw on their pages (specs/007-pdf-file-attachment); the Reader keeps them out of `annotations`. */
+  attachmentPins?: readonly PdfAttachmentPin[]
+  /** File Attachment tool: a click on a page (not on an icon, not between pages) asks to place a file there. */
+  onAttachmentPlace?: (pageIndex: number, point: { x: number; y: number }) => void
   /** Typewriter notes (rows of the annotation list) to paint; the Reader keeps them out of `annotations`. */
   typewriters?: readonly PdfTypewriterMark[]
   /** True while a note is being typed: a press elsewhere commits it instead of placing another box. */
@@ -432,6 +438,8 @@ export function PdfRenderer({
   onShapeSelect,
   shapePen,
   onShapeCreate,
+  attachmentPins,
+  onAttachmentPlace,
   typewriters,
   typewriterEditing = false,
   onTypewriterBegin,
@@ -550,6 +558,22 @@ export function PdfRenderer({
     }
     return byPage
   }, [inkStrokes, inkMove, inkResize, erasePreview])
+  const attachmentTool = interactionTool === 'fileAttachment'
+  const attachmentToolRef = useRef(attachmentTool)
+  attachmentToolRef.current = attachmentTool
+  const onAttachmentPlaceRef = useRef(onAttachmentPlace)
+  onAttachmentPlaceRef.current = onAttachmentPlace
+  const attachmentsByPageRef = useRef(new Map<number, PdfAttachmentPin[]>())
+  const attachmentsByPage = useMemo(() => {
+    const byPage = new Map<number, PdfAttachmentPin[]>()
+    for (const pin of attachmentPins ?? []) {
+      const list = byPage.get(pin.pageIndex)
+      if (list) list.push(pin)
+      else byPage.set(pin.pageIndex, [pin])
+    }
+    attachmentsByPageRef.current = byPage
+    return byPage
+  }, [attachmentPins])
   const typewriterTool = interactionTool === 'typewriter'
   const typewriterToolRef = useRef(typewriterTool)
   typewriterToolRef.current = typewriterTool
@@ -2038,6 +2062,32 @@ export function PdfRenderer({
     return point && marks ? typewriterBoxAt(marks, point[0], point[1], 0.004, 0.004) : null
   }
 
+  /** The attachment icon under the pointer (topmost), or null. */
+  const attachmentAt = (clientX: number, clientY: number): PdfAttachmentPin | null => {
+    const hit = slotAt(clientX, clientY)
+    const point = hit ? clientToPageUnit(clientX, clientY, hit.rect) : null
+    const pins = hit ? attachmentsByPageRef.current.get(hit.index) : undefined
+    return point && pins ? attachmentPinAt(pins, point[0], point[1]) : null
+  }
+
+  /** File Attachment tool: a click on a page asks to place a file at that point (the Reader opens the picker in Main). */
+  const placeAttachment = (event: ReactPointerEvent<HTMLDivElement>) => {
+    event.preventDefault()
+    window.getSelection()?.removeAllRanges()
+    if (typewriterEditingRef.current) {
+      onTypewriterOutsideRef.current?.()
+      return
+    }
+    // A press on an existing icon never places another one on top of it.
+    if (attachmentAt(event.clientX, event.clientY)) return
+    const hit = slotAt(event.clientX, event.clientY)
+    const point = hit ? clientToPageUnit(event.clientX, event.clientY, hit.rect) : null
+    if (!hit || !point) return
+    selectTarget(null)
+    onBlankClickRef.current?.()
+    onAttachmentPlaceRef.current?.(hit.index, { x: point[0], y: point[1] })
+  }
+
   /** Typewriter tool: a press places a box (click) or sizes one (drag); with a note open it only commits that note. */
   const beginTypewriter = (event: ReactPointerEvent<HTMLDivElement>) => {
     event.preventDefault()
@@ -2138,6 +2188,10 @@ export function PdfRenderer({
     }
     if (typewriterToolRef.current) {
       beginTypewriter(event)
+      return
+    }
+    if (attachmentToolRef.current) {
+      placeAttachment(event)
       return
     }
     // A press elsewhere commits a note that is being edited, then goes on as usual.
@@ -2460,6 +2514,7 @@ export function PdfRenderer({
                   flash={flash as PdfShapeFlash | null}
                 />
               ) : null}
+              {attachmentsByPage.has(index) ? <PdfPageAttachments pins={attachmentsByPage.get(index)!} /> : null}
               {typewritersByPage.has(index) || renderTypewriterEditor?.(index, size.h / size.w) || typewriterRubber?.pageIndex === index ? (
                 <PdfPageTypewriters
                   marks={typewritersByPage.get(index) ?? []}
@@ -2539,7 +2594,7 @@ export function PdfRenderer({
       data-pdf-pages={sizes.length}
       data-pdf-flow={flow}
       data-pdf-per-view={pagesPerView}
-      data-pdf-tool={pen ? 'pen' : eraser ? 'eraser' : shapeTool ? 'shape' : typewriterTool ? 'typewriter' : hand ? 'hand' : 'select'}
+      data-pdf-tool={pen ? 'pen' : eraser ? 'eraser' : shapeTool ? 'shape' : typewriterTool ? 'typewriter' : attachmentTool ? 'fileAttachment' : hand ? 'hand' : 'select'}
       // Pen cursor per drawing style (index.css).
       data-pdf-ink-style={pen ? (inkPen?.penStyle ?? 'pen') : undefined}
       // Highlight / Underline / Strikethrough: Select's surface with the tool's pen cursor.

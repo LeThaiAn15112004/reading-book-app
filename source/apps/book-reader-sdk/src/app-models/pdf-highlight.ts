@@ -15,7 +15,7 @@
 
 import { PageRectLocation, Rect, type NoteLocator, type PdfAnnotation, type PdfAnnotationRect, type PdfShapeGeometry } from '../domain/index.js'
 import { parseTypewriterDoc, type PdfTypewriterDoc } from '../typewriter/typewriter-doc.js'
-import { parsePdfAttachmentInfo } from '../attachments/pdf-attachment-annotation.js'
+import { parsePdfAttachmentInfo, type PdfAttachmentInfo } from '../attachments/pdf-attachment-annotation.js'
 import { packBookmarkLocator, parseBookmarkLocation } from './bookmark-location.js'
 import { DEFAULT_HIGHLIGHT_COLOR } from './highlight-colors.js'
 import {
@@ -59,6 +59,8 @@ export type PdfReaderHighlight = ReaderHighlightBase & {
   /** Shape annotations (rectangle / ellipse / line / arrow): pen width and, for a line / arrow, its endpoints. */
   shape?: PdfShapeGeometry
   typewriter?: PdfTypewriterDoc
+  /** File attachments (style kind `attachment`): the file embedded in the PDF; `rects[0]` is the icon box. */
+  attachment?: PdfAttachmentInfo
 }
 
 export function isPdfReaderHighlight(h: ReaderHighlightBase): h is PdfReaderHighlight {
@@ -327,6 +329,7 @@ export function pdfHighlightDtoToReaderHighlight(dto: {
     ...(annotation.caret ? { caret: true as const } : {}),
     ...(annotation.shape ? { shape: annotation.shape } : {}),
     ...(annotation.typewriter ? { typewriter: annotation.typewriter } : {}),
+    ...(annotation.attachment ? { attachment: annotation.attachment } : {}),
     styleKind: dto.styleKind,
     colorHex: dto.colorHex?.trim() || DEFAULT_HIGHLIGHT_COLOR,
     // A Typewriter note's text is the document its style runs index into: never trimmed.

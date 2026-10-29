@@ -17,7 +17,7 @@ export type CompanionTool = 'search' | 'speech' | 'translate'
 export type AnnotationTool = 'highlight' | 'underline' | 'squiggly' | 'strikethrough' | 'replace' | 'insert' | 'pen'
 
 /** Freehand Ink tools next to the markup tools (both are armed like a markup tool; the eraser removes whole Ink strokes only). */
-export type FreehandTool = 'pen' | 'shape' | 'eraser' | 'typewriter'
+export type FreehandTool = 'pen' | 'shape' | 'eraser' | 'typewriter' | 'fileAttachment'
 
 /** How the Eraser removes ink: whole strokes, or only the part under the eraser. */
 export type EraserMode = 'stroke' | 'partial'
@@ -91,6 +91,7 @@ export const TOOL_REGISTRY: readonly ToolDef[] = [
   { id: 'shape', label: 'Shapes', group: 'freehand', description: 'Shapes — drag to draw a rectangle, ellipse, line or arrow (see the arrow for the kind and look)', requires: ['shapeAnnotations'] },
   { id: 'eraser', label: 'Eraser', group: 'freehand', description: 'Eraser — remove freehand strokes (whole or in part, see the arrow)', requires: ['inkAnnotations'] },
   { id: 'typewriter', label: 'Typewriter', group: 'freehand', description: 'Typewriter — click or drag on the page, then type', requires: ['typewriterAnnotations'] },
+  { id: 'fileAttachment', label: 'File Attachment', group: 'freehand', description: 'File Attachment — click a spot on the page, then choose a file to embed in the PDF', requires: ['fileAttachments'] },
   { id: 'snapshot', label: 'Snapshot', group: 'tools', description: 'Snapshot — copy an area as an image', requires: ['snapshot'] },
   { id: 'wordCount', label: 'Word Count', group: 'tools', description: 'Word count and reading time', requires: ['wordCount'] },
   { id: 'settings', label: 'Settings', group: 'settings', description: 'Reading settings', requires: ['readingSettings'], popup: 'dialog' },

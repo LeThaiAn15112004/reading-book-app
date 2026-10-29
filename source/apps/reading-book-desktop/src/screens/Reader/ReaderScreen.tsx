@@ -46,6 +46,7 @@ import {
   pdfSelectionPageLabel,
   type PdfRendererApi,
   type PdfShapeMark,
+  type PdfAttachmentPin,
 } from '../../reader/renderers/pdf'
 import { TxtRenderer, type TxtRendererApi } from '../../reader/renderers/txt'
 import { MdRenderer, decodeMdSource, type MdRendererApi, type MdSelectionInfo } from '../../reader/renderers/md'
@@ -122,6 +123,7 @@ import { useReaderPdfGraphics } from './logic/hooks/useReaderPdfGraphics'
 import { usePdfShapePrefsStore } from './logic/pdfShapes/pdfShapePrefsStore'
 import { usePdfTypewriterPrefsStore } from './logic/pdfTypewriter/pdfTypewriterPrefsStore'
 import { useTypewriterEditorStore } from './logic/pdfTypewriter/typewriterEditorStore'
+import { usePageAttachmentsStore } from './logic/attachments/pageAttachmentsStore'
 import { TypewriterPropertiesPanel } from './components/rightPanel/TypewriterPropertiesPanel'
 import { useTypewriterPanelStore } from './logic/pdfTypewriter/typewriterPanelStore'
 import { PdfTypewriterEditor } from '../../reader/renderers/pdf/PdfTypewriterEditor'
@@ -359,7 +361,7 @@ export function ReaderScreen() {
   translateModeRef.current = translation.mode
   // The Pen exists on the PDF surface only: another book (or format) leaves it.
   useEffect(() => {
-    if (!isPdfSurface && (activeTool === 'pen' || activeTool === 'eraser' || activeTool === 'shape' || activeTool === 'typewriter')) setActiveTool('select')
+    if (!isPdfSurface && (activeTool === 'pen' || activeTool === 'eraser' || activeTool === 'shape' || activeTool === 'typewriter' || activeTool === 'fileAttachment')) setActiveTool('select')
   }, [isPdfSurface, activeTool])
   const selectTool = (tool: InteractionTool | ((current: InteractionTool) => InteractionTool)) => {
     if (translateModeRef.current) translation.setMode(false)
@@ -605,7 +607,20 @@ export function ReaderScreen() {
         ? txt.markup
         : highlights
   /** PDF marks as painted: the saved annotations plus the caret still being placed (Inserted Text). */
-  const pdfTextHighlights = useMemo(() => pdfHighlights.highlights.filter((h) => !isShapeStyleKind(h.styleKind) && h.styleKind !== 'typewriter'), [pdfHighlights.highlights])
+  const pdfTextHighlights = useMemo(
+    () => pdfHighlights.highlights.filter((h) => !isShapeStyleKind(h.styleKind) && h.styleKind !== 'typewriter' && h.styleKind !== 'attachment'),
+    [pdfHighlights.highlights],
+  )
+  // File attachments Readmate placed (rows of style kind `attachment`): drawn as icons by their own layer (specs/007).
+  const pdfAttachmentPins = useMemo(
+    () =>
+      pdfHighlights.highlights.flatMap((h): PdfAttachmentPin[] => {
+        const box = h.rects[0]
+        if (h.styleKind !== 'attachment' || !h.attachment || !box) return []
+        return [{ id: h.id, pageIndex: h.page - 1, box: { x: box.x, y: box.y, width: box.width, height: box.height }, name: h.attachment.name, sizeBytes: h.attachment.sizeBytes, editable: true }]
+      }),
+    [pdfHighlights.highlights],
+  )
   const pdfMarks = useMemo(
     () =>
       pdfHighlights.pendingInsert
@@ -824,7 +839,7 @@ export function ReaderScreen() {
         translation.setMode(false)
         return true
       }
-      if (!isMarkupTool(activeToolRef.current) && activeToolRef.current !== 'typewriter' && activeToolRef.current !== 'pen' && activeToolRef.current !== 'eraser' && activeToolRef.current !== 'shape') return false
+      if (!isMarkupTool(activeToolRef.current) && activeToolRef.current !== 'typewriter' && activeToolRef.current !== 'fileAttachment' && activeToolRef.current !== 'pen' && activeToolRef.current !== 'eraser' && activeToolRef.current !== 'shape') return false
       setActiveTool('select')
       return true
     },
@@ -880,6 +895,7 @@ export function ReaderScreen() {
     pen: { active: activeTool === 'pen' },
     shape: { active: activeTool === 'shape' },
     typewriter: { active: activeTool === 'typewriter' },
+    fileAttachment: { active: activeTool === 'fileAttachment' },
     eraser: { active: activeTool === 'eraser' },
     snapshot: { active: snapshot.active },
     settings: { active: chrome.settingsOpen, expanded: chrome.settingsOpen },
@@ -923,6 +939,7 @@ export function ReaderScreen() {
       case 'replace':
       case 'insert':
       case 'typewriter':
+      case 'fileAttachment':
       case 'pen':
       case 'shape':
       case 'eraser':
@@ -1727,6 +1744,10 @@ export function ReaderScreen() {
               onInkSelect={pdfInk.select}
               onInkMove={pdfInk.moveStroke}
               onInkResize={pdfInk.resizeStroke}
+              attachmentPins={pdfAttachmentPins}
+              onAttachmentPlace={(pageIndex, point) => {
+                if (bookId) void usePageAttachmentsStore.getState().create(bookId, pageIndex, point)
+              }}
               typewriters={pdfTypewriters}
               typewriterEditing={typewriterSession != null}
               selectedTypewriterId={selectedTypewriterId}

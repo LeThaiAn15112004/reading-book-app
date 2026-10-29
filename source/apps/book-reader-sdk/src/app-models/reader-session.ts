@@ -33,6 +33,8 @@ export type InteractionTool =
   | 'shape'
   /** Typewriter note (PDF only, capability `typewriterAnnotations`): a click or drag places a text box; never a text selection. */
   | 'typewriter'
+  /** File Attachment (PDF only, capability `fileAttachments`): a click on a page opens the file picker and places the file there. */
+  | 'fileAttachment'
 
 /** The tools whose drag over text saves a mark in that style (the `HighlightStyleKind` of the same name). */
 export const MARKUP_TOOLS = ['highlight', 'underline', 'squiggly', 'strikethrough', 'replace', 'insert'] as const
