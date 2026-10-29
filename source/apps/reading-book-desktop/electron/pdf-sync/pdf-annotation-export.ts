@@ -67,14 +67,37 @@ function writeErrorCode(err: unknown): ExportErrorCode {
  * (same volume), flushed, then renamed over it. The temp file is removed on any failure.
  */
 export async function writeFileSafely(target: string, bytes: Uint8Array): Promise<void> {
+  await writeFileSafelyStreaming(target, async (handle) => {
+    await handle.writeFile(bytes)
+  })
+}
+
+/** The temp file `writeFileSafelyStreaming` writes beside `target` — only names of this shape are ever swept. */
+export function isReadmateTempFor(target: string, name: string): boolean {
+  const base = `.${path.basename(target)}.readmate-`
+  return name.startsWith(base) && /^[0-9a-f]{12}\.tmp$/.test(name.slice(base.length))
+}
+
+/**
+ * `writeFileSafely` for content written piece by piece: `write` fills the temp file (next to `target`, same
+ * volume, created `wx`), which is flushed; `beforeRename` (given the temp path) may still refuse by throwing
+ * — e.g. a read-back of the temp file or a check that the target is unchanged. The temp file is removed on
+ * any failure, so the target is either untouched or entirely the new content.
+ */
+export async function writeFileSafelyStreaming(
+  target: string,
+  write: (handle: Awaited<ReturnType<typeof fsp.open>>) => Promise<void>,
+  beforeRename?: (tempPath: string) => Promise<void>,
+): Promise<void> {
   const temp = path.join(path.dirname(target), `.${path.basename(target)}.readmate-${randomBytes(6).toString('hex')}.tmp`)
   let handle: Awaited<ReturnType<typeof fsp.open>> | null = null
   try {
     handle = await fsp.open(temp, 'wx')
-    await handle.writeFile(bytes)
+    await write(handle)
     await handle.sync()
     await handle.close()
     handle = null
+    await beforeRename?.(temp)
     await fsp.rename(temp, target)
   } catch (err) {
     await handle?.close().catch(() => {})

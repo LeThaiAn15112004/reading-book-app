@@ -330,6 +330,169 @@ export function appendRawObjects(bytes: Uint8Array, build: (context: { objects: 
   }
 }
 
+/** A Readmate-made FileAttachment annotation (specs/007-pdf-file-attachment research R1, R9). */
+export type AttachmentAnnotationSpec = {
+  /** `/NM` = `readmate:<rowId>`. */
+  nm: string
+  pageIndex: number
+  /** The icon box, normalised 0–1 to the displayed page (top-left origin). */
+  box: { x: number; y: number; width: number; height: number }
+  /** `/C`, RGB 0–1: the icon's frame. */
+  color: [number, number, number]
+  /** `/T`. */
+  author: string
+  /** `/Contents`: what readers show as the annotation's text (the file name). */
+  contents: string
+  /** ISO-8601 → `/CreationDate`, `/M`. */
+  createdAt: string
+  modifiedAt: string
+}
+
+/** What the file specification says about the embedded file. The content itself is streamed by the caller. */
+export type AttachmentFileSpec = {
+  /** Sanitised file name. */
+  name: string
+  /** Uncompressed size (`/Params /Size`). */
+  sizeBytes: number
+  /** MD5 of the uncompressed content, lowercase hex (`/Params /CheckSum`). */
+  md5Hex: string
+  /** ISO-8601 → `/Params /ModDate`. */
+  modifiedAt?: string
+}
+
+/**
+ * One object of a planned update, in write order. `body` objects are written as they are; the `content`
+ * object is the EmbeddedFile stream (`<< streamDict >>` + `stream` + the deflated content + `endstream`);
+ * the `length` object holds the content's written byte length (an indirect `/Length`, so the content can be
+ * streamed without knowing its compressed size first).
+ */
+export type PlannedObject =
+  | { num: number; gen: number; body: string }
+  | { num: number; gen: number; streamDict: string; content: true }
+  | { num: number; gen: number; length: true }
+
+/** Plain data (structured-clone safe: planned in the scan worker, streamed by Main). */
+export type AttachmentUpdatePlan = {
+  /** Written right after the original bytes (a newline when they don't end with one). */
+  lead: string
+  objects: PlannedObject[]
+  /** The new annotation's object (pdf.js id `${num}R`) and its `/Rect` in user space — what the read-back checks. */
+  annotationRef: PdfRef
+  rect: [number, number, number, number]
+  /** The trailer the update continues, and the first object number it left unused. */
+  trailer: Trailer
+  nextNum: number
+}
+
+/** The xref section + trailer that ends `plan`, given each planned object's absolute offset and where the section starts. */
+export function finishAttachmentXref(plan: AttachmentUpdatePlan, offsets: ReadonlyMap<number, number>, xrefAt: number): string {
+  const entries = new Map<number, { gen: number; offset: number }>()
+  for (const object of plan.objects) {
+    const offset = offsets.get(object.num)
+    if (offset === undefined) throw new Error(`object ${object.num} was not written`)
+    entries.set(object.num, { gen: object.gen, offset })
+  }
+  return xrefSection(plan.trailer, entries, plan.nextNum, xrefAt)
+}
+
+/** Paperclip in a unit box (top-left origin, y down), drawn as one stroked path over a light frame. */
+const CLIP_PATH: { op: 'm' | 'l' | 'c'; pts: Point[] }[] = [
+  { op: 'm', pts: [[0.6, 0.36]] },
+  { op: 'l', pts: [[0.6, 0.7]] },
+  { op: 'c', pts: [[0.6, 0.83], [0.4, 0.83], [0.4, 0.7]] },
+  { op: 'l', pts: [[0.4, 0.24]] },
+  { op: 'c', pts: [[0.4, 0.1], [0.72, 0.1], [0.72, 0.24]] },
+  { op: 'l', pts: [[0.72, 0.66]] },
+]
+
+/** `/Rect` (user space) and appearance content of an attachment icon, mapped point by point (rotated / cropped pages). */
+function attachmentIconGeometry(spec: AttachmentAnnotationSpec, page: PageGeometry): { rect: [number, number, number, number]; content: string } {
+  const toUser = inverse(page.transform)
+  const at = (u: number, v: number): Point => toUser((spec.box.x + u * spec.box.width) * page.width, (spec.box.y + v * spec.box.height) * page.height)
+  const corners = [at(0, 0), at(1, 0), at(1, 1), at(0, 1)]
+  const rect = bbox(corners, 0)
+  const [r, g, b] = spec.color.map(num)
+  const frame = [at(0.06, 0.06), at(0.94, 0.06), at(0.94, 0.94), at(0.06, 0.94)]
+  const side = dist(corners[0]!, corners[1]!)
+  const ops = ['q', '1 J 1 j']
+  ops.push('1 0.97 0.82 rg', `${r} ${g} ${b} RG`, `${num(Math.max(0.5, side * 0.05))} w`)
+  ops.push(`${pt(frame[0]!)} m ${pt(frame[1]!)} l ${pt(frame[2]!)} l ${pt(frame[3]!)} l h B`)
+  ops.push('0.2 0.2 0.2 RG', `${num(Math.max(0.6, side * 0.07))} w`)
+  ops.push(CLIP_PATH.map((seg) => `${seg.pts.map((p) => pt(at(p[0], p[1]))).join(' ')} ${seg.op}`).join(' ') + ' S')
+  ops.push('Q')
+  return { rect, content: ops.join('\n') }
+}
+
+/** The FileAttachment annotation dictionary (also used to rewrite it on a move, keeping `/FS`). */
+function fileAttachmentDict(spec: AttachmentAnnotationSpec, page: PageGeometry, rect: [number, number, number, number], fsRef: string, apRef: PdfRef, keep: Record<string, string>): string {
+  const [r, g, b] = spec.color.map(num)
+  const parts = [
+    '/Type /Annot /Subtype /FileAttachment',
+    `/Rect [${rect.map(num).join(' ')}]`,
+    `/FS ${fsRef}`,
+    '/Name /Paperclip /F 4',
+    `/C [${r} ${g} ${b}]`,
+    `/Contents ${textString(spec.contents)}`,
+    `/T ${textString(spec.author)}`,
+    `/NM ${textString(spec.nm)}`,
+    `/M ${textString(pdfDate(spec.modifiedAt))}`,
+    `/CreationDate ${textString(pdfDate(spec.createdAt))}`,
+    `/P ${refText(page.ref)}`,
+    `/AP << /N ${refText(apRef)} >>`,
+  ]
+  for (const [key, value] of Object.entries(keep)) if (key !== 'FS') parts.push(`/${key} ${value}`)
+  return `<< ${parts.join(' ')} >>`
+}
+
+/** A file name as a PDF byte string for `/F` (ASCII; others replaced) — `/UF` carries the real Unicode name. */
+function asciiFileName(name: string): string {
+  const ascii = [...name].map((ch) => (/^[\x20-\x7e]$/.test(ch) ? ch : '_')).join('')
+  return textString(ascii || 'attachment')
+}
+
+/**
+ * Plan ONE incremental update that adds a FileAttachment annotation with an embedded file on `page`
+ * (research R1–R3): EmbeddedFile stream (Flate, indirect `/Length`, `/Params /Size /CheckSum /ModDate`),
+ * Filespec (`/F`, `/UF`, `/EF`), the annotation (`/NM readmate:…`, `/Name /Paperclip`, its own `/AP`) and the
+ * page's `/Annots`. Never touches the catalog's `/Names /EmbeddedFiles`. The content is NOT an input: the
+ * caller streams it where the `content` object says. Throws `PdfWriteError` — nothing is produced then.
+ */
+export function planAttachmentAppend(bytes: Uint8Array, page: PageGeometry, annotation: AttachmentAnnotationSpec, file: AttachmentFileSpec): AttachmentUpdatePlan {
+  try {
+    const objects = new PdfRawObjects(bytes)
+    if (objects.encrypted) throw new PdfWriteError('encrypted', 'the PDF is encrypted')
+    const trailer = readTrailer(objects)
+    let nextNum = trailer.size
+    const allocate = (): PdfRef => ({ num: nextNum++, gen: 0 })
+    const contentRef = allocate()
+    const lengthRef = allocate()
+    const specRef = allocate()
+    const apRef = allocate()
+    const annotRef = allocate()
+
+    const params = [`/Size ${file.sizeBytes}`, `/CheckSum <${file.md5Hex.toUpperCase()}>`]
+    if (file.modifiedAt) params.push(`/ModDate ${textString(pdfDate(file.modifiedAt))}`)
+    const streamDict = `/Type /EmbeddedFile /Filter /FlateDecode /Length ${refText(lengthRef)} /Params << ${params.join(' ')} >>`
+    const fileSpec = `<< /Type /Filespec /F ${asciiFileName(file.name)} /UF ${textString(file.name)} /EF << /F ${refText(contentRef)} /UF ${refText(contentRef)} >> >>`
+    const icon = attachmentIconGeometry(annotation, page)
+
+    const planned: PlannedObject[] = [
+      { ...contentRef, streamDict, content: true },
+      { ...lengthRef, length: true },
+      { ...specRef, body: fileSpec },
+      { ...apRef, body: streamObject(`/Type /XObject /Subtype /Form /FormType 1 /BBox [${icon.rect.map(num).join(' ')}]`, icon.content) },
+      { ...annotRef, body: fileAttachmentDict(annotation, page, icon.rect, refText(specRef), apRef, {}) },
+      patchPageAnnots(objects, page, { add: [annotRef], remove: new Set() }),
+    ]
+    const original = objects.text
+    const lead = original.endsWith('\n') || original.endsWith('\r') ? '' : '\n'
+    return { lead, objects: planned, annotationRef: annotRef, rect: icon.rect, trailer, nextNum }
+  } catch (err) {
+    if (err instanceof PdfSyntaxError) throw new PdfWriteError('unsupported_pdf', err.message)
+    throw err
+  }
+}
+
 /** A PDF date string for "now" (`/M` of a rewritten annotation). */
 export function pdfDateNow(): string {
   return pdfDate(new Date().toISOString())
@@ -425,51 +588,52 @@ function appendUnchecked(bytes: Uint8Array, pages: ReadonlyMap<number, PageGeome
     changesFor(pageIndex).remove.add(`${ref.num} ${ref.gen}`)
   }
 
-  for (const [pageIndex, change] of perPage) {
-    const page = pageOf(pageIndex)
-    const pageBody = objects.body(page.ref.num, page.ref.gen)
-    if (pageBody === undefined) throw new PdfWriteError('unsupported_pdf', `page object ${page.ref.num} not found`)
-    const pageDict = parseDict(pageBody)
-    const annotsValue = dictValue(pageBody, pageDict, 'Annots')
-    const indirect = parseRef(annotsValue)
-    let current: PdfRef[]
-    if (indirect) {
-      const arrayBody = objects.body(indirect.num, indirect.gen)
-      if (arrayBody === undefined) throw new PdfWriteError('unsupported_pdf', '/Annots array not found')
-      current = parseRefArray(arrayBody)
-    } else current = annotsValue ? parseRefArray(annotsValue) : []
-
-    if (change.remove.size > 0) {
-      // Also drop each removed annotation's popup (its /Popup, or a popup whose /Parent it is).
-      for (const ref of current) {
-        const key = `${ref.num} ${ref.gen}`
-        const body = objects.body(ref.num, ref.gen)
-        if (body === undefined) continue
-        try {
-          const dict = parseDict(body)
-          if (change.remove.has(key)) {
-            const popup = parseRef(dictValue(body, dict, 'Popup'))
-            if (popup) change.remove.add(`${popup.num} ${popup.gen}`)
-          } else if (dictValue(body, dict, 'Subtype') === '/Popup') {
-            const parent = parseRef(dictValue(body, dict, 'Parent'))
-            if (parent && change.remove.has(`${parent.num} ${parent.gen}`)) change.remove.add(key)
-          }
-        } catch {
-          // An annotation we can't parse is left where it is.
-        }
-      }
-    }
-    const next = [...current.filter((r) => !change.remove.has(`${r.num} ${r.gen}`)), ...change.add]
-    const arrayText = `[${next.map(refText).join(' ')}]`
-    if (indirect) written.push({ ...indirect, body: arrayText })
-    else written.push({ ...page.ref, body: patchDict(pageBody, pageDict, { Annots: arrayText }) })
-  }
+  for (const [pageIndex, change] of perPage) written.push(patchPageAnnots(objects, pageOf(pageIndex), change))
 
   if (written.length === 0) return new Uint8Array(bytes)
   return serialize(objects.text, trailer, written, nextNum)
 }
 
-function serialize(original: string, trailer: ReturnType<typeof readTrailer>, written: NewObject[], nextNum: number): Uint8Array {
+/** The page's `/Annots` (inline or indirect) with `change` applied — the object to write for it. */
+function patchPageAnnots(objects: PdfRawObjects, page: PageGeometry, change: { add: PdfRef[]; remove: Set<string> }): NewObject {
+  const pageBody = objects.body(page.ref.num, page.ref.gen)
+  if (pageBody === undefined) throw new PdfWriteError('unsupported_pdf', `page object ${page.ref.num} not found`)
+  const pageDict = parseDict(pageBody)
+  const annotsValue = dictValue(pageBody, pageDict, 'Annots')
+  const indirect = parseRef(annotsValue)
+  let current: PdfRef[]
+  if (indirect) {
+    const arrayBody = objects.body(indirect.num, indirect.gen)
+    if (arrayBody === undefined) throw new PdfWriteError('unsupported_pdf', '/Annots array not found')
+    current = parseRefArray(arrayBody)
+  } else current = annotsValue ? parseRefArray(annotsValue) : []
+
+  if (change.remove.size > 0) {
+    // Also drop each removed annotation's popup (its /Popup, or a popup whose /Parent it is).
+    for (const ref of current) {
+      const key = `${ref.num} ${ref.gen}`
+      const body = objects.body(ref.num, ref.gen)
+      if (body === undefined) continue
+      try {
+        const dict = parseDict(body)
+        if (change.remove.has(key)) {
+          const popup = parseRef(dictValue(body, dict, 'Popup'))
+          if (popup) change.remove.add(`${popup.num} ${popup.gen}`)
+        } else if (dictValue(body, dict, 'Subtype') === '/Popup') {
+          const parent = parseRef(dictValue(body, dict, 'Parent'))
+          if (parent && change.remove.has(`${parent.num} ${parent.gen}`)) change.remove.add(key)
+        }
+      } catch {
+        // An annotation we can't parse is left where it is.
+      }
+    }
+  }
+  const next = [...current.filter((r) => !change.remove.has(`${r.num} ${r.gen}`)), ...change.add]
+  const arrayText = `[${next.map(refText).join(' ')}]`
+  return indirect ? { ...indirect, body: arrayText } : { ...page.ref, body: patchDict(pageBody, pageDict, { Annots: arrayText }) }
+}
+
+function serialize(original: string, trailer: Trailer, written: NewObject[], nextNum: number): Uint8Array {
   let out = original.endsWith('\n') || original.endsWith('\r') ? '' : '\n'
   const base = original.length
   const offsets = new Map<number, { gen: number; offset: number }>()
@@ -477,10 +641,22 @@ function serialize(original: string, trailer: ReturnType<typeof readTrailer>, wr
     offsets.set(object.num, { gen: object.gen, offset: base + Buffer.byteLength(out, 'latin1') })
     out += `${object.num} ${object.gen} obj\n${object.body}\nendobj\n`
   }
+  out += xrefSection(trailer, offsets, nextNum, base + Buffer.byteLength(out, 'latin1'))
+  return new Uint8Array(Buffer.concat([Buffer.from(original, 'latin1'), Buffer.from(out, 'latin1')]))
+}
+
+export type Trailer = ReturnType<typeof readTrailer>
+
+/**
+ * The xref section + trailer continuing `trailer`, for objects at `offsets` (absolute), starting at byte `xrefAt`.
+ * `nextNum` = first unused object number (an xref stream takes it).
+ */
+function xrefSection(trailer: Trailer, written: ReadonlyMap<number, { gen: number; offset: number }>, nextNum: number, xrefAt: number): string {
+  const offsets = new Map(written)
+  let out = ''
   const trailerExtras = `/Root ${trailer.root}${trailer.info ? ` /Info ${trailer.info}` : ''}${trailer.id ? ` /ID ${trailer.id}` : ''} /Prev ${trailer.prev}`
 
   if (trailer.kind === 'table') {
-    const xrefAt = base + Buffer.byteLength(out, 'latin1')
     const nums = [...offsets.keys()].sort((a, b) => a - b)
     out += 'xref\n'
     for (let i = 0; i < nums.length; ) {
@@ -497,7 +673,6 @@ function serialize(original: string, trailer: ReturnType<typeof readTrailer>, wr
   } else {
     // The previous section is an xref stream: continue with one (W [1 4 2], uncompressed).
     const xrefNum = nextNum
-    const xrefAt = base + Buffer.byteLength(out, 'latin1')
     offsets.set(xrefNum, { gen: 0, offset: xrefAt })
     const nums = [...offsets.keys()].sort((a, b) => a - b)
     const index: number[] = []
@@ -519,5 +694,5 @@ function serialize(original: string, trailer: ReturnType<typeof readTrailer>, wr
     const data = Buffer.concat(rows).toString('latin1')
     out += `${xrefNum} 0 obj\n<< /Type /XRef /Size ${xrefNum + 1} /W [1 4 2] /Index [${index.join(' ')}] ${trailerExtras} /Length ${data.length} >>\nstream\n${data}\nendstream\nendobj\nstartxref\n${xrefAt}\n%%EOF\n`
   }
-  return new Uint8Array(Buffer.concat([Buffer.from(original, 'latin1'), Buffer.from(out, 'latin1')]))
+  return out
 }

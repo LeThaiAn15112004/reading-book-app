@@ -12,7 +12,9 @@
  *  - `apply` — already-planned file operations appended and verified (two-way sync,
  *              pdf_annotation_two_way_sync.md);
  *  - `attachments-list` / `attachment-extract` — the files embedded in a PDF (read-only,
- *              pdf_attachments.md).
+ *              pdf_attachments.md);
+ *  - `attachment-plan` / `attachment-verify` — the objects of a new file attachment (its content is
+ *              streamed by Main) and the read-back of the written file (specs/007-pdf-file-attachment R3, R6).
  * Gets the bytes Main already read and checked; never touches SQLite or the file system. Must not
  * import `electron`.
  */
@@ -23,7 +25,13 @@ import {
   type PdfAttachmentExtractResult,
   type PdfAttachmentListResult,
 } from '../attachments/pdf-attachments'
-import { scanPdfAnnotationBytes, type PdfAnnotationScanResult } from './pdf-annotation-scan'
+import {
+  scanPdfAnnotationBytes,
+  verifyPdfAttachmentBytes,
+  type AttachmentVerifyExpectation,
+  type AttachmentVerifyResult,
+  type PdfAnnotationScanResult,
+} from './pdf-annotation-scan'
 import {
   PdfVerifyError,
   applyAnnotationOps,
@@ -33,7 +41,14 @@ import {
   type PdfAnnotationWriteInput,
   type PdfAnnotationWriteOutput,
 } from './pdf-annotation-write'
-import { PdfWriteError } from './pdf-incremental-writer'
+import {
+  PdfWriteError,
+  planAttachmentAppend,
+  type AttachmentAnnotationSpec,
+  type AttachmentFileSpec,
+  type AttachmentUpdatePlan,
+  type PageGeometry,
+} from './pdf-incremental-writer'
 import { PdfGraphicError, editPdfGraphicBytes, listPdfGraphicsBytes, type PdfGraphicEditResult, type PdfGraphicListResult } from './pdf-graphics'
 import type { PdfGraphicOp } from '@reading-book/book-reader-sdk'
 
@@ -43,6 +58,8 @@ export type ScanWorkerRequest =
   | { id: number; kind: 'graphics-list'; bytes: Uint8Array }
   | { id: number; kind: 'graphic-edit'; bytes: Uint8Array; objectId: string; op: PdfGraphicOp }
   | { id: number; kind: 'attachment-extract'; bytes: Uint8Array; attachmentId: string }
+  | { id: number; kind: 'attachment-verify'; bytes: Uint8Array; expect: AttachmentVerifyExpectation }
+  | { id: number; kind: 'attachment-plan'; bytes: Uint8Array; page: PageGeometry; annotation: AttachmentAnnotationSpec; file: AttachmentFileSpec }
   | ({ id: number; kind: 'write' } & PdfAnnotationWriteInput)
   | ({ id: number; kind: 'apply' } & PdfAnnotationApplyInput)
 
@@ -54,6 +71,8 @@ export type WorkerResult =
   | PdfGraphicEditResult
   | PdfAttachmentListResult
   | PdfAttachmentExtractResult
+  | AttachmentVerifyResult
+  | AttachmentUpdatePlan
 
 export type ScanWorkerReply =
   | { id: number; type: 'done'; result: WorkerResult }
@@ -80,7 +99,11 @@ parentPort?.on('message', (request: ScanWorkerRequest) => {
           ? listPdfAttachmentBytes(request.bytes)
           : request.kind === 'attachment-extract'
             ? extractPdfAttachmentBytes(request.bytes, request.attachmentId)
-            : scanPdfAnnotationBytes(request.bytes)
+            : request.kind === 'attachment-verify'
+              ? verifyPdfAttachmentBytes(request.bytes, request.expect)
+              : request.kind === 'attachment-plan'
+                ? Promise.resolve().then(() => planAttachmentAppend(request.bytes, request.page, request.annotation, request.file))
+                : scanPdfAnnotationBytes(request.bytes)
   work.then(
     (result) => {
       const transfer = 'output' in result ? [result.output.buffer as ArrayBuffer] : []

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  ATTACH_COMBINED_MAX_BYTES,
   ATTACHMENT_MAX_BYTES,
   buildAttachmentId,
   checkAttachSize,
@@ -144,5 +145,11 @@ describe('checkAttachSize', () => {
     [ATTACHMENT_MAX_BYTES + 1, { ok: false, code: 'too_large', sizeBytes: ATTACHMENT_MAX_BYTES + 1, limitBytes: ATTACHMENT_MAX_BYTES }],
   ])('size %i', (size, verdict) => {
     expect(checkAttachSize(size, 1024)).toEqual(verdict)
+  })
+
+  it('refuses a PDF + file total over the measured ceiling, with both sizes', () => {
+    const pdf = ATTACH_COMBINED_MAX_BYTES - 10
+    expect(checkAttachSize(10, pdf)).toEqual({ ok: true })
+    expect(checkAttachSize(11, pdf)).toEqual({ ok: false, code: 'too_large_for_pdf', sizeBytes: 11, pdfSizeBytes: pdf, limitBytes: ATTACH_COMBINED_MAX_BYTES })
   })
 })

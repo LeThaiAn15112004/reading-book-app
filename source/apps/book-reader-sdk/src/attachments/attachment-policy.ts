@@ -190,9 +190,10 @@ export function checkAttachmentSize(bytes: number): AttachmentSizeVerdict {
 /**
  * Largest PDF size + new attachment size Readmate will write in one update (specs/007-pdf-file-attachment
  * research R3): the writer holds the whole PDF in memory and the read-back holds the decoded content, both in
- * the scan worker. Set from the M0 measurement (`spike:pdf:attachment-memory`).
+ * the scan worker. 300 MiB = the largest total measured by `spike:pdf:attachment-memory` (200 MB PDF + 100 MB
+ * file, all passed under the app's 512 MB worker heap); larger totals were not measured, so they are refused.
  */
-export const ATTACH_COMBINED_MAX_BYTES = Number.MAX_SAFE_INTEGER
+export const ATTACH_COMBINED_MAX_BYTES = 300 * 1024 * 1024
 
 export type AttachSizeVerdict =
   | { ok: true }

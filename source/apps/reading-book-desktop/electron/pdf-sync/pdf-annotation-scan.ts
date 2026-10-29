@@ -13,6 +13,7 @@ import {
   readPdfJsAnnotation,
   type ScannedPdfAnnotation,
 } from '@reading-book/book-reader-sdk'
+import { createHash } from 'node:crypto'
 import { loadPdfjs } from '../chunking/pdf-text'
 import { PdfRawObjects, parsePdfJsRef, readAnnotationNames } from './pdf-raw-objects'
 import type { PageGeometry } from './pdf-incremental-writer'
@@ -145,4 +146,63 @@ export async function scanPdfAnnotationBytes(bytes: Uint8Array): Promise<PdfAnno
     else complete = false
   }
   return { items, complete, pageCount, pages }
+}
+
+/** What the read-back of an attachment write must find (specs/007-pdf-file-attachment research R6). */
+export type AttachmentVerifyExpectation = {
+  /** pdf.js id of the FileAttachment annotation (`${num}R`). */
+  annotationId: string
+  pageIndex: number
+  /** Present after a create / move: the `/Rect` written (user space) and the content's SHA-256. Absent after a delete. */
+  present?: { rect: [number, number, number, number]; sha256: string }
+  /** pdf.js ids of annotations that must still be there (everything scanned before the write, minus a deleted one). */
+  keepIds: readonly string[]
+}
+
+export type AttachmentVerifyResult = { ok: true } | { ok: false; detail: string }
+
+const RECT_TOLERANCE = 0.5
+
+/**
+ * Read a freshly written PDF back with pdf.js: the attachment annotation is (or, after a delete, is no longer)
+ * on its page with the expected rect and decoded content, and no other annotation went missing. Never throws
+ * for a bad file — that is a failed verification.
+ */
+export async function verifyPdfAttachmentBytes(bytes: Uint8Array, expect: AttachmentVerifyExpectation): Promise<AttachmentVerifyResult> {
+  const pdfjs = await loadPdfjs()
+  const task = pdfjs.getDocument({ data: new Uint8Array(bytes), verbosity: 0, isEvalSupported: false, disableFontFace: true, useSystemFonts: false, stopAtErrors: true })
+  try {
+    const doc = await task.promise
+    const seen = new Set<string>()
+    let found: { pageIndex: number; rect: number[]; content: unknown } | null = null
+    for (let pageNumber = 1; pageNumber <= doc.numPages; pageNumber++) {
+      const page = await doc.getPage(pageNumber)
+      try {
+        const annotations = (await page.getAnnotations({ intent: 'any' })) as Array<{ id?: string; subtype?: string; rect?: number[]; file?: { content?: unknown } }>
+        for (const annotation of annotations) {
+          if (typeof annotation.id !== 'string') continue
+          seen.add(annotation.id)
+          if (annotation.id === expect.annotationId && annotation.subtype === 'FileAttachment') {
+            found = { pageIndex: pageNumber - 1, rect: annotation.rect ?? [], content: annotation.file?.content }
+          }
+        }
+      } finally {
+        page.cleanup()
+      }
+    }
+    for (const id of expect.keepIds) if (!seen.has(id)) return { ok: false, detail: `annotation ${id} is missing after the write` }
+    if (!expect.present) return found ? { ok: false, detail: 'the deleted attachment is still on the page' } : { ok: true }
+    if (!found) return { ok: false, detail: 'the attachment annotation was not found' }
+    if (found.pageIndex !== expect.pageIndex) return { ok: false, detail: `the attachment is on page ${found.pageIndex + 1}` }
+    const [x1, y1, x2, y2] = expect.present.rect
+    const want = [Math.min(x1, x2), Math.min(y1, y2), Math.max(x1, x2), Math.max(y1, y2)]
+    if (found.rect.length !== 4 || found.rect.some((v, i) => Math.abs(v - want[i]!) > RECT_TOLERANCE)) return { ok: false, detail: 'the attachment rect differs' }
+    if (!(found.content instanceof Uint8Array)) return { ok: false, detail: 'the attachment has no readable content' }
+    if (createHash('sha256').update(found.content).digest('hex') !== expect.present.sha256) return { ok: false, detail: 'the attachment content differs' }
+    return { ok: true }
+  } catch (err) {
+    return { ok: false, detail: `the written PDF cannot be read back: ${err instanceof Error ? err.message : String(err)}` }
+  } finally {
+    await task.destroy()
+  }
 }

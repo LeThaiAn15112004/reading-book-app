@@ -63,6 +63,27 @@ change.
   measurement (one constant in the SDK next to `ATTACHMENT_MAX_BYTES`). The per-file 100 MB limit is unchanged.
   Raising the worker heap is NOT the fallback (it would mask the cost on every later scan).
 
+**M0 result (2026-10-29, `npm run spike:pdf:attachment-memory`, Windows 11 dev machine, plain Node, worker heap
+512 MB)**: all 18 combinations passed (PDF 1 / 50 / 200 MB × file 1 / 50 / 100 MB × compressible / random); the
+worker never ran out of heap. Times (ms, one run; the 200 MB rows were noisy on this machine):
+
+| PDF + file | stage | plan (worker) | stream write | verify (worker) | next ordinary write | open scan |
+|---|---|---|---|---|---|---|
+| 1 + 50 random | 142 | 0 | 2 137 | 224 | 258 | 149 |
+| 50 + 1 random | 16 | 163 | 522 | 65 | 246 | 82 |
+| 50 + 50 random | 470 | 138 | 3 609 | 170 | 432 | 153 |
+| 50 + 100 random | 1 198 | 170 | 9 404* | 645 | 835 | 461 |
+| 200 + 100 random | 8 543 | 219 | 30 645* | 568 | 1 611 | 421 |
+| 200 + 100 text | 15 696 | 715 | 25 595* | 1 282 | 1 026 | 1 045 |
+
+\* measured before writes were batched into 1 MB blocks; the batched re-run of the quick matrix gave the first
+three rows. Most of the remaining write time is deflate of incompressible data.
+
+Peak-heap figures from in-worker sampling stayed ~46–53 MB, but sampling cannot see inside synchronous steps,
+so the gate is "no out-of-memory at 512 MB", not a heap number. Decision: `ATTACH_COMBINED_MAX_BYTES` =
+**300 MiB** (the largest measured total); larger totals are refused with `too_large_for_pdf` because they were
+not measured, not because they are known to fail.
+
 **Rationale**: removes the largest copy (the content) from the writer at low cost; keeps every other code path
 unchanged; turns the unknown into a measured constant with a clean refusal (FR-014).
 
