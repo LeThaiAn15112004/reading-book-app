@@ -15,3 +15,4 @@ export {
   type AttachmentVerdict,
   type BookAttachment,
 } from './attachment-policy.js'
+export * from './pdf-attachment-annotation.js'
