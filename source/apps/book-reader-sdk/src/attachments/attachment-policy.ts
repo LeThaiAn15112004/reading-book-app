@@ -31,6 +31,8 @@ export type BookAttachment = {
 }
 
 const ATTACHMENT_ID_PATTERN = /^(?:doc-\d{1,5}|page-\d{1,6}-\d{1,5})-[0-9a-f]{12}$/
+/** A Readmate-made page attachment: `rm-` + the `notes` row id (= `/NM readmate:<id>`), stable across moves. */
+const READMATE_ATTACHMENT_ID_PATTERN = /^rm-([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/
 
 /**
  * `doc-{ordinal}-{hash}` / `page-{page}-{ordinal}-{hash}`. `ordinal` is the position inside its group
@@ -48,7 +50,18 @@ export function buildAttachmentId(
 }
 
 export function isAttachmentId(value: unknown): value is string {
-  return typeof value === 'string' && value.length <= 40 && ATTACHMENT_ID_PATTERN.test(value)
+  return typeof value === 'string' && value.length <= 40 && (ATTACHMENT_ID_PATTERN.test(value) || READMATE_ATTACHMENT_ID_PATTERN.test(value))
+}
+
+/** The attachment id of a Readmate-made page attachment (data-model §4). `rowId` must be a lowercase UUID. */
+export function readmateAttachmentId(rowId: string): string {
+  return `rm-${rowId}`
+}
+
+/** The `notes` row id behind an `rm-<uuid>` attachment id, or null for any other id. */
+export function rowIdOfReadmateAttachmentId(id: unknown): string | null {
+  if (typeof id !== 'string') return null
+  return READMATE_ATTACHMENT_ID_PATTERN.exec(id)?.[1] ?? null
 }
 
 // eslint-disable-next-line no-control-regex
@@ -172,4 +185,30 @@ export type AttachmentSizeVerdict = { ok: true } | { ok: false; reason: 'empty' 
 export function checkAttachmentSize(bytes: number): AttachmentSizeVerdict {
   if (bytes <= 0) return { ok: false, reason: 'empty' }
   return bytes > ATTACHMENT_MAX_BYTES ? { ok: false, reason: 'too_large' } : { ok: true }
+}
+
+/**
+ * Largest PDF size + new attachment size Readmate will write in one update (specs/007-pdf-file-attachment
+ * research R3): the writer holds the whole PDF in memory and the read-back holds the decoded content, both in
+ * the scan worker. Set from the M0 measurement (`spike:pdf:attachment-memory`).
+ */
+export const ATTACH_COMBINED_MAX_BYTES = Number.MAX_SAFE_INTEGER
+
+export type AttachSizeVerdict =
+  | { ok: true }
+  | { ok: false; code: 'empty' }
+  | { ok: false; code: 'too_large'; sizeBytes: number; limitBytes: number }
+  | { ok: false; code: 'too_large_for_pdf'; sizeBytes: number; pdfSizeBytes: number; limitBytes: number }
+
+/**
+ * May a file of `contentBytes` be attached to a PDF of `pdfBytes`? Checked on the picked file's size BEFORE it
+ * is read (FR-011). The 100 MB per-file limit is a Readmate product choice, not a PDF one.
+ */
+export function checkAttachSize(contentBytes: number, pdfBytes: number): AttachSizeVerdict {
+  if (!(contentBytes > 0)) return { ok: false, code: 'empty' }
+  if (contentBytes > ATTACHMENT_MAX_BYTES) return { ok: false, code: 'too_large', sizeBytes: contentBytes, limitBytes: ATTACHMENT_MAX_BYTES }
+  if (pdfBytes + contentBytes > ATTACH_COMBINED_MAX_BYTES) {
+    return { ok: false, code: 'too_large_for_pdf', sizeBytes: contentBytes, pdfSizeBytes: pdfBytes, limitBytes: ATTACH_COMBINED_MAX_BYTES }
+  }
+  return { ok: true }
 }

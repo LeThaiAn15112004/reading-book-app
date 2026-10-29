@@ -1,6 +1,11 @@
 export {
+  ATTACH_COMBINED_MAX_BYTES,
   ATTACHMENT_MAX_BYTES,
   ATTACHMENT_MAX_COUNT,
+  checkAttachSize,
+  readmateAttachmentId,
+  rowIdOfReadmateAttachmentId,
+  type AttachSizeVerdict,
   attachmentExtension,
   buildAttachmentId,
   checkAttachmentSize,

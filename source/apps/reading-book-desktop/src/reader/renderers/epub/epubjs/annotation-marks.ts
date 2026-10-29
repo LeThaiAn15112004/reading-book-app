@@ -47,6 +47,8 @@ const LEGACY_ALPHA: Record<HighlightStyleKind, number> = {
   line: 1,
   arrow: 1,
   typewriter: 1,
+  // PDF file attachments (specs/007) are icons, never coloured marks
+  attachment: 1,
 }
 
 /**

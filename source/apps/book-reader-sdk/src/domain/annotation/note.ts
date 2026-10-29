@@ -1,3 +1,4 @@
+import type { PdfAttachmentInfo } from '../../attachments/pdf-attachment-annotation.js';
 import type { PdfTypewriterDoc } from '../../typewriter/typewriter-doc.js';
 import type {
   CfiLocationPlain,
@@ -70,6 +71,11 @@ export interface PdfAnnotation {
   shape?: PdfShapeGeometry;
   /** Typewriter notes only: rich text over `notes.note` (specs/005-typewriter-note/data-model.md §2); `rects[0]` is the box. */
   typewriter?: PdfTypewriterDoc;
+  /**
+   * File attachments only (specs/007-pdf-file-attachment/data-model.md §1): the file embedded in the PDF;
+   * `rects[0]` is the icon box. The content itself lives only in the PDF.
+   */
+  attachment?: PdfAttachmentInfo;
 }
 
 /**
@@ -156,6 +162,7 @@ export type NoteType =
   | 'line'
   | 'arrow'
   | 'typewriter'
+  | 'attachment'
   | 'bookmark';
 
 export type NoteStatus = 'None' | 'Review' | 'Done';

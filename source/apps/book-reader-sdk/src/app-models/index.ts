@@ -37,6 +37,7 @@ export {
   PDF_ANNOTATION_MAX_PAGE_INDEX,
   PDF_ANNOTATION_MAX_RECTS,
   PDF_ANNOTATION_MAX_REF_LENGTH,
+  isConsistentPdfAttachment,
   isConsistentPdfHighlight,
   isPdfReaderHighlight,
   normalizePdfHighlightRects,

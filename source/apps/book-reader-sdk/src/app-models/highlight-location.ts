@@ -29,6 +29,8 @@ export type HighlightStyleKind =
   | 'arrow'
   // PDF Typewriter note (specs/005-typewriter-note)
   | 'typewriter'
+  // PDF file attachment placed on a page (specs/007-pdf-file-attachment)
+  | 'attachment'
 
 /**
  * The format-independent part of a renderer-side highlight row — everything the shared

@@ -2,6 +2,9 @@ import { describe, expect, it } from 'vitest'
 import {
   ATTACHMENT_MAX_BYTES,
   buildAttachmentId,
+  checkAttachSize,
+  readmateAttachmentId,
+  rowIdOfReadmateAttachmentId,
   checkAttachmentSize,
   classifyAttachment,
   isAttachmentId,
@@ -110,5 +113,36 @@ describe('checkAttachmentSize', () => {
     expect(checkAttachmentSize(1)).toEqual({ ok: true })
     expect(checkAttachmentSize(ATTACHMENT_MAX_BYTES)).toEqual({ ok: true })
     expect(checkAttachmentSize(ATTACHMENT_MAX_BYTES + 1)).toEqual({ ok: false, reason: 'too_large' })
+  })
+})
+
+describe('Readmate-made attachment ids (rm-<uuid>)', () => {
+  const uuid = '0f8fad5b-d9cb-469f-a165-70867728950e'
+
+  it('round-trips a row id and is accepted as an attachment id', () => {
+    const id = readmateAttachmentId(uuid)
+    expect(id).toBe(`rm-${uuid}`)
+    expect(isAttachmentId(id)).toBe(true)
+    expect(rowIdOfReadmateAttachmentId(id)).toBe(uuid)
+  })
+
+  it.each(['rm-', 'rm-not-a-uuid', `rm-${uuid.toUpperCase()}`, `rm-${uuid}x`, `xrm-${uuid}`, uuid])('refuses %s', (id) => {
+    expect(isAttachmentId(id)).toBe(false)
+    expect(rowIdOfReadmateAttachmentId(id)).toBeNull()
+  })
+
+  it('keeps the older id shapes', () => {
+    expect(rowIdOfReadmateAttachmentId(buildAttachmentId('page', 3, 0, 'ab'.repeat(32)))).toBeNull()
+  })
+})
+
+describe('checkAttachSize', () => {
+  it.each([
+    [0, { ok: false, code: 'empty' }],
+    [1, { ok: true }],
+    [ATTACHMENT_MAX_BYTES, { ok: true }],
+    [ATTACHMENT_MAX_BYTES + 1, { ok: false, code: 'too_large', sizeBytes: ATTACHMENT_MAX_BYTES + 1, limitBytes: ATTACHMENT_MAX_BYTES }],
+  ])('size %i', (size, verdict) => {
+    expect(checkAttachSize(size, 1024)).toEqual(verdict)
   })
 })

@@ -15,6 +15,7 @@
 
 import { PageRectLocation, Rect, type NoteLocator, type PdfAnnotation, type PdfAnnotationRect, type PdfShapeGeometry } from '../domain/index.js'
 import { parseTypewriterDoc, type PdfTypewriterDoc } from '../typewriter/typewriter-doc.js'
+import { parsePdfAttachmentInfo } from '../attachments/pdf-attachment-annotation.js'
 import { packBookmarkLocator, parseBookmarkLocation } from './bookmark-location.js'
 import { DEFAULT_HIGHLIGHT_COLOR } from './highlight-colors.js'
 import {
@@ -223,7 +224,20 @@ export function parsePdfAnnotation(value: unknown, rowText?: string): PdfAnnotat
     if (!typewriter) return undefined
     annotation.typewriter = typewriter
   }
+  if (v.attachment !== undefined) {
+    // A file attachment is ONE icon box (rects[0]) with real size and nothing else (specs/007 data-model §1).
+    const attachment = parsePdfAttachmentInfo(v.attachment)
+    const box = rects[0]!
+    if (!attachment || rects.length !== 1 || box.width <= 0 || box.height <= 0) return undefined
+    if (annotation.shape || annotation.typewriter || annotation.caret) return undefined
+    annotation.attachment = attachment
+  }
   return annotation
+}
+
+/** Style kind `attachment` ⇔ an `attachment` payload (Main checks this on every write of such a row). */
+export function isConsistentPdfAttachment(styleKind: HighlightStyleKind, annotation: PdfAnnotation | undefined): boolean {
+  return (styleKind === 'attachment') === (annotation?.attachment !== undefined)
 }
 
 const MAX_SHAPE_STROKE = 0.1
