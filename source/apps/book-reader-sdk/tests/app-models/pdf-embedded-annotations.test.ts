@@ -102,7 +102,27 @@ describe('readPdfJsAnnotation', () => {
       Line: 'line',
       // Typewriter notes (only Readmate's own `readmate:*` ones are ever scanned in Main; a foreign FreeText is a graphic object)
       FreeText: 'typewriter',
+      // File attachments (only Readmate's own are annotations; others' are page attachments — specs/007)
+      FileAttachment: 'attachment',
     })
+  })
+
+  it('reads a FileAttachment from its icon rect, with no text (its file is added by Main)', () => {
+    const item = scan({ subtype: 'FileAttachment', quadPoints: undefined, rect: [100, 700, 120, 720], contentsObj: { str: 'report.docx' }, overlaidText: undefined })
+    expect(item.subtype).toBe('FileAttachment')
+    expect(item.rects).toHaveLength(1)
+    expect(item.rects[0]!.x).toBeCloseTo(100 / 612, 5)
+    expect(item.attachment).toBeUndefined()
+  })
+
+  it('validates a scanned FileAttachment only together with what its file holds', () => {
+    const base = { objectId: '7R', subtype: 'FileAttachment', pageIndex: 0, rects: [{ x: 0.1, y: 0.1, width: 0.03, height: 0.025 }], nm: 'readmate:x' }
+    const attachment = { name: 'a.txt', sizeBytes: 3, sha256: 'c'.repeat(64) }
+    expect(parseScannedPdfAnnotation({ ...base, attachment })?.attachment).toEqual(attachment)
+    expect(parseScannedPdfAnnotation(base)).toBeNull()
+    expect(parseScannedPdfAnnotation({ ...base, attachment: { ...attachment, sizeBytes: 0 } })).toBeNull()
+    expect(parseScannedPdfAnnotation({ ...base, subtype: 'Highlight', attachment })).toBeNull()
+    expect(highlightFromEmbeddedAnnotation(parseScannedPdfAnnotation({ ...base, attachment })!)).toMatchObject({ styleKind: 'attachment', pdfAnnotation: { attachment } })
   })
 
   it('reads a FreeText (Typewriter note) from its rect and text', () => {
@@ -122,7 +142,7 @@ describe('readPdfJsAnnotation', () => {
   })
 
   it('ignores types the app cannot represent, replies, and items without usable geometry', () => {
-    for (const subtype of ['Link', 'Ink', 'Polygon', 'Stamp', 'Popup', 'Widget', 'FileAttachment']) {
+    for (const subtype of ['Link', 'Ink', 'Polygon', 'Stamp', 'Popup', 'Widget', 'Sound']) {
       expect(readPdfJsAnnotation(pdfjsItem({ subtype }), LETTER)).toBeNull()
     }
     expect(readPdfJsAnnotation(pdfjsItem({ inReplyTo: '9R' }), LETTER)).toBeNull()

@@ -25,6 +25,7 @@
 
 import type { NoteLocator, NoteSelectionText, PdfAnnotation, PdfAnnotationRect, PdfShapeGeometry } from '../domain/index.js'
 import { DEFAULT_HIGHLIGHT_COLOR } from './highlight-colors.js'
+import { parsePdfAttachmentInfo, type PdfAttachmentInfo } from '../attachments/pdf-attachment-annotation.js'
 import { emptyTypewriterDoc, normalizeTypewriterText } from '../typewriter/typewriter-doc.js'
 import type { HighlightStyleKind } from './highlight-location.js'
 import {
@@ -38,7 +39,7 @@ import {
 import { clampShapeStroke, shapeColorHex } from './pdf-shape.js'
 
 /** PDF annotation subtypes the import understands — the ones the `notes` model can represent. */
-export const EMBEDDED_PDF_ANNOTATION_SUBTYPES = ['Highlight', 'Underline', 'Squiggly', 'StrikeOut', 'Text', 'Square', 'Circle', 'Line', 'FreeText'] as const
+export const EMBEDDED_PDF_ANNOTATION_SUBTYPES = ['Highlight', 'Underline', 'Squiggly', 'StrikeOut', 'Text', 'Square', 'Circle', 'Line', 'FreeText', 'FileAttachment'] as const
 export type EmbeddedPdfAnnotationSubtype = (typeof EMBEDDED_PDF_ANNOTATION_SUBTYPES)[number]
 
 /**
@@ -56,6 +57,9 @@ export const EMBEDDED_PDF_ANNOTATION_STYLE: Record<EmbeddedPdfAnnotationSubtype,
   Line: 'line',
   // Typewriter notes: only the ones Readmate wrote itself (`/NM` readmate:*) are ever scanned (a foreign FreeText is a graphic object).
   FreeText: 'typewriter',
+  // File attachments: only the ones Readmate wrote itself (`/NM` readmate:*) are annotations; others' are listed
+  // as page attachments (specs/007-pdf-file-attachment research R7, R8).
+  FileAttachment: 'attachment',
 }
 
 /** Subtypes that are shapes: one box + a `shape` geometry, no text. */
@@ -124,6 +128,8 @@ export type ScannedPdfAnnotation = {
   arrow?: true
   /** Shapes: `/CA`, 0–1 (absent = 1). */
   opacity?: number
+  /** `FileAttachment` only: the embedded file as read (name sanitised, real size and SHA-256 of the decoded content) — set by Main's scan. */
+  attachment?: PdfAttachmentInfo
 }
 
 function isFiniteNumber(value: unknown): value is number {
@@ -213,7 +219,7 @@ export function readPdfJsAnnotation(raw: unknown, page: PdfPageViewportInfo): Sc
   if (!(page.width > 0) || !(page.height > 0)) return null
 
   let boxes: number[][]
-  if (data.subtype === 'Text' || data.subtype === 'FreeText' || isEmbeddedShapeSubtype(data.subtype)) {
+  if (data.subtype === 'Text' || data.subtype === 'FreeText' || data.subtype === 'FileAttachment' || isEmbeddedShapeSubtype(data.subtype)) {
     const rect = numbers(data.rect)
     boxes = rect?.length === 4 ? [rect] : []
   } else {
@@ -294,6 +300,10 @@ export function parseScannedPdfAnnotation(value: unknown): ScannedPdfAnnotation 
   const text = optionalString(v.text, MAX_TEXT_LENGTH)
   const nm = optionalString(v.nm, MAX_NAME_LENGTH)
   if (contents === null || author === null || text === null || nm === null) return null
+  // A file attachment is ONE icon box with what the file holds; nothing else carries one.
+  const attachment = v.attachment === undefined ? undefined : parsePdfAttachmentInfo(v.attachment)
+  if (attachment === null || (v.subtype === 'FileAttachment') !== (attachment !== undefined)) return null
+  if (attachment && annotation.rects.length !== 1) return null
 
   const item: ScannedPdfAnnotation = {
     objectId: v.objectId,
@@ -309,6 +319,7 @@ export function parseScannedPdfAnnotation(value: unknown): ScannedPdfAnnotation 
   if (annotation.shape) item.shape = annotation.shape
   if (v.arrow === true) item.arrow = true
   if (typeof v.opacity === 'number' && v.opacity < 1) item.opacity = v.opacity
+  if (attachment) item.attachment = attachment
   return item
 }
 
@@ -400,6 +411,7 @@ export function embeddedAnnotationSourceHash(item: ScannedPdfAnnotation): string
       item.shape ?? null,
       item.arrow ?? false,
       item.opacity ?? 1,
+      item.attachment?.sha256 ?? '',
     ]),
   )
 }
@@ -425,6 +437,7 @@ export function highlightContentHash(content: HighlightContent): string {
         content.pdfAnnotation.rects.map((r) => [r.pageIndex ?? null, r.x, r.y, r.width, r.height]),
         ...(content.pdfAnnotation.shape ? [content.pdfAnnotation.shape] : []),
         ...(content.pdfAnnotation.typewriter ? [content.pdfAnnotation.typewriter] : []),
+        ...(content.pdfAnnotation.attachment ? [content.pdfAnnotation.attachment.sha256] : []),
       ]
     : null
   return hash53(
@@ -454,6 +467,8 @@ export function highlightFromEmbeddedAnnotation(item: ScannedPdfAnnotation): Emb
   }
   // A Readmate FreeText without a row (e.g. the database was lost): its text, plain — the rich-text document is the app's.
   if (item.subtype === 'FreeText') pdfAnnotation.typewriter = emptyTypewriterDoc()
+  // A Readmate file attachment without a row: the file's own description of what it holds.
+  if (item.subtype === 'FileAttachment' && item.attachment) pdfAnnotation.attachment = item.attachment
   const highlight: EmbeddedAnnotationHighlight = {
     locator: JSON.parse(packPdfHighlightLocator(pdfAnnotation)) as NoteLocator,
     styleKind: embeddedStyleOf(item),
@@ -461,7 +476,7 @@ export function highlightFromEmbeddedAnnotation(item: ScannedPdfAnnotation): Emb
     tags: [],
     pdfAnnotation,
   }
-  if (item.contents) highlight.note = item.subtype === 'FreeText' ? normalizeTypewriterText(item.contents) : item.contents
+  if (item.contents && item.subtype !== 'FileAttachment') highlight.note = item.subtype === 'FreeText' ? normalizeTypewriterText(item.contents) : item.contents
   if (item.text) highlight.selectionText = { highlight: item.text }
   return highlight
 }

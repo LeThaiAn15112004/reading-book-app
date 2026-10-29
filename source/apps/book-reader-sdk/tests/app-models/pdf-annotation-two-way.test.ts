@@ -398,3 +398,105 @@ describe('planTwoWaySync — Typewriter notes (FreeText)', () => {
     expect(empty.cycle().inserts).toHaveLength(0)
   })
 })
+
+describe('planTwoWaySync — file attachments (specs/007)', () => {
+  const INFO = { name: 'report.docx', sizeBytes: 1234, sha256: 'a'.repeat(64) }
+  const BOX = { pageIndex: 0, x: 0.4, y: 0.4, width: 0.03, height: 0.025 }
+  const attachmentRow = (id: string, box = BOX) =>
+    appRow(id, { styleKind: 'attachment', pdfAnnotation: { pageIndex: box.pageIndex, rects: [box], attachment: INFO } })
+  const attachmentItem = (id: string, box = BOX, extra: Partial<ScannedPdfAnnotation> = {}) =>
+    fileItem({ subtype: 'FileAttachment', nm: `readmate:${id}`, pageIndex: box.pageIndex, rects: [box], attachment: INFO, ...extra })
+
+  /** The state right after attachments:create: the file holds it, the row exists, no ledger entry yet. */
+  function created(id = 'att') {
+    const w = world()
+    w.rows.set(id, attachmentRow(id))
+    w.file = [attachmentItem(id)]
+    return w
+  }
+
+  it('links a freshly created attachment and never plans a file write for it', () => {
+    const w = created()
+    const first = w.cycle()
+    expect(first.links.map((l) => l.noteId)).toEqual(['att'])
+    expect(writes(first)).toBe(0)
+    for (let i = 0; i < 3; i++) {
+      const next = w.cycle()
+      expect(writes(next)).toBe(0)
+      expect(next.rowUpdates).toEqual([])
+    }
+    expect(w.rows.has('att')).toBe(true)
+  })
+
+  it('treats a 1e-5 rounding difference as the same place', () => {
+    const w = created()
+    w.cycle()
+    w.file = [{ ...w.file[0]!, rects: [{ ...BOX, x: BOX.x + 1e-5 }] }]
+    expect(w.cycle().rowUpdates).toEqual([])
+  })
+
+  it('the row follows a rect moved by another reader', () => {
+    const w = created()
+    w.cycle()
+    const moved = { ...BOX, x: 0.7, y: 0.1 }
+    w.file = [{ ...w.file[0]!, rects: [moved] }]
+    const plan = w.cycle()
+    expect(writes(plan)).toBe(0)
+    expect(plan.rowUpdates.map((u) => u.noteId)).toEqual(['att'])
+    expect(w.rows.get('att')!.pdfAnnotation!.rects[0]).toMatchObject({ x: 0.7, y: 0.1 })
+    expect(w.rows.get('att')!.pdfAnnotation!.attachment).toEqual(INFO)
+  })
+
+  it('the row goes when another reader removed it — after a complete scan only', () => {
+    const w = created()
+    w.cycle()
+    w.file = []
+    const partial = w.cycle(false)
+    expect(partial.rowDeletes).toEqual([])
+    expect(w.rows.has('att')).toBe(true)
+    const full = w.cycle(true)
+    expect(full.rowDeletes).toEqual(['att'])
+    expect(writes(full)).toBe(0)
+    expect(w.rows.has('att')).toBe(false)
+  })
+
+  it('an attachment row the file never held is dropped, never written', () => {
+    const w = world()
+    w.rows.set('ghost', attachmentRow('ghost'))
+    const plan = w.cycle()
+    expect(writes(plan)).toBe(0)
+    expect(plan.rowDeletes).toEqual(['ghost'])
+  })
+
+  it('a Readmate attachment found in the file without a row is imported as an attachment row', () => {
+    const w = world()
+    w.file = [attachmentItem('lost')]
+    const plan = w.cycle()
+    expect(plan.inserts).toHaveLength(1)
+    const row = [...w.rows.values()][0]!
+    expect(row.styleKind).toBe('attachment')
+    expect(row.pdfAnnotation!.attachment).toEqual(INFO)
+    expect(row.note).toBeUndefined()
+  })
+
+  it('a row deleted by its own operation but still in the file comes back instead of being removed from the file', () => {
+    const w = created()
+    w.cycle()
+    w.rows.delete('att')
+    const plan = w.cycle()
+    expect(writes(plan)).toBe(0)
+    expect(plan.restores).toHaveLength(1)
+  })
+
+  it('other annotations of the book are written as before', () => {
+    const w = created()
+    w.rows.set('h', appRow('h'))
+    const plan = w.cycle()
+    expect(plan.file.add.map((a) => a.nm)).toEqual(['readmate:h'])
+    expect(plan.file.remove).toEqual([])
+  })
+
+  it('fileSide / appSide agree on an attachment', () => {
+    expect(fileSide(attachmentItem('x')).kind).toBe('attachment')
+  })
+})

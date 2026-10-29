@@ -5,12 +5,17 @@
  * Must not import `electron`.
  */
 import {
+  ATTACHMENT_MAX_COUNT,
   EMBEDDED_PDF_SCAN_MAX_ANNOTATIONS,
   READMATE_NM_PREFIX,
   clampShapeStroke,
   isEmbeddedShapeSubtype,
   parseScannedPdfAnnotation,
+  buildAttachmentId,
+  clampAttachmentBox,
   readPdfJsAnnotation,
+  sanitizeAttachmentFileName,
+  type PdfAttachmentInfo,
   type ScannedPdfAnnotation,
 } from '@reading-book/book-reader-sdk'
 import { createHash } from 'node:crypto'
@@ -68,6 +73,41 @@ export type PdfAnnotationScanResult = {
   pageCount: number
   /** Every page's object and scale-1 viewport (what the writer maps coordinates with). */
   pages: PageGeometry[]
+  /**
+   * File attachments other readers put on pages (Readmate's own are `items`): shown, opened and saved, never edited
+   * (specs/007-pdf-file-attachment research R8). Ids match the ones `attachments:open` resolves.
+   */
+  pageAttachments: ScannedPageAttachment[]
+}
+
+/** A page-level file attachment not made by Readmate (contracts §3). */
+export type ScannedPageAttachment = {
+  attachmentId: string
+  pageIndex: number
+  /** The icon box, normalised to the displayed page and clamped inside it. */
+  rect: { x: number; y: number; width: number; height: number }
+  name: string
+  /** Actual decoded size; null when the file holds no readable content. */
+  sizeBytes: number | null
+  /** PDF.js id, to hide its own appearance on the canvas once the app draws the icon. */
+  objectId: string
+}
+
+type RawAttachmentAnnotation = { id?: unknown; subtype?: unknown; rect?: unknown; file?: { filename?: unknown; rawFilename?: unknown; content?: unknown } }
+
+const sha256Hex = (bytes: Uint8Array) => createHash('sha256').update(bytes).digest('hex')
+
+/** The icon box of a FileAttachment annotation, normalised to the displayed page (null for a degenerate one). */
+function attachmentBox(rect: unknown, page: { transform: readonly number[]; width: number; height: number }): ScannedPageAttachment['rect'] | null {
+  if (!Array.isArray(rect) || rect.length !== 4 || !rect.every((n) => typeof n === 'number' && Number.isFinite(n))) return null
+  const [a, b, c, d, e, f] = page.transform as [number, number, number, number, number, number]
+  const [x1, y1, x2, y2] = rect as [number, number, number, number]
+  const xs = [a * x1 + c * y1 + e, a * x2 + c * y2 + e]
+  const ys = [b * x1 + d * y1 + f, b * x2 + d * y2 + f]
+  const width = (Math.max(...xs) - Math.min(...xs)) / page.width
+  const height = (Math.max(...ys) - Math.min(...ys)) / page.height
+  if (!(width > 0) || !(height > 0)) return null
+  return clampAttachmentBox({ x: Math.min(...xs) / page.width, y: Math.min(...ys) / page.height, width, height })
 }
 
 /**
@@ -87,6 +127,9 @@ export async function scanPdfAnnotationBytes(bytes: Uint8Array): Promise<PdfAnno
     stopAtErrors: true,
   })
   const scanned: ScannedPdfAnnotation[] = []
+  const pageAttachments: ScannedPageAttachment[] = []
+  /** What the file says each FileAttachment holds (decoded name, size, SHA-256), by PDF.js id. */
+  const attachmentInfo = new Map<string, PdfAttachmentInfo | null>()
   let complete = true
   let pageCount = 0
   const pages: PageGeometry[] = []
@@ -101,6 +144,31 @@ export async function scanPdfAnnotationBytes(bytes: Uint8Array): Promise<PdfAnno
           pages.push({ pageIndex: pageNumber - 1, ref: { num: page.ref.num, gen: page.ref.gen }, transform: [...viewport.transform], width: viewport.width, height: viewport.height })
         }
         const annotations: unknown[] = await page.getAnnotations({ intent: 'display' })
+        if (annotations.some((raw) => (raw as RawAttachmentAnnotation).subtype === 'FileAttachment')) {
+          // Ordinals of page attachments count over EVERY FileAttachment of the page, as attachments:open does (intent 'any').
+          const all = (await page.getAnnotations({ intent: 'any' })) as RawAttachmentAnnotation[]
+          const shown = new Set(annotations.map((raw) => (raw as RawAttachmentAnnotation).id))
+          let ordinal = 0
+          for (const raw of all) {
+            if (raw.subtype !== 'FileAttachment' || !raw.file || typeof raw.file !== 'object' || typeof raw.id !== 'string') continue
+            const at = ordinal++
+            const content = raw.file.content instanceof Uint8Array ? raw.file.content : null
+            const name = sanitizeAttachmentFileName(raw.file.filename || raw.file.rawFilename, 'attachment')
+            const hash = sha256Hex(content ?? new Uint8Array(0))
+            attachmentInfo.set(raw.id, content && content.byteLength > 0 ? { name, sizeBytes: content.byteLength, sha256: hash } : null)
+            if (!shown.has(raw.id) || pageAttachments.length >= ATTACHMENT_MAX_COUNT) continue
+            const rect = attachmentBox(raw.rect, viewport)
+            if (!rect) continue
+            pageAttachments.push({
+              attachmentId: buildAttachmentId('page', pageNumber, at, hash),
+              pageIndex: pageNumber - 1,
+              rect,
+              name,
+              sizeBytes: content ? content.byteLength : null,
+              objectId: raw.id,
+            })
+          }
+        }
         if (annotations.length > 0) {
           const info = { pageIndex: pageNumber - 1, transform: viewport.transform, width: viewport.width, height: viewport.height }
           for (const raw of annotations) {
@@ -130,6 +198,11 @@ export async function scanPdfAnnotationBytes(bytes: Uint8Array): Promise<PdfAnno
     // A shape another reader drew stays the FILE's own graphic object (hover / select / edit in place, see
     // pdf_graphic_objects.md): only the shapes Readmate wrote itself (`readmate:<id>`) are annotations here.
     if ((isEmbeddedShapeSubtype(item.subtype) || item.subtype === 'FreeText') && !nm?.startsWith(READMATE_NM_PREFIX)) continue
+    // Likewise a file attachment: only Readmate's own are annotations (others' are `pageAttachments`).
+    if (item.subtype === 'FileAttachment') {
+      if (!nm?.startsWith(READMATE_NM_PREFIX)) continue
+      pageAttachments.splice(0, pageAttachments.length, ...pageAttachments.filter((p) => p.objectId !== item.objectId))
+    }
     const { line, width, ...more } = extras.get(item.objectId) ?? {}
     let shape = item.shape
     const page = line || width ? pages.find((p) => p.pageIndex === item.pageIndex) : undefined
@@ -141,11 +214,12 @@ export async function scanPdfAnnotationBytes(bytes: Uint8Array): Promise<PdfAnno
       const p2 = at(line[2]!, line[3]!)
       shape = { ...shape, line: [p1[0], p1[1], p2[0], p2[1]] }
     }
-    const checked = parseScannedPdfAnnotation({ ...item, ...(shape ? { shape } : {}), ...(nm ? { nm } : {}), ...more })
+    const attachment = item.subtype === 'FileAttachment' ? (attachmentInfo.get(item.objectId) ?? undefined) : undefined
+    const checked = parseScannedPdfAnnotation({ ...item, ...(shape ? { shape } : {}), ...(nm ? { nm } : {}), ...(attachment ? { attachment } : {}), ...more })
     if (checked) items.push(checked)
     else complete = false
   }
-  return { items, complete, pageCount, pages }
+  return { items, complete, pageCount, pages, pageAttachments }
 }
 
 /** What the read-back of an attachment write must find (specs/007-pdf-file-attachment research R6). */

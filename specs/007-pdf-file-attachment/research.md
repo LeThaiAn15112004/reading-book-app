@@ -154,9 +154,11 @@ wrong; restore can itself fail) — rejected.
 **`attachment`** (new `HighlightStyleKind`), `page-rect` locator, `pdfAnnotation.rects[0]` = icon box,
 `pdfAnnotation.attachment = { name, sizeBytes, sha256, mtime? }`. The content lives **only in the PDF**.
 
-The row is created / updated / deleted **only by the attachment operations** after a verified write, in the same
-SQLite transaction as its ledger entry in `pdf_embedded_annotations` (key = `/NM readmate:<rowId>`, base =
-written state). `overlay:saveHighlight` / `deleteHighlight` refuse kind `attachment` (Main re-validation).
+The row is created / updated / deleted **only by the attachment operations** after a verified write (and by the
+live sync, below). *Implementation note (Phase 2)*: create writes the row only — no ledger entry; the next sync cycle
+finds the `readmate:<rowId>` FileAttachment and **links** it (the existing `links` path), so the op never has to
+compute a ledger key. Delete removes the row and its ledger entries in one transaction. `overlay:saveHighlight` /
+`deleteHighlight` refuse kind `attachment` and any attachment payload (Main re-validation, `isAttachmentRow`).
 
 Live sync:
 - The scan reports Readmate-made FileAttachment annotations (`/NM` prefix `readmate:`) as `ScannedPdfAnnotation`

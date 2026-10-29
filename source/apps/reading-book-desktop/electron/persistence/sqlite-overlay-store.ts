@@ -222,7 +222,7 @@ const DEFAULT_HIGHLIGHT_COLOR = '#FFEB3B'
  */
 const HIGHLIGHT_TYPE_PREDICATE = `
   (json_extract(note_json, '$.group') IS NULL OR json_extract(note_json, '$.group') = 'annotation')
-  AND json_extract(note_json, '$.type') IN ('highlight', 'underline', 'strikethrough', 'squiggly', 'replace', 'insert', 'textbox', 'rectangle', 'ellipse', 'line', 'arrow', 'typewriter')
+  AND json_extract(note_json, '$.type') IN ('highlight', 'underline', 'strikethrough', 'squiggly', 'replace', 'insert', 'textbox', 'rectangle', 'ellipse', 'line', 'arrow', 'typewriter', 'attachment')
 `
 
 /**
@@ -291,6 +291,8 @@ const HIGHLIGHT_STYLE_KINDS: HighlightStyleKind[] = [
   'arrow',
   // PDF Typewriter note (specs/005-typewriter-note)
   'typewriter',
+  // PDF file attachment on a page (specs/007-pdf-file-attachment) — written only by the attachment operations and the live sync
+  'attachment',
 ]
 
 function rowToHighlightRecord(row: NoteRow): HighlightRecord | undefined {
@@ -708,6 +710,14 @@ export class SqliteOverlayStore implements OverlayStore {
 
   async saveHighlight(input: SaveHighlightInput): Promise<HighlightRecord> {
     return this.writeHighlight(input)
+  }
+
+  /** Is `id` a file-attachment row of `bookId`? Those are written only by the attachment operations and the live sync (specs/007). */
+  isAttachmentRow(bookId: string, id: string): boolean {
+    const row = this.db
+      .prepare(`SELECT 1 AS hit FROM notes WHERE id = ? AND book_id = ? AND json_extract(note_json, '$.type') = 'attachment'`)
+      .get(id.trim(), bookId.trim()) as { hit: number } | undefined
+    return row !== undefined
   }
 
   /**

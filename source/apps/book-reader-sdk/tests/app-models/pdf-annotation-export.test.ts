@@ -203,3 +203,17 @@ describe('planPdfAnnotationWrite', () => {
     expect(plan).toMatchObject({ add: [], replace: [], remove: [], kept: 0 })
   })
 })
+
+describe('planPdfAnnotationWrite — file attachments (specs/007)', () => {
+  it('keeps every FileAttachment of the file as it is, and never writes an attachment row', () => {
+    const info = { name: 'a.txt', sizeBytes: 3, sha256: 'b'.repeat(64) }
+    const box = { pageIndex: 0, x: 0.4, y: 0.4, width: 0.03, height: 0.025 }
+    const scanned = [{ objectId: '9R', subtype: 'FileAttachment' as const, pageIndex: 0, rects: [box], nm: 'readmate:att', attachment: info }]
+    const rows = [{ id: 'att', styleKind: 'attachment' as const, colorHex: '#1E88E5', tags: [], pdfAnnotation: { pageIndex: 0, rects: [box], attachment: info }, createdAt: 'c', updatedAt: 'u' }]
+    const plan = planPdfAnnotationWrite({ scanned, ledger: new Map(), rows })
+    expect(plan.add).toEqual([])
+    expect(plan.replace).toEqual([])
+    expect(plan.remove).toEqual([])
+    expect(plan.kept).toBe(1)
+  })
+})

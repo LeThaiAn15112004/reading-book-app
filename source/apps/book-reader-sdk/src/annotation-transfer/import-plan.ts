@@ -133,6 +133,8 @@ function validatePayload(a: TransferAnnotation, format: AnnotationFile['book']['
   if (format === 'pdf') {
     const parsed = parsePdfAnnotation(a.pdfAnnotation, a.note)
     if (!parsed) return { ok: false, reason: 'invalid PDF annotation' }
+    // A file attachment's content lives only in a PDF; an annotation file never creates one (specs/007 FR-027).
+    if (parsed.attachment) return { ok: false, reason: 'file attachments are not imported' }
     if (!isConsistentPdfHighlight(a.locator, parsed)) return { ok: false, reason: 'PDF location does not match its page' }
     return { ok: true, payloads: { pdfAnnotation: parsed } }
   }

@@ -242,6 +242,14 @@ export function planPdfAnnotationWrite(input: {
 
   const removal = (index: number) => ({ objectId: input.scanned[index]!.objectId, pageIndex: input.scanned[index]!.pageIndex })
 
+  // File attachments are only ever written by their own operation and are already in the file (with their
+  // content): the export keeps them exactly as they are (specs/007-pdf-file-attachment research R14).
+  input.scanned.forEach((item, index) => {
+    if (item.subtype !== 'FileAttachment') return
+    handledItems.add(index)
+    plan.kept += 1
+  })
+
   const writeRow = (row: ExportableHighlight, existing: { index: number; nm?: string }[]) => {
     const keepName = existing.length === 1 && !noteIdFromReadmateName(existing[0]!.nm) ? existing[0]!.nm : undefined
     const parts = pdfWriteAnnotationsFromHighlight(row, keepName)

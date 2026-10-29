@@ -153,6 +153,24 @@ describe('planImport', () => {
   })
 })
 
+describe('file attachments (specs/007)', () => {
+  it('never creates one: an attachment payload is reported not placed', () => {
+    const disguised = pdf('a', 2, {
+      type: 'textbox',
+      pdfAnnotation: { pageIndex: 1, rects: [R], attachment: { name: 'x.docx', sizeBytes: 10, sha256: 'a'.repeat(64) } },
+    })
+    const p = plan(fileOf('pdf', [disguised, pdf('ok', 2)]))
+    expect(p.toAdd.map((x) => x.sourceId)).toEqual(['ok'])
+    expect(p.notPlaced).toEqual([{ type: 'textbox', quote: 'pdf a', reason: 'file attachments are not imported' }])
+  })
+
+  it('rejects the attachment type itself when the file is read', () => {
+    const raw = { ...fileOf('pdf', []), annotations: [{ ...pdf('a', 2), type: 'attachment' }] }
+    const parsed = parseAnnotationFile(JSON.stringify(raw))
+    expect(parsed.ok && parsed.rejected.map((r) => r.reason)).toEqual(['unknown annotation type'])
+  })
+})
+
 describe('contentKeyOfNote', () => {
   it('is null for a row without a location and equal for the same stored content', () => {
     expect(contentKeyOfNote({ schemaVersion: 1, type: 'highlight' } as unknown as INoteState)).toBeNull()

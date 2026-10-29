@@ -80,6 +80,7 @@ function docSig(doc: unknown): string {
 }
 
 export function fileSide(item: ScannedPdfAnnotation): SyncSide {
+  if (item.subtype === 'FileAttachment') return { kind: 'attachment', color: '', text: '', geometry: geometrySig(item.rects) }
   if (item.subtype === 'FreeText') {
     return { kind: 'typewriter', color: '', text: item.contents ?? '', geometry: geometrySig(item.rects) }
   }
@@ -102,6 +103,7 @@ export function fileSide(item: ScannedPdfAnnotation): SyncSide {
 /** The row as seen from one file annotation (its rects on that annotation's page only). */
 export function appSide(row: ExportableHighlight, pageIndex: number): SyncSide {
   const rects = (row.pdfAnnotation?.rects ?? []).filter((r) => (r.pageIndex ?? row.pdfAnnotation!.pageIndex) === pageIndex)
+  if (row.styleKind === 'attachment') return { kind: 'attachment', color: '', text: '', geometry: geometrySig(rects) }
   if (row.styleKind === 'typewriter') {
     return { kind: 'typewriter', color: `${color6(row.colorHex)}|${docSig(row.pdfAnnotation?.typewriter)}`, text: row.note ?? '', geometry: geometrySig(rects) }
   }
@@ -230,6 +232,9 @@ export function planTwoWaySync(input: TwoWayInput): TwoWayPlan {
     frozen: 0,
   }
   const rowsById = new Map(input.rows.filter((r) => r.pdfAnnotation && isPdfWritableStyle(r.styleKind)).map((r) => [r.id, r]))
+  // File attachments (specs/007-pdf-file-attachment research R7): never written by this cycle — their own operation
+  // wrote them — and the FILE is authoritative: the row follows its rect, and goes when the file no longer has it.
+  const attachmentRows = new Map(input.rows.filter((r) => r.styleKind === 'attachment' && r.pdfAnnotation?.attachment).map((r) => [r.id, r]))
   const identities = embeddedAnnotationIdentities(input.items)
 
   // Match ledger entries to items: exact key, then the anchor key (pre-/NM rows).
@@ -263,6 +268,12 @@ export function planTwoWaySync(input: TwoWayInput): TwoWayPlan {
   for (const e of input.ledger) {
     const index = itemOf.get(e.sourceKey)
     const item = index === undefined ? undefined : input.items[index]
+
+    const attachmentRow = attachmentRows.get(e.noteId)
+    if (attachmentRow || item?.subtype === 'FileAttachment') {
+      planAttachmentEntry(plan, input.complete, e, item, attachmentRow, rowNext)
+      continue
+    }
     const row = rowsById.get(e.noteId)
 
     if (e.conflict) {
@@ -359,7 +370,7 @@ export function planTwoWaySync(input: TwoWayInput): TwoWayPlan {
     if (claimed.has(index)) return
     const key = identities[index]!.key
     const noteId = noteIdFromReadmateName(item.nm)
-    if (noteId && rowsById.has(noteId)) {
+    if (noteId && (rowsById.has(noteId) || (item.subtype === 'FileAttachment' && attachmentRows.has(noteId)))) {
       plan.links.push({ key, noteId, item })
       linkedRows.add(noteId)
       return
@@ -370,9 +381,12 @@ export function planTwoWaySync(input: TwoWayInput): TwoWayPlan {
 
   // Rows made in Readmate that the file doesn't hold → add.
   for (const row of rowsById.values()) if (!linkedRows.has(row.id)) rowsToWrite.set(row.id, row)
+  // …except file attachments: one the whole file doesn't hold is gone (never re-created: its content is only in the file).
+  if (input.complete) for (const row of attachmentRows.values()) if (!linkedRows.has(row.id) && !plan.rowDeletes.includes(row.id)) plan.rowDeletes.push(row.id)
 
   for (const [noteId, row] of rowNext) {
-    if (!plan.rowDeletes.includes(noteId)) plan.rowUpdates.push({ noteId, next: row, expectedHash: highlightContentHash(rowsById.get(noteId)!) })
+    const original = rowsById.get(noteId) ?? attachmentRows.get(noteId)!
+    if (!plan.rowDeletes.includes(noteId)) plan.rowUpdates.push({ noteId, next: row, expectedHash: highlightContentHash(original) })
   }
 
   // File operations, at row granularity: every part of a row is rewritten together.
@@ -394,6 +408,58 @@ export function planTwoWaySync(input: TwoWayInput): TwoWayPlan {
     plan.writtenRows.push({ noteId, row, oldKeys: entries.map((e) => e.sourceKey), names: parts.map((p) => p.nm) })
   }
   return plan
+}
+
+/** Two icon boxes are the same spot when every edge agrees within ~1 pt of a Letter page (the file stores 4-decimal user units). */
+const ATTACHMENT_BOX_TOLERANCE = 0.002
+
+function sameAttachmentPlace(item: ScannedPdfAnnotation, row: ExportableHighlight): boolean {
+  const a = item.rects[0]
+  const b = row.pdfAnnotation?.rects[0]
+  if (!a || !b || item.pageIndex !== row.pdfAnnotation!.pageIndex) return false
+  return [a.x - b.x, a.y - b.y, a.width - b.width, a.height - b.height].every((d) => Math.abs(d) <= ATTACHMENT_BOX_TOLERANCE)
+}
+
+/**
+ * One ledger entry of a file attachment (research R7): no file operation is ever planned. Row + file → the row follows
+ * the file's place (and what the file says it holds); file only → the row comes back; row only → removed from the file
+ * (complete scans only), so the row goes; neither → the entry is dropped.
+ */
+function planAttachmentEntry(
+  plan: TwoWayPlan,
+  complete: boolean,
+  entry: TwoWayLedgerEntry,
+  item: ScannedPdfAnnotation | undefined,
+  row: ExportableHighlight | undefined,
+  rowNext: Map<string, ExportableHighlight>,
+): void {
+  if (item && row) {
+    const sameContent = !item.attachment || item.attachment.sha256 === row.pdfAnnotation?.attachment?.sha256
+    if (sameAttachmentPlace(item, row) && sameContent) {
+      plan.unchanged += 1
+      if (!entry.base || entry.conflict) plan.baseRefresh.push({ key: entry.sourceKey, noteId: entry.noteId, item })
+      if (entry.conflict) plan.conflictsCleared.push(entry.sourceKey)
+      return
+    }
+    const r = item.rects[0]!
+    rowNext.set(entry.noteId, {
+      ...row,
+      pdfAnnotation: {
+        ...row.pdfAnnotation!,
+        pageIndex: item.pageIndex,
+        rects: [{ pageIndex: item.pageIndex, x: r.x, y: r.y, width: r.width, height: r.height }],
+        ...(item.attachment ? { attachment: item.attachment } : {}),
+      },
+    })
+    return
+  }
+  if (item && !row) {
+    plan.restores.push({ key: entry.sourceKey, item })
+    return
+  }
+  if (!complete) return
+  if (row && !plan.rowDeletes.includes(row.id)) plan.rowDeletes.push(row.id)
+  plan.ledgerDrops.push(entry.sourceKey)
 }
 
 /** The page a ledger entry's annotation was on (from its base geometry, else the row's first page). */

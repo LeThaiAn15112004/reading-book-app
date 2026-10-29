@@ -42,6 +42,7 @@ import type { PdfAnnotationScanResult } from '../pdf-sync/pdf-annotation-scan'
 import {
   createPdfAnnotationSyncService,
   type PdfAnnotationSyncEvent,
+  type FileOperationOutcome,
   type PdfAnnotationSyncService,
 } from '../pdf-sync/pdf-annotation-sync-service'
 import {
@@ -343,6 +344,10 @@ export function registerOverlayIpc(): void {
         pdfAnnotation = parsePdfAnnotationRef(body.pdfAnnotationRef, body.note)
         if (!pdfAnnotation || !isConsistentPdfHighlight(locator, pdfAnnotation)) return null
       }
+      // File attachments (specs/007-pdf-file-attachment contracts §5) are written only by attachments:create / change:
+      // neither a new row with an attachment payload nor a rewrite of an existing attachment row goes through here.
+      if (pdfAnnotation?.attachment) return null
+      if (typeof body.id === 'string' && body.id.trim() && overlays.isAttachmentRow(body.bookId, body.id)) return null
       // A shape is a PDF annotation with its own geometry (a line / arrow with endpoints); nothing else may carry one.
       if (isShapeStyleKind(body.styleKind)) {
         if (!pdfAnnotation?.shape) return null
@@ -396,6 +401,8 @@ export function registerOverlayIpc(): void {
       if (typeof body.bookId !== 'string' || typeof body.id !== 'string') {
         return { ok: false }
       }
+      // A file attachment is removed from the PDF by attachments:change (delete), never only from SQLite.
+      if (overlays.isAttachmentRow(body.bookId, body.id)) return { ok: false }
       try {
         const ok = await overlays.deleteHighlight(body.bookId, body.id)
         if (ok) pdfAnnotationSync().notifyAppChange(body.bookId.trim())
@@ -647,6 +654,7 @@ function toChangedDto(event: PdfAnnotationSyncEvent): PdfEmbeddedAnnotationsChan
     writeStatus: event.writeStatus,
     signerName: event.signerName,
     typewriterStatus: event.typewriterStatus,
+    pageAttachments: event.pageAttachments,
     timing: { totalMs: event.timing.totalMs, scanMs: event.timing.scanMs },
   }
 }
@@ -690,6 +698,19 @@ function pdfAnnotationSync(): PdfAnnotationSyncService {
     },
   })
   return syncService
+}
+
+/**
+ * What the PDF file-attachment operations (electron/ipc/attachments.ipc.ts, specs/007-pdf-file-attachment)
+ * share with the live sync: its per-book exclusive slot, the same write check, and the scan worker.
+ */
+export const pdfFileOperations = {
+  run: <T>(bookId: string, op: (context: { allowSigned: boolean }) => Promise<FileOperationOutcome<T>>, target?: WebContents) =>
+    pdfAnnotationSync().runFileOperation<T>(bookId, op, target),
+  checkWritable: (filePath: string, bytes: Uint8Array, allowSigned: boolean) =>
+    checkPdfWritable({ filePath, bytes, isReferenced: (p) => bookFileStorage(p) === 'referenced', verifySignature: verifyPdf, allowSigned }),
+  scan: scanInWorker,
+  inWorker: runInScanWorker,
 }
 
 /** Stop every file watch and the scan worker (app quit). */

@@ -138,6 +138,10 @@ export const AttachmentChannels = {
   open: 'attachments:open',
   /** Explicit Save As of one attachment through a Main-owned save dialog. */
   saveAs: 'attachments:saveAs',
+  /** Place a file on a PDF page: Main checks the file can be written, opens the picker, embeds the file (specs/007). */
+  create: 'attachments:create',
+  /** Move or delete a Readmate-made page attachment — reaches the file or is refused (specs/007). */
+  change: 'attachments:change',
 } as const
 
 export const GraphicsChannels = {

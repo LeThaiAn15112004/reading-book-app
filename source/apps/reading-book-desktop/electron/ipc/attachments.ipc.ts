@@ -15,6 +15,14 @@ function attachmentTempRoot(): string {
   return path.join(app.getPath('userData'), 'attachment-tmp')
 }
 
+/**
+ * Main-owned copies of files being attached to a PDF: `{userData}/attachment-staging/{uuid}/content`
+ * (specs/007-pdf-file-attachment research R4). Each is removed when its write ends; the root at startup.
+ */
+export function attachmentStagingRoot(): string {
+  return path.join(app.getPath('userData'), 'attachment-staging')
+}
+
 function samePath(a: string, b: string): boolean {
   const resolvedA = path.resolve(a)
   const resolvedB = path.resolve(b)
@@ -59,6 +67,8 @@ export function registerAttachmentsIpc(): void {
   // Leftovers of the previous run. A file an application still holds open survives (and is retried
   // next start); an error here is never fatal.
   void cleanAttachmentTemp(attachmentTempRoot())
+  // Copies of files whose attach was interrupted (crash, quit mid-write); nothing is running yet.
+  void cleanAttachmentTemp(attachmentStagingRoot())
 
   let currentWindow: BrowserWindow | undefined
   const svc = () => attachmentService(() => currentWindow)

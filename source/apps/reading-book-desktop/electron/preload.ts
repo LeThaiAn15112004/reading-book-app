@@ -132,6 +132,8 @@ const api: DesktopApi = {
     list: (bookId) => ipcRenderer.invoke(AttachmentChannels.list, bookId),
     open: (input) => ipcRenderer.invoke(AttachmentChannels.open, input),
     saveAs: (input) => ipcRenderer.invoke(AttachmentChannels.saveAs, input),
+    create: (input) => ipcRenderer.invoke(AttachmentChannels.create, input),
+    change: (input) => ipcRenderer.invoke(AttachmentChannels.change, input),
   },
   graphics: {
     list: (bookId) => ipcRenderer.invoke(GraphicsChannels.list, bookId),

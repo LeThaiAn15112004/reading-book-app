@@ -24,7 +24,7 @@
 import { createHash } from 'node:crypto'
 import fsp from 'node:fs/promises'
 import { hasFileWrites, type ScannedPdfAnnotation, type TwoWayPlan } from '@reading-book/book-reader-sdk'
-import type { PdfAnnotationScanResult } from './pdf-annotation-scan'
+import type { PdfAnnotationScanResult, ScannedPageAttachment } from './pdf-annotation-scan'
 import type { WriteBlockReason, WriteEligibility } from './pdf-write-eligibility'
 import { StableFileWatcher, sameSignature, statSignature, type FileSignature, type StableFileWatcherOptions } from './stable-file-watcher'
 import type { EmbeddedPdfSyncOutcome, TwoWaySyncOutcome } from '../persistence/sqlite-overlay-store'
@@ -65,6 +65,8 @@ export type PdfAnnotationSyncEvent = {
   signerName?: string
   /** The Typewriter notes this cycle tried to write, and the result for each (a note not listed was not touched). */
   typewriterStatus?: TypewriterFileStatus[]
+  /** Page attachments by other readers in the scanned file (specs/007-pdf-file-attachment). */
+  pageAttachments: ScannedPageAttachment[]
   /** PDF.js ids of the scanned items, aligned with `outcome.managedIndices`. */
   items: readonly ScannedPdfAnnotation[]
   /**
@@ -135,6 +137,8 @@ type Session = {
   lastStatus: WriteStatus | undefined
   /** Last file version handed to `recordFileVersion`. */
   recordedSha: string | null
+  /** The page attachments last sent to the renderer (a change is sent even when no row changed). */
+  pageAttachmentsSig: string | null
   disposed: boolean
   /** Resolves when the current run (and any queued follow-up) is finished — for tests. */
   idle: Promise<void>
@@ -142,6 +146,13 @@ type Session = {
 }
 
 export type WatchResult = { ok: true } | { ok: false; errorCode: 'not_found' | 'unavailable' }
+
+/** What a file operation (`runFileOperation`) tells the service once it is done. */
+export type FileOperationOutcome<T> = {
+  result: T
+  /** The book's file is now this version (Readmate wrote it). Absent: the file was not changed. */
+  newFile?: { sha256: string; sizeBytes: number }
+}
 
 function hasEofMarker(bytes: Uint8Array): boolean {
   const tail = Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength).subarray(Math.max(0, bytes.byteLength - EOF_WINDOW_BYTES))
@@ -154,6 +165,10 @@ export function sha256Hex(bytes: Uint8Array): string {
 
 export function createPdfAnnotationSyncService(deps: PdfAnnotationSyncDeps) {
   const sessions = new Map<number, Session>()
+  /** Books whose file a `runFileOperation` holds: no sync cycle of theirs starts meanwhile. */
+  const held = new Set<string>()
+  /** The last file operation of each book (they run one after another). */
+  const operations = new Map<string, Promise<unknown>>()
   const log = deps.log ?? (() => {})
   const maxRetries = MAX_RETRIES
   const retryMs = deps.retryTiming?.retryMs ?? RETRY_DELAY_MS
@@ -185,7 +200,7 @@ export function createPdfAnnotationSyncService(deps: PdfAnnotationSyncDeps) {
     const rank = (r: SyncReason) => (r === 'open' ? 2 : r === 'file-change' ? 1 : 0)
     const keep = session.pending && rank(session.pending.reason) >= rank(reason) ? session.pending.reason : reason
     session.pending = { reason: keep, firstEventAt: session.pending?.firstEventAt ?? firstEventAt }
-    if (!session.running) void drain(session)
+    if (!session.running && !held.has(session.bookId)) void drain(session)
   }
 
   async function drain(session: Session): Promise<void> {
@@ -196,7 +211,7 @@ export function createPdfAnnotationSyncService(deps: PdfAnnotationSyncDeps) {
       })
     }
     try {
-      while (session.pending && !session.disposed) {
+      while (session.pending && !session.disposed && !held.has(session.bookId)) {
         const { reason, firstEventAt } = session.pending
         session.pending = null
         await runOnce(session, reason, firstEventAt)
@@ -218,6 +233,14 @@ export function createPdfAnnotationSyncService(deps: PdfAnnotationSyncDeps) {
       request(session, reason, firstEventAt, true)
     }, locked ? lockedMs : retryMs)
     session.retryTimer.unref?.()
+  }
+
+  /** Did the page attachments differ from what the renderer last got? Records the new list as sent. */
+  function takePageAttachmentsChange(session: Session, scanned: PdfAnnotationScanResult): boolean {
+    const sig = JSON.stringify((scanned.pageAttachments ?? []).map((a) => [a.attachmentId, a.pageIndex, a.rect.x, a.rect.y, a.objectId]))
+    const changed = sig !== session.pageAttachmentsSig
+    session.pageAttachmentsSig = sig
+    return changed
   }
 
   function errnoCode(err: unknown): string {
@@ -333,7 +356,8 @@ export function createPdfAnnotationSyncService(deps: PdfAnnotationSyncDeps) {
     const repeated = blocked && session.lastStatus === writeStatus
     session.lastStatus = blocked ? writeStatus : undefined
 
-    const changed = outcome.inserted.length + outcome.updated.length + outcome.deleted.length + outcome.conflicts.length > 0
+    const attachmentsChanged = takePageAttachmentsChange(session, scanned)
+    const changed = outcome.inserted.length + outcome.updated.length + outcome.deleted.length + outcome.conflicts.length > 0 || attachmentsChanged
     if (!changed && reason !== 'open' && (!writeStatus || repeated)) return
     if (session.target.isDestroyed()) return
     deps.emit(session.target, {
@@ -343,6 +367,7 @@ export function createPdfAnnotationSyncService(deps: PdfAnnotationSyncDeps) {
       writeStatus,
       signerName,
       typewriterStatus,
+      pageAttachments: scanned.pageAttachments ?? [],
       items: scanned.items,
       matchesDisplayedFile: reason === 'open' && deps.servedSha256(session.bookId) === sha,
       complete: scanned.complete,
@@ -410,13 +435,15 @@ export function createPdfAnnotationSyncService(deps: PdfAnnotationSyncDeps) {
     session.lastSyncedSha = sha
     session.retries = 0
 
-    const changed = outcome.inserted.length + outcome.updated.length + outcome.deleted.length > 0
+    const attachmentsChanged = takePageAttachmentsChange(session, scanned)
+    const changed = outcome.inserted.length + outcome.updated.length + outcome.deleted.length > 0 || attachmentsChanged
     if (!changed && reason !== 'open') return
     if (session.target.isDestroyed()) return
     deps.emit(session.target, {
       bookId: session.bookId,
       reason,
       outcome: { ...outcome, conflicts: [] },
+      pageAttachments: scanned.pageAttachments ?? [],
       items: scanned.items,
       matchesDisplayedFile: reason === 'open' && deps.servedSha256(session.bookId) === sha,
       complete: scanned.complete,
@@ -447,6 +474,7 @@ export function createPdfAnnotationSyncService(deps: PdfAnnotationSyncDeps) {
         allowSigned: false,
         lastStatus: undefined,
         recordedSha: null,
+        pageAttachmentsSig: null,
         disposed: false,
         idle: Promise.resolve(),
         resolveIdle: null,
@@ -504,6 +532,48 @@ export function createPdfAnnotationSyncService(deps: PdfAnnotationSyncDeps) {
       session.lastStatus = undefined
       request(session, 'app-change', Date.now())
       return true
+    },
+
+    /**
+     * Run `op` while no sync cycle of `bookId` runs (specs/007-pdf-file-attachment research R5): waits for the
+     * cycles in progress, holds new ones (their triggers are kept), runs `op` — one operation per book at a time
+     * — and, when `op` wrote the file, records that version as Readmate's own (no sync-back, `books.sha256` kept
+     * current). Held triggers run afterwards. `allowSigned` is true when the user confirmed writing into this
+     * signed PDF in the window `target` (or any window on the book when `target` is omitted).
+     */
+    async runFileOperation<T>(bookId: string, op: (context: { allowSigned: boolean }) => Promise<FileOperationOutcome<T>>, target?: SyncTarget): Promise<T> {
+      const previous = operations.get(bookId) ?? Promise.resolve()
+      const run = previous.catch(() => {}).then(async () => {
+        held.add(bookId)
+        try {
+          const onBook = () => [...sessions.values()].filter((s) => s.bookId === bookId && !s.disposed)
+          while (onBook().some((s) => s.running)) await Promise.all(onBook().map((s) => s.idle))
+          const allowSigned = onBook().some((s) => s.allowSigned && (!target || s.target.id === target.id))
+          const outcome = await op({ allowSigned })
+          if (outcome.newFile) {
+            const { sha256, sizeBytes } = outcome.newFile
+            for (const s of onBook()) s.lastSyncedSha = sha256
+            if (deps.twoWay?.recordFileVersion) {
+              try {
+                deps.twoWay.recordFileVersion(bookId, sha256, sizeBytes)
+                for (const s of onBook()) s.recordedSha = sha256
+              } catch (err) {
+                log('[pdf-sync] could not record the file version', err)
+              }
+            }
+          }
+          return outcome.result
+        } finally {
+          held.delete(bookId)
+          for (const s of sessions.values()) if (s.bookId === bookId && s.pending && !s.running && !s.disposed) void drain(s)
+        }
+      })
+      operations.set(bookId, run)
+      try {
+        return await run
+      } finally {
+        if (operations.get(bookId) === run) operations.delete(bookId)
+      }
     },
 
     disposeAll(): void {

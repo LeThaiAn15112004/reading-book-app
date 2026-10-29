@@ -455,6 +455,39 @@ export type ListAttachmentsResult =
 
 export type AttachmentActionResult = { ok: true; fileName: string } | AttachmentFailureDto
 
+/** Why the book's PDF may not be written now (mirrors `WriteBlockReason`), or `changed`: another program saved it meanwhile. */
+export type PdfAttachmentBlockReasonDto = 'managed_copy' | 'read_only' | 'encrypted' | 'unsupported_pdf' | 'signed' | 'changed'
+
+/** attachments:create (specs/007-pdf-file-attachment contracts §1). The renderer never sends a path or a name. */
+export interface CreatePdfAttachmentRequestDto {
+  bookId: string
+  /** 0-based page. */
+  pageIndex: number
+  /** The icon's top-left, normalised 0–1 on the displayed page. */
+  point: { x: number; y: number }
+}
+
+export type CreatePdfAttachmentResultDto =
+  | { ok: true; highlight: HighlightDto }
+  | { ok: false; code: 'cancelled' }
+  | { ok: false; code: 'blocked'; reason: PdfAttachmentBlockReasonDto; signerName?: string }
+  | { ok: false; code: 'empty' | 'read_failed' | 'source_changed'; fileName?: string }
+  | { ok: false; code: 'too_large'; sizeBytes: number; limitBytes: number; fileName?: string }
+  | { ok: false; code: 'too_large_for_pdf'; sizeBytes: number; pdfSizeBytes: number; limitBytes: number; fileName?: string }
+  | { ok: false; code: 'write_failed'; errno?: string }
+  | { ok: false; code: 'verify_failed' | 'unsupported_pdf' | 'encrypted' | 'not_found' | 'invalid_request' | 'busy' }
+
+/** attachments:change (contracts §2). Only Readmate-made attachments (`notes` rows of style kind `attachment`). */
+export type ChangePdfAttachmentRequestDto =
+  | { bookId: string; rowId: string; op: 'move'; rect: { x: number; y: number; width: number; height: number } }
+  | { bookId: string; rowId: string; op: 'delete' }
+
+export type ChangePdfAttachmentResultDto =
+  | { ok: true; highlight?: HighlightDto }
+  | { ok: false; code: 'blocked'; reason: PdfAttachmentBlockReasonDto; signerName?: string }
+  | { ok: false; code: 'not_found' | 'not_editable' | 'verify_failed' | 'unsupported_pdf' | 'encrypted' | 'invalid_request' }
+  | { ok: false; code: 'write_failed'; errno?: string }
+
 /** A graphic object inside the PDF (validated shape: `parsePdfGraphicObject` in the SDK). */
 export type PdfGraphicObjectDto = import('@reading-book/book-reader-sdk').PdfGraphicObject
 export type PdfGraphicOpDto = import('@reading-book/book-reader-sdk').PdfGraphicOp
@@ -754,6 +787,22 @@ export interface WatchPdfEmbeddedAnnotationsResult {
  * Pushed (overlay:pdfEmbeddedAnnotationsChanged) after a sync of the watched PDF's embedded
  * annotations: on open, and after every settled change of the file that changed rows.
  */
+/** A page-level file attachment made by another reader (specs/007-pdf-file-attachment contracts §3). */
+export interface PdfPageAttachmentDto {
+  /** `page-{page}-{ordinal}-{hash12}` — what attachments:open / saveAs take. */
+  attachmentId: string
+  /** 0-based page. */
+  pageIndex: number
+  /** Icon box normalised 0–1 to the displayed page. */
+  rect: { x: number; y: number; width: number; height: number }
+  /** Sanitised file name. */
+  name: string
+  /** Actual size of the content in the file; null when it holds none. */
+  sizeBytes: number | null
+  /** PDF.js id — hide its canvas appearance only when the event's file is the displayed one. */
+  objectId: string
+}
+
 export interface PdfEmbeddedAnnotationsChangedDto {
   bookId: string
   reason: 'open' | 'file-change' | 'app-change'
@@ -779,6 +828,11 @@ export interface PdfEmbeddedAnnotationsChangedDto {
   /** Typewriter notes this cycle tried to write, with the result for each (a note not listed was not touched). */
   typewriterStatus?: TypewriterFileStatusDto[]
   /** Diagnostics: ms from the first file event (null for the open sync) and of the scan. */
+  /**
+   * File attachments OTHER readers put on pages (Readmate's own arrive as rows): shown, opened and saved, never
+   * edited (specs/007-pdf-file-attachment contracts §3). Present on every event; replaces the previous list.
+   */
+  pageAttachments?: PdfPageAttachmentDto[]
   timing: { totalMs: number; scanMs: number }
 }
 
@@ -1028,6 +1082,10 @@ export interface DesktopApi {
     open(input: { bookId: string; attachmentId: string }): Promise<AttachmentActionResult>
     /** Separate, explicit Save As (Main-owned dialog) — the way out for a file the policy will not open. */
     saveAs(input: { bookId: string; attachmentId: string }): Promise<AttachmentActionResult>
+    /** Place a file on a PDF page: write check → Main-owned file picker → embed → verify (specs/007). */
+    create(input: CreatePdfAttachmentRequestDto): Promise<CreatePdfAttachmentResultDto>
+    /** Move or delete a Readmate-made page attachment in the PDF (specs/007). */
+    change(input: ChangePdfAttachmentRequestDto): Promise<ChangePdfAttachmentResultDto>
   }
   annotationTransfer: {
     /** Number of annotations of a book that Export would write (0 for audiobooks and unknown ids). */
