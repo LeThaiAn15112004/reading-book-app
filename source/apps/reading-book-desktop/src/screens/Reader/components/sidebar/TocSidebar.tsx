@@ -1,5 +1,5 @@
 import { Component, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { isShapeStyleKind, type ReaderBookmark, type ReaderHighlightBase } from '@reading-book/book-reader-sdk'
+import { formatAttachmentSize, isShapeStyleKind, type ReaderBookmark, type ReaderHighlightBase } from '@reading-book/book-reader-sdk'
 
 /**
  * A highlight / note card in the sidebar — EPUB (`ReaderHighlight`) and PDF (`PdfReaderHighlight`)
@@ -10,12 +10,6 @@ export type SidebarHighlight = ReaderHighlightBase & {
   chapterIndex: number
   /** PDF file attachments only (specs/007): the embedded file's name and size. */
   attachment?: { name: string; sizeBytes: number }
-}
-
-function attachmentSizeLabel(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
 import type { EpubTocItem } from '../../../../reader/renderers/epub'
 import type { FakeChapter } from '../../logic'
@@ -437,7 +431,7 @@ function HighlightListItem({
             </span>
           ) : h.attachment ? (
             <span className="mt-1 block truncate text-[13px] leading-snug text-lib-text" title={h.attachment.name}>
-              {h.attachment.name} <span className="text-lib-faint">· {attachmentSizeLabel(h.attachment.sizeBytes)}</span>
+              {h.attachment.name} <span className="text-lib-faint">· {formatAttachmentSize(h.attachment.sizeBytes)}</span>
             </span>
           ) : isShapeStyleKind(h.styleKind) || h.styleKind === 'typewriter' || h.styleKind === 'attachment' ? null : (
             <span className="mt-1 block text-[13px] text-lib-faint italic">(no excerpt)</span>
