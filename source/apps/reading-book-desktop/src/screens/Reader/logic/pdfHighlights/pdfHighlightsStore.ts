@@ -715,7 +715,9 @@ function removeHighlightRow(set: Set, id: string): void {
  *  matching the EPUB store). */
 function patchHighlight(get: Get, set: Set, id: string, patch: Partial<PdfReaderHighlight>, coalesceKey?: string): void {
   const current = get().highlights.find((h) => h.id === id)
-  if (!current) return
+  // A file attachment changes only through attachments:change (Main refuses overlay:saveHighlight for it): never
+  // shown edited, never in the history as a colour / note step.
+  if (!current || current.styleKind === 'attachment') return
   const next: PdfReaderHighlight = { ...current, ...patch, updatedAt: new Date().toISOString() }
   get().history.push(highlightReplace(current, next), coalesceKey)
   replaceRow(set, next)

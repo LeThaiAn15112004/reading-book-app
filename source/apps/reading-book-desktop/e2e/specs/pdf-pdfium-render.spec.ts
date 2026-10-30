@@ -87,8 +87,7 @@ test('annotations written by Readmate are rendered by PDFium (Chromium / Edge en
   // Recolor the underline blue and the strikethrough… keep defaults simple: export as is.
   const tools = page.getByRole('navigation', { name: 'Main navigation' }).getByRole('button', { name: 'Tools', exact: true })
   if ((await tools.getAttribute('aria-expanded')) !== 'true') await tools.click()
-  await page.getByRole('button', { name: 'More options' }).click()
-  await page.getByRole('menuitem', { name: 'Export PDF with annotations…' }).click()
+  await page.getByRole('button', { name: 'Export PDF with annotations', exact: true }).click()
   await expect(page.getByText(/Exported “pdfium-exported\.pdf”/)).toBeVisible({ timeout: 20_000 })
   expect(readFileSync(target).length).toBeGreaterThan(source.length)
   // …and the book file was written by write-back (3 annotations appended after the original bytes).

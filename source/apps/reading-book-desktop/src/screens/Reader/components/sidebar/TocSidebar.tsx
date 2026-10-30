@@ -460,7 +460,22 @@ function HighlightListItem({
           ) : null}
         </span>
       </button>
-      {h.readOnly ? null : (
+      {h.readOnly ? null : h.styleKind === 'attachment' ? (
+        // A file attachment has no colour or comment to edit: only Delete (it asks first — specs/007 FR-019).
+        <button
+          type="button"
+          className="shrink-0 cursor-pointer rounded-md border-none bg-transparent px-1.5 py-0.5 text-xs leading-none text-lib-faint hover:bg-lib-surface-hover hover:text-lib-text-strong"
+          aria-label={`Delete attachment ${h.attachment?.name ?? ''}`.trim()}
+          title="Delete attachment…"
+          onClick={(e) => {
+            e.preventDefault()
+            e.stopPropagation()
+            onDelete?.(h.id)
+          }}
+        >
+          Delete…
+        </button>
+      ) : (
         <NoteItemMenu
           highlight={h}
           onChangeColor={(colorHex) => onChangeColor?.(h.id, colorHex)}

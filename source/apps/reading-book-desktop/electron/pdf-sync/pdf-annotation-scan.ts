@@ -201,6 +201,11 @@ export async function scanPdfAnnotationBytes(bytes: Uint8Array): Promise<PdfAnno
     // Likewise a file attachment: only Readmate's own are annotations (others' are `pageAttachments`).
     if (item.subtype === 'FileAttachment') {
       if (!nm?.startsWith(READMATE_NM_PREFIX)) continue
+      // Its embedded file is missing or empty (another program stripped it): it no longer holds a file, so it is not
+      // an annotation — never a reason to call the whole scan incomplete (that would stop every deletion of the
+      // book). It stays listed as an attachment of the page (open / save say it is empty) and, the file being
+      // authoritative for attachments, a complete scan removes its row like any attachment deleted elsewhere.
+      if (!attachmentInfo.get(item.objectId)) continue
       pageAttachments.splice(0, pageAttachments.length, ...pageAttachments.filter((p) => p.objectId !== item.objectId))
     }
     const { line, width, ...more } = extras.get(item.objectId) ?? {}

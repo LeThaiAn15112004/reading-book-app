@@ -15,6 +15,8 @@
  *                 and the attach is repeated (picker opens only then)
  *   5. move       one history entry; undo / redo move it in the PDF and SQLite; a refused undo keeps the entry
  *   6. delete     confirmation → gone from the list, SQLite and the PDF; not in the history
+ *  6b. fixes      attachment rows are never recoloured / annotated; a deleted attachment's move steps leave the
+ *                 history; a step that can never succeed is dropped (Undo never stuck)
  *   7. book       switching books clears other readers' attachments, the selection and pending dialogs; a late
  *                 sync event of the old book is ignored
  *
@@ -320,6 +322,54 @@ await check('delete asks first, then removes the row from the list, SQLite and t
   // Another reader's attachment can never be deleted from the renderer.
   A().requestDelete({ ...pinOf(listedAttachments()[0]), id: 'page-1-0-0123456789ab', editable: false })
   assert.equal(A().deleting, null)
+})
+
+console.log('6b. review fixes')
+await check('an attachment row is never shown recoloured / annotated: no optimistic edit, no history step, no save', async () => {
+  const row = listedAttachments()[0]
+  const undoBefore = H().history.canUndo()
+  const saves = toasts.length
+  H().updateHighlightColor(row.id, '#E53935')
+  H().updateHighlightNote(row.id, 'a comment')
+  const after = listedAttachments().find((h) => h.id === row.id)
+  assert.equal(after.colorHex, row.colorHex)
+  assert.equal(after.note, row.note)
+  assert.equal(H().history.canUndo(), undoBefore)
+  await new Promise((r) => setTimeout(r, 50))
+  assert.equal(toasts.length, saves, 'no "Could not update highlight." from a refused save')
+})
+await check('delete after a move: the attachment’s steps leave the history, so Undo reaches the steps behind them', async () => {
+  main.picked = sourceFile('temp.txt', 64)
+  await A().create('pdf-a', 1, { x: 0.3, y: 0.3 })
+  const row = listedAttachments().find((h) => h.attachment.name === 'temp.txt')
+  H().history.clear()
+  // An earlier, unrelated step: a move of the first attachment.
+  const first = listedAttachments().find((h) => h.id === ids.first)
+  await A().move(ids.first, { ...first.rects[0], x: 0.5, y: 0.5 })
+  await A().move(row.id, { ...row.rects[0], x: 0.7, y: 0.2 })
+  A().requestDelete(pinOf(listedAttachments().find((h) => h.id === row.id)))
+  await A().confirmDelete()
+  assert.ok(!listedAttachments().some((h) => h.id === row.id))
+  H().undo()
+  await until(() => !A().changing && Math.abs(listedAttachments().find((h) => h.id === ids.first).rects[0].x - first.rects[0].x) < 1e-9, 'the earlier step undone')
+  assert.equal(H().history.canUndo(), false)
+})
+await check('a step that can never succeed (deleted in another program) is dropped, never blocking Undo', async () => {
+  main.picked = sourceFile('elsewhere.txt', 64)
+  await A().create('pdf-a', 1, { x: 0.6, y: 0.6 })
+  const row = listedAttachments().find((h) => h.attachment.name === 'elsewhere.txt')
+  H().history.clear()
+  const first = listedAttachments().find((h) => h.id === ids.first)
+  await A().move(ids.first, { ...first.rects[0], x: 0.2, y: 0.8 })
+  await A().move(row.id, { ...row.rects[0], x: 0.1, y: 0.1 })
+  // Deleted behind the store's back (the same Main operation another window / the sync would leave behind).
+  assert.deepEqual(await changePdfAttachment(changeDeps, { bookId: 'pdf-a', rowId: row.id, op: 'delete' }), { ok: true })
+  H().undo()
+  await until(() => !A().changing, 'the refused undo')
+  assert.equal(lastToast(), 'This attachment is no longer in the PDF.')
+  assert.equal(H().history.canRedo(), false, 'the dead step is not kept on the redo side either')
+  H().undo()
+  await until(() => !A().changing && Math.abs(listedAttachments().find((h) => h.id === ids.first).rects[0].x - first.rects[0].x) < 1e-9, 'the step behind it')
 })
 
 console.log('7. book switch')

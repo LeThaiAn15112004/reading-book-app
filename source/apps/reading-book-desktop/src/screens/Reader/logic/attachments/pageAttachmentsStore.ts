@@ -6,6 +6,7 @@ import {
   formatAttachmentSize,
   highlightReplace,
   pdfHighlightDtoToReaderHighlight,
+  type HighlightAction,
   readmateAttachmentId,
   type PdfReaderHighlight,
 } from '@reading-book/book-reader-sdk'
@@ -140,20 +141,34 @@ function withBox(row: PdfReaderHighlight, box: Box): PdfReaderHighlight {
  * Write a move into the PDF; the row as Main stored it, or null (the reason was shown — or, for a signed PDF,
  * `onSigned` asks the user first).
  */
-async function writeMove(bookId: string, row: PdfReaderHighlight, box: Box, onSigned: (signerName?: string) => void): Promise<PdfReaderHighlight | null> {
+async function writeMove(
+  bookId: string,
+  row: PdfReaderHighlight,
+  box: Box,
+  onSigned: (signerName?: string) => void,
+): Promise<{ row: PdfReaderHighlight } | { failed: string | null }> {
   const result = await attachmentsApi.change({ bookId, rowId: row.id, op: 'move', rect: box }).catch(() => null)
   if (!result) {
     toast('The attachment could not be moved. Nothing was changed.')
-    return null
+    return { failed: null }
   }
   if (!result.ok) {
     if (isSignedRefusal(result)) onSigned(result.code === 'blocked' ? result.signerName : undefined)
     else toast(describeAttachFailure(result, 'move') ?? 'The attachment could not be moved. Nothing was changed.')
-    return null
+    return { failed: result.code }
   }
   const saved = result.highlight ? pdfHighlightDtoToReaderHighlight(result.highlight) : null
-  return saved ?? withBox(row, box)
+  return { row: saved ?? withBox(row, box) }
 }
+
+/** Refusals no retry can change: the attachment is gone from the PDF, or the step itself is invalid. */
+const PERMANENT_FAILURES = new Set(['not_found', 'not_editable', 'invalid_request'])
+
+/** Every history step of row `id` — dropped once the row can no longer be moved (deleted here or elsewhere). */
+const stepsOf =
+  (id: string) =>
+  (action: HighlightAction<PdfReaderHighlight>): boolean =>
+    action.kind === 'replace' ? action.before.id === id || action.after.id === id : action.value.id === id
 
 function replaceRow(row: PdfReaderHighlight): void {
   usePdfHighlightsStore.setState((s) => ({ highlights: s.highlights.map((h) => (h.id === row.id ? row : h)) }))
@@ -291,12 +306,12 @@ export const usePageAttachmentsStore = create<PageAttachmentsState>((set, get) =
     if (!bookId || changing || !before) return
     set({ changing: true, moving: { id: rowId, box } })
     try {
-      const after = await writeMove(bookId, before, box, (signerName) =>
+      const written = await writeMove(bookId, before, box, (signerName) =>
         set({ signed: { bookId, signerName, retry: () => void get().move(rowId, box) } }),
       )
-      if (!after || get().bookId !== bookId) return
-      replaceRow(after)
-      usePdfHighlightsStore.getState().history.push(highlightReplace(before, after))
+      if (!('row' in written) || get().bookId !== bookId) return
+      replaceRow(written.row)
+      usePdfHighlightsStore.getState().history.push(highlightReplace(before, written.row))
     } finally {
       set({ changing: false, moving: null })
     }
@@ -355,6 +370,8 @@ export const usePageAttachmentsStore = create<PageAttachmentsState>((set, get) =
         toast((result && describeAttachFailure(result, 'delete')) ?? 'The attachment could not be deleted. Nothing was changed.')
         return false
       }
+      // Its move steps can never be applied again: dropped, so Undo reaches the steps behind them.
+      usePdfHighlightsStore.getState().history.dropWhere(stepsOf(rowId))
       usePdfHighlightsStore.setState((s) => ({
         highlights: s.highlights.filter((h) => h.id !== rowId),
         focusedHighlightId: s.focusedHighlightId === rowId ? null : s.focusedHighlightId,
@@ -367,7 +384,8 @@ export const usePageAttachmentsStore = create<PageAttachmentsState>((set, get) =
   },
 }))
 
-// Undo / redo of a move = another move in the PDF. A refused step stays where it was in the history.
+// Undo / redo of a move = another move in the PDF. A refused step stays where it was in the history — unless it can
+// never succeed (the attachment is gone): then all of that attachment's steps are dropped, so Undo is never stuck.
 registerAttachmentHistory((target, direction) => {
   const store = usePageAttachmentsStore.getState()
   const history = usePdfHighlightsStore.getState().history
@@ -386,9 +404,10 @@ registerAttachmentHistory((target, direction) => {
       signed: { bookId, signerName, retry: () => (direction === 'undo' ? usePdfHighlightsStore.getState().undo() : usePdfHighlightsStore.getState().redo()) },
     })
   void writeMove(bookId, target, rect, askSigned)
-    .then((after) => {
+    .then((written) => {
       if (usePageAttachmentsStore.getState().bookId !== bookId) return
-      if (after) replaceRow(after)
+      if ('row' in written) replaceRow(written.row)
+      else if (written.failed && PERMANENT_FAILURES.has(written.failed)) history.dropWhere(stepsOf(target.id))
       else keepPosition()
     })
     .finally(() => usePageAttachmentsStore.setState({ changing: false, moving: null }))

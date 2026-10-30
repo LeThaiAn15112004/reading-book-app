@@ -78,9 +78,10 @@ test('annotations flow both ways between Readmate and the PDF file while it is o
   await openBook(reader, file)
   await goToPage(page, 1)
 
-  // There is no write-back switch (neither in the menu nor anywhere else): annotations just sync.
+  // There is no write-back switch (neither in the More menu nor anywhere else): annotations just sync. Export is a
+  // toolbar button.
   await openMore(page)
-  await expect(page.getByRole('menuitem', { name: 'Export PDF with annotations…' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Export PDF with annotations', exact: true })).toBeVisible()
   await expect(page.getByText(/Sync annotations into this PDF file/)).toHaveCount(0)
   await page.keyboard.press('Escape')
 

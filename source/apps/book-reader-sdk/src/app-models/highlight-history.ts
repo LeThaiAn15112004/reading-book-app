@@ -23,6 +23,11 @@ export type HighlightHistory<T = ReaderHighlight> = {
   undo: () => HighlightAction<T> | null
   redo: () => HighlightAction<T> | null
   clear: () => void
+  /**
+   * Remove every step (undo and redo side) `matches` holds for — e.g. all steps of a row that no longer exists, so
+   * a step that can never be applied does not block the ones behind it.
+   */
+  dropWhere: (matches: (action: HighlightAction<T>) => boolean) => void
   canUndo: () => boolean
   canRedo: () => boolean
 }
@@ -76,6 +81,11 @@ export function createHighlightHistory<T = ReaderHighlight>(limit = DEFAULT_LIMI
       last = null
       undoStack = []
       redoStack = []
+    },
+    dropWhere(matches) {
+      last = null
+      undoStack = undoStack.filter((a) => !matches(a))
+      redoStack = redoStack.filter((a) => !matches(a))
     },
     canUndo: () => undoStack.length > 0,
     canRedo: () => redoStack.length > 0,

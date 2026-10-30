@@ -737,6 +737,48 @@ await check('12. another program moves, then deletes, a Readmate attachment: the
   })
 }
 
+// ---- 12b. a Readmate attachment whose embedded file another program stripped (review fix)
+await check('12. an emptied readmate: attachment is not an annotation, never makes the scan incomplete, and its row goes', async () => {
+  const emptied = '5a5a5a5a-1111-4222-8333-944444444444'
+  const good = '6b6b6b6b-1111-4222-8333-944444444444'
+  const book = addBook(
+    buildPdf({
+      pages: 1,
+      pageFiles: [
+        { page: 1, name: 'stripped.txt', data: Buffer.alloc(0), nm: `readmate:${emptied}` },
+        { page: 1, name: 'kept.txt', data: Buffer.from('still here'), nm: `readmate:${good}`, rect: [100, 100, 120, 120] },
+      ],
+    }),
+    'emptied',
+  )
+  const scanned = await scanPdfAnnotationBytes(new Uint8Array(fs.readFileSync(book.file)))
+  assert.equal(scanned.complete, true, 'a stripped attachment never makes the scan incomplete')
+  assert.deepEqual(scanned.items.map((i) => i.nm), [`readmate:${good}`])
+  assert.deepEqual(scanned.pageAttachments.map((a) => [a.name, a.sizeBytes]), [['stripped.txt', 0]], 'still listed as an attachment of the page')
+
+  // Rows for both, linked by a first sync of the intact file; then another program empties one: its row goes, the other stays.
+  const intact = buildPdf({
+    pages: 1,
+    pageFiles: [
+      { page: 1, name: 'stripped.txt', data: Buffer.from('was here'), nm: `readmate:${emptied}` },
+      { page: 1, name: 'kept.txt', data: Buffer.from('still here'), nm: `readmate:${good}`, rect: [100, 100, 120, 120] },
+    ],
+  })
+  const stripped = fs.readFileSync(book.file)
+  fs.writeFileSync(book.file, intact)
+  const target = { id: 93, isDestroyed: () => false, once: () => {} }
+  assert.equal((await service.watch(target, book.id)).ok, true)
+  await service.whenIdle(target)
+  const names = async () => (await rowsOf(book.id, 'attachment')).map((r) => r.pdfAnnotation.attachment.name).sort()
+  assert.deepEqual(await names(), ['kept.txt', 'stripped.txt'], 'both imported from the intact file')
+  fs.writeFileSync(book.file, stripped)
+  service.notifyAppChange(book.id)
+  await new Promise((r) => setTimeout(r, 900))
+  await service.whenIdle(target)
+  assert.deepEqual(await names(), ['kept.txt'])
+  service.unwatch(target, book.id)
+})
+
 // ---- 13. hostile PDF (other readers' attachments, US2)
 {
   const { createAttachmentService } = await import('../../electron/attachments/attachment-service.ts')
