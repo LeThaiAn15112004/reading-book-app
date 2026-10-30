@@ -3,6 +3,7 @@
  * Pure: the caller (Main) reads the rows, decides each row's origin and writes the result.
  */
 import type { INoteState } from '../domain/index.js'
+import { parsePdfAttachmentInfo } from '../attachments/pdf-attachment-annotation.js'
 import {
   FILE_VERSION,
   TRANSFER_ANNOTATION_TYPES,
@@ -39,8 +40,28 @@ export interface BuildAnnotationFileInput {
   now: Date
 }
 
+/**
+ * A PDF file attachment, for the readable copy only (specs/007-pdf-file-attachment research R14): its content lives
+ * in the PDF, so it is never part of the restorable file and never imported.
+ */
+export interface ReadableAttachment {
+  name: string
+  sizeBytes: number
+  /** 1-based page. */
+  page: number
+  createdAt: string
+}
+
 export type BuildAnnotationFileResult =
-  | { ok: true; file: AnnotationFile; exported: number; skipped: number }
+  | {
+      ok: true
+      /** The restorable file: annotations only (it may hold none when the book has only file attachments). */
+      file: AnnotationFile
+      exported: number
+      skipped: number
+      /** PDF file attachments, in page order — for the readable copy. */
+      attachments: ReadableAttachment[]
+    }
   | { ok: false; errorCode: 'empty' }
 
 const DEFAULT_COLOR = '#FFEB3B'
@@ -77,6 +98,16 @@ function toAnnotation(row: ExportRow): TransferAnnotation | null {
   return out
 }
 
+/** A file-attachment row as the readable copy lists it, or null when the row is not one (or is unreadable). */
+function toReadableAttachment(row: ExportRow): ReadableAttachment | null {
+  const n = row.note
+  if (n.type !== 'attachment') return null
+  const locator = n.locatorExtended?.locator
+  const info = parsePdfAttachmentInfo((n.pdfAnnotation as { attachment?: unknown } | undefined)?.attachment)
+  if (!info || !locator || locator.kind !== 'page-rect') return null
+  return { name: info.name, sizeBytes: info.sizeBytes, page: locator.page, createdAt: row.createdAt }
+}
+
 /** Reading order: chapter, then page and top-to-bottom, then offset / Markdown anchor; ties by creation time. */
 function orderKey(a: TransferAnnotation): [number, number, number, number, string] {
   const loc = a.locator
@@ -104,13 +135,19 @@ function compareKeys(x: ReturnType<typeof orderKey>, y: ReturnType<typeof orderK
 
 export function buildAnnotationFile(input: BuildAnnotationFileInput): BuildAnnotationFileResult {
   const annotations: TransferAnnotation[] = []
+  const attachments: ReadableAttachment[] = []
   let skipped = 0
   for (const row of input.rows) {
     const a = toAnnotation(row)
     if (a) annotations.push(a)
-    else skipped += 1
+    else {
+      const attachment = toReadableAttachment(row)
+      if (attachment) attachments.push(attachment)
+      else skipped += 1
+    }
   }
-  if (annotations.length === 0) return { ok: false, errorCode: 'empty' }
+  if (annotations.length === 0 && attachments.length === 0) return { ok: false, errorCode: 'empty' }
+  attachments.sort((a, b) => a.page - b.page || (a.createdAt < b.createdAt ? -1 : a.createdAt > b.createdAt ? 1 : 0))
 
   annotations.sort((a, b) => compareKeys(orderKey(a), orderKey(b)))
   const file: AnnotationFile = {
@@ -121,5 +158,5 @@ export function buildAnnotationFile(input: BuildAnnotationFileInput): BuildAnnot
     annotations,
   }
   if (input.book.format === 'txt' && input.txtContentSha256) file.txt = { contentSha256: input.txtContentSha256 }
-  return { ok: true, file, exported: annotations.length, skipped }
+  return { ok: true, file, exported: annotations.length, skipped, attachments }
 }

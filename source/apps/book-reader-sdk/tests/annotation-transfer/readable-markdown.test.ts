@@ -131,3 +131,53 @@ describe('renderReadableMarkdown', () => {
     expect(parseAnnotationFile(md)).toEqual({ ok: false, errorCode: 'damaged' })
   })
 })
+
+describe('renderReadableMarkdown — PDF file attachments (specs/007 research R14)', () => {
+  const onPage = (sourceId: string, page: number, quote: string): TransferAnnotation =>
+    base({ sourceId, locator: { kind: 'page-rect', page, chapterIndex: page - 1 }, selectionText: { highlight: quote } })
+  const attachment = (name: string, page: number, sizeBytes: number) => ({ name, sizeBytes, page, createdAt: '2026-10-20T13:01:12.000Z' })
+
+  it('lists each attachment as `📎 name (size), page n` under its page, after that page’s annotations', () => {
+    const md = renderReadableMarkdown(fileOf('pdf', [onPage('h2', 2, 'trang hai'), onPage('h4', 4, 'trang bốn')]), {
+      utcOffsetMinutes: 0,
+      attachments: [attachment('đầu.txt', 1, 12), attachment('hai.docx', 2, 1536), attachment('cuối.zip', 5, 3 * 1024 * 1024)],
+    })
+    expect(md).toBe(
+      [
+        '# Nhà Giả Kim — Paulo Coelho',
+        'Exported 2026-10-28 · 2 annotations · 3 file attachments',
+        '',
+        '## Page 1',
+        '',
+        '📎 đầu.txt (12 B), page 1',
+        '',
+        '## Page 2',
+        '',
+        '> trang hai',
+        '',
+        '**Highlight** · Yellow · 2026-10-20 13:01',
+        '',
+        '📎 hai.docx (1.5 KB), page 2',
+        '',
+        '## Page 4',
+        '',
+        '> trang bốn',
+        '',
+        '**Highlight** · Yellow · 2026-10-20 13:01',
+        '',
+        '## Page 5',
+        '',
+        '📎 cuối.zip (3.0 MB), page 5',
+        '',
+      ].join('\n'),
+    )
+  })
+
+  it('a PDF with only attachments still gets a readable copy; without attachments the output is unchanged', () => {
+    const only = renderReadableMarkdown(fileOf('pdf', []), { utcOffsetMinutes: 0, attachments: [attachment('a.txt', 3, 5)] })
+    expect(only).toContain('· 0 annotations · 1 file attachment\n')
+    expect(only).toContain('## Page 3\n\n📎 a.txt (5 B), page 3\n')
+    const file = fileOf('pdf', [onPage('h1', 1, 'x')])
+    expect(renderReadableMarkdown(file, { utcOffsetMinutes: 0, attachments: [] })).toBe(renderReadableMarkdown(file, { utcOffsetMinutes: 0 }))
+  })
+})

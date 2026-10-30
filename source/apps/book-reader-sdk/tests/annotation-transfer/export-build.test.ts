@@ -162,3 +162,56 @@ describe('buildAnnotationFile', () => {
     expect(parsed.file.annotations[0]!.colorHex).toBe('#FFEB3B')
   })
 })
+
+describe('buildAnnotationFile — PDF file attachments (specs/007 research R14)', () => {
+  const attachmentRow = (id: string, page: number, name: string, sizeBytes: number, createdAt = '2026-10-20T13:01:12.000Z') =>
+    row(
+      id,
+      {
+        type: 'attachment',
+        style: { colorHex: '#1E88E5' },
+        locatorExtended: { locator: { kind: 'page-rect', page, chapterIndex: page - 1 } },
+        pdfAnnotation: {
+          pageIndex: page - 1,
+          rects: [{ pageIndex: page - 1, x: 0.1, y: 0.1, width: 0.03, height: 0.03 }],
+          attachment: { name, sizeBytes, sha256: 'c'.repeat(64) },
+        },
+      } as unknown as Partial<INoteState>,
+      { createdAt },
+    )
+  const highlightOn = (id: string, page: number) =>
+    row(id, {
+      locatorExtended: { locator: { kind: 'page-rect', page, chapterIndex: page - 1 } },
+      pdfAnnotation: { pageIndex: page - 1, rects: [{ pageIndex: page - 1, x: 0.1, y: 0.3, width: 0.5, height: 0.02 }] },
+    } as unknown as Partial<INoteState>)
+
+  it('leaves attachment rows out of the restorable file and lists them, in page order, for the readable copy', () => {
+    const { built, parsed } = roundTrip(book('pdf'), [attachmentRow('a2', 3, 'later.pdf', 2048), highlightOn('h1', 2), attachmentRow('a1', 1, 'Tài liệu.docx', 1536)])
+    if (!built.ok) throw new Error('unreachable')
+    expect(parsed.file.annotations.map((a) => a.sourceId)).toEqual(['h1'])
+    expect(JSON.stringify(built.file)).not.toContain('attachment')
+    expect(built.exported).toBe(1)
+    expect(built.skipped).toBe(0)
+    expect(built.attachments).toEqual([
+      { name: 'Tài liệu.docx', sizeBytes: 1536, page: 1, createdAt: '2026-10-20T13:01:12.000Z' },
+      { name: 'later.pdf', sizeBytes: 2048, page: 3, createdAt: '2026-10-20T13:01:12.000Z' },
+    ])
+  })
+
+  it('a book with only attachments still builds (for the readable copy), with no annotation in the file', () => {
+    const built = build(book('pdf'), [attachmentRow('a1', 1, 'only.txt', 10)])
+    expect(built.ok).toBe(true)
+    if (!built.ok) return
+    expect(built.exported).toBe(0)
+    expect(built.file.annotations).toEqual([])
+    expect(built.attachments).toHaveLength(1)
+  })
+
+  it('an unreadable attachment row is skipped, never exported', () => {
+    const broken = row('bad', { type: 'attachment', locatorExtended: { locator: { kind: 'page-rect', page: 1, chapterIndex: 0 } } } as unknown as Partial<INoteState>)
+    const built = build(book('pdf'), [broken, highlightOn('h1', 1)])
+    if (!built.ok) throw new Error('build failed')
+    expect(built.skipped).toBe(1)
+    expect(built.attachments).toEqual([])
+  })
+})

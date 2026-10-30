@@ -21,6 +21,10 @@
  *                      an existing target is replaced safely; a read-only target fails cleanly
  *                      (no temp file left, target untouched); a source that changes mid-export is
  *                      detected; the source file is never written
+ *  14. attachments  -> a PDF holding a Readmate-made file attachment (`/NM readmate:…`, linked to its row) and
+ *                      another reader's: both are in the exported file with identical content and position,
+ *                      the attachment row is not written again (no second copy), the other annotations are
+ *                      (specs/007-pdf-file-attachment research R14)
  *
  * Run: npm run spike:pdf:export   (builds the SDK bundle first)
  */
@@ -42,6 +46,7 @@ const fs = await import('node:fs')
 const os = await import('node:os')
 const path = await import('node:path')
 const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs')
+const { buildPdf } = await import('../attachments/pdf-fixtures.mjs')
 
 let passed = 0
 async function check(name, fn) {
@@ -342,6 +347,77 @@ await check('10. Typewriter notes are exported with the same writer; one that ca
   assert.equal(result.skippedTypewriter, 1)
   const items = (await scanPdfAnnotationBytes(new Uint8Array(fs.readFileSync(target)))).items
   assert.deepEqual(items.map((i) => [i.nm, i.subtype]), [['readmate:ok', 'FreeText']])
+  fs.rmSync(dir, { recursive: true, force: true })
+})
+
+await check('14. attachments: Readmate-made and foreign ones are in the export, identical, never added twice', async () => {
+  const uuid = '3f2a1b0c-9d8e-4f7a-8b6c-5d4e3f2a1b0c'
+  const mine = Buffer.from('Readmate attachment content ✓')
+  const theirs = Buffer.from('attached by another reader')
+  const source = buildPdf({
+    pages: 2,
+    pageFiles: [
+      { page: 1, name: 'mine.docx', data: mine, nm: `readmate:${uuid}`, rect: [40, 120, 60, 140] },
+      { page: 2, name: 'theirs.txt', data: theirs, rect: [100, 30, 120, 50] },
+    ],
+  })
+  /** Every FileAttachment: page, rect, name, content hash. */
+  const attachments = async (bytes) => {
+    const doc = await pdfjs.getDocument({ data: new Uint8Array(bytes), verbosity: 0 }).promise
+    const out = []
+    try {
+      for (let n = 1; n <= doc.numPages; n++) {
+        for (const a of await (await doc.getPage(n)).getAnnotations({ intent: 'any' })) {
+          if (a.subtype === 'FileAttachment') out.push({ page: n, rect: a.rect.map((v) => Math.round(v * 100) / 100), name: a.file?.filename, sha: sha(a.file?.content ?? new Uint8Array(0)) })
+        }
+      }
+    } finally {
+      await doc.destroy()
+    }
+    return out
+  }
+  const before = await attachments(source)
+  assert.equal(before.length, 2)
+
+  // The live sync linked the Readmate attachment to its row (ledger entry); another reader's is never a row.
+  const items = (await scanPdfAnnotationBytes(new Uint8Array(source))).items
+  assert.deepEqual(items.map((i) => [i.subtype, i.nm]), [['FileAttachment', `readmate:${uuid}`]])
+  const { ledger, rows: imported } = importedFrom(items)
+  const attachmentRow = {
+    ...imported[0],
+    id: uuid,
+    styleKind: 'attachment',
+    pdfAnnotation: { ...imported[0].pdfAnnotation, attachment: { name: 'mine.docx', sizeBytes: mine.length, sha256: sha(mine) } },
+  }
+  ledger[0].noteId = uuid
+  const rows = [attachmentRow, row('hl', { note: 'kept next to the attachments' })]
+  const embeddedStreams = (b) => (Buffer.from(b).toString('latin1').match(/\/Type\s*\/EmbeddedFile\b/g) ?? []).length
+
+  for (const [label, entries] of [['linked', ledger], ['not yet linked', []]]) {
+    const { output, summary } = await writeAnnotationsToPdf({ bytes: source, ledger: entries, rows })
+    assert.deepEqual(await attachments(output), before, `${label}: same attachments, same content, same place`)
+    assert.equal(summary.added, 1, `${label}: only the highlight is added`)
+    assert.ok(Buffer.from(output.subarray(0, source.length)).equals(Buffer.from(source)), 'the export starts with the source bytes')
+    assert.equal(embeddedStreams(output), embeddedStreams(source), `${label}: no second embedded copy`)
+  }
+
+  // Through the export flow on files: the exported PDF holds both attachments; the source is untouched.
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'readmate-export-attach-'))
+  const sourcePath = path.join(dir, 'book.pdf')
+  const target = path.join(dir, 'exported.pdf')
+  fs.writeFileSync(sourcePath, source)
+  const result = await exportAnnotatedPdf({
+    resolveSource: async () => sourcePath,
+    ledger: () => ledger,
+    rows: async () => rows,
+    verifySignature: () => ({ status: 'unsigned' }),
+    chooseTarget: async () => target,
+    isForbiddenTarget: () => false,
+    write: (input) => writeAnnotationsToPdf(input),
+  })
+  assert.equal(result.ok, true, JSON.stringify(result))
+  assert.deepEqual(await attachments(fs.readFileSync(target)), before)
+  assert.equal(sha(fs.readFileSync(sourcePath)), sha(source))
   fs.rmSync(dir, { recursive: true, force: true })
 })
 

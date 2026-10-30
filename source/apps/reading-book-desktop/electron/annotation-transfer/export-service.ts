@@ -13,6 +13,7 @@ import {
   renderReadableMarkdown,
   serializeAnnotationFile,
   type ExportRow,
+  type ReadableAttachment,
   type TransferBook,
   type TransferFormat,
 } from '@reading-book/book-reader-sdk'
@@ -92,7 +93,9 @@ function pdfOrigins(rows: readonly TransferNoteRow[], ledger: readonly EmbeddedA
   return out
 }
 
-type BuiltFile = { ok: true; file: AnnotationFile; exported: number } | { ok: false; errorCode: 'not_found' | 'empty'; message?: string }
+type BuiltFile =
+  | { ok: true; file: AnnotationFile; exported: number; attachments: ReadableAttachment[] }
+  | { ok: false; errorCode: 'not_found' | 'empty'; message?: string }
 
 /** Read the book's annotation rows (SQLite only — never the book file) and build the annotations file. */
 async function buildFileFor(bookId: string, deps: ExportDeps): Promise<BuiltFile> {
@@ -126,8 +129,10 @@ async function buildFileFor(bookId: string, deps: ExportDeps): Promise<BuiltFile
   })
   // Nothing to export: say so before any dialog is shown and write nothing.
   if (!built.ok) return { ok: false, errorCode: 'empty', message: 'This book has no annotations to export.' }
-  return { ok: true, file: built.file, exported: built.exported }
+  return { ok: true, file: built.file, exported: built.exported, attachments: built.attachments }
 }
+
+const NOTHING_TO_EXPORT = { ok: false, errorCode: 'empty', message: 'This book has no annotations to export.' } as const
 
 /** Ask for a target, refuse the app's own data folder, write atomically. */
 async function saveText(
@@ -154,6 +159,9 @@ async function saveText(
 export async function exportRestoreAnnotations(bookId: string, deps: ExportDeps): Promise<AnnotationExportResult> {
   const built = await buildFileFor(bookId, deps)
   if (!built.ok) return built
+  // PDF file attachments are never in the restorable file (their content lives in the PDF, specs/007 R14): a book
+  // with only attachments has nothing to restore.
+  if (built.exported === 0) return NOTHING_TO_EXPORT
   const saved = await saveText(serializeAnnotationFile(built.file), defaultRestoreFileName(built.file.book.title), 'restore', deps, withRestoreExtension)
   return saved.ok ? { ok: true, exported: built.exported } : saved
 }
@@ -163,6 +171,7 @@ export async function exportReadableAnnotations(bookId: string, deps: ExportDeps
   const built = await buildFileFor(bookId, deps)
   if (!built.ok) return built
   // EPUB headings are `Chapter N` from the stored chapter index: Main has no EPUB table-of-contents reader (research R9, T048).
-  const saved = await saveText(renderReadableMarkdown(built.file), defaultReadableFileName(built.file.book.title), 'readable', deps, withReadableExtension)
+  // PDF file attachments are listed under their page (`📎 name (size), page n`), never restorable (specs/007 R14).
+  const saved = await saveText(renderReadableMarkdown(built.file, { attachments: built.attachments }), defaultReadableFileName(built.file.book.title), 'readable', deps, withReadableExtension)
   return saved.ok ? { ok: true, exported: built.exported } : saved
 }

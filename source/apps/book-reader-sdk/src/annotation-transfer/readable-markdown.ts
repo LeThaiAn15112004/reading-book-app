@@ -4,6 +4,8 @@
  * contracts/readable-markdown.md.
  */
 import { HIGHLIGHT_COLOR_PRESETS } from '../app-models/highlight-colors.js'
+import { formatAttachmentSize } from '../attachments/pdf-attachment-annotation.js'
+import type { ReadableAttachment } from './export-build.js'
 import type { AnnotationFile, TransferAnnotation, TransferAnnotationType } from './file-format.js'
 
 /** TXT: annotations are grouped into sections of this many characters (the text has no chapters). */
@@ -17,6 +19,11 @@ export interface ReadableMarkdownOptions {
   headingOf?: (annotation: TransferAnnotation) => string | undefined
   /** Time zone offset (minutes east of UTC) used for the printed times; the machine's own when omitted. */
   utcOffsetMinutes?: number
+  /**
+   * PDF file attachments (`buildAnnotationFile(...).attachments`), listed under their page as
+   * `📎 name (size), page n` after that page's annotations (specs/007-pdf-file-attachment research R14).
+   */
+  attachments?: readonly ReadableAttachment[]
 }
 
 const KIND_LABEL: Record<TransferAnnotationType, string> = {
@@ -108,21 +115,47 @@ function renderAnnotation(file: AnnotationFile, a: TransferAnnotation, utcOffset
   return lines.join('\n')
 }
 
+function renderAttachment(a: ReadableAttachment): string {
+  return `📎 ${a.name} (${formatAttachmentSize(a.sizeBytes)}), page ${a.page}`
+}
+
+/** The page an annotation is on (PDF), for placing attachments between pages; Infinity elsewhere. */
+function pageOf(a: TransferAnnotation): number {
+  return a.locator.kind === 'page-rect' ? a.locator.page : Number.POSITIVE_INFINITY
+}
+
 export function renderReadableMarkdown(file: AnnotationFile, options: ReadableMarkdownOptions = {}): string {
   const { book } = file
+  const attachments = options.attachments ?? []
   const out: string[] = []
   out.push(`# ${book.title}${book.author ? ` — ${book.author}` : ''}`)
   const n = file.annotations.length
-  out.push(`Exported ${formatDate(file.exportedAt, options.utcOffsetMinutes)} · ${n} annotation${n === 1 ? '' : 's'}`)
+  const m = attachments.length
+  out.push(
+    `Exported ${formatDate(file.exportedAt, options.utcOffsetMinutes)} · ${n} annotation${n === 1 ? '' : 's'}` +
+      (m > 0 ? ` · ${m} file attachment${m === 1 ? '' : 's'}` : ''),
+  )
 
   let heading: string | null = null
-  for (const a of file.annotations) {
-    const h = options.headingOf?.(a) ?? defaultHeading(file, a)
-    if (h !== heading) {
-      heading = h
-      out.push('', `## ${h}`)
+  const section = (h: string) => {
+    if (h === heading) return
+    heading = h
+    out.push('', `## ${h}`)
+  }
+  // Attachments of a page follow that page's annotations; both lists are already in page order.
+  let next = 0
+  const attachmentsBefore = (page: number) => {
+    while (next < m && attachments[next]!.page < page) {
+      const a = attachments[next++]!
+      section(`Page ${a.page}`)
+      out.push('', renderAttachment(a))
     }
+  }
+  for (const a of file.annotations) {
+    attachmentsBefore(pageOf(a))
+    section(options.headingOf?.(a) ?? defaultHeading(file, a))
     out.push('', renderAnnotation(file, a, options.utcOffsetMinutes))
   }
+  attachmentsBefore(Number.POSITIVE_INFINITY)
   return `${out.join('\n')}\n`
 }

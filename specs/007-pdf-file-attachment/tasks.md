@@ -193,9 +193,9 @@ description: "Task list for PDF File Attachment"
 
 **Independent Test**: export a PDF with an attachment → content identical in the new file; compat kit produced and record filled (quickstart scenario 14, §3).
 
-- [ ] T050 [P] [US6] Extend `DESK/spikes/pdf-annotations/run-pdf-annotation-export.mjs` (the `spike:pdf:export` script) with scenario 14: export a PDF holding Readmate-made and foreign attachments → each present in the exported file with identical content and position; the export does not add a second copy
-- [ ] T051 [P] [US6] Extend `DESK/spikes/pdf-annotations/build-compat-kit.mjs` with attachment files: small text, 50 MB binary, Vietnamese file name, moved, deleted, plus copies of Foxit / Acrobat samples when provided in the input dir; write a README listing what to check per file
-- [ ] T052 [P] [US6] In `SDK/src/annotation-transfer/` list `attachment` rows in the readable Markdown copy as `📎 name (size), page n` and leave them out of the restorable JSON (research R14); tests in `SDK/tests/annotation-transfer/`
+- [X] T050 [P] [US6] Extend `DESK/spikes/pdf-annotations/run-pdf-annotation-export.mjs` (the `spike:pdf:export` script) with scenario 14: export a PDF holding Readmate-made and foreign attachments → each present in the exported file with identical content and position; the export does not add a second copy
+- [X] T051 [P] [US6] Extend `DESK/spikes/pdf-annotations/build-compat-kit.mjs` with attachment files: small text, 50 MB binary, Vietnamese file name, moved, deleted, plus copies of Foxit / Acrobat samples when provided in the input dir; write a README listing what to check per file
+- [X] T052 [P] [US6] In `SDK/src/annotation-transfer/` list `attachment` rows in the readable Markdown copy as `📎 name (size), page n` and leave them out of the restorable JSON (research R14); tests in `SDK/tests/annotation-transfer/`
 
 ---
 
