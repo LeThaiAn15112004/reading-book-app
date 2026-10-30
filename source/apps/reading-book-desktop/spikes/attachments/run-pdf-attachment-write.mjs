@@ -19,7 +19,11 @@
  *    2. size limit    100 MB + 1 B and a 150.2 MB file → too_large with both sizes, 0 B → empty, PDF + file over the
  *                     combined limit → too_large_for_pdf; the source is never opened; the PDF is unchanged
  *    5. changing file the source grows / shrinks while it is staged → source_changed; nothing written
- *   (US5 adds its scenarios here: 3, 6–8.)
+ *    3. not writable  read-only file, managed copy, encrypted, signed (not confirmed) → blocked + reason, no picker
+ *    6. write errors  ENOSPC / EIO at write, EIO at fsync, EPERM / EIO at rename → write_failed; PDF byte-identical
+ *    7. verify fails  → verify_failed; PDF byte-identical
+ *    8. changed       another program saves between scan and rename → blocked (changed); its version kept
+ *                     (3 / 6 / 7 / 8: no temp or staging file left; a not-yet-written underline stays pending)
  *
  * Run: npm run spike:pdf:attachment-write   (builds the SDK bundle first)
  */
@@ -574,6 +578,165 @@ await check('12. another program moves, then deletes, a Readmate attachment: the
   service.unwatch(target, book.id)
 })
 
+// ---- 3 / 6 / 7 / 8. PDFs that cannot be written, and write failures (US5)
+{
+  const fsp = (await import('node:fs/promises')).default
+  const real = { open: fsp.open, rename: fsp.rename }
+  const isTemp = (p) => /\.readmate-[0-9a-f]+\.tmp$/.test(String(p))
+  /** Make the next temp-file step fail with `code` (`write` / `sync` on the handle, or the `rename`). */
+  function inject(step, code) {
+    const fail = () => Object.assign(new Error(`${code}: injected`), { code })
+    if (step === 'rename') {
+      fsp.rename = async (from, to) => (isTemp(from) ? Promise.reject(fail()) : real.rename(from, to))
+      return
+    }
+    fsp.open = async (p, ...rest) => {
+      const handle = await real.open(p, ...rest)
+      if (!isTemp(p)) return handle
+      return new Proxy(handle, {
+        get(target, key) {
+          if (key === step) return async () => Promise.reject(fail())
+          const value = Reflect.get(target, key)
+          return typeof value === 'function' ? value.bind(target) : value
+        },
+      })
+    }
+  }
+  const restore = () => Object.assign(fsp, real)
+  const tempsBeside = (file) => fs.readdirSync(path.dirname(file)).filter((n) => isTemp(n))
+  /** createPdfAttachment with some deps replaced; `pickerCalls` counts the real picker stub. */
+  const attachWith = (book, overrides, sourcePath = sourceFile('doc.txt', 2048)) => {
+    picked = sourcePath
+    return createPdfAttachment({ ...deps, ...overrides }, { bookId: book.id, pageIndex: 0, point: { x: 0.3, y: 0.3 } })
+  }
+  const writableWith = (opts) => (filePath, bytes, allowSigned) =>
+    checkPdfWritable({ filePath, bytes, isReferenced: () => true, verifySignature: () => ({ status: 'unsigned' }), allowSigned, ...opts })
+  /** A not-yet-written underline: must still be there (and unwritten) after every refusal / failure. */
+  const pendingRow = (book) =>
+    store.writeHighlight({
+      bookId: book.id,
+      locator: { kind: 'page-rect', page: 1, chapterIndex: 0 },
+      styleKind: 'underline',
+      colorHex: '#1E88E5',
+      pdfAnnotation: { pageIndex: 0, rects: [{ pageIndex: 0, x: 0.2, y: 0.3, width: 0.3, height: 0.02 }] },
+      tags: [],
+    })
+  const assertIntact = async (book, before, pending, { scan = true } = {}) => {
+    assert.equal(sha(fs.readFileSync(book.file)), before, 'PDF byte-identical')
+    assert.deepEqual(tempsBeside(book.file), [], 'no temp file beside the PDF')
+    assert.deepEqual(fs.existsSync(staging) ? fs.readdirSync(staging) : [], [], 'no staging copy left')
+    const rows = await rowsOf(book.id)
+    assert.equal(rows.filter((r) => r.styleKind === 'attachment').length, 0, 'no attachment row')
+    assert.ok(rows.some((r) => r.id === pending.id), 'the pending underline is still there')
+    if (!scan) return // pdf.js cannot read the spike's fake encrypted trailer
+    const scanned = await scanPdfAnnotationBytes(new Uint8Array(fs.readFileSync(book.file)))
+    assert.ok(!scanned.items.some((i) => i.nm === `readmate:${pending.id}`), 'and still not in the file')
+  }
+
+  const cases3 = [
+    ['read-only file', (book) => fs.chmodSync(book.file, 0o444), {}, 'read_only'],
+    ['managed copy', () => {}, { checkWritable: writableWith({ isReferenced: () => false }) }, 'managed_copy'],
+    [
+      'encrypted PDF',
+      (book) => {
+        const text = fs.readFileSync(book.file).toString('latin1').replace(/trailer\s*<</, 'trailer\n<< /Encrypt 1 0 R')
+        fs.writeFileSync(book.file, Buffer.from(text, 'latin1'))
+      },
+      {},
+      'encrypted',
+    ],
+    ['signed PDF, not confirmed', () => {}, { checkWritable: writableWith({ verifySignature: () => ({ status: 'valid', signerName: 'Dr. Signer' }) }) }, 'signed'],
+  ]
+  for (const [label, prepare, overrides, reason] of cases3) {
+    await check(`3. ${label} → blocked (${reason}) before the picker opens; nothing changed`, async () => {
+      const book = addBook(buildPdf({ pages: 1 }), `blocked-${reason}`)
+      prepare(book)
+      const before = sha(fs.readFileSync(book.file))
+      const pending = pendingRow(book)
+      const calls = pickerCalls
+      try {
+        const result = await attachWith(book, overrides)
+        assert.equal(result.ok, false)
+        assert.equal(result.code, 'blocked', JSON.stringify(result))
+        assert.equal(result.reason, reason)
+        if (reason === 'signed') assert.equal(result.signerName, 'Dr. Signer')
+        assert.equal(pickerCalls, calls, 'the picker was never opened')
+        await assertIntact(book, before, pending, { scan: reason !== 'encrypted' })
+      } finally {
+        fs.chmodSync(book.file, 0o644)
+      }
+    })
+  }
+
+  for (const [step, code] of [['write', 'ENOSPC'], ['write', 'EIO'], ['sync', 'EIO'], ['rename', 'EPERM']]) {
+    await check(`6. ${code} at the temp file's ${step} → write_failed (${code}); the PDF byte-identical, nothing left behind`, async () => {
+      const book = addBook(annotatedPdf(), `fail-${step}-${code}`)
+      const before = sha(fs.readFileSync(book.file))
+      const pending = pendingRow(book)
+      inject(step, code)
+      let result
+      try {
+        result = await attachWith(book, {})
+      } finally {
+        restore()
+      }
+      assert.deepEqual(result, { ok: false, code: 'write_failed', errno: code })
+      await assertIntact(book, before, pending)
+    })
+  }
+
+  await check('6. a failed move / delete (EIO at rename) leaves the PDF and the row as they were', async () => {
+    const book = addBook(annotatedPdf(), 'fail-change')
+    const created = await attach(book, sourceFile('m.txt', 100))
+    const before = sha(fs.readFileSync(book.file))
+    const r = created.highlight.pdfAnnotation.rects[0]
+    inject('rename', 'EIO')
+    let moved, deleted
+    try {
+      moved = await changePdfAttachment(changeDeps, { bookId: book.id, rowId: created.highlight.id, op: 'move', rect: { ...r, x: 0.5 } })
+      deleted = await changePdfAttachment(changeDeps, { bookId: book.id, rowId: created.highlight.id, op: 'delete' })
+    } finally {
+      restore()
+    }
+    assert.deepEqual(moved, { ok: false, code: 'write_failed', errno: 'EIO' })
+    assert.deepEqual(deleted, { ok: false, code: 'write_failed', errno: 'EIO' })
+    assert.equal(sha(fs.readFileSync(book.file)), before)
+    assert.deepEqual(tempsBeside(book.file), [])
+    const rows = await rowsOf(book.id, 'attachment')
+    assert.equal(rows.length, 1)
+    assert.equal(rows[0].pdfAnnotation.rects[0].x, r.x)
+  })
+
+  await check('7. the read-back of the temp file fails → verify_failed; the PDF byte-identical', async () => {
+    const book = addBook(annotatedPdf(), 'verify-fails')
+    const before = sha(fs.readFileSync(book.file))
+    const pending = pendingRow(book)
+    const result = await attachWith(book, { verify: async () => ({ ok: false, detail: 'forced by the spike' }) })
+    assert.deepEqual(result, { ok: false, code: 'verify_failed' })
+    await assertIntact(book, before, pending)
+  })
+
+  await check('8. another program saves the PDF between the scan and the rename → blocked (changed); its version is kept', async () => {
+    const book = addBook(annotatedPdf(), 'changed-meanwhile')
+    const pending = pendingRow(book)
+    let theirs = null
+    const result = await attachWith(book, {
+      verify: async (bytes, expect) => {
+        const verdict = await verifyPdfAttachmentBytes(bytes, expect)
+        // "Another program" saves the PDF while ours is verified.
+        fs.appendFileSync(book.file, '\n% saved by another program\n')
+        theirs = sha(fs.readFileSync(book.file))
+        return verdict
+      },
+    })
+    assert.deepEqual(result, { ok: false, code: 'blocked', reason: 'changed' })
+    assert.equal(sha(fs.readFileSync(book.file)), theirs, 'the other program’s version is what is on disk')
+    assert.deepEqual(tempsBeside(book.file), [])
+    assert.ok((await rowsOf(book.id)).some((r) => r.id === pending.id))
+    assert.equal((await rowsOf(book.id, 'attachment')).length, 0)
+  })
+}
+
 // ---- 13. hostile PDF (other readers' attachments, US2)
 {
   const { createAttachmentService } = await import('../../electron/attachments/attachment-service.ts')
@@ -652,5 +815,6 @@ await check('12. another program moves, then deletes, a Readmate attachment: the
 }
 
 service.disposeAll()
-fs.rmSync(tmp, { recursive: true, force: true })
+// Retried: on Windows a virus scanner may hold a just-written temp file for a moment.
+fs.rmSync(tmp, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
 console.log(`\n${passed} attachment write checks passed`)

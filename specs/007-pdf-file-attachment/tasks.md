@@ -176,12 +176,12 @@ description: "Task list for PDF File Attachment"
 
 ### Tests for User Story 5
 
-- [ ] T047 [P] [US5] In `run-pdf-attachment-write.mjs` implement scenarios 3 (read-only, managed copy, encrypted, signed not confirmed → `blocked` + reason, picker stub never called), 6 (ENOSPC / EIO injected at temp write, fsync and rename → `write_failed`, target byte-identical, no temp / staging left), 7 (verification forced to fail → `verify_failed`, target byte-identical) and 8 (target modified between scan and rename → `blocked` `changed`, the other program's version kept); also check pending two-way rows of other kinds are still pending afterwards
+- [X] T047 [P] [US5] In `run-pdf-attachment-write.mjs` implement scenarios 3 (read-only, managed copy, encrypted, signed not confirmed → `blocked` + reason, picker stub never called), 6 (ENOSPC / EIO injected at temp write, fsync and rename → `write_failed`, target byte-identical, no temp / staging left), 7 (verification forced to fail → `verify_failed`, target byte-identical) and 8 (target modified between scan and rename → `blocked` `changed`, the other program's version kept); also check pending two-way rows of other kinds are still pending afterwards
 
 ### Implementation for User Story 5
 
-- [ ] T048 [US5] In `attachmentsStore.ts` handle `blocked` with `reason: 'signed'`: show the existing signed-file confirmation; on accept call `overlay:confirmSignedPdfWrite` and repeat `create` / `change` (the picker opens only then); decline writes nothing
-- [ ] T049 [US5] When the open sync reports a blocking write status for the book, show the File Attachment tool disabled with the reason in `toolRegistry.ts` / `ToolsMenu.tsx` (FR-012 "MAY"); a click on the page with a blocked file never opens a picker
+- [X] T048 [US5] In `attachmentsStore.ts` _(`pageAttachmentsStore.ts`; also for move / delete and undo / redo of a move)_ handle `blocked` with `reason: 'signed'`: show the existing signed-file confirmation; on accept call `overlay:confirmSignedPdfWrite` and repeat `create` / `change` (the picker opens only then); decline writes nothing
+- [X] T049 [US5] When the open sync reports a blocking write status for the book, show the File Attachment tool disabled with the reason in `toolRegistry.ts` / `ToolsMenu.tsx` (FR-012 "MAY"); a click on the page with a blocked file never opens a picker _(lasting blocks only — read-only, managed copy, encrypted, unsupported; a signed PDF stays usable and asks. Known from the sync's `writeStatus` or the last refusal)_
 
 **Checkpoint**: scenarios 3, 6, 7, 8 pass.
 

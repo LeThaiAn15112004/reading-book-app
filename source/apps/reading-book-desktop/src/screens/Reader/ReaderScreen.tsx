@@ -617,6 +617,7 @@ export function ReaderScreen() {
   const foreignPageAttachments = usePageAttachmentsStore((s) => s.foreign)
   const selectedAttachmentId = usePageAttachmentsStore((s) => s.selectedId)
   const movingAttachment = usePageAttachmentsStore((s) => s.moving)
+  const attachmentWriteBlocked = usePageAttachmentsStore((s) => s.writeBlocked)
   const pdfAttachmentPins = useMemo(
     () => [
       ...pdfHighlights.highlights.flatMap((h): PdfAttachmentPin[] => {
@@ -927,7 +928,10 @@ export function ReaderScreen() {
     pen: { active: activeTool === 'pen' },
     shape: { active: activeTool === 'shape' },
     typewriter: { active: activeTool === 'typewriter' },
-    fileAttachment: { active: activeTool === 'fileAttachment' },
+    // Disabled with the reason when the open PDF is known to be unwritable (FR-012); a signed PDF stays usable (it asks).
+    fileAttachment: attachmentWriteBlocked
+      ? { active: false, disabled: true, reason: attachmentWriteBlocked }
+      : { active: activeTool === 'fileAttachment' },
     eraser: { active: activeTool === 'eraser' },
     snapshot: { active: snapshot.active },
     settings: { active: chrome.settingsOpen, expanded: chrome.settingsOpen },

@@ -10,7 +10,7 @@ import {
   type PdfReaderHighlight,
 } from '@reading-book/book-reader-sdk'
 import { attachmentsApi } from '../../../../bridge/attachments'
-import type { overlayApi } from '../../../../bridge/overlay'
+import { overlayApi } from '../../../../bridge/overlay'
 import type { PdfAttachmentPin } from '../../../../reader/renderers/pdf'
 import { registerAttachmentHistory, usePdfHighlightsStore } from '../pdfHighlights/pdfHighlightsStore'
 
@@ -48,6 +48,18 @@ type PageAttachmentsState = {
   changing: boolean
   /** The delete confirmation. */
   deleting: PdfAttachmentPin | null
+  /**
+   * A digitally signed PDF: writing makes readers report the signature as modified, so the request waits for the
+   * user (FR-012). On confirm Main is told once (`overlay:confirmSignedPdfWrite`) and `retry` repeats the request
+   * — the picker opens only then for an attach; on decline nothing is written.
+   */
+  signed: { bookId: string; signerName?: string; retry: () => void } | null
+  /**
+   * Why this PDF cannot be written at all, as the sync or an attach / move / delete last found it (read-only,
+   * Readmate's own copy, encrypted, unsupported) — the File Attachment tool is shown disabled with it (FR-012).
+   * Null when writable or not known. A signed PDF is not "blocked": the user may confirm.
+   */
+  writeBlocked: string | null
   setBook: (bookId: string | null) => void
   applySync: (event: SyncEvent) => void
   create: (bookId: string, pageIndex: number, point: { x: number; y: number }) => Promise<void>
@@ -68,6 +80,8 @@ type PageAttachmentsState = {
   confirmDelete: () => Promise<void>
   /** Delete without asking (the confirmation already happened). Not in the history (research R13). */
   remove: (rowId: string) => Promise<boolean>
+  confirmSigned: () => Promise<void>
+  declineSigned: () => void
 }
 
 type Box = { x: number; y: number; width: number; height: number }
@@ -100,22 +114,41 @@ const IDLE = {
   moving: null,
   changing: false,
   deleting: null,
+  signed: null,
+  writeBlocked: null,
 }
+
+/** Write refusals that last until the file itself changes (not `signed`, `locked`, `changed`). */
+const LASTING_BLOCKS = new Set(['read_only', 'managed_copy', 'encrypted', 'unsupported_pdf'])
+
+/** The disabled tool's reason for a lasting block, or null. */
+function lastingBlock(reason: string | undefined): string | null {
+  return reason && LASTING_BLOCKS.has(reason) ? describeAttachFailure({ code: 'blocked', reason }) : null
+}
+
+type Failure = { ok: false; code: string; reason?: string; signerName?: string }
+
+/** A refusal because the PDF is signed (and the user has not confirmed writing into it yet). */
+const isSignedRefusal = (result: Failure) => result.code === 'blocked' && result.reason === 'signed'
 
 /** The row with the stored box replaced (the history's before / after snapshots). */
 function withBox(row: PdfReaderHighlight, box: Box): PdfReaderHighlight {
   return { ...row, rects: row.rects.map((r, i) => (i === 0 ? { ...r, ...box } : r)) }
 }
 
-/** Write a move into the PDF; the row as Main stored it, or null (the reason was shown). */
-async function writeMove(bookId: string, row: PdfReaderHighlight, box: Box): Promise<PdfReaderHighlight | null> {
+/**
+ * Write a move into the PDF; the row as Main stored it, or null (the reason was shown — or, for a signed PDF,
+ * `onSigned` asks the user first).
+ */
+async function writeMove(bookId: string, row: PdfReaderHighlight, box: Box, onSigned: (signerName?: string) => void): Promise<PdfReaderHighlight | null> {
   const result = await attachmentsApi.change({ bookId, rowId: row.id, op: 'move', rect: box }).catch(() => null)
   if (!result) {
     toast('The attachment could not be moved. Nothing was changed.')
     return null
   }
   if (!result.ok) {
-    toast(describeAttachFailure(result, 'move') ?? 'The attachment could not be moved. Nothing was changed.')
+    if (isSignedRefusal(result)) onSigned(result.code === 'blocked' ? result.signerName : undefined)
+    else toast(describeAttachFailure(result, 'move') ?? 'The attachment could not be moved. Nothing was changed.')
     return null
   }
   const saved = result.highlight ? pdfHighlightDtoToReaderHighlight(result.highlight) : null
@@ -135,7 +168,11 @@ export const usePageAttachmentsStore = create<PageAttachmentsState>((set, get) =
   },
 
   applySync: (event) => {
-    if (!event || event.bookId !== get().bookId || !event.pageAttachments) return
+    if (!event || event.bookId !== get().bookId) return
+    // Only a definite answer changes it: a lasting block disables the tool, a write that went through enables it.
+    if (event.writeStatus === 'written') set({ writeBlocked: null })
+    else if (event.writeStatus && LASTING_BLOCKS.has(event.writeStatus)) set({ writeBlocked: lastingBlock(event.writeStatus) })
+    if (!event.pageAttachments) return
     const foreign = event.pageAttachments
     set((s) => {
       const ids = new Set(foreign.map((a) => a.attachmentId))
@@ -151,6 +188,12 @@ export const usePageAttachmentsStore = create<PageAttachmentsState>((set, get) =
 
   create: async (bookId, pageIndex, point) => {
     if (get().creating) return
+    // Known to be unwritable: say why, never open the picker (Main would refuse before it anyway).
+    const blocked = get().writeBlocked
+    if (blocked) {
+      toast(blocked)
+      return
+    }
     set({ creating: true })
     try {
       const result = await attachmentsApi.create({ bookId, pageIndex, point }).catch(() => null)
@@ -159,10 +202,17 @@ export const usePageAttachmentsStore = create<PageAttachmentsState>((set, get) =
         return
       }
       if (!result.ok) {
+        if (result.code === 'blocked') set({ writeBlocked: lastingBlock(result.reason) })
+        if (isSignedRefusal(result)) {
+          // Asked before the picker opens; confirming repeats the attach (now the picker opens).
+          set({ signed: { bookId, signerName: result.code === 'blocked' ? result.signerName : undefined, retry: () => void get().create(bookId, pageIndex, point) } })
+          return
+        }
         const message = describeAttachFailure(result)
         if (message) toast(message)
         return
       }
+      set({ writeBlocked: null })
       const row = pdfHighlightDtoToReaderHighlight(result.highlight)
       // The book may have changed while the picker was open: the row belongs to the other book then.
       if (!row || usePdfHighlightsStore.getState().bookId !== bookId) return
@@ -241,7 +291,9 @@ export const usePageAttachmentsStore = create<PageAttachmentsState>((set, get) =
     if (!bookId || changing || !before) return
     set({ changing: true, moving: { id: rowId, box } })
     try {
-      const after = await writeMove(bookId, before, box)
+      const after = await writeMove(bookId, before, box, (signerName) =>
+        set({ signed: { bookId, signerName, retry: () => void get().move(rowId, box) } }),
+      )
       if (!after || get().bookId !== bookId) return
       replaceRow(after)
       usePdfHighlightsStore.getState().history.push(highlightReplace(before, after))
@@ -263,6 +315,24 @@ export const usePageAttachmentsStore = create<PageAttachmentsState>((set, get) =
     if (pin && (await get().remove(pin.id))) toast(`Removed “${pin.name}” from the PDF.`)
   },
 
+  confirmSigned: async () => {
+    const pending = get().signed
+    set({ signed: null })
+    if (!pending || pending.bookId !== get().bookId) return
+    const result = await overlayApi.confirmSignedPdfWrite(pending.bookId).catch(() => null)
+    if (!result?.ok) {
+      toast('Could not write into the signed PDF. Nothing was changed.')
+      return
+    }
+    pending.retry()
+  },
+
+  declineSigned: () => {
+    if (!get().signed) return
+    set({ signed: null })
+    toast('The signed PDF was not changed.')
+  },
+
   remove: async (rowId) => {
     const { bookId, changing } = get()
     if (!bookId || changing) return false
@@ -271,6 +341,17 @@ export const usePageAttachmentsStore = create<PageAttachmentsState>((set, get) =
       const result = await attachmentsApi.change({ bookId, rowId, op: 'delete' }).catch(() => null)
       if (get().bookId !== bookId) return false
       if (!result?.ok) {
+        if (result && isSignedRefusal(result)) {
+          const name = usePdfHighlightsStore.getState().highlights.find((h) => h.id === rowId)?.attachment?.name
+          set({
+            signed: {
+              bookId,
+              signerName: result.code === 'blocked' ? result.signerName : undefined,
+              retry: () => void get().remove(rowId).then((ok) => ok && name && toast(`Removed “${name}” from the PDF.`)),
+            },
+          })
+          return false
+        }
         toast((result && describeAttachFailure(result, 'delete')) ?? 'The attachment could not be deleted. Nothing was changed.')
         return false
       }
@@ -299,7 +380,12 @@ registerAttachmentHistory((target, direction) => {
   const bookId = store.bookId
   const rect = { x: box.x, y: box.y, width: box.width, height: box.height }
   usePageAttachmentsStore.setState({ changing: true, moving: { id: target.id, box: rect } })
-  void writeMove(bookId, target, rect)
+  const askSigned = (signerName?: string) =>
+    usePageAttachmentsStore.setState({
+      // Confirming repeats the same history step (the entry was put back where it was).
+      signed: { bookId, signerName, retry: () => (direction === 'undo' ? usePdfHighlightsStore.getState().undo() : usePdfHighlightsStore.getState().redo()) },
+    })
+  void writeMove(bookId, target, rect, askSigned)
     .then((after) => {
       if (usePageAttachmentsStore.getState().bookId !== bookId) return
       if (after) replaceRow(after)

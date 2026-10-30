@@ -4,13 +4,15 @@ import { openBlockedByName, usePageAttachmentsStore } from '../../logic/attachme
 import { AttachmentBlockedDialog, AttachmentOpenDialog } from './AttachmentDialogs'
 import { AttachmentContextMenu, AttachmentDetailsPanel } from './AttachmentDetailsPanel'
 import { DeleteAttachmentDialog } from './DeleteAttachmentDialog'
+import { SignedPdfWriteDialog } from './SignedPdfWriteDialog'
 
 const isTypingTarget = (target: EventTarget | null) =>
   target instanceof HTMLElement && (target.isContentEditable || /^(INPUT|TEXTAREA|SELECT|BUTTON)$/.test(target.tagName))
 
 /**
  * Everything a page attachment icon leads to (specs/007 US2, US3): the right-click menu, the details panel, the
- * "Open attachment?" confirmation, "Readmate can't open this file" and the delete confirmation. State lives in
+ * "Open attachment?" confirmation, "Readmate can't open this file", the delete confirmation and the signed-PDF
+ * confirmation before an attach / move / delete writes into a signed file. State lives in
  * `pageAttachmentsStore`; Enter on a selected icon opens its details, Delete asks to delete a Readmate-made one.
  * Mounted for PDFs only.
  */
@@ -23,6 +25,7 @@ export function PageAttachmentDialogs({ pins }: { pins: readonly PdfAttachmentPi
   const busy = usePageAttachmentsStore((s) => s.busy)
   const deleting = usePageAttachmentsStore((s) => s.deleting)
   const changing = usePageAttachmentsStore((s) => s.changing)
+  const signed = usePageAttachmentsStore((s) => s.signed)
   const store = usePageAttachmentsStore.getState
 
   // The selection is dropped when its icon is gone (deleted in another app, book switched).
@@ -61,6 +64,13 @@ export function PageAttachmentDialogs({ pins }: { pins: readonly PdfAttachmentPi
         onDetails={() => menu && store().showDetails(menu.pin)}
         onDelete={menu?.pin.editable ? () => store().requestDelete(menu.pin) : undefined}
         onDismiss={() => store().closeMenu()}
+      />
+      <SignedPdfWriteDialog
+        open={signed !== null}
+        action="write"
+        signerName={signed?.signerName}
+        onCancel={() => store().declineSigned()}
+        onConfirm={() => void store().confirmSigned()}
       />
       <DeleteAttachmentDialog
         pin={deleting}

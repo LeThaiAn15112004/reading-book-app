@@ -27,8 +27,10 @@ export type ToolState = {
   active?: boolean
   /** Its menu / panel is open (`aria-expanded`, for tools with `popup`). */
   expanded?: boolean
-  /** Shown but not usable (tool not built yet) — never active. */
+  /** Shown but not usable (tool not built yet, or the file can't be written) — never active. */
   disabled?: boolean
+  /** Why it is disabled: the tooltip then says this instead of the description. */
+  reason?: string
 }
 
 export type ToolStates = Partial<Record<ToolId, ToolState>>
@@ -423,9 +425,10 @@ export function ToolsStrip({ capabilities, toolStates, onTool, onToolContextMenu
         <button
           key={tool.id}
           ref={toolRefs?.[tool.id]}
-          className={iconOnlyClass(active)}
+          className={`${iconOnlyClass(active)}${disabled ? ' cursor-not-allowed opacity-50' : ''}`}
           type="button"
-          title={toolTitle(tool)}
+          disabled={disabled}
+          title={disabled && state?.reason ? state.reason : toolTitle(tool)}
           aria-label={tool.label}
           aria-pressed={active}
           onClick={() => onTool(tool.id)}
@@ -442,7 +445,7 @@ export function ToolsStrip({ capabilities, toolStates, onTool, onToolContextMenu
         className={`relative ${modeButtonClass(active)}${disabled ? ' cursor-not-allowed opacity-50' : ''}`}
         type="button"
         disabled={disabled}
-        title={toolTitle(tool)}
+        title={disabled && state?.reason ? state.reason : toolTitle(tool)}
         aria-label={tool.label}
         aria-pressed={tool.popup ? undefined : active}
         aria-haspopup={tool.popup}
@@ -471,8 +474,10 @@ export function ToolsStrip({ capabilities, toolStates, onTool, onToolContextMenu
           id: tool.id,
           label: tool.label,
           icon: <ToolIcon tool={tool.id} />,
-          active: toolStates[tool.id]?.active,
+          active: toolStates[tool.id]?.disabled ? false : toolStates[tool.id]?.active,
           shortcutId: tool.shortcutId,
+          disabled: toolStates[tool.id]?.disabled,
+          title: toolStates[tool.id]?.disabled ? toolStates[tool.id]?.reason : undefined,
           onSelect: () => onTool(tool.id),
         }))}
       />

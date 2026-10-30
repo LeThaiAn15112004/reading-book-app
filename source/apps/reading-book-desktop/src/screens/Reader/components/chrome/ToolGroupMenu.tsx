@@ -19,6 +19,9 @@ export type ToolGroupMenuItem = {
   /** Armed / on. `undefined` = a plain action (no checked state). */
   active?: boolean
   shortcutId?: ShortcutId
+  /** Shown but not usable; `title` says why. */
+  disabled?: boolean
+  title?: string
   onSelect: () => void
 }
 
@@ -193,8 +196,10 @@ export function ToolGroupMenuPopup({
       {items.map((item) => (
         <button
           key={item.id}
-          className={`${itemClass}${item.active ? itemActiveClass : ''}`}
+          className={`${itemClass}${item.active ? itemActiveClass : ''}${item.disabled ? ' cursor-not-allowed opacity-50' : ''}`}
           type="button"
+          disabled={item.disabled}
+          title={item.title}
           role={item.active === undefined ? 'menuitem' : 'menuitemcheckbox'}
           aria-checked={item.active}
           onClick={() => {
