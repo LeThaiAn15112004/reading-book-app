@@ -87,46 +87,60 @@ const BLOCK_REASON_TEXT: Record<string, string> = {
   changed: 'another program changed the PDF meanwhile — try again',
 }
 
+/** What the refused operation was: the wording of a refusal follows it. */
+export type AttachAction = 'attach' | 'move' | 'delete'
+
+const ACTION_TEXT: Record<AttachAction, string> = { attach: 'add a file to this PDF', move: 'move this attachment', delete: 'delete this attachment' }
+const NOTHING_DONE: Record<AttachAction, string> = { attach: 'Nothing was attached.', move: 'Nothing was moved.', delete: 'Nothing was deleted.' }
+
+/** A size limit as people read it: whole megabytes without a decimal ("100 MB"), anything else like a file size. */
+function formatLimit(bytes: number): string {
+  return bytes % (1024 * 1024) === 0 ? `${bytes / (1024 * 1024)} MB` : formatAttachmentSize(bytes)
+}
+
 /**
- * What to tell the user about a refused or failed attachment (FR-011, FR-012). The 100 MB limit is Readmate's own
- * choice and is worded as such — never as a limit of PDF or of another reader. Null for a cancelled picker.
+ * What to tell the user about a refused or failed attach / move / delete (FR-011, FR-012, US4). Sizes have one
+ * decimal ("150.2 MB — the limit is 100 MB"); the limit is Readmate's own choice and is worded as such, never as a
+ * limit of PDF, Foxit or Acrobat. The refused file's name leads the message when it is known. Null for a cancelled
+ * picker (nothing to say).
  */
-export function describeAttachFailure(failure: AttachFailure): string | null {
-  const named = (text: string, fileName?: string) => (fileName ? `“${fileName}”: ${text}` : text)
+export function describeAttachFailure(failure: AttachFailure, action: AttachAction = 'attach'): string | null {
+  const named = (text: string, fileName?: string) => (fileName ? `“${fileName}” ${text}` : `This file ${text}`)
+  const nothing = NOTHING_DONE[action]
   switch (failure.code) {
     case 'cancelled':
       return null
     case 'blocked':
-      return `Readmate can’t add a file to this PDF: ${BLOCK_REASON_TEXT[failure.reason] ?? 'the file cannot be written'}.`
+      return `Readmate can’t ${ACTION_TEXT[action]}: ${BLOCK_REASON_TEXT[failure.reason] ?? 'the file cannot be written'}. ${nothing}`
     case 'empty':
-      return named('the file is empty, so there is nothing to attach.', failure.fileName)
+      return named(`is empty (0 bytes), so there is nothing to attach. ${nothing}`, failure.fileName)
     case 'read_failed':
-      return named('the file could not be read, so nothing was attached.', failure.fileName)
+      return named(`could not be read (it may be locked, moved or not permitted). ${nothing}`, failure.fileName)
     case 'source_changed':
-      return named('the file changed while it was being read, so nothing was attached. Try again.', failure.fileName)
+      return named(`changed while it was being read. ${nothing} Try again once it is no longer changing.`, failure.fileName)
     case 'too_large':
-      return named(`the file is ${formatAttachmentSize(failure.sizeBytes)} — Readmate attaches files up to ${formatAttachmentSize(failure.limitBytes)}.`, failure.fileName)
+      return named(`is ${formatAttachmentSize(failure.sizeBytes)} — the limit is ${formatLimit(failure.limitBytes)}. ${nothing}`, failure.fileName)
     case 'too_large_for_pdf':
       return named(
-        `this PDF (${formatAttachmentSize(failure.pdfSizeBytes)}) and the file (${formatAttachmentSize(failure.sizeBytes)}) together are larger than Readmate can write in one go (${formatAttachmentSize(failure.limitBytes)}).`,
+        `is ${formatAttachmentSize(failure.sizeBytes)} and this PDF is ${formatAttachmentSize(failure.pdfSizeBytes)} — together they are over ${formatLimit(failure.limitBytes)}, the most Readmate writes into one PDF at a time. ${nothing}`,
         failure.fileName,
       )
     case 'write_failed':
       return failure.errno === 'ENOSPC' || failure.errno === 'EDQUOT'
-        ? 'There is not enough disk space to write the PDF. Nothing was changed.'
-        : 'The PDF could not be written. Nothing was changed.'
+        ? `There is not enough disk space to write the PDF. The PDF was not changed.`
+        : `The PDF could not be written${failure.errno && failure.errno !== 'DB' ? ` (${failure.errno})` : ''}. The PDF was not changed.`
     case 'verify_failed':
-      return 'The written PDF did not check out, so it was not kept. Nothing was changed.'
+      return 'The written PDF did not check out, so it was not kept. The PDF was not changed.'
     case 'unsupported_pdf':
-      return 'This PDF’s structure does not allow adding to it safely. Nothing was changed.'
+      return `This PDF’s structure does not allow changing it safely. ${nothing}`
     case 'encrypted':
-      return 'This PDF is encrypted, so nothing can be added to it.'
+      return `This PDF is encrypted, so Readmate can’t ${ACTION_TEXT[action]}.`
     case 'not_found':
-      return 'The attachment or the PDF could not be found.'
+      return action === 'attach' ? 'The PDF could not be found.' : 'This attachment is no longer in the PDF.'
     case 'not_editable':
       return 'This attachment was made in another app; Readmate can open or save it, but not move or delete it.'
     case 'invalid_request':
     case 'busy':
-      return 'That did not work. Nothing was changed.'
+      return `That did not work. ${nothing}`
   }
 }

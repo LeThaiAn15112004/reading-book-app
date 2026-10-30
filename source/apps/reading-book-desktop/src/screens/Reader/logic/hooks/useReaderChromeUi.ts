@@ -97,7 +97,8 @@ export function useReaderChromeUi({
 
   useEffect(() => {
     if (!toast) return
-    const t = window.setTimeout(() => setToast(null), 2200)
+    // Long messages (a refusal with sizes and the reason) stay long enough to be read; short ones as before.
+    const t = window.setTimeout(() => setToast(null), Math.min(8000, Math.max(2200, toast.length * 60)))
     return () => window.clearTimeout(t)
   }, [toast])
 

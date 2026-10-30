@@ -3,7 +3,10 @@ import {
   ATTACHMENT_ICON_PT,
   attachmentIconBox,
   clampAttachmentBox,
+  describeAttachFailure,
+  formatAttachmentSize,
   parsePdfAttachmentInfo,
+  type AttachFailure,
 } from '../../src/attachments/pdf-attachment-annotation.js'
 import { ATTACHMENT_MAX_BYTES } from '../../src/attachments/attachment-policy.js'
 import { isConsistentPdfAttachment, parsePdfAnnotation } from '../../src/app-models/pdf-highlight.js'
@@ -98,5 +101,68 @@ describe('icon box', () => {
 
   it('clamp keeps the size and handles NaN', () => {
     expect(clampAttachmentBox({ x: 0.99, y: Number.NaN, width: 0.05, height: 0.05 })).toEqual({ x: 0.95, y: 0, width: 0.05, height: 0.05 })
+  })
+})
+
+describe('describeAttachFailure', () => {
+  const MB = 1024 * 1024
+  it('gives the actual size with one decimal and the limit (spec US4 example)', () => {
+    const size = Math.round(150.2 * MB)
+    expect(describeAttachFailure({ code: 'too_large', sizeBytes: size, limitBytes: ATTACHMENT_MAX_BYTES, fileName: 'video.mp4' })).toBe(
+      '“video.mp4” is 150.2 MB — the limit is 100 MB. Nothing was attached.',
+    )
+    expect(describeAttachFailure({ code: 'too_large', sizeBytes: ATTACHMENT_MAX_BYTES + 1, limitBytes: ATTACHMENT_MAX_BYTES })).toBe(
+      'This file is 100.0 MB — the limit is 100 MB. Nothing was attached.',
+    )
+  })
+  it('says an empty file is empty and names it', () => {
+    expect(describeAttachFailure({ code: 'empty', fileName: 'blank.txt' })).toBe('“blank.txt” is empty (0 bytes), so there is nothing to attach. Nothing was attached.')
+  })
+  it('the combined limit gives both sizes', () => {
+    const text = describeAttachFailure({ code: 'too_large_for_pdf', sizeBytes: 90 * MB, pdfSizeBytes: 200 * MB, limitBytes: 250 * MB, fileName: 'a.bin' })
+    expect(text).toContain('90.0 MB')
+    expect(text).toContain('200.0 MB')
+    expect(text).toContain('250 MB')
+  })
+  it('follows the action for refusals of a move / delete', () => {
+    expect(describeAttachFailure({ code: 'blocked', reason: 'read_only' }, 'move')).toBe(
+      'Readmate can’t move this attachment: the PDF file or its folder is read-only. Nothing was moved.',
+    )
+    expect(describeAttachFailure({ code: 'blocked', reason: 'signed' }, 'delete')).toContain('can’t delete this attachment: the PDF is digitally signed')
+    expect(describeAttachFailure({ code: 'not_found' }, 'delete')).toBe('This attachment is no longer in the PDF.')
+  })
+  it('has a message for every result code but a cancelled picker, and never names PDF / Foxit / Acrobat as the source of the limit', () => {
+    const all: AttachFailure[] = [
+      { code: 'blocked', reason: 'managed_copy' },
+      { code: 'blocked', reason: 'changed' },
+      { code: 'empty' },
+      { code: 'read_failed', fileName: 'x' },
+      { code: 'source_changed' },
+      { code: 'too_large', sizeBytes: 2e8, limitBytes: ATTACHMENT_MAX_BYTES },
+      { code: 'too_large_for_pdf', sizeBytes: 1, pdfSizeBytes: 2, limitBytes: 3 },
+      { code: 'write_failed', errno: 'ENOSPC' },
+      { code: 'write_failed', errno: 'EIO' },
+      { code: 'verify_failed' },
+      { code: 'unsupported_pdf' },
+      { code: 'encrypted' },
+      { code: 'not_found' },
+      { code: 'not_editable' },
+      { code: 'invalid_request' },
+      { code: 'busy' },
+    ]
+    for (const failure of all) {
+      for (const action of ['attach', 'move', 'delete'] as const) {
+        const text = describeAttachFailure(failure, action)
+        expect(text, failure.code).toBeTruthy()
+        expect(text).not.toMatch(/Foxit|Acrobat|PDF (limit|allows)|limit of (the )?PDF/i)
+      }
+    }
+    expect(describeAttachFailure({ code: 'cancelled' })).toBeNull()
+    expect(describeAttachFailure({ code: 'write_failed', errno: 'ENOSPC' })).toContain('not enough disk space')
+  })
+  it('formats sizes in B / KB / MB with one decimal', () => {
+    expect(formatAttachmentSize(0)).toBe('0 B')
+    expect(formatAttachmentSize(1536)).toBe('1.5 KB')
+    expect(formatAttachmentSize(ATTACHMENT_MAX_BYTES)).toBe('100.0 MB')
   })
 })

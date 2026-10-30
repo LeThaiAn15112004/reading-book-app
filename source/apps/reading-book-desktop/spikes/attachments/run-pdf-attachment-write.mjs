@@ -16,7 +16,10 @@
  *    9. move          new rect, same object number, /FS + content untouched; row updated; refusals
  *   10. delete        not listed by pdf.js, every other annotation present, file did not shrink; row + ledger gone
  *   12. live sync     (also) another program moves / deletes a Readmate attachment → the row follows / is removed
- *   (US4–US5 add their scenarios here: 2, 3, 5–8.)
+ *    2. size limit    100 MB + 1 B and a 150.2 MB file → too_large with both sizes, 0 B → empty, PDF + file over the
+ *                     combined limit → too_large_for_pdf; the source is never opened; the PDF is unchanged
+ *    5. changing file the source grows / shrinks while it is staged → source_changed; nothing written
+ *   (US5 adds its scenarios here: 3, 6–8.)
  *
  * Run: npm run spike:pdf:attachment-write   (builds the SDK bundle first)
  */
@@ -303,6 +306,129 @@ await check('12. opening and syncing after attaching: no duplicate rows, rows li
   assert.equal((await rowsOf(book.id, 'attachment')).length, 2)
   service.unwatch(target, book.id)
 })
+
+// ---- 2 / 5. size limit and refusals (US4)
+{
+  const { ATTACHMENT_MAX_BYTES, ATTACH_COMBINED_MAX_BYTES, describeAttachFailure } = await import('@reading-book/book-reader-sdk')
+  const { stageAttachmentSource } = await import('../../electron/pdf-sync/pdf-attachment-writer.ts')
+  /** Every read stream opened while `fn` runs (the staging reads the source through `fs.createReadStream`). */
+  const realCreateReadStream = fs.createReadStream
+  let wrapRead = null
+  const opened = []
+  fs.createReadStream = (p, options) => {
+    opened.push(String(p))
+    const stream = realCreateReadStream(p, options)
+    if (wrapRead) wrapRead(String(p), stream)
+    return stream
+  }
+  /** A file of `size` bytes without writing them (sparse where the file system allows). */
+  const sizedFile = (name, size) => {
+    const dir = path.join(tmp, 'src', randomBytes(4).toString('hex'))
+    fs.mkdirSync(dir, { recursive: true })
+    const file = path.join(dir, name)
+    fs.closeSync(fs.openSync(file, 'w'))
+    fs.truncateSync(file, size)
+    return file
+  }
+  const unchanged = async (book, fn) => {
+    const before = sha(fs.readFileSync(book.file))
+    const rowsBefore = (await rowsOf(book.id)).length
+    const result = await fn()
+    assert.equal(sha(fs.readFileSync(book.file)), before, 'PDF fingerprint unchanged')
+    assert.equal((await rowsOf(book.id)).length, rowsBefore, 'no row added')
+    assert.deepEqual(fs.existsSync(staging) ? fs.readdirSync(staging) : [], [], 'no staging copy left')
+    return result
+  }
+
+  await check('2. 100 MB + 1 B → too_large with both sizes, refused before the file is opened for reading', async () => {
+    const book = addBook(annotatedPdf(), 'too-large')
+    const src = sizedFile('video.mp4', ATTACHMENT_MAX_BYTES + 1)
+    opened.length = 0
+    const started = Date.now()
+    const result = await unchanged(book, () => attach(book, src))
+    assert.ok(Date.now() - started < 1000, 'refused within 1 s (SC-005)')
+    assert.deepEqual(result, { ok: false, code: 'too_large', sizeBytes: ATTACHMENT_MAX_BYTES + 1, limitBytes: ATTACHMENT_MAX_BYTES, fileName: 'video.mp4' })
+    assert.ok(!opened.includes(src), 'the source was never opened for reading')
+    assert.equal(describeAttachFailure(result), '“video.mp4” is 100.0 MB — the limit is 100 MB. Nothing was attached.')
+  })
+
+  await check('2. a 150.2 MB file: the message gives its size and the limit (spec example)', async () => {
+    const book = addBook(annotatedPdf(), 'too-large-150')
+    const src = sizedFile('lecture.mov', Math.round(150.2 * MB))
+    opened.length = 0
+    const result = await unchanged(book, () => attach(book, src))
+    assert.equal(result.code, 'too_large')
+    assert.ok(!opened.includes(src))
+    assert.equal(describeAttachFailure(result), '“lecture.mov” is 150.2 MB — the limit is 100 MB. Nothing was attached.')
+  })
+
+  await check('2. 0 B → empty, never read', async () => {
+    const book = addBook(annotatedPdf(), 'empty')
+    const src = sizedFile('blank.txt', 0)
+    opened.length = 0
+    const result = await unchanged(book, () => attach(book, src))
+    assert.deepEqual(result, { ok: false, code: 'empty', fileName: 'blank.txt' })
+    assert.ok(!opened.includes(src))
+  })
+
+  await check('2. the PDF + file total above ATTACH_COMBINED_MAX_BYTES → too_large_for_pdf, never read', async () => {
+    const src = sizedFile('dataset.bin', 60 * MB)
+    const pdfSizeBytes = ATTACH_COMBINED_MAX_BYTES - 50 * MB
+    opened.length = 0
+    const result = await stageAttachmentSource(src, staging, { pdfSizeBytes })
+    assert.deepEqual(result, { ok: false, code: 'too_large_for_pdf', sizeBytes: 60 * MB, pdfSizeBytes, limitBytes: ATTACH_COMBINED_MAX_BYTES })
+    assert.ok(!opened.includes(src))
+    const text = describeAttachFailure({ ...result, fileName: 'dataset.bin' })
+    assert.match(text, /60\.0 MB/)
+    assert.doesNotMatch(text, /Foxit|Acrobat/)
+  })
+
+  for (const [label, mutate] of [
+    ['grows', (file) => fs.appendFileSync(file, randomBytes(256 * 1024))],
+    ['shrinks', (file) => fs.truncateSync(file, 1024)],
+  ]) {
+    await check(`5. the file ${label} while it is being staged → source_changed, nothing written`, async () => {
+      const book = addBook(annotatedPdf(), `changing-${label}`)
+      const src = sourceFile('growing.log', 4 * MB)
+      let done = false
+      wrapRead = (p, stream) => {
+        if (p !== src) return
+        stream.once('data', () => {
+          if (done) return
+          done = true
+          mutate(src)
+        })
+      }
+      try {
+        const result = await unchanged(book, () => attach(book, src))
+        assert.equal(result.ok, false)
+        assert.equal(result.code, 'source_changed', JSON.stringify(result))
+        assert.equal(result.fileName, 'growing.log')
+        assert.match(describeAttachFailure(result), /changed while it was being read/)
+      } finally {
+        wrapRead = null
+      }
+    })
+  }
+
+  await check('2 / 5. refusals leave pending annotations of other kinds untouched', async () => {
+    const book = addBook(annotatedPdf(), 'refusal-pending')
+    const pending = store.writeHighlight({
+      bookId: book.id,
+      locator: { kind: 'page-rect', page: 1, chapterIndex: 0 },
+      styleKind: 'underline',
+      colorHex: '#1E88E5',
+      pdfAnnotation: { pageIndex: 0, rects: [{ pageIndex: 0, x: 0.2, y: 0.3, width: 0.3, height: 0.02 }] },
+      tags: [],
+    })
+    await unchanged(book, () => attach(book, sizedFile('big.iso', ATTACHMENT_MAX_BYTES + 10)))
+    await unchanged(book, () => attach(book, sizedFile('none.txt', 0)))
+    const rows = await rowsOf(book.id)
+    assert.ok(rows.some((r) => r.id === pending.id && r.styleKind === 'underline'), 'the not-yet-written underline is still there')
+  })
+
+  fs.createReadStream = realCreateReadStream
+}
 
 // ---- 9 / 10. move and delete (US3)
 const changeDeps = {

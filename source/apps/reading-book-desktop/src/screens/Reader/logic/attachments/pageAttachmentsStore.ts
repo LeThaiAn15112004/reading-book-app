@@ -115,7 +115,7 @@ async function writeMove(bookId: string, row: PdfReaderHighlight, box: Box): Pro
     return null
   }
   if (!result.ok) {
-    toast(describeAttachFailure(result) ?? 'The attachment could not be moved. Nothing was changed.')
+    toast(describeAttachFailure(result, 'move') ?? 'The attachment could not be moved. Nothing was changed.')
     return null
   }
   const saved = result.highlight ? pdfHighlightDtoToReaderHighlight(result.highlight) : null
@@ -271,7 +271,7 @@ export const usePageAttachmentsStore = create<PageAttachmentsState>((set, get) =
       const result = await attachmentsApi.change({ bookId, rowId, op: 'delete' }).catch(() => null)
       if (get().bookId !== bookId) return false
       if (!result?.ok) {
-        toast((result && describeAttachFailure(result)) ?? 'The attachment could not be deleted. Nothing was changed.')
+        toast((result && describeAttachFailure(result, 'delete')) ?? 'The attachment could not be deleted. Nothing was changed.')
         return false
       }
       usePdfHighlightsStore.setState((s) => ({

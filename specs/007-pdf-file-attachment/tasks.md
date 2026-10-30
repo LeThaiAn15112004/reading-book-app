@@ -157,12 +157,12 @@ description: "Task list for PDF File Attachment"
 
 ### Tests for User Story 4
 
-- [ ] T044 [P] [US4] In `run-pdf-attachment-write.mjs` implement scenarios 2 (100 MB + 1 B → `too_large` with sizes; 0 B → `empty`; a spy proves the source was never opened for reading; target SHA-256 unchanged) and 5 (source grows / shrinks during staging → `source_changed`), plus `too_large_for_pdf` above `ATTACH_COMBINED_MAX_BYTES`
+- [X] T044 [P] [US4] In `run-pdf-attachment-write.mjs` implement scenarios 2 (100 MB + 1 B → `too_large` with sizes; 0 B → `empty`; a spy proves the source was never opened for reading; target SHA-256 unchanged) and 5 (source grows / shrinks during staging → `source_changed`), plus `too_large_for_pdf` above `ATTACH_COMBINED_MAX_BYTES` _(checked on `stageAttachmentSource` with a stated PDF size: a > 240 MB fixture PDF is not generated)_
 
 ### Implementation for User Story 4
 
-- [ ] T045 [P] [US4] Add `describeAttachFailure(result)` to `SDK/src/attachments/pdf-attachment-annotation.ts` returning message text for every result code of contracts §1–2, sizes formatted with one decimal (`"150.2 MB — the limit is 100 MB"`), never naming PDF, Foxit or Acrobat as the source of the limit; tests in `SDK/tests/attachments/pdf-attachment-annotation.test.ts`
-- [ ] T046 [US4] Show `describeAttachFailure` messages from `attachmentsStore.ts` (create and change) through the Reader's existing toast / notice mechanism; the refused file name is shown when known
+- [X] T045 [P] [US4] Add `describeAttachFailure(result)` to `SDK/src/attachments/pdf-attachment-annotation.ts` returning message text for every result code of contracts §1–2, sizes formatted with one decimal (`"150.2 MB — the limit is 100 MB"`), never naming PDF, Foxit or Acrobat as the source of the limit; tests in `SDK/tests/attachments/pdf-attachment-annotation.test.ts`
+- [X] T046 [US4] Show `describeAttachFailure` messages from `attachmentsStore.ts` _(`pageAttachmentsStore.ts`; the Reader toast now stays up to 8 s for long messages)_ (create and change) through the Reader's existing toast / notice mechanism; the refused file name is shown when known
 
 **Checkpoint**: scenarios 2 and 5 pass; messages match the spec examples.
 
