@@ -616,16 +616,20 @@ export function ReaderScreen() {
   // kind `attachment`) and, open / save only, the ones other readers made.
   const foreignPageAttachments = usePageAttachmentsStore((s) => s.foreign)
   const selectedAttachmentId = usePageAttachmentsStore((s) => s.selectedId)
+  const movingAttachment = usePageAttachmentsStore((s) => s.moving)
   const pdfAttachmentPins = useMemo(
     () => [
       ...pdfHighlights.highlights.flatMap((h): PdfAttachmentPin[] => {
-        const box = h.rects[0]
-        if (h.styleKind !== 'attachment' || !h.attachment || !box) return []
-        return [{ id: h.id, pageIndex: h.page - 1, box: { x: box.x, y: box.y, width: box.width, height: box.height }, name: h.attachment.name, sizeBytes: h.attachment.sizeBytes, editable: true }]
+        const stored = h.rects[0]
+        if (h.styleKind !== 'attachment' || !h.attachment || !stored) return []
+        // While a move is written the icon waits, dimmed, at the target spot; the answer puts it where the file has it.
+        const pending = movingAttachment?.id === h.id
+        const box = pending ? movingAttachment.box : { x: stored.x, y: stored.y, width: stored.width, height: stored.height }
+        return [{ id: h.id, pageIndex: h.page - 1, box, name: h.attachment.name, sizeBytes: h.attachment.sizeBytes, editable: true, pending }]
       }),
       ...foreignPageAttachments.map((a): PdfAttachmentPin => ({ id: a.attachmentId, pageIndex: a.pageIndex, box: a.rect, name: a.name, sizeBytes: a.sizeBytes, editable: false })),
     ],
-    [pdfHighlights.highlights, foreignPageAttachments],
+    [pdfHighlights.highlights, foreignPageAttachments, movingAttachment],
   )
   // The Notes list: other readers' attachments are read-only entries next to the rows (no colour, no delete).
   const pdfSidebarHighlights = useMemo(
@@ -1294,7 +1298,12 @@ export function ReaderScreen() {
               const row = highlights.highlights.find((h) => h.id === highlight.id)
               if (row) void highlights.jumpToHighlight(row)
             }}
-            onDeleteHighlight={markup.deleteHighlight}
+            onDeleteHighlight={(id) => {
+              // A file attachment is deleted from the PDF, after its own confirmation (specs/007 FR-019).
+              const pin = isPdfSurface ? pdfAttachmentPins.find((p) => p.id === id && p.editable) : undefined
+              if (pin) usePageAttachmentsStore.getState().requestDelete(pin)
+              else markup.deleteHighlight(id)
+            }}
             onChangeHighlightColor={markup.updateHighlightColor}
             onChangeHighlightNote={(id, note) => markup.updateHighlightNote(id, note)}
             onCopyHighlight={(highlight) => copyHighlightText(highlight.selectionText?.highlight)}
@@ -1788,6 +1797,7 @@ export function ReaderScreen() {
               onAttachmentSelect={(id) => usePageAttachmentsStore.getState().select(id)}
               onAttachmentDetails={(pin) => usePageAttachmentsStore.getState().showDetails(pin)}
               onAttachmentContextMenu={(pin, x, y) => usePageAttachmentsStore.getState().openMenu(pin, x, y)}
+              onAttachmentMove={(id, box) => void usePageAttachmentsStore.getState().move(id, box)}
               typewriters={pdfTypewriters}
               typewriterEditing={typewriterSession != null}
               selectedTypewriterId={selectedTypewriterId}

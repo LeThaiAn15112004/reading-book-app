@@ -14,7 +14,8 @@
  *  - `attachments-list` / `attachment-extract` — the files embedded in a PDF (read-only,
  *              pdf_attachments.md);
  *  - `attachment-plan` / `attachment-verify` — the objects of a new file attachment (its content is
- *              streamed by Main) and the read-back of the written file (specs/007-pdf-file-attachment R3, R6).
+ *              streamed by Main) and the read-back of the written file (specs/007-pdf-file-attachment R3, R6);
+ *  - `attachment-change` — the bytes of a move / delete of a Readmate-made file attachment (R10, R11).
  * Gets the bytes Main already read and checked; never touches SQLite or the file system. Must not
  * import `electron`.
  */
@@ -43,8 +44,10 @@ import {
 } from './pdf-annotation-write'
 import {
   PdfWriteError,
+  appendAttachmentChange,
   planAttachmentAppend,
   type AttachmentAnnotationSpec,
+  type AttachmentChange,
   type AttachmentFileSpec,
   type AttachmentUpdatePlan,
   type PageGeometry,
@@ -60,6 +63,7 @@ export type ScanWorkerRequest =
   | { id: number; kind: 'attachment-extract'; bytes: Uint8Array; attachmentId: string }
   | { id: number; kind: 'attachment-verify'; bytes: Uint8Array; expect: AttachmentVerifyExpectation }
   | { id: number; kind: 'attachment-plan'; bytes: Uint8Array; page: PageGeometry; annotation: AttachmentAnnotationSpec; file: AttachmentFileSpec }
+  | { id: number; kind: 'attachment-change'; bytes: Uint8Array; page: PageGeometry; change: AttachmentChange }
   | ({ id: number; kind: 'write' } & PdfAnnotationWriteInput)
   | ({ id: number; kind: 'apply' } & PdfAnnotationApplyInput)
 
@@ -73,6 +77,10 @@ export type WorkerResult =
   | PdfAttachmentExtractResult
   | AttachmentVerifyResult
   | AttachmentUpdatePlan
+  | AttachmentChangeOutput
+
+/** `attachment-change`: the whole new file (transferred, not copied). */
+export type AttachmentChangeOutput = { output: Uint8Array }
 
 export type ScanWorkerReply =
   | { id: number; type: 'done'; result: WorkerResult }
@@ -103,7 +111,9 @@ parentPort?.on('message', (request: ScanWorkerRequest) => {
               ? verifyPdfAttachmentBytes(request.bytes, request.expect)
               : request.kind === 'attachment-plan'
                 ? Promise.resolve().then(() => planAttachmentAppend(request.bytes, request.page, request.annotation, request.file))
-                : scanPdfAnnotationBytes(request.bytes)
+                : request.kind === 'attachment-change'
+                  ? Promise.resolve().then(() => ({ output: appendAttachmentChange(request.bytes, request.page, request.change) }))
+                  : scanPdfAnnotationBytes(request.bytes)
   work.then(
     (result) => {
       const transfer = 'output' in result ? [result.output.buffer as ArrayBuffer] : []

@@ -13,7 +13,10 @@
  *                     annotation write keeps every attachment
  *   13. hostile PDF  other readers' attachments: names sanitised, a false /Size ignored, open blocked by policy,
  *                    Save As only to the chosen path
- *   (US3–US5 add their scenarios here: 2, 3, 5–10.)
+ *    9. move          new rect, same object number, /FS + content untouched; row updated; refusals
+ *   10. delete        not listed by pdf.js, every other annotation present, file did not shrink; row + ledger gone
+ *   12. live sync     (also) another program moves / deletes a Readmate attachment → the row follows / is removed
+ *   (US4–US5 add their scenarios here: 2, 3, 5–8.)
  *
  * Run: npm run spike:pdf:attachment-write   (builds the SDK bundle first)
  */
@@ -29,12 +32,12 @@ import { buildPdf } from './pdf-fixtures.mjs'
 
 const { getOverlayStore } = await import('../../electron/persistence/sqlite-overlay-store.ts')
 const { scanPdfAnnotationBytes, verifyPdfAttachmentBytes } = await import('../../electron/pdf-sync/pdf-annotation-scan.ts')
-const { planAttachmentAppend } = await import('../../electron/pdf-sync/pdf-incremental-writer.ts')
+const { planAttachmentAppend, appendAttachmentChange } = await import('../../electron/pdf-sync/pdf-incremental-writer.ts')
 const { applyAnnotationOps } = await import('../../electron/pdf-sync/pdf-annotation-write.ts')
 const { writeFileSafely } = await import('../../electron/pdf-sync/pdf-annotation-export.ts')
 const { createPdfAnnotationSyncService } = await import('../../electron/pdf-sync/pdf-annotation-sync-service.ts')
 const { checkPdfWritable } = await import('../../electron/pdf-sync/pdf-write-eligibility.ts')
-const { createPdfAttachment } = await import('../../electron/pdf-sync/pdf-attachment-operations.ts')
+const { createPdfAttachment, changePdfAttachment } = await import('../../electron/pdf-sync/pdf-attachment-operations.ts')
 const { loadPdfjs } = await import('../../electron/chunking/pdf-text.ts')
 
 let passed = 0
@@ -298,6 +301,150 @@ await check('12. opening and syncing after attaching: no duplicate rows, rows li
   assert.equal((await service.watch(target, book.id)).ok, true)
   await service.whenIdle(target)
   assert.equal((await rowsOf(book.id, 'attachment')).length, 2)
+  service.unwatch(target, book.id)
+})
+
+// ---- 9 / 10. move and delete (US3)
+const changeDeps = {
+  resolvePdfPath: deps.resolvePdfPath,
+  runFileOperation: deps.runFileOperation,
+  checkWritable: deps.checkWritable,
+  scan: scanPdfAnnotationBytes,
+  verify: verifyPdfAttachmentBytes,
+  change: async (bytes, page, change) => appendAttachmentChange(bytes, page, change),
+  getRow: (bookId, rowId) => store.getAttachmentRow(bookId, rowId),
+  isOtherRow: (bookId, rowId) => store.getAttachmentRow(bookId, rowId) === undefined && store.hasAnnotationRow(bookId, rowId),
+  commit: (bookId, rowId, change) => store.commitAttachmentChange(bookId, rowId, change),
+}
+const change = (input) => changePdfAttachment(changeDeps, input)
+/** The raw `/FS` value of the FileAttachment annotation `objectId` (`${num}R`) in its latest revision. */
+function fsOf(file, objectId) {
+  const text = fs.readFileSync(file).toString('latin1')
+  const num = parseInt(objectId, 10)
+  const bodies = [...text.matchAll(new RegExp(`(?:^|\\s)${num} 0 obj([\\s\\S]*?)endobj`, 'g'))]
+  return /\/FS\s+(\d+ \d+ R)/.exec(bodies.at(-1)?.[1] ?? '')?.[1] ?? null
+}
+
+await check('9. move: new rect, same object number, /FS and content untouched, row updated', async () => {
+  const book = addBook(annotatedPdf(), 'move')
+  const created = await attach(book, sourceFile('plan.xlsx', MB), 0, { x: 0.2, y: 0.2 })
+  assert.equal(created.ok, true)
+  const row = created.highlight
+  const before = (await fileAttachments(book.file)).attachments[0]
+  const fsBefore = fsOf(book.file, before.id)
+  const sizeBefore = fs.statSync(book.file).size
+  const old = row.pdfAnnotation.rects[0]
+  const rect = { x: 0.6, y: 0.7, width: old.width, height: old.height }
+  const moved = await change({ bookId: book.id, rowId: row.id, op: 'move', rect })
+  assert.equal(moved.ok, true, JSON.stringify(moved))
+  assert.deepEqual({ x: moved.highlight.pdfAnnotation.rects[0].x, y: moved.highlight.pdfAnnotation.rects[0].y }, { x: 0.6, y: 0.7 })
+  const after = (await fileAttachments(book.file)).attachments
+  assert.equal(after.length, 1)
+  assert.equal(after[0].id, before.id, 'same object number')
+  assert.equal(after[0].sha256, before.sha256, 'content untouched')
+  assert.ok(Math.abs(after[0].rect.x - 0.6) < 0.002 && Math.abs(after[0].rect.y - 0.7) < 0.002, JSON.stringify(after[0].rect))
+  assert.equal(fsOf(book.file, before.id), fsBefore, '/FS kept')
+  assert.ok(fs.statSync(book.file).size - sizeBefore < 8 * 1024, 'only the annotation + appearance were appended (no second copy)')
+  const stored = await rowsOf(book.id, 'attachment')
+  assert.equal(stored.length, 1)
+  assert.equal(stored[0].pdfAnnotation.rects[0].x, 0.6)
+  assert.equal(stored[0].pdfAnnotation.attachment.sha256, row.pdfAnnotation.attachment.sha256)
+  // Open / Save As still find it by its rm id after the move.
+  const { extractPdfAttachmentBytes } = await import('../../electron/attachments/pdf-attachments.ts')
+  const extracted = await extractPdfAttachmentBytes(new Uint8Array(fs.readFileSync(book.file)), `rm-${row.id}`)
+  assert.equal(extracted.ok, true)
+  assert.equal(sha(extracted.content), row.pdfAnnotation.attachment.sha256)
+})
+
+await check('9. move refusals: another size, outside the page, foreign id, other kind, unknown row — nothing written', async () => {
+  const book = addBook(annotatedPdf(), 'move-refused')
+  const created = await attach(book, sourceFile('a.txt', 100))
+  const row = created.highlight
+  const r = row.pdfAnnotation.rects[0]
+  const before = sha(fs.readFileSync(book.file))
+  const other = store.writeHighlight({
+    bookId: book.id,
+    locator: { kind: 'page-rect', page: 1, chapterIndex: 0 },
+    styleKind: 'highlight',
+    colorHex: '#FFEB3B',
+    pdfAnnotation: { pageIndex: 0, rects: [{ pageIndex: 0, x: 0.1, y: 0.1, width: 0.3, height: 0.02 }] },
+    tags: [],
+  })
+  const cases = [
+    [{ op: 'move', rect: { ...r, width: r.width * 2 } }, 'invalid_request'],
+    [{ op: 'move', rect: { ...r, x: 1 - r.width / 2 } }, 'invalid_request'],
+    [{ op: 'move', rowId: 'page-1-0-0123456789ab', rect: r }, 'not_editable'],
+    [{ op: 'delete', rowId: other.id }, 'not_editable'],
+    [{ op: 'delete', rowId: '00000000-0000-4000-8000-000000000000' }, 'not_found'],
+    [{ op: 'spin', rect: r }, 'invalid_request'],
+  ]
+  for (const [extra, code] of cases) {
+    const result = await change({ bookId: book.id, rowId: row.id, ...extra })
+    assert.equal(result.code, code, JSON.stringify(extra))
+  }
+  assert.equal(sha(fs.readFileSync(book.file)), before)
+  store.deleteHighlightRow(book.id, other.id)
+})
+
+await check('10. delete: not listed by pdf.js, every other annotation present, file did not shrink, row + ledger gone', async () => {
+  const book = addBook(annotatedPdf(), 'delete')
+  const keep = await attach(book, sourceFile('keep.txt', 300), 0, { x: 0.1, y: 0.1 })
+  const gone = await attach(book, sourceFile('gone.txt', 300), 0, { x: 0.5, y: 0.5 })
+  // Link both rows to the ledger first (as an open book would).
+  const target = { id: 91, isDestroyed: () => false, once: () => {} }
+  assert.equal((await service.watch(target, book.id)).ok, true)
+  await service.whenIdle(target)
+  assert.ok(store.listTwoWayLedger(book.id).some((e) => e.noteId === gone.highlight.id))
+  const scannedBefore = await scanPdfAnnotationBytes(new Uint8Array(fs.readFileSync(book.file)))
+  const sizeBefore = fs.statSync(book.file).size
+  const result = await change({ bookId: book.id, rowId: gone.highlight.id, op: 'delete' })
+  assert.deepEqual(result, { ok: true })
+  await service.whenIdle(target)
+  const after = await fileAttachments(book.file)
+  assert.deepEqual(after.attachments.map((a) => a.name), ['keep.txt'])
+  const scannedAfter = await scanPdfAnnotationBytes(new Uint8Array(fs.readFileSync(book.file)))
+  const goneItem = scannedBefore.items.find((i) => i.nm === `readmate:${gone.highlight.id}`)
+  for (const item of scannedBefore.items) {
+    if (item.objectId === goneItem.objectId) continue
+    assert.ok(scannedAfter.items.some((i) => i.objectId === item.objectId), `annotation ${item.objectId} kept`)
+  }
+  assert.ok(fs.statSync(book.file).size >= sizeBefore, 'the PDF did not get smaller (the bytes stay in the history)')
+  const rows = await rowsOf(book.id, 'attachment')
+  assert.deepEqual(rows.map((r) => r.id), [keep.highlight.id])
+  assert.ok(!store.listTwoWayLedger(book.id).some((e) => e.noteId === gone.highlight.id), 'ledger entry removed')
+  const again = await change({ bookId: book.id, rowId: gone.highlight.id, op: 'delete' })
+  assert.equal(again.code, 'not_found')
+  service.unwatch(target, book.id)
+})
+
+await check('12. another program moves, then deletes, a Readmate attachment: the row follows, then is removed', async () => {
+  const book = addBook(annotatedPdf(), 'foreign-edit')
+  const created = await attach(book, sourceFile('shared.txt', 500), 0, { x: 0.2, y: 0.3 })
+  const row = created.highlight
+  const target = { id: 92, isDestroyed: () => false, once: () => {} }
+  assert.equal((await service.watch(target, book.id)).ok, true)
+  await service.whenIdle(target)
+  const otherWrite = async (make) => {
+    const bytes = new Uint8Array(fs.readFileSync(book.file))
+    const scanned = await scanPdfAnnotationBytes(bytes)
+    const item = scanned.items.find((i) => i.nm === `readmate:${row.id}`)
+    const page = scanned.pages.find((p) => p.pageIndex === item.pageIndex)
+    fs.writeFileSync(book.file, appendAttachmentChange(bytes, page, make(item)))
+    service.notifyAppChange(book.id)
+    await new Promise((r) => setTimeout(r, 900))
+    await service.whenIdle(target)
+  }
+  const r = row.pdfAnnotation.rects[0]
+  await otherWrite((item) => ({
+    op: 'move',
+    objectId: item.objectId,
+    annotation: { nm: `readmate:${row.id}`, pageIndex: 0, box: { ...r, x: 0.55, y: 0.15 }, color: [0, 0, 1], author: 'Foxit', contents: 'shared.txt', createdAt: row.createdAt, modifiedAt: new Date().toISOString() },
+  }))
+  const followed = await rowsOf(book.id, 'attachment')
+  assert.equal(followed.length, 1)
+  assert.ok(Math.abs(followed[0].pdfAnnotation.rects[0].x - 0.55) < 0.002, JSON.stringify(followed[0].pdfAnnotation.rects[0]))
+  await otherWrite((item) => ({ op: 'delete', objectId: item.objectId, pageIndex: item.pageIndex }))
+  assert.equal((await rowsOf(book.id, 'attachment')).length, 0, 'removed after a complete scan without its /NM')
   service.unwatch(target, book.id)
 })
 

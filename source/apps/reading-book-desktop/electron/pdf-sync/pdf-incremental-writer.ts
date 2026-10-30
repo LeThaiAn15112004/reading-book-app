@@ -493,6 +493,50 @@ export function planAttachmentAppend(bytes: Uint8Array, page: PageGeometry, anno
   }
 }
 
+/** A move or delete of a Readmate-made FileAttachment (`objectId` = its pdf.js id, `${num}R`). */
+export type AttachmentChange =
+  | { op: 'move'; objectId: string; annotation: AttachmentAnnotationSpec }
+  | { op: 'delete'; objectId: string; pageIndex: number }
+
+/**
+ * `bytes` + ONE incremental update moving or deleting a FileAttachment (research R10–R11). A move rewrites only
+ * the annotation dictionary (same object number) and a new appearance: `/FS` and the `/Popup` / `/IRT` / `/RT` /
+ * `/StructParent` / `/OC` links are kept, the Filespec and EmbeddedFile objects are never rewritten. A delete takes
+ * the annotation (and its popup) out of the page's `/Annots`; the file's bytes stay in the earlier revision.
+ * Throws `PdfWriteError` — nothing is produced then.
+ */
+export function appendAttachmentChange(bytes: Uint8Array, page: PageGeometry, change: AttachmentChange): Uint8Array {
+  if (change.op === 'delete') {
+    return appendAnnotationUpdate(bytes, new Map([[page.pageIndex, page]]), { add: [], replace: [], remove: [{ objectId: change.objectId, pageIndex: change.pageIndex }] })
+  }
+  const ref = parsePdfJsRef(change.objectId)
+  if (!ref) throw new PdfWriteError('unsupported_pdf', `cannot rewrite inline annotation ${change.objectId}`)
+  return appendRawObjects(bytes, ({ objects, allocate }) => {
+    const old = objects.body(ref.num, ref.gen)
+    if (old === undefined) throw new PdfWriteError('unsupported_pdf', `annotation object ${ref.num} not found`)
+    const dict = parseDict(old)
+    if (dictValue(old, dict, 'Subtype') !== '/FileAttachment') throw new PdfWriteError('unsupported_pdf', `object ${ref.num} is not a file attachment`)
+    const fs = dictValue(old, dict, 'FS')
+    if (fs === undefined) throw new PdfWriteError('unsupported_pdf', `file attachment ${ref.num} has no /FS`)
+    const keep: Record<string, string> = {}
+    for (const key of ['Popup', 'IRT', 'RT', 'StructParent', 'OC']) {
+      const value = dictValue(old, dict, key)
+      if (value !== undefined) keep[key] = value
+    }
+    const icon = attachmentIconGeometry(change.annotation, page)
+    const apRef = allocate()
+    return [
+      { ...apRef, body: streamObject(`/Type /XObject /Subtype /Form /FormType 1 /BBox [${icon.rect.map(num).join(' ')}]`, icon.content) },
+      { ...ref, body: fileAttachmentDict(change.annotation, page, icon.rect, fs, apRef, keep) },
+    ]
+  })
+}
+
+/** The `/Rect` (user space) a FileAttachment gets for `annotation.box` on `page` — what a move's read-back checks. */
+export function attachmentRectFor(annotation: AttachmentAnnotationSpec, page: PageGeometry): [number, number, number, number] {
+  return attachmentIconGeometry(annotation, page).rect
+}
+
 /** A PDF date string for "now" (`/M` of a rewritten annotation). */
 export function pdfDateNow(): string {
   return pdfDate(new Date().toISOString())

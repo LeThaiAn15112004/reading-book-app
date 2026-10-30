@@ -19,8 +19,15 @@ import {
   type SaveHighlightInput,
 } from '@reading-book/book-reader-sdk'
 import type { AttachmentVerifyExpectation, AttachmentVerifyResult, PdfAnnotationScanResult } from './pdf-annotation-scan'
-import { AttachmentVerifyError, StagedContentChangedError, TargetChangedError, stageAttachmentSource, writeAttachmentUpdate } from './pdf-attachment-writer'
-import type { AttachmentAnnotationSpec, AttachmentFileSpec, AttachmentUpdatePlan, PageGeometry } from './pdf-incremental-writer'
+import { AttachmentVerifyError, StagedContentChangedError, TargetChangedError, stageAttachmentSource, writeAttachmentChange, writeAttachmentUpdate } from './pdf-attachment-writer'
+import {
+  attachmentRectFor,
+  type AttachmentAnnotationSpec,
+  type AttachmentChange,
+  type AttachmentFileSpec,
+  type AttachmentUpdatePlan,
+  type PageGeometry,
+} from './pdf-incremental-writer'
 import type { FileOperationOutcome } from './pdf-annotation-sync-service'
 import type { WriteEligibility } from './pdf-write-eligibility'
 
@@ -213,4 +220,159 @@ export async function createPdfAttachment(deps: AttachmentOperationDeps, input: 
   } finally {
     await staged.staged.cleanup()
   }
+}
+
+export type ChangeAttachmentRequest =
+  | { bookId: string; rowId: string; op: 'move'; rect: { x: number; y: number; width: number; height: number } }
+  | { bookId: string; rowId: string; op: 'delete' }
+
+export type ChangeAttachmentResult =
+  | { ok: true; highlight?: HighlightRecord }
+  | { ok: false; code: 'blocked'; reason: BlockReason; signerName?: string }
+  | { ok: false; code: 'write_failed'; errno?: string }
+  | { ok: false; code: 'not_found' | 'not_editable' | 'verify_failed' | 'unsupported_pdf' | 'encrypted' | 'invalid_request' }
+
+export type AttachmentChangeDeps = Pick<AttachmentOperationDeps, 'resolvePdfPath' | 'runFileOperation' | 'checkWritable' | 'scan' | 'verify' | 'log'> & {
+  /** The worker's `attachment-change`: `bytes` + the move / delete update. */
+  change: (bytes: Uint8Array, page: PageGeometry, change: AttachmentChange) => Promise<Uint8Array>
+  /** `SqliteOverlayStore.getAttachmentRow`: the row when it is a file-attachment row of the book. */
+  getRow: (bookId: string, rowId: string) => HighlightRecord | undefined
+  /** Is `rowId` an annotation row of the book of another kind (→ `not_editable`)? */
+  isOtherRow: (bookId: string, rowId: string) => boolean
+  /** `SqliteOverlayStore.commitAttachmentChange`: ONE transaction. */
+  commit: (bookId: string, rowId: string, change: { op: 'move'; input: SaveHighlightInput } | { op: 'delete' }) => HighlightRecord | null
+}
+
+const ROW_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
+const SIZE_TOLERANCE = 1e-6
+
+function isBox(value: unknown): value is { x: number; y: number; width: number; height: number } {
+  if (!value || typeof value !== 'object') return false
+  const { x, y, width, height } = value as Record<string, unknown>
+  return [x, y, width, height].every((n) => typeof n === 'number' && Number.isFinite(n))
+}
+
+/** Validate an untrusted attachments:change payload. Another reader's attachment id (`page-…` / `doc-…`) → `{ foreign }`. */
+export function parseChangeAttachmentRequest(input: unknown): ChangeAttachmentRequest | { foreign: true } | null {
+  if (!input || typeof input !== 'object') return null
+  const v = input as Record<string, unknown>
+  if (typeof v.bookId !== 'string' || !v.bookId.trim() || typeof v.rowId !== 'string') return null
+  if (!ROW_ID.test(v.rowId)) return /^(page|doc)-[0-9a-z-]+$/.test(v.rowId) ? { foreign: true } : null
+  const base = { bookId: v.bookId.trim(), rowId: v.rowId }
+  if (v.op === 'delete') return { ...base, op: 'delete' }
+  if (v.op === 'move' && isBox(v.rect)) return { ...base, op: 'move', rect: { x: v.rect.x, y: v.rect.y, width: v.rect.width, height: v.rect.height } }
+  return null
+}
+
+/**
+ * attachments:change (contracts §2): move or delete a Readmate-made file attachment. Only rows of kind
+ * `attachment` whose `/NM readmate:<rowId>` is in the current file qualify. Inside the live sync's slot: write
+ * check → scan → the update (same object number on a move, `/Annots` on a delete) → temp file, read back, target
+ * re-checked → rename → ONE transaction on the row. Nothing in the file or SQLite changes on any failure; the
+ * delete confirmation is the renderer's.
+ */
+export async function changePdfAttachment(deps: AttachmentChangeDeps, input: unknown): Promise<ChangeAttachmentResult> {
+  const request = parseChangeAttachmentRequest(input)
+  if (!request) return { ok: false, code: 'invalid_request' }
+  if ('foreign' in request) return { ok: false, code: 'not_editable' }
+  const filePath = await deps.resolvePdfPath(request.bookId)
+  if (!filePath) return { ok: false, code: 'not_found' }
+  const row = deps.getRow(request.bookId, request.rowId)
+  if (!row) return { ok: false, code: deps.isOtherRow(request.bookId, request.rowId) ? 'not_editable' : 'not_found' }
+  const stored = row.pdfAnnotation?.rects[0]
+  const info = row.pdfAnnotation?.attachment
+  if (!row.pdfAnnotation || !stored || !info) return { ok: false, code: 'not_found' }
+  const rowAnnotation = row.pdfAnnotation
+  if (request.op === 'move') {
+    const r = request.rect
+    const sameSize = Math.abs(r.width - stored.width) <= SIZE_TOLERANCE && Math.abs(r.height - stored.height) <= SIZE_TOLERANCE
+    const inside = r.x >= -SIZE_TOLERANCE && r.y >= -SIZE_TOLERANCE && r.x + r.width <= 1 + SIZE_TOLERANCE && r.y + r.height <= 1 + SIZE_TOLERANCE
+    if (!sameSize || !inside) return { ok: false, code: 'invalid_request' }
+  }
+
+  return deps.runFileOperation<ChangeAttachmentResult>(request.bookId, async ({ allowSigned }) => {
+    const bytes = new Uint8Array(await fsp.readFile(filePath))
+    const eligibility = await deps.checkWritable(filePath, bytes, allowSigned)
+    if (!eligibility.ok) return { result: { ok: false, code: 'blocked', reason: eligibility.reason, ...(eligibility.signerName ? { signerName: eligibility.signerName } : {}) } }
+    let scanned: PdfAnnotationScanResult
+    try {
+      scanned = await deps.scan(bytes)
+    } catch (err) {
+      deps.log?.('[attachments] the PDF could not be read before changing an attachment', err)
+      return { result: { ok: false, code: 'unsupported_pdf' } }
+    }
+    const item = scanned.items.find((i) => i.subtype === 'FileAttachment' && i.nm === `readmate:${request.rowId}`)
+    if (!item) return { result: { ok: false, code: 'not_found' } }
+    const page = scanned.pages.find((p) => p.pageIndex === item.pageIndex)
+    if (!page) return { result: { ok: false, code: 'unsupported_pdf' } }
+
+    const annotation: AttachmentAnnotationSpec | null =
+      request.op === 'move'
+        ? {
+            nm: `readmate:${request.rowId}`,
+            pageIndex: item.pageIndex,
+            box: request.rect,
+            color: rgb(row.colorHex || ATTACHMENT_ICON_COLOR),
+            author: READMATE_PDF_AUTHOR,
+            contents: info.name,
+            createdAt: row.createdAt,
+            modifiedAt: new Date().toISOString(),
+          }
+        : null
+    const change: AttachmentChange = annotation
+      ? { op: 'move', objectId: item.objectId, annotation }
+      : { op: 'delete', objectId: item.objectId, pageIndex: item.pageIndex }
+    const everything = [...scanned.items.map((i) => i.objectId), ...scanned.pageAttachments.map((a) => a.objectId)]
+    let newFile: { sha256: string; sizeBytes: number } | null = null
+    try {
+      const next = await deps.change(bytes, page, change)
+      await writeAttachmentChange({
+        target: filePath,
+        bytes,
+        bytesSha256: sha256Hex(bytes),
+        next,
+        verify: async (tempPath) => {
+          const written = new Uint8Array(await fsp.readFile(tempPath))
+          const verdict = await deps.verify(written, {
+            annotationId: item.objectId,
+            pageIndex: item.pageIndex,
+            ...(annotation ? { present: { rect: attachmentRectFor(annotation, page), sha256: info.sha256 } } : {}),
+            keepIds: annotation ? everything : everything.filter((id) => id !== item.objectId),
+          })
+          if (!verdict.ok) return verdict.detail
+          newFile = { sha256: sha256Hex(written), sizeBytes: written.length }
+          return null
+        },
+      })
+    } catch (err) {
+      deps.log?.(`[attachments] the attachment was not ${annotation ? 'moved' : 'deleted'}; the PDF is unchanged`, err)
+      return { result: writeFailure(err) as ChangeAttachmentResult }
+    }
+
+    try {
+      if (!annotation) {
+        deps.commit(request.bookId, request.rowId, { op: 'delete' })
+        return { result: { ok: true }, newFile: newFile ?? undefined }
+      }
+      const pdfAnnotation: PdfAnnotation = { ...rowAnnotation, rects: [{ pageIndex: item.pageIndex, ...annotation.box }] }
+      const highlight = deps.commit(request.bookId, request.rowId, {
+        op: 'move',
+        input: {
+          id: request.rowId,
+          bookId: request.bookId,
+          locator: JSON.parse(packPdfHighlightLocator(pdfAnnotation)) as NoteLocator,
+          styleKind: 'attachment',
+          colorHex: row.colorHex,
+          tags: row.tags,
+          pdfAnnotation,
+          createdAt: row.createdAt,
+        },
+      })
+      return { result: highlight ? { ok: true, highlight } : { ok: true }, newFile: newFile ?? undefined }
+    } catch (err) {
+      // The file has the change; the next sync cycle brings the row in line (the file is authoritative, research R7).
+      deps.log?.('[attachments] the PDF was changed but the row could not be updated; the next sync follows the file', err)
+      return { result: { ok: false, code: 'write_failed', errno: 'DB' }, newFile: newFile ?? undefined }
+    }
+  })
 }

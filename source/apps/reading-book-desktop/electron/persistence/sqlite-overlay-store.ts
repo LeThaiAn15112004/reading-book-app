@@ -720,6 +720,46 @@ export class SqliteOverlayStore implements OverlayStore {
     return row !== undefined
   }
 
+  /** Is `id` an annotation row (any kind) of `bookId`? */
+  hasAnnotationRow(bookId: string, id: string): boolean {
+    const row = this.db
+      .prepare(`SELECT 1 AS hit FROM notes WHERE id = ? AND book_id = ? AND ${HIGHLIGHT_TYPE_PREDICATE}`)
+      .get(id.trim(), bookId.trim()) as { hit: number } | undefined
+    return row !== undefined
+  }
+
+  /** A file-attachment row of `bookId` (specs/007), or undefined. */
+  getAttachmentRow(bookId: string, id: string): HighlightRecord | undefined {
+    const row = this.db
+      .prepare(`SELECT ${NOTE_COLUMNS} FROM notes WHERE id = ? AND book_id = ? AND json_extract(note_json, '$.type') = 'attachment'`)
+      .get(id.trim(), bookId.trim()) as NoteRow | undefined
+    return row ? rowToHighlightRecord(row) : undefined
+  }
+
+  /**
+   * After a verified move / delete of a file attachment in the PDF (attachments:change, contracts §2): ONE
+   * transaction rewriting the row (move) or removing it with its sync-ledger entries (delete). A moved row keeps
+   * its ledger entry; the next sync cycle re-records it from the file, which is authoritative for attachments.
+   */
+  commitAttachmentChange(bookId: string, rowId: string, change: { op: 'move'; input: SaveHighlightInput } | { op: 'delete' }): HighlightRecord | null {
+    const book = bookId.trim()
+    const id = rowId.trim()
+    this.db.exec('BEGIN IMMEDIATE')
+    try {
+      let result: HighlightRecord | null = null
+      if (change.op === 'move') result = this.writeHighlight({ ...change.input, id, bookId: book })
+      else {
+        this.db.prepare(`DELETE FROM pdf_embedded_annotations WHERE book_id = ? AND note_id = ?`).run(book, id)
+        this.deleteHighlightRow(book, id)
+      }
+      this.db.exec('COMMIT')
+      return result
+    } catch (err) {
+      this.db.exec('ROLLBACK')
+      throw err
+    }
+  }
+
   /**
    * `saveHighlight`'s synchronous body — also run inside the embedded-annotation sync transaction
    * and the TXT commit transaction (`SqliteTxtStore.commit`), which is why it is public.

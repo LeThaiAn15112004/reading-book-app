@@ -239,6 +239,40 @@ export async function writeAttachmentUpdate(input: AttachmentWriteInput): Promis
   )
 }
 
+export type AttachmentChangeWriteInput = {
+  target: string
+  /** The bytes as read and planned, and their SHA-256. */
+  bytes: Uint8Array
+  bytesSha256: string
+  /** `bytes` + the move / delete update. */
+  next: Uint8Array
+  verify: (tempPath: string) => Promise<string | null>
+}
+
+/**
+ * A move / delete (no content to stream): the same temp → fsync → verify → re-check → rename path as
+ * `writeAttachmentUpdate`, so a failure leaves `target` untouched and no temp file behind.
+ */
+export async function writeAttachmentChange(input: AttachmentChangeWriteInput): Promise<void> {
+  await sweepOrphanTemps(input.target)
+  await writeFileSafelyStreaming(
+    input.target,
+    async (handle) => {
+      for (let at = 0; at < input.next.length; at += WRITE_BATCH_BYTES * 8) {
+        await handle.write(input.next.subarray(at, Math.min(input.next.length, at + WRITE_BATCH_BYTES * 8)))
+      }
+    },
+    async (tempPath) => {
+      const problem = await input.verify(tempPath)
+      if (problem) throw new AttachmentVerifyError(problem)
+      const now = await fsp.readFile(input.target)
+      if (now.length !== input.bytes.length || createHash('sha256').update(now).digest('hex') !== input.bytesSha256) {
+        throw new TargetChangedError('the PDF changed while the attachment was being changed')
+      }
+    },
+  )
+}
+
 /** Remove `.{name}.readmate-{hex}.tmp` files beside `target` (only that exact pattern; T018). */
 export async function sweepOrphanTemps(target: string): Promise<void> {
   const dir = path.dirname(target)

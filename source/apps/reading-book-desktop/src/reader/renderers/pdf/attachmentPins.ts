@@ -13,6 +13,8 @@ export type PdfAttachmentPin = {
   sizeBytes: number | null
   /** Readmate-made: can be moved and deleted. Another reader's: open / save only. */
   editable: boolean
+  /** A move is being written: drawn dimmed at the target spot until Main answers. */
+  pending?: boolean
 }
 
 /** The pin under a normalised page point (topmost = last drawn), or null. */

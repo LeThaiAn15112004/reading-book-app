@@ -4,14 +4,17 @@ import type { PdfAttachmentPin } from './attachmentPins'
 type Props = {
   pins: readonly PdfAttachmentPin[]
   selectedId?: string | null
+  /** The icon being dragged and where it would land (drawn there instead of at its box). */
+  drag?: { id: string; box: PdfAttachmentPin['box'] } | null
 }
 
 /** The page's attachment icons. Pointer input is handled by the renderer's surface (hit-tested with `attachmentPinAt`). */
-export const PdfPageAttachments = memo(function PdfPageAttachments({ pins, selectedId = null }: Props) {
+export const PdfPageAttachments = memo(function PdfPageAttachments({ pins, selectedId = null, drag = null }: Props) {
   return (
     <div className="pointer-events-none absolute inset-0" style={{ zIndex: 4 }} data-pdf-attachments="">
       {pins.map((pin) => {
         const selected = pin.id === selectedId
+        const box = drag?.id === pin.id ? drag.box : pin.box
         return (
           <div
             key={pin.id}
@@ -19,12 +22,15 @@ export const PdfPageAttachments = memo(function PdfPageAttachments({ pins, selec
             aria-label={`Attached file: ${pin.name}`}
             title={pin.name}
             data-attachment-id={pin.id}
+            data-attachment-pending={pin.pending ? '' : undefined}
             className="pointer-events-auto absolute flex items-center justify-center rounded-[3px]"
             style={{
-              left: `${pin.box.x * 100}%`,
-              top: `${pin.box.y * 100}%`,
-              width: `${pin.box.width * 100}%`,
-              height: `${pin.box.height * 100}%`,
+              left: `${box.x * 100}%`,
+              top: `${box.y * 100}%`,
+              width: `${box.width * 100}%`,
+              height: `${box.height * 100}%`,
+              opacity: pin.pending || drag?.id === pin.id ? 0.55 : 1,
+              cursor: pin.editable ? 'move' : 'pointer',
               background: '#FFF7D1',
               border: `1.5px solid ${selected ? '#0D47A1' : '#1E88E5'}`,
               boxShadow: selected ? '0 0 0 2px rgba(30, 136, 229, 0.45)' : '0 1px 2px rgba(0, 0, 0, 0.25)',

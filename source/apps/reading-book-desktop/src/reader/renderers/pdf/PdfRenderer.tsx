@@ -81,7 +81,7 @@ import {
 } from './pdfSearchDom'
 import { PdfPageInk, type PdfInkLayerMark } from './PdfInkLayer'
 import { PdfInkSelectionOverlay, type PdfCustomHandle } from './PdfInkSelectionOverlay'
-import { typewriterBoxAt } from '@reading-book/book-reader-sdk'
+import { clampAttachmentBox, typewriterBoxAt } from '@reading-book/book-reader-sdk'
 import { PAN_DRAG_THRESHOLD_PX } from '../../interaction/interaction-hit'
 import { PdfPageTypewriters, type PdfTypewriterFlash, type PdfTypewriterMark } from './PdfTypewriterLayer'
 import { PdfPageShapes, type PdfShapeDraft, type PdfShapeFlash, type PdfShapeMark } from './PdfShapeLayer'
@@ -288,6 +288,8 @@ export interface PdfRendererProps {
   onAttachmentDetails?: (pin: PdfAttachmentPin) => void
   /** Right-click on an icon, at client coordinates. */
   onAttachmentContextMenu?: (pin: PdfAttachmentPin, x: number, y: number) => void
+  /** Select / Hand: a Readmate-made icon dragged on its page and dropped at `box` (same size, inside the page). */
+  onAttachmentMove?: (id: string, box: { x: number; y: number; width: number; height: number }) => void
   /** Typewriter notes (rows of the annotation list) to paint; the Reader keeps them out of `annotations`. */
   typewriters?: readonly PdfTypewriterMark[]
   /** True while a note is being typed: a press elsewhere commits it instead of placing another box. */
@@ -452,6 +454,7 @@ export function PdfRenderer({
   onAttachmentSelect,
   onAttachmentDetails,
   onAttachmentContextMenu,
+  onAttachmentMove,
   typewriters,
   typewriterEditing = false,
   onTypewriterBegin,
@@ -583,6 +586,11 @@ export function PdfRenderer({
   onAttachmentDetailsRef.current = onAttachmentDetails
   const onAttachmentContextMenuRef = useRef(onAttachmentContextMenu)
   onAttachmentContextMenuRef.current = onAttachmentContextMenu
+  const onAttachmentMoveRef = useRef(onAttachmentMove)
+  onAttachmentMoveRef.current = onAttachmentMove
+  /** A press on an editable icon: becomes a move once it passes the drag threshold. */
+  const attachmentDragRef = useRef<{ pointerId: number; pin: PdfAttachmentPin; startClient: [number, number]; grab: [number, number]; box: PdfAttachmentPin['box'] | null } | null>(null)
+  const [attachmentDrag, setAttachmentDrag] = useState<{ id: string; box: PdfAttachmentPin['box'] } | null>(null)
   const attachmentsByPageRef = useRef(new Map<number, PdfAttachmentPin[]>())
   const attachmentsByPage = useMemo(() => {
     const byPage = new Map<number, PdfAttachmentPin[]>()
@@ -2091,6 +2099,51 @@ export function PdfRenderer({
     return point && pins ? attachmentPinAt(pins, point[0], point[1]) : null
   }
 
+  /** Select / Hand: a press on an icon selects it; on a Readmate-made one it may become a drag (never opens the panel). */
+  const beginAttachmentPress = (event: ReactPointerEvent<HTMLDivElement>, pin: PdfAttachmentPin) => {
+    event.preventDefault()
+    window.getSelection()?.removeAllRanges()
+    selectTarget(null)
+    onBlankClickRef.current?.()
+    onAttachmentSelectRef.current?.(pin.id)
+    if (!pin.editable || !onAttachmentMoveRef.current) return
+    const rect = slotsRef.current[pin.pageIndex]?.getBoundingClientRect()
+    const point = rect && rect.width > 0 ? clientToPageUnit(event.clientX, event.clientY, rect) : null
+    if (!point) return
+    try {
+      event.currentTarget.setPointerCapture(event.pointerId)
+    } catch {
+      /* ignore */
+    }
+    attachmentDragRef.current = { pointerId: event.pointerId, pin, startClient: [event.clientX, event.clientY], grab: [point[0] - pin.box.x, point[1] - pin.box.y], box: null }
+  }
+
+  const moveAttachmentDrag = (event: ReactPointerEvent<HTMLDivElement>) => {
+    const drag = attachmentDragRef.current
+    if (!drag || event.pointerId !== drag.pointerId) return
+    if (!drag.box && !exceedsDragThreshold(drag.startClient[0], drag.startClient[1], event.clientX, event.clientY)) return
+    const rect = slotsRef.current[drag.pin.pageIndex]?.getBoundingClientRect()
+    const point = rect && rect.width > 0 ? clientToPageUnit(event.clientX, event.clientY, rect) : null
+    if (!point) return
+    // Same page, same size: the box follows the pointer and stays wholly inside the page.
+    drag.box = clampAttachmentBox({ x: point[0] - drag.grab[0], y: point[1] - drag.grab[1], width: drag.pin.box.width, height: drag.pin.box.height })
+    setAttachmentDrag({ id: drag.pin.id, box: drag.box })
+  }
+
+  const endAttachmentDrag = (commit: boolean) => {
+    const drag = attachmentDragRef.current
+    attachmentDragRef.current = null
+    setAttachmentDrag(null)
+    if (!drag) return
+    try {
+      if (rootRef.current?.hasPointerCapture(drag.pointerId)) rootRef.current.releasePointerCapture(drag.pointerId)
+    } catch {
+      /* element already detached */
+    }
+    const moved = drag.box && (Math.abs(drag.box.x - drag.pin.box.x) > 1e-6 || Math.abs(drag.box.y - drag.pin.box.y) > 1e-6)
+    if (commit && drag.box && moved) onAttachmentMoveRef.current?.(drag.pin.id, drag.box)
+  }
+
   /** File Attachment tool: a click on a page asks to place a file at that point (the Reader opens the picker in Main). */
   const placeAttachment = (event: ReactPointerEvent<HTMLDivElement>) => {
     event.preventDefault()
@@ -2222,6 +2275,14 @@ export function PdfRenderer({
     }
     // A press elsewhere commits a note that is being edited, then goes on as usual.
     if (typewriterEditingRef.current) onTypewriterOutsideRef.current?.()
+    // Select and Hand mode: a press on an attachment icon selects it (and may drag a Readmate-made one).
+    if ((selectToolRef.current || handRef.current) && attachmentsByPageRef.current.size > 0) {
+      const pin = attachmentAt(event.clientX, event.clientY)
+      if (pin) {
+        beginAttachmentPress(event, pin)
+        return
+      }
+    }
     // Select and Hand mode: one click selects a note (never a text selection under it, never a pan); a press on the
     // selected note itself is handled by its own overlay (move / resize), so this only ever selects.
     if (selectToolRef.current || handRef.current) {
@@ -2281,6 +2342,10 @@ export function PdfRenderer({
     }
     if (inkMoveRef.current) {
       moveInkDrag(event)
+      return
+    }
+    if (attachmentDragRef.current) {
+      moveAttachmentDrag(event)
       return
     }
     const gesture = gestureRef.current
@@ -2354,6 +2419,10 @@ export function PdfRenderer({
     }
     if (inkMoveRef.current) {
       if (event.pointerId === inkMoveRef.current.pointerId) endInkMove(true)
+      return
+    }
+    if (attachmentDragRef.current) {
+      if (event.pointerId === attachmentDragRef.current.pointerId) endAttachmentDrag(true)
       return
     }
     const gesture = gestureRef.current
@@ -2553,7 +2622,7 @@ export function PdfRenderer({
                   flash={flash as PdfShapeFlash | null}
                 />
               ) : null}
-              {attachmentsByPage.has(index) ? <PdfPageAttachments pins={attachmentsByPage.get(index)!} selectedId={selectedAttachmentId} /> : null}
+              {attachmentsByPage.has(index) ? <PdfPageAttachments pins={attachmentsByPage.get(index)!} selectedId={selectedAttachmentId} drag={attachmentDrag} /> : null}
               {typewritersByPage.has(index) || renderTypewriterEditor?.(index, size.h / size.w) || typewriterRubber?.pageIndex === index ? (
                 <PdfPageTypewriters
                   marks={typewritersByPage.get(index) ?? []}
@@ -2648,6 +2717,7 @@ export function PdfRenderer({
         endTypewriter(false)
         endInkMove(false)
         endInkResize(false)
+        endAttachmentDrag(false)
         void endGesture()
       }}
       onContextMenu={onContextMenu}
@@ -2671,6 +2741,7 @@ export function PdfRenderer({
         if (shapeDraftRef.current) endShape(false)
         if (typewriterDragRef.current) endTypewriter(false)
         if (inkMoveRef.current) endInkMove(false)
+        if (attachmentDragRef.current) endAttachmentDrag(false)
         if (gestureRef.current?.pan) endGesture()
       }}
       onPointerLeave={() => {

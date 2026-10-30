@@ -4,13 +4,15 @@ import {
   describeAttachFailure,
   describeAttachmentBlock,
   formatAttachmentSize,
+  highlightReplace,
   pdfHighlightDtoToReaderHighlight,
   readmateAttachmentId,
+  type PdfReaderHighlight,
 } from '@reading-book/book-reader-sdk'
 import { attachmentsApi } from '../../../../bridge/attachments'
 import type { overlayApi } from '../../../../bridge/overlay'
 import type { PdfAttachmentPin } from '../../../../reader/renderers/pdf'
-import { usePdfHighlightsStore } from '../pdfHighlights/pdfHighlightsStore'
+import { registerAttachmentHistory, usePdfHighlightsStore } from '../pdfHighlights/pdfHighlightsStore'
 
 type SyncEvent = Parameters<Parameters<typeof overlayApi.onPdfEmbeddedAnnotationsChanged>[0]>[0]
 export type ForeignPageAttachment = NonNullable<SyncEvent['pageAttachments']>[number]
@@ -40,6 +42,12 @@ type PageAttachmentsState = {
   blocked: { pin: PdfAttachmentPin; message: string } | null
   /** An open / save is in flight: at most one. */
   busy: boolean
+  /** A move is being written: the icon is shown dimmed at `box` until Main answers (then the file's place). */
+  moving: { id: string; box: Box } | null
+  /** A move / delete is in flight: at most one. */
+  changing: boolean
+  /** The delete confirmation. */
+  deleting: PdfAttachmentPin | null
   setBook: (bookId: string | null) => void
   applySync: (event: SyncEvent) => void
   create: (bookId: string, pageIndex: number, point: { x: number; y: number }) => Promise<void>
@@ -53,7 +61,16 @@ type PageAttachmentsState = {
   confirmOpen: () => Promise<void>
   saveAs: (pin: PdfAttachmentPin) => Promise<void>
   dismissBlocked: () => void
+  /** Drag-to-move of a Readmate-made attachment (same page, same size): ONE history entry on success. */
+  move: (rowId: string, box: Box) => Promise<void>
+  requestDelete: (pin: PdfAttachmentPin) => void
+  cancelDelete: () => void
+  confirmDelete: () => Promise<void>
+  /** Delete without asking (the confirmation already happened). Not in the history (research R13). */
+  remove: (rowId: string) => Promise<boolean>
 }
+
+type Box = { x: number; y: number; width: number; height: number }
 
 /** The id attachments:open / saveAs take for a pin (contracts §4). */
 export function attachmentIdOfPin(pin: PdfAttachmentPin): string {
@@ -71,7 +88,43 @@ export function openBlockedByName(pin: PdfAttachmentPin): string | null {
 
 const toast = (message: string) => usePdfHighlightsStore.getState().onToast(message)
 
-const IDLE = { creating: false, foreign: [], selectedId: null, details: null, menu: null, confirming: null, blocked: null, busy: false }
+const IDLE = {
+  creating: false,
+  foreign: [],
+  selectedId: null,
+  details: null,
+  menu: null,
+  confirming: null,
+  blocked: null,
+  busy: false,
+  moving: null,
+  changing: false,
+  deleting: null,
+}
+
+/** The row with the stored box replaced (the history's before / after snapshots). */
+function withBox(row: PdfReaderHighlight, box: Box): PdfReaderHighlight {
+  return { ...row, rects: row.rects.map((r, i) => (i === 0 ? { ...r, ...box } : r)) }
+}
+
+/** Write a move into the PDF; the row as Main stored it, or null (the reason was shown). */
+async function writeMove(bookId: string, row: PdfReaderHighlight, box: Box): Promise<PdfReaderHighlight | null> {
+  const result = await attachmentsApi.change({ bookId, rowId: row.id, op: 'move', rect: box }).catch(() => null)
+  if (!result) {
+    toast('The attachment could not be moved. Nothing was changed.')
+    return null
+  }
+  if (!result.ok) {
+    toast(describeAttachFailure(result) ?? 'The attachment could not be moved. Nothing was changed.')
+    return null
+  }
+  const saved = result.highlight ? pdfHighlightDtoToReaderHighlight(result.highlight) : null
+  return saved ?? withBox(row, box)
+}
+
+function replaceRow(row: PdfReaderHighlight): void {
+  usePdfHighlightsStore.setState((s) => ({ highlights: s.highlights.map((h) => (h.id === row.id ? row : h)) }))
+}
 
 export const usePageAttachmentsStore = create<PageAttachmentsState>((set, get) => ({
   bookId: null,
@@ -181,4 +234,76 @@ export const usePageAttachmentsStore = create<PageAttachmentsState>((set, get) =
   },
 
   dismissBlocked: () => set({ blocked: null }),
+
+  move: async (rowId, box) => {
+    const { bookId, changing } = get()
+    const before = usePdfHighlightsStore.getState().highlights.find((h) => h.id === rowId && h.styleKind === 'attachment')
+    if (!bookId || changing || !before) return
+    set({ changing: true, moving: { id: rowId, box } })
+    try {
+      const after = await writeMove(bookId, before, box)
+      if (!after || get().bookId !== bookId) return
+      replaceRow(after)
+      usePdfHighlightsStore.getState().history.push(highlightReplace(before, after))
+    } finally {
+      set({ changing: false, moving: null })
+    }
+  },
+
+  requestDelete: (pin) => {
+    if (!pin.editable || get().changing) return
+    set({ deleting: pin, selectedId: pin.id, menu: null, details: null })
+  },
+
+  cancelDelete: () => set({ deleting: null }),
+
+  confirmDelete: async () => {
+    const pin = get().deleting
+    set({ deleting: null })
+    if (pin && (await get().remove(pin.id))) toast(`Removed “${pin.name}” from the PDF.`)
+  },
+
+  remove: async (rowId) => {
+    const { bookId, changing } = get()
+    if (!bookId || changing) return false
+    set({ changing: true })
+    try {
+      const result = await attachmentsApi.change({ bookId, rowId, op: 'delete' }).catch(() => null)
+      if (get().bookId !== bookId) return false
+      if (!result?.ok) {
+        toast((result && describeAttachFailure(result)) ?? 'The attachment could not be deleted. Nothing was changed.')
+        return false
+      }
+      usePdfHighlightsStore.setState((s) => ({
+        highlights: s.highlights.filter((h) => h.id !== rowId),
+        focusedHighlightId: s.focusedHighlightId === rowId ? null : s.focusedHighlightId,
+      }))
+      set((s) => ({ selectedId: s.selectedId === rowId ? null : s.selectedId, details: s.details?.id === rowId ? null : s.details }))
+      return true
+    } finally {
+      set({ changing: false })
+    }
+  },
 }))
+
+// Undo / redo of a move = another move in the PDF. A refused step stays where it was in the history.
+registerAttachmentHistory((target, direction) => {
+  const store = usePageAttachmentsStore.getState()
+  const history = usePdfHighlightsStore.getState().history
+  const keepPosition = () => (direction === 'undo' ? history.redo() : history.undo())
+  const box = target.rects[0]
+  if (!store.bookId || store.changing || !box) {
+    keepPosition()
+    return
+  }
+  const bookId = store.bookId
+  const rect = { x: box.x, y: box.y, width: box.width, height: box.height }
+  usePageAttachmentsStore.setState({ changing: true, moving: { id: target.id, box: rect } })
+  void writeMove(bookId, target, rect)
+    .then((after) => {
+      if (usePageAttachmentsStore.getState().bookId !== bookId) return
+      if (after) replaceRow(after)
+      else keepPosition()
+    })
+    .finally(() => usePageAttachmentsStore.setState({ changing: false, moving: null }))
+})

@@ -96,19 +96,21 @@ type AttachmentContextMenuProps = {
   onOpen: () => void
   onSaveAs: () => void
   onDetails: () => void
+  /** Present only for a Readmate-made attachment (others' are open / save only). */
+  onDelete?: () => void
   onDismiss: () => void
 }
 
 const MENU_WIDTH = 200
-const MENU_HEIGHT = 120
+const MENU_HEIGHT = 160
 
 /** Right-click on an attachment icon. Portaled: the reading surface is transformed (zoom / pan). */
-export function AttachmentContextMenu({ menu, canOpen, onOpen, onSaveAs, onDetails, onDismiss }: AttachmentContextMenuProps) {
+export function AttachmentContextMenu({ menu, ...rest }: AttachmentContextMenuProps) {
   if (!menu) return null
-  return <AttachmentContextMenuBody menu={menu} canOpen={canOpen} onOpen={onOpen} onSaveAs={onSaveAs} onDetails={onDetails} onDismiss={onDismiss} />
+  return <AttachmentContextMenuBody menu={menu} {...rest} />
 }
 
-function AttachmentContextMenuBody({ menu, canOpen, onOpen, onSaveAs, onDetails, onDismiss }: AttachmentContextMenuProps & { menu: NonNullable<AttachmentContextMenuProps['menu']> }) {
+function AttachmentContextMenuBody({ menu, canOpen, onOpen, onSaveAs, onDetails, onDelete, onDismiss }: AttachmentContextMenuProps & { menu: NonNullable<AttachmentContextMenuProps['menu']> }) {
   const ref = useRef<HTMLDivElement | null>(null)
   useDismissOnOutsideOrEscape(ref, onDismiss)
   const left = Math.max(8, Math.min(menu.x, window.innerWidth - MENU_WIDTH - 8))
@@ -139,6 +141,11 @@ function AttachmentContextMenuBody({ menu, canOpen, onOpen, onSaveAs, onDetails,
       <button role="menuitem" type="button" className={item} onClick={run(onDetails)}>
         Details
       </button>
+      {onDelete ? (
+        <button role="menuitem" type="button" className={item} onClick={run(onDelete)}>
+          Delete…
+        </button>
+      ) : null}
     </div>,
     document.body,
   )

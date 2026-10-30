@@ -3,14 +3,16 @@ import type { PdfAttachmentPin } from '../../../../reader/renderers/pdf'
 import { openBlockedByName, usePageAttachmentsStore } from '../../logic/attachments/pageAttachmentsStore'
 import { AttachmentBlockedDialog, AttachmentOpenDialog } from './AttachmentDialogs'
 import { AttachmentContextMenu, AttachmentDetailsPanel } from './AttachmentDetailsPanel'
+import { DeleteAttachmentDialog } from './DeleteAttachmentDialog'
 
 const isTypingTarget = (target: EventTarget | null) =>
   target instanceof HTMLElement && (target.isContentEditable || /^(INPUT|TEXTAREA|SELECT|BUTTON)$/.test(target.tagName))
 
 /**
- * Everything a page attachment icon leads to (specs/007 US2): the right-click menu, the details panel, the
- * "Open attachment?" confirmation and "Readmate can't open this file". State lives in `pageAttachmentsStore`;
- * Enter on a selected icon opens its details. Mounted for PDFs only.
+ * Everything a page attachment icon leads to (specs/007 US2, US3): the right-click menu, the details panel, the
+ * "Open attachment?" confirmation, "Readmate can't open this file" and the delete confirmation. State lives in
+ * `pageAttachmentsStore`; Enter on a selected icon opens its details, Delete asks to delete a Readmate-made one.
+ * Mounted for PDFs only.
  */
 export function PageAttachmentDialogs({ pins }: { pins: readonly PdfAttachmentPin[] }) {
   const selectedId = usePageAttachmentsStore((s) => s.selectedId)
@@ -19,6 +21,8 @@ export function PageAttachmentDialogs({ pins }: { pins: readonly PdfAttachmentPi
   const confirming = usePageAttachmentsStore((s) => s.confirming)
   const blocked = usePageAttachmentsStore((s) => s.blocked)
   const busy = usePageAttachmentsStore((s) => s.busy)
+  const deleting = usePageAttachmentsStore((s) => s.deleting)
+  const changing = usePageAttachmentsStore((s) => s.changing)
   const store = usePageAttachmentsStore.getState
 
   // The selection is dropped when its icon is gone (deleted in another app, book switched).
@@ -29,17 +33,22 @@ export function PageAttachmentDialogs({ pins }: { pins: readonly PdfAttachmentPi
   useEffect(() => {
     if (selectedId === null) return
     const onKey = (event: KeyboardEvent) => {
-      if (event.key !== 'Enter' || event.repeat || event.altKey || event.ctrlKey || event.metaKey) return
+      const enter = event.key === 'Enter'
+      const del = event.key === 'Delete' || event.key === 'Backspace'
+      if ((!enter && !del) || event.repeat || event.altKey || event.ctrlKey || event.metaKey) return
       if (isTypingTarget(event.target)) return
       const s = store()
-      if (s.details || s.menu || s.confirming || s.blocked) return
+      if (s.details || s.menu || s.confirming || s.blocked || s.deleting) return
       const pin = pins.find((p) => p.id === s.selectedId)
-      if (!pin) return
+      if (!pin || (del && !pin.editable)) return
       event.preventDefault()
-      s.showDetails(pin)
+      event.stopPropagation()
+      if (enter) s.showDetails(pin)
+      else s.requestDelete(pin)
     }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
+    // Capture: the Reader's own Delete (focused annotation) never sees a key meant for the selected icon.
+    window.addEventListener('keydown', onKey, true)
+    return () => window.removeEventListener('keydown', onKey, true)
   }, [pins, selectedId, store])
 
   return (
@@ -50,7 +59,14 @@ export function PageAttachmentDialogs({ pins }: { pins: readonly PdfAttachmentPi
         onOpen={() => menu && store().requestOpen(menu.pin)}
         onSaveAs={() => menu && void store().saveAs(menu.pin)}
         onDetails={() => menu && store().showDetails(menu.pin)}
+        onDelete={menu?.pin.editable ? () => store().requestDelete(menu.pin) : undefined}
         onDismiss={() => store().closeMenu()}
+      />
+      <DeleteAttachmentDialog
+        pin={deleting}
+        busy={changing}
+        onCancel={() => store().cancelDelete()}
+        onDelete={() => void store().confirmDelete()}
       />
       <AttachmentDetailsPanel
         pin={details}

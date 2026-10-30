@@ -8,9 +8,10 @@ import { isPathInsideUserData, resolveBookFile } from '../files/sandbox'
 import { getLibraryStore } from '../persistence/sqlite-library-store'
 import { getOverlayStore } from '../persistence/sqlite-overlay-store'
 import type { AttachmentVerifyResult } from '../pdf-sync/pdf-annotation-scan'
-import { createPdfAttachment, type AttachmentOperationDeps } from '../pdf-sync/pdf-attachment-operations'
+import { changePdfAttachment, createPdfAttachment, type AttachmentChangeDeps, type AttachmentOperationDeps } from '../pdf-sync/pdf-attachment-operations'
+import type { AttachmentChangeOutput } from '../pdf-sync/pdf-annotation-scan.worker'
 import type { AttachmentUpdatePlan } from '../pdf-sync/pdf-incremental-writer'
-import type { AttachmentActionResult, CreatePdfAttachmentResultDto, ListAttachmentsResult } from './api-types'
+import type { AttachmentActionResult, ChangePdfAttachmentResultDto, CreatePdfAttachmentResultDto, ListAttachmentsResult } from './api-types'
 import { AttachmentChannels } from './channels'
 import { pdfFileOperations, runInScanWorker, toHighlightDto } from './overlay.ipc'
 
@@ -94,6 +95,24 @@ function attachmentOperationDeps(sender: Electron.WebContents): AttachmentOperat
   }
 }
 
+/** The real dependencies of attachments:change (move / delete of a Readmate-made attachment). */
+function attachmentChangeDeps(sender: Electron.WebContents): AttachmentChangeDeps {
+  const base = attachmentOperationDeps(sender)
+  const store = getOverlayStore()
+  return {
+    resolvePdfPath: base.resolvePdfPath,
+    runFileOperation: base.runFileOperation,
+    checkWritable: base.checkWritable,
+    scan: base.scan,
+    verify: base.verify,
+    log: base.log,
+    change: async (bytes, page, change) => (await runInScanWorker<AttachmentChangeOutput>({ kind: 'attachment-change', bytes, page, change })).output,
+    getRow: (bookId, rowId) => store.getAttachmentRow(bookId, rowId),
+    isOtherRow: (bookId, rowId) => store.getAttachmentRow(bookId, rowId) === undefined && store.hasAnnotationRow(bookId, rowId),
+    commit: (bookId, rowId, change) => store.commitAttachmentChange(bookId, rowId, change),
+  }
+}
+
 /** Handlers for attachments:* — list / open / saveAs of a PDF's embedded files (pdf_attachments.md); create of a page attachment (specs/007). */
 export function registerAttachmentsIpc(): void {
   // Leftovers of the previous run. A file an application still holds open survives (and is retried
@@ -125,6 +144,17 @@ export function registerAttachmentsIpc(): void {
       return result.ok ? { ok: true, highlight: toHighlightDto(result.highlight) } : result
     } catch (err) {
       console.warn('[attachments] create failed', err)
+      return { ok: false, code: 'write_failed' }
+    }
+  })
+
+  ipcMain.removeHandler(AttachmentChannels.change)
+  ipcMain.handle(AttachmentChannels.change, async (event, input: unknown): Promise<ChangePdfAttachmentResultDto> => {
+    try {
+      const result = await changePdfAttachment(attachmentChangeDeps(event.sender), input)
+      return result.ok ? (result.highlight ? { ok: true, highlight: toHighlightDto(result.highlight) } : { ok: true }) : result
+    } catch (err) {
+      console.warn('[attachments] change failed', err)
       return { ok: false, code: 'write_failed' }
     }
   })

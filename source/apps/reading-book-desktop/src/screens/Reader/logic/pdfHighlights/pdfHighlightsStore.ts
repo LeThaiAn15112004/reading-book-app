@@ -648,12 +648,17 @@ export const usePdfHighlightsStore = create<PdfHighlightsStoreState>()((set, get
 
   undo: () => {
     const action = get().history.undo()
-    if (action) applyHighlightHistoryStep(action, 'undo', historyHandlers(get, set))
+    if (!action) return
+    // A file attachment's move is undone by moving it in the PDF again (specs/007 research R13).
+    if (action.kind === 'replace' && action.before.styleKind === 'attachment' && attachmentHistory) attachmentHistory(action.before, 'undo')
+    else applyHighlightHistoryStep(action, 'undo', historyHandlers(get, set))
   },
 
   redo: () => {
     const action = get().history.redo()
-    if (action) applyHighlightHistoryStep(action, 'redo', historyHandlers(get, set))
+    if (!action) return
+    if (action.kind === 'replace' && action.after.styleKind === 'attachment' && attachmentHistory) attachmentHistory(action.after, 'redo')
+    else applyHighlightHistoryStep(action, 'redo', historyHandlers(get, set))
   },
 
   deleteFocused: () => {
@@ -663,6 +668,16 @@ export const usePdfHighlightsStore = create<PdfHighlightsStoreState>()((set, get
 
   hasFocusedHighlight: () => get().focusedHighlightId != null,
 }))
+
+/**
+ * Undo / redo of a file attachment's move (the only attachment change in the history): the attachment store
+ * moves it in the PDF to `target` (Main writes the file; `overlay:saveHighlight` refuses attachment rows).
+ * Registered by `pageAttachmentsStore` so this store does not import it back.
+ */
+let attachmentHistory: ((target: PdfReaderHighlight, direction: 'undo' | 'redo') => void) | null = null
+export function registerAttachmentHistory(handler: typeof attachmentHistory): void {
+  attachmentHistory = handler
+}
 
 type Get = () => PdfHighlightsStoreState
 type Set = (
