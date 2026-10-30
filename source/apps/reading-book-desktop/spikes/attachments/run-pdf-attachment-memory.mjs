@@ -9,8 +9,14 @@
  * Prints a table (time, peak V8 heap and external memory per step) and the largest PDF + content total that
  * passed. Exits non-zero when a combination fails or crashes the worker.
  *
- * Run: npm run spike:pdf:attachment-memory             (full matrix, several minutes)
- *      npm run spike:pdf:attachment-memory -- --quick  (1 MB / 50 MB only)
+ * Then the success criteria (T055), end to end with the same split as the app (scan / plan / verify in the worker,
+ * staging + streamed write on this thread) while a 10 ms timer measures this thread's longest stall:
+ *   SC-004  10 MB into a 50 MB PDF ≤ 5 s; 100 MB into a 50 MB PDF completes or is refused cleanly, no stall > 1 s
+ *   SC-005  an over-limit file (150 MB) is refused ≤ 1 s, before its content is read
+ *
+ * Run: npm run spike:pdf:attachment-memory             (full matrix + SC, several minutes)
+ *      npm run spike:pdf:attachment-memory -- --quick  (1 MB / 50 MB only, + SC)
+ *      npm run spike:pdf:attachment-memory -- --sc     (SC only)
  */
 import { createHash, randomBytes } from 'node:crypto'
 import fs from 'node:fs'
@@ -28,6 +34,7 @@ if (!HEAP_LIMIT_MB) throw new Error('SCAN_WORKER_HEAP_LIMIT_MB not found in over
 
 const MB = 1024 * 1024
 const quick = process.argv.includes('--quick')
+const scOnly = process.argv.includes('--sc')
 const PDF_SIZES = quick ? [1, 50] : [1, 50, 200]
 const CONTENT_SIZES = quick ? [1, 50] : [1, 50, 100]
 const KINDS = ['text', 'random']
@@ -79,7 +86,7 @@ const rows = []
 let failures = 0
 let largestPassed = 0
 
-for (const pdfMb of PDF_SIZES) {
+for (const pdfMb of scOnly ? [] : PDF_SIZES) {
   const pdfBytes = pdfOf(pdfMb)
   const target = path.join(dir, `book-${pdfMb}.pdf`)
   for (const contentMb of CONTENT_SIZES) {
@@ -154,8 +161,103 @@ for (const pdfMb of PDF_SIZES) {
   }
 }
 
+if (!scOnly) {
+  console.log(`\nworker heap limit ${HEAP_LIMIT_MB} MB; largest PDF + content that passed: ${(largestPassed / MB).toFixed(1)} MB (${largestPassed} bytes)`)
+  console.log(failures ? `${failures} combination(s) failed` : 'all combinations passed')
+}
+
+// ---- Success criteria SC-004 / SC-005 (T055) -------------------------------------------------------------------
+/** Longest gap between 10 ms ticks of this thread while `fn` runs = the longest time it could not respond. */
+async function withStallMeter(fn) {
+  let last = performance.now()
+  let longest = 0
+  const timer = setInterval(() => {
+    const now = performance.now()
+    longest = Math.max(longest, now - last - 10)
+    last = now
+  }, 10)
+  try {
+    const result = await fn()
+    return { result, stallMs: Math.max(0, longest) }
+  } finally {
+    clearInterval(timer)
+  }
+}
+
+/** One attach as the app runs it after the picker: scan → stage → plan → streamed write → read-back → rename. */
+async function attachEndToEnd(pdfBytes, target, source) {
+  await fsp.writeFile(target, pdfBytes)
+  const scan = await ask({ kind: 'scan', bytes: pdfBytes })
+  if (!scan.ok) return { ok: false, refused: `scan: ${scan.error}` }
+  const page = scan.result.pages[0]
+  const staged = await stageAttachmentSource(source, staging, { pdfSizeBytes: pdfBytes.length })
+  if (!staged.ok) return { ok: false, refused: staged.code }
+  try {
+    const now = new Date().toISOString()
+    const annotation = { nm: 'readmate:00000000-0000-4000-8000-00000000005c', pageIndex: 0, box: { x: 0.4, y: 0.4, width: 0.05, height: 0.05 }, color: [0.2, 0.4, 0.8], author: 'Readmate', contents: 'content.bin', createdAt: now, modifiedAt: now }
+    const file = { name: 'content.bin', sizeBytes: staged.staged.sizeBytes, md5Hex: staged.staged.md5Hex, modifiedAt: staged.staged.modifiedAt }
+    const plan = await ask({ kind: 'plan', bytes: pdfBytes, page, annotation, file })
+    if (!plan.ok) return { ok: false, refused: `plan: ${plan.error}` }
+    await writeAttachmentUpdate({
+      target,
+      bytes: pdfBytes,
+      bytesSha256: createHash('sha256').update(pdfBytes).digest('hex'),
+      plan: plan.result,
+      content: { stagedPath: staged.staged.stagedPath, sha256: staged.staged.sha256 },
+      verify: async (tempPath) => {
+        const bytes = new Uint8Array(await fsp.readFile(tempPath))
+        const verified = await ask(
+          { kind: 'verify', bytes, expect: { annotationId: `${plan.result.annotationRef.num}R`, pageIndex: 0, present: { rect: plan.result.rect, sha256: staged.staged.sha256 }, keepIds: scan.result.ids } },
+          [bytes.buffer],
+        )
+        if (!verified.ok) return `verify crashed: ${verified.error}`
+        return verified.result.ok ? null : verified.result.detail
+      },
+    })
+    return { ok: true }
+  } catch (err) {
+    return { ok: false, refused: err instanceof Error ? err.message : String(err) }
+  } finally {
+    await staged.staged.cleanup()
+  }
+}
+
+console.log('\nSuccess criteria (end to end; scan / plan / verify in the worker as in the app)')
+const sc = []
+const pdf50 = pdfOf(50)
+const target50 = path.join(dir, 'sc-book-50.pdf')
+const content10 = path.join(dir, 'sc-content-10.bin')
+const content100 = path.join(dir, 'sc-content-100.bin')
+await writeContent(content10, 10, 'random')
+await writeContent(content100, 100, 'random')
+{
+  const started = performance.now()
+  const { result, stallMs } = await withStallMeter(() => attachEndToEnd(pdf50, target50, content10))
+  const ms = performance.now() - started
+  sc.push({ id: 'SC-004a', what: '10 MB file into a 50 MB PDF', ms, stallMs, pass: result.ok && ms <= 5000, note: result.ok ? 'attached' : `failed: ${result.refused}` })
+}
+{
+  const started = performance.now()
+  const { result, stallMs } = await withStallMeter(() => attachEndToEnd(pdf50, target50, content100))
+  const ms = performance.now() - started
+  sc.push({ id: 'SC-004b', what: '100 MB file into a 50 MB PDF', ms, stallMs, pass: stallMs <= 1000, note: result.ok ? 'attached' : `refused cleanly: ${result.refused}` })
+}
+{
+  const big = path.join(dir, 'sc-over-limit.iso')
+  await fsp.writeFile(big, '')
+  await fsp.truncate(big, Math.round(150 * MB))
+  const started = performance.now()
+  const { result, stallMs } = await withStallMeter(() => stageAttachmentSource(big, staging, { pdfSizeBytes: pdf50.length }))
+  const ms = performance.now() - started
+  const refused = !result.ok && result.code === 'too_large'
+  sc.push({ id: 'SC-005', what: '150 MB file refused (size checked before reading)', ms, stallMs, pass: refused && ms <= 1000, note: refused ? `too_large ${result.sizeBytes} > ${result.limitBytes}` : JSON.stringify(result) })
+}
+for (const r of sc) {
+  console.log(`${r.pass ? 'ok  ' : 'FAIL'} ${r.id} ${r.what.padEnd(48)} | ${String(Math.round(r.ms)).padStart(6)} ms | longest stall ${String(Math.round(r.stallMs)).padStart(4)} ms | ${r.note}`)
+}
+const scFailures = sc.filter((r) => !r.pass).length
+
 await worker.terminate()
-await fsp.rm(dir, { recursive: true, force: true })
-console.log(`\nworker heap limit ${HEAP_LIMIT_MB} MB; largest PDF + content that passed: ${(largestPassed / MB).toFixed(1)} MB (${largestPassed} bytes)`)
-console.log(failures ? `${failures} combination(s) failed` : 'all combinations passed')
-process.exit(failures ? 1 : 0)
+await fsp.rm(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+console.log(scFailures ? `${scFailures} success criterion / criteria not met` : 'all success criteria met')
+process.exit(failures || scFailures ? 1 : 0)

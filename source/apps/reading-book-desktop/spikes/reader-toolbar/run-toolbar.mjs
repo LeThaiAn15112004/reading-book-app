@@ -99,6 +99,16 @@ check('PDF = placeholder + search + text markup + freehand ink + shapes + file a
   const expected = [...placeholder, 'search', 'markupAnnotations', 'inkAnnotations', 'shapeAnnotations', 'typewriterAnnotations', 'fileAttachments', 'attachments'].filter((c) => c !== 'readingSettings')
   assert.deepEqual([...pdf].sort(), expected.sort())
 })
+check('File Attachment tool (specs/007 SC-007): PDF only — never EPUB, TXT, Markdown, MP3 or another audio format', () => {
+  const hasTool = (capabilities) => registry.TOOL_REGISTRY.some((t) => t.id === 'fileAttachment' && t.requires.every((c) => capabilities.has(c)))
+  assert.ok(hasTool(pdf))
+  assert.deepEqual(registry.toolsForGroup('freehand', pdf).map((t) => t.id).filter((id) => id === 'fileAttachment'), ['fileAttachment'])
+  for (const format of ['epub', 'txt', 'md', 'mp3', 'm4a', 'm4b', 'aac', 'wav', 'flac', 'ogg', 'opus', 'aiff', null]) {
+    const surface = caps.getReaderCapabilities(format)
+    assert.ok(!surface.has('fileAttachments'), String(format))
+    assert.ok(!hasTool(surface), String(format))
+  }
+})
 check('Aa (readingSettings) stays on EPUB and the placeholder, not PDF', () => {
   assert.ok(epub.has('readingSettings'))
   assert.ok(placeholder.has('readingSettings'))

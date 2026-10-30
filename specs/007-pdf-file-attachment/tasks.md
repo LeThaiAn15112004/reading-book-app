@@ -201,11 +201,11 @@ description: "Task list for PDF File Attachment"
 
 ## Phase 9: Polish & Cross-Cutting Concerns
 
-- [ ] T053 [P] Write `DESK/spikes/attachments/run-pdf-attachment-store.mjs`: the real renderer `attachmentsStore` + `pdfHighlightsStore` against the real Main service on temp files — create, cancel, refusals, move + undo / redo, refused undo, delete, book switch clears `pageAttachments`
-- [ ] T054 [P] Extend `DESK/spikes/reader-toolbar/run-toolbar.mjs` (`spike:reader:toolbar`) to assert the File Attachment tool exists for PDF only and for none of EPUB, TXT, Markdown, MP3 and other audio formats (SC-007)
-- [ ] T055 Measure SC-004 / SC-005 in `run-pdf-attachment-memory.mjs` (10 MB into 50 MB ≤ 5 s; 100 MB into 50 MB completes or is refused; over-limit refusal ≤ 1 s) and record the numbers in `docs/implementation_plan/pdf_file_attachment.md`
-- [ ] T056 Complete `docs/implementation_plan/pdf_file_attachment.md` (structures written, flow, ids, limits, delete semantics, known limits incl. scan cost and slower later writes) and add the **PDF file attachments (create / move / delete)** paragraph to `CLAUDE.md` next to "PDF attachments"; list the new spikes in the CLAUDE.md commands section
-- [ ] T057 Run the full default checks (SDK `npm run verify`; desktop `npm run typecheck`, `npm run lint`, `npm run e2e:typecheck`, `npx vite build`; all spikes of quickstart §1) and fix anything red
+- [X] T053 [P] Write `DESK/spikes/attachments/run-pdf-attachment-store.mjs`: the real renderer `attachmentsStore` _(`pageAttachmentsStore`)_ + `pdfHighlightsStore` against the real Main service on temp files — create, cancel, refusals, move + undo / redo, refused undo, delete, book switch clears `pageAttachments`
+- [X] T054 [P] Extend `DESK/spikes/reader-toolbar/run-toolbar.mjs` (`spike:reader:toolbar`) to assert the File Attachment tool exists for PDF only and for none of EPUB, TXT, Markdown, MP3 and other audio formats (SC-007)
+- [X] T055 Measure SC-004 / SC-005 in `run-pdf-attachment-memory.mjs` (10 MB into 50 MB ≤ 5 s; 100 MB into 50 MB completes or is refused; over-limit refusal ≤ 1 s) and record the numbers in `docs/implementation_plan/pdf_file_attachment.md`
+- [X] T056 Complete `docs/implementation_plan/pdf_file_attachment.md` (structures written, flow, ids, limits, delete semantics, known limits incl. scan cost and slower later writes) and add the **PDF file attachments (create / move / delete)** paragraph to `CLAUDE.md` next to "PDF attachments"; list the new spikes in the CLAUDE.md commands section
+- [X] T057 Run the full default checks (SDK `npm run verify`; desktop `npm run typecheck`, `npm run lint`, `npm run e2e:typecheck`, `npx vite build`; all spikes of quickstart §1) and fix anything red _(all green except failures that predate this feature: SDK `tests/config/audiobook-transcription-gate` + `audiobook-zip-gate` (flags ON in `packages/config/features.ts`) and `spike:reader:toolbar`'s transcript-tab rail check)_
 
 ---
 
