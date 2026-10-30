@@ -13,11 +13,13 @@ import {
   ATTACHMENT_MAX_BYTES,
   ATTACHMENT_MAX_COUNT,
   buildAttachmentId,
+  rowIdOfReadmateAttachmentId,
   sanitizeAttachmentFileName,
   type AttachmentSource,
   type BookAttachment,
 } from '@reading-book/book-reader-sdk'
 import { loadPdfjs } from '../chunking/pdf-text'
+import { readAnnotationNames } from '../pdf-sync/pdf-raw-objects'
 
 export type PdfAttachmentListResult = {
   items: BookAttachment[]
@@ -35,6 +37,8 @@ type FoundAttachment = {
   descriptor: BookAttachment
   /** Present only while extracting; the listing never carries the bytes. */
   content: Uint8Array | null
+  /** PDF.js id of a page attachment's annotation (to read its `/NM`). */
+  annotationId?: string
 }
 
 const DESCRIPTION_MAX_LENGTH = 500
@@ -121,12 +125,15 @@ async function collect(
       let ordinal = 0
       try {
         const annotations = (await page.getAnnotations({ intent: 'any' })) as Array<{
+          id?: string
           subtype?: string
           file?: RawFileSpec
         }>
         for (const annotation of annotations) {
           if (annotation.subtype !== 'FileAttachment' || !annotation.file || typeof annotation.file !== 'object') continue
-          if (!push(describe(annotation.file, 'page', pageNumber, ordinal++))) break
+          const entry = describe(annotation.file, 'page', pageNumber, ordinal++)
+          if (typeof annotation.id === 'string') entry.annotationId = annotation.id
+          if (!push(entry)) break
           if (stopAt && found[found.length - 1]!.descriptor.id === stopAt) return { found, truncated }
         }
       } finally {
@@ -150,8 +157,16 @@ export async function listPdfAttachmentBytes(bytes: Uint8Array): Promise<PdfAtta
  * records (never trusted as a position or path); the size limit is applied to the real data.
  */
 export async function extractPdfAttachmentBytes(bytes: Uint8Array, id: string): Promise<PdfAttachmentExtractResult> {
-  const { found } = await collect(bytes, id)
-  const match = found.find((entry) => entry.descriptor.id === id)
+  // A Readmate-made page attachment (`rm-<uuid>`, specs/007) is found by its annotation's `/NM`, so a move never
+  // changes its id; every other id by its position + content hash.
+  const rowId = rowIdOfReadmateAttachmentId(id)
+  const { found } = await collect(bytes, rowId ? undefined : id)
+  let match: FoundAttachment | undefined
+  if (rowId) {
+    const pageEntries = found.filter((entry) => entry.descriptor.source === 'page' && entry.annotationId)
+    const names = readAnnotationNames(bytes, pageEntries.map((entry) => entry.annotationId!))
+    match = pageEntries.find((entry) => names.get(entry.annotationId!) === `readmate:${rowId}`)
+  } else match = found.find((entry) => entry.descriptor.id === id)
   if (!match) return { ok: false, code: 'not_found' }
   const content = match.content
   if (!content || content.byteLength === 0) return { ok: false, code: 'empty' }

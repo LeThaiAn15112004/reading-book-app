@@ -646,8 +646,9 @@ function toChangedDto(event: PdfAnnotationSyncEvent): PdfEmbeddedAnnotationsChan
     inserted: event.outcome.inserted.map(toHighlightDto),
     updated: event.outcome.updated.map(toHighlightDto),
     deletedIds: event.outcome.deleted,
+    // Readmate draws every page attachment's icon itself, others' included (specs/007 research R9).
     hiddenObjectIds: event.matchesDisplayedFile
-      ? event.outcome.managedIndices.map((i) => event.items[i]!.objectId)
+      ? [...event.outcome.managedIndices.map((i) => event.items[i]!.objectId), ...(event.pageAttachments ?? []).map((a) => a.objectId)]
       : [],
     complete: event.complete,
     conflicts: event.outcome.conflicts.map(({ noteId, conflict }) => ({ noteId, kind: conflict.kind, fields: conflict.fields })),

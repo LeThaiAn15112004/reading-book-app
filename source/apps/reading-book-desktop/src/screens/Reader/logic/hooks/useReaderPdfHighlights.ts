@@ -1,3 +1,4 @@
+import { usePageAttachmentsStore } from '../attachments/pageAttachmentsStore'
 import { isShapeStyleKind } from '@reading-book/book-reader-sdk'
 import { useEffect, type MutableRefObject } from 'react'
 import { overlayApi } from '../../../../bridge'
@@ -66,8 +67,13 @@ export function useReaderPdfHighlights({
   // after a change in another app, and pushes the result — no reopen needed. One watch per open PDF;
   // closing or switching the book (or unmounting the reader) ends it.
   useEffect(() => {
+    usePageAttachmentsStore.getState().setBook(bookId && isPdfSurface ? bookId : null)
     if (!bookId || !isPdfSurface) return
-    const unsubscribe = overlayApi.onPdfEmbeddedAnnotationsChanged(applyEmbeddedSync)
+    const unsubscribe = overlayApi.onPdfEmbeddedAnnotationsChanged((event) => {
+      applyEmbeddedSync(event)
+      // Page attachments other readers made (specs/007): shown with Readmate's own, open / save only.
+      usePageAttachmentsStore.getState().applySync(event)
+    })
     void overlayApi.watchPdfEmbeddedAnnotations(bookId).catch(() => {})
     void loadConflicts()
     return () => {

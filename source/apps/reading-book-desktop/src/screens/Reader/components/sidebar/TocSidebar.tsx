@@ -8,8 +8,10 @@ import { formatAttachmentSize, isShapeStyleKind, type ReaderBookmark, type Reade
  */
 export type SidebarHighlight = ReaderHighlightBase & {
   chapterIndex: number
-  /** PDF file attachments only (specs/007): the embedded file's name and size. */
-  attachment?: { name: string; sizeBytes: number }
+  /** PDF file attachments only (specs/007): the embedded file's name and size (null: the file holds no data). */
+  attachment?: { name: string; sizeBytes: number | null }
+  /** Another reader's attachment: listed and jumped to, never recoloured, edited or deleted. */
+  readOnly?: boolean
 }
 import type { EpubTocItem } from '../../../../reader/renderers/epub'
 import type { FakeChapter } from '../../logic'
@@ -431,7 +433,11 @@ function HighlightListItem({
             </span>
           ) : h.attachment ? (
             <span className="mt-1 block truncate text-[13px] leading-snug text-lib-text" title={h.attachment.name}>
-              {h.attachment.name} <span className="text-lib-faint">· {formatAttachmentSize(h.attachment.sizeBytes)}</span>
+              {h.attachment.name}{' '}
+              <span className="text-lib-faint">
+                · {h.attachment.sizeBytes === null ? 'size unknown' : formatAttachmentSize(h.attachment.sizeBytes)}
+                {h.readOnly ? ' · added by another app' : ''}
+              </span>
             </span>
           ) : isShapeStyleKind(h.styleKind) || h.styleKind === 'typewriter' || h.styleKind === 'attachment' ? null : (
             <span className="mt-1 block text-[13px] text-lib-faint italic">(no excerpt)</span>
@@ -454,14 +460,16 @@ function HighlightListItem({
           ) : null}
         </span>
       </button>
-      <NoteItemMenu
-        highlight={h}
-        onChangeColor={(colorHex) => onChangeColor?.(h.id, colorHex)}
-        onEditNote={(note) => onChangeNote?.(h.id, note)}
-        onCopy={() => onCopy?.(h)}
-        onAskAi={() => onAskAi?.(h)}
-        onDelete={() => onDelete?.(h.id)}
-      />
+      {h.readOnly ? null : (
+        <NoteItemMenu
+          highlight={h}
+          onChangeColor={(colorHex) => onChangeColor?.(h.id, colorHex)}
+          onEditNote={(note) => onChangeNote?.(h.id, note)}
+          onCopy={() => onCopy?.(h)}
+          onAskAi={() => onAskAi?.(h)}
+          onDelete={() => onDelete?.(h.id)}
+        />
+      )}
     </div>
   )
 }

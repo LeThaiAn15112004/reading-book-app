@@ -12,6 +12,7 @@
  *   6. authorization  ids validated, non-PDF books, an attachment of ANOTHER pdf, single in-flight open
  *   7. integrity    the original PDF is never modified; temp cleanup
  *   8. store        double-click → confirm → one open; Cancel never extracts; blocked → explicit Save As
+ *  7b. rm ids       Readmate-made page attachments (specs/007): resolved by /NM, stable after a move, unknown refused
  *   9. wiring       channels / preload / registration / no shell or child_process
  *
  * Run: npm run spike:pdf:attachments   (builds the SDK bundle first)
@@ -385,6 +386,65 @@ await check('temp cleanup removes the root; a missing root is fine', async () =>
   assert.equal(fs.existsSync(tempRoot), false)
   assert.equal(await cleanAttachmentTemp(tempRoot), true)
 })
+
+console.log('7b. Readmate-made attachments (rm-<uuid>, specs/007)')
+{
+  const UUID = '0b6f7a52-3c1d-4e8f-9a2b-5c6d7e8f9a01'
+  const OTHER = '9f8e7d6c-5b4a-4321-8fed-cba987654321'
+  addPdf('rm', buildPdf({ pages: 2, pageFiles: [{ page: 1, name: 'mine.docx', data: text('readmate copy'), nm: `readmate:${UUID}` }] }))
+  // The same annotation after a move: another page, another rect, and a foreign attachment now in front of it.
+  addPdf(
+    'rm-moved',
+    buildPdf({
+      pages: 2,
+      pageFiles: [
+        { page: 2, name: 'foreign.txt', data: text('not ours') },
+        { page: 2, name: 'mine.docx', data: text('readmate copy'), nm: `readmate:${UUID}`, rect: [120, 150, 140, 170] },
+      ],
+    }),
+  )
+  const h = harness({ rm: 'rm', 'rm-moved': 'rm-moved' })
+  h.state.saveTarget = path.join(tmp, 'saved-mine.docx')
+
+  await check('an rm-<uuid> id is resolved by /NM in the freshly read bytes and extracts that file', async () => {
+    const result = await extractPdfAttachmentBytes(files.rm.bytes, `rm-${UUID}`)
+    assert.equal(result.ok, true)
+    assert.equal(new TextDecoder().decode(result.content), 'readmate copy')
+    assert.equal(result.name, 'mine.docx')
+  })
+  await check('the same rm id still works after the annotation moved (page, rect and ordinal changed)', async () => {
+    const result = await extractPdfAttachmentBytes(files['rm-moved'].bytes, `rm-${UUID}`)
+    assert.equal(result.ok, true)
+    assert.equal(new TextDecoder().decode(result.content), 'readmate copy')
+    // The position-based id of the same annotation did change: only the rm id is stable.
+    const { items } = await listPdfAttachmentBytes(files['rm-moved'].bytes)
+    assert.equal(items.filter((i) => i.name === 'mine.docx')[0].page, 2)
+  })
+  await check('open / Save As through the service accept rm ids (temp copy opened, bytes saved unchanged)', async () => {
+    const opened = await h.svc.open('rm-moved', `rm-${UUID}`)
+    assert.equal(opened.ok, true, JSON.stringify(opened))
+    assert.equal(h.calls.open.at(-1).content.toString(), 'readmate copy')
+    const saved = await h.svc.saveAs('rm', `rm-${UUID}`)
+    assert.equal(saved.ok, true, JSON.stringify(saved))
+    assert.equal(fs.readFileSync(h.state.saveTarget, 'utf8'), 'readmate copy')
+  })
+  await check('an unknown uuid is refused with attachment_not_found; a foreign attachment never answers to an rm id', async () => {
+    const unknown = await h.svc.open('rm', `rm-${OTHER}`)
+    assert.equal(unknown.ok, false)
+    assert.equal(unknown.errorCode, 'attachment_not_found')
+    // `foreign.txt` has no /NM: no rm id resolves to it.
+    const plainPages = await extractPdfAttachmentBytes(files.pages.bytes, `rm-${UUID}`)
+    assert.deepEqual(plainPages, { ok: false, code: 'not_found' })
+  })
+  await check('malformed rm ids are rejected before any file is read', async () => {
+    const reads = h.calls.read
+    for (const id of ['rm-', 'rm-not-a-uuid', `rm-${UUID.toUpperCase()}`, `rm-${UUID}/../x`]) {
+      const result = await h.svc.open('rm', id)
+      assert.equal(result.errorCode, 'invalid_request', id)
+    }
+    assert.equal(h.calls.read, reads)
+  })
+}
 
 console.log('8. renderer store (real store → real service → real PDF.js)')
 {

@@ -280,6 +280,14 @@ export interface PdfRendererProps {
   attachmentPins?: readonly PdfAttachmentPin[]
   /** File Attachment tool: a click on a page (not on an icon, not between pages) asks to place a file there. */
   onAttachmentPlace?: (pageIndex: number, point: { x: number; y: number }) => void
+  /** The selected attachment icon (outlined), or null. */
+  selectedAttachmentId?: string | null
+  /** A click on an icon selects it (null: a click elsewhere drops the selection). Never opens anything. */
+  onAttachmentSelect?: (id: string | null) => void
+  /** Double-click on an icon: the Reader shows its details panel. */
+  onAttachmentDetails?: (pin: PdfAttachmentPin) => void
+  /** Right-click on an icon, at client coordinates. */
+  onAttachmentContextMenu?: (pin: PdfAttachmentPin, x: number, y: number) => void
   /** Typewriter notes (rows of the annotation list) to paint; the Reader keeps them out of `annotations`. */
   typewriters?: readonly PdfTypewriterMark[]
   /** True while a note is being typed: a press elsewhere commits it instead of placing another box. */
@@ -440,6 +448,10 @@ export function PdfRenderer({
   onShapeCreate,
   attachmentPins,
   onAttachmentPlace,
+  selectedAttachmentId = null,
+  onAttachmentSelect,
+  onAttachmentDetails,
+  onAttachmentContextMenu,
   typewriters,
   typewriterEditing = false,
   onTypewriterBegin,
@@ -563,6 +575,14 @@ export function PdfRenderer({
   attachmentToolRef.current = attachmentTool
   const onAttachmentPlaceRef = useRef(onAttachmentPlace)
   onAttachmentPlaceRef.current = onAttachmentPlace
+  const selectedAttachmentIdRef = useRef(selectedAttachmentId)
+  selectedAttachmentIdRef.current = selectedAttachmentId
+  const onAttachmentSelectRef = useRef(onAttachmentSelect)
+  onAttachmentSelectRef.current = onAttachmentSelect
+  const onAttachmentDetailsRef = useRef(onAttachmentDetails)
+  onAttachmentDetailsRef.current = onAttachmentDetails
+  const onAttachmentContextMenuRef = useRef(onAttachmentContextMenu)
+  onAttachmentContextMenuRef.current = onAttachmentContextMenu
   const attachmentsByPageRef = useRef(new Map<number, PdfAttachmentPin[]>())
   const attachmentsByPage = useMemo(() => {
     const byPage = new Map<number, PdfAttachmentPin[]>()
@@ -1636,6 +1656,7 @@ export function PdfRenderer({
     onInkSelectRef.current?.(target?.kind === 'ink' ? target.id : null)
     onShapeSelectRef.current?.(target?.kind === 'shape' ? target.id : null)
     onGraphicSelectRef.current?.(target?.kind === 'graphic' ? target.id : null)
+    if (selectedAttachmentIdRef.current !== null) onAttachmentSelectRef.current?.(null)
   }
 
   /** Hover feedback for what is under client (`x`, `y`): outline only, never selects or changes anything. */
@@ -2078,8 +2099,13 @@ export function PdfRenderer({
       onTypewriterOutsideRef.current?.()
       return
     }
-    // A press on an existing icon never places another one on top of it.
-    if (attachmentAt(event.clientX, event.clientY)) return
+    // A press on an existing icon selects it; it never places another one on top of it.
+    const pin = attachmentAt(event.clientX, event.clientY)
+    if (pin) {
+      selectTarget(null)
+      onAttachmentSelectRef.current?.(pin.id)
+      return
+    }
     const hit = slotAt(event.clientX, event.clientY)
     const point = hit ? clientToPageUnit(event.clientX, event.clientY, hit.rect) : null
     if (!hit || !point) return
@@ -2364,6 +2390,14 @@ export function PdfRenderer({
     // A press that leaves a selection behind (double / triple click on text) is not a tap. A pan
     // press can't select, so an older selection there is just what the tap should clear.
     if (!gesture.pan && hasTextSelection()) return
+    // A click on an attachment icon only selects it (name tooltip); double-click / Enter opens its details.
+    const pin = attachmentsByPageRef.current.size > 0 ? attachmentAt(event.clientX, event.clientY) : null
+    if (pin) {
+      selectTarget(null)
+      onBlankClickRef.current?.()
+      onAttachmentSelectRef.current?.(pin.id)
+      return
+    }
     const hit = annotationAt(event.clientX, event.clientY)
     if (hit) {
       selectTarget(null)
@@ -2399,6 +2433,11 @@ export function PdfRenderer({
     const selection = readPdfSelectionAt(root, event.clientX, event.clientY)
     if (selection) {
       onSelectionContextMenuRef.current?.(selection, event.clientX, event.clientY)
+      return
+    }
+    const pin = attachmentsByPageRef.current.size > 0 ? attachmentAt(event.clientX, event.clientY) : null
+    if (pin) {
+      onAttachmentContextMenuRef.current?.(pin, event.clientX, event.clientY)
       return
     }
     const note = typewritersByPageRef.current.size > 0 ? typewriterAt(event.clientX, event.clientY) : null
@@ -2514,7 +2553,7 @@ export function PdfRenderer({
                   flash={flash as PdfShapeFlash | null}
                 />
               ) : null}
-              {attachmentsByPage.has(index) ? <PdfPageAttachments pins={attachmentsByPage.get(index)!} /> : null}
+              {attachmentsByPage.has(index) ? <PdfPageAttachments pins={attachmentsByPage.get(index)!} selectedId={selectedAttachmentId} /> : null}
               {typewritersByPage.has(index) || renderTypewriterEditor?.(index, size.h / size.w) || typewriterRubber?.pageIndex === index ? (
                 <PdfPageTypewriters
                   marks={typewritersByPage.get(index) ?? []}
@@ -2613,6 +2652,12 @@ export function PdfRenderer({
       }}
       onContextMenu={onContextMenu}
       onDoubleClick={(event) => {
+        const pin = attachmentsByPageRef.current.size > 0 ? attachmentAt(event.clientX, event.clientY) : null
+        if (pin) {
+          window.getSelection()?.removeAllRanges()
+          onAttachmentDetailsRef.current?.(pin)
+          return
+        }
         // Hand mode: a single press already selects a note (onPointerDown); this stays for a double-click that lands before the overlay exists.
         if (!handRef.current) return
         const note = typewriterAt(event.clientX, event.clientY)

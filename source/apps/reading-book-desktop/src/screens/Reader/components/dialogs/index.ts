@@ -2,3 +2,5 @@ export { AttachmentBlockedDialog, AttachmentOpenDialog } from './AttachmentDialo
 export { BookInfoDialog } from './BookInfoDialog'
 export { TrashConfirmDialog } from './TrashConfirmDialog'
 export { SignedPdfWriteDialog } from './SignedPdfWriteDialog'
+export { AttachmentContextMenu, AttachmentDetailsPanel } from './AttachmentDetailsPanel'
+export { PageAttachmentDialogs } from './PageAttachmentDialogs'

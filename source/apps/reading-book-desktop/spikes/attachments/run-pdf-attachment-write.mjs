@@ -11,7 +11,9 @@
  *   11. same names    two files with the same name on one page → both kept, distinct, both intact
  *   12. live sync     opening / syncing after attaching → no duplicate rows, rows linked, a later ordinary
  *                     annotation write keeps every attachment
- *   (US2–US5 add their scenarios here: 2, 3, 5–10, 13.)
+ *   13. hostile PDF  other readers' attachments: names sanitised, a false /Size ignored, open blocked by policy,
+ *                    Save As only to the chosen path
+ *   (US3–US5 add their scenarios here: 2, 3, 5–10.)
  *
  * Run: npm run spike:pdf:attachment-write   (builds the SDK bundle first)
  */
@@ -298,6 +300,83 @@ await check('12. opening and syncing after attaching: no duplicate rows, rows li
   assert.equal((await rowsOf(book.id, 'attachment')).length, 2)
   service.unwatch(target, book.id)
 })
+
+// ---- 13. hostile PDF (other readers' attachments, US2)
+{
+  const { createAttachmentService } = await import('../../electron/attachments/attachment-service.ts')
+  const { listPdfAttachmentBytes, extractPdfAttachmentBytes } = await import('../../electron/attachments/pdf-attachments.ts')
+  const mz = Buffer.from([0x4d, 0x5a, 0x90, 0x00, 3, 0, 0, 0])
+  const book = addBook(
+    buildPdf({
+      pages: 1,
+      pageFiles: [
+        { page: 1, name: '../../evil.txt', data: Buffer.from('traversal') },
+        { page: 1, name: 'CON', data: Buffer.from('device') },
+        { page: 1, name: 'invoice‮txt.exe', data: Buffer.from('bidi') },
+        { page: 1, name: 'small.txt', data: Buffer.from('abc'), declaredSize: 999_999_999 },
+        { page: 1, name: 'report.pdf', data: mz },
+      ],
+    }),
+    'hostile',
+  )
+  const before = sha(fs.readFileSync(book.file))
+  const opened = []
+  let saveTarget = null
+  const svc = createAttachmentService({
+    resolvePdf: async (id) => (paths[id] ? { ok: true, path: paths[id] } : { ok: false, code: 'not_found' }),
+    readFile: async (p) => new Uint8Array(fs.readFileSync(p)),
+    list: listPdfAttachmentBytes,
+    extract: extractPdfAttachmentBytes,
+    tempRoot: path.join(tmp, 'attachment-tmp'),
+    openPath: async (p) => {
+      opened.push(p)
+      return ''
+    },
+    chooseSaveTarget: async () => saveTarget,
+    isForbiddenTarget: (target, pdfPath) => path.resolve(target) === path.resolve(pdfPath),
+  })
+  const scanned = await scanPdfAnnotationBytes(new Uint8Array(fs.readFileSync(book.file)))
+  const byData = (n) => scanned.pageAttachments[n]
+
+  await check('13. hostile names are sanitised in the sync event: no path, no device name, no bidi control', async () => {
+    assert.equal(scanned.pageAttachments.length, 5)
+    const names = scanned.pageAttachments.map((a) => a.name)
+    for (const name of names) assert.ok(!/[\\/]/.test(name) && !/[‪-‮⁦-⁩]/.test(name), name)
+    assert.equal(names[0], 'evil.txt')
+    assert.notEqual(names[1], 'CON')
+    assert.equal(names[2], 'invoicetxt.exe')
+    assert.equal(scanned.items.filter((i) => i.subtype === 'FileAttachment').length, 0, 'foreign attachments never become rows')
+  })
+  await check('13. a false /Size is ignored: the size is the real data length', async () => {
+    assert.equal(byData(3).sizeBytes, 3)
+  })
+  await check('13. open is blocked as the policy says (executable behind .pdf, .exe after bidi); allowed ones open', async () => {
+    for (const n of [2, 4]) {
+      const result = await svc.open(book.id, byData(n).attachmentId)
+      assert.equal(result.ok, false)
+      assert.equal(result.errorCode, 'blocked', byData(n).name)
+    }
+    assert.equal(opened.length, 0, 'nothing was launched')
+    const ok = await svc.open(book.id, byData(0).attachmentId)
+    assert.equal(ok.ok, true, JSON.stringify(ok))
+    assert.equal(path.basename(opened[0]), 'evil.txt')
+    assert.ok(path.resolve(opened[0]).startsWith(path.resolve(tmp, 'attachment-tmp')), 'temp copy inside the temp root')
+  })
+  await check('13. Save As writes only to the chosen path; cancel writes nothing; the PDF is unchanged', async () => {
+    const chosen = path.join(tmp, 'chosen', 'kept.bin')
+    fs.mkdirSync(path.dirname(chosen), { recursive: true })
+    saveTarget = null
+    const cancelled = await svc.saveAs(book.id, byData(4).attachmentId)
+    assert.equal(cancelled.errorCode, 'canceled')
+    assert.deepEqual(fs.readdirSync(path.dirname(chosen)), [])
+    saveTarget = chosen
+    const saved = await svc.saveAs(book.id, byData(4).attachmentId)
+    assert.equal(saved.ok, true, JSON.stringify(saved))
+    assert.deepEqual(fs.readdirSync(path.dirname(chosen)), ['kept.bin'])
+    assert.deepEqual(fs.readFileSync(chosen), mz)
+    assert.equal(sha(fs.readFileSync(book.file)), before)
+  })
+}
 
 service.disposeAll()
 fs.rmSync(tmp, { recursive: true, force: true })

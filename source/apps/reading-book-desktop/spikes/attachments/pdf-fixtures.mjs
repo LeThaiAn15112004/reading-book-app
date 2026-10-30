@@ -5,6 +5,11 @@
  */
 
 function literal(text) {
+  // Beyond Latin-1 (e.g. bidi controls): a UTF-16BE hex string with BOM, as PDF text strings allow.
+  if (/[^\u0000-ÿ]/.test(String(text))) {
+    const units = String(text).split('').map((ch) => ch.charCodeAt(0).toString(16).padStart(4, '0')).join('')
+    return `<FEFF${units}>`
+  }
   return `(${String(text).replace(/\\/g, '\\\\').replace(/\(/g, '\\(').replace(/\)/g, '\\)')})`
 }
 
@@ -12,7 +17,7 @@ function literal(text) {
  * @param {{
  *   pages?: number,
  *   docFiles?: Array<{ key?: string, name?: string | null, desc?: string, data?: Uint8Array, noStream?: boolean }>,
- *   pageFiles?: Array<{ page: number, name?: string | null, desc?: string, data?: Uint8Array }>,
+ *   pageFiles?: Array<{ page: number, name?: string | null, desc?: string, data?: Uint8Array, nm?: string, rect?: number[], declaredSize?: number }>,
  * }} options
  */
 export function buildPdf({ pages = 1, docFiles = [], pageFiles = [] } = {}) {
@@ -28,13 +33,16 @@ export function buildPdf({ pages = 1, docFiles = [], pageFiles = [] } = {}) {
     return n
   }
 
-  function addFileSpec({ name, desc, data, noStream }) {
+  function addFileSpec({ name, desc, data, noStream, declaredSize }) {
     let ef = ''
     if (!noStream) {
       const payload = Buffer.from(data ?? new Uint8Array(0))
       const stream = add(
         Buffer.concat([
-          Buffer.from(`<< /Type /EmbeddedFile /Length ${payload.length} >>\nstream\n`, 'latin1'),
+          Buffer.from(
+            `<< /Type /EmbeddedFile /Length ${payload.length}${declaredSize === undefined ? '' : ` /Params << /Size ${declaredSize} >>`} >>\nstream\n`,
+            'latin1',
+          ),
           payload,
           Buffer.from('\nendstream', 'latin1'),
         ]),
@@ -53,7 +61,7 @@ export function buildPdf({ pages = 1, docFiles = [], pageFiles = [] } = {}) {
   for (const file of pageFiles) {
     const spec = addFileSpec(file)
     const annot = add(
-      `<< /Type /Annot /Subtype /FileAttachment /Rect [10 10 30 30] /Name /PushPin /Contents (attached) /FS ${spec} 0 R /F 4 >>`,
+      `<< /Type /Annot /Subtype /FileAttachment /Rect [${(file.rect ?? [10, 10, 30, 30]).join(' ')}] /Name /PushPin /Contents (attached) /FS ${spec} 0 R /F 4${file.nm ? ` /NM ${literal(file.nm)}` : ''} >>`,
     )
     annotsByPage.set(file.page, [...(annotsByPage.get(file.page) ?? []), annot])
   }

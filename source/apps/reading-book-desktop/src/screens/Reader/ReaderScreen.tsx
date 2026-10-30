@@ -79,6 +79,7 @@ import {
   sidebarContentInsetLeft,
   SignInfoPanel,
   SignedPdfWriteDialog,
+  PageAttachmentDialogs,
   SyncConflictBanner,
   TocSidebar,
   TranslationPopover,
@@ -611,15 +612,42 @@ export function ReaderScreen() {
     () => pdfHighlights.highlights.filter((h) => !isShapeStyleKind(h.styleKind) && h.styleKind !== 'typewriter' && h.styleKind !== 'attachment'),
     [pdfHighlights.highlights],
   )
-  // File attachments Readmate placed (rows of style kind `attachment`): drawn as icons by their own layer (specs/007).
+  // File attachments on the pages, drawn as icons by their own layer (specs/007): the rows Readmate placed (style
+  // kind `attachment`) and, open / save only, the ones other readers made.
+  const foreignPageAttachments = usePageAttachmentsStore((s) => s.foreign)
+  const selectedAttachmentId = usePageAttachmentsStore((s) => s.selectedId)
   const pdfAttachmentPins = useMemo(
-    () =>
-      pdfHighlights.highlights.flatMap((h): PdfAttachmentPin[] => {
+    () => [
+      ...pdfHighlights.highlights.flatMap((h): PdfAttachmentPin[] => {
         const box = h.rects[0]
         if (h.styleKind !== 'attachment' || !h.attachment || !box) return []
         return [{ id: h.id, pageIndex: h.page - 1, box: { x: box.x, y: box.y, width: box.width, height: box.height }, name: h.attachment.name, sizeBytes: h.attachment.sizeBytes, editable: true }]
       }),
-    [pdfHighlights.highlights],
+      ...foreignPageAttachments.map((a): PdfAttachmentPin => ({ id: a.attachmentId, pageIndex: a.pageIndex, box: a.rect, name: a.name, sizeBytes: a.sizeBytes, editable: false })),
+    ],
+    [pdfHighlights.highlights, foreignPageAttachments],
+  )
+  // The Notes list: other readers' attachments are read-only entries next to the rows (no colour, no delete).
+  const pdfSidebarHighlights = useMemo(
+    () =>
+      foreignPageAttachments.length === 0
+        ? pdfHighlights.highlights
+        : [
+            ...pdfHighlights.highlights,
+            ...foreignPageAttachments.map((a) => ({
+              id: a.attachmentId,
+              locatorRef: '',
+              styleKind: 'attachment' as const,
+              colorHex: '',
+              tags: [],
+              createdAt: '',
+              updatedAt: '',
+              chapterIndex: a.pageIndex,
+              attachment: { name: a.name, sizeBytes: a.sizeBytes },
+              readOnly: true,
+            })),
+          ],
+    [pdfHighlights.highlights, foreignPageAttachments],
   )
   const pdfMarks = useMemo(
     () =>
@@ -1233,7 +1261,7 @@ export function ReaderScreen() {
             onDeleteBookmark={bookmarks.deleteBookmarkById}
             highlights={
               isPdfSurface
-                ? pdfHighlights.highlights
+                ? pdfSidebarHighlights
                 : isMdSurface
                   ? mdHighlights.highlights
                   : isTxtSurface
@@ -1255,6 +1283,12 @@ export function ReaderScreen() {
               if (isPdfSurface) {
                 const row = pdfHighlights.highlights.find((h) => h.id === highlight.id)
                 if (row) pdfHighlights.jumpToHighlight(row)
+                // An attachment (Readmate's or another reader's) is also selected, like a click on its icon.
+                const pin = highlight.styleKind === 'attachment' ? pdfAttachmentPins.find((p) => p.id === highlight.id) : undefined
+                if (pin) {
+                  if (!row) pdfApiRef.current?.goToPagePoint(pin.pageIndex + 1, pin.box.y)
+                  usePageAttachmentsStore.getState().select(pin.id)
+                }
                 return
               }
               const row = highlights.highlights.find((h) => h.id === highlight.id)
@@ -1344,6 +1378,8 @@ export function ReaderScreen() {
           />
 
           <ImportPreviewDialog onToast={chrome.setToast} />
+
+          {isPdfSurface ? <PageAttachmentDialogs pins={pdfAttachmentPins} /> : null}
 
           <SignedPdfWriteDialog
             open={pendingSignedExport !== null}
@@ -1748,6 +1784,10 @@ export function ReaderScreen() {
               onAttachmentPlace={(pageIndex, point) => {
                 if (bookId) void usePageAttachmentsStore.getState().create(bookId, pageIndex, point)
               }}
+              selectedAttachmentId={selectedAttachmentId}
+              onAttachmentSelect={(id) => usePageAttachmentsStore.getState().select(id)}
+              onAttachmentDetails={(pin) => usePageAttachmentsStore.getState().showDetails(pin)}
+              onAttachmentContextMenu={(pin, x, y) => usePageAttachmentsStore.getState().openMenu(pin, x, y)}
               typewriters={pdfTypewriters}
               typewriterEditing={typewriterSession != null}
               selectedTypewriterId={selectedTypewriterId}
