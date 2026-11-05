@@ -211,9 +211,9 @@
 
 **Risk checks first** (Expo Go, feasibility build; no Desktop change):
 
-- [ ] T094 [US3] Check R1, R3 and R6 on the device: long press on text and on a mark in EPUB, PDF and Markdown, which events reach the renderers, where the selection is reported, and the note editor with the soft keyboard; record in `specs/008-shared-core-architecture/m5-results.md`
-- [ ] T095 [US3] Check R2, R4 and R5 on the device with a throwaway tap-zone and swipe prototype in the feasibility build only (`source/apps/reading-book-mobile/web/src/feasibility/`): selecting text never turns the page, each format at 360 × 640 and in landscape, rotation while reading, memory over 50 PDF pages; record in `specs/008-shared-core-architecture/m5-results.md`, then delete the prototype
-- [ ] T096 [US3] Report T094 and T095 to the user, and update the scope and layout in `specs/008-shared-core-architecture/contracts/phone-ui.md` if a check failed
+- [X] T094 [US3] Check R1, R3 and R6 on the device: long press on text and on a mark in EPUB, PDF and Markdown, which events reach the renderers, where the selection is reported, and the note editor with the soft keyboard; record in `specs/008-shared-core-architecture/m5-results.md` **Checked 2026-11-05 at the user's request, NOT run on a device**: deferred until the app runs end to end; the Mobile Reader was built without it (T101–T103)
+- [X] T095 [US3] Check R2, R4 and R5 on the device with a throwaway tap-zone and swipe prototype in the feasibility build only (`source/apps/reading-book-mobile/web/src/feasibility/`): selecting text never turns the page, each format at 360 × 640 and in landscape, rotation while reading, memory over 50 PDF pages; record in `specs/008-shared-core-architecture/m5-results.md`, then delete the prototype **Checked 2026-11-05 at the user's request, NOT run on a device**: deferred until the app runs end to end; the Mobile Reader was built without it (T101–T103)
+- [X] T096 [US3] Report T094 and T095 to the user, and update the scope and layout in `specs/008-shared-core-architecture/contracts/phone-ui.md` if a check failed **Checked 2026-11-05 at the user's request, NOT run on a device**: deferred until the app runs end to end; the Mobile Reader was built without it (T101–T103)
 
 **Moving wiring out of `ReaderScreen.tsx`** (one step per change; after each: Desktop `typecheck`, `lint`, `npx vite build`, `spike:reader:toolbar`, `spike:session:roundtrip`, `spike:txt:store`, and a manual Desktop check of each format; Desktop E2E only if the user agrees):
 
