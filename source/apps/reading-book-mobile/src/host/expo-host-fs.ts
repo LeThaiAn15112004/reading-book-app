@@ -1,13 +1,26 @@
 /**
  * `HostFs` on `expo-file-system` and `expo-document-picker` (spec 008, T052; Expo 57 docs, `sdk/filesystem`,
  * `sdk/document-picker`). App-private storage is `Paths.document`, which the system does not clear; only relative
- * paths are stored, because iOS can move the container after an update. The picker copies the chosen file to the
- * cache (`copyToCacheDirectory`, the default), so the service reads a `file://` copy and never a `content://` one.
+ * paths are stored, because iOS can move the container after an update.
+ *
+ * The picked file:
+ *   - iOS: the picker copies it to the cache (`copyToCacheDirectory`), and the service reads that `file://` copy.
+ *   - Android: the service reads the picker's own `content://` document URI (ACTION_OPEN_DOCUMENT, so a SAF document
+ *     that `File.open('r')` supports), once, right after the pick. Not a cache copy, because in Expo Go the picker
+ *     writes that copy outside the project's scoped folders and `expo-file-system` then refuses to open it
+ *     (`InvalidPermissionException`, shown to the user as "Could not read the selected file", 2026-11-05). The
+ *     document is only ever read: `discardUri` never deletes a `content://` URI, which is the user's own file.
  */
 import * as DocumentPicker from 'expo-document-picker'
 import { Directory, File, FileMode, Paths } from 'expo-file-system'
+import { Platform } from 'react-native'
 
 import type { ByteReader, ByteWriter, HostFs, PickedDocument } from './file-service'
+
+/** Android reads the picked document in place (see above); iOS reads a cache copy. */
+const COPY_PICKED_TO_CACHE = Platform.OS !== 'android'
+
+const isContentUri = (uri: string) => uri.startsWith('content:')
 
 const segments = (rel: string) => rel.split('/').filter(Boolean)
 const appFile = (rel: string) => new File(Paths.document, ...segments(rel))
@@ -28,7 +41,7 @@ function reader(file: File): ByteReader {
 export function createExpoHostFs(): HostFs {
   return {
     async pickDocument(): Promise<PickedDocument | null> {
-      const result = await DocumentPicker.getDocumentAsync({ type: '*/*', copyToCacheDirectory: true, multiple: false })
+      const result = await DocumentPicker.getDocumentAsync({ type: '*/*', copyToCacheDirectory: COPY_PICKED_TO_CACHE, multiple: false })
       if (result.canceled || !result.assets?.length) return null
       const asset = result.assets[0]!
       const size = asset.size ?? new File(asset.uri).size
@@ -97,6 +110,8 @@ export function createExpoHostFs(): HostFs {
     },
 
     discardUri(uri) {
+      // A content:// URI is the user's own document, never a copy of ours: nothing to discard.
+      if (isContentUri(uri)) return
       try {
         const file = new File(uri)
         if (file.exists) file.delete()

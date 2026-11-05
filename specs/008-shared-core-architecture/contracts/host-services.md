@@ -19,7 +19,7 @@ The host accepts messages only from the bundled origin, and rejects unknown serv
 | `sql.query` | `sql`, `params` | Rows | Read only; rows capped in size |
 | `sql.run` | `sql`, `params` | `changes`, `lastInsertRowId` | One statement |
 | `sql.transaction` | `statements[]` | Per-statement result | All or nothing, in `withExclusiveTransactionAsync` |
-| `files.pick` | `extensions[]` (subset of `epub`, `pdf`, `txt`, `md`) | `{ status: 'picked', pickId, name, size, extension }`, `{ status: 'cancelled' }` or `{ status: 'unsupported', name }` | Picker only, copy to cache; no path returned |
+| `files.pick` | `extensions[]` (subset of `epub`, `pdf`, `txt`, `md`) | `{ status: 'picked', pickId, name, size, extension }`, `{ status: 'cancelled' }` or `{ status: 'unsupported', name }` | Picker only; no path returned. iOS reads a cache copy; Android reads the picker's `content://` document once, in `files.stage` (in Expo Go the cache copy is outside the scoped folders and cannot be opened, 2026-11-05); a `content://` URI is never deleted |
 | `files.stage` | `pickId`, `stagingId` (UUID) | Staged size | Copies in 1 MiB chunks with `importProgress`; `NO_SPACE` (checked before copying, and on a write failure), `CANCELLED`, `READ_FAILED` |
 | `files.hashStaged` | `stagingId` | SHA-256 hex and size | Chunked, incremental (`src/host/sha256.ts`, same digest as Desktop) |
 | `files.cancel` | `stagingId` | Whether a job was running | Stops `stage` / `hashStaged` between chunks; the job then fails with `CANCELLED` and removes its staging folder (added at M4) |

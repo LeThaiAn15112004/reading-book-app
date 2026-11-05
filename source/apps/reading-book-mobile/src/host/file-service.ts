@@ -100,6 +100,12 @@ function isNoSpace(error: unknown): boolean {
   return /ENOSPC|no space|disk full|not enough space/i.test(text)
 }
 
+/** The underlying error text, kept in the host error so a failed read can be diagnosed from the log. */
+function detail(error: unknown): string {
+  const text = error instanceof Error ? error.message : String(error)
+  return text.replace(/\s+/g, ' ').slice(0, 300)
+}
+
 function extensionOf(name: string): string {
   const match = /\.([A-Za-z0-9]+)$/.exec(name.trim())
   return match ? match[1]!.toLowerCase() : ''
@@ -168,8 +174,8 @@ export function createFileService(options: FileServiceOptions) {
       fs.mkdirp(stagingDir(stagingId))
       try {
         reader = fs.openReadUri(picked.uri)
-      } catch {
-        throw new HostServiceError('READ_FAILED', 'The picked file could not be read')
+      } catch (error) {
+        throw new HostServiceError('READ_FAILED', `The picked file could not be opened: ${detail(error)}`)
       }
       writer = fs.openWrite(target)
       let done = 0
@@ -180,8 +186,8 @@ export function createFileService(options: FileServiceOptions) {
         let chunk: Uint8Array
         try {
           chunk = reader.read(FILE_LIMITS.chunkBytes)
-        } catch {
-          throw new HostServiceError('READ_FAILED', 'The picked file could not be read')
+        } catch (error) {
+          throw new HostServiceError('READ_FAILED', `The picked file could not be read: ${detail(error)}`)
         }
         if (chunk.length === 0) break
         try {

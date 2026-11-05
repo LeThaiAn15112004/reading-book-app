@@ -122,6 +122,7 @@ export function createImportGroup(ctx: BridgeContext): ImportGroup {
         await ctx.client.call('files', 'stage', { pickId: picked.pickId, stagingId }, { timeoutMs: 0 })
       } catch (error) {
         const code = error instanceof HostCallError ? error.code : ''
+        console.warn('[bridge] import: copying the picked file failed', code, error instanceof Error ? error.message : error)
         if (code === 'CANCELLED' || job.cancelled) return failure('cancelled', 'Import cancelled.')
         if (code === 'NO_SPACE') return failure('save_failed', 'There is not enough free space on this device for this book. Nothing was added.')
         if (code === 'READ_FAILED') return failure('access_denied', 'Could not read the selected file.')

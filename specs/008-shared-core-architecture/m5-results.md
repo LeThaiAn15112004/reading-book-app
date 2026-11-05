@@ -79,3 +79,14 @@ folders appear and `app/build/outputs/apk/debug/app-debug.apk` is written. If ni
 `android/local.properties`, or a shorter checkout path.
 
 T017, T093 and T074 run on that APK and need a device or emulator.
+
+## Import on the phone: "Could not read the selected file." (2026-11-05)
+
+Reported by the user on BlueStacks 5.22, Expo Go. `files.stage` answered `READ_FAILED`: the picker
+(`copyToCacheDirectory: true`) copies the document to `context.cacheDir/DocumentPicker/`, which in Expo Go is outside
+the project's scoped folders, and `expo-file-system` refuses `File.open()` there (`checkPermissionForPath` →
+`InvalidPermissionException`). Content URIs skip that check. **Fix**: on Android the picker no longer copies, and the
+host reads the `content://` document (ACTION_OPEN_DOCUMENT → SAF, which `File.open('r')` supports) once, during
+`files.stage`; `discardUri` never deletes a `content://` URI. iOS keeps the cache copy. `READ_FAILED` now carries the
+underlying error text, and the bridge logs it (`[bridge] import: copying the picked file failed`). **Not yet confirmed
+on the device**: the cause is read from the Expo 57 sources, not from a log.
