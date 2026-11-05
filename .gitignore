@@ -147,3 +147,10 @@ dist
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 .vite/
+
+# Expo / React Native at the repository root (spec 009 T017)
+/android
+/ios
+.expo/
+expo-env.d.ts
+.metro-health-check*

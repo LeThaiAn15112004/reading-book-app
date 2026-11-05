@@ -1,0 +1,22 @@
+{
+  // Expo needs a tsconfig.json at the project root (`npx expo start` writes one if it is missing, spec 009 T018).
+  // It covers the React Native host only; the Desktop, WebView UI and core keep their own tsconfig files until US4
+  // gives the project one shared base (plan "Project Structure").
+  "extends": "expo/tsconfig.base",
+  "compilerOptions": {
+    "strict": true,
+    "paths": {
+      "@reading-book/book-reader-sdk": ["./source/apps/book-reader-sdk/src/index.ts"],
+      "@reading-book/book-reader-sdk/*": ["./source/apps/book-reader-sdk/src/*"],
+      "@/*": ["./source/apps/reading-book-mobile/src/*"],
+      "@/assets/*": ["./source/apps/reading-book-mobile/assets/*"]
+    }
+  },
+  "include": [
+    "source/apps/reading-book-mobile/src/**/*.ts",
+    "source/apps/reading-book-mobile/src/**/*.tsx",
+    "source/apps/reading-book-mobile/modules/*/index.ts",
+    ".expo/types/**/*.ts",
+    "expo-env.d.ts"
+  ]
+}

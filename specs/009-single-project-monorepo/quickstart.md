@@ -85,3 +85,13 @@ npm run e2e
 | `npm run check` | pass |
 | Desktop baseline | 26/26 (the Main check now accepts the listed changes) |
 | Desktop E2E (React 19, hidden, 84 tests) | **72 passed / 4 failed / 8 skipped** (pre-009: 67–71 passed). 3 failures known before spec 009 (`epub-toc-regression` E2E 7, `md-reader` E, `pdf-annotations` "EPUB highlights …"); `pdf-typewriter` passes alone (2/2). No failure from React 19 / TS 6 |
+
+### After US1 + US2 (T013–T018, 2026-11-05)
+
+| Check | Result |
+|---|---|
+| `npm run dev` (root, hidden window) | Desktop only: renderer `200`, Electron running, no Metro (SC-001 Desktop) |
+| `npx expo start` / `npm run dev:mobile` (root) | Metro ready in 69 s incl. the WebView build; `/readmate-ui/index.html` `200`; Android bundle 1,384 modules |
+| `npx expo prebuild -p android` (root) | `./android` written; plugins applied; `local-server` autolinked |
+| Expo Go on a device | **user** (SC-007) |
+| `npm run check` | pass |
