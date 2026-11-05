@@ -93,5 +93,5 @@ npm run e2e
 | `npm run dev` (root, hidden window) | Desktop only: renderer `200`, Electron running, no Metro (SC-001 Desktop) |
 | `npx expo start` / `npm run dev:mobile` (root) | Metro ready in 69 s incl. the WebView build; `/readmate-ui/index.html` `200`; Android bundle 1,384 modules |
 | `npx expo prebuild -p android` (root) | `./android` written; plugins applied; `local-server` autolinked |
-| Expo Go on a device | **user** (SC-007) |
+| Expo Go on a device | **User, 2026-11-05: import works** (SC-007) |
 | `npm run check` | pass |
