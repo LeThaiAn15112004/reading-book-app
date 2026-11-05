@@ -2,13 +2,15 @@
 
 Validation guide for spec 009. Commands are in [contracts/root-commands.md](./contracts/root-commands.md).
 
-## Baseline (before Phase 1; filled in step 1.1)
+## Baseline (before Phase 1; recorded 2026-11-05, T001)
 
 | Measure | Value |
 |---|---|
-| Install folders and sizes | root 11 MB, `source/` 950 MB, Desktop 480 MB, Mobile 1.6 GB (incl. Android native build output), SDK 0 — ~3.0 GB (2026-11-05) |
-| Size without native build output | (1.1) |
-| `npm ls react` | (1.1) |
+| Install folders (all content) | root 10,978 KB; `source/` 972,375 KB; Desktop 490,540 KB; Mobile 1,616,783 KB; SDK 8 KB: **~3.09 GB** |
+| Same, without `*/android/.cxx` and `*/android/build` | root 10,978; `source/` 972,375; Desktop 490,540; Mobile 408,707 KB: **1,882,600 KB (~1.80 GiB)** — SC-004 target ≤ 1,411,950 KB measured the same way |
+| `npm ls` (depth 0) | Desktop: react / react-dom 18.3.1, typescript 5.9.3, eslint 8.57.1. Mobile: react / react-dom 19.2.3, typescript 6.0.3, eslint 9.39.5. SDK: typescript 5.9.3 |
+| Desktop `vite build` assets (hashes removed) | `__vite-browser-external.js comic-book.js cursor-editorTextHighlight.svg epub.js fb2.js fflate.js fixed-layout.js hidden-epub-pagination.js index.css index.js mobi.js MobileReaderScreen.js` 9 Noto fonts `paginator.js pdf.worker.min.mjs rolldown-runtime.js search.js tts.js view.js zip.js` |
+| Desktop migrations | 30 files; SHA-256 (CRLF → LF) in `source/scripts/desktop-migrations.sha256.json`, checked by `check-desktop-baseline` "migrations byte-identical" (T002) |
 | Desktop baseline | 25/25 (2026-11-05) |
 | `check:boundaries` | 6/6, 42 tests |
 | Core tests / Mobile tests | 1016 / 111 |

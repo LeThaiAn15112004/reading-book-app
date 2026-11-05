@@ -132,6 +132,33 @@ function runGit() {
   const removed = [...before].filter((f) => f.endsWith('.sql') && !now.includes(f))
   record('git', 'no new or removed migration', atBase.ok && added.length === 0 && removed.length === 0,
     `${now.length} migrations${added.length ? `; added ${added.join(', ')}` : ''}${removed.length ? `; removed ${removed.join(', ')}` : ''}`)
+  checkMigrationHashes()
+}
+
+/**
+ * Spec 009 (T002): the 30 Desktop migrations keep their exact content wherever they move. Hashes are of the text with
+ * CRLF normalised to LF (git `autocrlf` checkouts), recorded in `desktop-migrations.sha256.json`.
+ */
+export const DESKTOP_MIGRATION_DIRS = [
+  'source/apps/reading-book-desktop/electron/persistence/migrations',
+  'source/core/src/db/desktop/migrations',
+]
+
+function checkMigrationHashes() {
+  const expected = JSON.parse(readFileSync(path.join(sourceRoot, 'scripts/desktop-migrations.sha256.json'), 'utf8'))
+  const dir = DESKTOP_MIGRATION_DIRS.map((d) => path.join(repoRoot, d)).find((d) => existsSync(d))
+  if (!dir) {
+    record('git', 'migrations byte-identical', false, 'migrations folder not found')
+    return
+  }
+  const wrong = Object.entries(expected).filter(([file, hash]) => {
+    const full = path.join(dir, file)
+    if (!existsSync(full)) return true
+    const text = readFileSync(full, 'utf8').replace(/\r\n/g, '\n')
+    return createHash('sha256').update(text).digest('hex') !== hash
+  })
+  record('git', 'migrations byte-identical', wrong.length === 0,
+    wrong.length ? `${wrong.length} differ or missing: ${wrong.slice(0, 5).map(([f]) => f).join(', ')}` : `${Object.keys(expected).length} files, ${path.relative(repoRoot, dir).replaceAll('\\', '/')}`)
 }
 
 // --- Group 3: the copied pre-change library (T026) --------------------------------------------------------------

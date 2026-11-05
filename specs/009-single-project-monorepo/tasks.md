@@ -31,8 +31,8 @@ T012 is done (contracts/root-commands.md).
 
 **Purpose**: Record what must not change.
 
-- [ ] T001 Record the baseline in `specs/009-single-project-monorepo/quickstart.md` §Baseline: size of each `node_modules` with and without `**/android/.cxx` and `**/android/build` (research R8), `npm ls react react-dom typescript eslint` per workspace, G-base results, the asset list of Desktop `npx vite build` (`source/apps/reading-book-desktop/dist/assets`), and SHA-256 of the 30 files in `source/apps/reading-book-desktop/electron/persistence/migrations/`
-- [ ] T002 [P] Add the 30 migration SHA-256 values from T001 to `source/scripts/check-desktop-baseline.mjs` as a check "migrations byte-identical" (it must keep passing after T030 moves them)
+- [X] T001 Record the baseline in `specs/009-single-project-monorepo/quickstart.md` §Baseline: size of each `node_modules` with and without `**/android/.cxx` and `**/android/build` (research R8), `npm ls react react-dom typescript eslint` per workspace, G-base results, the asset list of Desktop `npx vite build` (`source/apps/reading-book-desktop/dist/assets`), and SHA-256 of the 30 files in `source/apps/reading-book-desktop/electron/persistence/migrations/`
+- [X] T002 [P] Add the 30 migration SHA-256 values from T001 to `source/scripts/check-desktop-baseline.mjs` as a check "migrations byte-identical" (it must keep passing after T030 moves them)
 
 ---
 
