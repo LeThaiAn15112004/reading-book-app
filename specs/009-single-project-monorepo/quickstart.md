@@ -84,4 +84,4 @@ npm run e2e
 | Size without native build output | **1,873,973 KB** vs baseline 1,882,600 KB (−0.5 %). The duplicates were small; most of the size is packages only one host uses. SC-004 (≤ 1,411,950 KB) is **not met** yet: T021 lists the largest packages |
 | `npm run check` | pass |
 | Desktop baseline | 26/26 (the Main check now accepts the listed changes) |
-| Desktop E2E | not run (T005, user) |
+| Desktop E2E (React 19, hidden, 84 tests) | **72 passed / 4 failed / 8 skipped** (pre-009: 67–71 passed). 3 failures known before spec 009 (`epub-toc-regression` E2E 7, `md-reader` E, `pdf-annotations` "EPUB highlights …"); `pdf-typewriter` passes alone (2/2). No failure from React 19 / TS 6 |
