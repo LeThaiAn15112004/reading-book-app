@@ -1,8 +1,9 @@
 import {
-  SETTINGS_SECTIONS,
+  visibleSettingsSections,
   useSettingsNavStore,
 } from '../../logic/settingsNavStore'
 import { SettingsSectionIcon } from './SettingsSectionIcon'
+import { isMobileHost } from '../../../../platform/index'
 
 /** Same chevron paths as the Reader sidebar edge handle (`SidebarEdgeRail`). */
 function ChevronIcon({ collapsed }: { collapsed: boolean }) {
@@ -32,7 +33,9 @@ function ChevronIcon({ collapsed }: { collapsed: boolean }) {
  */
 export function SettingsSidebar() {
   const activeSection = useSettingsNavStore((s) => s.activeSection)
-  const collapsed = useSettingsNavStore((s) => s.collapsed)
+  // Mobile host (spec 008, T069): the icon rail leaves the phone's width to the content; there is no toggle there.
+  const phone = isMobileHost()
+  const collapsed = useSettingsNavStore((s) => s.collapsed) || phone
   const setActiveSection = useSettingsNavStore((s) => s.setActiveSection)
   const toggleCollapsed = useSettingsNavStore((s) => s.toggleCollapsed)
   const toggleLabel = collapsed ? 'Expand settings sidebar' : 'Collapse settings sidebar'
@@ -63,7 +66,7 @@ export function SettingsSidebar() {
 
         <nav className="app-scroll min-h-0 flex-1 overflow-x-hidden overflow-y-auto p-2">
           <ul className="m-0 flex list-none flex-col gap-0.5 p-0">
-            {SETTINGS_SECTIONS.map((section) => {
+            {visibleSettingsSections().map((section) => {
               const active = section.id === activeSection
               return (
                 <li key={section.id}>
@@ -97,6 +100,7 @@ export function SettingsSidebar() {
         </nav>
       </aside>
 
+      {phone ? null : (
       <button
         type="button"
         className="absolute top-0 bottom-0 left-full flex w-5 cursor-pointer items-center justify-center rounded-r-md border border-l-0 border-lib-border-soft bg-lib-surface-strong text-lib-muted shadow-md transition-colors hover:border-lib-accent-ring hover:text-lib-accent focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-lib-accent"
@@ -107,6 +111,7 @@ export function SettingsSidebar() {
       >
         <ChevronIcon collapsed={collapsed} />
       </button>
+      )}
     </div>
   )
 }

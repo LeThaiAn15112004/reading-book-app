@@ -5,6 +5,10 @@
     "apps/*",
     "packages/*"
   ],
+  "scripts": {
+    "check:desktop-baseline": "node scripts/check-desktop-baseline.mjs",
+    "check:boundaries": "node scripts/boundaries/run-all.mjs"
+  },
   "overrides": {
     "lightningcss": "1.30.1"
   },

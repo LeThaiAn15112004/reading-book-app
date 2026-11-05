@@ -1,0 +1,25 @@
+{
+  "contractVersion": 1,
+  "kind": "pdf-bookmark",
+  "description": "PDF bookmark: page-rect locator without a rect (1-based page, chapterIndex = 0-based page), label only. Shape of a real Desktop row.",
+  "bookFormat": "pdf",
+  "bookmark": {
+    "locator": { "kind": "page-rect", "page": 7, "chapterIndex": 6 },
+    "label": "Page 7"
+  },
+  "expect": {
+    "noteJson": {
+      "schemaVersion": 1,
+      "type": "bookmark",
+      "group": "bookmark",
+      "locatorExtended": { "locator": { "kind": "page-rect", "page": 7, "chapterIndex": 6 } },
+      "label": "Page 7",
+      "created": "<timestamp>",
+      "modified": "<timestamp>"
+    },
+    "record": {
+      "locator": { "kind": "page-rect", "page": 7, "chapterIndex": 6 },
+      "label": "Page 7"
+    }
+  }
+}

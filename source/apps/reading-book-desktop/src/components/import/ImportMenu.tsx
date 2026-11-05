@@ -1,6 +1,7 @@
 import { useEffect, useId, useRef, useState } from 'react'
 import { features } from '@reading-book/config'
 import { useZipImportStore, zipJobShortLabel } from '../../hooks/library'
+import { isFeatureAvailable } from '../../platform/index'
 import { SpinnerIcon } from './SpinnerIcon'
 
 export type ImportMenuProps = {
@@ -149,6 +150,16 @@ export function ImportMenu({
   const secondaryClass = isLg
     ? 'inline-flex h-12 cursor-pointer items-center gap-2.5 rounded-xl border border-lib-border bg-transparent px-7 text-[15px] font-semibold text-lib-text-strong transition-colors hover:border-lib-accent hover:bg-lib-accent-soft'
     : 'inline-flex h-[38px] shrink-0 cursor-pointer items-center gap-2 rounded-lg border border-lib-border bg-transparent px-4 text-[13px] font-semibold text-lib-text-strong transition-colors hover:border-lib-accent hover:bg-lib-accent-soft'
+
+  // Mobile host (spec 008, T068): no URL or audiobook import in the first release, so "Add file" is the only entry.
+  if (!isFeatureAvailable('urlImport') && !isFeatureAvailable('audiobooks')) {
+    return (
+      <button type="button" className={primaryClass} aria-label="Add file from this device" onClick={onFromDevice}>
+        <PlusIcon className={iconClass} />
+        <span>Add file</span>
+      </button>
+    )
+  }
 
   return (
     <div className="inline-flex shrink-0" aria-label="Import documents">

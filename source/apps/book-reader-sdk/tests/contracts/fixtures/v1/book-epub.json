@@ -1,0 +1,51 @@
+{
+  "contractVersion": 1,
+  "kind": "book-epub",
+  "description": "One books row through LibraryStore.save / findById: Mobile's path rules (relative file_path and cover_path), metadata fields, no signature (signatureStatus absent = not checked). <id> is replaced by the saved book's id.",
+  "book": {
+    "title": "  A Contract Book — Sách mẫu  ",
+    "filePath": "books/<id>/file",
+    "format": "epub",
+    "coverPath": "covers/<id>.png",
+    "sha256": "8f434346648f6b96df89dda901c5176b10a6d83961dd3c1ac88b59b2dc327aa4",
+    "fileSizeBytes": 123456,
+    "description": "A short blurb.",
+    "pageCount": 42,
+    "isFavorite": true,
+    "addedAt": "2026-11-04T00:00:00.000Z",
+    "updatedAt": "2026-11-04T00:00:00.000Z"
+  },
+  "expect": {
+    "row": {
+      "title": "A Contract Book — Sách mẫu",
+      "file_path": "books/<id>/file",
+      "normalized_path": null,
+      "file_format": "epub",
+      "cover_path": "covers/<id>.png",
+      "sha256": "8f434346648f6b96df89dda901c5176b10a6d83961dd3c1ac88b59b2dc327aa4",
+      "is_favorite": 1,
+      "reading_status": "not-started",
+      "source_url": null,
+      "source_provider": null,
+      "external_id": null,
+      "metadata_json": { "fileSizeBytes": 123456, "pageCount": 42, "description": "A short blurb." },
+      "genres_json": [],
+      "reading_state_json": {},
+      "added_at": "2026-11-04T00:00:00.000Z",
+      "updated_at": "2026-11-04T00:00:00.000Z"
+    },
+    "book": {
+      "title": "A Contract Book — Sách mẫu",
+      "filePath": "books/<id>/file",
+      "format": "epub",
+      "coverPath": "covers/<id>.png",
+      "sha256": "8f434346648f6b96df89dda901c5176b10a6d83961dd3c1ac88b59b2dc327aa4",
+      "fileSizeBytes": 123456,
+      "description": "A short blurb.",
+      "pageCount": 42,
+      "isFavorite": true,
+      "addedAt": "2026-11-04T00:00:00.000Z",
+      "updatedAt": "2026-11-04T00:00:00.000Z"
+    }
+  }
+}

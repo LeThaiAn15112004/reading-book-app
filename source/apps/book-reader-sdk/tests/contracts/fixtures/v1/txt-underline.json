@@ -1,0 +1,38 @@
+{
+  "contractVersion": 1,
+  "kind": "txt-underline",
+  "description": "TXT underline: text-offset locator (blockId txt) plus txtAnnotation UTF-16 offsets into the canonical text. On Desktop these rows are written only inside txt:commit, through the same store write; at store level the row shape is the contract. Mobile is read-only for TXT in the first release (contracts/mobile-bridge.md).",
+  "bookFormat": "txt",
+  "save": {
+    "locator": { "kind": "text-offset", "offset": 120, "blockId": "txt", "chapterIndex": 0 },
+    "styleKind": "underline",
+    "colorHex": "#90CAF9",
+    "selectionText": { "highlight": "a plain line of text", "before": "Here is ", "after": " in a TXT book." },
+    "txtAnnotation": { "startOffset": 120, "endOffset": 140 }
+  },
+  "expect": {
+    "noteJson": {
+      "schemaVersion": 1,
+      "type": "underline",
+      "group": "annotation",
+      "locatorExtended": {
+        "locator": { "kind": "text-offset", "offset": 120, "blockId": "txt", "chapterIndex": 0 },
+        "text": { "highlight": "a plain line of text", "before": "Here is ", "after": " in a TXT book." }
+      },
+      "txtAnnotation": { "startOffset": 120, "endOffset": 140 },
+      "textualValue": "a plain line of text",
+      "note": null,
+      "style": { "colorHex": "#90CAF9" },
+      "created": "<timestamp>",
+      "modified": "<timestamp>"
+    },
+    "record": {
+      "locator": { "kind": "text-offset", "offset": 120, "blockId": "txt", "chapterIndex": 0 },
+      "styleKind": "underline",
+      "colorHex": "#90CAF9",
+      "tags": [],
+      "selectionText": { "highlight": "a plain line of text", "before": "Here is ", "after": " in a TXT book." },
+      "txtAnnotation": { "startOffset": 120, "endOffset": 140 }
+    }
+  }
+}

@@ -10,8 +10,8 @@ import {
   StorageSettings,
 } from './components'
 import {
-  SETTINGS_SECTIONS,
   useSettingsNavStore,
+  visibleSettingsSections,
   type SettingsSectionId,
 } from './logic/settingsNavStore'
 
@@ -28,7 +28,8 @@ const SECTION_DESCRIPTIONS: Partial<Record<SettingsSectionId, string>> = {
 /** SCR-06 — App Settings: section sidebar (collapsible) + content panel. */
 export function SettingsScreen() {
   const activeSection = useSettingsNavStore((s) => s.activeSection)
-  const section = SETTINGS_SECTIONS.find((s) => s.id === activeSection) ?? SETTINGS_SECTIONS[0]
+  const sections = visibleSettingsSections()
+  const section = sections.find((s) => s.id === activeSection) ?? sections[0]!
   const description = SECTION_DESCRIPTIONS[section.id]
 
   return (

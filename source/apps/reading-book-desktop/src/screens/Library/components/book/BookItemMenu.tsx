@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type MouseEvent as ReactMouseEvent } from 'react'
 import { annotationTransferApi } from '../../../../bridge'
+import { isFeatureAvailable, isMobileHost } from '../../../../platform/index'
 import { supportsAnnotationTransfer } from '../../../Reader/logic/annotationTransferStore'
 import type {
   CollectionSummary,
@@ -108,7 +109,9 @@ export function BookItemMenu({
 }: BookItemMenuProps) {
   const menuRef = useRef<HTMLDivElement>(null)
   const [collectionsOpen, setCollectionsOpen] = useState(false)
-  const canExportAnnotations = supportsAnnotationTransfer(book.format)
+  const canExportAnnotations = supportsAnnotationTransfer(book.format) && isFeatureAvailable('annotationTransfer')
+  // Mobile host (spec 008, T073): a full-width sheet at the bottom; the measured desktop placement does not fit a phone.
+  const phone = isMobileHost()
   const [annotationCount, setAnnotationCount] = useState(0)
   useEffect(() => {
     if (!canExportAnnotations) return
@@ -155,20 +158,24 @@ export function BookItemMenu({
       ref={menuRef}
       role="menu"
       aria-label={`Actions for ${book.title}`}
-      className="fixed z-[300] w-[274px] rounded-xl border border-lib-border bg-lib-surface-strong p-1.5 shadow-[0_18px_48px_rgba(0,0,0,0.45)]"
-      style={{ left, top }}
+      className={
+        phone
+          ? 'phone-sheet fixed inset-x-0 bottom-0 z-[300] max-h-[80vh] overflow-y-auto rounded-t-2xl border border-lib-border bg-lib-surface-strong p-2 shadow-[0_-12px_40px_rgba(0,0,0,0.45)]'
+          : 'fixed z-[300] w-[274px] rounded-xl border border-lib-border bg-lib-surface-strong p-1.5 shadow-[0_18px_48px_rgba(0,0,0,0.45)]'
+      }
+      style={phone ? undefined : { left, top }}
       onContextMenu={blockContextMenu}
     >
       <button className={itemClass} role="menuitem" onClick={() => run(() => onResume(book.id))}>
         Resume reading
       </button>
-      <div className="relative" onMouseLeave={() => setCollectionsOpen(false)}>
+      <div className="relative" onMouseLeave={phone ? undefined : () => setCollectionsOpen(false)}>
         <button
           className={itemClass}
           role="menuitem"
           aria-haspopup="menu"
           aria-expanded={collectionsOpen}
-          onMouseEnter={() => setCollectionsOpen(true)}
+          onMouseEnter={phone ? undefined : () => setCollectionsOpen(true)}
           onClick={() => setCollectionsOpen((open) => !open)}
         >
           <span>Add to collection</span>
@@ -176,16 +183,20 @@ export function BookItemMenu({
         </button>
         {collectionsOpen ? (
           <div
-            className={`absolute top-0 w-[230px] ${
-              openCollectionsLeft
-                ? 'left-full pl-1.5'
-                : 'right-full pr-1.5'
-            }`}
+            className={
+              phone
+                ? 'pl-3'
+                : `absolute top-0 w-[230px] ${
+                    openCollectionsLeft
+                      ? 'left-full pl-1.5'
+                      : 'right-full pr-1.5'
+                  }`
+            }
           >
             <div
               role="menu"
               aria-label="Collections"
-              className="w-56 rounded-xl border border-lib-border bg-lib-surface-strong p-1.5 shadow-[0_18px_48px_rgba(0,0,0,0.45)]"
+              className={phone ? 'w-full' : 'w-56 rounded-xl border border-lib-border bg-lib-surface-strong p-1.5 shadow-[0_18px_48px_rgba(0,0,0,0.45)]'}
             >
               {collections.map((collection) => {
                 const included = collection.bookIds.includes(book.id)
@@ -268,13 +279,17 @@ export function BookItemMenu({
           Import annotations…
         </button>
       ) : null}
-      <MenuSeparator />
-      <button className={itemClass} role="menuitem" onClick={() => run(() => onOpenFileLocation(book.id))}>
-        Open file location
-      </button>
-      <button className={itemClass} role="menuitem" onClick={() => run(() => onCopyFilePath(book.id))}>
-        Copy file path
-      </button>
+      {isFeatureAvailable('fileSystemActions') ? (
+        <>
+          <MenuSeparator />
+          <button className={itemClass} role="menuitem" onClick={() => run(() => onOpenFileLocation(book.id))}>
+            Open file location
+          </button>
+          <button className={itemClass} role="menuitem" onClick={() => run(() => onCopyFilePath(book.id))}>
+            Copy file path
+          </button>
+        </>
+      ) : null}
       <MenuSeparator />
       {book.chapterCount ? (
         // A multi-chapter audiobook's files are all app-owned copies: "remove the record, keep the files" would leave

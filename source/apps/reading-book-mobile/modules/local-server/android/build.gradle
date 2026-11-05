@@ -1,0 +1,23 @@
+plugins {
+  id 'com.android.library'
+  id 'expo-module-gradle-plugin'
+}
+
+group = 'com.anle.readmate'
+version = '1.0.0'
+
+android {
+  namespace "expo.modules.readmate.localserver"
+  defaultConfig {
+    versionCode 1
+    versionName '1.0.0'
+  }
+  // ui-assets/web-ui is written by `npm run build:web` and git-ignored.
+  sourceSets {
+    main.assets.srcDirs += ['../ui-assets']
+  }
+}
+
+dependencies {
+  testImplementation 'junit:junit:4.13.2'
+}

@@ -4,7 +4,7 @@
 
 **Created**: 2026-10-26
 
-**Status**: Draft — awaiting three decisions (see Clarifications needed)
+**Status**: Superseded by [spec 008](../008-shared-core-architecture/spec.md), which settles all three decisions. Kept for history; do not plan from this file.
 
 **Input**: User description (translated from Vietnamese): "For the current project: would it be OK to merge everything into one repository/project, instead of three separate projects under `source`? One repo; the desktop app is the main interface, and the mobile app (Android and iOS) is cloned from that desktop project."
 

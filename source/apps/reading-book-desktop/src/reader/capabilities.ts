@@ -1,3 +1,5 @@
+import { isMobileHost } from '../platform/index'
+
 /**
  * What the reader surface for the open book can actually do. The toolbar shows a tool only when the
  * surface has every capability the tool `requires` (hidden, never disabled) — a new renderer declares
@@ -87,6 +89,30 @@ export function readerSurfaceForFormat(format: string | null | undefined): Reade
   return 'placeholder'
 }
 
+/**
+ * Not in the first Mobile release (spec 008, `contracts/phone-ui.md`, Gating): removed on the Mobile host only, so
+ * those tools are hidden there exactly as an undeclared capability is hidden everywhere.
+ */
+const MOBILE_EXCLUDED: ReadonlySet<ReaderCapability> = new Set<ReaderCapability>([
+  'textEdit',
+  'search',
+  'readAloud',
+  'translate',
+  'snapshot',
+  'wordCount',
+  'attachments',
+  'inkAnnotations',
+  'shapeAnnotations',
+  'typewriterAnnotations',
+  'fileAttachments',
+])
+
 export function getReaderCapabilities(format: string | null | undefined): ReadonlySet<ReaderCapability> {
-  return new Set(SURFACE_CAPABILITIES[readerSurfaceForFormat(format)])
+  const surface = readerSurfaceForFormat(format)
+  const capabilities = new Set(SURFACE_CAPABILITIES[surface])
+  if (!isMobileHost()) return capabilities
+  for (const capability of MOBILE_EXCLUDED) capabilities.delete(capability)
+  // TXT is read-only on Mobile (no `txt.commit` in the first release), and TXT markup is saved with a text revision.
+  if (surface === 'txt') capabilities.delete('markupAnnotations')
+  return capabilities
 }

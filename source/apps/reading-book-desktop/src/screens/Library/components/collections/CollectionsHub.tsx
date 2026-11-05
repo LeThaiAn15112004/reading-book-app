@@ -139,7 +139,7 @@ export function CollectionsHub({
                       </div>
                     </div>
                   </button>
-                  <div className="absolute top-2.5 right-2.5 flex gap-1 rounded-lg bg-lib-surface-strong/90 p-1 opacity-0 shadow-lg transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
+                  <div className="hover-reveal absolute top-2.5 right-2.5 flex gap-1 rounded-lg bg-lib-surface-strong/90 p-1 opacity-0 shadow-lg transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
                     <button
                       type="button"
                       className="h-7 cursor-pointer rounded-md border-none bg-transparent px-2 text-xs text-lib-muted hover:bg-white/10 hover:text-lib-text-strong"

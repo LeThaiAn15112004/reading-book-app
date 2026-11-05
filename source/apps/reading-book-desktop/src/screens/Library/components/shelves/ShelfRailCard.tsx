@@ -1,5 +1,6 @@
 import { formatLastReadLine, type LibraryBook } from '@reading-book/book-reader-sdk'
 import { BookCover, BookMenuButton, type BookMenuPoint } from '../book'
+import { withLongPress } from '../../../../platform/long-press'
 
 const PROVIDER_LABEL: Record<'google_drive' | 'dropbox' | 'onedrive', string> = {
   google_drive: 'Google Drive',
@@ -64,10 +65,10 @@ export function ShelfRailCard({
     <div
       role="listitem"
       className={`group relative flex min-w-0 flex-col gap-2 ${className}`}
-      onContextMenu={(event) => {
+      {...withLongPress((event) => {
         event.preventDefault()
         onBookMenu(book.id, { x: event.clientX, y: event.clientY })
-      }}
+      })}
     >
       <button
         type="button"

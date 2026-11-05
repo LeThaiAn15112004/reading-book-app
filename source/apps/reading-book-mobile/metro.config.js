@@ -1,13 +1,14 @@
-const { getDefaultConfig } = require('expo/metro-config')
-const { withNativewind } = require('nativewind/metro')
 const path = require('node:path')
+const { getDefaultConfig } = require('expo/metro-config')
+const { withUiMiddleware } = require('./scripts/ui-middleware.cjs')
 
-const projectRoot = __dirname
-const workspaceRoot = path.resolve(projectRoot, '../../')
-
+// Monorepo watch folders and node_modules paths come from expo/metro-config (SDK 52+); do not set them here.
 /** @type {import('expo/metro-config').MetroConfig} */
-const config = getDefaultConfig(projectRoot)
+const config = getDefaultConfig(__dirname)
 
-config.watchFolders = [path.resolve(workspaceRoot, 'packages')]
+config.server = {
+  ...config.server,
+  enhanceMiddleware: withUiMiddleware(path.join(__dirname, 'web', 'dist'), config.server?.enhanceMiddleware),
+}
 
-module.exports = withNativewind(config)
+module.exports = config

@@ -1,0 +1,28 @@
+{
+  "contractVersion": 1,
+  "kind": "epub-bookmark",
+  "description": "EPUB bookmark: point CFI plus chapterIndex, label and excerpt (textualValue). Shape of a real Desktop row; text replaced. The label is saved with surrounding spaces, which the store trims.",
+  "bookFormat": "epub",
+  "bookmark": {
+    "locator": { "kind": "cfi", "cfi": "epubcfi(/6/10!/4/4[id70270891363200]/2/2/2/2/1:0)", "chapterIndex": 4 },
+    "label": "  Memoir  ",
+    "excerpt": "The personal history of the author is interesting but difficult."
+  },
+  "expect": {
+    "noteJson": {
+      "schemaVersion": 1,
+      "type": "bookmark",
+      "group": "bookmark",
+      "locatorExtended": { "locator": { "kind": "cfi", "cfi": "epubcfi(/6/10!/4/4[id70270891363200]/2/2/2/2/1:0)", "chapterIndex": 4 } },
+      "textualValue": "The personal history of the author is interesting but difficult.",
+      "label": "Memoir",
+      "created": "<timestamp>",
+      "modified": "<timestamp>"
+    },
+    "record": {
+      "locator": { "kind": "cfi", "cfi": "epubcfi(/6/10!/4/4[id70270891363200]/2/2/2/2/1:0)", "chapterIndex": 4 },
+      "label": "Memoir",
+      "excerpt": "The personal history of the author is interesting but difficult."
+    }
+  }
+}

@@ -8,10 +8,13 @@ hash, engine render) đều do **host app inject** lúc khởi tạo.
 - `dist/` **tự chứa**: không có `import`/`require` tới package nào (zustand/vanilla được bundle
   sẵn). Copy thư mục SDK tới bất kỳ đâu, trỏ relative path là chạy — không cần `npm install`,
   không cần monorepo. Script build **tự kiểm tra** điều này và fail nếu vi phạm.
-- Core biên dịch với `lib: ES2022`, `types: []` → dùng `fs`, `window`, `Buffer`, `process`,
-  `better-sqlite3`, React… trong `src/` là **lỗi compile**, không chỉ là quy ước.
-- Tương thích dữ liệu hiện có của desktop: `notes.note_json` (migration 018/019),
-  `Location.toString()`, `locatorRef`, `last_read_location`.
+- Core biên dịch với `lib: ES2022`, `types: []` → dùng **biến toàn cục** Node/DOM (`fs`, `window`, `Buffer`,
+  `process`…) trong `src/` là **lỗi compile**. Còn **import package** (`better-sqlite3`, `react`, `epubjs`…) thì
+  tsconfig KHÔNG chặn được: việc đó do `npm run check:boundaries` (trong `source/`, spec 008 R2/R3) kiểm — chỉ cho
+  phép đường dẫn tương đối bên trong `src` và `zustand/vanilla`.
+- `Location.toString()`, `locatorRef`, `last_read_location` khớp dữ liệu desktop. **`createSqlNoteRepositories`
+  (`persistence/sql-notes.ts`) thì KHÔNG khớp** layout `notes.note_json` của desktop (xem chú thích trong file, spec
+  008 FR-023) — không dùng cho dữ liệu thật; hình dạng dữ liệu được chốt bằng contract fixtures ở `tests/contracts/`.
 
 ## Cấu trúc
 
@@ -209,7 +212,22 @@ await sdk.dispose()     // mọi lời gọi sau đó ném SdkError('DISPOSED')
 - Kiểm tra lỗi bằng `isSdkError(e)` + `e.code`, **không** dùng `instanceof` (host có thể nạp cả
   bản ESM và CJS).
 
-## Electron: chia SDK giữa hai process
+## Host thật dùng SDK thế nào (hiện trạng, spec 008)
+
+Cả hai app **không** dùng `createBookReaderSdk`, `sdk.services.*` hay `createSqlNoteRepositories`. Chúng import
+thẳng **mã nguồn** các module thuần (alias `@reading-book/book-reader-sdk` → `src/index.ts`, không qua `dist/`):
+
+| Host | Dùng gì từ SDK | Lưu trữ |
+|---|---|---|
+| Desktop renderer (`reading-book-desktop/src`) | `app-models/*` (highlight, bookmark, PDF annotation, embedded sync, typewriter…), `Location`/CFI, `txt/`, `audio/`, `annotation-transfer/`, `attachments/`, prefs mặc định | Qua `window.api` → IPC → Main |
+| Desktop Main (`electron/`) | Cùng các luật thuần ở trên (kiểm tra lại payload, lập kế hoạch sync / import) | `sqlite-*-store.ts` riêng trên migration 001–030 |
+| Mobile WebView (`reading-book-mobile/web`) | Chính UI desktop ở trên (không copy file nào) + trong bridge / store: `Book`, `parseDocumentFormat`, `readEpubImportMetadata`, luật TXT (`normalizeTxtText`, BOM, giới hạn) và Markdown (`checkMdFileSize`), parse locator PDF / Markdown | `web/src/stores/*` trên SQLite của host, test với contract fixtures |
+| Mobile host React Native (`reading-book-mobile/src`) | Không import SDK ở bản đầu (OD-1) | `expo-sqlite`, `expo-file-system` |
+
+Các phần `createBookReaderSdk` / `sdk.stores` / `createSqlNoteRepositories` / `createIpcStorage` bên dưới vẫn chạy
+(test `tests/integration/reader-flow.test.ts`) nhưng là API **chưa được app nào áp dụng**.
+
+## Electron: chia SDK giữa hai process (thiết kế, chưa áp dụng)
 
 | | Main process | Renderer |
 |---|---|---|
@@ -217,9 +235,12 @@ await sdk.dispose()     // mọi lời gọi sau đó ném SdkError('DISPOSED')
 | fs / zip / hash | `node:fs`, JSZip, `node:crypto` | — (renderer không bao giờ thấy path thật) |
 | Dùng gì | `sdk.services.*` trong IPC handler | `sdk.stores.*` qua hooks |
 
-Ví dụ tích hợp Electron chính là app desktop thật (`apps/reading-book-desktop`): Main ở
-`electron/persistence/` + `electron/ipc/`, Renderer ở `src/bridge/` + `src/hooks/`.
-## Lộ trình áp dụng vào desktop app
+App desktop thật (`apps/reading-book-desktop`) **không** làm theo bảng trên: Main có store SQLite riêng ở
+`electron/persistence/` + `electron/ipc/`, Renderer dùng `src/bridge/` + store zustand của chính nó (xem mục trước).
+## Lộ trình áp dụng vào desktop app (chưa thực hiện)
+
+Bước 1 đã xong (alias). Bước 4 đã xong theo cách khác: `packages/domain` và `packages/shared` đã được gộp vào SDK và
+xoá. Bước 2 và 3 chưa làm; muốn làm thì trước hết phải đối chiếu với contract fixtures (OD-2).
 
 1. Thêm alias `@reading-book/book-reader-sdk` (tsconfig + vite, cả bản build Electron main).
 2. Renderer: thay `screens/Reader/logic/highlights/highlightsStore.ts` + `useReaderBookmarks` bằng

@@ -9,11 +9,13 @@ import {
   GlobalReadingPrefsProvider,
   ImmersiveReadingProvider,
   OpenReadingProvider,
+  PhoneNav,
   ReaderChromeMenuProvider,
   ReminderNavigationBridge,
   SessionFlushBridge,
   useImmersiveReading,
 } from './chrome'
+import { isFeatureAvailable } from './platform/index'
 import { LibraryScreen } from './screens/Library/LibraryScreen'
 import { ReaderRoute } from './screens/ReaderRoute'
 import { SettingsScreen } from './screens/Settings/SettingsScreen'
@@ -37,8 +39,15 @@ function AppChromeFrame({ children }: { children: ReactNode }) {
         }`}
         aria-hidden={immersive || undefined}
       >
-        <AppTitlebar />
-        <AppMenubar />
+        {/* Desktop window chrome; the Mobile host has a compact phone navigation instead (spec 008, T070). */}
+        {isFeatureAvailable('desktopChrome') ? (
+          <>
+            <AppTitlebar />
+            <AppMenubar />
+          </>
+        ) : (
+          <PhoneNav />
+        )}
       </div>
       <div className="relative min-h-0 flex-1 overflow-hidden">
         {children}

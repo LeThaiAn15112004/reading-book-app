@@ -1,5 +1,6 @@
 import { formatFileSizeMb } from '@reading-book/book-reader-sdk'
 import { BookCover, BookMenuButton, type BookMenuPoint } from '../book'
+import { withLongPress } from '../../../../platform/long-press'
 
 export type ShelfDetailItemData = {
   id: string
@@ -110,10 +111,10 @@ export function ShelfDetailItem({
     <li>
       <div
         className="group relative flex w-full items-center gap-3.5 rounded-[10px] border border-lib-border bg-lib-surface p-3 transition-[border-color,background-color,transform] hover:-translate-y-px hover:border-lib-accent-ring hover:bg-[rgb(30_41_59/0.55)] focus-within:border-lib-accent-ring"
-        onContextMenu={(event) => {
+        {...withLongPress((event) => {
           event.preventDefault()
           onBookMenu(item.id, { x: event.clientX, y: event.clientY })
-        }}
+        })}
       >
         <button
           type="button"

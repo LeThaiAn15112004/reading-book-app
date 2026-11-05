@@ -41,3 +41,12 @@ example
 # generated native folders
 /ios
 /android
+
+# Mobile web UI build output (npm run build:web)
+/modules/local-server/ui-assets
+/modules/local-server/android/build
+
+# Native module build output (Gradle / IDE import of modules/*/android)
+modules/*/android/.gradle/
+modules/*/android/build/
+modules/*/android/.cxx/

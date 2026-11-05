@@ -1,3 +1,4 @@
+import { isFeatureAvailable, type AppFeature } from '../../../platform/index'
 import { useShortcutsStore } from '../../../shortcuts/shortcutsStore'
 import { useAppAppearanceStore } from '../../../theme/appAppearanceStore'
 import { usePdfViewStore } from '../../Reader/logic/pdfView/pdfViewStore'
@@ -18,6 +19,8 @@ export type AppSettingsResetter = {
   id: string
   label: string
   reset: () => boolean | Promise<boolean>
+  /** The group exists only where this feature does (spec 008: the Mobile host has no Main-owned preferences). */
+  feature?: AppFeature
 }
 
 /**
@@ -39,18 +42,26 @@ export const APP_SETTINGS_RESETTERS: readonly AppSettingsResetter[] = [
     id: 'notifications',
     label: 'Notifications',
     reset: () => useNotificationsStore.getState().reset(),
+    feature: 'notificationSettings',
   },
   {
     id: 'background',
     label: 'Background & System Tray',
     reset: () => useBackgroundStore.getState().reset(),
+    feature: 'notificationSettings',
   },
   {
     id: 'keyboard-shortcuts',
     label: 'Keyboard Shortcuts',
     reset: () => useShortcutsStore.getState().reset(),
+    feature: 'keyboardShortcuts',
   },
 ]
+
+/** The groups that exist on this platform: all of them in Electron. */
+export function availableAppSettingsResetters(): readonly AppSettingsResetter[] {
+  return APP_SETTINGS_RESETTERS.filter((r) => r.feature === undefined || isFeatureAvailable(r.feature))
+}
 
 export type ResetAppSettingsResult = {
   /** Groups whose defaults could not be saved (in-memory state is still reset where possible). */
@@ -62,7 +73,7 @@ export type ResetAppSettingsResult = {
  * failure does not stop the rest. Stores update in place, so the UI reflects the defaults at once.
  */
 export async function resetAppSettings(
-  resetters: readonly AppSettingsResetter[] = APP_SETTINGS_RESETTERS,
+  resetters: readonly AppSettingsResetter[] = availableAppSettingsResetters(),
 ): Promise<ResetAppSettingsResult> {
   const failed: AppSettingsResetter[] = []
   for (const resetter of resetters) {

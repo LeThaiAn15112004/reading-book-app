@@ -1,0 +1,27 @@
+{
+  "contractVersion": 1,
+  "kind": "reading-state-txt",
+  "description": "books.reading_state_json for a TXT book: text-offset location with a percent label, dual layout, landscape. Shape of a real Desktop row. Optional keys left out of the save are absent from the JSON.",
+  "bookFormat": "txt",
+  "session": {
+    "lastReadLocation": "{\"kind\":\"text-offset\",\"offset\":1200,\"blockId\":\"txt\"}",
+    "lastReadLabel": "9%",
+    "percent": 9,
+    "fontFamily": "serif",
+    "fontSize": 18,
+    "layoutMode": "dual",
+    "isLandscape": true,
+    "updatedAt": "2026-10-19T07:56:55.161Z"
+  },
+  "expect": {
+    "readingStateJson": {
+      "lastReadLocation": { "kind": "text-offset", "offset": 1200, "blockId": "txt", "label": "9%" },
+      "percent": 9,
+      "fontFamily": "serif",
+      "fontSize": 18,
+      "layoutMode": "dual",
+      "isLandscape": true,
+      "updatedAt": "2026-10-19T07:56:55.161Z"
+    }
+  }
+}

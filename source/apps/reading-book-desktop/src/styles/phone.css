@@ -1,0 +1,43 @@
+/*
+ * Phone layout (spec 008, T066, T072; specs/008-shared-core-architecture/contracts/phone-ui.md).
+ *
+ * Every rule is scoped twice: under `[data-mobile-host]`, which only the Mobile app's web entry sets on <html>, and
+ * inside a width below Desktop's 900 px minimum window. Electron never sets the attribute, so not even a zoomed
+ * Desktop window can match these rules. Existing Tailwind classes are not rewritten; the Reader has its own Mobile
+ * layout (T101–T103) and is not styled here.
+ */
+
+/* Rules that do not depend on width: a phone in landscape can be wider than 900 px. */
+:root[data-mobile-host] {
+  /* No grey flash on tap, no long-press callout on app chrome (book text keeps its own selection). */
+  -webkit-tap-highlight-color: transparent;
+}
+
+:root[data-mobile-host] body {
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+  overscroll-behavior: none;
+}
+
+:root[data-mobile-host] button,
+:root[data-mobile-host] [role='menuitem'] {
+  -webkit-touch-callout: none;
+  touch-action: manipulation;
+}
+
+/* T072: controls that appear only on hover are always shown: there is no hover on a touch screen. */
+:root[data-mobile-host] .hover-reveal {
+  opacity: 1 !important;
+}
+
+/* T073: the book menu as a bottom sheet clears the home indicator. */
+:root[data-mobile-host] .phone-sheet {
+  padding-bottom: calc(0.5rem + env(safe-area-inset-bottom));
+}
+
+@media (max-width: 899.98px) {
+  /* Targets at least 44 px (contracts/phone-ui.md, Touch replacements). */
+  :root[data-mobile-host] [role='menuitem'],
+  :root[data-mobile-host] .phone-nav button {
+    min-height: 44px;
+  }
+}

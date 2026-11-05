@@ -71,7 +71,8 @@
     "spike:transcription:ffmpeg": "node spikes/transcription/run-ffmpeg-decoder.mjs",
     "spike:transcription:smoke": "npm run build --prefix ../book-reader-sdk && npx vite build && node spikes/transcription/run-transcription-smoke.mjs",
     "spike:md:main": "npm run build --prefix ../book-reader-sdk && node --experimental-transform-types --import ./spikes/txt/register-alias.mjs spikes/md/run-md-main.mjs",
-    "spike:md:render": "node --experimental-transform-types spikes/md/run-md-render.mjs"
+    "spike:md:render": "node --experimental-transform-types spikes/md/run-md-render.mjs",
+    "spike:contract:fixtures": "npm run build --prefix ../book-reader-sdk && node --experimental-transform-types spikes/mobile-contract-fixtures.mts"
   },
   "dependencies": {
     "@huggingface/transformers": "^4.3.0",

@@ -140,7 +140,7 @@ export function LibrarySearchBox({
                 <button
                   type="button"
                   tabIndex={-1}
-                  className="inline-flex size-6 shrink-0 cursor-pointer items-center justify-center rounded border-none bg-transparent text-[12px] text-lib-faint opacity-0 transition-opacity group-hover:opacity-100 hover:text-lib-text-strong"
+                  className="hover-reveal inline-flex size-6 shrink-0 cursor-pointer items-center justify-center rounded border-none bg-transparent text-[12px] text-lib-faint opacity-0 transition-opacity group-hover:opacity-100 hover:text-lib-text-strong"
                   aria-label={`Remove “${query}” from recent searches`}
                   title="Remove"
                   onClick={(e) => {

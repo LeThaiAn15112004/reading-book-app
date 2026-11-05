@@ -1,0 +1,39 @@
+{
+  "contractVersion": 1,
+  "kind": "reading-state-epub",
+  "description": "books.reading_state_json after a full session save of an EPUB: CFI location with its label, percent, every per-book typography override. Shape of a real Desktop row.",
+  "bookFormat": "epub",
+  "session": {
+    "lastReadLocation": "{\"kind\":\"cfi\",\"cfi\":\"epubcfi(/6/2!/4/542/1:0)\"}",
+    "lastReadLabel": "2",
+    "percent": 90,
+    "fontFamily": "serif",
+    "fontSize": 18,
+    "fontWeight": "400",
+    "lineHeight": 1.65,
+    "textAlign": "justify",
+    "layoutMode": "single",
+    "pageTurnMode": "paginated",
+    "marginsEnabled": true,
+    "marginPreset": "normal",
+    "isLandscape": false,
+    "updatedAt": "2026-08-15T09:06:20.282Z"
+  },
+  "expect": {
+    "readingStateJson": {
+      "lastReadLocation": { "kind": "cfi", "cfi": "epubcfi(/6/2!/4/542/1:0)", "label": "2" },
+      "percent": 90,
+      "fontFamily": "serif",
+      "fontSize": 18,
+      "fontWeight": "400",
+      "lineHeight": 1.65,
+      "textAlign": "justify",
+      "layoutMode": "single",
+      "pageTurnMode": "paginated",
+      "marginsEnabled": true,
+      "marginPreset": "normal",
+      "isLandscape": false,
+      "updatedAt": "2026-08-15T09:06:20.282Z"
+    }
+  }
+}

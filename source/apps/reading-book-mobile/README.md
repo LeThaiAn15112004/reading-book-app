@@ -1,56 +1,61 @@
-# Welcome to your Expo app 👋
+# Readmate Mobile (`reading-book-mobile`)
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+The phone app is a thin React Native host around a WebView. The WebView runs the **same React UI as Desktop**
+(`reading-book-desktop/src/`), built for the browser by Vite, with a Mobile implementation of `window.api` (the
+"Mobile Bridge") in place of Electron's preload + IPC. Spec: `specs/008-shared-core-architecture/` (architecture and
+contracts); feature map: `docs/implementation_plan/mobile_webview.md`.
 
-## Get started
-
-1. Install dependencies
-
-   ```bash
-   npm install
-   ```
-
-2. Start the app
-
-   ```bash
-   npx expo start
-   ```
-
-In the output, you'll find options to open the app in a
-
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
-
-```bash
-npm run reset-project
+```
+React Native host (src/)                         WebView (web/ + reading-book-desktop/src/)
+├── app/index.tsx      WebView, boot values      ├── web/src/main.ts        sets __READMATE_HOST__, builds window.api,
+├── host/rpc.ts        host-services dispatcher  │                          then imports Desktop's src/main.tsx
+├── host/sql-service   expo-sqlite (sql.*)       ├── web/src/bridge/*       window.api groups (library, overlay, import,
+├── host/file-service  picker, staging, books/   │                          txt, app); unavailable.ts for the rest
+├── host/app-service   app.info, system bars …   ├── web/src/stores/*       SQLite stores on the host's sql.* service
+└── host/local-server  starts modules/local-server├── web/src/db/*           Mobile schema baseline + migrations
+                                                 └── reading-book-desktop/src  screens, renderers, stores (unchanged;
+modules/local-server/  Kotlin + Swift loopback                                  phone branches behind isMobileHost())
+                       HTTP server (UI + book bytes)
+plugins/with-loopback-cleartext.js   release builds allow cleartext to 127.0.0.1 only
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+- **One channel for messages, one for bytes.** Small JSON requests go over `postMessage` (`contracts/host-services.md`);
+  book bytes and covers come from the loopback server on `127.0.0.1` with a per-launch token (`decisions/local-file-server.md`).
+  No real file path ever reaches the UI.
+- **Copy-based library.** An imported book is copied into app storage (`books/{uuid}/file`); the user's file is never
+  referenced or written.
+- **First release**: EPUB, PDF, TXT (read-only), Markdown; bookmarks, highlights and notes; reading position and
+  appearance. Cloud, URL import, audiobooks, annotation transfer, search, translation, read aloud and PDF tools are
+  hidden on the phone and answer `NOT_AVAILABLE_ON_PLATFORM` in the bridge (`contracts/mobile-bridge.md`).
+- **Phone UI**: Library and Settings are Desktop's screens with phone CSS (`src/styles/phone.css`) and small branches;
+  the Reader is a separate Mobile Reader (`src/screens/Reader/phone/`) on the same core hooks
+  (`contracts/phone-ui.md`).
 
-### Other setup steps
+## Commands (from this folder)
 
-- To set up ESLint for linting, run `npx expo lint`, or follow our guide on ["Using ESLint and Prettier"](https://docs.expo.dev/guides/using-eslint/)
-- If you'd like to set up unit testing, follow our guide on ["Unit Testing with Jest"](https://docs.expo.dev/develop/unit-testing/)
-- Learn more about the TypeScript setup in this template in our guide on ["Using TypeScript"](https://docs.expo.dev/guides/typescript/)
+| Command | What |
+|---|---|
+| `npm run build:web` | Build the WebView UI into `web/dist` (Vite; pdf.js legacy build on Mobile) |
+| `npm run dev:web` | Same, watching |
+| `npm start` | `expo start` — Expo Go: the UI comes from Metro over the LAN, books in 1 MiB chunks (≤ 20 MB per book). Development only |
+| `npm run android` | `expo run:android` — the native build with the local server (needs the Android SDK and JDK 17+) |
+| `npm run typecheck`, `npm run typecheck:web` | Host and WebView TypeScript |
+| `npm test` | vitest: host services, bridge, stores, migrations against Desktop's contract fixtures |
+| `npm run lint` | ESLint |
 
-## Learn more
+From `source/`: `npm run check:boundaries` checks the dependency rules (SDK imports, app imports, Mobile UI bundle
+graph, workspace graph, no secrets in bundles).
 
-To learn more about developing your project with Expo, look at the following resources:
+## Android build notes (Windows)
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+- Build one or two ABIs while developing: `cd android && ./gradlew assembleDebug -PreactNativeArchitectures=arm64-v8a,x86_64`.
+  With all four ABIs and parallel Gradle, CMake/ninja on Windows can fail with `manifest 'build.ninja' still dirty after
+  100 tries` or a locked `*_timing.txt`; `--no-parallel` avoids both (see `specs/008-shared-core-architecture/m5-results.md`).
+- Kotlin unit tests of the local server: `./gradlew :local-server:testDebugUnitTest`.
+- Kotlin sources must not contain a lone carriage return inside a string literal (Windows editors can insert one before
+  an escaped `\r\n`); the compiler then reports `Expecting '"'`.
 
-## Join the community
+## iOS
 
-Join our community of developers creating universal apps.
-
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+The Swift side of the local server and every host module are written for iOS, but nothing has been built or run on iOS
+yet (M6, a separate task). What is unproven is listed in `specs/008-shared-core-architecture/ios-readiness.md`.

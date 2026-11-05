@@ -1,0 +1,39 @@
+{
+  "recorded": "2026-11-03",
+  "source": "%APPDATA%/reading-book-desktop, last written 2026-10-31 00:17 (before spec 008 code); copied to %LOCALAPPDATA%/readmate-baseline/userdata-pre-change",
+  "procedure": "baseline.md, Pre-change library check (T026)",
+  "counts": {
+    "migrations": 30,
+    "lastMigration": "030_audio_transcript_scope.sql",
+    "books": 36,
+    "booksByFormat": {
+      "docx": 1,
+      "epub": 5,
+      "md": 8,
+      "mp3": 2,
+      "pdf": 19,
+      "txt": 1
+    },
+    "positions": 36,
+    "audioPositions": 2,
+    "bookmarks": 11,
+    "annotations": 48,
+    "annotationsByType": {
+      "attachment": 1,
+      "highlight": 22,
+      "insert": 1,
+      "replace": 1,
+      "squiggly": 5,
+      "strikethrough": 7,
+      "textbox": 1,
+      "typewriter": 1,
+      "underline": 9
+    },
+    "audioNotes": 4,
+    "collections": 0,
+    "collectionBooks": 0,
+    "txtDocuments": 1,
+    "bookIdsHash": "43e952f6a299eecd",
+    "noteIdsHash": "65a309f7d618765a"
+  }
+}

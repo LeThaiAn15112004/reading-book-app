@@ -1,0 +1,38 @@
+{
+  "contractVersion": 1,
+  "kind": "md-highlight",
+  "description": "Markdown highlight: text-offset locator (blockId md) plus mdAnnotation segment offsets and the quote with its context. Shape of a real Desktop row.",
+  "bookFormat": "md",
+  "save": {
+    "locator": { "kind": "text-offset", "offset": 25, "blockId": "md", "chapterIndex": 0 },
+    "styleKind": "highlight",
+    "colorHex": "#A5D6A7",
+    "selectionText": { "highlight": "Cách tra cứu (Ctrl + click):", "before": " Từ vựng N3\n\n\n📑 Mục lục\n", "after": "\n\nTrong file .md: giữ Ctrl (Wind" },
+    "mdAnnotation": { "startSegment": 0, "startOffset": 25, "endSegment": 0, "endOffset": 53 }
+  },
+  "expect": {
+    "noteJson": {
+      "schemaVersion": 1,
+      "type": "highlight",
+      "group": "annotation",
+      "locatorExtended": {
+        "locator": { "kind": "text-offset", "offset": 25, "blockId": "md", "chapterIndex": 0 },
+        "text": { "highlight": "Cách tra cứu (Ctrl + click):", "before": " Từ vựng N3\n\n\n📑 Mục lục\n", "after": "\n\nTrong file .md: giữ Ctrl (Wind" }
+      },
+      "mdAnnotation": { "startSegment": 0, "startOffset": 25, "endSegment": 0, "endOffset": 53 },
+      "textualValue": "Cách tra cứu (Ctrl + click):",
+      "note": null,
+      "style": { "colorHex": "#A5D6A7" },
+      "created": "<timestamp>",
+      "modified": "<timestamp>"
+    },
+    "record": {
+      "locator": { "kind": "text-offset", "offset": 25, "blockId": "md", "chapterIndex": 0 },
+      "styleKind": "highlight",
+      "colorHex": "#A5D6A7",
+      "tags": [],
+      "selectionText": { "highlight": "Cách tra cứu (Ctrl + click):", "before": " Từ vựng N3\n\n\n📑 Mục lục\n", "after": "\n\nTrong file .md: giữ Ctrl (Wind" },
+      "mdAnnotation": { "startSegment": 0, "startOffset": 25, "endSegment": 0, "endOffset": 53 }
+    }
+  }
+}

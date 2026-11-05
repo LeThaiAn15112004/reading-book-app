@@ -98,8 +98,14 @@ function highlightRowToRecord(row: NoteRow): HighlightRecord | undefined {
 }
 
 /**
- * `OverlayStore` (bookmarks + highlights + reading session) over two tables matching the
- * desktop SQLite layout: the shared `notes` table (migration 019) and `reading_sessions`.
+ * `OverlayStore` (bookmarks + highlights + reading session) over a `notes` table and a `reading_sessions` table.
+ *
+ * **Not for production use (spec 008, FR-023).** Its rows do NOT match Desktop's stored layout: `note_json` here is
+ * flat (`locator`, `styleKind`, `colorHex` at the top) where Desktop stores `type`, `locatorExtended.locator`,
+ * `style.colorHex`, `schemaVersion` and format payloads, and reading state goes to `reading_sessions` where Desktop
+ * keeps it in `books.reading_state_json` (migration 020). `tests/contracts/sql-notes-mismatch.test.ts` proves the
+ * difference against the contract fixtures. A database written by it cannot be read by Desktop, or the reverse.
+ * Mobile implements the contract in its own stores instead (`reading-book-mobile/web/src/stores/`).
  */
 export function createSqlNoteRepositories(db: SqlDatabase): OverlayStore {
   const listRows = (bookId: string, predicate: string) =>

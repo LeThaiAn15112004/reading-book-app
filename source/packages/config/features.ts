@@ -34,8 +34,8 @@ export const defaultFeatures: FeatureFlags = {
   restoreSessionEnabled: true,
   systemThemeSync: false,
   hideToolbarOnRead: true,
-  audiobookZipImportEnabled: true, // LOCAL ONLY — the committed value must stay false (see tests/config/audiobook-zip-gate.test.ts)
-  audiobookTranscriptionEnabled: true, // OFF until the own-build FFmpeg is integrated and verified (see tests/config/audiobook-transcription-gate.test.ts)
+  audiobookZipImportEnabled: false, // the committed value must stay false (see tests/config/audiobook-zip-gate.test.ts)
+  audiobookTranscriptionEnabled: false, // OFF until the own-build FFmpeg is integrated and verified (see tests/config/audiobook-transcription-gate.test.ts)
 };
 
 /** Alias used by G0 acceptance checklist. */

@@ -1,5 +1,6 @@
 import { formatRelativeLastRead, type LibraryBook } from '@reading-book/book-reader-sdk'
 import { BookCover, BookMenuButton, type BookMenuPoint } from '../book'
+import { withLongPress } from '../../../../platform/long-press'
 
 export type ContinueReadingProps = {
   /** Books in progress, most recent first (`pickContinueReadingBooks`); parent omits when empty. */
@@ -29,10 +30,10 @@ export function ContinueReading({ books, onResume, onBookMenu }: ContinueReading
             <li
               key={book.id}
               className="group flex min-w-0 items-center gap-3.5 rounded-xl border border-lib-border-soft bg-lib-surface p-3 transition-colors hover:border-lib-accent-ring"
-              onContextMenu={(event) => {
+              {...withLongPress((event) => {
                 event.preventDefault()
                 onBookMenu(book.id, { x: event.clientX, y: event.clientY })
-              }}
+              })}
             >
               <button
                 type="button"

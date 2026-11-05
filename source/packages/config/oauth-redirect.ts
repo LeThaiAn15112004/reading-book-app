@@ -7,9 +7,10 @@
  * provider can hand control back to whichever app started the flow — a fixed loopback port (desktop)
  * or `expo-linking`'s dev-server URL (mobile, non-standalone builds) cannot survive store submission.
  *
- * The mobile app is not yet wired into the `packages/*` workspace graph (see root CLAUDE.md), so it
- * cannot import this constant directly; `Linking.createURL(OAUTH_CALLBACK_PATH)` in the mobile app
- * must be kept in sync with `OAUTH_CUSTOM_SCHEME`/`OAUTH_CALLBACK_PATH` below by hand.
+ * The mobile app's React Native host does not import `@reading-book/config` (cloud sources are not in the Mobile
+ * first release, spec 008 OD-7), so if Mobile OAuth is added, `Linking.createURL(OAUTH_CALLBACK_PATH)` there must be
+ * kept in sync with `OAUTH_CUSTOM_SCHEME`/`OAUTH_CALLBACK_PATH` below — or the host must start importing this file.
+ * `app.json` → `expo.scheme` already equals `OAUTH_CUSTOM_SCHEME`.
  */
 export const OAUTH_CUSTOM_SCHEME = 'readmate-reader';
 export const OAUTH_CALLBACK_PATH = 'oauth/callback';

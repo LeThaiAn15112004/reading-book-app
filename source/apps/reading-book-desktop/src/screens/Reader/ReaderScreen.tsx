@@ -1,25 +1,22 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type MutableRefObject } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import {
   CfiLocation,
   PageRectLocation,
-  TextOffsetLocation,
-  parseMdReadingLocation,
-  fontFamilyCss,
   formatHighlightCitation,
   isMarkupTool,
   isShapeStyleKind,
   shapeColorHex,
   shapeOpacityOf,
   shapeStrokeHex,
-  resolveTxtReadingOffset,
-  buildMdOutline,
   type InteractionTool,
   type MdHeadingInfo,
-  type MdOutlineNode,
 } from '@reading-book/book-reader-sdk'
 
-const MD_HEADING_HREF = 'md-heading:'
+import { MD_HEADING_HREF, mdInitialPointFor, mdSourceFor, mdTocFromHeadings, txtInitialOffsetFor } from './logic/reader-core/derivations'
+import { readingStyleFor } from './logic/reader-core/reading-style'
+import { useReaderCore } from './logic/reader-core/useReaderCore'
+import { useReaderAnnotations } from './logic/reader-core/useReaderAnnotations'
 import {
   useAppTitle,
   useGlobalReadingPrefs,
@@ -49,9 +46,8 @@ import {
   type PdfAttachmentPin,
 } from '../../reader/renderers/pdf'
 import { TxtRenderer, type TxtRendererApi } from '../../reader/renderers/txt'
-import { MdRenderer, decodeMdSource, type MdRendererApi, type MdSelectionInfo } from '../../reader/renderers/md'
+import { MdRenderer, type MdRendererApi, type MdSelectionInfo } from '../../reader/renderers/md'
 import type { EpubTocItem, ViewportRectLike } from '../../reader/renderers/epub'
-import type { TextSurfaceApi } from '../../reader/renderers/textSurface'
 import { appApi } from '../../bridge/app'
 import {
   AaSettingsPanel,
@@ -96,14 +92,9 @@ import {
   FAKE_CHAPTERS,
   useBookIndexing,
   useBookRelink,
-  useReaderBookmarks,
-  useReaderHighlights,
-  useReaderBookOpen,
   useReaderChromeUi,
-  useReaderNavigation,
   useReaderSearch,
   useReaderShortcuts,
-  useReaderSessionBridge,
   useImmersiveChromeReveal,
   useReaderZoomControls,
   useSnapshotTool,
@@ -111,8 +102,6 @@ import {
   useReadAloud,
   useReaderTranslation,
   usePdfSelectionMenu,
-  useReaderMdHighlights,
-  useReaderPdfHighlights,
   useReaderTxt,
   useRightPanelStore,
   type HighlightShortcuts,
@@ -206,21 +195,26 @@ export function ReaderScreen() {
   activeToolRef.current = activeTool
   const activeAnnotationTool = isMarkupTool(activeTool) ? activeTool : null
 
-  const book = useReaderBookOpen({
+  const mdApiRef = useRef<MdRendererApi | null>(null)
+  // Book open + session + navigation, shared with the Mobile Reader (spec 008, FR-012c step 3).
+  const { book, session, nav, isPdfSurface, isTxtSurface, isMdSurface, isTextSurface } = useReaderCore({
     bookId,
     ensureTab,
     updateBookTitle,
     setDocumentSubtitle,
     globalPrefsRef,
+    epubApiRef,
+    pdfApiRef,
+    txtApiRef,
+    mdApiRef,
+    closeFloating: chrome.closeFloating,
+    highlightShortcutsRef,
   })
 
-  const isPdfSurface =
-    book.contentStatus === 'ready' && book.bookFormat === 'pdf' && !!book.bookBytes
   // Like EPUB, wait for the saved position before mounting so the PDF opens on the right page.
   const isPdfSessionLoading = isPdfSurface && book.sessionLoadStatus === 'loading'
 
   // TXT: the text itself comes from Main (`txt:open`, edited copy aware), not from the book bytes.
-  const isTxtSurface = book.contentStatus === 'ready' && book.bookFormat === 'txt'
   const txt = useReaderTxt({
     bookId,
     active: isTxtSurface,
@@ -230,10 +224,8 @@ export function ReaderScreen() {
   })
   // Markdown: read-only; the bytes come from `openBookContent` (Main enforces the size limit) and
   // are decoded here. Like TXT it scrolls as one continuous text and reports a percentage.
-  const isMdSurface = book.contentStatus === 'ready' && book.bookFormat === 'md' && !!book.bookBytes
-  const mdApiRef = useRef<MdRendererApi | null>(null)
   const mdSource = useMemo(
-    () => (isMdSurface && book.bookBytes ? decodeMdSource(book.bookBytes) : null),
+    () => mdSourceFor(isMdSurface, book.bookBytes),
     [isMdSurface, book.bookBytes],
   )
   // Markdown outline: the headings the surface reports, as sidebar Contents entries (`md-heading:N`
@@ -246,22 +238,11 @@ export function ReaderScreen() {
     setMdHeadings([])
     setMdActiveHeading(null)
   }, [bookId])
-  const mdToc = useMemo<EpubTocItem[]>(() => {
-    const toItem = (node: MdOutlineNode): EpubTocItem => ({
-      id: `md-h-${node.index}`,
-      label: node.label,
-      href: `${MD_HEADING_HREF}${node.index}`,
-      level: node.level,
-      children: node.children.map(toItem),
-    })
-    return buildMdOutline(mdHeadings).map(toItem)
-  }, [mdHeadings])
-  const isTextSurface = isTxtSurface || isMdSurface
+  const mdToc = useMemo<EpubTocItem[]>(() => mdTocFromHeadings(mdHeadings), [mdHeadings])
   // Markdown has no Hand tool (it scrolls natively): never sit on it.
   useEffect(() => {
     if (isMdSurface) setActiveTool((tool) => (tool === 'hand' ? 'select' : tool))
   }, [isMdSurface])
-  const textApiRef: MutableRefObject<TextSurfaceApi | null> = isMdSurface ? mdApiRef : txtApiRef
   const txtReady = isTxtSurface && txt.loadStatus === 'ready'
   const txtLoadFailed = isTxtSurface && txt.loadStatus === 'error'
   // Like EPUB / PDF, wait for the saved position before mounting so the text opens where it was left.
@@ -271,17 +252,14 @@ export function ReaderScreen() {
     setTxtPercent(0)
   }, [bookId])
   const txtInitialOffset = useMemo(
-    () =>
-      book.resumeLocation instanceof TextOffsetLocation
-        ? resolveTxtReadingOffset(book.resumeLocation, txt.getTextLength())
-        : 0,
+    () => txtInitialOffsetFor(book.resumeLocation, txt.getTextLength()),
     // The renderer reads this once, when it mounts (text and saved position are both ready then).
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [book.resumeLocation, txtReady],
   )
   // Markdown opens where it was left, like TXT: the saved text point, read once when it mounts.
   const mdInitialPoint = useMemo(
-    () => parseMdReadingLocation(book.resumeLocation),
+    () => mdInitialPointFor(book.resumeLocation),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [book.resumeLocation, isMdSurface],
   )
@@ -368,32 +346,6 @@ export function ReaderScreen() {
     if (translateModeRef.current) translation.setMode(false)
     setActiveTool(tool)
   }
-
-  const session = useReaderSessionBridge({
-    bookId,
-    epubApiRef,
-    pdfApiRef,
-    txtApiRef: textApiRef,
-    prefsRef: book.prefsRef,
-    prefsDirtyRef: book.prefsDirtyRef,
-    prefs: book.prefs,
-    sessionLoadStatus: book.sessionLoadStatus,
-  })
-
-  const nav = useReaderNavigation({
-    bookId,
-    contentStatus: book.contentStatus,
-    bookBytes: book.bookBytes,
-    bookFormat: book.bookFormat,
-    isEpubSurface: book.isEpubSurface,
-    epubApiRef,
-    isPdfSurface,
-    pdfApiRef,
-    isTxtSurface: isTextSurface,
-    txtApiRef: textApiRef,
-    closeFloating: chrome.closeFloating,
-    highlightShortcutsRef,
-  })
 
   const zoom = useReaderZoomControls({
     bookId,
@@ -514,19 +466,24 @@ export function ReaderScreen() {
         : 0
   const effectiveMargin = book.prefs.marginEnabled ? book.prefs.margin : 'off'
 
-  const bookmarks = useReaderBookmarks({
+  // Bookmarks + EPUB / PDF-text / Markdown highlights, shared with the Mobile Reader (spec 008, FR-012c step 4).
+  const { bookmarks, highlights, pdfHighlights, mdHighlights } = useReaderAnnotations({
     bookId,
     isEpubSurface: book.isEpubSurface,
-    epubApiRef,
-    epubNav: nav.epubNav ?? null,
     isPdfSurface,
+    isMdSurface,
+    epubApiRef,
     pdfApiRef,
+    mdApiRef,
+    epubNav: nav.epubNav ?? null,
     pdfPage: pdfPageCurrent,
     chapterIndex: nav.chapterIndex,
     chapterLabel,
     goChapter: nav.goChapter,
-    setChromeHidden: chrome.setChromeHidden,
+    zoom: zoom.viewZoom,
     setToast: chrome.setToast,
+    setChromeHidden: chrome.setChromeHidden,
+    activeAnnotationTool,
   })
 
   // Reader dialogs without `aria-modal` (so the bridge's DOM guard can't see them) still block the
@@ -552,16 +509,6 @@ export function ReaderScreen() {
     setToast: chrome.setToast,
   })
 
-  const highlights = useReaderHighlights({
-    bookId,
-    isEpubSurface: book.isEpubSurface,
-    epubApiRef,
-    epubNav: nav.epubNav ?? null,
-    setToast: chrome.setToast,
-    setChromeHidden: chrome.setChromeHidden,
-    activeAnnotationTool,
-  })
-
   // PDF: right-click inside a text-layer selection → the same menu as EPUB (see
   // docs/implementation_plan/pdf_selection_context_menu.md); its markup actions create PDF text
   // annotations (docs/implementation_plan/pdf_text_annotations.md).
@@ -572,15 +519,6 @@ export function ReaderScreen() {
     zoom: zoom.viewZoom,
   })
 
-  // PDF text annotations — the PDF counterpart of `highlights` (page + normalized rects, no CFI).
-  const pdfHighlights = useReaderPdfHighlights({
-    bookId,
-    isPdfSurface,
-    pdfApiRef,
-    zoom: zoom.viewZoom,
-    setToast: chrome.setToast,
-    setChromeHidden: chrome.setChromeHidden,
-  })
   // PDF freehand Ink (strokes are their own `notes` type; the Pen tool lives in the toolbar's Annotation group).
   const pdfInk = useReaderPdfInk({ bookId, isPdfSurface, setToast: chrome.setToast })
   // Graphic objects inside the PDF that other readers made (shapes, lines, text boxes): edits are written into the file.
@@ -590,14 +528,6 @@ export function ReaderScreen() {
   const inkStyles = usePdfInkPrefsStore((s) => s.styles)
   const inkPen = useMemo(() => ({ penStyle: inkTool, ...inkStyles[inkTool] }), [inkTool, inkStyles])
   /** The open surface's annotation store: drives the shared popups, sidebar actions and shortcuts. */
-  // Markdown annotations — the Markdown counterpart of `pdfHighlights` (piece + offset anchors, no CFI).
-  const mdHighlights = useReaderMdHighlights({
-    bookId,
-    isMdSurface,
-    mdApiRef,
-    setToast: chrome.setToast,
-    setChromeHidden: chrome.setChromeHidden,
-  })
   /** Right-click inside a Markdown text selection: the same menu as the other formats. */
   const [mdSelectionMenu, setMdSelectionMenu] = useState<{ selection: MdSelectionInfo; point: { x: number; y: number } } | null>(null)
   const markup = isPdfSurface
@@ -885,13 +815,13 @@ export function ReaderScreen() {
 
   const readingStyle = useMemo(
     () =>
-      ({
-        '--reader-reading-size': `${book.prefs.fontSize}px`,
-        '--reader-reading-line-height': String(book.prefs.lineHeight),
-        '--reader-reading-weight': String(book.prefs.fontWeight),
-        '--reader-font-reading': fontFamilyCss(book.prefs.fontFamily),
-        '--reader-reading-align': book.prefs.textAlign,
-      }) as CSSProperties,
+      readingStyleFor({
+        fontSize: book.prefs.fontSize,
+        lineHeight: book.prefs.lineHeight,
+        fontWeight: book.prefs.fontWeight,
+        fontFamily: book.prefs.fontFamily,
+        textAlign: book.prefs.textAlign,
+      }),
     [
       book.prefs.fontSize,
       book.prefs.lineHeight,

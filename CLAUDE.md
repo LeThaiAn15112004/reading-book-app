@@ -5,8 +5,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Project overview
 
 Local-first reading app ("reading-book-app"). MVP focus is the **desktop app** (Electron + Vite + React +
-TypeScript); shared platform-agnostic logic lives in `book-reader-sdk`; a mobile app (Expo + React Native) exists only
-as an early scaffold and is not yet built out.
+TypeScript); shared platform-agnostic logic lives in `book-reader-sdk`. The **mobile app** (Expo + React Native) is a
+thin host around a WebView that runs the SAME React UI as Desktop with a Mobile `window.api` (spec 008, see "Mobile
+app" below); Android is in progress, iOS is not built yet.
 Product/UX rationale lives in `docs/reading-habbit/`; the authoritative architecture and data-model spec is
 `docs/software/SDS.md` (Vietnamese) — read it before making structural changes, since this file only summarizes it.
 Feature write-ups live in `docs/change_plan/` and `docs/implementation_plan/`.
@@ -22,7 +23,7 @@ source/                          # npm workspaces root (workspaces: apps/*, pack
 │   │   ├── host-adapters/       # Node-side adapters outside the core (cloud providers, translation engine)
 │   │   └── tests/ dist/         # vitest unit + integration tests; built self-contained bundle
 │   ├── reading-book-desktop/    # MVP app — Electron main/preload + React renderer
-│   └── reading-book-mobile/     # Expo Router scaffold, not yet built out
+│   └── reading-book-mobile/     # Expo host + WebView running the desktop UI (src/ host, web/ bridge, modules/ local server)
 └── packages/
     └── config/                  # @reading-book/config — formats, theme tokens, feature flags, OAuth config
 ```
@@ -111,7 +112,13 @@ SDK (`cd source/apps/book-reader-sdk`): `npm run typecheck`, `npm test` (vitest,
 `npx vitest run tests/text/chunk-text.test.ts`), `npm run test:watch`, `npm run typecheck:tests`, `npm run build`,
 `npm run verify` (typecheck + test typecheck + tests + build).
 
-Mobile app (`cd source/apps/reading-book-mobile`): `npm run start`, `android`, `ios`, `web`, `lint`.
+Mobile app (`cd source/apps/reading-book-mobile`): `npm run build:web` (WebView UI → `web/dist`), `npm start` (Expo Go,
+development only), `npm run android` (native build with the local server), `typecheck`, `typecheck:web`, `test` (vitest:
+host services, bridge, stores, contract fixtures), `lint`. See its `README.md`.
+
+Workspace checks (`cd source`): `npm run check:boundaries` (dependency rules R2–R11 of spec 008: SDK imports, app
+imports, Mobile UI bundle graph, workspace graph, no secrets in bundles; with negative tests),
+`npm run check:desktop-baseline` (Desktop's recorded baseline checks).
 
 **CI** (`.github/workflows/ci.yml`, every push and PR, Ubuntu, `npm ci` in `source/`): SDK typecheck, test
 typecheck, tests, build; desktop typecheck and lint. Keep all six green locally before pushing.
@@ -137,8 +144,10 @@ format/AI/sync boundaries, running across Electron's Main/Preload/Renderer proce
 and the ERD are in `docs/software/SDS.md` §2–3.
 
 Dependency rule: `book-reader-sdk/src` must never import `electron`, `better-sqlite3`, Node/DOM APIs, React or any
-format engine (`epubjs`, PDF libs, etc.) — its tsconfig (`lib: ES2022`, `types: []`) makes a violation a compile
-error. Those only exist inside `apps/reading-book-desktop/electron/**`, `src/reader/renderers`, and
+format engine (`epubjs`, PDF libs, etc.). Its tsconfig (`lib: ES2022`, `types: []`) makes a Node/DOM **global** a
+compile error, but NOT a package import (`better-sqlite3`, `react`, `epubjs` would compile): imports are caught by
+`npm run check:boundaries` in `source/` (allowlist: relative paths inside `src` and `zustand/vanilla`).
+Those only exist inside `apps/reading-book-desktop/electron/**`, `src/reader/renderers`, and
 `book-reader-sdk/host-adapters` (Node-side, imported by the desktop Main process). Screens/components never touch
 SQL or `fs` directly; they call a use case or the IPC bridge.
 
@@ -322,8 +331,35 @@ tokens, opaque `rb-cover://` cover URLs, and binary payloads (`OpenBookContentRe
 
 `@reading-book/config` → `../../packages/config` and `@reading-book/book-reader-sdk` → `../book-reader-sdk/src/index.ts`
 (the desktop consumes SDK source, not `dist/`) — defined in both `tsconfig.json` (`compilerOptions.paths`) and
-`vite.config.ts` (`resolve.alias`, duplicated for the Electron main-process build). Keep both in sync. The mobile
-app maps the SDK in its `tsconfig.json`, but its `babel.config.js` still aliases the removed `@reading-book/shared`.
+`vite.config.ts` (`resolve.alias`, duplicated for the Electron main-process build). Keep both in sync. Mobile: the
+WebView build (`reading-book-mobile/web/vite.config.ts` + `web/tsconfig.json`) maps both aliases the same way and swaps
+`pdfjs-dist` for its legacy build (OD-4); the React Native host maps only the SDK (`tsconfig.json`) and imports none of
+it in the first release (OD-1).
+
+### Mobile app (spec 008; `specs/008-shared-core-architecture/`, map in `docs/implementation_plan/mobile_webview.md`)
+
+`reading-book-mobile` is a React Native host (`src/app/index.tsx`, `src/host/*`) around a `react-native-webview`. The
+WebView loads `web/` (Vite): `web/src/main.ts` sets `window.__READMATE_HOST__ = 'mobile'`, assembles `window.api` from
+`web/src/bridge/*` (typed as Desktop's `Window['api']`, so TypeScript fails if a group is missing), then imports
+Desktop's `src/main.tsx` unchanged. **No Desktop file is copied into Mobile.**
+- **Bridge** (`contracts/mobile-bridge.md`): first-release groups `app`, `library`, `overlay`, `import`, `txt.open`
+  (read-only) on SQLite stores in `web/src/stores/*` (own Mobile schema in `web/src/db/`, tested against Desktop's
+  contract fixtures in `book-reader-sdk/tests/contracts/`); everything else answers `NOT_AVAILABLE_ON_PLATFORM`
+  (`unavailable.ts`). Every call is counted in `window.__readmateBridgeLog`.
+- **Host services** (`contracts/host-services.md`): small JSON messages only (`sql.*`, `files.*`, `app.*`), dispatched
+  by `src/host/rpc.ts`; no service accepts a path or writes to an imported book. Books are **copied** into app storage
+  (`books/{uuid}/file`), never referenced.
+- **Bytes** (`decisions/local-file-server.md`): the native module `modules/local-server/` (Kotlin + Swift) serves the UI
+  and book bytes / covers on `127.0.0.1` with a per-launch token, `Range` → `206` / `416`, `Cache-Control: no-store`.
+  In Expo Go (development only) the UI comes from Metro and books from `files.readChunk` (≤ 20 MB).
+- **Phone UI inside `src/`** (`contracts/phone-ui.md`): `src/platform/` (`isMobileHost()`, `isFeatureAvailable()`;
+  Electron never sets the signal, so Desktop is unchanged), `src/styles/phone.css` (rules under `[data-mobile-host]`),
+  `chrome/PhoneNav.tsx` instead of the titlebar / menubar, `platform/long-press.ts`, and capabilities removed only on
+  the Mobile host. The Reader is separate: `ReaderRoute` lazy-loads `screens/Reader/phone/MobileReaderScreen.tsx` on
+  the Mobile host only, which runs the same core hooks as Desktop (`screens/Reader/logic/reader-core/`:
+  `useReaderCore`, `useReaderAnnotations`, pure derivations) — never copy logic into it, and add no Mobile-only store
+  without writing the reason in `contracts/phone-ui.md`.
+- **Dependency rules** R2–R11 (spec 008) are enforced by `source/scripts/boundaries/` (`npm run check:boundaries`).
 
 ### AI port
 

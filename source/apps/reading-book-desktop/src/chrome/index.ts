@@ -6,6 +6,7 @@ export {
 } from './AppTitleContext'
 export { AppTitlebar } from './AppTitlebar'
 export { AppMenubar } from './AppMenubar'
+export { PhoneNav } from './PhoneNav'
 export {
   AppNavProvider,
   useAppNav,

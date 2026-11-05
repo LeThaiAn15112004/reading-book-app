@@ -4,6 +4,7 @@ import { ConfirmBookActionDialog } from '../../../Library/components/book/Confir
 import { resetAppSettings } from '../../logic/resetAppSettings'
 import { useUpdatesStore, type UpdateCheckState } from '../../logic/updatesStore'
 import { SettingsCard } from '../layout/SettingsCard'
+import { isFeatureAvailable } from '../../../../platform/index'
 
 const RESET_APP_SETTINGS_COPY =
   'Your books, reading progress, annotations, and other personal data will not be affected.'
@@ -108,42 +109,45 @@ export function AdvancedSettings() {
 
   return (
     <div className="flex flex-col gap-[var(--ui-density-gap)]">
-      <SettingsCard title="Updates">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="min-w-0">
-            <p className="m-0 text-[13px] text-lib-muted">Current Version</p>
-            <p className="m-0 mt-0.5 text-[15px] font-semibold text-lib-text-strong tabular-nums select-text">
-              {version === null ? 'Loading…' : version === undefined ? 'Unknown' : version}
-            </p>
+      {/* No update channel on the Mobile host (spec 008): the app store updates it. */}
+      {isFeatureAvailable('updates') ? (
+        <SettingsCard title="Updates">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="min-w-0">
+              <p className="m-0 text-[13px] text-lib-muted">Current Version</p>
+              <p className="m-0 mt-0.5 text-[15px] font-semibold text-lib-text-strong tabular-nums select-text">
+                {version === null ? 'Loading…' : version === undefined ? 'Unknown' : version}
+              </p>
+            </div>
+            <button
+              type="button"
+              className="inline-flex h-9 shrink-0 cursor-pointer items-center gap-2 rounded-lg border border-lib-border bg-transparent px-4 text-[13px] font-semibold text-lib-text-strong transition-colors hover:border-lib-accent hover:bg-lib-accent-soft focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-lib-accent disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:border-lib-border disabled:hover:bg-transparent"
+              disabled={checking}
+              aria-busy={checking}
+              onClick={() => void checkForUpdates()}
+            >
+              {checking ? (
+                <span
+                  className="size-3.5 animate-spin rounded-full border-2 border-lib-border border-t-lib-accent"
+                  aria-hidden
+                />
+              ) : null}
+              {checking ? 'Checking…' : 'Check for Updates'}
+            </button>
           </div>
-          <button
-            type="button"
-            className="inline-flex h-9 shrink-0 cursor-pointer items-center gap-2 rounded-lg border border-lib-border bg-transparent px-4 text-[13px] font-semibold text-lib-text-strong transition-colors hover:border-lib-accent hover:bg-lib-accent-soft focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-lib-accent disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:border-lib-border disabled:hover:bg-transparent"
-            disabled={checking}
-            aria-busy={checking}
-            onClick={() => void checkForUpdates()}
-          >
-            {checking ? (
-              <span
-                className="size-3.5 animate-spin rounded-full border-2 border-lib-border border-t-lib-accent"
-                aria-hidden
-              />
-            ) : null}
-            {checking ? 'Checking…' : 'Check for Updates'}
-          </button>
-        </div>
 
-        {status ? (
-          <div
-            role="status"
-            aria-live="polite"
-            className={`mt-4 rounded-lg border px-3 py-2.5 text-[13px] ${TONE_CLASS[status.tone]}`}
-          >
-            <p className="m-0 font-semibold">{status.title}</p>
-            <p className="m-0 mt-0.5 text-[12px] opacity-90">{status.body}</p>
-          </div>
-        ) : null}
-      </SettingsCard>
+          {status ? (
+            <div
+              role="status"
+              aria-live="polite"
+              className={`mt-4 rounded-lg border px-3 py-2.5 text-[13px] ${TONE_CLASS[status.tone]}`}
+            >
+              <p className="m-0 font-semibold">{status.title}</p>
+              <p className="m-0 mt-0.5 text-[12px] opacity-90">{status.body}</p>
+            </div>
+          ) : null}
+        </SettingsCard>
+      ) : null}
 
       <SettingsCard
         title="Reset App Settings"

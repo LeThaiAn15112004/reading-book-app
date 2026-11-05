@@ -1,0 +1,56 @@
+{
+  "contractVersion": 1,
+  "kind": "pdf-highlight",
+  "description": "PDF text highlight over two lines: page-rect locator (1-based page, chapterIndex = 0-based page) plus pdfAnnotation with 0-based pageIndex and rects normalised 0-1. Shape of a real Desktop row; text replaced.",
+  "bookFormat": "pdf",
+  "save": {
+    "locator": { "kind": "page-rect", "page": 1, "rect": { "x": 0.05879, "y": 0.20444, "width": 0.86554, "height": 0.02931 }, "chapterIndex": 0 },
+    "styleKind": "highlight",
+    "colorHex": "#FFEB3B",
+    "selectionText": { "highlight": "Placement of a visible signature on the page, and support for time-stamped signatures." },
+    "pdfAnnotation": {
+      "pageIndex": 0,
+      "rects": [
+        { "x": 0.05879, "y": 0.20444, "width": 0.86554, "height": 0.01421, "pageIndex": 0 },
+        { "x": 0.05879, "y": 0.21955, "width": 0.58391, "height": 0.0142, "pageIndex": 0 }
+      ]
+    }
+  },
+  "expect": {
+    "noteJson": {
+      "schemaVersion": 1,
+      "type": "highlight",
+      "group": "annotation",
+      "locatorExtended": {
+        "locator": { "kind": "page-rect", "page": 1, "rect": { "x": 0.05879, "y": 0.20444, "width": 0.86554, "height": 0.02931 }, "chapterIndex": 0 },
+        "text": { "highlight": "Placement of a visible signature on the page, and support for time-stamped signatures." }
+      },
+      "pdfAnnotation": {
+        "pageIndex": 0,
+        "rects": [
+          { "x": 0.05879, "y": 0.20444, "width": 0.86554, "height": 0.01421, "pageIndex": 0 },
+          { "x": 0.05879, "y": 0.21955, "width": 0.58391, "height": 0.0142, "pageIndex": 0 }
+        ]
+      },
+      "textualValue": "Placement of a visible signature on the page, and support for time-stamped signatures.",
+      "note": null,
+      "style": { "colorHex": "#FFEB3B" },
+      "created": "<timestamp>",
+      "modified": "<timestamp>"
+    },
+    "record": {
+      "locator": { "kind": "page-rect", "page": 1, "rect": { "x": 0.05879, "y": 0.20444, "width": 0.86554, "height": 0.02931 }, "chapterIndex": 0 },
+      "styleKind": "highlight",
+      "colorHex": "#FFEB3B",
+      "tags": [],
+      "selectionText": { "highlight": "Placement of a visible signature on the page, and support for time-stamped signatures." },
+      "pdfAnnotation": {
+        "pageIndex": 0,
+        "rects": [
+          { "x": 0.05879, "y": 0.20444, "width": 0.86554, "height": 0.01421, "pageIndex": 0 },
+          { "x": 0.05879, "y": 0.21955, "width": 0.58391, "height": 0.0142, "pageIndex": 0 }
+        ]
+      }
+    }
+  }
+}

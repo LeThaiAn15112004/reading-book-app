@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { isFeatureAvailable, type AppFeature } from '../../../platform/index'
 
 /**
  * Settings sidebar sections, in display order. App Language lives inside Appearance; Library view
@@ -13,15 +14,20 @@ export type SettingsSectionId =
   | 'advanced'
   | 'about'
 
-export const SETTINGS_SECTIONS: readonly { id: SettingsSectionId; label: string }[] = [
+export const SETTINGS_SECTIONS: readonly { id: SettingsSectionId; label: string; feature?: AppFeature }[] = [
   { id: 'appearance', label: 'Appearance' },
-  { id: 'storage', label: 'Storage' },
-  { id: 'notifications', label: 'Notifications' },
-  { id: 'keyboard', label: 'Keyboard Shortcuts' },
+  { id: 'storage', label: 'Storage', feature: 'storageSettings' },
+  { id: 'notifications', label: 'Notifications', feature: 'notificationSettings' },
+  { id: 'keyboard', label: 'Keyboard Shortcuts', feature: 'keyboardShortcuts' },
   { id: 'privacy', label: 'Privacy' },
   { id: 'advanced', label: 'Advanced' },
   { id: 'about', label: 'About' },
 ]
+
+/** The sections shown on this platform: every one in Electron; hidden, never disabled, on the Mobile host (spec 008). */
+export function visibleSettingsSections(): readonly { id: SettingsSectionId; label: string }[] {
+  return SETTINGS_SECTIONS.filter((s) => s.feature === undefined || isFeatureAvailable(s.feature))
+}
 
 const COLLAPSED_STORAGE_KEY = 'reading-book.settings.sidebar-collapsed'
 

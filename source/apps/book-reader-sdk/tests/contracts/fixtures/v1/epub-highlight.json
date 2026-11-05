@@ -1,0 +1,39 @@
+{
+  "contractVersion": 1,
+  "kind": "epub-highlight",
+  "description": "EPUB highlight with a comment and a tag: a range CFI plus chapterIndex, the selected text, colour. Shape of a real Desktop row (library copy, 2026-11-04); text replaced. The comment is saved with surrounding spaces, which the store trims.",
+  "bookFormat": "epub",
+  "save": {
+    "locator": { "kind": "cfi", "cfi": "epubcfi(/6/28!/4/4[id70270871498280]/64,/2/2/1:0,/3:196)", "chapterIndex": 13 },
+    "styleKind": "highlight",
+    "colorHex": "#FFEB3B",
+    "note": "  A comment with Vietnamese: Đọc lại đoạn này.  ",
+    "tags": ["reread"],
+    "selectionText": { "highlight": "Call me Ishmael. Some years ago, never mind how long precisely." }
+  },
+  "expect": {
+    "noteJson": {
+      "schemaVersion": 1,
+      "type": "highlight",
+      "group": "annotation",
+      "locatorExtended": {
+        "locator": { "kind": "cfi", "cfi": "epubcfi(/6/28!/4/4[id70270871498280]/64,/2/2/1:0,/3:196)", "chapterIndex": 13 },
+        "text": { "highlight": "Call me Ishmael. Some years ago, never mind how long precisely." }
+      },
+      "textualValue": "Call me Ishmael. Some years ago, never mind how long precisely.",
+      "note": "A comment with Vietnamese: Đọc lại đoạn này.",
+      "style": { "colorHex": "#FFEB3B" },
+      "tags": ["reread"],
+      "created": "<timestamp>",
+      "modified": "<timestamp>"
+    },
+    "record": {
+      "locator": { "kind": "cfi", "cfi": "epubcfi(/6/28!/4/4[id70270871498280]/64,/2/2/1:0,/3:196)", "chapterIndex": 13 },
+      "styleKind": "highlight",
+      "colorHex": "#FFEB3B",
+      "note": "A comment with Vietnamese: Đọc lại đoạn này.",
+      "tags": ["reread"],
+      "selectionText": { "highlight": "Call me Ishmael. Some years ago, never mind how long precisely." }
+    }
+  }
+}
