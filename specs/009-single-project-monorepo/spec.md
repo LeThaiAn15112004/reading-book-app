@@ -21,11 +21,13 @@
   `screens/`, `platforms/` with one adapter file per runtime, for example `storage.*.ts`, `window.*.ts`) (FR-010,
   FR-013).
 - Q: Do the `platforms/` adapter files mean rewriting the UI in React Native, or keeping the mobile app's WebView? →
-  A: Keep the WebView (spec 008). Adapters are `*.electron.ts` and `*.mobile.ts`, chosen by the UI build for each
-  host; the shared UI is not rewritten (FR-010a).
-- Q: Where do the native hosts (Electron Main/Preload, the React Native host, Kotlin/Swift modules) and the real
-  SQLite / file code go; does SQLite move into `source/core`? → A: Two host folders, `source/desktop/` and
-  `source/mobile/`; `source/core` stays platform-independent logic only (FR-013, FR-011).
+  A: Keep the WebView (spec 008); the shared UI is not rewritten. Adapter files keep the user's names,
+  `*.electron.ts` and `*.native.ts`, and the UI build picks one per host (FR-010a).
+- Q: Where do the native hosts and the real SQLite / file code go? → A: Exactly the user's layout, with no extra
+  `source/desktop/` or `source/mobile/` (this replaces an earlier answer of the same session): runtime code, including
+  the Electron Main/Preload process, the React Native host and its Kotlin/Swift modules, lives under
+  `source/app/platforms/`; `source/core` holds the database and file *logic* (schema, migrations, SQL, stores,
+  parsers) written against an injected driver, and the drivers themselves live in `platforms/` (FR-011, FR-013).
 
 ## Relationship to Earlier Specs
 
@@ -212,7 +214,7 @@ People using the desktop app, and the user testing the mobile app, see no change
 - **FR-010**: The UI (screens, components, stores, renderers), the reading core, the desktop host and the mobile host
   MUST each live in one clearly named folder of that project; nothing is duplicated between them.
 - **FR-010a**: Platform differences in the UI MUST live in `source/app/platforms/`, one file per runtime for each
-  concern (`<concern>.electron.ts` for the desktop host, `<concern>.mobile.ts` for the mobile WebView), selected when
+  concern (`<concern>.electron.ts` for the desktop host, `<concern>.native.ts` for the mobile WebView), selected when
   the UI is built for that host; screens and components import the concern without a runtime suffix and never test
   the platform themselves for what an adapter covers. These adapters replace today's two `window.api` wrappers
   (Desktop's `src/bridge` and Mobile's `web/src/bridge`). The mobile app keeps running the shared UI in its WebView;
@@ -231,14 +233,13 @@ People using the desktop app, and the user testing the mobile app, see no change
   - `source/app/`: the shared UI and platform adapters, today's `apps/reading-book-desktop/src`:
     `components/`, `screens/` and `platforms/` (one adapter file per runtime for each platform-specific concern, such
     as storage and window).
-  - `source/desktop/`: the desktop host, today's `apps/reading-book-desktop/electron` (Main and Preload, the SQLite
-    stores on the desktop driver, file access, importers, workers), plus its spikes, end-to-end tests, packaging
-    config and assets.
-  - `source/mobile/`: the mobile host, today's `apps/reading-book-mobile` without its UI build input: the React
-    Native host, the host services (SQLite and files on the mobile drivers), the native local-server module, config
-    plugins, and the WebView entry and stores.
-  `source/core` holds no database driver, file-system or runtime code (FR-011); the SQLite and file code of each
-  platform lives in that platform's host folder.
+  - `source/app/platforms/` also holds each runtime's own code: the desktop host (today's
+    `apps/reading-book-desktop/electron`: Main and Preload, workers, packaging, spikes, end-to-end tests) and the mobile
+    host (today's `apps/reading-book-mobile`: React Native host, host services, the Kotlin/Swift local-server module,
+    config plugins, WebView entry), with the database and file drivers of each runtime.
+  - `source/core` holds the database and file logic shared by both runtimes (schema, migrations, SQL, stores,
+    parsers) written against injected driver ports; it never imports a driver, a runtime or a UI library (FR-011).
+  There is no `source/desktop/` or `source/mobile/` folder.
   The old folders `source/apps/*` and `source/packages/*` no longer exist once their content has moved.
 - **FR-014**: Shared tool configuration (type checking, linting, test runner, path aliases) MUST be defined once
   where the tools allow it; where a host needs its own (for example the mobile host's bundler), it MUST extend the
