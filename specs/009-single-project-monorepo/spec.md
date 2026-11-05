@@ -28,6 +28,8 @@
   the Electron Main/Preload process, the React Native host and its Kotlin/Swift modules, lives under
   `source/app/platforms/`; `source/core` holds the database and file *logic* (schema, migrations, SQL, stores,
   parsers) written against an injected driver, and the drivers themselves live in `platforms/` (FR-011, FR-013).
+- Q: The install cannot shrink by 25 % without removing features (2026-11-06, T021); what does SC-004 require? →
+  A: No duplicate installs and no growth over the baseline; the size target is dropped (SC-004).
 
 ## Relationship to Earlier Specs
 
@@ -113,8 +115,8 @@ install, an update or a clean-up happens in one place.
 
 1. **Given** a fresh install, **When** the developer lists dependency folders, **Then** there is exactly one at the top
    level of the repository and none at the top of any app or core folder.
-2. **Given** that install, **When** the total size is measured, **Then** it is smaller than the recorded 3.0 GB
-   baseline by the amount in SC-004.
+2. **Given** that install, **When** it is listed, **Then** no package is installed twice at the same version, and
+   no package exists in two versions only because two apps asked for different ones (SC-004).
 3. **Given** the repository is installed, **When** a package is used by both apps, **Then** it is installed once.
 
 ---
@@ -280,8 +282,10 @@ People using the desktop app, and the user testing the mobile app, see no change
 - **SC-002**: After a fresh install there is exactly 1 top-level dependency folder and 1 lock file in the repository.
 - **SC-003**: 100% of the commands in the current developer documentation have a root equivalent, or are listed as
   retired with their replacement.
-- **SC-004**: The installed dependencies take at least 25% less disk space than the 3.0 GB baseline measured on
-  2026-11-05 (same machine, fresh install, native build output excluded from both measurements).
+- **SC-004**: No duplicate installs: `npm dedupe` leaves nothing to merge, the UI library, the type checker and the
+  linter are each installed in one version, and the install is no larger than the 2026-11-05 baseline measured the
+  same way (native build output excluded). (Changed 2026-11-06: the original "25 % smaller" assumed the 3.0 GB were
+  mostly duplicates; measured, they were ~60 MB, see quickstart.md §US3.)
 - **SC-005**: The Desktop baseline check of spec 008 passes with 0 removed or weakened checks, and an existing library
   opens with 100% of its books, positions and annotations.
 - **SC-006**: The dependency-rule check passes, and each of its negative tests (a rule broken on purpose) still fails.

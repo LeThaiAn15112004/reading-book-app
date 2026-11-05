@@ -28,7 +28,7 @@ dependency rules) and a commit, so a failing step is reverted alone (FR-019, SC-
 **Testing**: vitest (core `tests/`, Mobile WebView tests), `node --test` (boundaries), Desktop spikes, Kotlin unit tests (local server), Desktop baseline script, Playwright E2E (manual, user's agreement only)
 **Target Platform**: Windows / macOS / Linux desktop (Electron); Android (Expo Go + native build); iOS later (spec 008 M6)
 **Project Type**: Single project with two hosts (desktop app + mobile app) sharing one UI and one core
-**Performance Goals**: No regression of Desktop startup or reader performance (Desktop baseline + E2E); install footprint ≥ 25 % smaller than 3.0 GB (SC-004)
+**Performance Goals**: No regression of Desktop startup or reader performance (Desktop baseline + E2E); no duplicate installs, no growth over the 2026-11-05 baseline (SC-004, changed 2026-11-06)
 **Constraints**: Desktop users notice nothing (FR-015); stored data and migrations unchanged; the synchronous annotation-import transaction stays synchronous (R3); desktop package contains no mobile code (FR-017); Windows path length (spec 008 M5)
 **Scale/Scope**: ~370 UI files, ~24 k lines in `electron/`, ~270 core files, ~60 Mobile files, 69 Desktop scripts, 22 spikes
 

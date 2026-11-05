@@ -101,7 +101,7 @@ npm run e2e
 | Measure | Value |
 |---|---|
 | `check:single-install` | 1 install folder, 1 lock file, root manifest + 4 kept without dependencies |
-| Size after `npm dedupe` (without native build output) | **1,823,780 KB** = baseline 1,882,600 KB − 3.1 % (target ≤ 1,411,950 KB, SC-004 **not met**) |
+| Size after `npm dedupe` (without native build output) | **1,823,780 KB** = baseline 1,882,600 KB − 3.1 % (target ≤ 1,411,950 KB, SC-004 as first written not met; **met as changed 2026-11-06** (no duplicates, no growth)) |
 | With native build output (all content) | baseline ~3.09 GB → 1.82 GB now, but only because the old Android `.cxx` / `build` folders went with the old installs; they come back on the next Android build (now under `%LOCALAPPDATA%mcxx`, outside the repo) |
 
 Largest packages (KB) and who needs them:
