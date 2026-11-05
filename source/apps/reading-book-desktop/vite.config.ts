@@ -6,6 +6,8 @@ import react from '@vitejs/plugin-react'
 
 // https://vitejs.dev/config/
 export default defineConfig({
+  // Spec 009: Vite's cache lives in the one install folder at the repository root, never in a node_modules here.
+  cacheDir: path.resolve(__dirname, '../../../node_modules/.vite/desktop'),
   resolve: {
     alias: {
       '@reading-book/config': path.resolve(__dirname, '../../packages/config'),

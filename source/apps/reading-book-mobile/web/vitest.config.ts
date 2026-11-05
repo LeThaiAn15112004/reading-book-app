@@ -6,6 +6,8 @@ const workspaceRoot = path.resolve(__dirname, '../../..')
 
 export default defineConfig({
   root: __dirname,
+  // Spec 009: caches live in the one install folder at the repository root.
+  cacheDir: path.join(workspaceRoot, '..', 'node_modules', '.vite/mobile-tests'),
   resolve: {
     alias: [
       { find: '@reading-book/config', replacement: path.join(workspaceRoot, 'packages/config') },

@@ -18,7 +18,7 @@
     "typecheck": "npm run sdk:typecheck && npm run sdk:typecheck:tests && npm run desktop:typecheck && npm run e2e:typecheck && npm run mobile:typecheck && npm run mobile:typecheck:web",
     "lint": "npm run desktop:lint && npm run mobile:lint",
     "test": "npm run sdk:test && npm run mobile:test",
-    "check": "npm run typecheck && npm run lint && npm test && npm run check:boundaries && npm run build && npm run build:web",
+    "check": "npm run check:single-install && npm run typecheck && npm run lint && npm test && npm run check:boundaries && npm run build && npm run build:web",
     "check:desktop-baseline": "node source/scripts/check-desktop-baseline.mjs",
     "check:boundaries": "node source/scripts/boundaries/run-all.mjs",
     "sdk:typecheck": "cd source/apps/book-reader-sdk && tsc -p tsconfig.json",
@@ -96,7 +96,9 @@
     "spike:transcription:smoke": "npm run sdk:build && cd source/apps/reading-book-desktop && npx vite build && node spikes/transcription/run-transcription-smoke.mjs",
     "spike:md:main": "npm run sdk:build && cd source/apps/reading-book-desktop && node --experimental-transform-types --import ./spikes/txt/register-alias.mjs spikes/md/run-md-main.mjs",
     "spike:md:render": "cd source/apps/reading-book-desktop && node --experimental-transform-types spikes/md/run-md-render.mjs",
-    "spike:contract:fixtures": "npm run sdk:build && cd source/apps/reading-book-desktop && node --experimental-transform-types spikes/mobile-contract-fixtures.mts"
+    "spike:contract:fixtures": "npm run sdk:build && cd source/apps/reading-book-desktop && node --experimental-transform-types spikes/mobile-contract-fixtures.mts",
+    "check:single-install": "node source/scripts/check-single-install.mjs",
+    "clean:old-installs": "node source/scripts/clean-old-installs.mjs"
   },
   "dependencies": {
     "@expo/ui": "~57.0.26",

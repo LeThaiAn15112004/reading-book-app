@@ -95,3 +95,34 @@ npm run e2e
 | `npx expo prebuild -p android` (root) | `./android` written; plugins applied; `local-server` autolinked |
 | Expo Go on a device | **User, 2026-11-05: import works** (SC-007) |
 | `npm run check` | pass |
+
+### US3 (T019–T021, 2026-11-06)
+
+| Measure | Value |
+|---|---|
+| `check:single-install` | 1 install folder, 1 lock file, root manifest + 4 kept without dependencies |
+| Size after `npm dedupe` (without native build output) | **1,823,780 KB** = baseline 1,882,600 KB − 3.1 % (target ≤ 1,411,950 KB, SC-004 **not met**) |
+| With native build output (all content) | baseline ~3.09 GB → 1.82 GB now, but only because the old Android `.cxx` / `build` folders went with the old installs; they come back on the next Android build (now under `%LOCALAPPDATA%mcxx`, outside the repo) |
+
+Largest packages (KB) and who needs them:
+
+| Package | Size | Needed by | Note |
+|---|---|---|---|
+| `electron` | 334,794 | Desktop | the Electron runtime itself |
+| `onnxruntime-node` | 294,809 | Desktop (`@huggingface/transformers`: translation, transcription) | binaries for win32 136,572 + darwin 87,364 + linux 70,076 |
+| `onnxruntime-web` | 143,559 | pulled by `@huggingface/transformers`, not used by Main | |
+| `expo-image` | 136,290 | Mobile | `prebuilds/` 134,840 |
+| `expo-sqlite` | 76,733 | Mobile | |
+| `hermes-compiler` | 47,502 | Mobile | |
+| `pdfjs-dist` | 37,932 | both | |
+| `@napi-rs/canvas-win32-x64-msvc` | 36,889 | Desktop (pdf.js in Node) | |
+| `expo-modules-core`, `react-native` | 34,081, 31,648 | Mobile | |
+| `electron-winstaller` | 31,590 | Desktop packaging | |
+| `typescript` | 24,169 | both | |
+
+**Why SC-004 fails**: the spec assumed the 3.0 GB were mostly duplicate installs. Measured, the duplicates were ~60 MB
+(React 18 + 19, two TypeScript and ESLint versions, nested copies); ~1.2 GB was Android native build output, and the
+rest is packages that only one host uses. Reaching −25 % (≈ −470 MB) would need removing a feature's dependencies,
+for example: dropping `onnxruntime-web` (−144 MB, not used by Main), pruning `onnxruntime-node` binaries of other
+platforms at install (−157 MB on Windows), or making translation / transcription models an optional install.
+

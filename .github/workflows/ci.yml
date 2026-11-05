@@ -32,6 +32,11 @@ jobs:
         id: install
         run: npm ci
 
+      # Spec 009: one install folder, one lock file, no dependency-carrying manifest outside the root.
+      - name: Single install
+        if: (success() || failure()) && steps.install.outcome == 'success'
+        run: npm run check:single-install
+
       # Each check runs even when an earlier check failed, so one push reports every problem.
       - name: SDK · typecheck
         if: (success() || failure()) && steps.install.outcome == 'success'
