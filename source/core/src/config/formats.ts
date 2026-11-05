@@ -1,4 +1,4 @@
-import { DocumentFormat } from '@reading-book/book-reader-sdk';
+import { DocumentFormat } from '../domain/book/document-format.js';
 
 export interface FormatDescriptor {
   format: DocumentFormat;

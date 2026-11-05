@@ -1,4 +1,4 @@
-import { AppTheme } from '@reading-book/book-reader-sdk';
+import { AppTheme } from '../domain/preferences/preferences.js';
 
 export type ThemeTokenName = '--bg' | '--text' | '--accent';
 export type ThemeTokens = Readonly<Record<ThemeTokenName, string>>;
@@ -23,5 +23,5 @@ export const THEME_TOKENS: Readonly<Record<AppTheme, ThemeTokens>> = {
 };
 
 export function getThemeTokens(theme: AppTheme): ThemeTokens {
-  return THEME_TOKENS[theme];
+  return THEME_TOKENS[theme]!;
 }

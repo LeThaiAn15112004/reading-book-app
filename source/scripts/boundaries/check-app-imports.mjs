@@ -7,7 +7,7 @@
 //   R11 No Mobile file imports `book-reader-sdk/host-adapters` (until OD-7).
 import path from 'node:path'
 import {
-  desktopDir, isInside, isMain, isRelative, listCodeFiles, mobileDir, packageName, runCli, scanImports, sdkDir,
+  desktopDir, hostAdaptersDir, isInside, isMain, isRelative, listCodeFiles, mobileDir, packageName, runCli, scanImports, sdkDir,
   targetPath, violation,
 } from './lib/imports.mjs'
 
@@ -22,9 +22,9 @@ export function mobileArea(file, root = mobileDir) {
   return 'host'
 }
 
-export function checkAppImports({ desktop = desktopDir, mobile = mobileDir, sdk = sdkDir } = {}) {
+export function checkAppImports({ desktop = desktopDir, mobile = mobileDir, sdk = sdkDir, hostAdaptersRoot = hostAdaptersDir } = {}) {
   const violations = []
-  const hostAdapters = path.join(sdk, 'host-adapters')
+  const hostAdapters = hostAdaptersRoot
   const resolve = (file, spec) => {
     const target = targetPath(file, spec)
     // Fixture roots differ from the real ones; aliases still map to the real SDK, so re-map them under `sdk`.

@@ -15,7 +15,7 @@ import type {
   TranslationEngineLoader,
   TranslationEngineTranslateOptions,
   TranslationLoadProgress,
-} from '../../src/ports/translation.js'
+} from '../../../../core/src/ports/translation.js'
 
 export interface TransformersTranslationEngineOptions {
   /**

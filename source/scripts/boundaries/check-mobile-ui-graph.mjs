@@ -7,7 +7,7 @@
 import path from 'node:path'
 import {
   CODE_EXTENSIONS, desktopDir, isInside, isMain, isRelative, loadExceptions, mobileDir, norm, packageName, rel,
-  resolveFile, runCli, scanImports, sdkDir, targetPath, violation,
+  hostAdaptersDir, resolveFile, runCli, scanImports, targetPath, violation,
 } from './lib/imports.mjs'
 
 export function allowedElectronFiles(exceptions = loadExceptions(), root = desktopDir) {
@@ -35,7 +35,7 @@ export function checkMobileUiGraph({
     if (seen.has(key)) continue
     seen.add(key)
     if (!CODE_EXTENSIONS.includes(path.extname(file))) continue
-    if (isInside(file, path.join(sdkDir, 'host-adapters'))) reachedHostAdapters.add(rel(file))
+    if (isInside(file, hostAdaptersDir)) reachedHostAdapters.add(rel(file))
     for (const { specifier, typeOnly, line } of scanImports(file)) {
       if (typeOnly) continue
       if (!isRelative(specifier) && !specifier.startsWith('@reading-book/')) {

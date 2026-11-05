@@ -14,12 +14,12 @@ import { describe, expect, it } from 'vitest'
  * copy to try the menu without turning this test red; the moment a commit carries `true`, CI (which tests that commit)
  * fails. When git is not available the working-copy file is checked instead (stricter, never looser).
  */
-const featuresPath = fileURLToPath(new URL('../../../../packages/config/features.ts', import.meta.url))
+const featuresPath = fileURLToPath(new URL('../../src/config/features.ts', import.meta.url))
 
 function committedFeaturesSource(): string {
   try {
-    return execFileSync('git', ['show', 'HEAD:source/packages/config/features.ts'], {
-      cwd: fileURLToPath(new URL('../../../../', import.meta.url)),
+    return execFileSync('git', ['show', 'HEAD:source/core/src/config/features.ts'], {
+      cwd: fileURLToPath(new URL('../../', import.meta.url)),
       encoding: 'utf8',
       stdio: ['ignore', 'pipe', 'ignore'],
     })

@@ -16,8 +16,6 @@ const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'
 export const KEPT_MANIFESTS = {
   'source/apps/reading-book-desktop/package.json': 'Electron reads name / main (the name sets userData)',
   'source/apps/reading-book-mobile/package.json': 'kept until the Mobile host moves (US4); Expo now reads the root one',
-  'source/apps/book-reader-sdk/package.json': 'linked as @reading-book/book-reader-sdk until US4 (T022)',
-  'source/packages/config/package.json': 'linked as @reading-book/config until US4 (T022)',
 }
 
 const SKIP = new Set(['.git', 'android', 'ios', '.expo', 'dist', 'dist-electron', 'release', '.gradle', 'build', '.cxx'])

@@ -15,7 +15,9 @@ import { rolldown } from 'rolldown'
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 const dist = join(root, 'dist')
 const require = createRequire(import.meta.url)
-const pkg = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'))
+// Interim (spec 009 T022): the manifest is gone; T023 deletes this whole bundle.
+const pkg = { name: '@reading-book/book-reader-sdk', version: '0.1.0' }
+const coreSrc = join(root, '../../core/src')
 
 function fail(message) {
   console.error(`\n✖ build failed: ${message}\n`)
@@ -23,16 +25,16 @@ function fail(message) {
 }
 
 // 0. Version constant must match package.json.
-const versionSource = readFileSync(join(root, 'src/core/version.ts'), 'utf8')
+const versionSource = readFileSync(join(coreSrc, 'core/version.ts'), 'utf8')
 if (!versionSource.includes(`'${pkg.version}'`)) {
-  fail(`src/core/version.ts SDK_VERSION does not match package.json version ${pkg.version}`)
+  fail(`src/core/version.ts SDK_VERSION does not match the build version ${pkg.version}`)
 }
 
 rmSync(dist, { recursive: true, force: true })
 
 // 1. JS bundles.
 const bundle = await rolldown({
-  input: join(root, 'src/index.ts'),
+  input: join(coreSrc, 'index.ts'),
   platform: 'neutral',
   resolve: { conditionNames: ['import', 'default'], mainFields: ['module', 'main'] },
   treeshake: true,

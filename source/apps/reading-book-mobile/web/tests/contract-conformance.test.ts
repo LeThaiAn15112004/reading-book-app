@@ -6,8 +6,8 @@
  */
 import { Book, Location, ReadingSessionState } from '@reading-book/book-reader-sdk'
 import { afterAll, describe, expect, it } from 'vitest'
-import { runOverlayContract, type ContractHost, type NoteRowRaw } from '../../../book-reader-sdk/tests/contracts/contract-runner'
-import { loadContractFixtures } from '../../../book-reader-sdk/tests/contracts/fixtures'
+import { runOverlayContract, type ContractHost, type NoteRowRaw } from '../../../../core/tests/contracts/contract-runner'
+import { loadContractFixtures } from '../../../../core/tests/contracts/fixtures'
 import { columnsOf, migratedDesktopDatabase, schemaOf } from '../../scripts/dump-desktop-schema.mjs'
 import { migrate } from '../src/db/migrate'
 import { MobileLibraryStore, bookFilePath } from '../src/stores/library-store'

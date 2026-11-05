@@ -25,7 +25,7 @@ import {
   isSignatureInfoCurrent,
   signatureInfoFromMetadata,
   signatureMetadataPatch,
-} from '../../../book-reader-sdk/src/domain/book/book-signature.ts'
+} from '../../../../core/src/domain/book/book-signature.ts'
 import { verifyDetachedCms } from '../../electron/signature/cms.ts'
 import { hashFile } from '../../electron/files/file-hash.ts'
 import { resolveSignatureInfo } from '../../electron/signature/signature-check.ts'

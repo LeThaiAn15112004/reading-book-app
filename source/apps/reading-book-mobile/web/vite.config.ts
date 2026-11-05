@@ -34,8 +34,8 @@ export default defineConfig({
   publicDir: path.join(desktopRoot, 'public'),
   resolve: {
     alias: [
-      { find: '@reading-book/config', replacement: path.join(workspaceRoot, 'packages/config') },
-      { find: '@reading-book/book-reader-sdk', replacement: path.join(workspaceRoot, 'apps/book-reader-sdk/src/index.ts') },
+      { find: '@reading-book/config', replacement: path.join(workspaceRoot, 'core/src/config') },
+      { find: '@reading-book/book-reader-sdk', replacement: path.join(workspaceRoot, 'core/src/index.ts') },
       { find: /^pdfjs-dist$/, replacement: `${pdfjsLegacy}/pdf.mjs` },
       { find: /^pdfjs-dist\/build\/pdf\.worker\.min\.mjs(\?url)?$/, replacement: `${pdfjsLegacy}/pdf.worker.min.mjs$1` },
       { find: /^react(\/.*)?$/, replacement: `${path.join(rootNodeModules, 'react').replaceAll('\\', '/')}$1` },

@@ -115,6 +115,7 @@ describe('R7, R8, R11: app imports', () => {
       desktop: path.join(root, 'reading-book-desktop'),
       mobile: path.join(root, 'reading-book-mobile'),
       sdk: path.join(root, 'book-reader-sdk'),
+      hostAdaptersRoot: path.join(root, 'book-reader-sdk/host-adapters'),
     })
   }
   const base = {

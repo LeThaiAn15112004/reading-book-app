@@ -5,8 +5,8 @@
     "ignoreDeprecations": "6.0",
     "strict": true,
     "paths": {
-      "@reading-book/book-reader-sdk": ["../book-reader-sdk/src/index.ts"],
-      "@reading-book/book-reader-sdk/*": ["../book-reader-sdk/src/*"],
+      "@reading-book/book-reader-sdk": ["../../core/src/index.ts"],
+      "@reading-book/book-reader-sdk/*": ["../../core/src/*"],
       "@/*": [
         "./src/*"
       ],

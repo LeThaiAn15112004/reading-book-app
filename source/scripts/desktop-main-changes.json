@@ -3,6 +3,8 @@
   "files": {
     "source/apps/reading-book-desktop/electron/chunking/book-chunk-service.ts": "T011: @types/node types a Worker 'error' as unknown; message read the same way for an Error (type-only)",
     "source/apps/reading-book-desktop/electron/ipc/overlay.ipc.ts": "T011: same, the worker error is passed on as an Error (type-only)",
-    "source/apps/reading-book-desktop/electron/translation/translation-service.ts": "T011: same (type-only)"
+    "source/apps/reading-book-desktop/electron/translation/translation-service.ts": "T011: same (type-only)",
+    "source/apps/reading-book-desktop/electron/config/cloud-oauth-config.ts": "T022: the config folder moved to source/core/src/config (path of cloud-oauth-secrets.json / client_secret_*.json only)",
+    "source/apps/reading-book-desktop/electron/config/google-oauth-config.ts": "T022: the config folder moved to source/core/src/config (path of cloud-oauth-secrets.json / client_secret_*.json only)"
   }
 }

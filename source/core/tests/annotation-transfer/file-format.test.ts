@@ -25,7 +25,7 @@ const base = () => ({
 describe('parseAnnotationFile', () => {
   it('accepts the documented sample file', () => {
     const sample = readFileSync(
-      new URL('../../../../../specs/006-annotation-import-export/samples/sample-epub.readmate-notes.json', import.meta.url),
+      new URL('../../../../specs/006-annotation-import-export/samples/sample-epub.readmate-notes.json', import.meta.url),
       'utf-8',
     )
     const r = parseAnnotationFile(sample)

@@ -1,10 +1,10 @@
-import type { ConnectionTestResult, ExternalLibraryInfo } from '../../src/domain/index.js';
+import type { ConnectionTestResult, ExternalLibraryInfo } from '../../../../core/src/domain/index.js';
 import type {
   ExternalCatalogEntry,
   ExternalLibraryConnector,
   ExternalLibraryProvider,
   LinkLibraryOptions,
-} from '../../src/domain-ports/index.js';
+} from '../../../../core/src/domain-ports/index.js';
 
 /**
  * Link an external library provider (Google Drive, Google Books)

@@ -13,7 +13,7 @@ import {
  * without a manifest is named after its folder. T050 re-points this list when the areas move to `source/core` and
  * `source/app`.
  */
-export const AREA_DIRS = ['apps/book-reader-sdk', 'packages/config', 'apps/reading-book-desktop', 'apps/reading-book-mobile']
+export const AREA_DIRS = ['core', 'apps/reading-book-desktop', 'apps/reading-book-mobile']
 
 export function workspacePackages(root = sourceRoot) {
   return AREA_DIRS.map((d) => path.join(root, d))

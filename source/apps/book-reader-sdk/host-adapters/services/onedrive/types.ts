@@ -7,7 +7,7 @@
 
 /**
  * No client ID is baked in here — it lives in the gitignored
- * `packages/config/cloud-oauth-secrets.json` (loaded by the desktop app's
+ * `source/core/src/config/cloud-oauth-secrets.json` (loaded by the desktop app's
  * `electron/config/cloud-oauth-config.ts`) or the `AZURE_CLIENT_ID` env var, both handled inside
  * `OneDriveAuthService`.
  */

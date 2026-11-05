@@ -1,9 +1,9 @@
-import { isSupportedExternalFormat, type ConnectionTestResult } from '../../src/domain/index.js';
+import { isSupportedExternalFormat, type ConnectionTestResult } from '../../../../core/src/domain/index.js';
 import type {
   ExternalCatalogEntry,
   ExternalLibraryProvider,
   LinkLibraryOptions,
-} from '../../src/domain-ports/index.js';
+} from '../../../../core/src/domain-ports/index.js';
 import {
   DropboxAuthService,
   DropboxDownloadService,

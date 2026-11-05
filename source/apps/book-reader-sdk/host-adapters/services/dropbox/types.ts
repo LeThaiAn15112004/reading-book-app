@@ -4,7 +4,7 @@
 
 /**
  * No app key/secret is baked in here — they live in the gitignored
- * `packages/config/cloud-oauth-secrets.json` (loaded by the desktop app's
+ * `source/core/src/config/cloud-oauth-secrets.json` (loaded by the desktop app's
  * `electron/config/cloud-oauth-config.ts`) or the `DROPBOX_APP_KEY`/`DROPBOX_APP_SECRET` env vars,
  * both handled inside `DropboxAuthService`. These constants stay empty so nothing sensitive ships
  * in source control.

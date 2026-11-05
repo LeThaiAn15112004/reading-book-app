@@ -10,8 +10,8 @@ export default defineConfig({
   cacheDir: path.resolve(__dirname, '../../../node_modules/.vite/desktop'),
   resolve: {
     alias: {
-      '@reading-book/config': path.resolve(__dirname, '../../packages/config'),
-      '@reading-book/book-reader-sdk': path.resolve(__dirname, '../book-reader-sdk/src/index.ts'),
+      '@reading-book/config': path.resolve(__dirname, '../../core/src/config'),
+      '@reading-book/book-reader-sdk': path.resolve(__dirname, '../../core/src/index.ts'),
     },
   },
   optimizeDeps: {
@@ -36,8 +36,8 @@ export default defineConfig({
         vite: {
           resolve: {
             alias: {
-              '@reading-book/config': path.resolve(__dirname, '../../packages/config'),
-              '@reading-book/book-reader-sdk': path.resolve(__dirname, '../book-reader-sdk/src/index.ts'),
+              '@reading-book/config': path.resolve(__dirname, '../../core/src/config'),
+              '@reading-book/book-reader-sdk': path.resolve(__dirname, '../../core/src/index.ts'),
             },
           },
           build: {

@@ -5,7 +5,7 @@
  */
 import { register } from 'node:module'
 
-const target = new URL('../../../book-reader-sdk/src/domain/book/book-signature.ts', import.meta.url).href
+const target = new URL('../../../../core/src/domain/book/book-signature.ts', import.meta.url).href
 
 register(
   'data:text/javascript,' +

@@ -10,8 +10,8 @@ export default defineConfig({
   cacheDir: path.join(workspaceRoot, '..', 'node_modules', '.vite/mobile-tests'),
   resolve: {
     alias: [
-      { find: '@reading-book/config', replacement: path.join(workspaceRoot, 'packages/config') },
-      { find: '@reading-book/book-reader-sdk', replacement: path.join(workspaceRoot, 'apps/book-reader-sdk/src/index.ts') },
+      { find: '@reading-book/config', replacement: path.join(workspaceRoot, 'core/src/config') },
+      { find: '@reading-book/book-reader-sdk', replacement: path.join(workspaceRoot, 'core/src/index.ts') },
     ],
   },
   test: {

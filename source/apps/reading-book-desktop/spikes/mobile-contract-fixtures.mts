@@ -1,6 +1,6 @@
 /**
  * Data contract, Desktop side (spec 008, US4, T038 / SC-006): the versioned fixtures of
- * `book-reader-sdk/tests/contracts/fixtures/` run through the REAL `SqliteOverlayStore` and `SqliteLibraryStore`, on
+ * `core/tests/contracts/fixtures/` run through the REAL `SqliteOverlayStore` and `SqliteLibraryStore`, on
  * the REAL better-sqlite3 with every numbered migration applied (FTS5 included), on a temp file in WAL mode like the app.
  * Mobile runs the same runner on its own stores (`reading-book-mobile/web/tests/contract-conformance.test.ts`).
  *
@@ -33,8 +33,8 @@ const sdk = await import('@reading-book/book-reader-sdk')
 const { getDatabase, closeAndRemove } = await import('./annotations/db-stub-bs.mjs')
 const { SqliteOverlayStore } = await import('../electron/persistence/sqlite-overlay-store.ts')
 const { SqliteLibraryStore } = await import('../electron/persistence/sqlite-library-store.ts')
-const { runOverlayContract } = await import('../../book-reader-sdk/tests/contracts/contract-runner.ts')
-const { loadContractFixtures } = await import('../../book-reader-sdk/tests/contracts/fixtures.ts')
+const { runOverlayContract } = await import('../../../core/tests/contracts/contract-runner.ts')
+const { loadContractFixtures } = await import('../../../core/tests/contracts/fixtures.ts')
 
 type Row = Record<string, unknown>
 const db = getDatabase()

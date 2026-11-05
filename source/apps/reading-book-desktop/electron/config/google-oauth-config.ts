@@ -11,7 +11,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 function resolveConfigDirectory(): string {
   const appRoot = process.env.APP_ROOT ?? path.join(__dirname, '..')
-  return path.resolve(appRoot, '../../packages/config')
+  return path.resolve(appRoot, '../../core/src/config')
 }
 
 function findClientSecretPath(): string | null {

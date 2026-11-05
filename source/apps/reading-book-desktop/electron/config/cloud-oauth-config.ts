@@ -11,11 +11,11 @@ interface CloudOAuthSecrets {
 
 function resolveConfigDirectory(): string {
   const appRoot = process.env.APP_ROOT ?? path.join(__dirname, '..')
-  return path.resolve(appRoot, '../../packages/config')
+  return path.resolve(appRoot, '../../core/src/config')
 }
 
 /**
- * Reads `packages/config/cloud-oauth-secrets.json` — gitignored, local-only file holding the
+ * Reads `source/core/src/config/cloud-oauth-secrets.json` — gitignored, local-only file holding the
  * Dropbox app key/secret and OneDrive client ID (see `cloud-oauth-secrets.example.json` for the
  * expected shape). Returns `null` when the file is absent so callers can fall back to the
  * `DROPBOX_APP_KEY`/`DROPBOX_APP_SECRET`/`AZURE_CLIENT_ID` env vars already handled inside
