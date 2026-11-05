@@ -71,7 +71,7 @@ function spawnWorker(job: BookChunkJob): boolean {
     }
   })
   worker.on('error', (err) => {
-    settle({ bookId, state: 'error', errorMessage: err.message })
+    settle({ bookId, state: 'error', errorMessage: err instanceof Error ? err.message : String(err) })
   })
   worker.on('exit', (code) => {
     // A clean run already settled via 'message'; this covers crashes / OOM / terminate().

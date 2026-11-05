@@ -73,4 +73,15 @@ npm run e2e
 
 ## Results
 
-(filled in at step 4.5)
+### After Phase 2 (T003–T012, 2026-11-05)
+
+| Measure | Value |
+|---|---|
+| Install folders | `./node_modules` only (+ 6 files VS Code holds under the old Mobile folder, see T010) |
+| Lock files | `./package-lock.json` only |
+| Manifests | root + 4 without dependencies (Desktop, Mobile, SDK, config; plan "Kept manifests", removed in US4 except where a tool needs one) |
+| `npm ls react typescript eslint` | react / react-dom 19.2.3, typescript 6.0.3, eslint 9.39.5, each once |
+| Size without native build output | **1,873,973 KB** vs baseline 1,882,600 KB (−0.5 %). The duplicates were small; most of the size is packages only one host uses. SC-004 (≤ 1,411,950 KB) is **not met** yet: T021 lists the largest packages |
+| `npm run check` | pass |
+| Desktop baseline | 26/26 (the Main check now accepts the listed changes) |
+| Desktop E2E | not run (T005, user) |

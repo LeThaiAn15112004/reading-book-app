@@ -29,7 +29,7 @@ function TableIcon() {
   )
 }
 
-const LAYOUTS: readonly { id: LibraryLayout; label: string; icon: () => JSX.Element }[] = [
+const LAYOUTS: readonly { id: LibraryLayout; label: string; icon: () => React.JSX.Element }[] = [
   { id: 'grid', label: 'Grid view', icon: GridIcon },
   { id: 'table', label: 'Table view', icon: TableIcon },
 ]

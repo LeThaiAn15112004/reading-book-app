@@ -5,8 +5,8 @@
       "@reading-book/config/*": ["../../../packages/config/*"],
       "@reading-book/book-reader-sdk": ["../../book-reader-sdk/src/index.ts"],
       "@reading-book/book-reader-sdk/*": ["../../book-reader-sdk/src/*"],
-      "react": ["../../../node_modules/@types/react/index.d.ts"],
-      "react/*": ["../../../node_modules/@types/react/*"]
+      "react": ["../../../../node_modules/@types/react/index.d.ts"],
+      "react/*": ["../../../../node_modules/@types/react/*"]
     },
     "target": "ES2020",
     "useDefineForClassFields": true,
@@ -20,7 +20,7 @@
     "noEmit": true,
     "jsx": "react-jsx",
     "types": ["node"],
-    "typeRoots": ["../../../node_modules/@types"],
+    "typeRoots": ["../../../../node_modules/@types"],
     "strict": true,
     "noUnusedLocals": true,
     "noUnusedParameters": true,

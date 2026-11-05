@@ -82,7 +82,7 @@ function ensureWorker(): Worker {
   created.on('message', handleWorkerMessage)
   created.on('error', (err) => {
     if (worker === created) worker = null
-    failAllPending(`Translation worker crashed: ${err.message}`)
+    failAllPending(`Translation worker crashed: ${err instanceof Error ? err.message : String(err)}`)
   })
   created.on('exit', (code) => {
     // A crash / OOM: the next request respawns a fresh worker.

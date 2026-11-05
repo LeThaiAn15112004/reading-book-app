@@ -2,25 +2,27 @@
 // R5 / FR-006 (spec 008): the workspace dependency graph is acyclic (apps → config → SDK). Edges come from two
 // sources, because either alone can hide a cycle: manifest dependencies on another workspace package, and imports
 // (relative or alias, type-only included) from one package's files into another package's folder.
-import { readFileSync, readdirSync, existsSync } from 'node:fs'
+import { readFileSync, existsSync } from 'node:fs'
 import path from 'node:path'
 import {
   isInside, isMain, listCodeFiles, rel, runCli, scanImports, sourceRoot, targetPath, violation,
 } from './lib/imports.mjs'
 
-/** Workspace packages from `source/package.json` `workspaces` (`apps/*`, `packages/*`). */
+/**
+ * The code areas of the single project (spec 009): npm workspaces are gone, so the areas are listed here. An area
+ * without a manifest is named after its folder. T050 re-points this list when the areas move to `source/core` and
+ * `source/app`.
+ */
+export const AREA_DIRS = ['apps/book-reader-sdk', 'packages/config', 'apps/reading-book-desktop', 'apps/reading-book-mobile']
+
 export function workspacePackages(root = sourceRoot) {
-  const { workspaces = [] } = JSON.parse(readFileSync(path.join(root, 'package.json'), 'utf8'))
-  const packages = []
-  for (const pattern of workspaces) {
-    const base = path.join(root, pattern.replace(/\/\*$/, ''))
-    const dirs = pattern.endsWith('/*') ? readdirSync(base, { withFileTypes: true }).filter((d) => d.isDirectory()).map((d) => path.join(base, d.name)) : [base]
-    for (const dir of dirs) {
-      const manifest = path.join(dir, 'package.json')
-      if (existsSync(manifest)) packages.push({ dir, manifest: JSON.parse(readFileSync(manifest, 'utf8')) })
-    }
-  }
-  return packages.map((p) => ({ name: p.manifest.name, dir: p.dir, manifest: p.manifest }))
+  return AREA_DIRS.map((d) => path.join(root, d))
+    .filter((dir) => existsSync(dir))
+    .map((dir) => {
+      const file = path.join(dir, 'package.json')
+      const manifest = existsSync(file) ? JSON.parse(readFileSync(file, 'utf8')) : { name: path.basename(dir) }
+      return { name: manifest.name ?? path.basename(dir), dir, manifest }
+    })
 }
 
 export function workspaceEdges(packages) {
@@ -78,7 +80,7 @@ export function checkWorkspaceGraph({ packages = workspacePackages() } = {}) {
   const edges = workspaceEdges(packages)
   const violations = findCycles(edges).map((cycle) => {
     const first = edges.find((e) => e.from === cycle[0] && e.to === cycle[1])
-    return violation('R5', path.join(sourceRoot, 'package.json'), 0, cycle.join(' -> '), `workspace cycle; first edge from ${first?.evidence ?? '?'}`)
+    return violation('R5', path.join(sourceRoot, '..', 'package.json'), 0, cycle.join(' -> '), `workspace cycle; first edge from ${first?.evidence ?? '?'}`)
   })
   return { violations, edges }
 }

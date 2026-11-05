@@ -57,7 +57,7 @@ if (!process.versions.electron) {
   await esbuild.build({ ...common, entryPoints: [path.join(desktop, 'electron/persistence/sqlite-transcript-store.ts')], outfile: bundles.dbStore, external: ['better-sqlite3', 'electron'] })
   await esbuild.build({ ...common, entryPoints: [path.join(desktop, 'electron/transcription/transcription-service.ts')], outfile: bundles.service, external: ['electron'] })
   // the renderer's own store, with the real bridge and zustand (no DOM is touched at import time)
-  await esbuild.build({ ...common, entryPoints: [path.join(here, 'renderer-entry.mjs')], outfile: bundles.renderer, nodePaths: [path.join(desktop, 'node_modules'), path.join(desktop, '../../node_modules')] })
+  await esbuild.build({ ...common, entryPoints: [path.join(here, 'renderer-entry.mjs')], outfile: bundles.renderer, nodePaths: [path.join(desktop, '../../../node_modules')] })
   await esbuild.build({ ...common, entryPoints: [path.join(desktop, 'electron/transcription/transcript-export-file.ts')], outfile: bundles.exportFile, external: ['electron'] })
   const electron = require('electron')
   const env = { ...process.env, ELECTRON_RUN_AS_NODE: '1', TRANSCRIPTION_STORE_SPIKE_DB: bundles.dbStore, TRANSCRIPTION_STORE_SPIKE_SERVICE: bundles.service, TRANSCRIPTION_STORE_SPIKE_RENDERER: bundles.renderer, TRANSCRIPTION_STORE_SPIKE_EXPORTFILE: bundles.exportFile }

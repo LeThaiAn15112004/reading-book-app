@@ -16,9 +16,6 @@ jobs:
     name: Typecheck · Lint · Test
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    defaults:
-      run:
-        working-directory: source
     env:
       # Typecheck / lint / unit tests never launch Electron — skip the ~100 MB binary download.
       ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
@@ -29,7 +26,7 @@ jobs:
         with:
           node-version: 22
           cache: npm
-          cache-dependency-path: source/package-lock.json
+          cache-dependency-path: package-lock.json
 
       - name: Install
         id: install
@@ -38,44 +35,44 @@ jobs:
       # Each check runs even when an earlier check failed, so one push reports every problem.
       - name: SDK · typecheck
         if: (success() || failure()) && steps.install.outcome == 'success'
-        run: npm run typecheck -w @reading-book/book-reader-sdk
+        run: npm run sdk:typecheck
 
       - name: SDK · typecheck tests
         if: (success() || failure()) && steps.install.outcome == 'success'
-        run: npm run typecheck:tests -w @reading-book/book-reader-sdk
+        run: npm run sdk:typecheck:tests
 
       - name: SDK · test
         if: (success() || failure()) && steps.install.outcome == 'success'
-        run: npm test -w @reading-book/book-reader-sdk
+        run: npm run sdk:test
 
       - name: SDK · build
         if: (success() || failure()) && steps.install.outcome == 'success'
-        run: npm run build -w @reading-book/book-reader-sdk
+        run: npm run sdk:build
 
       - name: Desktop · typecheck
         if: (success() || failure()) && steps.install.outcome == 'success'
-        run: npm run typecheck -w reading-book-desktop
+        run: npm run desktop:typecheck
 
       - name: Desktop · lint
         if: (success() || failure()) && steps.install.outcome == 'success'
-        run: npm run lint -w reading-book-desktop
+        run: npm run desktop:lint
 
       - name: Mobile · typecheck host
         if: (success() || failure()) && steps.install.outcome == 'success'
-        run: npm run typecheck -w reading-book-mobile
+        run: npm run mobile:typecheck
 
       - name: Mobile · typecheck web UI
         if: (success() || failure()) && steps.install.outcome == 'success'
-        run: npm run typecheck:web -w reading-book-mobile
+        run: npm run mobile:typecheck:web
 
       # Mobile stores against the Desktop data contract, on node:sqlite (spec 008, US4).
       - name: Mobile · test
         if: (success() || failure()) && steps.install.outcome == 'success'
-        run: npm test -w reading-book-mobile
+        run: npm run mobile:test
 
       - name: Mobile · build web UI
         if: (success() || failure()) && steps.install.outcome == 'success'
-        run: npm run build:web -w reading-book-mobile
+        run: npm run build:web
 
       # After the web build, so the secrets check also reads the Mobile bundle (spec 008, US2).
       - name: Boundaries · import rules, graphs, secrets

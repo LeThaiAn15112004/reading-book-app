@@ -1,0 +1,8 @@
+{
+  "_doc": "Spec 009: Main-process files that may differ from the spec 008 base (8130c17), each with its reason. check-desktop-baseline fails on any other change under electron/.",
+  "files": {
+    "source/apps/reading-book-desktop/electron/chunking/book-chunk-service.ts": "T011: @types/node types a Worker 'error' as unknown; message read the same way for an Error (type-only)",
+    "source/apps/reading-book-desktop/electron/ipc/overlay.ipc.ts": "T011: same, the worker error is passed on as an Error (type-only)",
+    "source/apps/reading-book-desktop/electron/translation/translation-service.ts": "T011: same (type-only)"
+  }
+}

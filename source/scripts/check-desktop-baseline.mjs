@@ -20,8 +20,6 @@ import { fileURLToPath } from 'node:url'
 
 const sourceRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const repoRoot = path.dirname(sourceRoot)
-const sdkDir = path.join(sourceRoot, 'apps/book-reader-sdk')
-const desktopDir = path.join(sourceRoot, 'apps/reading-book-desktop')
 const specDir = path.join(repoRoot, 'specs/008-shared-core-architecture')
 const expectedLibraryFile = path.join(specDir, 'baseline-library.json')
 
@@ -84,14 +82,15 @@ function runChecks() {
   // fail in CI's form, so by default they read the working file through their documented fallback (baseline.md).
   const testEnv = ciMode ? {} : { GIT_DIR: path.join(os.tmpdir(), 'readmate-no-git') }
   const checks = [
-    { name: 'SDK typecheck', cwd: sdkDir, cmd: 'npm run typecheck' },
-    { name: 'SDK typecheck:tests', cwd: sdkDir, cmd: 'npm run typecheck:tests' },
-    { name: `SDK test${ciMode ? ' (CI form)' : ''}`, cwd: sdkDir, cmd: 'npm test', env: testEnv, tests: true },
-    { name: 'SDK build', cwd: sdkDir, cmd: 'npm run build' },
-    { name: 'Desktop typecheck', cwd: desktopDir, cmd: 'npm run typecheck' },
-    { name: 'Desktop lint', cwd: desktopDir, cmd: 'npm run lint' },
-    { name: 'Desktop e2e:typecheck', cwd: desktopDir, cmd: 'npm run e2e:typecheck' },
-    { name: 'Desktop vite build', cwd: desktopDir, cmd: 'npx vite build' },
+    // Spec 009: one manifest at the repository root, so every check is a root script.
+    { name: 'SDK typecheck', cwd: repoRoot, cmd: 'npm run sdk:typecheck' },
+    { name: 'SDK typecheck:tests', cwd: repoRoot, cmd: 'npm run sdk:typecheck:tests' },
+    { name: `SDK test${ciMode ? ' (CI form)' : ''}`, cwd: repoRoot, cmd: 'npm run sdk:test', env: testEnv, tests: true },
+    { name: 'SDK build', cwd: repoRoot, cmd: 'npm run sdk:build' },
+    { name: 'Desktop typecheck', cwd: repoRoot, cmd: 'npm run desktop:typecheck' },
+    { name: 'Desktop lint', cwd: repoRoot, cmd: 'npm run desktop:lint' },
+    { name: 'Desktop e2e:typecheck', cwd: repoRoot, cmd: 'npm run e2e:typecheck' },
+    { name: 'Desktop vite build', cwd: repoRoot, cmd: 'npm run build' },
   ]
   for (const check of checks) {
     console.log(`… ${check.name}`)
@@ -122,8 +121,13 @@ function runGit() {
   const changed = git('diff', '--name-only', base, '--', electron)
   const untracked = git('ls-files', '--others', '--exclude-standard', '--', electron)
   const files = `${changed.output}\n${untracked.output}`.split(/\r?\n/).map((f) => f.trim()).filter(Boolean)
-  record('git', `electron/ unchanged since ${base}`, changed.ok && untracked.ok && files.length === 0,
-    files.length ? `${files.length} file(s): ${files.slice(0, 5).join(', ')}${files.length > 5 ? ', …' : ''}` : '0 files')
+  // Spec 009 changes Main on purpose; each changed file must be listed with its reason.
+  const approved = JSON.parse(readFileSync(path.join(sourceRoot, 'scripts/desktop-main-changes.json'), 'utf8')).files
+  const unexpected = files.filter((f) => !(f in approved))
+  record('git', `electron/ changes since ${base} all approved`, changed.ok && untracked.ok && unexpected.length === 0,
+    unexpected.length
+      ? `${unexpected.length} unapproved: ${unexpected.slice(0, 5).join(', ')}${unexpected.length > 5 ? ', …' : ''}`
+      : `${files.length} approved file(s) (desktop-main-changes.json)`)
 
   const atBase = git('ls-tree', '--name-only', base, '--', `${migrations}/`)
   const before = new Set(atBase.output.split(/\r?\n/).map((f) => path.posix.basename(f.trim())).filter(Boolean))

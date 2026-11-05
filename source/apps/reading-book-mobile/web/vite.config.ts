@@ -5,12 +5,12 @@ import { defineConfig, type Plugin } from 'vite'
 
 const workspaceRoot = path.resolve(__dirname, '../../..')
 const desktopRoot = path.join(workspaceRoot, 'apps/reading-book-desktop')
-// Desktop's React 18: the host's React 19 sits under this app and must never reach the UI bundle.
-const rootNodeModules = path.join(workspaceRoot, 'node_modules')
+// The one install folder at the repository root (spec 009): one React 19 for the UI bundle.
+const rootNodeModules = path.join(workspaceRoot, '..', 'node_modules')
 // pdf.js 5 calls ES2025 APIs (`Uint8Array#toHex` in the worker's fingerprint) that Android System WebView older than
 // Chrome 140 lacks ("a.toHex is not a function" in Expo Go). Its legacy build polyfills them; Desktop's Electron keeps
 // the modern build. Mobile-only, so the UI source is unchanged.
-const pdfjsLegacy = path.join(desktopRoot, 'node_modules/pdfjs-dist/legacy/build').replaceAll('\\', '/')
+const pdfjsLegacy = path.join(rootNodeModules, 'pdfjs-dist/legacy/build').replaceAll('\\', '/')
 
 /** Tailwind scans from the Vite root, which is here, so Desktop's stylesheet is told where the UI source is. */
 function scanDesktopUiForTailwind(): Plugin {
@@ -28,6 +28,8 @@ function scanDesktopUiForTailwind(): Plugin {
 
 export default defineConfig({
   root: __dirname,
+  // Keep Vite's cache in the one install folder, never a second node_modules under web/ (spec 009 FR-006).
+  cacheDir: path.join(rootNodeModules, '.vite/mobile-web'),
   base: './',
   publicDir: path.join(desktopRoot, 'public'),
   resolve: {

@@ -100,7 +100,7 @@ describe('R1, R2, R3: SDK src (architecture-audit.md §3 probes)', () => {
         include: [],
         files: [norm(path.join(root, 'probe.ts'))],
       }))
-      const tsc = path.join(sourceRoot, 'node_modules/typescript/bin/tsc')
+      const tsc = path.join(sourceRoot, '..', 'node_modules/typescript/bin/tsc')
       const out = spawnSync(process.execPath, [tsc, '-p', path.join(root, 'tsconfig.json')], { encoding: 'utf8' })
       assert.notEqual(out.status, 0, 'tsc should fail')
       assert.match(out.stdout, new RegExp(`Cannot find name '${probe}'`))

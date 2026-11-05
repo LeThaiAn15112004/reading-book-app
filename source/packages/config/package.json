@@ -7,14 +7,5 @@
   "types": "./index.ts",
   "exports": {
     ".": "./index.ts"
-  },
-  "scripts": {
-    "typecheck": "tsc --noEmit"
-  },
-  "dependencies": {
-    "@reading-book/book-reader-sdk": "*"
-  },
-  "devDependencies": {
-    "typescript": "^5.2.2"
   }
 }

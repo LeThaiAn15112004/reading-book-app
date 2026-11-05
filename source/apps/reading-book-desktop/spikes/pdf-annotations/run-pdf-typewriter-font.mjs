@@ -227,7 +227,7 @@ try {
     pageWidth: page0.width,
     lines: n0.layout.lines.map((l) => ({ start: l.start, end: l.end, width: l.width, justified: l.justified })),
     pdfPath,
-    pdfjsDir: path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../node_modules/pdfjs-dist/build'),
+    pdfjsDir: path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../../../node_modules/pdfjs-dist/build'),
     boxes: [n0.annotation.rects[0], n1.annotation.rects[0]],
     pngDir: process.env.TW_PNG_DIR || null,
   }

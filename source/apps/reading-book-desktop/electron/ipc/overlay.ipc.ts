@@ -603,7 +603,7 @@ function ensureScanWorker(): Worker {
     else pending.reject(Object.assign(new Error(reply.message), { code: reply.code }))
   })
   worker.on('error', (err) => {
-    if (scanWorker === worker) stopScanWorker(err)
+    if (scanWorker === worker) stopScanWorker(err instanceof Error ? err : new Error(String(err)))
   })
   worker.on('exit', (code) => {
     if (scanWorker === worker) {
