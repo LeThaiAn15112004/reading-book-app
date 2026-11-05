@@ -16,6 +16,16 @@
   `source/`; only the manifest, lock file, install folder and tool-required root entries move to the root (FR-013).
 - Q: Is the reading core's portable `dist/` bundle kept? → A: No, drop it; nothing outside the repository uses it
   (FR-012).
+- Q: Inside `source/`, do the current folder names stay, or does the shared UI move out of the desktop folder? → A:
+  New layout given by the user: `source/core/` (`src/`, `tests/`: the reading core) and `source/app/` (`components/`,
+  `screens/`, `platforms/` with one adapter file per runtime, for example `storage.*.ts`, `window.*.ts`) (FR-010,
+  FR-013).
+- Q: Do the `platforms/` adapter files mean rewriting the UI in React Native, or keeping the mobile app's WebView? →
+  A: Keep the WebView (spec 008). Adapters are `*.electron.ts` and `*.mobile.ts`, chosen by the UI build for each
+  host; the shared UI is not rewritten (FR-010a).
+- Q: Where do the native hosts (Electron Main/Preload, the React Native host, Kotlin/Swift modules) and the real
+  SQLite / file code go; does SQLite move into `source/core`? → A: Two host folders, `source/desktop/` and
+  `source/mobile/`; `source/core` stays platform-independent logic only (FR-013, FR-011).
 
 ## Relationship to Earlier Specs
 
@@ -201,16 +211,35 @@ People using the desktop app, and the user testing the mobile app, see no change
   the mobile framework or a native module requires one, each listed with its reason.
 - **FR-010**: The UI (screens, components, stores, renderers), the reading core, the desktop host and the mobile host
   MUST each live in one clearly named folder of that project; nothing is duplicated between them.
+- **FR-010a**: Platform differences in the UI MUST live in `source/app/platforms/`, one file per runtime for each
+  concern (`<concern>.electron.ts` for the desktop host, `<concern>.mobile.ts` for the mobile WebView), selected when
+  the UI is built for that host; screens and components import the concern without a runtime suffix and never test
+  the platform themselves for what an adapter covers. These adapters replace today's two `window.api` wrappers
+  (Desktop's `src/bridge` and Mobile's `web/src/bridge`). The mobile app keeps running the shared UI in its WebView;
+  no screen is rewritten in React Native.
 - **FR-011**: The reading core MUST keep its platform independence: the dependency rules of spec 008 (R1–R11) MUST
   still be enforced by an automated check that fails on a violation.
 - **FR-012**: The reading core's portable bundle (the self-contained build that can be copied anywhere,
   `book-reader-sdk/dist`) MUST be dropped: both apps use the core's source, nothing outside this repository uses the
   bundle. Its build step, its package entry points and the checks that only exist for it (for example "the bundle is
   self-contained") are removed; the checks that protect the core's platform independence (FR-011) stay.
-- **FR-013**: The `source/` folder MUST stay, with the UI, core, desktop host and mobile host inside it; only the
-  project manifest, the lock file, the single install folder and the root-level entries the tools require (such as
-  the mobile framework's entry and configuration) move to the repository root. Paths inside `source/` change only
-  where a separate package no longer exists.
+- **FR-013**: The `source/` folder MUST stay; only the project manifest, the lock file, the single install folder,
+  the shared `tsconfig.json` (path aliases to `source/core` and `source/app`) and the root-level entries the tools
+  require (the mobile framework's `app.json`, `metro.config.js` and similar) live at the repository root. Inside
+  `source/`:
+  - `source/core/` (`src/`, `tests/`): the reading core, today's `apps/book-reader-sdk`.
+  - `source/app/`: the shared UI and platform adapters, today's `apps/reading-book-desktop/src`:
+    `components/`, `screens/` and `platforms/` (one adapter file per runtime for each platform-specific concern, such
+    as storage and window).
+  - `source/desktop/`: the desktop host, today's `apps/reading-book-desktop/electron` (Main and Preload, the SQLite
+    stores on the desktop driver, file access, importers, workers), plus its spikes, end-to-end tests, packaging
+    config and assets.
+  - `source/mobile/`: the mobile host, today's `apps/reading-book-mobile` without its UI build input: the React
+    Native host, the host services (SQLite and files on the mobile drivers), the native local-server module, config
+    plugins, and the WebView entry and stores.
+  `source/core` holds no database driver, file-system or runtime code (FR-011); the SQLite and file code of each
+  platform lives in that platform's host folder.
+  The old folders `source/apps/*` and `source/packages/*` no longer exist once their content has moved.
 - **FR-014**: Shared tool configuration (type checking, linting, test runner, path aliases) MUST be defined once
   where the tools allow it; where a host needs its own (for example the mobile host's bundler), it MUST extend the
   shared one rather than repeat it.
