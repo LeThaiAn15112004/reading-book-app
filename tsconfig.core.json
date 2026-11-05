@@ -1,5 +1,5 @@
 {
-  // Typecheck for the SDK core. `lib: ES2022` + `types: []` is deliberate: no DOM, no @types/node,
+  // Typecheck for the core (spec 009 T023; was source/core/tsconfig.json). `lib: ES2022` + `types: []` is deliberate: no DOM, no @types/node,
   // so any accidental use of `fs`, `window`, `document`, `Buffer`, `process`... is a compile error.
   "compilerOptions": {
     "target": "ES2022",
@@ -18,5 +18,5 @@
     "skipLibCheck": true,
     "noEmit": true
   },
-  "include": ["src/**/*.ts"]
+  "include": ["source/core/src/**/*.ts"]
 }

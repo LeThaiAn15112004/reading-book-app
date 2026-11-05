@@ -3,12 +3,13 @@
  * no Vite). Same job as spikes/pdf-annotations/register-alias.mjs, plus:
  *   - a bare directory import (`'../../../../bridge'`) → its `index.ts`, because the renderer store
  *     imports the IPC bridge that way.
- * `@reading-book/book-reader-sdk` → the SDK's built bundle; `electron` → the recording stub;
+ * `@reading-book/book-reader-sdk` → the SDK source; `electron` → the recording stub;
  * `electron/persistence/db.ts` → the node:sqlite stand-in on the real migrations.
  */
 import { register } from 'node:module'
 
-const sdk = new URL('../../../book-reader-sdk/dist/index.mjs', import.meta.url).href
+const sdk = new URL('../../../../core/src/index.ts', import.meta.url).href
+const config = new URL('../../../../core/src/config/index.ts', import.meta.url).href
 const electronStub = new URL('../pdf-annotations/electron-stub.mjs', import.meta.url).href
 const dbStub = new URL('../pdf-annotations/db-stub.mjs', import.meta.url).href
 
@@ -19,6 +20,7 @@ register(
       import { fileURLToPath } from 'node:url'
       export async function resolve(specifier, context, next) {
         if (specifier === '@reading-book/book-reader-sdk') return { url: ${JSON.stringify(sdk)}, shortCircuit: true }
+        if (specifier === '@reading-book/config') return { url: ${JSON.stringify(config)}, shortCircuit: true }
         if (specifier === 'electron') return { url: ${JSON.stringify(electronStub)}, shortCircuit: true }
         if (
           (specifier.startsWith('./') || specifier.startsWith('../')) &&

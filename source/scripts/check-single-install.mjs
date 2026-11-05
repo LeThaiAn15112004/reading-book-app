@@ -14,6 +14,7 @@ const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'
 
 /** Manifests kept on purpose (spec 009 tasks T009): no dependencies, read by a tool. */
 export const KEPT_MANIFESTS = {
+  'source/core/package.json': 'only "type": "module", so Node runs the core TypeScript as ES modules in the spikes',
   'source/apps/reading-book-desktop/package.json': 'Electron reads name / main (the name sets userData)',
   'source/apps/reading-book-mobile/package.json': 'kept until the Mobile host moves (US4); Expo now reads the root one',
 }

@@ -95,7 +95,7 @@ describe('R1, R2, R3: SDK src (architecture-audit.md §3 probes)', () => {
     test(`probe "${probe}" fails the SDK tsconfig (R1)`, () => {
       const root = tree({ 'probe.ts': code })
       writeFileSync(path.join(root, 'tsconfig.json'), JSON.stringify({
-        extends: norm(path.join(sdkDir, 'tsconfig.json')),
+        extends: norm(path.join(sourceRoot, '..', 'tsconfig.core.json')),
         compilerOptions: { noEmit: true, rootDir: norm(root) },
         include: [],
         files: [norm(path.join(root, 'probe.ts'))],

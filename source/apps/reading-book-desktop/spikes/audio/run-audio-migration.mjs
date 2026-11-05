@@ -27,6 +27,7 @@ import { spawnSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import fs from 'node:fs'
 import { createRequire } from 'node:module'
+import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 
@@ -290,8 +291,14 @@ check('028: deleting the parent book cascades its chapters only', () => {
   assert.deepEqual(db.pragma('foreign_key_check'), [])
 })
 
-// JSON merge-patch against the real engine, driven by the SDK's own patch builder (built bundle).
-const sdk = await import(pathToFileURL(path.join(here, '../../../book-reader-sdk/dist/index.mjs')).href)
+// JSON merge-patch against the real engine, driven by the SDK's own patch builder (core source, bundled).
+// (esbuild bundles the core source: no build step, and it does not depend on the Node version of the Electron binary)
+const sdkOut = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'readmate-audio-migration-sdk-')), 'core.mjs')
+await require('esbuild').build({
+  entryPoints: [path.join(here, '../../../../core/src/index.ts')],
+  bundle: true, platform: 'node', format: 'esm', outfile: sdkOut, logLevel: 'error',
+})
+const sdk = await import(pathToFileURL(sdkOut).href)
 const NOW = '2026-01-01T00:00:00.000Z'
 const stateOf = (id) => JSON.parse(db.prepare(`SELECT reading_state_json s FROM books WHERE id=?`).get(id).s)
 const applyProgress = (id, input) =>

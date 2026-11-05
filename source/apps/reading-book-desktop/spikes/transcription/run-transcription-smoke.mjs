@@ -49,8 +49,8 @@ const MODELS_DIR = process.env.READMATE_TRANSCRIPTION_MODELS || path.join(os.tmp
 if (!process.versions.electron) {
   // ---- phase 1 (plain node): bundle the host + model manager, then re-launch under Electron's Node ----
   const esbuild = require('esbuild')
-  const sdk = path.resolve(desktop, '../book-reader-sdk/dist/index.mjs')
-  assert.ok(fs.existsSync(sdk), 'build the SDK first (the npm script does)')
+  const sdk = path.resolve(desktop, '../../core/src/index.ts')
+  assert.ok(fs.existsSync(sdk), 'core source missing')
   const out = fs.mkdtempSync(path.join(os.tmpdir(), 'readmate-transcription-smoke-'))
   const bundles = { manager: path.join(out, 'model-manager.mjs'), host: path.join(out, 'speech-process-host.mjs') }
   const plugin = { name: 'sdk', setup: (b) => b.onResolve({ filter: /^@reading-book\/book-reader-sdk$/ }, () => ({ path: sdk })) }

@@ -86,7 +86,6 @@ function runChecks() {
     { name: 'SDK typecheck', cwd: repoRoot, cmd: 'npm run sdk:typecheck' },
     { name: 'SDK typecheck:tests', cwd: repoRoot, cmd: 'npm run sdk:typecheck:tests' },
     { name: `SDK test${ciMode ? ' (CI form)' : ''}`, cwd: repoRoot, cmd: 'npm run sdk:test', env: testEnv, tests: true },
-    { name: 'SDK build', cwd: repoRoot, cmd: 'npm run sdk:build' },
     { name: 'Desktop typecheck', cwd: repoRoot, cmd: 'npm run desktop:typecheck' },
     { name: 'Desktop lint', cwd: repoRoot, cmd: 'npm run desktop:lint' },
     { name: 'Desktop e2e:typecheck', cwd: repoRoot, cmd: 'npm run e2e:typecheck' },

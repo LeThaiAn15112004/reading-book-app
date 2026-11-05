@@ -50,9 +50,6 @@ jobs:
         if: (success() || failure()) && steps.install.outcome == 'success'
         run: npm run sdk:test
 
-      - name: SDK · build
-        if: (success() || failure()) && steps.install.outcome == 'success'
-        run: npm run sdk:build
 
       - name: Desktop · typecheck
         if: (success() || failure()) && steps.install.outcome == 'success'

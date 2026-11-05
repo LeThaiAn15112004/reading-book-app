@@ -41,8 +41,8 @@ const desktop = path.resolve(here, '../..')
 if (!process.versions.electron) {
   // ---- phase 1 (plain node): bundle the TypeScript under test, then re-launch under Electron's Node ----
   const esbuild = require('esbuild')
-  const sdk = path.resolve(desktop, '../book-reader-sdk/dist/index.mjs')
-  assert.ok(fs.existsSync(sdk), 'build the SDK first (the npm script does)')
+  const sdk = path.resolve(desktop, '../../core/src/index.ts')
+  assert.ok(fs.existsSync(sdk), 'core source missing')
   const out = fs.mkdtempSync(path.join(os.tmpdir(), 'readmate-transcription-spike-'))
   const plugin = {
     name: 'spike-aliases',
