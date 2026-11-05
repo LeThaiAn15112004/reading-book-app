@@ -88,5 +88,5 @@ the project's scoped folders, and `expo-file-system` refuses `File.open()` there
 `InvalidPermissionException`). Content URIs skip that check. **Fix**: on Android the picker no longer copies, and the
 host reads the `content://` document (ACTION_OPEN_DOCUMENT → SAF, which `File.open('r')` supports) once, during
 `files.stage`; `discardUri` never deletes a `content://` URI. iOS keeps the cache copy. `READ_FAILED` now carries the
-underlying error text, and the bridge logs it (`[bridge] import: copying the picked file failed`). **Not yet confirmed
-on the device**: the cause is read from the Expo 57 sources, not from a log.
+underlying error text, and the bridge logs it (`[bridge] import: copying the picked file failed`). **Confirmed on the
+device** by the user on 2026-11-05 (Expo Go, started from the repository root after spec 009 T018): import works.
