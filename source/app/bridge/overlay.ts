@@ -1,40 +1,41 @@
-/** Typed wrappers for overlay:* IPC via window.api. */
+/** Typed wrappers for overlay:* IPC via api. */
 
+import { api } from '../platforms/api'
 export const overlayApi = {
-  getSessionState: (bookId: string) => window.api.overlay.getSessionState(bookId),
+  getSessionState: (bookId: string) => api.overlay.getSessionState(bookId),
   saveSessionState: (
-    ...args: Parameters<typeof window.api.overlay.saveSessionState>
-  ) => window.api.overlay.saveSessionState(...args),
-  getAudioProgress: (bookId: string) => window.api.overlay.getAudioProgress(bookId),
+    ...args: Parameters<typeof api.overlay.saveSessionState>
+  ) => api.overlay.saveSessionState(...args),
+  getAudioProgress: (bookId: string) => api.overlay.getAudioProgress(bookId),
   saveAudioProgress: (
-    ...args: Parameters<typeof window.api.overlay.saveAudioProgress>
-  ) => window.api.overlay.saveAudioProgress(...args),
-  listBookmarks: (bookId: string) => window.api.overlay.listBookmarks(bookId),
+    ...args: Parameters<typeof api.overlay.saveAudioProgress>
+  ) => api.overlay.saveAudioProgress(...args),
+  listBookmarks: (bookId: string) => api.overlay.listBookmarks(bookId),
   saveBookmark: (
-    ...args: Parameters<typeof window.api.overlay.saveBookmark>
-  ) => window.api.overlay.saveBookmark(...args),
+    ...args: Parameters<typeof api.overlay.saveBookmark>
+  ) => api.overlay.saveBookmark(...args),
   deleteBookmark: (
-    ...args: Parameters<typeof window.api.overlay.deleteBookmark>
-  ) => window.api.overlay.deleteBookmark(...args),
-  listHighlights: (bookId: string) => window.api.overlay.listHighlights(bookId),
+    ...args: Parameters<typeof api.overlay.deleteBookmark>
+  ) => api.overlay.deleteBookmark(...args),
+  listHighlights: (bookId: string) => api.overlay.listHighlights(bookId),
   saveHighlight: (
-    ...args: Parameters<typeof window.api.overlay.saveHighlight>
-  ) => window.api.overlay.saveHighlight(...args),
+    ...args: Parameters<typeof api.overlay.saveHighlight>
+  ) => api.overlay.saveHighlight(...args),
   deleteHighlight: (
-    ...args: Parameters<typeof window.api.overlay.deleteHighlight>
-  ) => window.api.overlay.deleteHighlight(...args),
-  listInk: (bookId: string) => window.api.overlay.listInk(bookId),
-  saveInk: (...args: Parameters<typeof window.api.overlay.saveInk>) => window.api.overlay.saveInk(...args),
-  deleteInk: (...args: Parameters<typeof window.api.overlay.deleteInk>) => window.api.overlay.deleteInk(...args),
-  watchPdfEmbeddedAnnotations: (bookId: string) => window.api.overlay.watchPdfEmbeddedAnnotations(bookId),
-  unwatchPdfEmbeddedAnnotations: (bookId: string) => window.api.overlay.unwatchPdfEmbeddedAnnotations(bookId),
+    ...args: Parameters<typeof api.overlay.deleteHighlight>
+  ) => api.overlay.deleteHighlight(...args),
+  listInk: (bookId: string) => api.overlay.listInk(bookId),
+  saveInk: (...args: Parameters<typeof api.overlay.saveInk>) => api.overlay.saveInk(...args),
+  deleteInk: (...args: Parameters<typeof api.overlay.deleteInk>) => api.overlay.deleteInk(...args),
+  watchPdfEmbeddedAnnotations: (bookId: string) => api.overlay.watchPdfEmbeddedAnnotations(bookId),
+  unwatchPdfEmbeddedAnnotations: (bookId: string) => api.overlay.unwatchPdfEmbeddedAnnotations(bookId),
   onPdfEmbeddedAnnotationsChanged: (
-    ...args: Parameters<typeof window.api.overlay.onPdfEmbeddedAnnotationsChanged>
-  ) => window.api.overlay.onPdfEmbeddedAnnotationsChanged(...args),
-  exportAnnotatedPdf: (...args: Parameters<typeof window.api.overlay.exportAnnotatedPdf>) =>
-    window.api.overlay.exportAnnotatedPdf(...args),
-  confirmSignedPdfWrite: (bookId: string) => window.api.overlay.confirmSignedPdfWrite(bookId),
-  listPdfAnnotationConflicts: (bookId: string) => window.api.overlay.listPdfAnnotationConflicts(bookId),
-  resolvePdfAnnotationConflict: (...args: Parameters<typeof window.api.overlay.resolvePdfAnnotationConflict>) =>
-    window.api.overlay.resolvePdfAnnotationConflict(...args),
+    ...args: Parameters<typeof api.overlay.onPdfEmbeddedAnnotationsChanged>
+  ) => api.overlay.onPdfEmbeddedAnnotationsChanged(...args),
+  exportAnnotatedPdf: (...args: Parameters<typeof api.overlay.exportAnnotatedPdf>) =>
+    api.overlay.exportAnnotatedPdf(...args),
+  confirmSignedPdfWrite: (bookId: string) => api.overlay.confirmSignedPdfWrite(bookId),
+  listPdfAnnotationConflicts: (bookId: string) => api.overlay.listPdfAnnotationConflicts(bookId),
+  resolvePdfAnnotationConflict: (...args: Parameters<typeof api.overlay.resolvePdfAnnotationConflict>) =>
+    api.overlay.resolvePdfAnnotationConflict(...args),
 }

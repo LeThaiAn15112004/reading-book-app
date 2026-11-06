@@ -1,9 +1,10 @@
-/** Typed wrappers for import:* IPC via window.api. */
+/** Typed wrappers for import:* IPC via api. */
 
+import { api } from '../platforms/api'
 export const importApi = {
-  fromFile: () => window.api.import.fromFile(),
-  fromUrl: (url: string) => window.api.import.fromUrl(url),
-  cancel: () => window.api.import.cancel(),
-  onProgress: (handler: Parameters<typeof window.api.import.onProgress>[0]) =>
-    window.api.import.onProgress(handler),
+  fromFile: () => api.import.fromFile(),
+  fromUrl: (url: string) => api.import.fromUrl(url),
+  cancel: () => api.import.cancel(),
+  onProgress: (handler: Parameters<typeof api.import.onProgress>[0]) =>
+    api.import.onProgress(handler),
 }

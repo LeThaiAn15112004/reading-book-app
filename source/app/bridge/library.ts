@@ -1,35 +1,36 @@
-/** Typed wrappers for library:* IPC via window.api. */
+/** Typed wrappers for library:* IPC via api. */
 
+import { api } from '../platforms/api'
 export const libraryApi = {
-  listBooks: () => window.api.library.listBooks(),
-  getBook: (id: string) => window.api.library.getBook(id),
-  openBookContent: (id: string) => window.api.library.openBookContent(id),
-  markAsReading: (id: string) => window.api.library.markAsReading(id),
-  markAsCompleted: (id: string) => window.api.library.markAsCompleted(id),
+  listBooks: () => api.library.listBooks(),
+  getBook: (id: string) => api.library.getBook(id),
+  openBookContent: (id: string) => api.library.openBookContent(id),
+  markAsReading: (id: string) => api.library.markAsReading(id),
+  markAsCompleted: (id: string) => api.library.markAsCompleted(id),
   setGeneratedCover: (id: string, png: ArrayBuffer) =>
-    window.api.library.setGeneratedCover(id, png),
+    api.library.setGeneratedCover(id, png),
   setFavorite: (id: string, value: boolean) =>
-    window.api.library.setFavorite(id, value),
-  updateMetadata: (input: Parameters<typeof window.api.library.updateMetadata>[0]) =>
-    window.api.library.updateMetadata(input),
-  showInFolder: (id: string) => window.api.library.showInFolder(id),
-  copyFilePath: (id: string) => window.api.library.copyFilePath(id),
-  removeBook: (id: string) => window.api.library.removeBook(id),
-  deleteBookFile: (id: string) => window.api.library.deleteBookFile(id),
-  removeAudiobook: (id: string) => window.api.library.removeAudiobook(id),
-  relinkBook: (id: string) => window.api.library.relinkBook(id),
-  checkSignature: (id: string) => window.api.library.checkSignature(id),
-  listCollections: () => window.api.library.listCollections(),
+    api.library.setFavorite(id, value),
+  updateMetadata: (input: Parameters<typeof api.library.updateMetadata>[0]) =>
+    api.library.updateMetadata(input),
+  showInFolder: (id: string) => api.library.showInFolder(id),
+  copyFilePath: (id: string) => api.library.copyFilePath(id),
+  removeBook: (id: string) => api.library.removeBook(id),
+  deleteBookFile: (id: string) => api.library.deleteBookFile(id),
+  removeAudiobook: (id: string) => api.library.removeAudiobook(id),
+  relinkBook: (id: string) => api.library.relinkBook(id),
+  checkSignature: (id: string) => api.library.checkSignature(id),
+  listCollections: () => api.library.listCollections(),
   createCollection: (
-    input: Parameters<typeof window.api.library.createCollection>[0],
-  ) => window.api.library.createCollection(input),
+    input: Parameters<typeof api.library.createCollection>[0],
+  ) => api.library.createCollection(input),
   updateCollection: (
     id: string,
-    input: Parameters<typeof window.api.library.updateCollection>[1],
-  ) => window.api.library.updateCollection(id, input),
-  deleteCollection: (id: string) => window.api.library.deleteCollection(id),
+    input: Parameters<typeof api.library.updateCollection>[1],
+  ) => api.library.updateCollection(id, input),
+  deleteCollection: (id: string) => api.library.deleteCollection(id),
   addBookToCollection: (collectionId: string, bookId: string) =>
-    window.api.library.addBookToCollection(collectionId, bookId),
+    api.library.addBookToCollection(collectionId, bookId),
   removeBookFromCollection: (collectionId: string, bookId: string) =>
-    window.api.library.removeBookFromCollection(collectionId, bookId),
+    api.library.removeBookFromCollection(collectionId, bookId),
 }

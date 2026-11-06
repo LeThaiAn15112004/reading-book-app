@@ -1,14 +1,15 @@
-/** Typed wrappers for background:* IPC via window.api. */
+/** Typed wrappers for background:* IPC via api. */
 
-export type BackgroundPrefs = Awaited<ReturnType<typeof window.api.background.getPrefs>>
-export type BackgroundPrefsResult = Awaited<ReturnType<typeof window.api.background.setPrefs>>
-export type StartAtLogin = Awaited<ReturnType<typeof window.api.background.getStartAtLogin>>
+import { api } from '../platforms/api'
+export type BackgroundPrefs = Awaited<ReturnType<typeof api.background.getPrefs>>
+export type BackgroundPrefsResult = Awaited<ReturnType<typeof api.background.setPrefs>>
+export type StartAtLogin = Awaited<ReturnType<typeof api.background.getStartAtLogin>>
 
 export const backgroundApi = {
-  getPrefs: () => window.api.background.getPrefs(),
-  setPrefs: (patch: Partial<BackgroundPrefs>) => window.api.background.setPrefs(patch),
-  resetPrefs: () => window.api.background.resetPrefs(),
-  getStartAtLogin: () => window.api.background.getStartAtLogin(),
-  setStartAtLogin: (enabled: boolean) => window.api.background.setStartAtLogin(enabled),
-  quit: () => window.api.background.quit(),
+  getPrefs: () => api.background.getPrefs(),
+  setPrefs: (patch: Partial<BackgroundPrefs>) => api.background.setPrefs(patch),
+  resetPrefs: () => api.background.resetPrefs(),
+  getStartAtLogin: () => api.background.getStartAtLogin(),
+  setStartAtLogin: (enabled: boolean) => api.background.setStartAtLogin(enabled),
+  quit: () => api.background.quit(),
 }

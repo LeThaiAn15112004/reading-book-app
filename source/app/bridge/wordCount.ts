@@ -1,8 +1,9 @@
-/** Typed wrappers for wordCount:* IPC via window.api. */
+/** Typed wrappers for wordCount:* IPC via api. */
 
-export type WordCountStats = Awaited<ReturnType<typeof window.api.wordCount.getStats>>
+import { api } from '../platforms/api'
+export type WordCountStats = Awaited<ReturnType<typeof api.wordCount.getStats>>
 export type WordCountStatsOk = Extract<WordCountStats, { state: 'ok' }>
 
 export const wordCountApi = {
-  getStats: (bookId: string) => window.api.wordCount.getStats(bookId),
+  getStats: (bookId: string) => api.wordCount.getStats(bookId),
 }

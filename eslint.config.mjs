@@ -6,7 +6,7 @@ import globals from 'globals'
 import tseslint from 'typescript-eslint'
 
 function windowApiRestrictions() {
-  const message = 'window.api is used only in source/app/bridge/*; import the bridge wrapper instead (spec 008, R9).'
+  const message = 'window.api is used only in source/app/platforms/api.electron.ts; import `api` from the platform adapter instead (spec 008 R9, spec 009 T043).'
   return ['window', 'globalThis', 'self'].flatMap((object) => [
     { selector: `MemberExpression[object.name='${object}'][property.name='api']`, message },
     { selector: `MemberExpression[object.name='${object}'][computed=true][property.value='api']`, message },
@@ -44,7 +44,7 @@ export default tseslint.config(
       // New in typescript-eslint 8's `recommended`, not in 7's: kept off so the rule set stays the one before T007
       // (the code uses `(e.preventDefault(), move(1))` style key handlers on purpose).
       '@typescript-eslint/no-unused-expressions': 'off',
-      // R9 (spec 008): only source/app/bridge touches window.api, so Mobile can supply the same API behind the same seam.
+      // R9 (spec 008): only the `api` platform adapter touches window.api, so Mobile can supply the same API behind the same seam.
       'no-restricted-syntax': ['error', ...windowApiRestrictions()],
     },
   },
@@ -72,7 +72,7 @@ export default tseslint.config(
     },
   },
   {
-    files: ['source/app/bridge/**'],
+    files: ['source/app/platforms/api.electron.ts'],
     rules: { 'no-restricted-syntax': 'off' },
   },
   {

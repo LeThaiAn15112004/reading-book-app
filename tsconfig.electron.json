@@ -47,6 +47,7 @@
     "./source/app",
     "./source/apps/reading-book-desktop/electron"
   ],
+  "exclude": ["./source/app/**/*.native.ts", "./source/app/**/*.native.tsx"],
   "references": [
     {
       "path": "./source/apps/reading-book-desktop/tsconfig.node.json"

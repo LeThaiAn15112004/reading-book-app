@@ -1,8 +1,9 @@
-/** Typed wrappers for updates:* IPC via window.api. */
+/** Typed wrappers for updates:* IPC via api. */
 
-export type UpdateCheckResult = Awaited<ReturnType<typeof window.api.updates.check>>
+import { api } from '../platforms/api'
+export type UpdateCheckResult = Awaited<ReturnType<typeof api.updates.check>>
 export type UpdateChannel = UpdateCheckResult['channel']
 
 export const updatesApi = {
-  check: () => window.api.updates.check(),
+  check: () => api.updates.check(),
 }

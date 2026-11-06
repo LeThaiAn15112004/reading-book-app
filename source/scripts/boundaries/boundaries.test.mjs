@@ -227,25 +227,25 @@ describe('R5: workspace graph', () => {
   })
 })
 
-describe('R9: window.api only in source/app/bridge (ESLint)', () => {
+describe('R9: window.api only in source/app/platforms/api.electron.ts (ESLint)', () => {
   const repoRoot = path.resolve(sourceRoot, '..')
   const require = createRequire(path.join(repoRoot, 'package.json'))
   const { ESLint } = require('eslint')
   const eslint = new ESLint({ cwd: repoRoot })
   const lint = async (file, code) => (await eslint.lintText(code, { filePath: path.join(sourceRoot, file) }))[0].messages
 
-  test('window.api outside source/app/bridge fails', async () => {
+  test('window.api outside the api adapter fails', async () => {
     const msgs = await lint('app/screens/__probe.ts', 'export const a = window.api\n')
     assert.ok(msgs.some((m) => m.ruleId === 'no-restricted-syntax' && /R9/.test(m.message)), JSON.stringify(msgs))
   })
 
-  test("window['api'] outside source/app/bridge fails", async () => {
+  test("window['api'] outside the api adapter fails", async () => {
     const msgs = await lint('app/screens/__probe.ts', "export const a = window['api']\n")
     assert.ok(msgs.some((m) => /R9/.test(m.message)))
   })
 
-  test('window.api inside source/app/bridge passes', async () => {
-    const msgs = await lint('app/bridge/__probe.ts', 'export const a = window.api\n')
+  test('window.api in the api adapter passes', async () => {
+    const msgs = await lint('app/platforms/api.electron.ts', 'export const a = window.api\n')
     assert.ok(!msgs.some((m) => /R9/.test(m.message)))
   })
 })

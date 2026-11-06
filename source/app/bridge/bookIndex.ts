@@ -1,7 +1,8 @@
-/** Typed wrappers for bookIndex:* IPC via window.api. */
+/** Typed wrappers for bookIndex:* IPC via api. */
 
+import { api } from '../platforms/api'
 export const bookIndexApi = {
-  ensure: (bookId: string) => window.api.bookIndex.ensure(bookId),
-  onStatus: (handler: Parameters<typeof window.api.bookIndex.onStatus>[0]) =>
-    window.api.bookIndex.onStatus(handler),
+  ensure: (bookId: string) => api.bookIndex.ensure(bookId),
+  onStatus: (handler: Parameters<typeof api.bookIndex.onStatus>[0]) =>
+    api.bookIndex.onStatus(handler),
 }

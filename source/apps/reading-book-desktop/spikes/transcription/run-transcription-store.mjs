@@ -53,7 +53,8 @@ if (!process.versions.electron) {
     exportFile: path.join(out, 'transcript-export-file.mjs'),
     renderer: path.join(out, 'renderer-store.mjs'),
   }
-  const common = { bundle: true, platform: 'node', format: 'esm', plugins: [plugin], logLevel: 'error' }
+  // Platform adapters (spec 009): the spike runs the Desktop renderer, so the .electron file of a concern wins.
+  const common = { bundle: true, platform: 'node', format: 'esm', plugins: [plugin], logLevel: 'error', resolveExtensions: ['.electron.ts', '.electron.tsx', '.ts', '.tsx', '.mjs', '.js', '.json'] }
   await esbuild.build({ ...common, entryPoints: [path.join(desktop, 'electron/persistence/sqlite-transcript-store.ts')], outfile: bundles.dbStore, external: ['better-sqlite3', 'electron'] })
   await esbuild.build({ ...common, entryPoints: [path.join(desktop, 'electron/transcription/transcription-service.ts')], outfile: bundles.service, external: ['electron'] })
   // the renderer's own store, with the real bridge and zustand (no DOM is touched at import time)
