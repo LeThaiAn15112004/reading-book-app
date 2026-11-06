@@ -1,4 +1,7 @@
 /**
+ * Status / navigation bar colours of the Mobile host (moved from `web/src/bridge/system-bars.ts`, spec 009 T045; used by
+ * `window.native.ts` and the Mobile bridge).
+ *
  * Keeps the phone's status bar and navigation bar the colour of the app (Mobile host only).
  *
  * The bars are transparent (edge-to-edge); the host paints the areas behind them with the colours this module
@@ -7,7 +10,10 @@
  * reading theme, a sheet open at the bottom. Read again when the theme changes (`setChromeTheme`), on navigation,
  * on resize, and once a second while the page is visible; only a change is sent.
  */
-import type { HostClient } from './host-client'
+/** The one thing this module needs from the host client. */
+export interface HostCaller {
+  call(service: string, method: string, args?: unknown): Promise<unknown>
+}
 
 export interface Rgba {
   r: number
@@ -70,7 +76,7 @@ export function edgeColors(doc: Document): { top: string; bottom: string } {
 }
 
 /** Starts following the page; returns `refresh`, to call when something is known to have changed. */
-export function startSystemBarSync(client: HostClient, doc: Document = document): () => void {
+export function startSystemBarSync(client: HostCaller, doc: Document = document): () => void {
   let last = ''
   let scheduled = false
   const send = () => {

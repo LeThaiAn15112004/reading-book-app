@@ -2,7 +2,7 @@ import {
   toAppThemeAttr,
   type ReaderTheme,
 } from '@reading-book/book-reader-sdk'
-import { appApi } from '../bridge/app'
+import { setWindowTheme } from '../platforms/window'
 
 /** App chrome theme ids (Night / Sepia / Paper). */
 export type AppThemeId = ReaderTheme
@@ -11,8 +11,6 @@ export type AppThemeId = ReaderTheme
 export function applyTheme(theme: string): void {
   const id = toAppThemeAttr(theme)
   document.documentElement.dataset.theme = id
-  // Native minimize / maximize / close (Electron titleBarOverlay).
-  void appApi.setChromeTheme(id).catch(() => {
-    // Not in Electron (or preload not ready yet).
-  })
+  // Native minimize / maximize / close on Desktop, status / navigation bars on the phone.
+  void setWindowTheme(id)
 }

@@ -1,10 +1,14 @@
 /**
+ * Platform adapter `window`, Desktop renderer (spec 009 T045; was `theme/syncWindowControlsInset.ts`).
+ *
  * Reserve horizontal space for Electron titleBarOverlay caption buttons
  * (minimize / maximize / close) so they do not cover header actions.
  *
  * Prefer Window Controls Overlay geometry when available; otherwise fall back
  * to a Windows/Linux caption width (~46px × 3).
  */
+
+import { api } from './api'
 
 declare global {
   interface Navigator {
@@ -45,7 +49,7 @@ function measureInset(): number {
 }
 
 /** Call once at boot; keeps CSS `--window-controls-width` in sync. */
-export function syncWindowControlsInset(): () => void {
+export function startWindowSync(): () => void {
   const update = () => applyInset(measureInset())
   update()
 
@@ -57,4 +61,11 @@ export function syncWindowControlsInset(): () => void {
     overlay?.removeEventListener('geometrychange', update)
     window.removeEventListener('resize', update)
   }
+}
+
+/** Native minimize / maximize / close buttons take the app theme (Electron titleBarOverlay). */
+export async function setWindowTheme(themeId: string): Promise<void> {
+  await api.setChromeTheme(themeId).catch(() => {
+    // Preload not ready yet.
+  })
 }

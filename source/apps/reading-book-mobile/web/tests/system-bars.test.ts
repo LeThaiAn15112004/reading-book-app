@@ -1,7 +1,7 @@
 /** Status / navigation bar colours: what the page reports and what the host accepts. */
 import { describe, expect, it } from 'vitest'
 import { createAppService } from '../../src/host/app-service'
-import { edgeColors, parseCssColor, toHex } from '../src/bridge/system-bars'
+import { edgeColors, parseCssColor, toHex } from '@app/platforms/window-system-bars'
 
 /** A page whose elements at the top and bottom edge have these backgrounds, innermost first. */
 function fakeDoc(top: string[], bottom: string[], libBgDeep = '#0f172a') {

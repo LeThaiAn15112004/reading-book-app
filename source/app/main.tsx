@@ -14,7 +14,7 @@ import {
   systemPrefersDark,
 } from './theme/appAppearance'
 import { applyTheme } from './theme/applyTheme'
-import { syncWindowControlsInset } from './theme/syncWindowControlsInset'
+import { startWindowSync } from './platforms/window'
 
 /** Boot theme / accent / density from stored prefs before React mounts (avoid flash). */
 try {
@@ -28,7 +28,7 @@ try {
 } catch {
   applyTheme(DEFAULT_GLOBAL_READING_PREFS.theme)
 }
-syncWindowControlsInset()
+startWindowSync()
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>

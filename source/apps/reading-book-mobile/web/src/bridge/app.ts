@@ -5,7 +5,7 @@
  */
 import type { LifecyclePayload } from '../../../src/host/protocol'
 import type { BridgeContext } from './context'
-import { startSystemBarSync } from './system-bars'
+import { startSystemBarSync } from '@app/platforms/window-system-bars'
 import { noEvents, notAvailable } from './unavailable'
 
 type Api = Window['api']
