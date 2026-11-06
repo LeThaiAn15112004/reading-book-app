@@ -12,7 +12,7 @@ module.exports = defineConfig([
   },
   {
     // `@app/*` is the shared UI alias (tsconfig paths + Vite); this resolver does not read it (spec 009 T038).
-    files: ["web/src/main.ts"],
+    files: ["web/src/**/*.ts", "web/tests/**/*.ts"],
     rules: { "import/no-unresolved": ["error", { ignore: ["^@app/"] }] },
   },
   {

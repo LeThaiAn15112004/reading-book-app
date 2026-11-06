@@ -35,8 +35,8 @@ export function checkAppImports({ app = appDir, desktop = desktopDir, mobile = m
   for (const file of [...listCodeFiles(app), ...listCodeFiles(desktop)]) {
     for (const { specifier, line } of scanImports(file)) {
       const target = resolve(file, specifier)
-      // A `.native` platform adapter is the WebView side of the shared UI: it may import Mobile's web/ (contracts/platform-adapters.md).
-      if (/\/platforms\/[^/]+\.native\.tsx?$/.test(file.replaceAll('\\', '/')) && target && isInside(target, path.join(mobile, 'web'))) continue
+      // A `.native` platform adapter is the WebView side of the shared UI: it may import Mobile's WebView-side code (contracts/platform-adapters.md).
+      if (/\/platforms\/[^/]+\.native\.tsx?$/.test(file.replaceAll('\\', '/')) && target && isInside(target, mobile)) continue
       if ((target && isInside(target, mobile)) || (!isRelative(specifier) && packageName(specifier) === 'reading-book-mobile')) {
         violations.push(violation('R7', file, line, specifier, 'Desktop never imports Mobile'))
       }

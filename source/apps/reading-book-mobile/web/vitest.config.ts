@@ -9,7 +9,10 @@ export default defineConfig({
   // Spec 009: caches live in the one install folder at the repository root.
   cacheDir: path.join(workspaceRoot, '..', 'node_modules', '.vite/mobile-tests'),
   resolve: {
+    // Same adapter resolution as the WebView build (research R4).
+    extensions: ['.native.tsx', '.native.ts', '.mjs', '.js', '.mts', '.ts', '.jsx', '.tsx', '.json'],
     alias: [
+      { find: /^@app\//, replacement: `${path.join(workspaceRoot, 'app').replaceAll('\\', '/')}/` },
       { find: '@reading-book/config', replacement: path.join(workspaceRoot, 'core/src/config') },
       { find: '@reading-book/book-reader-sdk', replacement: path.join(workspaceRoot, 'core/src/index.ts') },
     ],
