@@ -1,0 +1,129 @@
+import { usePageAttachmentsStore } from '../attachments/pageAttachmentsStore'
+import { isShapeStyleKind } from '@reading-book/book-reader-sdk'
+import { useEffect, type MutableRefObject } from 'react'
+import { overlayApi } from '../../../../bridge'
+import type { PdfRendererApi } from '../../../../components/reader/renderers/pdf'
+import { usePdfHighlightsStore } from '../pdfHighlights/pdfHighlightsStore'
+import { usePdfSignedWriteStore } from '../pdfExport/pdfSignedWriteStore'
+
+type UseReaderPdfHighlightsOptions = {
+  bookId: string | undefined
+  isPdfSurface: boolean
+  pdfApiRef: MutableRefObject<PdfRendererApi | null>
+  /** Reader zoom — a change re-lays the marks out, so an open menu would point at the old spot. */
+  zoom: number
+  setToast: (message: string | null) => void
+  setChromeHidden?: (hidden: boolean) => void
+}
+
+const noop = () => {}
+
+/**
+ * React-lifecycle adapter over `usePdfHighlightsStore` (PDF text annotations): syncs the
+ * ReaderScreen context into the store, loads the open PDF's annotations, and closes the
+ * annotation menu when the zoom changes. Inert for any other surface.
+ */
+export function useReaderPdfHighlights({
+  bookId,
+  isPdfSurface,
+  pdfApiRef,
+  zoom,
+  setToast,
+  setChromeHidden,
+}: UseReaderPdfHighlightsOptions) {
+  const highlights = usePdfHighlightsStore((s) => s.highlights)
+  const activeHighlight = usePdfHighlightsStore((s) => s.activeHighlight)
+  const focusedHighlightId = usePdfHighlightsStore((s) => s.focusedHighlightId)
+  const lastUsedColorHex = usePdfHighlightsStore((s) => s.lastUsedColorHex)
+  const setContext = usePdfHighlightsStore((s) => s.setContext)
+  const resetForNewBook = usePdfHighlightsStore((s) => s.resetForNewBook)
+  const loadHighlights = usePdfHighlightsStore((s) => s.loadHighlights)
+  const applyEmbeddedSync = usePdfHighlightsStore((s) => s.applyEmbeddedSync)
+  const hiddenEmbeddedObjectIds = usePdfHighlightsStore((s) => s.hiddenEmbeddedObjectIds)
+  const conflicts = usePdfHighlightsStore((s) => s.conflicts)
+  const loadConflicts = usePdfHighlightsStore((s) => s.loadConflicts)
+  const resetSignedWrite = usePdfSignedWriteStore((s) => s.reset)
+  const closeEditPopup = usePdfHighlightsStore((s) => s.closeEditPopup)
+  const cancelInsert = usePdfHighlightsStore((s) => s.cancelInsert)
+
+  useEffect(() => {
+    setContext({
+      pdfApiRef,
+      bookId: isPdfSurface ? bookId : undefined,
+      onToast: setToast,
+      onChromeHidden: setChromeHidden ?? noop,
+    })
+  })
+
+  // Fresh state per book; only a PDF surface loads (EPUB rows would be dropped by the mapper anyway).
+  // Runs after the context sync above, so the store already has this `bookId`.
+  useEffect(() => {
+    resetForNewBook()
+    if (!bookId || !isPdfSurface) return
+    void loadHighlights()
+  }, [bookId, isPdfSurface, resetForNewBook, loadHighlights])
+
+  // Embedded annotations (Foxit / Acrobat): Main syncs them now and again whenever the file settles
+  // after a change in another app, and pushes the result — no reopen needed. One watch per open PDF;
+  // closing or switching the book (or unmounting the reader) ends it.
+  useEffect(() => {
+    usePageAttachmentsStore.getState().setBook(bookId && isPdfSurface ? bookId : null)
+    if (!bookId || !isPdfSurface) return
+    const unsubscribe = overlayApi.onPdfEmbeddedAnnotationsChanged((event) => {
+      applyEmbeddedSync(event)
+      // Page attachments other readers made (specs/007): shown with Readmate's own, open / save only.
+      usePageAttachmentsStore.getState().applySync(event)
+    })
+    void overlayApi.watchPdfEmbeddedAnnotations(bookId).catch(() => {})
+    void loadConflicts()
+    return () => {
+      unsubscribe()
+      void overlayApi.unwatchPdfEmbeddedAnnotations(bookId).catch(() => {})
+      resetSignedWrite()
+    }
+  }, [bookId, isPdfSurface, applyEmbeddedSync, loadConflicts, resetSignedWrite])
+
+  useEffect(() => {
+    // A zoom closes the open menu, but a SELECTED shape stays selected (its handles follow the page).
+    const { focusedHighlightId, highlights, focusHighlight } = usePdfHighlightsStore.getState()
+    const focused = focusedHighlightId ? highlights.find((h) => h.id === focusedHighlightId) : undefined
+    if (focused && (isShapeStyleKind(focused.styleKind) || focused.styleKind === 'typewriter')) focusHighlight(focused.id)
+    else closeEditPopup()
+    cancelInsert()
+  }, [zoom, closeEditPopup, cancelInsert])
+
+  return {
+    highlights,
+    activeHighlight,
+    focusedHighlightId,
+    lastUsedColorHex,
+    createFromSelection: usePdfHighlightsStore((s) => s.createFromSelection),
+    commitMarkupSelection: usePdfHighlightsStore((s) => s.commitMarkupSelection),
+    pendingInsert: usePdfHighlightsStore((s) => s.pendingInsert),
+    beginInsert: usePdfHighlightsStore((s) => s.beginInsert),
+    commitInsert: usePdfHighlightsStore((s) => s.commitInsert),
+    cancelInsert: usePdfHighlightsStore((s) => s.cancelInsert),
+    hiddenEmbeddedObjectIds,
+    conflicts,
+    resolveConflict: usePdfHighlightsStore((s) => s.resolveConflict),
+    openHighlight: usePdfHighlightsStore((s) => s.openHighlight),
+    closeEditPopup,
+    dismissAnnotationUi: usePdfHighlightsStore((s) => s.dismissAnnotationUi),
+    updateHighlightColor: usePdfHighlightsStore((s) => s.updateHighlightColor),
+    updateHighlightStyleKind: usePdfHighlightsStore((s) => s.updateHighlightStyleKind),
+    updateHighlightNote: usePdfHighlightsStore((s) => s.updateHighlightNote),
+    updateHighlightTags: usePdfHighlightsStore((s) => s.updateHighlightTags),
+    deleteHighlight: usePdfHighlightsStore((s) => s.deleteHighlight),
+    focusHighlight: usePdfHighlightsStore((s) => s.focusHighlight),
+    createShape: usePdfHighlightsStore((s) => s.createShape),
+    createTypewriter: usePdfHighlightsStore((s) => s.createTypewriter),
+    updateTypewriter: usePdfHighlightsStore((s) => s.updateTypewriter),
+    formatTypewriter: usePdfHighlightsStore((s) => s.formatTypewriter),
+    updateShapeGeometry: usePdfHighlightsStore((s) => s.updateShapeGeometry),
+    jumpToHighlight: usePdfHighlightsStore((s) => s.jumpToHighlight),
+    undo: usePdfHighlightsStore((s) => s.undo),
+    redo: usePdfHighlightsStore((s) => s.redo),
+    deleteFocused: usePdfHighlightsStore((s) => s.deleteFocused),
+    hasFocusedHighlight: usePdfHighlightsStore((s) => s.hasFocusedHighlight),
+  }
+}

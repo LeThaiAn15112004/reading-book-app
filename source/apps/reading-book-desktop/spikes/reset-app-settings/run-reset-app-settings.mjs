@@ -116,17 +116,17 @@ for (const [key, value] of Object.entries(OUT_OF_SCOPE)) storage.set(key, value)
 storage.set(KEYS.appearance, JSON.stringify(NON_DEFAULT_APPEARANCE))
 storage.set(KEYS.library, JSON.stringify(NON_DEFAULT_LIBRARY))
 
-const { DEFAULT_APP_APPEARANCE, loadAppAppearance } = await import('../../src/theme/appAppearance.ts')
-const { useAppAppearanceStore } = await import('../../src/theme/appAppearanceStore.ts')
+const { DEFAULT_APP_APPEARANCE, loadAppAppearance } = await import('../../../../app/theme/appAppearance.ts')
+const { useAppAppearanceStore } = await import('../../../../app/theme/appAppearanceStore.ts')
 const { DEFAULT_LIBRARY_BROWSE_PREFS, useLibraryBrowseStore } = await import(
-  '../../src/screens/Library/logic/libraryBrowseStore.ts'
+  '../../../../app/screens/Library/logic/libraryBrowseStore.ts'
 )
 const { useNotificationsStore } = await import(
-  '../../src/screens/Settings/logic/notificationsStore.ts'
+  '../../../../app/screens/Settings/logic/notificationsStore.ts'
 )
-const { useBackgroundStore } = await import('../../src/screens/Settings/logic/backgroundStore.ts')
+const { useBackgroundStore } = await import('../../../../app/screens/Settings/logic/backgroundStore.ts')
 const { APP_SETTINGS_RESETTERS, resetAppSettings } = await import(
-  '../../src/screens/Settings/logic/resetAppSettings.ts'
+  '../../../../app/screens/Settings/logic/resetAppSettings.ts'
 )
 
 // ---------------------------------------------------------------------------

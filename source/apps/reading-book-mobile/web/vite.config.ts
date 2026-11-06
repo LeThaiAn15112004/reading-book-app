@@ -5,6 +5,7 @@ import { defineConfig, type Plugin } from 'vite'
 
 const workspaceRoot = path.resolve(__dirname, '../../..')
 const desktopRoot = path.join(workspaceRoot, 'apps/reading-book-desktop')
+const appRoot = path.join(workspaceRoot, 'app')
 // The one install folder at the repository root (spec 009): one React 19 for the UI bundle.
 const rootNodeModules = path.join(workspaceRoot, '..', 'node_modules')
 // pdf.js 5 calls ES2025 APIs (`Uint8Array#toHex` in the worker's fingerprint) that Android System WebView older than
@@ -14,8 +15,8 @@ const pdfjsLegacy = path.join(rootNodeModules, 'pdfjs-dist/legacy/build').replac
 
 /** Tailwind scans from the Vite root, which is here, so Desktop's stylesheet is told where the UI source is. */
 function scanDesktopUiForTailwind(): Plugin {
-  const stylesheet = path.join(desktopRoot, 'src/index.css').replaceAll('\\', '/')
-  const source = path.join(desktopRoot, 'src').replaceAll('\\', '/')
+  const stylesheet = path.join(appRoot, 'index.css').replaceAll('\\', '/')
+  const source = appRoot.replaceAll('\\', '/')
   return {
     name: 'readmate:scan-desktop-ui',
     enforce: 'pre',
@@ -34,6 +35,7 @@ export default defineConfig({
   publicDir: path.join(desktopRoot, 'public'),
   resolve: {
     alias: [
+      { find: /^@app\//, replacement: `${appRoot.replaceAll('\\', '/')}/` },
       { find: '@reading-book/config', replacement: path.join(workspaceRoot, 'core/src/config') },
       { find: '@reading-book/book-reader-sdk', replacement: path.join(workspaceRoot, 'core/src/index.ts') },
       { find: /^pdfjs-dist$/, replacement: `${pdfjsLegacy}/pdf.mjs` },

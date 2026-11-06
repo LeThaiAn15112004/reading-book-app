@@ -52,11 +52,11 @@ globalThis.window = {
   },
 }
 
-const { pickerEventAction } = await import('../../src/screens/Reader/components/chrome/inkColorPickerState.ts')
-const { usePdfInkPrefsStore, activeInkLook } = await import('../../src/screens/Reader/logic/pdfInk/pdfInkPrefsStore.ts')
-const { usePdfShapePrefsStore } = await import('../../src/screens/Reader/logic/pdfShapes/pdfShapePrefsStore.ts')
-const { usePdfInkStore, dtoToInkMark } = await import('../../src/screens/Reader/logic/pdfInk/pdfInkStore.ts')
-const { usePdfHighlightsStore } = await import('../../src/screens/Reader/logic/pdfHighlights/pdfHighlightsStore.ts')
+const { pickerEventAction } = await import('../../../../app/screens/Reader/components/chrome/inkColorPickerState.ts')
+const { usePdfInkPrefsStore, activeInkLook } = await import('../../../../app/screens/Reader/logic/pdfInk/pdfInkPrefsStore.ts')
+const { usePdfShapePrefsStore } = await import('../../../../app/screens/Reader/logic/pdfShapes/pdfShapePrefsStore.ts')
+const { usePdfInkStore, dtoToInkMark } = await import('../../../../app/screens/Reader/logic/pdfInk/pdfInkStore.ts')
+const { usePdfHighlightsStore } = await import('../../../../app/screens/Reader/logic/pdfHighlights/pdfHighlightsStore.ts')
 
 const ink = () => usePdfInkStore.getState()
 const hl = () => usePdfHighlightsStore.getState()

@@ -84,8 +84,8 @@ globalThis.window = {
 }
 const emitProgress = (p) => [...progressHandlers].forEach((h) => h(p))
 
-const { useZipImportStore, zipJobShortLabel, zipJobDetail } = await import('../../src/hooks/library/zipImportStore.ts')
-const { useLibraryImportStore } = await import('../../src/hooks/library/libraryImportStore.ts')
+const { useZipImportStore, zipJobShortLabel, zipJobDetail } = await import('../../../../app/hooks/library/zipImportStore.ts')
+const { useLibraryImportStore } = await import('../../../../app/hooks/library/libraryImportStore.ts')
 const Z = () => useZipImportStore.getState()
 
 const entry = (id, name) => ({ id, path: name, name, kind: 'audio', size: 10, status: 'ok', eligible: true })

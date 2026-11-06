@@ -56,11 +56,11 @@ globalThis.window = {
   },
 }
 
-const { usePdfHighlightsStore } = await import('../../src/screens/Reader/logic/pdfHighlights/pdfHighlightsStore.ts')
-const { usePdfInkStore } = await import('../../src/screens/Reader/logic/pdfInk/pdfInkStore.ts')
-const { useTypewriterEditorStore } = await import('../../src/screens/Reader/logic/pdfTypewriter/typewriterEditorStore.ts')
-const { usePdfTypewriterPrefsStore, DEFAULT_PDF_TYPEWRITER_PREFS } = await import('../../src/screens/Reader/logic/pdfTypewriter/pdfTypewriterPrefsStore.ts')
-const { pdfUndo, pdfRedo } = await import('../../src/screens/Reader/logic/pdfInk/pdfUndoRouter.ts')
+const { usePdfHighlightsStore } = await import('../../../../app/screens/Reader/logic/pdfHighlights/pdfHighlightsStore.ts')
+const { usePdfInkStore } = await import('../../../../app/screens/Reader/logic/pdfInk/pdfInkStore.ts')
+const { useTypewriterEditorStore } = await import('../../../../app/screens/Reader/logic/pdfTypewriter/typewriterEditorStore.ts')
+const { usePdfTypewriterPrefsStore, DEFAULT_PDF_TYPEWRITER_PREFS } = await import('../../../../app/screens/Reader/logic/pdfTypewriter/pdfTypewriterPrefsStore.ts')
+const { pdfUndo, pdfRedo } = await import('../../../../app/screens/Reader/logic/pdfInk/pdfUndoRouter.ts')
 
 const H = () => usePdfHighlightsStore.getState()
 const E = () => useTypewriterEditorStore.getState()
@@ -276,8 +276,8 @@ await check('editor: a range gets the style, a collapsed caret gets a pending st
 })
 
 console.log('3c. properties panel target (US4)')
-const { useTypewriterPanelStore } = await import('../../src/screens/Reader/logic/pdfTypewriter/typewriterPanelStore.ts')
-const { typewriterFormatValues } = await import('../../src/screens/Reader/logic/pdfTypewriter/typewriterFormatValues.ts')
+const { useTypewriterPanelStore } = await import('../../../../app/screens/Reader/logic/pdfTypewriter/typewriterPanelStore.ts')
+const { typewriterFormatValues } = await import('../../../../app/screens/Reader/logic/pdfTypewriter/typewriterFormatValues.ts')
 await check('target A → B → none → defaults: each value shown is read from that target; nothing of the previous one is left', async () => {
   await openBook()
   const a = H().createTypewriter({ pageIndex: 0, box, text: 'AAA', doc: sdk.applyStyle(sdk.emptyTypewriterDoc(), 'AAA', null, { color: '#FF0000', family: 'noto-serif' }) })
@@ -363,7 +363,7 @@ console.log('5. prefs')
 await check('persist across a reload; invalid stored values fall back per field; reset restores the defaults', async () => {
   assert.equal(JSON.parse(localStore.get('readmate.pdfTypewriterPrefs.v1')).style.family, 'noto-serif')
   localStore.set('readmate.pdfTypewriterPrefs.v1', JSON.stringify({ style: { family: 'nope', size: 'big', color: '#12ab34', bold: 'yes', italic: true }, align: 'sideways' }))
-  const reloaded = await import(`../../src/screens/Reader/logic/pdfTypewriter/pdfTypewriterPrefsStore.ts?reload=${Date.now()}`)
+  const reloaded = await import(`../../../../app/screens/Reader/logic/pdfTypewriter/pdfTypewriterPrefsStore.ts?reload=${Date.now()}`)
   const s = reloaded.usePdfTypewriterPrefsStore.getState()
   assert.equal(s.style.family, DEFAULT_PDF_TYPEWRITER_PREFS.style.family)
   assert.equal(s.style.size, DEFAULT_PDF_TYPEWRITER_PREFS.style.size)

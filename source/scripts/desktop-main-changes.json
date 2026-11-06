@@ -17,6 +17,7 @@
     "source/apps/reading-book-desktop/electron/persistence/sqlite-overlay-store.ts": "T033: SQL and note_json codecs come from core (overlayStatements / overlayCodec), run through the SyncSqlDriver; the manual BEGIN IMMEDIATE blocks are driver.transaction(…, immediate); behaviour unchanged",
     "source/apps/reading-book-desktop/electron/persistence/sqlite-txt-store.ts": "T034: SQL and row codec come from core (txtStatements / txtCodec), run through the SyncSqlDriver; commit keeps its own immediate transaction",
     "source/apps/reading-book-desktop/electron/persistence/sqlite-audio-store.ts": "T035: SQL and the Notes rules come from core (audioStatements / audioCodec), run through the SyncSqlDriver; behaviour unchanged",
-    "source/apps/reading-book-desktop/electron/persistence/sqlite-transcript-store.ts": "T036: SQL, row codecs and limits come from core (transcriptStatements / transcriptCodec), run through the SyncSqlDriver; commitWindow keeps its single transaction"
+    "source/apps/reading-book-desktop/electron/persistence/sqlite-transcript-store.ts": "T036: SQL, row codecs and limits come from core (transcriptStatements / transcriptCodec), run through the SyncSqlDriver; commitWindow keeps its single transaction",
+    "source/apps/reading-book-desktop/electron/theme/titlebar-overlay.ts": "T038: comment only (the stylesheet moved to source/app/styles)"
   }
 }

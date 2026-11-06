@@ -7,7 +7,7 @@
 //   R11 No Mobile file imports `electron/host-adapters` (until OD-7).
 import path from 'node:path'
 import {
-  desktopDir, hostAdaptersDir, isInside, isMain, isRelative, listCodeFiles, mobileDir, packageName, runCli, scanImports, sdkDir,
+  appDir, desktopDir, hostAdaptersDir, isInside, isMain, isRelative, listCodeFiles, mobileDir, packageName, runCli, scanImports, sdkDir,
   targetPath, violation,
 } from './lib/imports.mjs'
 
@@ -22,7 +22,7 @@ export function mobileArea(file, root = mobileDir) {
   return 'host'
 }
 
-export function checkAppImports({ desktop = desktopDir, mobile = mobileDir, sdk = sdkDir, hostAdaptersRoot = hostAdaptersDir } = {}) {
+export function checkAppImports({ app = appDir, desktop = desktopDir, mobile = mobileDir, sdk = sdkDir, hostAdaptersRoot = hostAdaptersDir } = {}) {
   const violations = []
   const hostAdapters = hostAdaptersRoot
   const resolve = (file, spec) => {
@@ -32,7 +32,7 @@ export function checkAppImports({ desktop = desktopDir, mobile = mobileDir, sdk 
     return target
   }
 
-  for (const file of listCodeFiles(desktop)) {
+  for (const file of [...listCodeFiles(app), ...listCodeFiles(desktop)]) {
     for (const { specifier, line } of scanImports(file)) {
       const target = resolve(file, specifier)
       if ((target && isInside(target, mobile)) || (!isRelative(specifier) && packageName(specifier) === 'reading-book-mobile')) {
@@ -47,8 +47,8 @@ export function checkAppImports({ desktop = desktopDir, mobile = mobileDir, sdk 
       const target = resolve(file, specifier)
       const pkg = isRelative(specifier) ? null : packageName(specifier)
       const intoDesktop = (target && isInside(target, desktop)) || pkg === 'reading-book-desktop'
-      if (intoDesktop && !(area === 'web' && target && isInside(target, path.join(desktop, 'src')))) {
-        violations.push(violation('R7', file, line, specifier, "Mobile never imports Desktop; only Mobile's web/ may import Desktop's src/"))
+      if (intoDesktop && !(area === 'web' && target && (isInside(target, path.join(desktop, 'src')) || isInside(target, app)))) {
+        violations.push(violation('R7', file, line, specifier, "Mobile never imports Desktop; only Mobile's web/ may import the shared UI in source/app"))
       }
       if (area === 'host' && pkg && (pkg === 'electron' || DOM_LIBRARIES.includes(pkg))) {
         violations.push(violation('R8', file, line, specifier, 'Mobile host code imports no electron and no DOM library'))

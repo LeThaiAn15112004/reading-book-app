@@ -31,11 +31,11 @@ globalThis.localStorage = {
   removeItem: (key) => void storage.delete(key),
 }
 
-const defs = await import('../../src/shortcuts/shortcutDefinitions.ts')
-const keys = await import('../../src/shortcuts/shortcutKeys.ts')
-const conflicts = await import('../../src/shortcuts/shortcutConflicts.ts')
+const defs = await import('../../../../app/shortcuts/shortcutDefinitions.ts')
+const keys = await import('../../../../app/shortcuts/shortcutKeys.ts')
+const conflicts = await import('../../../../app/shortcuts/shortcutConflicts.ts')
 const { useShortcutsStore, effectiveShortcutKeys, SHORTCUTS_STORAGE_KEY } = await import(
-  '../../src/shortcuts/shortcutsStore.ts'
+  '../../../../app/shortcuts/shortcutsStore.ts'
 )
 
 let failures = 0
@@ -182,7 +182,7 @@ await check('reset to defaults restores everything and clears the stored key', (
 })
 
 await check('Reset App Settings includes Keyboard Shortcuts', () => {
-  const source = readFileSync(new URL('../../src/screens/Settings/logic/resetAppSettings.ts', import.meta.url), 'utf8')
+  const source = readFileSync(new URL('../../../../app/screens/Settings/logic/resetAppSettings.ts', import.meta.url), 'utf8')
   assert.match(source, /id: 'keyboard-shortcuts'[\s\S]*useShortcutsStore\.getState\(\)\.reset\(\)/)
 })
 
@@ -196,19 +196,19 @@ await check('stored overrides that are invalid or conflicting are dropped on loa
       'general.nope': ['Mod', 'K'], // unknown action
     }),
   )
-  const fresh = await import('../../src/shortcuts/shortcutsStore.ts?fresh')
+  const fresh = await import('../../../../app/shortcuts/shortcutsStore.ts?fresh')
   assert.deepEqual(fresh.useShortcutsStore.getState().overrides, { 'general.openBook': ['Mod', 'Shift', 'O'] })
 })
 
 await check('conflict logic lives in one place', () => {
-  const root = new URL('../../src/', import.meta.url)
+  const root = new URL('../../../../app/', import.meta.url)
   for (const file of ['screens/Settings/components/keyboard/KeyboardShortcutsSettings.tsx', 'shortcuts/ShortcutsBridge.tsx']) {
     const source = readFileSync(new URL(file, root), 'utf8')
     assert.doesNotMatch(source, /findShortcutConflict|contextsOverlap/, file)
   }
 })
 
-const read = (file) => readFileSync(new URL(file, new URL('../../src/', import.meta.url)), 'utf8')
+const read = (file) => readFileSync(new URL(file, new URL('../../../../app/', import.meta.url)), 'utf8')
 
 await check('reader defaults are valid and do not collide with each other', () => {
   for (const s of defs.SHORTCUTS) {
@@ -242,7 +242,7 @@ await check('locked actions cannot be changed or loaded from storage', async () 
   const result = store().tryAssign('search.nextResult', ['Mod', 'K'])
   assert.deepEqual([result.ok, result.reason], [false, 'invalid'])
   storage.set(SHORTCUTS_STORAGE_KEY, JSON.stringify({ 'search.previousResult': ['Mod', 'K'] }))
-  const fresh = await import('../../src/shortcuts/shortcutsStore.ts?locked')
+  const fresh = await import('../../../../app/shortcuts/shortcutsStore.ts?locked')
   assert.deepEqual(fresh.useShortcutsStore.getState().overrides, {})
 })
 
@@ -284,7 +284,7 @@ await check('stored overrides that collide with an alias are dropped on load', a
     SHORTCUTS_STORAGE_KEY,
     JSON.stringify({ 'navigation.firstPage': ['PageDown'], 'navigation.lastPage': ['G'] }),
   )
-  const fresh = await import('../../src/shortcuts/shortcutsStore.ts?alias')
+  const fresh = await import('../../../../app/shortcuts/shortcutsStore.ts?alias')
   assert.deepEqual(fresh.useShortcutsStore.getState().overrides, { 'navigation.lastPage': ['G'] })
 })
 
@@ -322,7 +322,7 @@ await check('End of Book uses goToEnd, never the start of the last section', () 
   assert.match(shortcuts, /'navigation\.lastPage'[\s\S]*?goToEnd\(\)/)
   assert.doesNotMatch(shortcuts, /goToSpineIndex/)
   assert.match(read('screens/Reader/logic/hooks/useReaderNavigation.ts'), /api\.goToEnd\(\)/)
-  const epub = read('reader/renderers/epub/openEpubjs.ts')
+  const epub = read('components/reader/renderers/epub/openEpubjs.ts')
   const goToEnd = /const goToEnd = async[\s\S]*?\r?\n  }\r?\n/.exec(epub)?.[0] ?? ''
   assert.match(goToEnd, /displayed\.total - 1\) \* delta/)
   assert.match(goToEnd, /scrollTop = container\.scrollHeight/)
@@ -339,7 +339,7 @@ await check('Add Bookmark has one registration that calls the existing toggle on
       }
     }
   }
-  walk(new URL('../../src/', import.meta.url))
+  walk(new URL('../../../../app/', import.meta.url))
   assert.deepEqual(hits, ['useReaderShortcuts.ts'])
   const source = read('screens/Reader/logic/hooks/useReaderShortcuts.ts')
   assert.equal(source.match(/toggleBookmark\(\)/g)?.length, 1)
@@ -424,7 +424,7 @@ await check('View shortcuts persist across a restart; reset one / all restores t
   store().tryAssign('view.toggleFullscreen', ['F10'])
   const saved = JSON.parse(storage.get(SHORTCUTS_STORAGE_KEY))
   assert.deepEqual(saved, { 'view.zoomIn': ['Mod', 'Shift', 'K'], 'view.toggleFullscreen': ['F10'] })
-  const fresh = await import('../../src/shortcuts/shortcutsStore.ts?view-restart')
+  const fresh = await import('../../../../app/shortcuts/shortcutsStore.ts?view-restart')
   assert.deepEqual(fresh.useShortcutsStore.getState().overrides, saved)
 
   store().resetOne('view.zoomIn')
@@ -464,7 +464,7 @@ await check('each View key has exactly one dispatcher: no legacy listener, one r
       }
     }
   }
-  walk(new URL('../../src/', import.meta.url))
+  walk(new URL('../../../../app/', import.meta.url))
   assert.deepEqual(registrations, {
     'view.zoomIn': ['useReaderZoomControls.ts'],
     'view.zoomOut': ['useReaderZoomControls.ts'],
@@ -472,7 +472,7 @@ await check('each View key has exactly one dispatcher: no legacy listener, one r
     'view.toggleFullscreen': ['ImmersiveReadingContext.tsx'],
   })
   // The fullscreen registration reuses the existing context callback (same one the footer button calls).
-  assert.match(read('chrome/ImmersiveReadingContext.tsx'), /useShortcutAction\('view\.toggleFullscreen', toggleFullscreen\)/)
+  assert.match(read('components/chrome/ImmersiveReadingContext.tsx'), /useShortcutAction\('view\.toggleFullscreen', toggleFullscreen\)/)
   // The bridge keeps zoom keys out of text fields, as the legacy listener did.
   assert.match(read('shortcuts/ShortcutsBridge.tsx'), /s\.ignoreInTextFields && isTypingTarget/)
 })

@@ -139,8 +139,8 @@ globalThis.window = {
   },
 }
 
-const { useAudioPlayerStore, audioStreamUrl, selectCanAddNote } = await import('../../src/screens/AudioBook/logic/audioPlayerStore.ts')
-const { flushRegisteredSession } = await import('../../src/screens/Reader/logic/session/sessionFlushRegistry.ts')
+const { useAudioPlayerStore, audioStreamUrl, selectCanAddNote } = await import('../../../../app/screens/AudioBook/logic/audioPlayerStore.ts')
+const { flushRegisteredSession } = await import('../../../../app/screens/Reader/logic/session/sessionFlushRegistry.ts')
 const store = useAudioPlayerStore
 const S = () => store.getState()
 const current = () => elements.filter((e) => !e.released).at(-1)
@@ -1705,7 +1705,7 @@ await check('NOTES markers: only the current track\'s Notes, following track cha
 // ---- 7. Notes grouped by track (the multi-track Notes tab): rows, open / closed state, "add opens its row" ----
 console.log('7. Notes grouped by track')
 const { groupNotesByTrack } = await import('@reading-book/book-reader-sdk')
-const { useNoteGroupsStore } = await import('../../src/screens/AudioBook/logic/audioNoteGroupsStore.ts')
+const { useNoteGroupsStore } = await import('../../../../app/screens/AudioBook/logic/audioNoteGroupsStore.ts')
 const GS = () => useNoteGroupsStore.getState()
 const G = () => groupNotesByTrack(S().notes, S().tracks)
 

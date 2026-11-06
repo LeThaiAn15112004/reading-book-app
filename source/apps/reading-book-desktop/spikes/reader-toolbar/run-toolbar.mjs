@@ -28,11 +28,11 @@
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 
-const caps = await import('../../src/reader/capabilities.ts')
-const registry = await import('../../src/screens/Reader/components/chrome/toolRegistry.ts')
-const layoutMod = await import('../../src/screens/Reader/components/chrome/toolbarLayout.ts')
-const shortcuts = await import('../../src/shortcuts/shortcutDefinitions.ts')
-const sidebarTabs = await import('../../src/screens/Reader/components/sidebar/sidebarTabs.ts')
+const caps = await import('../../../../app/components/reader/capabilities.ts')
+const registry = await import('../../../../app/screens/Reader/components/chrome/toolRegistry.ts')
+const layoutMod = await import('../../../../app/screens/Reader/components/chrome/toolbarLayout.ts')
+const shortcuts = await import('../../../../app/shortcuts/shortcutDefinitions.ts')
+const sidebarTabs = await import('../../../../app/screens/Reader/components/sidebar/sidebarTabs.ts')
 
 const { TOOL_REGISTRY, TOOL_GROUPS, FOLD_ORDER, INLINE_MAX } = registry
 const { resolveToolbarLayout, foldableGroups } = layoutMod
@@ -192,11 +192,11 @@ check('no view.* shortcut / zoom / fullscreen tool on the toolbar', () => {
 
 console.log('7. wiring (static)')
 const screen = readFileSync(
-  new URL('../../src/screens/Reader/ReaderScreen.tsx', import.meta.url),
+  new URL('../../../../app/screens/Reader/ReaderScreen.tsx', import.meta.url),
   'utf8',
 ).replace(/\r\n/g, '\n')
 const menu = readFileSync(
-  new URL('../../src/screens/Reader/components/chrome/ToolGroupMenu.tsx', import.meta.url),
+  new URL('../../../../app/screens/Reader/components/chrome/ToolGroupMenu.tsx', import.meta.url),
   'utf8',
 )
 const handleToolBody = (() => {
@@ -284,7 +284,7 @@ check('ReaderScreen routes rail, sidebar and shortcuts through the resolved tab'
   assert.doesNotMatch(screen, /chrome\.sidebarTab\}|onOpenTab=\{chrome\.openSidebarTab\}/)
 })
 
-const toolsMenu = readFileSync(new URL('../../src/screens/Reader/components/chrome/ToolsMenu.tsx', import.meta.url), 'utf8').replace(/\r\n/g, '\n')
+const toolsMenu = readFileSync(new URL('../../../../app/screens/Reader/components/chrome/ToolsMenu.tsx', import.meta.url), 'utf8').replace(/\r\n/g, '\n')
 
 check('Eraser mode dropdown: an arrow beside the Eraser only picks the mode; the Eraser button arms whichever mode is set', () => {
   // the arrow sits right after the Eraser button, inside the same tool group
@@ -349,7 +349,7 @@ check('Escape backs a Shape tool out to Select like the pen', () => {
 })
 
 check('Typewriter properties: right-click on the tool opens the typewriter panel in defaults mode (no arm / disarm); RightPanelId has it', () => {
-  const rightPanelStore = readFileSync(new URL('../../src/screens/Reader/logic/rightPanel/rightPanelStore.ts', import.meta.url), 'utf8')
+  const rightPanelStore = readFileSync(new URL('../../../../app/screens/Reader/logic/rightPanel/rightPanelStore.ts', import.meta.url), 'utf8')
   assert.match(rightPanelStore, /RightPanelId = 'settings' \| 'typewriter'/)
   assert.match(toolsMenu, /tool\.id === 'typewriter' && onToolContextMenu \? \(e\) => \{ e\.preventDefault\(\); onToolContextMenu\(tool\.id\) \}/)
   assert.match(screen, /onToolContextMenu=\{\(tool\) => \{[^]*if \(tool !== 'typewriter'\) return\s+useTypewriterPanelStore\.getState\(\)\.showDefaults\(\)\s+openRightPanel\('typewriter'\)/)

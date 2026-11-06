@@ -72,7 +72,7 @@ describe('audiobook transcription release gate', () => {
     const runtime = readFileSync(desktop('electron/transcription/transcription-runtime.ts'), 'utf8')
     expect(runtime).toMatch(/isEnabled:\s*\(\)\s*=>\s*features\.audiobookTranscriptionEnabled\s*&&\s*isTranscriptionPlatformSupported\(\)/)
 
-    const screen = readFileSync(desktop('src/screens/AudioBook/AudioBookScreen.tsx'), 'utf8')
+    const screen = readFileSync(fileURLToPath(new URL('../../../app/screens/AudioBook/AudioBookScreen.tsx', import.meta.url)), 'utf8')
     expect(screen).toMatch(/features\.audiobookTranscriptionEnabled\s*&&\s*platformSupported/)
     expect(screen).toMatch(/info\.transcriptionSupported/)
   })

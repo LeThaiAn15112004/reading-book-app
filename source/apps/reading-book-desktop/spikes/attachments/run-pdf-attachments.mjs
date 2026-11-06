@@ -464,7 +464,7 @@ console.log('8. renderer store (real store → real service → real PDF.js)')
     counts: { open: 0, saveAs: 0 },
   }
   globalThis.window = { api }
-  const { useAttachmentsStore } = await import('../../src/screens/Reader/logic/attachments/attachmentsStore.ts')
+  const { useAttachmentsStore } = await import('../../../../app/screens/Reader/logic/attachments/attachmentsStore.ts')
   const store = useAttachmentsStore
   const reset = () => {
     store.getState().reset()
@@ -587,16 +587,16 @@ await check('Main opens files only through shell.openPath: no child_process, exe
   assert.match(read('electron/ipc/attachments.ipc.ts'), /shell\.openPath\(file\)/)
 })
 await check('the renderer store touches no filesystem and sends only ids', () => {
-  const store = read('src/screens/Reader/logic/attachments/attachmentsStore.ts')
+  const store = read('../../app/screens/Reader/logic/attachments/attachmentsStore.ts')
   assert.doesNotMatch(store, /node:|require\(|\bfs\b/)
-  const bridge = read('src/bridge/attachments.ts')
+  const bridge = read('../../app/bridge/attachments.ts')
   assert.match(bridge, /bookId: string; attachmentId: string/)
 })
 await check('the PDF-only capability gates the tab', () => {
-  const caps = read('src/reader/capabilities.ts')
+  const caps = read('../../app/components/reader/capabilities.ts')
   assert.match(caps, /pdf: \[[^\]]*'attachments'\]/)
   assert.doesNotMatch(caps, /(epub|txt|md|placeholder): \[[^\]]*'attachments'/)
-  assert.match(read('src/screens/Reader/components/sidebar/sidebarTabs.ts'), /id: 'attachments'[^}]*requires: 'attachments'/)
+  assert.match(read('../../app/screens/Reader/components/sidebar/sidebarTabs.ts'), /id: 'attachments'[^}]*requires: 'attachments'/)
 })
 
 fs.rmSync(tmp, { recursive: true, force: true })

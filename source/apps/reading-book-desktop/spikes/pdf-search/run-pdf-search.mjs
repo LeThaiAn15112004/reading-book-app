@@ -25,8 +25,8 @@ await import('./build-fixtures.mjs')
 
 const { pdfParagraphs, pdfPageText } = await import('../../electron/chunking/pdf-text.ts')
 const { findBookMatches } = await import('../../electron/search/book-search-query.ts')
-const { buildPdfTextLayerIndex } = await import('../../src/reader/renderers/pdf/pdfSearchDom.ts')
-const { pickSectionMatch } = await import('../../src/reader/renderers/epub/search/epubSearchDom.ts')
+const { buildPdfTextLayerIndex } = await import('../../../../app/components/reader/renderers/pdf/pdfSearchDom.ts')
+const { pickSectionMatch } = await import('../../../../app/components/reader/renderers/epub/search/epubSearchDom.ts')
 const sdk = await import('./sdk-stub.mjs')
 
 let passed = 0
@@ -159,9 +159,9 @@ console.log('5. no-text state (static)')
 await check('search service answers an empty index with noText; panel and store handle it', () => {
   const service = readFileSync(new URL('../../electron/search/book-search-service.ts', import.meta.url), 'utf8')
   assert.match(service, /chunkCount === 0\) return \{ state: 'noText' \}/)
-  const store = readFileSync(new URL('../../src/screens/Reader/logic/search/bookSearchStore.ts', import.meta.url), 'utf8')
+  const store = readFileSync(new URL('../../../../app/screens/Reader/logic/search/bookSearchStore.ts', import.meta.url), 'utf8')
   assert.match(store, /case 'noText':\s*\n\s*set\(\{ status: 'noText'/)
-  const panel = readFileSync(new URL('../../src/screens/Reader/components/chrome/ReaderSearchPanel.tsx', import.meta.url), 'utf8')
+  const panel = readFileSync(new URL('../../../../app/screens/Reader/components/chrome/ReaderSearchPanel.tsx', import.meta.url), 'utf8')
   assert.match(panel, /status === 'noText'/)
   const extract = readFileSync(new URL('../../electron/chunking/extract-book-text.ts', import.meta.url), 'utf8')
   assert.match(extract, /new Set\(\['epub', 'txt', 'md', 'pdf'\]\)/)

@@ -38,7 +38,7 @@ export function checkMobileUiGraph({
     if (isInside(file, hostAdaptersDir)) reachedHostAdapters.add(rel(file))
     for (const { specifier, typeOnly, line } of scanImports(file)) {
       if (typeOnly) continue
-      if (!isRelative(specifier) && !specifier.startsWith('@reading-book/')) {
+      if (!isRelative(specifier) && targetPath(file, specifier) === null) {
         const pkg = packageName(specifier)
         if (pkg === 'electron') violations.push(violation('R8', file, line, specifier, 'the Mobile UI bundle must not import the electron package'))
         continue

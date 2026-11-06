@@ -16,8 +16,8 @@
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 
-const hand = await import('../../src/reader/interaction/hand-gesture.ts')
-const hit = await import('../../src/reader/interaction/interaction-hit.ts')
+const hand = await import('../../../../app/components/reader/interaction/hand-gesture.ts')
+const hit = await import('../../../../app/components/reader/interaction/interaction-hit.ts')
 const { createHandHoverDwell, exceedsDragThreshold, isInCenterTapZone } = hand
 
 let passed = 0
@@ -116,10 +116,10 @@ await check('center-tap zone is the middle half', () => {
 
 console.log('3. wiring (static)')
 const read = (rel) => readFileSync(new URL(rel, import.meta.url), 'utf8').replace(/\r\n/g, '\n')
-const pdf = read('../../src/reader/renderers/pdf/PdfRenderer.tsx')
-const canvas = read('../../src/screens/Reader/components/canvas/ReadingCanvas.tsx')
-const css = read('../../src/index.css')
-const epub = read('../../src/reader/renderers/epub/EpubRenderer.tsx')
+const pdf = read('../../../../app/components/reader/renderers/pdf/PdfRenderer.tsx')
+const canvas = read('../../../../app/screens/Reader/components/canvas/ReadingCanvas.tsx')
+const css = read('../../../../app/index.css')
+const epub = read('../../../../app/components/reader/renderers/epub/EpubRenderer.tsx')
 await check('PDF: shared dwell, armed text selects, everything else pans', () => {
   assert.match(pdf, /createHandHoverDwell\(/)
   assert.match(pdf, /dwellRef\.current\?\.isArmed\(\) && isTextAt\(/)

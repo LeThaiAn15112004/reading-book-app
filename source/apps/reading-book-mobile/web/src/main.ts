@@ -30,7 +30,7 @@ async function createApi(): Promise<object> {
 async function boot() {
   Object.defineProperty(window, 'api', { value: await createApi() })
   // Loaded only after window.api exists: Desktop's UI source is the input, never a copy.
-  await import('../../../reading-book-desktop/src/main.tsx')
+  await import('@app/main')
 }
 
 boot().catch((error: unknown) => {

@@ -82,7 +82,7 @@ globalThis.window = {
   },
 }
 
-const { useTxtDocumentStore: store } = await import('../../src/screens/Reader/logic/txtDocument/txtDocumentStore.ts')
+const { useTxtDocumentStore: store } = await import('../../../../app/screens/Reader/logic/txtDocument/txtDocumentStore.ts')
 const S = () => store.getState()
 const toasts = []
 const surface = { cleared: 0, jumped: [], flashed: [] }

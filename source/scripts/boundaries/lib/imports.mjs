@@ -11,6 +11,7 @@ const ts = require('typescript')
 export const sourceRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..')
 export const appsDir = path.join(sourceRoot, 'apps')
 export const coreDir = path.join(sourceRoot, 'core')
+export const appDir = path.join(sourceRoot, 'app')
 export const sdkDir = coreDir
 export const desktopDir = path.join(appsDir, 'reading-book-desktop')
 export const mobileDir = path.join(appsDir, 'reading-book-mobile')
@@ -118,6 +119,7 @@ export function packageName(spec) {
 
 /** Workspace aliases shared by Desktop and Mobile (`tsconfig.json` paths, `vite.config.ts` aliases). */
 export const WORKSPACE_ALIASES = {
+  '@app': appDir,
   '@reading-book/config': configDir,
   '@reading-book/book-reader-sdk': sdkDir,
 }

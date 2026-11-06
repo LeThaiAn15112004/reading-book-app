@@ -60,10 +60,10 @@ globalThis.window = {
   },
 }
 
-const { usePdfInkStore } = await import('../../src/screens/Reader/logic/pdfInk/pdfInkStore.ts')
-const { usePdfInkPrefsStore, DEFAULT_PDF_INK_PREFS, parseHexInput } = await import('../../src/screens/Reader/logic/pdfInk/pdfInkPrefsStore.ts')
-const { pdfUndo, pdfRedo, pdfDeleteFocused, pdfHasFocusedMark } = await import('../../src/screens/Reader/logic/pdfInk/pdfUndoRouter.ts')
-const { usePdfHighlightsStore } = await import('../../src/screens/Reader/logic/pdfHighlights/pdfHighlightsStore.ts')
+const { usePdfInkStore } = await import('../../../../app/screens/Reader/logic/pdfInk/pdfInkStore.ts')
+const { usePdfInkPrefsStore, DEFAULT_PDF_INK_PREFS, parseHexInput } = await import('../../../../app/screens/Reader/logic/pdfInk/pdfInkPrefsStore.ts')
+const { pdfUndo, pdfRedo, pdfDeleteFocused, pdfHasFocusedMark } = await import('../../../../app/screens/Reader/logic/pdfInk/pdfUndoRouter.ts')
+const { usePdfHighlightsStore } = await import('../../../../app/screens/Reader/logic/pdfHighlights/pdfHighlightsStore.ts')
 
 const ink = usePdfInkStore
 const S = () => ink.getState()
@@ -202,17 +202,17 @@ await check('settings persist: a fresh store (app restart) reads them back; the 
   const saved = JSON.parse(localStore.get('readmate.pdfInkPrefs.v1'))
   assert.equal(saved.tool, 'marker')
   assert.deepEqual(Object.keys(saved.styles), ['pen', 'pencil', 'marker', 'brush'])
-  const fresh = (await import('../../src/screens/Reader/logic/pdfInk/pdfInkPrefsStore.ts?restart=1')).usePdfInkPrefsStore.getState()
+  const fresh = (await import('../../../../app/screens/Reader/logic/pdfInk/pdfInkPrefsStore.ts?restart=1')).usePdfInkPrefsStore.getState()
   assert.equal(fresh.tool, 'marker')
   assert.deepEqual(fresh.styles, prefs.getState().styles)
   // Phase 1 wrote { pen: { colorHex, width }, tool }.
   localStore.set('readmate.pdfInkPrefs.v1', JSON.stringify({ pen: { colorHex: '#43A047', width: 0.007 }, tool: 'pen' }))
-  const migrated = (await import('../../src/screens/Reader/logic/pdfInk/pdfInkPrefsStore.ts?restart=2')).usePdfInkPrefsStore.getState()
+  const migrated = (await import('../../../../app/screens/Reader/logic/pdfInk/pdfInkPrefsStore.ts?restart=2')).usePdfInkPrefsStore.getState()
   assert.deepEqual(migrated.styles.pen, { colorHex: '#43A047', width: 0.007, opacity: 1 })
   assert.deepEqual(migrated.styles.pencil, DEFAULT_PDF_INK_PREFS.styles.pencil)
   // Corrupt storage falls back to the defaults instead of throwing.
   localStore.set('readmate.pdfInkPrefs.v1', '{"tool":"calligraphy","styles":{"pen":{"colorHex":"red","width":"x"}}}')
-  const corrupt = (await import('../../src/screens/Reader/logic/pdfInk/pdfInkPrefsStore.ts?restart=3')).usePdfInkPrefsStore.getState()
+  const corrupt = (await import('../../../../app/screens/Reader/logic/pdfInk/pdfInkPrefsStore.ts?restart=3')).usePdfInkPrefsStore.getState()
   assert.equal(corrupt.tool, 'pen')
   assert.deepEqual(corrupt.styles, DEFAULT_PDF_INK_PREFS.styles)
   localStore.set('readmate.pdfInkPrefs.v1', JSON.stringify({ tool: 'marker', styles: saved.styles }))
@@ -371,12 +371,12 @@ await check('Brush settings persist across a restart; preferences saved before t
   const saved = JSON.parse(localStore.get('readmate.pdfInkPrefs.v1'))
   assert.equal(saved.tool, 'brush')
   assert.deepEqual(saved.styles.brush, { colorHex: '#E91E63', width: 0.02, opacity: 0.5 })
-  const fresh = (await import('../../src/screens/Reader/logic/pdfInk/pdfInkPrefsStore.ts?restart=brush1')).usePdfInkPrefsStore.getState()
+  const fresh = (await import('../../../../app/screens/Reader/logic/pdfInk/pdfInkPrefsStore.ts?restart=brush1')).usePdfInkPrefsStore.getState()
   assert.equal(fresh.tool, 'brush')
   assert.deepEqual(fresh.styles.brush, { colorHex: '#E91E63', width: 0.02, opacity: 0.5 })
   const { brush: _brush, ...beforeBrush } = saved.styles
   localStore.set('readmate.pdfInkPrefs.v1', JSON.stringify({ tool: 'pencil', styles: beforeBrush }))
-  const old = (await import('../../src/screens/Reader/logic/pdfInk/pdfInkPrefsStore.ts?restart=brush2')).usePdfInkPrefsStore.getState()
+  const old = (await import('../../../../app/screens/Reader/logic/pdfInk/pdfInkPrefsStore.ts?restart=brush2')).usePdfInkPrefsStore.getState()
   assert.equal(old.tool, 'pencil')
   assert.deepEqual(old.styles.brush, DEFAULT_PDF_INK_PREFS.styles.brush)
   assert.deepEqual(old.styles.pen, saved.styles.pen)

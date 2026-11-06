@@ -55,10 +55,10 @@ globalThis.window = {
   },
 }
 
-const { usePdfHighlightsStore } = await import('../../src/screens/Reader/logic/pdfHighlights/pdfHighlightsStore.ts')
-const { usePdfInkStore } = await import('../../src/screens/Reader/logic/pdfInk/pdfInkStore.ts')
-const { usePdfShapePrefsStore, DEFAULT_PDF_SHAPE_PREFS } = await import('../../src/screens/Reader/logic/pdfShapes/pdfShapePrefsStore.ts')
-const { pdfUndo, pdfRedo } = await import('../../src/screens/Reader/logic/pdfInk/pdfUndoRouter.ts')
+const { usePdfHighlightsStore } = await import('../../../../app/screens/Reader/logic/pdfHighlights/pdfHighlightsStore.ts')
+const { usePdfInkStore } = await import('../../../../app/screens/Reader/logic/pdfInk/pdfInkStore.ts')
+const { usePdfShapePrefsStore, DEFAULT_PDF_SHAPE_PREFS } = await import('../../../../app/screens/Reader/logic/pdfShapes/pdfShapePrefsStore.ts')
+const { pdfUndo, pdfRedo } = await import('../../../../app/screens/Reader/logic/pdfInk/pdfUndoRouter.ts')
 
 const H = () => usePdfHighlightsStore.getState()
 const toasts = []

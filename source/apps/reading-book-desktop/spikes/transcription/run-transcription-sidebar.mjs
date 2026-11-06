@@ -18,8 +18,8 @@ function check(name, fn) {
   console.log(`  ✓ ${name}`)
 }
 
-const { SIDEBAR_TABS, SIDEBAR_TAB_LABEL, sidebarTabsFor, isSidebarTabAvailable, resolveSidebarTab } = await import('../../src/screens/Reader/components/sidebar/sidebarTabs.ts')
-const { getReaderCapabilities, readerSurfaceForFormat } = await import('../../src/reader/capabilities.ts')
+const { SIDEBAR_TABS, SIDEBAR_TAB_LABEL, sidebarTabsFor, isSidebarTabAvailable, resolveSidebarTab } = await import('../../../../app/screens/Reader/components/sidebar/sidebarTabs.ts')
+const { getReaderCapabilities, readerSurfaceForFormat } = await import('../../../../app/components/reader/capabilities.ts')
 
 /** The text reader's tabs before the Transcript tab existed. */
 const BEFORE = [

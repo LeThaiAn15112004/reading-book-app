@@ -1,6 +1,6 @@
 import type { BrowserWindow } from 'electron'
 
-/** Match `src/styles/theme.css` --lib-titlebar-* (Night / Sepia / Paper). */
+/** Match `source/app/styles/theme.css` --lib-titlebar-* (Night / Sepia / Paper). */
 export type ChromeThemeId = 'night' | 'sepia' | 'paper'
 
 export const TITLE_BAR_OVERLAY_HEIGHT = 36

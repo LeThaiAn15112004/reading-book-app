@@ -26,7 +26,7 @@
     "sdk:test": "cd source/core && vitest run",
     "sdk:test:watch": "cd source/core && vitest",
     "desktop:typecheck": "cd source/apps/reading-book-desktop && tsc --noEmit",
-    "desktop:lint": "cd source/apps/reading-book-desktop && eslint . --max-warnings 0",
+    "desktop:lint": "eslint source/apps/reading-book-desktop source/app --max-warnings 0",
     "mobile:typecheck": "cd source/apps/reading-book-mobile && tsc --noEmit",
     "mobile:typecheck:web": "cd source/apps/reading-book-mobile && tsc -p web/tsconfig.json",
     "mobile:lint": "cd source/apps/reading-book-mobile && eslint .",

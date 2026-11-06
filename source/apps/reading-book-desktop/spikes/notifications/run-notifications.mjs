@@ -80,7 +80,7 @@ class FakeNotification {
 }
 globalThis.Notification = FakeNotification
 
-const { useNotificationsStore } = await import('../../src/screens/Settings/logic/notificationsStore.ts')
+const { useNotificationsStore } = await import('../../../../app/screens/Settings/logic/notificationsStore.ts')
 const store = () => useNotificationsStore.getState()
 
 async function fresh({ prefs = DEFAULTS(), supported = true, permission = 'default', answer: webAnswer = 'granted' } = {}) {

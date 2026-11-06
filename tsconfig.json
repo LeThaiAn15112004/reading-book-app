@@ -6,6 +6,7 @@
   "compilerOptions": {
     "strict": true,
     "paths": {
+      "@app/*": ["./source/app/*"],
       "@reading-book/book-reader-sdk": ["./source/core/src/index.ts"],
       "@reading-book/book-reader-sdk/*": ["./source/core/src/*"],
       "@/*": ["./source/apps/reading-book-mobile/src/*"],

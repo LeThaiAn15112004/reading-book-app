@@ -142,8 +142,8 @@ globalThis.window = {
   },
 }
 
-const { usePdfHighlightsStore } = await import('../../src/screens/Reader/logic/pdfHighlights/pdfHighlightsStore.ts')
-const { usePageAttachmentsStore } = await import('../../src/screens/Reader/logic/attachments/pageAttachmentsStore.ts')
+const { usePdfHighlightsStore } = await import('../../../../app/screens/Reader/logic/pdfHighlights/pdfHighlightsStore.ts')
+const { usePageAttachmentsStore } = await import('../../../../app/screens/Reader/logic/attachments/pageAttachmentsStore.ts')
 
 const H = () => usePdfHighlightsStore.getState()
 const A = () => usePageAttachmentsStore.getState()

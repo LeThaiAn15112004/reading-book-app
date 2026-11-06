@@ -153,7 +153,7 @@ globalThis.window = {
   },
 }
 
-const { useAnnotationTransferStore, registerAnnotationReloader, supportsAnnotationTransfer } = await import('../../src/screens/Reader/logic/annotationTransferStore.ts')
+const { useAnnotationTransferStore, registerAnnotationReloader, supportsAnnotationTransfer } = await import('../../../../app/screens/Reader/logic/annotationTransferStore.ts')
 const store = useAnnotationTransferStore
 const toasts = []
 const onToast = (m) => toasts.push(m)
@@ -394,11 +394,11 @@ await check('importing into a book that is not open reloads nothing; a reloader 
   offB()
 })
 
-const { createAnnotationReloader } = await import('../../src/screens/Reader/logic/annotationReload.ts')
-const { useHighlightsStore } = await import('../../src/screens/Reader/logic/highlights/highlightsStore.ts')
-const { usePdfHighlightsStore } = await import('../../src/screens/Reader/logic/pdfHighlights/pdfHighlightsStore.ts')
-const { useMdHighlightsStore } = await import('../../src/screens/Reader/logic/mdHighlights/mdHighlightsStore.ts')
-const { useTxtDocumentStore } = await import('../../src/screens/Reader/logic/txtDocument/txtDocumentStore.ts')
+const { createAnnotationReloader } = await import('../../../../app/screens/Reader/logic/annotationReload.ts')
+const { useHighlightsStore } = await import('../../../../app/screens/Reader/logic/highlights/highlightsStore.ts')
+const { usePdfHighlightsStore } = await import('../../../../app/screens/Reader/logic/pdfHighlights/pdfHighlightsStore.ts')
+const { useMdHighlightsStore } = await import('../../../../app/screens/Reader/logic/mdHighlights/mdHighlightsStore.ts')
+const { useTxtDocumentStore } = await import('../../../../app/screens/Reader/logic/txtDocument/txtDocumentStore.ts')
 
 await check('each format reloads through its own store (EPUB, PDF, Markdown: loadHighlights; TXT: flush, then load)', async () => {
   const log = []

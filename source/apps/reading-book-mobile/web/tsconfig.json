@@ -1,6 +1,7 @@
 {
   "compilerOptions": {
     "paths": {
+      "@app/*": ["../../../app/*"],
       "@reading-book/config": ["../../../core/src/config/index.ts"],
       "@reading-book/config/*": ["../../../core/src/config/*"],
       "@reading-book/book-reader-sdk": ["../../../core/src/index.ts"],
@@ -26,5 +27,5 @@
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true
   },
-  "include": ["src", "tests", "vite.config.ts", "vitest.config.ts", "../../reading-book-desktop/src/**/*.d.ts", "../../reading-book-desktop/electron/electron-env.d.ts"]
+  "include": ["src", "tests", "vite.config.ts", "vitest.config.ts", "../../../app/**/*.d.ts", "../../reading-book-desktop/electron/electron-env.d.ts"]
 }

@@ -9,7 +9,7 @@ import { expectCurrentPage, goToPage, openBook, pdfPage } from '../support/reade
 
 const sampleEpub = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../public/spikes/spike-sample.epub')
 
-// Mirrors src/reader/renderers/pdf/pdfLayout.ts.
+// Mirrors source/app/components/reader/renderers/pdf/pdfLayout.ts.
 const PDF_TO_CSS = 96 / 72
 const PAD_PX = 16
 const PAGE_GAP_PX = 12
