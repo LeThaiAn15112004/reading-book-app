@@ -1,20 +1,21 @@
-# Readmate Mobile (`reading-book-mobile`)
+# Readmate Mobile (`source/app/platforms/native`)
 
 The phone app is a thin React Native host around a WebView. The WebView runs the **same React UI as Desktop**
-(`reading-book-desktop/src/`), built for the browser by Vite, with a Mobile implementation of `window.api` (the
+(`source/app/`), built for the browser by Vite, with a Mobile implementation of `window.api` (the
 "Mobile Bridge") in place of Electron's preload + IPC. Spec: `specs/008-shared-core-architecture/` (architecture and
 contracts); feature map: `docs/implementation_plan/mobile_webview.md`.
 
 ```
-React Native host (src/)                         WebView (web/ + reading-book-desktop/src/)
-├── app/index.tsx      WebView, boot values      ├── web/src/main.ts        sets __READMATE_HOST__, builds window.api,
-├── host/rpc.ts        host-services dispatcher  │                          then imports Desktop's src/main.tsx
-├── host/sql-service   expo-sqlite (sql.*)       ├── web/src/bridge/*       window.api groups (library, overlay, import,
+React Native host (this folder)                  WebView (this folder + source/app/)
+├── routes/index.tsx   WebView, boot values      ├── main.ts                sets __READMATE_HOST__, builds window.api
+├── host/rpc.ts        host-services dispatcher  │                          (create-api.ts), then imports @app/main
+├── host/sql-service   expo-sqlite (sql.*)       ├── bridge/*               window.api groups (library, overlay, import,
 ├── host/file-service  picker, staging, books/   │                          txt, app); unavailable.ts for the rest
-├── host/app-service   app.info, system bars …   ├── web/src/stores/*       SQLite stores on the host's sql.* service
-└── host/local-server  starts modules/local-server├── web/src/db/*           Mobile schema baseline + migrations
-                                                 └── reading-book-desktop/src  screens, renderers, stores (unchanged;
-modules/local-server/  Kotlin + Swift loopback                                  phone branches behind isMobileHost())
+├── host/app-service   app.info, system bars …   ├── stores/*               SQLite stores on the host's sql.* service
+└── host/local-server  starts modules/local-server├── db/*                   Mobile schema baseline + migrations
+                                                 └── source/app (screens, components, hooks: unchanged;
+                                                       phone branches behind isMobileHost())
+modules/local-server/  Kotlin + Swift loopback
                        HTTP server (UI + book bytes)
 plugins/with-loopback-cleartext.js   release builds allow cleartext to 127.0.0.1 only
 ```
@@ -27,24 +28,23 @@ plugins/with-loopback-cleartext.js   release builds allow cleartext to 127.0.0.1
 - **First release**: EPUB, PDF, TXT (read-only), Markdown; bookmarks, highlights and notes; reading position and
   appearance. Cloud, URL import, audiobooks, annotation transfer, search, translation, read aloud and PDF tools are
   hidden on the phone and answer `NOT_AVAILABLE_ON_PLATFORM` in the bridge (`contracts/mobile-bridge.md`).
-- **Phone UI**: Library and Settings are Desktop's screens with phone CSS (`src/styles/phone.css`) and small branches;
-  the Reader is a separate Mobile Reader (`src/screens/Reader/phone/`) on the same core hooks
+- **Phone UI**: Library and Settings are Desktop's screens with phone CSS (`source/app/styles/phone.css`) and small branches;
+  the Reader is a separate Mobile Reader (`source/app/screens/Reader/phone/`) on the same core hooks
   (`contracts/phone-ui.md`).
 
-## Commands (from this folder)
+## Commands (from the repository root)
 
 | Command | What |
 |---|---|
-| `npm run build:web` | Build the WebView UI into `web/dist` (Vite; pdf.js legacy build on Mobile) |
+| `npm run build:web` | Build the WebView UI into `web-dist/` (Vite, `vite.native.config.ts`; pdf.js legacy build on Mobile) |
 | `npm run dev:web` | Same, watching |
-| `npm start` | `expo start` — Expo Go: the UI comes from Metro over the LAN, books in 1 MiB chunks (≤ 20 MB per book). Development only |
+| `npm run dev:mobile` | `expo start` — Expo Go: the UI comes from Metro over the LAN, books in 1 MiB chunks (≤ 20 MB per book). Development only |
 | `npm run android` | `expo run:android` — the native build with the local server (needs the Android SDK and JDK 17+) |
-| `npm run typecheck`, `npm run typecheck:web` | Host and WebView TypeScript |
-| `npm test` | vitest: host services, bridge, stores, migrations against Desktop's contract fixtures |
-| `npm run lint` | ESLint |
+| `npm run mobile:typecheck`, `npm run mobile:typecheck:web` | Host and WebView TypeScript |
+| `npm run mobile:test` | vitest: host services, bridge, stores, migrations against Desktop's contract fixtures |
+| `npm run mobile:lint` | ESLint (this folder keeps its own Expo config) |
 
-From `source/`: `npm run check:boundaries` checks the dependency rules (SDK imports, app imports, Mobile UI bundle
-graph, workspace graph, no secrets in bundles).
+Also: `npm run check:boundaries` (dependency rules R1–R3, R5–R9, R11, R12), `npm run check:build-split`.
 
 ## Android build notes (Windows)
 

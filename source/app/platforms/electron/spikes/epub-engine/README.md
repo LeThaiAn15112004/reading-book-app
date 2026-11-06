@@ -6,7 +6,7 @@ PoC harness to compare **epub.js**, **foliate-js**, and a JSZip+iframe baseline.
 ## Commands
 
 ```bash
-# From source/apps/reading-book-desktop
+# From source/app/platforms/electron
 npm run spike:epub:fixture   # build fixtures/spike-sample.epub + public copy
 npm run spike:epub:eval      # Node packaging / API matrix → MATRIX.md companion JSON
 npm run dev                  # then open #/spike/epub

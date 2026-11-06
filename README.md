@@ -59,45 +59,56 @@ Các quyết định sản phẩm trong repository này đang bám theo 4 tài l
 ## Cấu trúc repository
 
 - `docs/reading-habbit/`: tài liệu nghiên cứu, UX và design system.
-- `source/`: workspace chính cho các app.
-- `source/apps/reading-book-desktop/`: app desktop Electron + Vite + React.
-- `source/apps/reading-book-mobile/`: app mobile Expo + React Native.
-- `source/packages/`: các package dùng chung.
+- `source/core/`: logic dùng chung không phụ thuộc nền tảng (domain, use case, store, cấu hình, SQL).
+- `source/app/`: giao diện React dùng chung và hai host trong `source/app/platforms/`.
+  - `source/app/platforms/electron/`: host desktop (Electron Main/Preload + Vite).
+  - `source/app/platforms/native/`: host mobile (Expo + React Native, WebView chạy cùng giao diện).
+- `source/scripts/`: các lệnh kiểm tra (ranh giới phụ thuộc, adapter nền tảng, baseline Desktop).
+
+Cả repository là một project duy nhất: một `package.json` và một `node_modules` ở thư mục gốc.
 
 ## Chạy ứng dụng
+
+Tất cả lệnh chạy từ thư mục gốc của repository.
+
+```bash
+npm install
+```
 
 ### Desktop
 
 ```bash
-cd source/apps/reading-book-desktop
-npm install
 npm run dev
 ```
 
 Các lệnh khác:
 
-- `npm run build`: build production cho desktop app.
+- `npm run build`: build bản production cho desktop (renderer + Main).
+- `npm run package`: build rồi đóng gói bằng electron-builder.
 - `npm run lint`: kiểm tra lint.
 
 ### Mobile
 
 ```bash
-cd source/apps/reading-book-mobile
-npm install
-npm run start
+npm run dev:mobile
 ```
 
 Các lệnh khác:
 
-- `npm run android`: chạy trên Android.
-- `npm run ios`: chạy trên iOS.
-- `npm run web`: chạy bản web.
+- `npm run android`: chạy trên Android (bản native có local server).
+- `npm run build:web`: build giao diện WebView.
+- Chi tiết: `source/app/platforms/native/README.md`.
+
+### Kiểm tra
+
+- `npm run check`: toàn bộ cổng kiểm tra (typecheck, lint, test, ranh giới phụ thuộc, build).
+- `npm run check:desktop-baseline`: so sánh Desktop với baseline đã ghi.
 
 ## Ghi chú kỹ thuật
 
-- Workspace dùng cấu trúc monorepo, nên các app được phát triển trong `source/apps`.
-- Desktop app hiện dùng Electron + Vite + React + TypeScript.
-- Mobile app hiện dùng Expo Router + React Native.
+- Một project duy nhất (không dùng npm workspaces); alias `@core` trỏ tới `source/core/src`, `@app` tới `source/app`.
+- Desktop dùng Electron + Vite + React + TypeScript.
+- Mobile dùng Expo Router + React Native, WebView chạy cùng giao diện React với Desktop.
 
 ## Hướng phát triển tiếp theo
 
