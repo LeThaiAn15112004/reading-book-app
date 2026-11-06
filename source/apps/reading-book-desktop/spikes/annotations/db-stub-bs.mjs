@@ -11,7 +11,7 @@ import { fileURLToPath } from 'node:url'
 
 const require = createRequire(import.meta.url)
 const Database = require('better-sqlite3')
-const migrationsDir = path.join(path.dirname(fileURLToPath(import.meta.url)), '../../electron/persistence/migrations')
+const migrationsDir = path.join(path.dirname(fileURLToPath(import.meta.url)), '../../../../core/src/db/desktop/migrations')
 
 let db = null
 let dir = null

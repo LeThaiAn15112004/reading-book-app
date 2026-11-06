@@ -10,7 +10,7 @@ import path from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
 import { fileURLToPath } from 'node:url'
 
-const migrationsDir = path.join(path.dirname(fileURLToPath(import.meta.url)), '../../electron/persistence/migrations')
+const migrationsDir = path.join(path.dirname(fileURLToPath(import.meta.url)), '../../../../core/src/db/desktop/migrations')
 
 export function createMigratedDatabase() {
   const db = new DatabaseSync(':memory:')

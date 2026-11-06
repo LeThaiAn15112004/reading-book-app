@@ -121,7 +121,7 @@ await check('message names the book in progress', () => {
 
 // 3. SQLite (real schema) --------------------------------------------------------
 
-const migrationsDir = path.join(__dirname, '../../electron/persistence/migrations')
+const migrationsDir = path.join(__dirname, '../../../../core/src/db/desktop/migrations')
 const db = new DatabaseSync(':memory:')
 // 021 builds an FTS5 index over book_chunks (node:sqlite ships without FTS5) and never touches `books`.
 for (const file of fs.readdirSync(migrationsDir).filter((f) => f.endsWith('.sql') && !f.startsWith('021_') && !f.startsWith('029_') && !f.startsWith('030_')).sort()) {

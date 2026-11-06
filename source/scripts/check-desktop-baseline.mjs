@@ -112,7 +112,7 @@ function runChecks() {
 
 function runGit() {
   const electron = 'source/apps/reading-book-desktop/electron'
-  const migrations = `${electron}/persistence/migrations`
+  const migrations = `${electron}/persistence/migrations` // where they were at the base commit (T029 moved them)
   if (!git('rev-parse', '--verify', '--quiet', `${base}^{commit}`).ok) {
     record('git', `base ${base}`, false, 'commit not found')
     return
@@ -131,7 +131,8 @@ function runGit() {
 
   const atBase = git('ls-tree', '--name-only', base, '--', `${migrations}/`)
   const before = new Set(atBase.output.split(/\r?\n/).map((f) => path.posix.basename(f.trim())).filter(Boolean))
-  const now = readdirSync(path.join(repoRoot, migrations)).filter((f) => f.endsWith('.sql'))
+  const nowDir = DESKTOP_MIGRATION_DIRS.map((d) => path.join(repoRoot, d)).find((d) => existsSync(d)) ?? path.join(repoRoot, migrations)
+  const now = readdirSync(nowDir).filter((f) => f.endsWith('.sql'))
   const added = now.filter((f) => !before.has(f))
   const removed = [...before].filter((f) => f.endsWith('.sql') && !now.includes(f))
   record('git', 'no new or removed migration', atBase.ok && added.length === 0 && removed.length === 0,

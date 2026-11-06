@@ -17,7 +17,7 @@ import { DatabaseSync } from 'node:sqlite'
 import { fileURLToPath } from 'node:url'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
-const migrationsDir = path.resolve(here, '../../reading-book-desktop/electron/persistence/migrations')
+const migrationsDir = path.resolve(here, '../../../core/src/db/desktop/migrations')
 const args = process.argv.slice(2)
 const option = (name) => {
   const i = args.indexOf(name)

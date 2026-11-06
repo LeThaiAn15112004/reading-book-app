@@ -80,7 +80,7 @@ async function check(name, fn) {
   console.log(`  ✓ ${name}`)
 }
 
-const migrationsDir = path.join(desktop, 'electron/persistence/migrations')
+const migrationsDir = path.join(desktop, '../../core/src/db/desktop/migrations')
 const files = fs.readdirSync(migrationsDir).filter((f) => f.endsWith('.sql')).sort()
 function freshDb(books) {
   const db = new Database(':memory:')

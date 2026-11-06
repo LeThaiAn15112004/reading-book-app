@@ -42,13 +42,13 @@ if (!process.versions.electron) {
 }
 
 const Database = require('better-sqlite3')
-const migrationsDir = path.join(here, '../../electron/persistence/migrations')
+const migrationsDir = path.join(here, '../../../../core/src/db/desktop/migrations')
 const files = fs.readdirSync(migrationsDir).filter((f) => f.endsWith('.sql')).sort()
 
 // The runner must know about 026 (static check on migrate.ts, which cannot be imported: Vite `?raw`).
 const migrateSource = fs.readFileSync(path.join(here, '../../electron/persistence/migrate.ts'), 'utf8')
 assert.ok(files.includes('026_books_audio_format.sql'), '026 file exists')
-assert.ok(migrateSource.includes("'026_books_audio_format.sql'") && migrateSource.includes('./migrations/026_books_audio_format.sql?raw'), 'migrate.ts lists 026')
+assert.ok(migrateSource.includes("'026_books_audio_format.sql'") && migrateSource.includes('/migrations/026_books_audio_format.sql?raw'), 'migrate.ts lists 026')
 const listed = [...migrateSource.matchAll(/name: '(\d{3}_[a-z0-9_]+\.sql)'/g)].map((m) => m[1])
 assert.deepEqual(listed, files, 'migrate.ts MIGRATIONS list == files on disk, in order')
 
@@ -202,7 +202,7 @@ check('ON DELETE CASCADE still works from the new books (children + FTS triggers
   assert.equal(n('pdf_embedded_annotations', 'b-pdf'), 1)
 })
 // ---- apply 027 (more audio formats) on top ----
-assert.ok(files.includes('027_books_more_audio_formats.sql') && migrateSource.includes('./migrations/027_books_more_audio_formats.sql?raw'), '027 exists and is listed')
+assert.ok(files.includes('027_books_more_audio_formats.sql') && migrateSource.includes('/migrations/027_books_more_audio_formats.sql?raw'), '027 exists and is listed')
 const before27 = snapshot() // earlier checks changed rows (cascade test), so compare against the state right before 027
 applyMigration(db, '027_books_more_audio_formats.sql')
 console.log('after 027')
@@ -224,7 +224,7 @@ check('027: m4a m4b aac wav flac ogg opus insert; aiff / aif / zip / xyz are sti
   db.prepare(`DELETE FROM books WHERE id LIKE 'n27-%'`).run()
 })
 // ---- apply 028 (multi-chapter audiobooks) on top ----
-assert.ok(files.includes('028_book_audio_chapters.sql') && migrateSource.includes('./migrations/028_book_audio_chapters.sql?raw'), '028 exists and is listed')
+assert.ok(files.includes('028_book_audio_chapters.sql') && migrateSource.includes('/migrations/028_book_audio_chapters.sql?raw'), '028 exists and is listed')
 const before28 = snapshot()
 applyMigration(db, '028_book_audio_chapters.sql')
 console.log('after 028')

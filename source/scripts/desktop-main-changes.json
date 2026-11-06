@@ -10,6 +10,8 @@
     "source/apps/reading-book-desktop/electron/ipc/cloud.ipc.ts": "T024: import path of host-adapters (moved into electron/)",
     "source/apps/reading-book-desktop/electron/translation/translation.worker.ts": "T024: import path of host-adapters (moved into electron/)",
     "source/apps/reading-book-desktop/electron/persistence/db.ts": "T027: getSqlDriver() hands out the core SyncSqlDriver over the same connection (no store changed)",
-    "source/apps/reading-book-desktop/electron/persistence/sql-driver.ts": "T027: new, SyncSqlDriver over better-sqlite3"
+    "source/apps/reading-book-desktop/electron/persistence/sql-driver.ts": "T027: new, SyncSqlDriver over better-sqlite3",
+    "source/apps/reading-book-desktop/electron/persistence/migrations/": "T029: the 30 migrations moved byte-identical to source/core/src/db/desktop/migrations (hashes in desktop-migrations.sha256.json)",
+    "source/apps/reading-book-desktop/electron/persistence/migrate.ts": "T029: the ?raw imports read the migrations from their new folder (list and order unchanged)"
   }
 }

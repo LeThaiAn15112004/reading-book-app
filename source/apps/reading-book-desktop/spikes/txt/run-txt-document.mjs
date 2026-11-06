@@ -624,7 +624,7 @@ await check('txt:open / txt:commit are registered and validate their arguments',
 // ------------------------------------------------------------------------------------------------
 await check('migration 025 on a database that already holds books and notes: nothing changes, one table appears', async () => {
   const { DatabaseSync } = await import('node:sqlite')
-  const dir = new URL('../../electron/persistence/migrations/', import.meta.url)
+  const dir = new URL('../../../../core/src/db/desktop/migrations/', import.meta.url)
   const files = fs.readdirSync(dir).filter((f) => f.endsWith('.sql') && !f.startsWith('021_') && !f.startsWith('029_') && !f.startsWith('030_')).sort()
   const old = new DatabaseSync(':memory:')
   for (const f of files.filter((f) => f < '025')) old.exec(fs.readFileSync(new URL(f, dir), 'utf8'))

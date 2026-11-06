@@ -163,7 +163,7 @@ if (process.env.TRANSCRIPTION_SPIKE_CHILD) {
   await new Promise(() => {})
 }
 
-const migrationsDir = path.join(desktop, 'electron/persistence/migrations')
+const migrationsDir = path.join(desktop, '../../core/src/db/desktop/migrations')
 const files = fs.readdirSync(migrationsDir).filter((f) => f.endsWith('.sql')).sort()
 const migrateSource = fs.readFileSync(path.join(desktop, 'electron/persistence/migrate.ts'), 'utf8')
 
@@ -215,7 +215,7 @@ console.log('\nA. migration 029')
 // =====================================================================================================================
 await check('migrate.ts lists 029 and its file, in order, like every other migration', () => {
   assert.ok(files.includes('029_audio_transcripts.sql'))
-  assert.ok(migrateSource.includes("'029_audio_transcripts.sql'") && migrateSource.includes('./migrations/029_audio_transcripts.sql?raw'))
+  assert.ok(migrateSource.includes("'029_audio_transcripts.sql'") && migrateSource.includes('/migrations/029_audio_transcripts.sql?raw'))
   const listed = [...migrateSource.matchAll(/name: '(\d{3}_[a-z0-9_]+\.sql)'/g)].map((m) => m[1])
   assert.deepEqual(listed, files)
 })
@@ -1489,7 +1489,7 @@ console.log('\nF. transcription service (T015 / T015a / T016 / T022) — real SQ
     assert.deepEqual(old.prepare('SELECT * FROM audio_transcripts').all(), before.map((row) => ({ ...row, scope_json: null })))
     assert.throws(() => old.prepare(`UPDATE audio_transcripts SET scope_json = 'not json'`).run(), /CHECK/)
     assert.equal(files.at(-1), '030_audio_transcript_scope.sql')
-    assert.ok(migrateSource.includes("'030_audio_transcript_scope.sql'") && migrateSource.includes('./migrations/030_audio_transcript_scope.sql?raw'))
+    assert.ok(migrateSource.includes("'030_audio_transcript_scope.sql'") && migrateSource.includes('/migrations/030_audio_transcript_scope.sql?raw'))
     assert.deepEqual(old.pragma('foreign_key_check'), []); assert.deepEqual(old.pragma('integrity_check'), [{ integrity_check: 'ok' }])
     old.close()
   })
