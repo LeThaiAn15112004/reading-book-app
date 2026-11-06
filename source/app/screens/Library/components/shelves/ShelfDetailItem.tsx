@@ -1,6 +1,6 @@
 import { formatFileSizeMb } from '@reading-book/book-reader-sdk'
 import { BookCover, BookMenuButton, type BookMenuPoint } from '../book'
-import { withLongPress } from '../../../../platform/long-press'
+import { withLongPress } from '../../../../platforms/longPress'
 
 export type ShelfDetailItemData = {
   id: string

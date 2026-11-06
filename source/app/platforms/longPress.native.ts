@@ -1,15 +1,14 @@
 /**
- * Long press = right-click, on the Mobile host only (spec 008, T071; `contracts/phone-ui.md`, Touch replacements).
+ * Platform adapter `longPress`, Mobile WebView (spec 009 T042; was `platform/long-press.ts`, spec 008 T071; `contracts/phone-ui.md`, Touch replacements).
  *
  * `withLongPress(onContextMenu)` returns the props to spread on the element that already has an `onContextMenu`:
- *   - In Electron it returns `{ onContextMenu }` and nothing else, so Desktop's behaviour is the same object as before.
- *   - On the Mobile host it adds touch pointer handlers: a 500 ms press that moves less than 10 px calls the same
+ *   - Desktop's `longPress.electron.ts` returns `{ onContextMenu }` and nothing else.
+ *   - Here it adds touch pointer handlers: a 500 ms press that moves less than 10 px calls the same
  *     handler with a synthetic event at the press point, and the click that ends the press is swallowed.
  *     Android WebView may also fire a native `contextmenu` for the same press (risk R1): that one is dropped, so the
  *     menu opens once.
  */
 import type { MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent } from 'react'
-import { isMobileHost } from '../platforms/host'
 
 export const LONG_PRESS_MS = 500
 const MOVE_TOLERANCE_PX = 10
@@ -55,8 +54,6 @@ function clear() {
 const justFired = () => Date.now() - firedAt < 1000
 
 export function withLongPress<E extends Element>(onContextMenu: ContextMenuHandler<E>): LongPressProps<E> {
-  if (!isMobileHost()) return { onContextMenu }
-
   return {
     onContextMenu(event) {
       if (justFired()) {

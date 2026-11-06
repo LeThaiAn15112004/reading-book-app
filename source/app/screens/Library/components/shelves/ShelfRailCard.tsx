@@ -1,6 +1,6 @@
 import { formatLastReadLine, type LibraryBook } from '@reading-book/book-reader-sdk'
 import { BookCover, BookMenuButton, type BookMenuPoint } from '../book'
-import { withLongPress } from '../../../../platform/long-press'
+import { withLongPress } from '../../../../platforms/longPress'
 
 const PROVIDER_LABEL: Record<'google_drive' | 'dropbox' | 'onedrive', string> = {
   google_drive: 'Google Drive',
