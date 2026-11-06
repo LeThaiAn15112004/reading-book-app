@@ -1,31 +1,3 @@
 {
-  "compilerOptions": {
-    "paths": {
-      "@app/*": ["../../../app/*"],
-      "@reading-book/config": ["../../../core/src/config/index.ts"],
-      "@reading-book/config/*": ["../../../core/src/config/*"],
-      "@reading-book/book-reader-sdk": ["../../../core/src/index.ts"],
-      "@reading-book/book-reader-sdk/*": ["../../../core/src/*"],
-      "react": ["../../../../node_modules/@types/react/index.d.ts"],
-      "react/*": ["../../../../node_modules/@types/react/*"]
-    },
-    "target": "ES2020",
-    "useDefineForClassFields": true,
-    "lib": ["ES2022", "DOM", "DOM.Iterable"],
-    "module": "ESNext",
-    "skipLibCheck": true,
-    "moduleResolution": "bundler",
-    "allowImportingTsExtensions": true,
-    "resolveJsonModule": true,
-    "isolatedModules": true,
-    "noEmit": true,
-    "jsx": "react-jsx",
-    "types": ["node"],
-    "typeRoots": ["../../../../node_modules/@types"],
-    "strict": true,
-    "noUnusedLocals": true,
-    "noUnusedParameters": true,
-    "noFallthroughCasesInSwitch": true
-  },
-  "include": ["src", "tests", "vite.config.ts", "vitest.config.ts", "../../../app/**/*.d.ts", "../../reading-book-desktop/electron/electron-env.d.ts"]
+  "extends": "../../../../tsconfig.native.json"
 }

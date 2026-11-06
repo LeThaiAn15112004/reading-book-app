@@ -34,6 +34,8 @@ export default defineConfig({
   base: './',
   publicDir: path.join(desktopRoot, 'public'),
   resolve: {
+    // Research R4: the host's own suffix wins, so `host.native.ts` is chosen for `host`.
+    extensions: ['.native.tsx', '.native.ts', '.mjs', '.js', '.mts', '.ts', '.jsx', '.tsx', '.json'],
     alias: [
       { find: /^@app\//, replacement: `${appRoot.replaceAll('\\', '/')}/` },
       { find: '@reading-book/config', replacement: path.join(workspaceRoot, 'core/src/config') },

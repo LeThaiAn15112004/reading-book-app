@@ -1,0 +1,66 @@
+// Mobile WebView UI typecheck of the shared UI (spec 009 T039, research R4): `moduleSuffixes` makes TypeScript pick `<concern>.native.ts` the way
+// Vite's `resolve.extensions` does. Standalone rather than extending the root tsconfig.json, which is Expo's (React Native base).
+{
+  "compilerOptions": {
+    "paths": {
+      "@app/*": [
+        "./source/app/*"
+      ],
+      "@reading-book/config": [
+        "./source/core/src/config/index.ts"
+      ],
+      "@reading-book/config/*": [
+        "./source/core/src/config/*"
+      ],
+      "@reading-book/book-reader-sdk": [
+        "./source/core/src/index.ts"
+      ],
+      "@reading-book/book-reader-sdk/*": [
+        "./source/core/src/*"
+      ],
+      "react": [
+        "./node_modules/@types/react/index.d.ts"
+      ],
+      "react/*": [
+        "./node_modules/@types/react/*"
+      ]
+    },
+    "moduleSuffixes": [
+      ".native",
+      ""
+    ],
+    "target": "ES2020",
+    "useDefineForClassFields": true,
+    "lib": [
+      "ES2022",
+      "DOM",
+      "DOM.Iterable"
+    ],
+    "module": "ESNext",
+    "skipLibCheck": true,
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "noEmit": true,
+    "jsx": "react-jsx",
+    "types": [
+      "node"
+    ],
+    "typeRoots": [
+      "./node_modules/@types"
+    ],
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true
+  },
+  "include": [
+    "./source/app/**/*.d.ts",
+    "./source/apps/reading-book-mobile/web/src",
+    "./source/apps/reading-book-mobile/web/tests",
+    "./source/apps/reading-book-mobile/web/vite.config.ts",
+    "./source/apps/reading-book-mobile/web/vitest.config.ts",
+    "./source/apps/reading-book-desktop/electron/electron-env.d.ts"
+  ]
+}

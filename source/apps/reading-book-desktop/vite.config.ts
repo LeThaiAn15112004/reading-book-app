@@ -15,6 +15,8 @@ export default defineConfig({
   // Spec 009: Vite's cache lives in the one install folder at the repository root, never in a node_modules here.
   cacheDir: path.resolve(__dirname, '../../../node_modules/.vite/desktop'),
   resolve: {
+    // Research R4: the host's own suffix wins, so `host.electron.ts` is chosen for `host`.
+    extensions: ['.electron.tsx', '.electron.ts', '.mjs', '.js', '.mts', '.ts', '.jsx', '.tsx', '.json'],
     alias: {
       '@app': appRoot,
       '@reading-book/config': path.resolve(__dirname, '../../core/src/config'),
