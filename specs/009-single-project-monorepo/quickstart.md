@@ -126,3 +126,15 @@ rest is packages that only one host uses. Reaching −25 % (≈ −470 MB) would
 for example: dropping `onnxruntime-web` (−144 MB, not used by Main), pruning `onnxruntime-node` binaries of other
 platforms at install (−157 MB on Windows), or making translation / transcription models an optional install.
 
+
+### US4 platform adapters (T038–T046, 2026-11-06)
+
+| Check | Result |
+|---|---|
+| Concerns in `source/app/platforms/` | `host`, `longPress`, `api`, `storage`, `window` (each `.electron` + `.native`, same export names: `check:platform-adapters`) |
+| Desktop renderer build (source maps, 781 modules) | **0** `.native` modules, 4 `.electron` |
+| Mobile WebView build (source maps, 818 modules) | **0** `.electron` modules, 5 `.native` |
+| Command | `npm run check:build-split` (builds both into a temp folder, reads every source map; part of `npm run check`) |
+| Desktop vite build asset list | equal to T001's except hashes |
+| Marker grep (extra, minified output) | no `ipcRenderer` / `contextBridge` / `rb-cover://` / `windowControlsOverlay` in the WebView; no `__readmateBridgeLog` / `readChunk` / `setSystemBars` in Desktop. Two strings first looked like leaks and were not: a Desktop message "…decoder … could not start" and a generic touch check in the pointer code of another module |
+| Not covered | Mobile on a device or Expo Go after T043 (top-level await in `api.native.ts`) |
