@@ -1,6 +1,6 @@
 /**
  * Parse epubjs selection range CFI into start/end point CFIs (T5.1).
- * Pure string helpers live in `@reading-book/book-reader-sdk`; DOM/geometry stays here.
+ * Pure string helpers live in `@core`; DOM/geometry stays here.
  */
 
 import {
@@ -8,7 +8,7 @@ import {
   splitCfiRange,
   splitTopLevelCommas,
   type SplitCfiRange,
-} from '@reading-book/book-reader-sdk'
+} from '@core'
 
 export type { SplitCfiRange }
 export { cfiRangesOverlap, splitCfiRange }

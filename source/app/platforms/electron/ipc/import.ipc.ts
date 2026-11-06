@@ -1,9 +1,9 @@
-import { SUPPORTED_EXTENSIONS, SUPPORTED_FORMATS, features } from '@reading-book/config'
+import { SUPPORTED_EXTENSIONS, SUPPORTED_FORMATS, features } from '@core/config'
 import {
   Book,
   type BookSignatureInfo,
   type ImportResult as DomainImportResult,
-} from '@reading-book/book-reader-sdk'
+} from '@core'
 import { BrowserWindow, dialog, ipcMain, type WebContents } from 'electron'
 import { randomUUID } from 'node:crypto'
 import fsp from 'node:fs/promises'

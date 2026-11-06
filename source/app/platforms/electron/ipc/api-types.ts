@@ -1,6 +1,6 @@
 /** Narrow Desktop API exposed to the renderer via contextBridge (`window.api`). */
 
-import type { ZipImportPreview, ZipImportSelection } from '@reading-book/book-reader-sdk'
+import type { ZipImportPreview, ZipImportSelection } from '@core'
 
 export type DocumentFormatDto =
   | 'epub'
@@ -489,8 +489,8 @@ export type ChangePdfAttachmentResultDto =
   | { ok: false; code: 'write_failed'; errno?: string }
 
 /** A graphic object inside the PDF (validated shape: `parsePdfGraphicObject` in the SDK). */
-export type PdfGraphicObjectDto = import('@reading-book/book-reader-sdk').PdfGraphicObject
-export type PdfGraphicOpDto = import('@reading-book/book-reader-sdk').PdfGraphicOp
+export type PdfGraphicObjectDto = import('@core').PdfGraphicObject
+export type PdfGraphicOpDto = import('@core').PdfGraphicOp
 export type PdfGraphicFailureCodeDto = 'not_found' | 'not_allowed' | 'managed_copy' | 'read_only' | 'encrypted' | 'unsupported_pdf' | 'signed' | 'locked' | 'changed' | 'verify_failed' | 'failed'
 export type ListPdfGraphicsResult = { ok: true; objects: PdfGraphicObjectDto[]; complete: boolean } | { ok: false; errorCode: PdfGraphicFailureCodeDto }
 export type ApplyPdfGraphicResult = { ok: true; objects: PdfGraphicObjectDto[]; sha256: string } | { ok: false; errorCode: PdfGraphicFailureCodeDto; signerName?: string }
@@ -618,7 +618,7 @@ export interface HighlightDto {
   id: string
   bookId: string
   locatorRef: string
-  styleKind: import('@reading-book/book-reader-sdk').HighlightStyleKind
+  styleKind: import('@core').HighlightStyleKind
   colorHex: string
   note?: string
   tags: string[]
@@ -647,7 +647,7 @@ export interface SaveHighlightInput {
   bookId: string
   id?: string
   locatorRef: string
-  styleKind: import('@reading-book/book-reader-sdk').HighlightStyleKind
+  styleKind: import('@core').HighlightStyleKind
   colorHex: string
   note?: string
   tags?: string[]

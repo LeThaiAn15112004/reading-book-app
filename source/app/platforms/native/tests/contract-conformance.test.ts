@@ -4,7 +4,7 @@
  * on the Mobile baseline schema, on `node:sqlite`. Plus: the baseline has exactly Desktop's columns for every
  * first-release table.
  */
-import { Book, Location, ReadingSessionState } from '@reading-book/book-reader-sdk'
+import { Book, Location, ReadingSessionState } from '@core'
 import { afterAll, describe, expect, it } from 'vitest'
 import { runOverlayContract, type ContractHost, type NoteRowRaw } from '../../../../core/tests/contracts/contract-runner'
 import { loadContractFixtures } from '../../../../core/tests/contracts/fixtures'

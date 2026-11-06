@@ -7,8 +7,8 @@
     "strict": true,
     "paths": {
       "@app/*": ["./source/app/*"],
-      "@reading-book/book-reader-sdk": ["./source/core/src/index.ts"],
-      "@reading-book/book-reader-sdk/*": ["./source/core/src/*"],
+      "@core": ["./source/core/src/index.ts"],
+      "@core/*": ["./source/core/src/*"],
       "@/*": ["./source/app/platforms/native/*"],
       "@/assets/*": ["./source/app/platforms/native/assets/*"]
     }

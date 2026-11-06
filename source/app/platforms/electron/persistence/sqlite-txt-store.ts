@@ -1,4 +1,4 @@
-import { txtCodec, txtStatements as q, type SaveHighlightInput, type SyncSqlDriver } from '@reading-book/book-reader-sdk'
+import { txtCodec, txtStatements as q, type SaveHighlightInput, type SyncSqlDriver } from '@core'
 import type { Database as SqliteDatabase } from 'better-sqlite3'
 import { getDatabase } from './db'
 import { getOverlayStore, type SqliteOverlayStore } from './sqlite-overlay-store'

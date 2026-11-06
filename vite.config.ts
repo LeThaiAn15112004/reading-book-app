@@ -29,10 +29,10 @@ const electronPlugins =
         },
         vite: {
           resolve: {
-            alias: {
-              '@reading-book/config': path.resolve(__dirname, './source/core/src/config'),
-              '@reading-book/book-reader-sdk': path.resolve(__dirname, './source/core/src/index.ts'),
-            },
+            alias: [
+              { find: /^@core$/, replacement: path.resolve(__dirname, './source/core/src/index.ts') },
+              { find: /^@core\//, replacement: `${path.resolve(__dirname, './source/core/src').replaceAll('\\', '/')}/` },
+            ],
           },
           build: {
             outDir: path.join(hostRoot, 'dist-electron'),
@@ -83,11 +83,11 @@ export default defineConfig({
   resolve: {
     // Research R4: the host's own suffix wins, so `host.electron.ts` is chosen for `host`.
     extensions: ['.electron.tsx', '.electron.ts', '.mjs', '.js', '.mts', '.ts', '.jsx', '.tsx', '.json'],
-    alias: {
-      '@app': appRoot,
-      '@reading-book/config': path.resolve(__dirname, './source/core/src/config'),
-      '@reading-book/book-reader-sdk': path.resolve(__dirname, './source/core/src/index.ts'),
-    },
+    alias: [
+      { find: /^@app\//, replacement: `${appRoot.replaceAll('\\', '/')}/` },
+      { find: /^@core$/, replacement: path.resolve(__dirname, './source/core/src/index.ts') },
+      { find: /^@core\//, replacement: `${path.resolve(__dirname, './source/core/src').replaceAll('\\', '/')}/` },
+    ],
   },
   optimizeDeps: {
     include: ['epubjs', 'jszip'],

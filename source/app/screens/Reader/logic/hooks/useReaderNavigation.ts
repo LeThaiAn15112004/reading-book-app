@@ -16,7 +16,7 @@ import type {
   PdfRendererApi,
 } from '../../../../components/reader/renderers/pdf'
 import type { TextSurfaceApi } from '../../../../components/reader/renderers/textSurface'
-import { resolveActivePageTocEntry } from '@reading-book/book-reader-sdk'
+import { resolveActivePageTocEntry } from '@core'
 import { blurReaderSidebarFocus } from '../../../../components/reader/chrome'
 import {
   isTypingTarget,

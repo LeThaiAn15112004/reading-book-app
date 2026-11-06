@@ -1,5 +1,5 @@
 import { useEffect, useMemo, type MutableRefObject } from 'react'
-import type { TxtReaderHighlight } from '@reading-book/book-reader-sdk'
+import type { TxtReaderHighlight } from '@core'
 import type { TxtRendererApi } from '../../../../components/reader/renderers/txt'
 import { registerSessionFlushHandler } from '../session/sessionFlushRegistry'
 import { useTxtDocumentStore } from '../txtDocument/txtDocumentStore'

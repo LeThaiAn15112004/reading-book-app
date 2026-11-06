@@ -29,7 +29,7 @@ if (!process.versions.electron) {
   process.exit(r.status ?? 1)
 }
 
-const sdk = await import('@reading-book/book-reader-sdk')
+const sdk = await import('@core')
 const { getDatabase, closeAndRemove } = await import('./annotations/db-stub-bs.mjs')
 const { SqliteOverlayStore } = await import('../electron/persistence/sqlite-overlay-store.ts')
 const { SqliteLibraryStore } = await import('../electron/persistence/sqlite-library-store.ts')

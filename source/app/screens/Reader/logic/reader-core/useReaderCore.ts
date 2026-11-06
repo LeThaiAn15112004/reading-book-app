@@ -19,7 +19,7 @@
  * is checked by the Desktop E2E suite.
  */
 import type { MutableRefObject } from 'react'
-import type { GlobalReadingPrefs } from '@reading-book/book-reader-sdk'
+import type { GlobalReadingPrefs } from '@core'
 import type { EpubRendererApi } from '../../../../components/reader/renderers/epub'
 import type { MdRendererApi } from '../../../../components/reader/renderers/md'
 import type { PdfRendererApi } from '../../../../components/reader/renderers/pdf'

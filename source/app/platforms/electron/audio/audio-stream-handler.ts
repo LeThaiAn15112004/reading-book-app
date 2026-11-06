@@ -1,6 +1,6 @@
 import fs from 'node:fs'
 import { Readable } from 'node:stream'
-import { audioMimeForFormat, parseByteRange } from '@reading-book/book-reader-sdk'
+import { audioMimeForFormat, parseByteRange } from '@core'
 
 /**
  * HTTP-style streaming of one audiobook file, with byte-Range support, for the `rb-audio` protocol.

@@ -21,7 +21,7 @@ import { getDatabase } from './db-stub.mjs'
 
 const { OverlayChannels } = await import('../../ipc/channels.ts')
 const { registerOverlayIpc } = await import('../../ipc/overlay.ipc.ts')
-const sdk = await import('@reading-book/book-reader-sdk')
+const sdk = await import('@core')
 
 let passed = 0
 async function check(name, fn) {

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useShortcutAction } from '../../../../shortcuts'
 import type { ZoomLayoutPreset } from '../../logic'
-import type { PageLayout, ReadingViewMode } from '@reading-book/book-reader-sdk'
+import type { PageLayout, ReadingViewMode } from '@core'
 import { ZoomControl } from './ZoomControl'
 import { FullscreenButton } from './FullscreenButton'
 

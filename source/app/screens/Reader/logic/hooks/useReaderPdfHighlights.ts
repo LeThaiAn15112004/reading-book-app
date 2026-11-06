@@ -1,5 +1,5 @@
 import { usePageAttachmentsStore } from '../attachments/pageAttachmentsStore'
-import { isShapeStyleKind } from '@reading-book/book-reader-sdk'
+import { isShapeStyleKind } from '@core'
 import { useEffect, type MutableRefObject } from 'react'
 import { overlayApi } from '../../../../bridge'
 import type { PdfRendererApi } from '../../../../components/reader/renderers/pdf'

@@ -6,7 +6,7 @@
  * the model is updated once, on `compositionend`, after which the content is rebuilt.
  */
 import { useLayoutEffect, useMemo, useRef, type ClipboardEvent, type CompositionEvent, type KeyboardEvent } from 'react'
-import { editText, type PdfTypewriterDoc, type TypewriterLayout, type TypewriterTextStyle } from '@reading-book/book-reader-sdk'
+import { editText, type PdfTypewriterDoc, type TypewriterLayout, type TypewriterTextStyle } from '@core'
 import { TypewriterLines } from './PdfTypewriterLayer'
 import { layoutNote, noteHeightFraction, type TypewriterNormBox } from './typewriterBox'
 

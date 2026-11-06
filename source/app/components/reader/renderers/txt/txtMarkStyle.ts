@@ -1,5 +1,5 @@
 import type { CSSProperties } from 'react'
-import type { TxtReaderHighlight } from '@reading-book/book-reader-sdk'
+import type { TxtReaderHighlight } from '@core'
 
 /** Share of the annotation color a highlight fill keeps (the text on top must stay readable). */
 const FILL_PERCENT = 46

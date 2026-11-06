@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react'
-import type { ReaderHighlightBase } from '@reading-book/book-reader-sdk'
+import type { ReaderHighlightBase } from '@core'
 import type { ViewportRectLike } from '../../../../components/reader/renderers/epub'
 import { NoteFloatingMenu } from './NoteFloatingMenu'
 

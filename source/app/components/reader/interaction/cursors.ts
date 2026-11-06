@@ -1,6 +1,6 @@
 /** Reading-surface cursor + user-select — CSS-first (Foxit/Adobe style). */
 
-import type { InteractionTool } from '@reading-book/book-reader-sdk'
+import type { InteractionTool } from '@core'
 import { TEXT_CURSOR_SELECTOR } from './interaction-hit'
 
 const SURFACE_STYLE_ID = 'rb-interaction-surface-style'

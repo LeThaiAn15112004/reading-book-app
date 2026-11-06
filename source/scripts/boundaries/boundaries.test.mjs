@@ -70,8 +70,8 @@ describe('R1, R2, R3: SDK src (architecture-audit.md §3 probes)', () => {
     assert.deepEqual(rules(sdkCase("import type { BrowserWindow } from 'electron'\nexport type W = BrowserWindow\n")), ['R2'])
   })
 
-  test('probe "@reading-book/config" fails R3', () => {
-    assert.deepEqual(rules(sdkCase("import { features } from '@reading-book/config'\nexport { features }\n")), ['R3'])
+  test('probe "@core/config" fails R3', () => {
+    assert.deepEqual(rules(sdkCase("import { features } from '@core/config'\nexport { features }\n")), ['R3'])
   })
 
   test('probe "../../reading-book-desktop/electron/ipc/channels" fails R3', () => {
@@ -152,7 +152,7 @@ describe('R7, R8, R11: app imports', () => {
   })
 
   test('Mobile web importing host-adapters through the SDK alias fails R11', () => {
-    assert.deepEqual(rules(apps({ ...base, 'reading-book-mobile/web/src/x.ts': "import { cloud } from '@reading-book/book-reader-sdk/host-adapters/cloud'\nexport { cloud }\n" })), ['R11'])
+    assert.deepEqual(rules(apps({ ...base, 'reading-book-mobile/web/src/x.ts': "import { cloud } from '@core/host-adapters/cloud'\nexport { cloud }\n" })), ['R11'])
   })
 
   test('the real apps pass', () => {

@@ -1,5 +1,5 @@
 import { Component, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { formatAttachmentSize, isShapeStyleKind, type ReaderBookmark, type ReaderHighlightBase } from '@reading-book/book-reader-sdk'
+import { formatAttachmentSize, isShapeStyleKind, type ReaderBookmark, type ReaderHighlightBase } from '@core'
 
 /**
  * A highlight / note card in the sidebar — EPUB (`ReaderHighlight`) and PDF (`PdfReaderHighlight`)

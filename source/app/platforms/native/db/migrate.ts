@@ -7,7 +7,7 @@
  * host's `sql.run` rule), so a migration file is split by `splitSqlStatements`.
  */
 import baseline001 from '../../../../core/src/db/mobile/migrations/001_baseline.sql?raw'
-import { planMigrations, splitSqlStatements, type Migration } from '@reading-book/book-reader-sdk'
+import { planMigrations, splitSqlStatements, type Migration } from '@core'
 import type { SqlDriver, SqlStatement } from './sql-driver'
 
 // The planning and the statement splitter live in core (spec 009 T031); re-exported for the tests that import them here.

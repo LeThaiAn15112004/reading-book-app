@@ -1,4 +1,4 @@
-import type { Location } from '@reading-book/book-reader-sdk'
+import type { Location } from '@core'
 
 /** Trailing quiet period after a relocate before writing. */
 export const READING_SESSION_DEBOUNCE_MS = 750

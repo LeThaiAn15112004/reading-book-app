@@ -1,6 +1,6 @@
 import fsp from 'node:fs/promises'
 import path from 'node:path'
-import { isAudioFormat, isChapterFileName, type AudioChapterRecord } from '@reading-book/book-reader-sdk'
+import { isAudioFormat, isChapterFileName, type AudioChapterRecord } from '@core'
 import type { AudioFileLookup } from './audio-stream-handler'
 
 /**

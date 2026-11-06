@@ -24,7 +24,7 @@ import { createHash } from 'node:crypto'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import { FILE_EXTENSION, embeddedAnnotationIdentities, parseAnnotationFile } from '@reading-book/book-reader-sdk'
+import { FILE_EXTENSION, embeddedAnnotationIdentities, parseAnnotationFile } from '@core'
 
 const { getDatabase } = await import('../pdf-annotations/db-stub.mjs')
 const { getOverlayStore } = await import('../../persistence/sqlite-overlay-store.ts')
@@ -359,7 +359,7 @@ await check('the database rows are unchanged by exports', () => {
 // 4. import — the real import service on the same stores, the dialog / file read / PDF scan stubbed
 // =================================================================================================================
 const { createImportService } = await import('../../annotation-transfer/import-service.ts')
-const { planTwoWaySync } = await import('@reading-book/book-reader-sdk')
+const { planTwoWaySync } = await import('@core')
 
 const events = []
 let nextImportFile = null

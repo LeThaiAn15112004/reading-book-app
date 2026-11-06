@@ -1,4 +1,4 @@
-import { detectTxtBom, normalizeTxtText } from '@reading-book/book-reader-sdk'
+import { detectTxtBom, normalizeTxtText } from '@core'
 
 export interface DecodedTxt {
   /** Canonical text: no BOM, `\n` line breaks (`txt/txt-text.ts` in the SDK). */

@@ -11,7 +11,7 @@ import {
   shapeStrokeHex,
   type InteractionTool,
   type MdHeadingInfo,
-} from '@reading-book/book-reader-sdk'
+} from '@core'
 
 import { MD_HEADING_HREF, mdInitialPointFor, mdSourceFor, mdTocFromHeadings, txtInitialOffsetFor } from './logic/reader-core/derivations'
 import { readingStyleFor } from './logic/reader-core/reading-style'

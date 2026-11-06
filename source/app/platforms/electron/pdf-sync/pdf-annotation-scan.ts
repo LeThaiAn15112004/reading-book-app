@@ -17,7 +17,7 @@ import {
   sanitizeAttachmentFileName,
   type PdfAttachmentInfo,
   type ScannedPdfAnnotation,
-} from '@reading-book/book-reader-sdk'
+} from '@core'
 import { createHash } from 'node:crypto'
 import { loadPdfjs } from '../chunking/pdf-text'
 import { PdfRawObjects, parsePdfJsRef, readAnnotationNames } from './pdf-raw-objects'

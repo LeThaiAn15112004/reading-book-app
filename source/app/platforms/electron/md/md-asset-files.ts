@@ -1,6 +1,6 @@
 import fsp from 'node:fs/promises'
 import path from 'node:path'
-import { MD_MAX_IMAGE_BYTES, classifyMdImageSrc } from '@reading-book/book-reader-sdk'
+import { MD_MAX_IMAGE_BYTES, classifyMdImageSrc } from '@core'
 
 /** Pure filesystem + path logic for Markdown images (no Electron), so a spike can run it on temp files. */
 

@@ -13,7 +13,7 @@ import {
   type TimeRange,
   type TranscriptPassage,
   type TranscriptionErrorCode,
-} from '@reading-book/book-reader-sdk'
+} from '@core'
 import type {
   OkResult,
   TranscriptPassageDto,

@@ -1,4 +1,4 @@
-import { applyAlign, emptyTypewriterDoc, type TypewriterAlign, type TypewriterTextStyle } from '@reading-book/book-reader-sdk'
+import { applyAlign, emptyTypewriterDoc, type TypewriterAlign, type TypewriterTextStyle } from '@core'
 import type { PdfTypewriterMark } from '../../../../components/reader/renderers/pdf/PdfTypewriterLayer'
 import { usePdfTypewriterPrefsStore } from '../../logic/pdfTypewriter/pdfTypewriterPrefsStore'
 import { useTypewriterEditorStore } from '../../logic/pdfTypewriter/typewriterEditorStore'

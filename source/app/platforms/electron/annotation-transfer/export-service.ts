@@ -16,8 +16,8 @@ import {
   type ReadableAttachment,
   type TransferBook,
   type TransferFormat,
-} from '@reading-book/book-reader-sdk'
-import type { EmbeddedAnnotationLedgerEntry } from '@reading-book/book-reader-sdk'
+} from '@core'
+import type { EmbeddedAnnotationLedgerEntry } from '@core'
 import type { AnnotationExportResult } from '../ipc/api-types'
 import type { TransferNoteRow } from '../persistence/sqlite-overlay-store'
 

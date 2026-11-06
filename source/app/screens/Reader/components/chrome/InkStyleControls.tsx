@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
-import { INK_PEN_PRESETS, INK_PEN_STYLES, type InkPenStyle } from '@reading-book/book-reader-sdk'
+import { INK_PEN_PRESETS, INK_PEN_STYLES, type InkPenStyle } from '@core'
 import { pickerEventAction, setInkColorPickerOpen } from './inkColorPickerState'
 import { inkWidthToPoints, parseHexInput } from '../../logic/pdfInk/pdfInkPrefsStore'
 

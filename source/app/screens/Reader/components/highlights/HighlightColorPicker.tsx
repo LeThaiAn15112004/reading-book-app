@@ -5,7 +5,7 @@ import {
   splitHighlightColor,
   withHighlightAlpha,
   type HighlightStyleKind,
-} from '@reading-book/book-reader-sdk'
+} from '@core'
 
 type HighlightColorPickerProps = {
   value: string

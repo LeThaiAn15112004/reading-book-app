@@ -1,4 +1,4 @@
-import { features } from '@reading-book/config'
+import { features } from '@core/config'
 import { app, BrowserWindow } from 'electron'
 import { parseFile } from 'music-metadata'
 import path from 'node:path'

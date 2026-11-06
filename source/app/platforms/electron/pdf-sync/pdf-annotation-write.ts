@@ -11,7 +11,7 @@ import {
   type ExportableHighlight,
   type PdfAnnotationWritePlan,
   type ScannedPdfAnnotation,
-} from '@reading-book/book-reader-sdk'
+} from '@core'
 import { scanPdfAnnotationBytes, type PdfAnnotationScanResult } from './pdf-annotation-scan'
 import { appendAnnotationUpdate, PdfWriteError, type AnnotationUpdate, type PageGeometry } from './pdf-incremental-writer'
 import { TypewriterWriteError, type TypewriterWriteFailure } from './typewriter-pdf'

@@ -53,7 +53,7 @@ import {
   type PageGeometry,
 } from './pdf-incremental-writer'
 import { PdfGraphicError, editPdfGraphicBytes, listPdfGraphicsBytes, type PdfGraphicEditResult, type PdfGraphicListResult } from './pdf-graphics'
-import type { PdfGraphicOp } from '@reading-book/book-reader-sdk'
+import type { PdfGraphicOp } from '@core'
 
 export type ScanWorkerRequest =
   | { id: number; kind: 'scan'; bytes: Uint8Array }

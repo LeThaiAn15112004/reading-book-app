@@ -1,4 +1,4 @@
-import { DocumentFormat } from '@reading-book/book-reader-sdk'
+import { DocumentFormat } from '@core'
 import { readEpubLibraryMetadata } from '../adapters/epub.adapter'
 import { resolveBookFile } from '../files/sandbox'
 import { getLibraryStore } from './sqlite-library-store'

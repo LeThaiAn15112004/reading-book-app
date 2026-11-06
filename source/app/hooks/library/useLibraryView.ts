@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import type { NavFilterId } from '@reading-book/book-reader-sdk'
+import type { NavFilterId } from '@core'
 import {
   CLOUD_STUB_NAV_PROVIDER,
   navIdForView,

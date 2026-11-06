@@ -5,7 +5,7 @@ import {
   parseTextSearchQuery,
   type TextMatcher,
   type TextSearchOptions,
-} from '@reading-book/book-reader-sdk'
+} from '@core'
 import {
   searchApi,
   type BookSearchMatch,

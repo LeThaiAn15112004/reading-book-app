@@ -1,5 +1,5 @@
 /**
- * Stand-in for `@reading-book/book-reader-sdk` in the Reset App Settings checks. Re-exports the real,
+ * Stand-in for `@core` in the Reset App Settings checks. Re-exports the real,
  * import-free reading-prefs module; the Library helpers the stores never call at load time are
  * stubbed so the whole SDK does not have to be loaded.
  */

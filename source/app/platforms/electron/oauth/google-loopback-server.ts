@@ -4,7 +4,7 @@ import {
   GOOGLE_OAUTH_LOOPBACK_CALLBACK_PATH,
   GOOGLE_OAUTH_LOOPBACK_HOST,
   GOOGLE_OAUTH_LOOPBACK_PORT,
-} from '@reading-book/config'
+} from '@core/config'
 
 export type LoopbackAuthResult = { code: string; state?: string } | { error: string }
 

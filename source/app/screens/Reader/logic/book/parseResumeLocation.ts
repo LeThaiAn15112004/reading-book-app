@@ -1,4 +1,4 @@
-import { CfiLocation, Location, PageRectLocation, TextOffsetLocation } from '@reading-book/book-reader-sdk'
+import { CfiLocation, Location, PageRectLocation, TextOffsetLocation } from '@core'
 import { toEpubjsDisplayCfi } from '../../../../components/reader/renderers/epub'
 
 /**

@@ -7,7 +7,7 @@
  *     the original the user picked was never referenced. A file left behind is caught by the startup sweep.
  * Every write runs through the single write queue.
  */
-import { checkMdFileSize, describeMdTooLarge } from '@reading-book/book-reader-sdk'
+import { checkMdFileSize, describeMdTooLarge } from '@core'
 import { bytesToBase64 } from '../host/encoding'
 import type { BookListItem } from '../stores/library-store'
 import { idOf, type BridgeContext } from './context'

@@ -1,5 +1,5 @@
-import type { ExternalLibraryProvider } from '@reading-book/book-reader-sdk'
-import type { NavFilterId } from '@reading-book/book-reader-sdk'
+import type { ExternalLibraryProvider } from '@core'
+import type { NavFilterId } from '@core'
 
 /** Sidebar ids that Library view can highlight / navigate. */
 export type LibraryNavId =

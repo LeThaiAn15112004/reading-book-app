@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { ImportToastVariant } from '@reading-book/book-reader-sdk'
+import type { ImportToastVariant } from '@core'
 
 export type ImportSource = 'file' | 'url'
 

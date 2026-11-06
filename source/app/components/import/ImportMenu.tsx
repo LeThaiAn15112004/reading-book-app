@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef, useState } from 'react'
-import { features } from '@reading-book/config'
+import { features } from '@core/config'
 import { useZipImportStore, zipJobShortLabel } from '../../hooks/library'
 import { isFeatureAvailable } from '../../platforms/host'
 import { SpinnerIcon } from './SpinnerIcon'

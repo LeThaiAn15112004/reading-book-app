@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type MutableRefObject } from 'react'
-import { CfiLocation, PageRectLocation } from '@reading-book/book-reader-sdk'
+import { CfiLocation, PageRectLocation } from '@core'
 import {
   bookmarkDtoToReaderBookmark,
   findReaderBookmarksAtLocation,
@@ -7,7 +7,7 @@ import {
   readerBookmarkJumpLocation,
   resolveCurrentBookmarkLocation,
   type ReaderBookmark,
-} from '@reading-book/book-reader-sdk'
+} from '@core'
 import { overlayApi } from '../../../../bridge'
 import {
   waitForFrames,

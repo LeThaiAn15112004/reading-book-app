@@ -2,7 +2,7 @@
  * Mobile-only rules of the stores and the migration runner (spec 008, T042, T044, T045): what the shared contract
  * does not cover because Desktop has no such rule.
  */
-import { Book, DocumentFormat } from '@reading-book/book-reader-sdk'
+import { Book, DocumentFormat } from '@core'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { MOBILE_MIGRATIONS, migrate, splitSqlStatements } from '../db/migrate'
 import { MobileBookRuleError, MobileLibraryStore, bookCoverPath, bookFilePath } from '../stores/library-store'

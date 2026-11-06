@@ -2,7 +2,7 @@ import type {
   UrlDocumentFetcher,
   UrlFetchOptions,
   UrlFetchResult,
-} from '@reading-book/book-reader-sdk'
+} from '@core'
 import { app } from 'electron'
 import { randomUUID } from 'node:crypto'
 import fs from 'node:fs'

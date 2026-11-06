@@ -2,7 +2,7 @@ import { app, type WebContents } from 'electron'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { Worker } from 'node:worker_threads'
-import { resolveTranslationRoute, sanitizeTranslationInput } from '@reading-book/book-reader-sdk'
+import { resolveTranslationRoute, sanitizeTranslationInput } from '@core'
 import { TranslationChannels } from '../ipc/channels'
 import type {
   TranslateRequestDto,

@@ -16,7 +16,7 @@ import {
   type TypewriterAlign,
   type TypewriterFamilyId,
   type TypewriterTextStyle,
-} from '@reading-book/book-reader-sdk'
+} from '@core'
 
 const PAGE_PT = 612
 const keepFocus = (e: MouseEvent) => e.preventDefault()

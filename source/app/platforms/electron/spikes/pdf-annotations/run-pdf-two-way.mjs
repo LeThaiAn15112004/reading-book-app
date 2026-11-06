@@ -27,7 +27,7 @@ import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import { pdfHighlightDtoToReaderHighlight, packPdfHighlightLocator, planTwoWaySync } from '@reading-book/book-reader-sdk'
+import { pdfHighlightDtoToReaderHighlight, packPdfHighlightLocator, planTwoWaySync } from '@core'
 import { invoke } from './electron-stub.mjs'
 import { getDatabase } from './db-stub.mjs'
 import { buildAnnotatedPdf } from '../../e2e/support/build-annotated-pdf.mjs'
@@ -552,7 +552,7 @@ await check('no duplicates overall: every row ↔ one annotation, ledger keys un
 })
 
 await check('10. Typewriter notes: written as /FreeText (status in_file), a formatting edit rewrites it in place and keeps the document, a delete removes it', async () => {
-  const sdk = await import('@reading-book/book-reader-sdk')
+  const sdk = await import('@core')
   const TEXT = 'Xin chào thế giới\nDòng hai'
   const book = await openBook('twn', 'Typewriter', buildAnnotatedPdf())
   await service.watch(book.target, 'twn')

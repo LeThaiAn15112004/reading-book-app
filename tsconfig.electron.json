@@ -6,16 +6,10 @@
       "@app/*": [
         "./source/app/*"
       ],
-      "@reading-book/config": [
-        "./source/core/src/config/index.ts"
-      ],
-      "@reading-book/config/*": [
-        "./source/core/src/config/*"
-      ],
-      "@reading-book/book-reader-sdk": [
+      "@core": [
         "./source/core/src/index.ts"
       ],
-      "@reading-book/book-reader-sdk/*": [
+      "@core/*": [
         "./source/core/src/*"
       ]
     },

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, type MutableRefObject, type RefObject } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { PageRectLocation, mdReadingLocation, txtReadingLocation, type CfiLocation, type MdPoint } from '@reading-book/book-reader-sdk'
+import { PageRectLocation, mdReadingLocation, txtReadingLocation, type CfiLocation, type MdPoint } from '@core'
 import type { EpubRendererApi } from '../../../../components/reader/renderers/epub'
 import type { PdfNavState, PdfRendererApi } from '../../../../components/reader/renderers/pdf'
 import type { TextSurfaceApi } from '../../../../components/reader/renderers/textSurface'

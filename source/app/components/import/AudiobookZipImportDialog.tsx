@@ -8,7 +8,7 @@ import {
   singleFileImportNotes,
   type ZipImportPreview,
   type ZipPreviewEntry,
-} from '@reading-book/book-reader-sdk'
+} from '@core'
 import { useZipImportStore } from '../../hooks/library'
 
 const ROW_HEIGHT = 32

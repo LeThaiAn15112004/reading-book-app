@@ -11,7 +11,7 @@ import type {
   ReaderTheme,
   TextAlign,
   TextMatcher,
-} from '@reading-book/book-reader-sdk'
+} from '@core'
 import type { SpineExcerpt } from '../previews/spineExcerptCache'
 
 export type EpubPageLayout = 'single' | 'dual'

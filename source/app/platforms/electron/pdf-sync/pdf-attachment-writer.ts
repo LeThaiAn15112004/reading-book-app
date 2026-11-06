@@ -11,7 +11,7 @@ import path from 'node:path'
 import { pipeline } from 'node:stream/promises'
 import { Writable } from 'node:stream'
 import { createDeflate } from 'node:zlib'
-import { ATTACHMENT_MAX_BYTES, checkAttachSize, type AttachSizeVerdict } from '@reading-book/book-reader-sdk'
+import { ATTACHMENT_MAX_BYTES, checkAttachSize, type AttachSizeVerdict } from '@core'
 import { isReadmateTempFor, writeFileSafelyStreaming } from './pdf-annotation-export'
 import { finishAttachmentXref, type AttachmentUpdatePlan } from './pdf-incremental-writer'
 

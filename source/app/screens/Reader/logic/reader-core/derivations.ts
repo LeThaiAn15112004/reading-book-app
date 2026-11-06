@@ -10,7 +10,7 @@ import {
   resolveTxtReadingOffset,
   type MdHeadingInfo,
   type MdOutlineNode,
-} from '@reading-book/book-reader-sdk'
+} from '@core'
 import { decodeMdSource, type MdSource } from '../../../../components/reader/renderers/md'
 import type { EpubTocItem } from '../../../../components/reader/renderers/epub'
 

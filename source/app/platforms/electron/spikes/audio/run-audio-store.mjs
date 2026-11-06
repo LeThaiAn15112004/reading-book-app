@@ -18,7 +18,7 @@ import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import { parseAudioProgress, parseReadingState } from '@reading-book/book-reader-sdk'
+import { parseAudioProgress, parseReadingState } from '@core'
 import { invoke } from '../pdf-annotations/electron-stub.mjs'
 import { getDatabase } from '../pdf-annotations/db-stub.mjs'
 
@@ -393,7 +393,7 @@ await check('retry after an error loads again', async () => {
 
 // ---- 3b. chapters, scope, bookmarks, sleep timer, volume ----
 console.log('3b. chapters / Book–Chapter scope / bookmarks / sleep timer / volume')
-const { timelineView } = await import('@reading-book/book-reader-sdk')
+const { timelineView } = await import('@core')
 const u32 = (n) => { const b = Buffer.alloc(4); b.writeUInt32BE(n >>> 0); return b }
 const id3frame = (id, body) => Buffer.concat([Buffer.from(id), u32(body.length), Buffer.from([0, 0]), body])
 const iso = (t) => Buffer.concat([Buffer.from([0]), Buffer.from(t, 'latin1')])
@@ -776,7 +776,7 @@ await check('a decode / network error from the element → error state with a re
 // ---- 5. multi-track audiobooks (Stage B1): track switching, races, errors ----
 console.log('5. multi-track: load, restore, switching, races, errors')
 const { randomUUID } = await import('node:crypto')
-const { chapterFileName } = await import('@reading-book/book-reader-sdk')
+const { chapterFileName } = await import('@core')
 const insertChapter = db.prepare(
   `INSERT INTO book_audio_chapters (id, book_id, position, title, file_name, source_path, file_format, size_bytes, sha256, duration_seconds)
    VALUES (?, ?, ?, ?, ?, ?, 'mp3', 10, ?, ?)`,
@@ -1233,7 +1233,7 @@ await check('single-file regression: one element, no tracks, no trackId in the s
 
 // ---- 6. Notes for multi-track audiobooks: add / list / edit / delete, jumps, fallback and races, limits ----
 console.log('6. multi-track Notes: add, list, edit, delete, jumps, fallback, races, limits')
-const { notesForTrack, noteMarkerFraction } = await import('@reading-book/book-reader-sdk')
+const { notesForTrack, noteMarkerFraction } = await import('@core')
 const rawState = (id) => JSON.parse(db.prepare('SELECT reading_state_json j FROM books WHERE id = ?').get(id).j)
 const mkNote = (id, trackId, positionSeconds, extra = {}) => ({ id, label: `L-${id}`, positionSeconds, createdAt: '2026-01-01T00:00:00Z', ...extra, trackId })
 /** A multi-track book seeded with Notes (`notes(ids)`), opened, track 0 loaded and PLAYING at `position`. Counters are cleared. */
@@ -1704,7 +1704,7 @@ await check('NOTES markers: only the current track\'s Notes, following track cha
 
 // ---- 7. Notes grouped by track (the multi-track Notes tab): rows, open / closed state, "add opens its row" ----
 console.log('7. Notes grouped by track')
-const { groupNotesByTrack } = await import('@reading-book/book-reader-sdk')
+const { groupNotesByTrack } = await import('@core')
 const { useNoteGroupsStore } = await import('../../../../screens/AudioBook/logic/audioNoteGroupsStore.ts')
 const GS = () => useNoteGroupsStore.getState()
 const G = () => groupNotesByTrack(S().notes, S().tracks)

@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import type { LibraryBook } from '@reading-book/book-reader-sdk'
+import type { LibraryBook } from '@core'
 import { BookMenuButton, LibraryBookInfoContent, type BookMenuPoint } from '../book'
 
 export type LibraryBookDetailPanelProps = {

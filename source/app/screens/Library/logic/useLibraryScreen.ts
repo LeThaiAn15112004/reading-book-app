@@ -8,7 +8,7 @@ import {
   useLibraryView,
   useZipImportStore,
 } from '../../../hooks/library/index.js'
-import { type LibraryBook } from '@reading-book/book-reader-sdk'
+import { type LibraryBook } from '@core'
 import { importApi, libraryApi } from '../../../bridge'
 import { useAppNav, useOpenReading, type AppStubNavId } from '../../../components/chrome'
 import type { BootLocationState } from '../../boot'

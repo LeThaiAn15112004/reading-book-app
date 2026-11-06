@@ -21,7 +21,7 @@ import {
   type ImportPlan,
   type RejectedAnnotation,
   type SaveHighlightInput,
-} from '@reading-book/book-reader-sdk'
+} from '@core'
 import type {
   AnnotationImportPreviewDto,
   AnnotationImportPreviewResult,

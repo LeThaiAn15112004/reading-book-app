@@ -9,7 +9,7 @@
  * | txt, md, docx, doc | no signature mechanism the app verifies  | always unsupported             |
  */
 
-import type { SignatureStatus } from '@reading-book/book-reader-sdk'
+import type { SignatureStatus } from '@core'
 import { verifyPdfSignatures } from './pdf-signatures.ts'
 
 export interface SignatureVerification {

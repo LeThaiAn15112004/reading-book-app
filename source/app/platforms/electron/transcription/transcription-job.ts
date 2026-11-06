@@ -1,4 +1,4 @@
-import type { TranscriptionErrorCode } from '@reading-book/book-reader-sdk'
+import type { TranscriptionErrorCode } from '@core'
 import type { WhisperLoadStage, WhisperSegment } from './whisper-engine'
 
 /**

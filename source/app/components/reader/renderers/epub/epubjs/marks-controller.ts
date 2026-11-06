@@ -4,7 +4,7 @@
  * `resized` listeners; `dispose()` detaches them.
  */
 import type { Rendition } from 'epubjs'
-import type { HighlightStyleKind } from '@reading-book/book-reader-sdk'
+import type { HighlightStyleKind } from '@core'
 import {
   epubAnnotationTypeFor,
   isLineMarkKind,

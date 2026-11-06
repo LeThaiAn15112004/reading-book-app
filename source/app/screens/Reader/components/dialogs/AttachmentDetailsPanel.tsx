@@ -1,6 +1,6 @@
 import { useRef } from 'react'
 import { createPortal } from 'react-dom'
-import { formatAttachmentSize } from '@reading-book/book-reader-sdk'
+import { formatAttachmentSize } from '@core'
 import type { PdfAttachmentPin } from '../../../../components/reader/renderers/pdf'
 import { useDismissOnOutsideOrEscape } from '../../logic'
 

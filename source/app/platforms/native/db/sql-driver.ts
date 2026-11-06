@@ -7,7 +7,7 @@
  * in the middle, so a store that must read before it writes does so before the batch, and relies on the bridge's
  * single write queue (T056) for ordering, as Desktop relies on its single Main process.
  */
-import type { SqlValue } from '@reading-book/book-reader-sdk'
+import type { SqlValue } from '@core'
 
 /** The core's `SqlValue`; the host takes `string | number | null` only, and `createHostSqlDriver` refuses the rest. */
 export type SqlParam = SqlValue

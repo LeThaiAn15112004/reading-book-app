@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useLinkedLibraries } from '../../../hooks/app/index.js'
-import type { ExternalCatalogEntry, ExternalLibraryProvider } from '@reading-book/book-reader-sdk'
+import type { ExternalCatalogEntry, ExternalLibraryProvider } from '@core'
 import { cloudApi } from '../../../bridge'
 
 /** Byte progress for the entry currently being downloaded (keyed by externalId). */

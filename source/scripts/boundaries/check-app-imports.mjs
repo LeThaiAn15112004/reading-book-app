@@ -60,7 +60,7 @@ export function checkAppImports({ app = appDir, desktop = desktopDir, mobile = m
         violations.push(violation('R8', file, line, specifier, 'Mobile host code imports no electron and no DOM library'))
       }
       const intoHostAdapters =
-        (target && isInside(target, hostAdapters)) || specifier.startsWith('@reading-book/book-reader-sdk/host-adapters')
+        (target && isInside(target, hostAdapters)) || specifier.startsWith('@core/host-adapters')
       if (intoHostAdapters) {
         violations.push(violation('R11', file, line, specifier, 'Mobile does not import electron/host-adapters (OD-7)'))
       }

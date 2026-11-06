@@ -6,7 +6,7 @@ import {
   clampInkWidth,
   isInkPenStyle,
   type InkPenStyle,
-} from '@reading-book/book-reader-sdk'
+} from '@core'
 
 /** Same key as Phase 1; the old `{ pen, tool }` shape is read as the Pen's settings. */
 const PREFS_STORAGE_KEY = 'readmate.pdfInkPrefs.v1'

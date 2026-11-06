@@ -10,7 +10,7 @@ import {
   type GlobalReadingPrefs,
   type ReaderTheme,
   type TextAlign,
-} from '@reading-book/book-reader-sdk'
+} from '@core'
 import {
   GlobalReadingPrefsProvider as SharedGlobalReadingPrefsProvider,
   useGlobalReadingPrefs,

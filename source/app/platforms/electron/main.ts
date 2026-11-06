@@ -1,7 +1,7 @@
 import { app, BrowserWindow, Menu, ipcMain, powerMonitor } from 'electron'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
-import { OAUTH_CUSTOM_SCHEME } from '@reading-book/config'
+import { OAUTH_CUSTOM_SCHEME } from '@core/config'
 import {
   registerCoverProtocol,
   registerCoverSchemePrivileged,

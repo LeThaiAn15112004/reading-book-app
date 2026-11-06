@@ -7,7 +7,7 @@
  */
 
 import ePubImport, { type Book, type Rendition } from 'epubjs'
-import type { ReaderTheme } from '@reading-book/book-reader-sdk'
+import type { ReaderTheme } from '@core'
 import {
   EPUB_VIEW_MANAGER,
   applyDualSpreadHost,

@@ -24,7 +24,7 @@ import {
   type MdAnnotation,
   type PdfAnnotation,
   type PdfInkRecord,
-} from '@reading-book/book-reader-sdk'
+} from '@core'
 import { BrowserWindow, app, dialog, ipcMain, type WebContents } from 'electron'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'

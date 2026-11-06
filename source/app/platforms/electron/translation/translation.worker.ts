@@ -12,7 +12,7 @@ import {
   createConsoleLogger,
   isSdkError,
   type TranslationLoadProgress,
-} from '@reading-book/book-reader-sdk'
+} from '@core'
 import { createTransformersTranslationEngineLoader } from '../host-adapters/translation'
 import type { TranslationErrorCode } from '../ipc/api-types'
 import type {

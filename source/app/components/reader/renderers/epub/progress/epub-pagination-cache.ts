@@ -9,7 +9,7 @@ import {
   buildPaginationCacheRecord,
   isUsablePaginationRecord,
   type EpubPaginationCacheRecord,
-} from '@reading-book/book-reader-sdk'
+} from '@core'
 
 export {
   buildLayoutFingerprint,
@@ -17,7 +17,7 @@ export {
   fingerprintEpubBytes,
   type EpubPaginationCacheKeyInput,
   type EpubPaginationCacheRecord,
-} from '@reading-book/book-reader-sdk'
+} from '@core'
 
 const DB_NAME = 'reading-book-epub-pagination'
 const DB_VERSION = 1

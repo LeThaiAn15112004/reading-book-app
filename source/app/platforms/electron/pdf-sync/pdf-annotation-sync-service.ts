@@ -23,7 +23,7 @@
  */
 import { createHash } from 'node:crypto'
 import fsp from 'node:fs/promises'
-import { hasFileWrites, type ScannedPdfAnnotation, type TwoWayPlan } from '@reading-book/book-reader-sdk'
+import { hasFileWrites, type ScannedPdfAnnotation, type TwoWayPlan } from '@core'
 import type { PdfAnnotationScanResult, ScannedPageAttachment } from './pdf-annotation-scan'
 import type { WriteBlockReason, WriteEligibility } from './pdf-write-eligibility'
 import { StableFileWatcher, sameSignature, statSignature, type FileSignature, type StableFileWatcherOptions } from './stable-file-watcher'

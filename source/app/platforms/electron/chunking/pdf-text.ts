@@ -12,7 +12,7 @@
  * "occurrence k of page n" lands on the same words in the renderer.
  */
 import fsp from 'node:fs/promises'
-import type { TextParagraph } from '@reading-book/book-reader-sdk'
+import type { TextParagraph } from '@core'
 
 type PdfTextItem = { str?: string; hasEOL?: boolean }
 

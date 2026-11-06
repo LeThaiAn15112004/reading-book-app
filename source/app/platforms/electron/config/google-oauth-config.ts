@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url'
 import {
   parseGoogleOAuthClientConfig,
   type GoogleOAuthClientConfig,
-} from '@reading-book/config'
+} from '@core/config'
 
 const CLIENT_SECRET_FILE_PATTERN = /^client_secret_.*\.json$/
 const __dirname = path.dirname(fileURLToPath(import.meta.url))

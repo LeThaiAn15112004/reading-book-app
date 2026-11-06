@@ -4,14 +4,14 @@ import {
   useState,
   type MutableRefObject,
 } from 'react'
-import { CfiLocation, isMarkupTool } from '@reading-book/book-reader-sdk'
+import { CfiLocation, isMarkupTool } from '@core'
 import type {
   FontFamily,
   FontWeight,
   InteractionTool,
   ReaderTheme,
   TextAlign,
-} from '@reading-book/book-reader-sdk'
+} from '@core'
 import {
   openEpubjs,
 } from './openEpubjs'

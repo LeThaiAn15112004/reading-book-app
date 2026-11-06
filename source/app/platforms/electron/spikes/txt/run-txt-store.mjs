@@ -21,7 +21,7 @@ import {
   deriveTextEdit,
   packTxtAnnotationRef,
   packTxtHighlightLocator,
-} from '@reading-book/book-reader-sdk'
+} from '@core'
 import { getDatabase } from '../pdf-annotations/db-stub.mjs'
 
 const { getOverlayStore } = await import('../../persistence/sqlite-overlay-store.ts')

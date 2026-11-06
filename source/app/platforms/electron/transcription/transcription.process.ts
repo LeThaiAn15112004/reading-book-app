@@ -9,7 +9,7 @@
  * down with a native exception; a process can simply be killed. Requests are served one at a time, in order; the
  * resident model is freed after a quiet period (the host also kills an idle process).
  */
-import { createConsoleLogger } from '@reading-book/book-reader-sdk'
+import { createConsoleLogger } from '@core'
 import { ModelError } from './model-manager'
 import type { SpeechMessage, SpeechProcessData, SpeechRequest } from './transcription-job'
 import { createWhisperEngine } from './whisper-engine'

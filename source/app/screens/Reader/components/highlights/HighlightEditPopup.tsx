@@ -1,5 +1,5 @@
 import { type ReactNode, useLayoutEffect, useRef, useState } from 'react'
-import { HIGHLIGHT_TAG_PRESETS, type ReaderHighlightBase } from '@reading-book/book-reader-sdk'
+import { HIGHLIGHT_TAG_PRESETS, type ReaderHighlightBase } from '@core'
 import type { ViewportRectLike } from '../../../../components/reader/renderers/epub'
 import {
   highlightPopoverPosition,

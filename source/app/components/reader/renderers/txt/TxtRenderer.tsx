@@ -19,7 +19,7 @@ import {
   type TxtReaderHighlight,
   type TxtSelection,
   type MarkupInteractionTool,
-} from '@reading-book/book-reader-sdk'
+} from '@core'
 import {
   boxForOffsets,
   lineTopAt,

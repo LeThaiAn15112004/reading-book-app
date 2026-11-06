@@ -1,4 +1,4 @@
-import { resolveFormatFromExtension } from '@reading-book/config'
+import { resolveFormatFromExtension } from '@core/config'
 import { app } from 'electron'
 import { randomUUID } from 'node:crypto'
 import fs from 'node:fs'

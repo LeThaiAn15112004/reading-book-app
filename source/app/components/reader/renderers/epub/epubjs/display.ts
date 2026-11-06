@@ -3,7 +3,7 @@
  * and the first-paint retry used while the reader host is still laying out.
  */
 import type { Book, Rendition } from 'epubjs'
-import { spineIndexFromCfiPath } from '@reading-book/book-reader-sdk'
+import { spineIndexFromCfiPath } from '@core'
 import {
   isTrivialSectionStartCfi,
   resolveCfiRange,

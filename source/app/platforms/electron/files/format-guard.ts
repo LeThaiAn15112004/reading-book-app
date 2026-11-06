@@ -2,8 +2,8 @@ import {
   isSupportedExtension,
   resolveFormatFromExtension,
   SUPPORTED_FORMATS,
-} from '@reading-book/config'
-import { audioFormatFromExtension, type DocumentFormat } from '@reading-book/book-reader-sdk'
+} from '@core/config'
+import { audioFormatFromExtension, type DocumentFormat } from '@core'
 import path from 'node:path'
 
 /** Stable code mapped to ImportErrorCode.unsupported_format. */

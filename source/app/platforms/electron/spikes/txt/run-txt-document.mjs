@@ -36,7 +36,7 @@ import {
   txtHighlightToWire,
   txtReadingLocation,
   resolveTxtReadingOffset,
-} from '@reading-book/book-reader-sdk'
+} from '@core'
 import { invoke } from '../pdf-annotations/electron-stub.mjs'
 import { getDatabase } from '../pdf-annotations/db-stub.mjs'
 

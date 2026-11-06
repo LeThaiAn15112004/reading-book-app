@@ -9,7 +9,7 @@ import {
   type HighlightAction,
   readmateAttachmentId,
   type PdfReaderHighlight,
-} from '@reading-book/book-reader-sdk'
+} from '@core'
 import { attachmentsApi } from '../../../../bridge/attachments'
 import { overlayApi } from '../../../../bridge/overlay'
 import type { PdfAttachmentPin } from '../../../../components/reader/renderers/pdf'

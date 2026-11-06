@@ -77,7 +77,7 @@ export function splitCfiComponents(cfi: string): string[] {
   return parts.map((p) => p.trim()).filter(Boolean)
 }
 
-export { cfiChapterSignature } from '@reading-book/book-reader-sdk'
+export { cfiChapterSignature } from '@core'
 
 function parseCfiStep(token: string): CfiStep | null {
   const num = Number.parseInt(token, 10)

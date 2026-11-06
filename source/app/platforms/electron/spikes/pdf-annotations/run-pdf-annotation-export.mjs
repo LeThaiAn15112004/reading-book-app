@@ -35,7 +35,7 @@ import {
   embeddedAnnotationSourceHash,
   highlightContentHash,
   highlightFromEmbeddedAnnotation,
-} from '@reading-book/book-reader-sdk'
+} from '@core'
 import { SAMPLE_ANNOTATIONS, appendIncrementalUpdate, buildAnnotatedPdf } from '../../e2e/support/build-annotated-pdf.mjs'
 
 const { writeAnnotationsToPdf } = await import('../../pdf-sync/pdf-annotation-write.ts')
@@ -317,7 +317,7 @@ await check('9. export flow: confirmation, refused targets, safe overwrite, writ
 })
 
 await check('10. Typewriter notes are exported with the same writer; one that cannot be drawn is left out and counted, the rest is exported', async () => {
-  const sdk = await import('@reading-book/book-reader-sdk')
+  const sdk = await import('@core')
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'readmate-export-tw-'))
   const sourcePath = path.join(dir, 'book.pdf')
   fs.writeFileSync(sourcePath, plainSource)

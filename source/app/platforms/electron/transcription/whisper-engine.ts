@@ -1,5 +1,5 @@
 import path from 'node:path'
-import { normalisePassageText } from '@reading-book/book-reader-sdk'
+import { normalisePassageText } from '@core'
 import { ModelError, createModelManager, type ModelManager } from './model-manager'
 import { findTranscriptionModel } from './transcription-models'
 

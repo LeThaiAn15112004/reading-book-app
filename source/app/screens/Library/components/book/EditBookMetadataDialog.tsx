@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react'
-import type { LibraryBook } from '@reading-book/book-reader-sdk'
+import type { LibraryBook } from '@core'
 
 export type BookMetadataValues = {
   id: string

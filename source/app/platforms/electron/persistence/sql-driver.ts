@@ -1,5 +1,5 @@
 import type { Database as SqliteDatabase, Statement as SqliteStatement } from 'better-sqlite3'
-import type { SqlValue, Statement, SyncSqlDriver } from '@reading-book/book-reader-sdk'
+import type { SqlValue, Statement, SyncSqlDriver } from '@core'
 
 /**
  * `SyncSqlDriver` (core port, spec 009 contracts/sql-drivers.md) over the app's one better-sqlite3 connection.

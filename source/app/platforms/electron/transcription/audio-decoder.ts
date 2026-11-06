@@ -2,7 +2,7 @@ import { spawn, type ChildProcess } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import fs from 'node:fs'
 import path from 'node:path'
-import type { TranscriptionErrorCode } from '@reading-book/book-reader-sdk'
+import type { TranscriptionErrorCode } from '@core'
 import {
   FFMPEG_ARTIFACTS,
   ffmpegArtifactKey,

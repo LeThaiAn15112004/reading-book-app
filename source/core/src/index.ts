@@ -1,5 +1,5 @@
 /**
- * @reading-book/book-reader-sdk — public API.
+ * @core — public API.
  *
  * Everything here is platform-agnostic: no `fs`, no SQLite driver, no DOM, no React, no
  * Electron. The host injects I/O through `createBookReaderSdk({ adapters })`.

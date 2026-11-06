@@ -8,7 +8,7 @@
  * of the text from the start of that piece to the point (`Range#toString`, i.e. the piece's text nodes
  * in document order). Font, width, theme and zoom never change it.
  */
-import { compareMdPoints, mdQuoteMatches, type HighlightStyleKind, type MdPoint } from '@reading-book/book-reader-sdk'
+import { compareMdPoints, mdQuoteMatches, type HighlightStyleKind, type MdPoint } from '@core'
 
 /** Attribute on each rendered piece. */
 export const MD_SEG_ATTR = 'data-md-seg'

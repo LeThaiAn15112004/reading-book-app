@@ -1,4 +1,4 @@
-import type { MarkupInteractionTool } from '@reading-book/book-reader-sdk'
+import type { MarkupInteractionTool } from '@core'
 
 const DONE: Record<MarkupInteractionTool, string> = {
   highlight: 'Highlighted',

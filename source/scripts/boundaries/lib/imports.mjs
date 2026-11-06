@@ -122,8 +122,7 @@ export function packageName(spec) {
 /** Workspace aliases shared by Desktop and Mobile (`tsconfig.json` paths, `vite.config.ts` aliases). */
 export const WORKSPACE_ALIASES = {
   '@app': appDir,
-  '@reading-book/config': configDir,
-  '@reading-book/book-reader-sdk': sdkDir,
+  '@core': path.join(coreDir, 'src'),
 }
 
 /** Target path of a relative or workspace-alias specifier, without touching node_modules; null for packages. */
@@ -131,7 +130,7 @@ export function targetPath(fromFile, spec) {
   const clean = spec.split('?')[0]
   if (isRelative(clean)) return path.resolve(path.dirname(fromFile), clean)
   for (const [alias, dir] of Object.entries(WORKSPACE_ALIASES)) {
-    if (clean === alias) return alias === '@reading-book/book-reader-sdk' ? path.join(sdkDir, 'src/index.ts') : path.join(dir, 'index.ts')
+    if (clean === alias) return alias === '@core' ? path.join(dir, 'index.ts') : dir
     if (clean.startsWith(`${alias}/`)) return path.join(dir, clean.slice(alias.length + 1))
   }
   return null

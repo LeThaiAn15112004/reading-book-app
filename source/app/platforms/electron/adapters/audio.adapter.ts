@@ -1,5 +1,5 @@
-import type { DocumentFormat, DocumentImporter, ImportResult } from '@reading-book/book-reader-sdk'
-import { audioFormatFromExtension } from '@reading-book/book-reader-sdk'
+import type { DocumentFormat, DocumentImporter, ImportResult } from '@core'
+import { audioFormatFromExtension } from '@core'
 import { parseFile, type IAudioMetadata } from 'music-metadata'
 import { randomUUID } from 'node:crypto'
 import fsp from 'node:fs/promises'

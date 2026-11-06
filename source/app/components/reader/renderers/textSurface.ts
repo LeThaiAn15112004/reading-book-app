@@ -1,4 +1,4 @@
-import type { Location } from '@reading-book/book-reader-sdk'
+import type { Location } from '@core'
 
 /**
  * What the Reader shell needs from a continuous-text surface (TXT, Markdown): scroll progress,

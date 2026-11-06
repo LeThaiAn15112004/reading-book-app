@@ -9,7 +9,7 @@
  * behind. Metadata is read in the WebView: EPUB through the SDK's OPF reader, everything else from the file name.
  * Covers are not made here: the Library renders one for each book that has none (`generateBookCover.ts`).
  */
-import { Book, parseDocumentFormat, readEpubImportMetadata, type ArchiveReader, type DocumentFormat } from '@reading-book/book-reader-sdk'
+import { Book, parseDocumentFormat, readEpubImportMetadata, type ArchiveReader, type DocumentFormat } from '@core'
 import JSZip from 'jszip'
 import type { PickResult } from '../host/file-service'
 import type { ImportProgressPayload } from '../host/protocol'

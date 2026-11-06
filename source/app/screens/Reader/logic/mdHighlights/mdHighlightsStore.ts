@@ -20,7 +20,7 @@ import {
   type MarkupInteractionTool,
   type MdPoint,
   type MdReaderHighlight,
-} from '@reading-book/book-reader-sdk'
+} from '@core'
 import { overlayApi } from '../../../../bridge'
 import type { MdInsertionInfo, MdRendererApi, MdSelectionInfo } from '../../../../components/reader/renderers/md'
 

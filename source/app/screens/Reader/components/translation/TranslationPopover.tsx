@@ -1,5 +1,5 @@
 import { useCallback, useLayoutEffect, useRef } from 'react'
-import { findTranslationLanguage } from '@reading-book/book-reader-sdk'
+import { findTranslationLanguage } from '@core'
 import { useDismissOnOutsideOrEscape, type DismissReason } from '../../logic/highlights/useDismissOnOutsideOrEscape'
 import { useDraggableTranslationPanel } from '../../logic/translation/useDraggableTranslationPanel'
 import { useResizableTranslationPanel } from '../../logic/translation/useResizableTranslationPanel'

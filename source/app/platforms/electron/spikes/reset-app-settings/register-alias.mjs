@@ -1,7 +1,7 @@
 /**
  * Node resolve hook for the Reset App Settings checks: lets plain `node --experimental-strip-types`
  * load the renderer stores without Vite —
- *   - `@reading-book/book-reader-sdk` → a small stub (only the reading-prefs helpers are needed);
+ *   - `@core` → a small stub (only the reading-prefs helpers are needed);
  *   - extensionless relative imports (`./appAppearance`) → the `.ts` file next to the importer.
  */
 import { register } from 'node:module'
@@ -14,7 +14,7 @@ register(
       import { existsSync } from 'node:fs'
       import { fileURLToPath } from 'node:url'
       export async function resolve(specifier, context, next) {
-        if (specifier === '@reading-book/book-reader-sdk') {
+        if (specifier === '@core') {
           return { url: ${JSON.stringify(sdkStub)}, shortCircuit: true }
         }
         if (

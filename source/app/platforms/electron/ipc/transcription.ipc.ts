@@ -1,7 +1,7 @@
 import fsp from 'node:fs/promises'
 import path from 'node:path'
 import { app, BrowserWindow, dialog, ipcMain } from 'electron'
-import { transcriptExportFileName } from '@reading-book/book-reader-sdk'
+import { transcriptExportFileName } from '@core'
 import { isPathInsideUserData } from '../files/sandbox'
 import { getLibraryStore } from '../persistence/sqlite-library-store'
 import { exportTranscriptToFile } from '../transcription/transcript-export-file'

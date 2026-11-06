@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { PDF_SHAPE_DEFAULT_STROKE, clampShapeStroke, isPdfShapeKind, type PdfShapeKind } from '@reading-book/book-reader-sdk'
+import { PDF_SHAPE_DEFAULT_STROKE, clampShapeStroke, isPdfShapeKind, type PdfShapeKind } from '@core'
 
 const PREFS_STORAGE_KEY = 'readmate.pdfShapePrefs.v1'
 

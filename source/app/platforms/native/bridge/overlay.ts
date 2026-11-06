@@ -4,7 +4,7 @@
  * release, and on Desktop TXT rows are written only by `txt:commit`). A rejected save resolves to `null`, as on
  * Desktop. PDF ink and the PDF file sync do not exist on Mobile: their reads are safe empty results.
  */
-import { parseMdAnnotationRef, parsePdfAnnotationRef, type MdAnnotation, type PdfAnnotation } from '@reading-book/book-reader-sdk'
+import { parseMdAnnotationRef, parsePdfAnnotationRef, type MdAnnotation, type PdfAnnotation } from '@core'
 import { MOBILE_WRITABLE_STYLE_KINDS } from '../stores/overlay-store'
 import { idOf, type BridgeContext } from './context'
 import { parseLocatorRef, parseSelectionTextRef, toBookmarkDto, toHighlightDto, toSessionDto } from './dto'

@@ -17,7 +17,7 @@ import {
   type NoteLocator,
   type PdfAnnotation,
   type SaveHighlightInput,
-} from '@reading-book/book-reader-sdk'
+} from '@core'
 import type { AttachmentVerifyExpectation, AttachmentVerifyResult, PdfAnnotationScanResult } from './pdf-annotation-scan'
 import { AttachmentVerifyError, StagedContentChangedError, TargetChangedError, stageAttachmentSource, writeAttachmentChange, writeAttachmentUpdate } from './pdf-attachment-writer'
 import {

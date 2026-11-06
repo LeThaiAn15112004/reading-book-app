@@ -1,10 +1,8 @@
 {
   "compilerOptions": {
     "paths": {
-      "@reading-book/config": ["../../../../core/src/config/index.ts"],
-      "@reading-book/config/*": ["../../../core/src/config/*"],
-      "@reading-book/book-reader-sdk": ["../../../../core/src/index.ts"],
-      "@reading-book/book-reader-sdk/*": ["../../../core/src/*"]
+      "@core": ["../../../../core/src/index.ts"],
+      "@core/*": ["../../../../core/src/*"]
     },
     "target": "ES2022",
     "lib": ["ES2022", "DOM"],

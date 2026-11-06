@@ -1,5 +1,5 @@
 import { app, BrowserWindow, clipboard, ipcMain, shell } from 'electron'
-import { isSafeExternalUrl } from '@reading-book/book-reader-sdk'
+import { isSafeExternalUrl } from '@core'
 import type {
   AppInfo,
   GoogleOAuthClientConfigDto,

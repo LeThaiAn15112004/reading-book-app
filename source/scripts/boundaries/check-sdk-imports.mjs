@@ -16,7 +16,7 @@ export function checkSdkImports({ srcDir = path.join(sdkDir, 'src') } = {}) {
         if (!isInside(target, srcDir)) {
           violations.push(violation('R3', file, line, specifier, 'a relative import leaves SDK src (the SDK never imports an app, config or host-adapters)'))
         }
-      } else if (specifier.startsWith('@reading-book/')) {
+      } else if (specifier.startsWith('@core')) {
         violations.push(violation('R3', file, line, specifier, 'the SDK never imports config or an app (config already depends on the SDK)'))
       } else if (!SDK_ALLOWED_PACKAGES.includes(specifier)) {
         violations.push(violation('R2', file, line, specifier, `SDK src may import only ${SDK_ALLOWED_PACKAGES.join(', ')} and relative paths`))

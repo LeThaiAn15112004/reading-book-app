@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import { matchesSearch, type LibraryBook } from '@reading-book/book-reader-sdk'
+import { matchesSearch, type LibraryBook } from '@core'
 import {
   countLibraryFilters,
   filterLibraryBooks,

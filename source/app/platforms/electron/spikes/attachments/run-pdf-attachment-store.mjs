@@ -38,7 +38,7 @@ const { scanPdfAnnotationBytes, verifyPdfAttachmentBytes } = await import('../..
 const { planAttachmentAppend, appendAttachmentChange } = await import('../../pdf-sync/pdf-incremental-writer.ts')
 const { checkPdfWritable } = await import('../../pdf-sync/pdf-write-eligibility.ts')
 const { createPdfAttachment, changePdfAttachment } = await import('../../pdf-sync/pdf-attachment-operations.ts')
-const { ATTACHMENT_MAX_BYTES } = await import('@reading-book/book-reader-sdk')
+const { ATTACHMENT_MAX_BYTES } = await import('@core')
 
 let passed = 0
 async function check(name, fn) {

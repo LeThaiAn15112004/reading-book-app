@@ -30,7 +30,7 @@ import {
   type TxtReaderHighlight,
   type TxtSelection,
   type TxtStepResult,
-} from '@reading-book/book-reader-sdk'
+} from '@core'
 import { txtApi, type TxtOpenResult } from '../../../../bridge'
 import type {
   ClientBox,

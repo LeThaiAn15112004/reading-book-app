@@ -1,5 +1,5 @@
 import { useId } from 'react'
-import { trackDurationLabel } from '@reading-book/book-reader-sdk'
+import { trackDurationLabel } from '@core'
 import { useZipImportStore, zipJobDetail, type ZipImportJob } from '../../hooks/library'
 import { SpinnerIcon } from './SpinnerIcon'
 

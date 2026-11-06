@@ -16,7 +16,7 @@ import {
   toFts5MatchExpression,
   type TextMatch,
   type TextSearchQuery,
-} from '@reading-book/book-reader-sdk'
+} from '@core'
 
 export interface BookChunkStats {
   chunkCount: number

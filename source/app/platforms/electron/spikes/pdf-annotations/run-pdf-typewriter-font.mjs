@@ -29,7 +29,7 @@ import {
   applyStyle,
   layoutTypewriter,
   typewriterFontFaces,
-} from '@reading-book/book-reader-sdk'
+} from '@core'
 
 const { parseTrueType } = await import('../../pdf-sync/pdf-font-embed.ts')
 const { loadTypewriterFace, typewriterFontMetrics, typewriterFontsDir } = await import('../../pdf-sync/typewriter-font-files.ts')

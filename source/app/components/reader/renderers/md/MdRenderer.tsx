@@ -20,8 +20,8 @@ import {
   collectMdReferenceDefinitions,
   findHeadingForAnchor,
   splitMdSource,
-} from '@reading-book/book-reader-sdk'
-import { mdReadingLocation, type MarkupInteractionTool, type MdHeadingInfo, type MdPoint } from '@reading-book/book-reader-sdk'
+} from '@core'
+import { mdReadingLocation, type MarkupInteractionTool, type MdHeadingInfo, type MdPoint } from '@core'
 import type { TextSurfaceApi } from '../textSurface'
 import {
   boxOfRange,

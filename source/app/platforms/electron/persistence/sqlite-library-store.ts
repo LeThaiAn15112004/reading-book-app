@@ -19,7 +19,7 @@ import {
   type LibraryStore,
   type ReadingStateJson,
   type SyncSqlDriver,
-} from '@reading-book/book-reader-sdk'
+} from '@core'
 import type { Database as SqliteDatabase } from 'better-sqlite3'
 import { randomUUID } from 'node:crypto'
 import path from 'node:path'

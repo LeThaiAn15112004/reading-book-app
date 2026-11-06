@@ -4,7 +4,7 @@ import {
   findTranslationLanguage,
   searchTranslationLanguages,
   type TranslationLanguage,
-} from '@reading-book/book-reader-sdk'
+} from '@core'
 
 type LanguageComboboxProps = {
   /** Accessible name, e.g. "Translate from". */

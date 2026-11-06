@@ -1,4 +1,4 @@
-import { isAudioFormat } from '@reading-book/book-reader-sdk'
+import { isAudioFormat } from '@core'
 import { ipcMain } from 'electron'
 import { readAudioChapters } from '../audio/audio-chapters'
 import { resolveBookFile } from '../files/sandbox'

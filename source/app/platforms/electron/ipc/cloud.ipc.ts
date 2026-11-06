@@ -26,7 +26,7 @@ import {
   GOOGLE_OAUTH_LOOPBACK_REDIRECT_URI,
   OAUTH_REDIRECT_URI,
   isSupportedExtension,
-} from '@reading-book/config'
+} from '@core/config'
 import { loadDropboxOAuthCredentials, loadOneDriveOAuthCredentials } from '../config/cloud-oauth-config'
 import { loadGoogleOAuthCredentials } from '../config/google-oauth-config'
 import { sanitizeFilename } from '../files/metadata-filename'

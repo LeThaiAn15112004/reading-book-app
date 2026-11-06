@@ -3,7 +3,7 @@
  * revisions and `editable` is always false. The text is decoded exactly as Desktop's Main does (`txt-codec.ts`, which
  * lives in Electron Main and cannot be imported: R7); highlights are the book's stored rows.
  */
-import { TXT_MAX_FILE_BYTES, detectTxtBom, normalizeTxtText } from '@reading-book/book-reader-sdk'
+import { TXT_MAX_FILE_BYTES, detectTxtBom, normalizeTxtText } from '@core'
 import { idOf, type BridgeContext } from './context'
 import { toHighlightDto } from './dto'
 import { HostCallError } from './host-client'

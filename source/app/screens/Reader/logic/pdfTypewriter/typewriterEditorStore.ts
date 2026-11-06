@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { emptyTypewriterDoc, applyAlign, applyStyle, familyHasItalic, type PdfTypewriterDoc, type TypewriterAlign, type TypewriterTextStyle } from '@reading-book/book-reader-sdk'
+import { emptyTypewriterDoc, applyAlign, applyStyle, familyHasItalic, type PdfTypewriterDoc, type TypewriterAlign, type TypewriterTextStyle } from '@core'
 import type { TypewriterFlag } from '../../../../components/reader/renderers/pdf/PdfTypewriterEditor'
 import { typewriterFormatValues } from './typewriterFormatValues'
 

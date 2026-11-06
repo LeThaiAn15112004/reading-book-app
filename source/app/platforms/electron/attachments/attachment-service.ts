@@ -18,7 +18,7 @@ import {
   isAttachmentId,
   sanitizeAttachmentFileName,
   type BookAttachment,
-} from '@reading-book/book-reader-sdk'
+} from '@core'
 import type { PdfAttachmentExtractResult, PdfAttachmentListResult } from './pdf-attachments'
 
 export type AttachmentErrorCode =

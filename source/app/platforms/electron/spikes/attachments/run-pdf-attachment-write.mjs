@@ -32,7 +32,7 @@ import { createHash, randomBytes } from 'node:crypto'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import { planTwoWaySync } from '@reading-book/book-reader-sdk'
+import { planTwoWaySync } from '@core'
 import { getDatabase } from '../pdf-annotations/db-stub.mjs'
 import { buildAnnotatedPdf, lineQuads } from '../../e2e/support/build-annotated-pdf.mjs'
 import { buildPdf } from './pdf-fixtures.mjs'
@@ -313,7 +313,7 @@ await check('12. opening and syncing after attaching: no duplicate rows, rows li
 
 // ---- 2 / 5. size limit and refusals (US4)
 {
-  const { ATTACHMENT_MAX_BYTES, ATTACH_COMBINED_MAX_BYTES, describeAttachFailure } = await import('@reading-book/book-reader-sdk')
+  const { ATTACHMENT_MAX_BYTES, ATTACH_COMBINED_MAX_BYTES, describeAttachFailure } = await import('@core')
   const { stageAttachmentSource } = await import('../../pdf-sync/pdf-attachment-writer.ts')
   /** Every read stream opened while `fn` runs (the staging reads the source through `fs.createReadStream`). */
   const realCreateReadStream = fs.createReadStream

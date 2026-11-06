@@ -14,7 +14,7 @@
  */
 import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
-import { Book, audiobookParentSha256, chapterFileName } from '@reading-book/book-reader-sdk'
+import { Book, audiobookParentSha256, chapterFileName } from '@core'
 import { createMigratedDatabase } from '../pdf-annotations/db-stub.mjs'
 
 const { SqliteLibraryStore } = await import('../../persistence/sqlite-library-store.ts')

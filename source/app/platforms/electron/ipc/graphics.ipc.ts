@@ -1,6 +1,6 @@
 import fsp from 'node:fs/promises'
 import { ipcMain } from 'electron'
-import { parsePdfGraphicOp } from '@reading-book/book-reader-sdk'
+import { parsePdfGraphicOp } from '@core'
 import { bookFileStorage, resolveBookFile } from '../files/sandbox'
 import { writeFileSafely } from '../pdf-sync/pdf-annotation-export'
 import { sha256Hex } from '../pdf-sync/pdf-annotation-sync-service'

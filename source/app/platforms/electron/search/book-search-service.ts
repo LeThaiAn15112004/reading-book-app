@@ -1,4 +1,4 @@
-import { parseTextSearchQuery, toFts5MatchExpression } from '@reading-book/book-reader-sdk'
+import { parseTextSearchQuery, toFts5MatchExpression } from '@core'
 import { ensureBookChunks } from '../chunking/book-chunk-service'
 import type {
   BookSearchMatchDto,

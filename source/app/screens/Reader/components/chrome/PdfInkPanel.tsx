@@ -1,4 +1,4 @@
-import type { InkPenStyle } from '@reading-book/book-reader-sdk'
+import type { InkPenStyle } from '@core'
 import type { PdfInkMark } from '../../logic/pdfInk/pdfInkStore'
 import { InkStyleControls } from './InkStyleControls'
 

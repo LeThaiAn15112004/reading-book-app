@@ -3,7 +3,7 @@ import {
   CfiLocation,
   type ReaderTheme,
   type TextMatcher,
-} from '@reading-book/book-reader-sdk'
+} from '@core'
 import { cfiCodec, tryEncodeCfi, type EpubCfiDecodeResult } from './cfi/cfi-codec'
 import {
   installEpubjsStartContainerLogFilter,

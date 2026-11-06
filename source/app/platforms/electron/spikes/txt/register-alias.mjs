@@ -3,7 +3,7 @@
  * no Vite). Same job as spikes/pdf-annotations/register-alias.mjs, plus:
  *   - a bare directory import (`'../../../../bridge'`) → its `index.ts`, because the renderer store
  *     imports the IPC bridge that way.
- * `@reading-book/book-reader-sdk` → the SDK source; `electron` → the recording stub;
+ * `@core` → the SDK source; `electron` → the recording stub;
  * `electron/persistence/db.ts` → the node:sqlite stand-in on the real migrations.
  */
 import { register } from 'node:module'
@@ -27,8 +27,8 @@ register(
         return next(url, context)
       }
       export async function resolve(specifier, context, next) {
-        if (specifier === '@reading-book/book-reader-sdk') return { url: ${JSON.stringify(sdk)}, shortCircuit: true }
-        if (specifier === '@reading-book/config') return { url: ${JSON.stringify(config)}, shortCircuit: true }
+        if (specifier === '@core') return { url: ${JSON.stringify(sdk)}, shortCircuit: true }
+        if (specifier === '@core/config') return { url: ${JSON.stringify(config)}, shortCircuit: true }
         if (specifier === 'electron') return { url: ${JSON.stringify(electronStub)}, shortCircuit: true }
         if (
           (specifier.startsWith('./') || specifier.startsWith('../')) &&
@@ -46,7 +46,7 @@ register(
           const index = new URL(specifier + '/index.ts', context.parentURL)
           if (existsSync(fileURLToPath(index))) return { url: index.href, shortCircuit: true }
         }
-        // TS sources importing siblings as \`./x.js\` (e.g. @reading-book/config) → the \`.ts\` file.
+        // TS sources importing siblings as \`./x.js\` (e.g. @core/config) → the \`.ts\` file.
         if (
           (specifier.startsWith('./') || specifier.startsWith('../')) &&
           specifier.endsWith('.js') &&

@@ -1,4 +1,4 @@
-import type { ReadingViewMode } from '@reading-book/book-reader-sdk'
+import type { ReadingViewMode } from '@core'
 
 /** Layout constants for SCR-03 reader chrome (tools bar + footer). */
 

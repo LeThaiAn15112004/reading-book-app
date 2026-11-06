@@ -1,6 +1,6 @@
-import type { DocumentFormat, DocumentImporter, ImportResult } from '@reading-book/book-reader-sdk'
+import type { DocumentFormat, DocumentImporter, ImportResult } from '@core'
 import path from 'node:path'
-import { resolveFormatFromExtension } from '@reading-book/config'
+import { resolveFormatFromExtension } from '@core/config'
 import { hashFile } from '../files/file-hash'
 import { titleFromFilename } from '../files/metadata-filename'
 

@@ -24,7 +24,7 @@ import {
   type InteractionTool,
   type MdHeadingInfo,
   type ReaderHighlightBase,
-} from '@reading-book/book-reader-sdk'
+} from '@core'
 import { useAppTitle, useGlobalReadingPrefs, useOpenReading } from '../../../components/chrome'
 import { EpubRenderer, type EpubRendererApi, type EpubTocItem } from '../../../components/reader/renderers/epub'
 import { PdfRenderer, type PdfRendererApi } from '../../../components/reader/renderers/pdf'

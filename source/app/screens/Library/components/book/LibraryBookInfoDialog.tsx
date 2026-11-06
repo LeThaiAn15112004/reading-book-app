@@ -1,4 +1,4 @@
-import { formatFileSizeMb } from '@reading-book/book-reader-sdk'
+import { formatFileSizeMb } from '@core'
 import { BookCover } from './BookCover'
 
 export type LibraryBookInfoFields = {

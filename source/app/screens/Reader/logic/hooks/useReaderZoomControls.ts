@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type RefObject } from 'react'
 import { useShortcutAction } from '../../../../shortcuts'
-import type { InteractionTool } from '@reading-book/book-reader-sdk'
+import type { InteractionTool } from '@core'
 import type { ReaderZoomViewportHandle } from '../../components'
 import {
   ZOOM_DEFAULT,

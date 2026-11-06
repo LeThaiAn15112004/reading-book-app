@@ -1,7 +1,7 @@
 import fsp from 'node:fs/promises'
 import type { DocumentFormatDto } from '../ipc/api-types'
 import { readEpubSpineDocuments } from '../adapters/epub.adapter'
-import { htmlToParagraphs, type TextParagraph } from '@reading-book/book-reader-sdk'
+import { htmlToParagraphs, type TextParagraph } from '@core'
 import { pdfParagraphs } from './pdf-text'
 import { decodeTxtBytes } from '../txt/txt-codec'
 

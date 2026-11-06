@@ -15,7 +15,7 @@
  * Run: npm run spike:pdf:typewriter   (builds the SDK bundle first)
  */
 import assert from 'node:assert/strict'
-import { emptyTypewriterDoc, packPdfHighlightLocator, pdfHighlightDtoToReaderHighlight } from '@reading-book/book-reader-sdk'
+import { emptyTypewriterDoc, packPdfHighlightLocator, pdfHighlightDtoToReaderHighlight } from '@core'
 import { invoke } from './electron-stub.mjs'
 import { getDatabase } from './db-stub.mjs'
 
@@ -113,7 +113,7 @@ await check('refused: a document on a row that is not a Typewriter note', async 
 })
 
 console.log('4. file (T-11 / T-12): the real SDK plan + incremental writer + read-back through pdf.js')
-const sdk = await import('@reading-book/book-reader-sdk')
+const sdk = await import('@core')
 const { writeAnnotationsToPdf } = await import('../../pdf-sync/pdf-annotation-write.ts')
 const { PdfWriteError } = await import('../../pdf-sync/pdf-incremental-writer.ts')
 const { buildAnnotatedPdf } = await import('../../e2e/support/build-annotated-pdf.mjs')

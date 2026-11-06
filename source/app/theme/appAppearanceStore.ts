@@ -2,7 +2,7 @@ import { create } from 'zustand'
 import {
   GLOBAL_READING_PREFS_STORAGE_KEY,
   parseGlobalReadingPrefsJson,
-} from '@reading-book/book-reader-sdk'
+} from '@core'
 import {
   applyAppearanceAttributes,
   DEFAULT_APP_APPEARANCE,

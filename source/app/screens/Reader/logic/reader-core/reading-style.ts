@@ -4,7 +4,7 @@
  * unchanged, for both Readers.
  */
 import type { CSSProperties } from 'react'
-import { fontFamilyCss, type FontFamily } from '@reading-book/book-reader-sdk'
+import { fontFamilyCss, type FontFamily } from '@core'
 
 export interface ReadingStyleInput {
   fontSize: number

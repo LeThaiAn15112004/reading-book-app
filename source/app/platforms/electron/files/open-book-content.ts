@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto'
 import fsp from 'node:fs/promises'
-import { checkMdFileSize, describeMdTooLarge, isAudioFormat } from '@reading-book/book-reader-sdk'
+import { checkMdFileSize, describeMdTooLarge, isAudioFormat } from '@core'
 import { getLibraryStore } from '../persistence/sqlite-library-store'
 import type {
   DocumentFormatDto,

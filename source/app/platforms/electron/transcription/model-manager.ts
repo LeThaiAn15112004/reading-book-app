@@ -3,7 +3,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { Readable, Transform, type TransformCallback } from 'node:stream'
 import { pipeline } from 'node:stream/promises'
-import type { TranscriptionErrorCode } from '@reading-book/book-reader-sdk'
+import type { TranscriptionErrorCode } from '@core'
 import {
   TRANSCRIPTION_MODELS,
   modelFileUrl,

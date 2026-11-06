@@ -12,7 +12,7 @@ import {
   type HighlightRecord,
   type NoteLocator,
   type NoteSelectionText,
-} from '@reading-book/book-reader-sdk'
+} from '@core'
 import type { BookListItem } from '../stores/library-store'
 import type { SessionRecord } from '../stores/overlay-store'
 

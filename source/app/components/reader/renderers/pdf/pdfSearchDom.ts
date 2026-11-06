@@ -1,4 +1,4 @@
-import type { TextMatcher } from '@reading-book/book-reader-sdk'
+import type { TextMatcher } from '@core'
 import { rangeForMatch, type SectionTextIndex } from '../epub/search/epubSearchDom'
 
 /**

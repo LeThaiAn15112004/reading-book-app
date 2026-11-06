@@ -3,7 +3,7 @@ import {
   useReaderBookOpen as useSharedReaderBookOpen,
   type ReaderBookOpenClient,
 } from '../../../../hooks/reader/index.js'
-import type { GlobalReadingPrefs } from '@reading-book/book-reader-sdk'
+import type { GlobalReadingPrefs } from '@core'
 import { libraryApi, overlayApi } from '../../../../bridge'
 import type { ReadingPrefs } from '../../components'
 import { parseResumeLocation } from '../book/parseResumeLocation'

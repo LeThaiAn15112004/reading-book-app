@@ -26,8 +26,8 @@ const server = await createServer({
   optimizeDeps: { noDiscovery: true, include: [] },
   resolve: {
     alias: {
-      '@reading-book/book-reader-sdk': path.resolve(root, '../../../core/src/index.ts'),
-      '@reading-book/config': path.resolve(root, '../../../core/src/config'),
+      '@core': path.resolve(root, '../../../core/src/index.ts'),
+      '@core/config': path.resolve(root, '../../../core/src/config'),
     },
   },
   ssr: { noExternal: ['react-markdown', 'remark-gfm'] },

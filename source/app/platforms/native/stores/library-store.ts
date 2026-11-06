@@ -24,7 +24,7 @@ import {
   type BookMetadataJson,
   type LibraryStore,
   type ReadingStateJson,
-} from '@reading-book/book-reader-sdk'
+} from '@core'
 import type { SqlDriver, SqlStatement } from '../db/sql-driver'
 
 // The SQL (core `libraryStatements`) and the row codecs (`libraryCodec`) are shared with Desktop (spec 009 T032);

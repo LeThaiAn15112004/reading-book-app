@@ -65,7 +65,7 @@ import {
   type InteractionTool,
   type MarkupInteractionTool,
   type TextMatcher,
-} from '@reading-book/book-reader-sdk'
+} from '@core'
 import {
   createHandHoverDwell,
   exceedsDragThreshold,
@@ -81,7 +81,7 @@ import {
 } from './pdfSearchDom'
 import { PdfPageInk, type PdfInkLayerMark } from './PdfInkLayer'
 import { PdfInkSelectionOverlay, type PdfCustomHandle } from './PdfInkSelectionOverlay'
-import { clampAttachmentBox, typewriterBoxAt } from '@reading-book/book-reader-sdk'
+import { clampAttachmentBox, typewriterBoxAt } from '@core'
 import { PAN_DRAG_THRESHOLD_PX } from '../../interaction/interaction-hit'
 import { PdfPageTypewriters, type PdfTypewriterFlash, type PdfTypewriterMark } from './PdfTypewriterLayer'
 import { PdfPageShapes, type PdfShapeDraft, type PdfShapeFlash, type PdfShapeMark } from './PdfShapeLayer'

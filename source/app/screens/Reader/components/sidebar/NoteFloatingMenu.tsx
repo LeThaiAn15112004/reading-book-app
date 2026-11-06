@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import type { ReaderHighlightBase } from '@reading-book/book-reader-sdk'
+import type { ReaderHighlightBase } from '@core'
 import type { ViewportRectLike } from '../../../../components/reader/renderers/epub'
 import { highlightPopoverPosition, useDismissOnOutsideOrEscape } from '../../logic'
 import { HighlightColorPicker } from '../highlights/HighlightColorPicker'

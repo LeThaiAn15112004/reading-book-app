@@ -1,11 +1,11 @@
-import type { PageLayout } from '@reading-book/book-reader-sdk'
+import type { PageLayout } from '@core'
 import { useShortcutLabel } from '../../../../shortcuts/useShortcutLabel'
 import type {
   FontFamily,
   FontWeight,
   ReadingViewMode,
   TextAlign,
-} from '@reading-book/book-reader-sdk'
+} from '@core'
 
 export type MarginMode = 'narrow' | 'normal' | 'wide' | 'off'
 

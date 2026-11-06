@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode, type RefObject } from 'react'
-import { PDF_SHAPE_KINDS, PDF_SHAPE_LABELS, PDF_SHAPE_MAX_STROKE, PDF_SHAPE_MIN_STROKE, type PdfShapeKind } from '@reading-book/book-reader-sdk'
+import { PDF_SHAPE_KINDS, PDF_SHAPE_LABELS, PDF_SHAPE_MAX_STROKE, PDF_SHAPE_MIN_STROKE, type PdfShapeKind } from '@core'
 import { inkWidthToPoints } from '../../logic/pdfInk/pdfInkPrefsStore'
 import { usePdfShapePrefsStore } from '../../logic/pdfShapes/pdfShapePrefsStore'
 import { useDismissOnOutsideOrEscape } from '../../logic/highlights/useDismissOnOutsideOrEscape'

@@ -4,14 +4,14 @@ import {
   useState,
   type MutableRefObject,
 } from 'react'
-import { CfiLocation, Location } from '@reading-book/book-reader-sdk'
+import { CfiLocation, Location } from '@core'
 import {
   readingPrefsFromGlobal,
   readingPrefsFromSession,
   type GlobalReadingPrefs,
   type ReadingSessionPrefsFields,
   type ResolvedReadingPrefs,
-} from '@reading-book/book-reader-sdk'
+} from '@core'
 
 const DEFAULT_PREFS: ResolvedReadingPrefs = {
   fontFamily: 'serif',

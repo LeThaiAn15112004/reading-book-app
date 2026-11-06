@@ -2,7 +2,7 @@
  * Pure geometry + styling helpers for highlight / underline / strikethrough / textbox marks drawn
  * by epub.js (marks-pane). Stateless — the per-book mark bookkeeping stays in `openEpubjs`.
  */
-import { splitHighlightColor, type HighlightStyleKind } from '@reading-book/book-reader-sdk'
+import { splitHighlightColor, type HighlightStyleKind } from '@core'
 import type { ViewportRectLike } from './types'
 
 /**

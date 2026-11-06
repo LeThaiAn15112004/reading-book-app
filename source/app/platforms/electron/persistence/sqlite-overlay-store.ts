@@ -14,20 +14,20 @@ import {
   type SaveBookmarkInput,
   type SaveHighlightInput,
   type SyncSqlDriver,
-} from '@reading-book/book-reader-sdk'
+} from '@core'
 import type { Database as SqliteDatabase } from 'better-sqlite3'
 import { createHash, randomUUID } from 'node:crypto'
 import {
   parseReadingState,
   type ReadingStateJson,
-} from '@reading-book/book-reader-sdk'
+} from '@core'
 import {
   audioProgressPatch,
   isAudioFormat,
   parseAudioProgress,
   type AudioProgress,
   type AudioProgressInput,
-} from '@reading-book/book-reader-sdk'
+} from '@core'
 import { getDatabase } from './db'
 import { createSyncSqlDriver } from './sql-driver'
 import {
@@ -48,7 +48,7 @@ import {
   type EmbeddedAnnotationSyncOptions,
   type EmbeddedAnnotationSyncStep,
   type ScannedPdfAnnotation,
-} from '@reading-book/book-reader-sdk'
+} from '@core'
 
 // Row types, codecs and the SQL (core `overlayCodec` / `overlayStatements`, spec 009 T033) are shared with Mobile.
 export type SessionRecord = overlayCodec.SessionRecord

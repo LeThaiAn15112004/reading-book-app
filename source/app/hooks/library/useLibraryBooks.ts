@@ -3,7 +3,7 @@ import {
   mapBookSummary,
   type BookSummaryInput,
   type LibraryBook,
-} from '@reading-book/book-reader-sdk'
+} from '@core'
 
 export type LibraryBooksClient = {
   listBooks: () => Promise<BookSummaryInput[]>

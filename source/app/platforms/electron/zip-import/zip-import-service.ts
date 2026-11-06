@@ -15,7 +15,7 @@ import {
   type ZipPreviewEntry,
   type ZipRejectCode,
   type ZipWarning,
-} from '@reading-book/book-reader-sdk'
+} from '@core'
 import {
   ZipFormatError,
   extractEntryToFile,

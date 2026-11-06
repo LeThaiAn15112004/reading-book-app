@@ -17,7 +17,7 @@ import {
   type InkPoint,
   type PdfInkStroke,
   type UndoHistory,
-} from '@reading-book/book-reader-sdk'
+} from '@core'
 import { overlayApi } from '../../../../bridge'
 import { activeInkLook, usePdfInkPrefsStore } from './pdfInkPrefsStore'
 

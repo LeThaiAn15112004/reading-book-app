@@ -22,7 +22,7 @@ import { createHash, randomBytes, randomUUID } from 'node:crypto'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import { READMATE_PDF_AUTHOR, applyAlign, applyStyle, attachmentIconBox, clampAttachmentBox, emptyTypewriterDoc } from '@reading-book/book-reader-sdk'
+import { READMATE_PDF_AUTHOR, applyAlign, applyStyle, attachmentIconBox, clampAttachmentBox, emptyTypewriterDoc } from '@core'
 import { buildAnnotatedPdf } from '../../e2e/support/build-annotated-pdf.mjs'
 
 const { writeAnnotationsToPdf } = await import('../../pdf-sync/pdf-annotation-write.ts')

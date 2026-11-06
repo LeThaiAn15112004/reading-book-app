@@ -7,7 +7,7 @@
  * glyphs), cmap formats 4 and 12, hmtx. CFF/OpenType-CFF, TTC and variable fonts are refused.
  */
 
-import type { EmbeddedFontFaceInfo, FontMetrics } from '@reading-book/book-reader-sdk'
+import type { EmbeddedFontFaceInfo, FontMetrics } from '@core'
 
 export interface TtfFace {
   readonly bytes: Uint8Array

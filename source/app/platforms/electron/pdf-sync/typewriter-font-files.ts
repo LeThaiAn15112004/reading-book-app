@@ -3,7 +3,7 @@
  * parses it once and hands out the cached face. specs/005-typewriter-note/ (T018).
  */
 
-import type { EmbeddedFontFaceInfo, FontMetrics } from '@reading-book/book-reader-sdk'
+import type { EmbeddedFontFaceInfo, FontMetrics } from '@core'
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'

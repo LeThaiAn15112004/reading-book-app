@@ -8,7 +8,7 @@ import {
   toggleTrack,
   type ZipImportPreview,
   type ZipImportSelection,
-} from '@reading-book/book-reader-sdk'
+} from '@core'
 import { audioApi, zipImportApi } from '../../bridge'
 import { useLibraryImportStore } from './libraryImportStore.js'
 

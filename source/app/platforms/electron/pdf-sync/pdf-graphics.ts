@@ -15,7 +15,7 @@ import {
   type PdfGraphicBox,
   type PdfGraphicObject,
   type PdfGraphicOp,
-} from '@reading-book/book-reader-sdk'
+} from '@core'
 import { loadPdfjs } from '../chunking/pdf-text'
 import { PdfRawObjects, parsePdfJsRef, readAnnotationNames } from './pdf-raw-objects'
 import { appearanceStreamBody, appendAnnotationUpdate, appendRawObjects, pdfDateNow, PdfWriteError, type PageGeometry } from './pdf-incremental-writer'

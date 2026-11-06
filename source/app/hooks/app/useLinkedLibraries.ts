@@ -6,7 +6,7 @@ import type {
   ExternalLibraryInfo,
   ExternalLibraryProvider,
   LinkLibraryOptions,
-} from '@reading-book/book-reader-sdk';
+} from '@core';
 import { CompositeExternalLibraryConnector } from '../../platforms/electron/host-adapters/external-libraries/composite-connector.js';
 import {
   getAllExternalLibrariesStatus,

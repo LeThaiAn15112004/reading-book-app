@@ -7,7 +7,7 @@
  * never takes pointer events; PdfRenderer hit-tests and draws itself.
  */
 import { memo } from 'react'
-import { INK_PEN_PRESETS, inkPathData, inkStrokeLayers, type InkPenStyle, type InkPoint } from '@reading-book/book-reader-sdk'
+import { INK_PEN_PRESETS, inkPathData, inkStrokeLayers, type InkPenStyle, type InkPoint } from '@core'
 
 /** One stroke as the PDF surface paints it. */
 export type PdfInkLayerMark = {

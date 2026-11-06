@@ -13,7 +13,7 @@ import {
   type TranscriptStatus,
   type TranscriptionErrorCode,
   type TranscriptionScope,
-} from '@reading-book/book-reader-sdk'
+} from '@core'
 import { getDatabase } from './db'
 import { createSyncSqlDriver } from './sql-driver'
 

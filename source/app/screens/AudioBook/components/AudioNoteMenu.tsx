@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent } from 'react'
 import { createPortal } from 'react-dom'
-import { MAX_NOTE_CHARS, formatPlaybackTime, trackNoteLabel } from '@reading-book/book-reader-sdk'
+import { MAX_NOTE_CHARS, formatPlaybackTime, trackNoteLabel } from '@core'
 import { useDismissOnOutsideOrEscape } from '../../Reader/logic'
 import { useNoteMenuStore } from '../logic/audioNoteMenuStore'
 import { useAudioPlayerStore } from '../logic/audioPlayerStore'

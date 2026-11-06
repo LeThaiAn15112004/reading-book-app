@@ -29,7 +29,7 @@ const out = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'readmate-sql-driver
 await require('esbuild').build({
   entryPoints: [path.join(here, '../../persistence/sql-driver.ts')],
   bundle: true, platform: 'node', format: 'esm', outfile: out, logLevel: 'error',
-  external: ['@reading-book/book-reader-sdk'], // type-only import
+  external: ['@core'], // type-only import
 })
 const { createSyncSqlDriver } = await import(pathToFileURL(out).href)
 

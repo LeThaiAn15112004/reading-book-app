@@ -7,7 +7,7 @@ import {
   timelineView,
   trackEyebrow,
   type ProgressScope,
-} from '@reading-book/book-reader-sdk'
+} from '@core'
 import { useNoteMenuStore } from '../logic/audioNoteMenuStore'
 import { useAudioPlayerStore } from '../logic/audioPlayerStore'
 

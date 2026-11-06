@@ -2,7 +2,7 @@ import Database from 'better-sqlite3'
 import type { Database as SqliteDatabase } from 'better-sqlite3'
 import { app } from 'electron'
 import path from 'node:path'
-import type { SyncSqlDriver } from '@reading-book/book-reader-sdk'
+import type { SyncSqlDriver } from '@core'
 import { migrate } from './migrate'
 import { createSyncSqlDriver } from './sql-driver'
 

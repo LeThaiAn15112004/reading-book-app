@@ -1,7 +1,7 @@
 import {
   toAppThemeAttr,
   type ReaderTheme,
-} from '@reading-book/book-reader-sdk'
+} from '@core'
 import { setWindowTheme } from '../platforms/window'
 
 /** App chrome theme ids (Night / Sepia / Paper). */

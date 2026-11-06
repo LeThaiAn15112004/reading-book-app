@@ -7,7 +7,7 @@ import {
   type PdfTypewriterDoc,
   type TypewriterAlign,
   type TypewriterTextStyle,
-} from '@reading-book/book-reader-sdk'
+} from '@core'
 import type { TypewriterFormatValues } from '../../components/rightPanel/TypewriterFormatControls'
 
 /**

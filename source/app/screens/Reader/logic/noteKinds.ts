@@ -1,4 +1,4 @@
-import type { HighlightStyleKind } from '@reading-book/book-reader-sdk'
+import type { HighlightStyleKind } from '@core'
 
 /**
  * Markup whose text lives in the note and so opens the comment editor right after it is made:

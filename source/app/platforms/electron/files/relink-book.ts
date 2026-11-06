@@ -1,4 +1,4 @@
-import { resolveFormatFromExtension } from '@reading-book/config'
+import { resolveFormatFromExtension } from '@core/config'
 import path from 'node:path'
 import type { RelinkBookResult } from '../ipc/api-types'
 import { getLibraryStore } from '../persistence/sqlite-library-store'

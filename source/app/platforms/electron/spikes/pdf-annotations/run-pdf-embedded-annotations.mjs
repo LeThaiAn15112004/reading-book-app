@@ -26,7 +26,7 @@
  * Run: npm run spike:pdf:embedded   (builds the SDK bundle first)
  */
 import assert from 'node:assert/strict'
-import { highlightDtoToReaderHighlight, pdfHighlightDtoToReaderHighlight } from '@reading-book/book-reader-sdk'
+import { highlightDtoToReaderHighlight, pdfHighlightDtoToReaderHighlight } from '@core'
 import { invoke } from './electron-stub.mjs'
 import { getDatabase } from './db-stub.mjs'
 import { SAMPLE_ANNOTATIONS, buildAnnotatedPdf } from '../../e2e/support/build-annotated-pdf.mjs'

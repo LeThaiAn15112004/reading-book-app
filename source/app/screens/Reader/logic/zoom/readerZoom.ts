@@ -1,5 +1,5 @@
 /** Viewport zoom for the reader surface (independent of Aa font-size). Math lives in the SDK. */
-import { focalZoomScroll, type ZoomFocalPoint } from '@reading-book/book-reader-sdk'
+import { focalZoomScroll, type ZoomFocalPoint } from '@core'
 
 export {
   ZOOM_DEFAULT,
@@ -23,7 +23,7 @@ export {
   type ZoomAnchor,
   type ZoomFocalPoint,
   type ZoomLayoutPreset,
-} from '@reading-book/book-reader-sdk'
+} from '@core'
 
 /**
  * Keep the document point under the cursor fixed while changing scale.

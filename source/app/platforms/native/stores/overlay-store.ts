@@ -37,7 +37,7 @@ import {
   type ReadingStateJson,
   type SaveBookmarkInput,
   type SaveHighlightInput,
-} from '@reading-book/book-reader-sdk'
+} from '@core'
 import type { SqlDriver, SqlStatement } from '../db/sql-driver'
 
 // The SQL (core `overlayStatements`) and the `note_json` / reading-state codecs (core `overlayCodec`) are shared with

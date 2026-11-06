@@ -26,7 +26,7 @@ import { buildPdf } from './pdf-fixtures.mjs'
 
 const { listPdfAttachmentBytes, extractPdfAttachmentBytes } = await import('../../attachments/pdf-attachments.ts')
 const { createAttachmentService, cleanAttachmentTemp } = await import('../../attachments/attachment-service.ts')
-const { ATTACHMENT_MAX_BYTES } = await import('@reading-book/book-reader-sdk')
+const { ATTACHMENT_MAX_BYTES } = await import('@core')
 
 let passed = 0
 async function check(name, fn) {

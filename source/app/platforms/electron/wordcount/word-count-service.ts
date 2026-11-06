@@ -2,7 +2,7 @@ import { ensureBookChunks } from '../chunking/book-chunk-service'
 import type { WordCountStatsDto } from '../ipc/api-types'
 import { getDatabase } from '../persistence/db'
 import { readBookChunkStats } from '../search/book-search-query'
-import { accumulateTextStats, createTextStats } from '@reading-book/book-reader-sdk'
+import { accumulateTextStats, createTextStats } from '@core'
 import { iterateBookChunkContents } from './word-count-query'
 
 /**

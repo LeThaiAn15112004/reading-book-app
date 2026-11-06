@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { HighlightStyleKind } from '@reading-book/book-reader-sdk'
+import type { HighlightStyleKind } from '@core'
 
 export type NotesSortBy = 'readingOrder' | 'chronological'
 

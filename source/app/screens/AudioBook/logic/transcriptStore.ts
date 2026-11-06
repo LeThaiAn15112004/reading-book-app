@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { findActivePassageIndex } from '@reading-book/book-reader-sdk'
+import { findActivePassageIndex } from '@core'
 import { useAudioPlayerStore } from './audioPlayerStore'
 import {
   transcriptionApi,

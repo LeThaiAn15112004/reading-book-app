@@ -1,4 +1,4 @@
-import type { PdfAnnotationRect } from '@reading-book/book-reader-sdk'
+import type { PdfAnnotationRect } from '@core'
 
 /**
  * Freehand and stamp notes (`NoteType` in book-reader-sdk `domain/annotation/note.ts`) are

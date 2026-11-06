@@ -17,7 +17,7 @@ import {
   sanitizeAttachmentFileName,
   type AttachmentSource,
   type BookAttachment,
-} from '@reading-book/book-reader-sdk'
+} from '@core'
 import { loadPdfjs } from '../chunking/pdf-text'
 import { readAnnotationNames } from '../pdf-sync/pdf-raw-objects'
 

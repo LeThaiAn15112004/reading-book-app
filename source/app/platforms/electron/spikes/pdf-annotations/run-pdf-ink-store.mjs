@@ -697,7 +697,7 @@ await check('a refused delete puts the affected stroke back and tells the user',
 })
 
 console.log('3c. partial eraser')
-const sdk = await import('@reading-book/book-reader-sdk')
+const sdk = await import('@core')
 insertBook.run('pdf-c', 'PDF C', '/c.pdf', 'pdf', 'sha-c')
 await openBook('pdf-c')
 const hl = usePdfHighlightsStore.getState()

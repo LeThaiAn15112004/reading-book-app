@@ -3,7 +3,7 @@
  * "check this book's signature" used by the Reader / Library UI. Verification only.
  */
 
-import type { BookSignatureInfo } from '@reading-book/book-reader-sdk'
+import type { BookSignatureInfo } from '@core'
 import type { BookSignatureDto, CheckSignatureResult } from '../ipc/api-types'
 import { resolveBookFile } from '../files/sandbox'
 import { getLibraryStore } from '../persistence/sqlite-library-store'

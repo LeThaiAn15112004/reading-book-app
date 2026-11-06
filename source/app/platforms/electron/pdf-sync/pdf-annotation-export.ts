@@ -6,7 +6,7 @@
 import { createHash, randomBytes } from 'node:crypto'
 import fsp from 'node:fs/promises'
 import path from 'node:path'
-import type { EmbeddedAnnotationLedgerEntry, ExportableHighlight } from '@reading-book/book-reader-sdk'
+import type { EmbeddedAnnotationLedgerEntry, ExportableHighlight } from '@core'
 import type { PdfAnnotationWriteInput, PdfAnnotationWriteOutput, PdfAnnotationWriteSummary } from './pdf-annotation-write'
 import { sameSignature, statSignature } from './stable-file-watcher'
 

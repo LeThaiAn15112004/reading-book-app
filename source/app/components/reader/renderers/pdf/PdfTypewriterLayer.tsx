@@ -5,7 +5,7 @@
  * zoom never re-wraps a line. Saved notes take no pointer events; PdfRenderer hit-tests them itself.
  */
 import { memo, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react'
-import type { LaidOutLine, LaidOutSegment, PdfTypewriterDoc, TypewriterLayout } from '@reading-book/book-reader-sdk'
+import type { LaidOutLine, LaidOutSegment, PdfTypewriterDoc, TypewriterLayout } from '@core'
 import { layoutNote, noteHeightFraction, useTypewriterFonts, type TypewriterNormBox } from './typewriterBox'
 import { PdfTypewriterSelection } from './PdfTypewriterSelection'
 import { typewriterCssFamily, typewriterRendererMetrics } from './typewriterFonts'

@@ -11,7 +11,7 @@ import {
   audiobookParentSha256,
   chapterFileName,
   type AudioChapterRecord,
-} from '@reading-book/book-reader-sdk'
+} from '@core'
 import { hashFile } from '../files/file-hash'
 import type { ReadTrack, TrackMetadata } from './track-metadata'
 import {

@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { pdfGraphicAllows, type PdfGraphicObject, type PdfGraphicOp } from '@reading-book/book-reader-sdk'
+import { pdfGraphicAllows, type PdfGraphicObject, type PdfGraphicOp } from '@core'
 import { graphicsApi } from '../../../../bridge'
 
 type GraphicsContext = {

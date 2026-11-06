@@ -1,7 +1,7 @@
 /**
  * Integration checks for the audiobook (MP3) foundation on the Main side — no Electron window, no
  * user data: every path is under os.tmpdir(). Uses the real code:
- *   - format registry (`@reading-book/config`) + `assertSupportedExtension`
+ *   - format registry (`@core/config`) + `assertSupportedExtension`
  *   - the MP3 importer (`music-metadata`) and the library store on the migrated schema (node:sqlite)
  *   - `createAudioStreamHandler` (the `rb-audio` protocol's logic) against real files, with the real
  *     `resolveBookFile` path validation
@@ -36,7 +36,7 @@ import {
   parseAudioProgress,
   parseReadingState,
   resolveRestorePosition,
-} from '@reading-book/book-reader-sdk'
+} from '@core'
 import { invoke } from '../pdf-annotations/electron-stub.mjs'
 import { getDatabase } from '../pdf-annotations/db-stub.mjs'
 
@@ -50,7 +50,7 @@ const { createAudioStreamHandler, parseAudioRequestUrl } = await import('../../a
 const { assertSupportedExtension, UnsupportedFormatError } = await import('../../files/format-guard.ts')
 const { isChunkableFormat } = await import('../../chunking/extract-book-text.ts')
 const { openBookContent } = await import('../../files/open-book-content.ts')
-const config = await import('@reading-book/config')
+const config = await import('@core/config')
 
 let passed = 0
 async function check(name, fn) {
@@ -690,7 +690,7 @@ if (sample && fs.existsSync(sample)) {
 console.log('7. multi-track audiobooks: per-track stream URLs, track list, progress + Notes guards')
 {
   const { randomUUID } = await import('node:crypto')
-  const { chapterFileName } = await import('@reading-book/book-reader-sdk')
+  const { chapterFileName } = await import('@core')
   const { createBookAudioLookup } = await import('../../audio/audio-lookup.ts')
   const { parseAudioRequestTarget } = await import('../../audio/audio-stream-handler.ts')
   const { registerAudioIpc } = await import('../../ipc/audio.ipc.ts')

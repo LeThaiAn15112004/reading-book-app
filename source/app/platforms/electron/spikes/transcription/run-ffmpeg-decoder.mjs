@@ -45,7 +45,7 @@ const decoderBundle = path.join(work, 'audio-decoder.mjs')
 await esbuild.build({
   entryPoints: [path.join(desktop, 'transcription/audio-decoder.ts')],
   bundle: true, platform: 'node', format: 'esm', outfile: decoderBundle, logLevel: 'error',
-  external: ['@reading-book/book-reader-sdk'],
+  external: ['@core'],
 })
 const { createAudioDecoder, buildFfmpegArgs, DecodeError, DECODE_SAMPLE_RATE } = await import(pathToFileURL(decoderBundle).href)
 

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef } from 'react'
-import type { Location } from '@reading-book/book-reader-sdk'
+import type { Location } from '@core'
 import {
   pendingFromSessionParts,
   READING_SESSION_DEBOUNCE_MS,

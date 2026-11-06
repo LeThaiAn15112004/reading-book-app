@@ -1,5 +1,5 @@
 /** `SqlDriver` over the host's `sql.*` services (spec 008, T043, T056): what the Mobile stores run on in the app. */
-import type { AsyncSqlDriver, SqlValue, Statement } from '@reading-book/book-reader-sdk'
+import type { AsyncSqlDriver, SqlValue, Statement } from '@core'
 import type { SqlDriver, SqlRunResult, SqlStatement } from '../db/sql-driver'
 import type { HostClient } from './host-client'
 

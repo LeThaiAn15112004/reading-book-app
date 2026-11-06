@@ -5,7 +5,7 @@ import { supportsAnnotationTransfer } from '../../../Reader/logic/annotationTran
 import type {
   CollectionSummary,
   LibraryBook,
-} from '@reading-book/book-reader-sdk'
+} from '@core'
 
 export type BookMenuPoint = { x: number; y: number }
 

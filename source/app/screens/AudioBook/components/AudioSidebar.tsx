@@ -8,7 +8,7 @@ import {
   trackNumberLabel,
   type AudioBookmark,
   type TrackNoteGroup,
-} from '@reading-book/book-reader-sdk'
+} from '@core'
 import type { SidebarTab } from '../../Reader/components/sidebar'
 import { SIDEBAR_RAIL_WIDTH_PX, SIDEBAR_TAB_LABEL } from '../../Reader/components/sidebar/sidebarTabs'
 import { selectNoteGroupOpen, useNoteGroupsStore } from '../logic/audioNoteGroupsStore'

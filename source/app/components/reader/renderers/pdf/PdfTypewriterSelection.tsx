@@ -5,7 +5,7 @@
  * `PdfTypewriterLayer`; this reports a live `preview` box while dragging and the final box on release.
  */
 import { useRef, useState, type PointerEvent as ReactPointerEvent, type RefObject } from 'react'
-import { TYPEWRITER_HANDLES, moveTypewriterBox, resizeTypewriterBox, type TypewriterHandle } from '@reading-book/book-reader-sdk'
+import { TYPEWRITER_HANDLES, moveTypewriterBox, resizeTypewriterBox, type TypewriterHandle } from '@core'
 import type { PdfTypewriterMark } from './PdfTypewriterLayer'
 import { layoutNote, noteHeightFraction, type TypewriterNormBox } from './typewriterBox'
 

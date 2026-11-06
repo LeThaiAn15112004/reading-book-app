@@ -20,7 +20,7 @@ import { createHash } from 'node:crypto'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import { audiobookParentSha256, isChapterFileName } from '@reading-book/book-reader-sdk'
+import { audiobookParentSha256, isChapterFileName } from '@core'
 import { app, clipboard, invoke } from '../pdf-annotations/electron-stub.mjs'
 import { getDatabase } from '../pdf-annotations/db-stub.mjs'
 import { JPG, PNG1, buildZip, mp3, wav } from './zip-fixtures.mjs'
@@ -411,7 +411,7 @@ await check('single-file remove / delete are unchanged: removeBook keeps the fil
 console.log('7. the ordinary "Add file" dialog')
 {
   const { dialog, handlers } = await import('../pdf-annotations/electron-stub.mjs')
-  const config = await import('@reading-book/config')
+  const config = await import('@core/config')
   const { ImportChannels, ZipImportChannels } = await import('../../ipc/channels.ts')
   const { registerImportIpc } = await import('../../ipc/import.ipc.ts')
   const { registerZipImportIpc } = await import('../../ipc/zip-import.ipc.ts')

@@ -4,7 +4,7 @@
  * width, so zoom and window resize never change a line break. The page height in the same unit is `heightRatio`.
  */
 import { useEffect, useState } from 'react'
-import { layoutTypewriter, TYPEWRITER_MIN_BOX_WIDTH, type PdfTypewriterDoc, type TypewriterLayout } from '@reading-book/book-reader-sdk'
+import { layoutTypewriter, TYPEWRITER_MIN_BOX_WIDTH, type PdfTypewriterDoc, type TypewriterLayout } from '@core'
 import { areTypewriterFontsReady, loadTypewriterFonts, typewriterRendererMetrics } from './typewriterFonts'
 
 export type TypewriterNormBox = { x: number; y: number; width: number; height: number }

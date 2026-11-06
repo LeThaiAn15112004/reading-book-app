@@ -15,7 +15,7 @@ import {
   type PdfShapeKind,
   type PdfShapeRect,
   type PdfShapeGeometry,
-} from '@reading-book/book-reader-sdk'
+} from '@core'
 
 /** One saved shape as the PDF surface paints it. */
 export type PdfShapeMark = {

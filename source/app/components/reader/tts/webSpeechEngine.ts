@@ -1,4 +1,4 @@
-import type { TtsEngine, TtsSpeakHandlers, TtsSpeakRequest, TtsVoiceMatch } from '@reading-book/book-reader-sdk'
+import type { TtsEngine, TtsSpeakHandlers, TtsSpeakRequest, TtsVoiceMatch } from '@core'
 
 const VOICES_TIMEOUT_MS = 1500
 /** Chromium's `resume()` sometimes leaves the engine silent; re-speak if nothing started by then. */

@@ -7,7 +7,7 @@
  * Run: npm run spike:pdf:typewriter-perf
  */
 import assert from 'node:assert/strict'
-import { applyStyle, editText, emptyTypewriterDoc, layoutTypewriter, TYPEWRITER_MAX_CHARS } from '@reading-book/book-reader-sdk'
+import { applyStyle, editText, emptyTypewriterDoc, layoutTypewriter, TYPEWRITER_MAX_CHARS } from '@core'
 import { buildAnnotatedPdf } from '../../e2e/support/build-annotated-pdf.mjs'
 
 const { typewriterFontMetrics } = await import('../../pdf-sync/typewriter-font-files.ts')

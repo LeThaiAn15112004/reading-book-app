@@ -29,7 +29,7 @@ import {
   type ChapterStatus,
   type ProgressScope,
   type RawChapter,
-} from '@reading-book/book-reader-sdk'
+} from '@core'
 import { audioApi, libraryApi, overlayApi } from '../../../bridge'
 import { registerSessionFlushHandler } from '../../Reader/logic/session/sessionFlushRegistry'
 

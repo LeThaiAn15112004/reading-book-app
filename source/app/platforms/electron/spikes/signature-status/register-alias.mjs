@@ -1,6 +1,6 @@
 /**
  * Node resolve hook for the signature checks: maps the workspace alias the Electron code imports
- * (`@reading-book/book-reader-sdk`) onto the one import-free SDK module they need at runtime, so the
+ * (`@core`) onto the one import-free SDK module they need at runtime, so the
  * checks run under plain `node --experimental-strip-types` without bundling the whole SDK.
  */
 import { register } from 'node:module'
@@ -11,7 +11,7 @@ register(
   'data:text/javascript,' +
     encodeURIComponent(`
       export async function resolve(specifier, context, next) {
-        if (specifier === '@reading-book/book-reader-sdk') {
+        if (specifier === '@core') {
           return { url: ${JSON.stringify(target)}, shortCircuit: true }
         }
         return next(specifier, context)

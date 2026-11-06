@@ -12,7 +12,7 @@ import {
   normalizeGlobalReadingPrefs,
   type GlobalReadingPrefs,
   type ReaderTheme,
-} from '@reading-book/book-reader-sdk'
+} from '@core'
 
 export type GlobalReadingPrefsStorage = {
   load: () => GlobalReadingPrefs

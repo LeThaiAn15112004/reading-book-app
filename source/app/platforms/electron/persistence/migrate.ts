@@ -1,5 +1,5 @@
 import type { Database } from 'better-sqlite3'
-import { planMigrations, type Migration } from '@reading-book/book-reader-sdk'
+import { planMigrations, type Migration } from '@core'
 import migration001 from '../../../../core/src/db/desktop/migrations/001_initial.sql?raw'
 import migration002 from '../../../../core/src/db/desktop/migrations/002_expand_file_formats.sql?raw'
 import migration003 from '../../../../core/src/db/desktop/migrations/003_book_signatures.sql?raw'

@@ -4,7 +4,7 @@ import type {
   FontWeight,
   ReaderTheme,
   TextAlign,
-} from '@reading-book/book-reader-sdk'
+} from '@core'
 import type {
   EpubPageLayout,
   EpubSettingsPatch,

@@ -1,4 +1,4 @@
-import { segmentSectionText, type ReadAloudSegment } from '@reading-book/book-reader-sdk'
+import { segmentSectionText, type ReadAloudSegment } from '@core'
 import { buildSectionTextIndex, rangeForMatch, type SectionTextIndex } from '../search/epubSearchDom'
 
 /**

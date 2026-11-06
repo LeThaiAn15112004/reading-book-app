@@ -1,7 +1,7 @@
 import type { Database } from 'better-sqlite3'
 import { createHash } from 'node:crypto'
-import { countSearchWords } from '@reading-book/book-reader-sdk'
-import type { TextChunk } from '@reading-book/book-reader-sdk'
+import { countSearchWords } from '@core'
+import type { TextChunk } from '@core'
 
 /** Deterministic id: the same book text always yields the same row ids (idempotent re-runs). */
 export function chunkId(bookId: string, chunk: TextChunk): string {

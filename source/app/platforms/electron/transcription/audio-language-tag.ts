@@ -1,4 +1,4 @@
-import { whisperLanguageForTag } from '@reading-book/book-reader-sdk'
+import { whisperLanguageForTag } from '@core'
 
 /**
  * The language an audio file declares about itself (spec 004, FR-005: the default transcription language is the audiobook's own

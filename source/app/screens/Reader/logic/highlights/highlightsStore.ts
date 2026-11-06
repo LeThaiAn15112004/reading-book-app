@@ -2,7 +2,7 @@ import { create } from 'zustand'
 import { markupToast } from '../markupToast'
 import { opensNotePopup } from '../noteKinds'
 import type { MutableRefObject } from 'react'
-import { CfiLocation } from '@reading-book/book-reader-sdk'
+import { CfiLocation } from '@core'
 import {
   applyHighlightHistoryStep,
   createHighlightHistory,
@@ -17,7 +17,7 @@ import {
   type HighlightStyleKind,
   type MarkupInteractionTool,
   type ReaderHighlight,
-} from '@reading-book/book-reader-sdk'
+} from '@core'
 import { overlayApi } from '../../../../bridge'
 import type {
   EpubHighlightClickInfo,

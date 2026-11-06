@@ -1,4 +1,4 @@
-import type { ResolvedReadingPrefs } from '@reading-book/book-reader-sdk'
+import type { ResolvedReadingPrefs } from '@core'
 import type { ReadingPrefs } from '../../components/settings/AaSettingsPanel'
 
 /** Map shared resolved prefs into desktop Aa panel prefs shape. */

@@ -1,4 +1,4 @@
-import { formatRelativeLastRead, type LibraryBook } from '@reading-book/book-reader-sdk'
+import { formatRelativeLastRead, type LibraryBook } from '@core'
 import { BookCover, BookMenuButton, type BookMenuPoint } from '../book'
 import { withLongPress } from '../../../../platforms/longPress'
 

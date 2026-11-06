@@ -7,7 +7,7 @@ import {
   isTypewriterFamily,
   type TypewriterAlign,
   type TypewriterTextStyle,
-} from '@reading-book/book-reader-sdk'
+} from '@core'
 
 const PREFS_STORAGE_KEY = 'readmate.pdfTypewriterPrefs.v1'
 

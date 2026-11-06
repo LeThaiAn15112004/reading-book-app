@@ -1,4 +1,4 @@
-import type { ReaderTheme } from '@reading-book/book-reader-sdk'
+import type { ReaderTheme } from '@core'
 import { customAccentTokens, normalizeHex } from './accentColor'
 
 /**

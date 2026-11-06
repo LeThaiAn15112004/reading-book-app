@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import type { ReaderBookmark, ReaderHighlightBase } from '@reading-book/book-reader-sdk'
+import type { ReaderBookmark, ReaderHighlightBase } from '@core'
 import { MobileSheet, MobileSheetRow } from './MobileSheet'
 
 type Tab = 'bookmarks' | 'notes'

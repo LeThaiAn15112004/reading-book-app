@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type RefObject } from 'react'
-import { INK_PEN_PRESETS } from '@reading-book/book-reader-sdk'
+import { INK_PEN_PRESETS } from '@core'
 import { usePdfInkPrefsStore } from '../../logic/pdfInk/pdfInkPrefsStore'
 import { useDismissOnOutsideOrEscape } from '../../logic/highlights/useDismissOnOutsideOrEscape'
 import { InkStyleControls } from './InkStyleControls'

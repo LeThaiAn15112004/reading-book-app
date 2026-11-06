@@ -10,7 +10,7 @@ import {
   type FontWeight,
   type ReaderTheme,
   type TextAlign,
-} from '@reading-book/book-reader-sdk'
+} from '@core'
 
 /** Default Aa panel size — zoom % is relative to this. */
 export const EPUB_BASE_FONT_PX = 18

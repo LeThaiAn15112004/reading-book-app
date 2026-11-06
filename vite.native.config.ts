@@ -39,8 +39,8 @@ export default defineConfig({
     extensions: ['.native.tsx', '.native.ts', '.mjs', '.js', '.mts', '.ts', '.jsx', '.tsx', '.json'],
     alias: [
       { find: /^@app\//, replacement: `${appRoot.replaceAll('\\', '/')}/` },
-      { find: '@reading-book/config', replacement: path.join(workspaceRoot, 'core/src/config') },
-      { find: '@reading-book/book-reader-sdk', replacement: path.join(workspaceRoot, 'core/src/index.ts') },
+      { find: /^@core$/, replacement: path.join(workspaceRoot, 'core/src/index.ts') },
+      { find: /^@core\//, replacement: `${path.join(workspaceRoot, 'core/src').replaceAll('\\', '/')}/` },
       { find: /^pdfjs-dist$/, replacement: `${pdfjsLegacy}/pdf.mjs` },
       { find: /^pdfjs-dist\/build\/pdf\.worker\.min\.mjs(\?url)?$/, replacement: `${pdfjsLegacy}/pdf.worker.min.mjs$1` },
       { find: /^react(\/.*)?$/, replacement: `${path.join(rootNodeModules, 'react').replaceAll('\\', '/')}$1` },

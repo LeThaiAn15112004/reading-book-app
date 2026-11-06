@@ -1,5 +1,5 @@
 import type { Database as SqliteDatabase } from 'better-sqlite3'
-import { audioCodec, audioStatements as q, isAudioFormat, type AudioBookmark, type SyncSqlDriver } from '@reading-book/book-reader-sdk'
+import { audioCodec, audioStatements as q, isAudioFormat, type AudioBookmark, type SyncSqlDriver } from '@core'
 import { getDatabase } from './db'
 import { createSyncSqlDriver } from './sql-driver'
 

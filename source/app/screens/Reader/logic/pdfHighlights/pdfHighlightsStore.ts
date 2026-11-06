@@ -35,7 +35,7 @@ import {
   type PdfReaderHighlight,
   type PdfShapeGeometryResult,
   type PdfShapeKind,
-} from '@reading-book/book-reader-sdk'
+} from '@core'
 import { overlayApi } from '../../../../bridge'
 import { usePdfSignedWriteStore } from '../pdfExport/pdfSignedWriteStore'
 import type { PdfInsertionPoint, PdfRendererApi, PdfSelectionInfo } from '../../../../components/reader/renderers/pdf'

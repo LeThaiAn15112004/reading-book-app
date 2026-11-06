@@ -41,5 +41,5 @@ export {
   resolveCumulativeTarget,
   type CumulativePageMetrics,
   type TargetPageLocation,
-} from '@reading-book/book-reader-sdk'
+} from '@core'
 

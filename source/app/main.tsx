@@ -6,7 +6,7 @@ import {
   DEFAULT_GLOBAL_READING_PREFS,
   GLOBAL_READING_PREFS_STORAGE_KEY,
   parseGlobalReadingPrefsJson,
-} from '@reading-book/book-reader-sdk'
+} from '@core'
 import {
   applyAppearanceAttributes,
   loadAppAppearance,

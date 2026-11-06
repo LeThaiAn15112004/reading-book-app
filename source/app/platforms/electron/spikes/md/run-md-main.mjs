@@ -11,7 +11,7 @@ import { createHash } from 'node:crypto'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import { MD_MAX_FILE_BYTES, MD_MAX_IMAGE_BYTES } from '@reading-book/book-reader-sdk'
+import { MD_MAX_FILE_BYTES, MD_MAX_IMAGE_BYTES } from '@core'
 import { getDatabase } from '../pdf-annotations/db-stub.mjs'
 
 const { openBookContent } = await import('../../files/open-book-content.ts')

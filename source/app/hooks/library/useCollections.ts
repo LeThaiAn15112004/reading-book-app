@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import type { CollectionSummary } from '@reading-book/book-reader-sdk'
+import type { CollectionSummary } from '@core'
 
 function newId(): string {
   if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {

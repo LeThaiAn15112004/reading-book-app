@@ -1,4 +1,4 @@
-import type { LibraryBook } from '@reading-book/book-reader-sdk'
+import type { LibraryBook } from '@core'
 import { useSearchHistoryStore } from '../../hooks/library/index.js'
 import {
   BootErrorBanner,

@@ -9,7 +9,7 @@
  * Styles: `.rb-pdf-annot-*` in index.css.
  */
 import type { CSSProperties } from 'react'
-import type { HighlightStyleKind, PdfHighlightRect } from '@reading-book/book-reader-sdk'
+import type { HighlightStyleKind, PdfHighlightRect } from '@core'
 
 /** One annotation as the PDF surface paints it. */
 export type PdfAnnotationMark = {

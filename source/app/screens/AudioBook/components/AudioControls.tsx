@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { PLAYBACK_RATES, formatPlaybackTime } from '@reading-book/book-reader-sdk'
+import { PLAYBACK_RATES, formatPlaybackTime } from '@core'
 import { useNoteMenuStore } from '../logic/audioNoteMenuStore'
 import { AudioSelect, type AudioSelectOption } from './AudioSelect'
 import { SLEEP_MINUTES, selectCanAddNote, useAudioPlayerStore, type SleepOption } from '../logic/audioPlayerStore'

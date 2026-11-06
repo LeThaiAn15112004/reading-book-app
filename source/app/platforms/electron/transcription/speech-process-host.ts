@@ -1,5 +1,5 @@
 import { fork, type ForkOptions } from 'node:child_process'
-import type { TranscriptionErrorCode } from '@reading-book/book-reader-sdk'
+import type { TranscriptionErrorCode } from '@core'
 import type { SpeechMessage, SpeechProcessData, SpeechRequest } from './transcription-job'
 import type { WhisperLoadStage, WhisperSegment } from './whisper-engine'
 

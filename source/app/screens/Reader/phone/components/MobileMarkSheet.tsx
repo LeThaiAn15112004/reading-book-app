@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { HIGHLIGHT_COLOR_PRESETS, type HighlightStyleKind, type ReaderHighlightBase } from '@reading-book/book-reader-sdk'
+import { HIGHLIGHT_COLOR_PRESETS, type HighlightStyleKind, type ReaderHighlightBase } from '@core'
 import { MobileSheet } from './MobileSheet'
 
 const STYLE_CHOICES: { kind: HighlightStyleKind; label: string }[] = [

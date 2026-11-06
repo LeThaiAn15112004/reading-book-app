@@ -1,4 +1,4 @@
-import { normalizeTxtText } from '@reading-book/book-reader-sdk'
+import { normalizeTxtText } from '@core'
 
 export type MdSource = {
   /** Canonical text: BOM dropped, `\n` line breaks. Empty string for an empty file. */

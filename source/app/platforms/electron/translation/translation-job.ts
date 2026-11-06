@@ -1,4 +1,4 @@
-import type { TranslationLoadProgress, TranslationRoute } from '@reading-book/book-reader-sdk'
+import type { TranslationLoadProgress, TranslationRoute } from '@core'
 import type { TranslationErrorCode } from '../ipc/api-types'
 
 /** `workerData` for translation.worker.ts. */

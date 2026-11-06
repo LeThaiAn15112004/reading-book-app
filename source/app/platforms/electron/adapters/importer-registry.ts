@@ -1,4 +1,4 @@
-import { DocumentFormat, type DocumentImporter } from '@reading-book/book-reader-sdk'
+import { DocumentFormat, type DocumentImporter } from '@core'
 import { createEpubAdapter } from './epub.adapter'
 import { mdAdapter } from './md.adapter'
 import { createAudioAdapter } from './audio.adapter'

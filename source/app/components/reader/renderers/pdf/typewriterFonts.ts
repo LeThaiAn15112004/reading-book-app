@@ -4,7 +4,7 @@
  * editor shows equals the layout Main writes into the PDF.
  */
 
-import { typewriterFontFaces, type EmbeddedFontFaceInfo, type FontMetrics } from '@reading-book/book-reader-sdk'
+import { typewriterFontFaces, type EmbeddedFontFaceInfo, type FontMetrics } from '@core'
 import { parseTrueType, ttfFontMetrics, type TtfFace } from '../../../../platforms/electron/pdf-sync/pdf-font-embed'
 
 const urls = import.meta.glob('../../../../assets/fonts/typewriter/*.ttf', { query: '?url', import: 'default', eager: true }) as Record<string, string>

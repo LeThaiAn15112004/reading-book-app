@@ -1,5 +1,5 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react'
-import { AUTO_LANGUAGE, WHISPER_LANGUAGES } from '@reading-book/book-reader-sdk'
+import { AUTO_LANGUAGE, WHISPER_LANGUAGES } from '@core'
 import type { TranscriptionScope } from '../../../bridge'
 import { useAudioPlayerStore } from '../logic/audioPlayerStore'
 import { decoderUnavailableText, formatMegabytes, transcriptionErrorText } from '../logic/transcriptionMessages'

@@ -8,7 +8,7 @@ import {
   collisionKey,
   normalizeArchivePath,
   type ZipRejectCode,
-} from '@reading-book/book-reader-sdk'
+} from '@core'
 
 /**
  * Minimal, bounded ZIP reader for the audiobook import preview. It reads only the end-of-central-directory

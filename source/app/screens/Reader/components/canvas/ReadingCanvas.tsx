@@ -13,7 +13,7 @@ import {
   isTextNodeAtPoint,
   type HandHoverDwell,
 } from '../../../../components/reader/interaction'
-import type { InteractionTool } from '@reading-book/book-reader-sdk'
+import type { InteractionTool } from '@core'
 import type { FakeChapter } from '../../logic'
 
 type MarginMode = 'narrow' | 'normal' | 'wide' | 'off'

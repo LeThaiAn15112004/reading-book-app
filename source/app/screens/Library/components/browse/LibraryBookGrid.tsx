@@ -1,4 +1,4 @@
-import type { LibraryBook } from '@reading-book/book-reader-sdk'
+import type { LibraryBook } from '@core'
 import type { BookMenuPoint } from '../book'
 import { ShelfRailCard } from '../shelves/ShelfRailCard'
 

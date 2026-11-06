@@ -1,4 +1,4 @@
-import { filterByNav, type LibraryBook } from '@reading-book/book-reader-sdk'
+import { filterByNav, type LibraryBook } from '@core'
 
 /** Library sidebar destinations (status filters + favorites). Collections live in the top nav. */
 export type LibraryBrowseFilter = 'all' | 'reading' | 'not-started' | 'completed' | 'favorites'

@@ -13,7 +13,7 @@ import {
   type HighlightRecord,
   type NoteLocator,
   type SaveHighlightInput as SdkSaveHighlightInput,
-} from '@reading-book/book-reader-sdk'
+} from '@core'
 import type { BookFileResolution } from '../files/sandbox'
 import type {
   HighlightDto,

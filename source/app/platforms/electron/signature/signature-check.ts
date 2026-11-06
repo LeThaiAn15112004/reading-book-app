@@ -11,7 +11,7 @@
 
 import { createHash } from 'node:crypto'
 import fsp from 'node:fs/promises'
-import { isSignatureInfoCurrent, type BookSignatureInfo } from '@reading-book/book-reader-sdk'
+import { isSignatureInfoCurrent, type BookSignatureInfo } from '@core'
 import { hashFile } from '../files/file-hash.ts'
 import { signatureNeedsFileContent, verifySignature } from './signature-service.ts'
 

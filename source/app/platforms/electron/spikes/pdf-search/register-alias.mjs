@@ -1,6 +1,6 @@
 /**
  * Node resolve hook for the PDF search checks (`node --experimental-strip-types`, no Vite):
- *   - `@reading-book/book-reader-sdk` → `sdk-stub.mjs` (real text-search + chunk-text sources);
+ *   - `@core` → `sdk-stub.mjs` (real text-search + chunk-text sources);
  *   - extensionless relative imports → the `.ts` file next to the importer.
  */
 import { register } from 'node:module'
@@ -13,7 +13,7 @@ register(
       import { existsSync } from 'node:fs'
       import { fileURLToPath } from 'node:url'
       export async function resolve(specifier, context, next) {
-        if (specifier === '@reading-book/book-reader-sdk') {
+        if (specifier === '@core') {
           return { url: ${JSON.stringify(sdkStub)}, shortCircuit: true }
         }
         if (

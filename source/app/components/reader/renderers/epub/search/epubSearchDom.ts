@@ -1,4 +1,4 @@
-import type { TextMatch, TextMatcher } from '@reading-book/book-reader-sdk'
+import type { TextMatch, TextMatcher } from '@core'
 
 /**
  * In-section search for the EPUB surface.

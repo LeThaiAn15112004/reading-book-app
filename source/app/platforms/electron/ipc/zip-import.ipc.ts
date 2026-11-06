@@ -1,4 +1,4 @@
-import { features } from '@reading-book/config'
+import { features } from '@core/config'
 import { app, BrowserWindow, dialog, ipcMain } from 'electron'
 import fsp from 'node:fs/promises'
 import path from 'node:path'

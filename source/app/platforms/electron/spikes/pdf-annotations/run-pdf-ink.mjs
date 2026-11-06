@@ -14,7 +14,7 @@
  * Run: npm run spike:pdf:ink   (builds the SDK bundle first)
  */
 import assert from 'node:assert/strict'
-import { packPdfInkLocator, packPdfInkRef, packPdfHighlightLocator, pdfAnnotationFromRects } from '@reading-book/book-reader-sdk'
+import { packPdfInkLocator, packPdfInkRef, packPdfHighlightLocator, pdfAnnotationFromRects } from '@core'
 import { invoke } from './electron-stub.mjs'
 import { getDatabase } from './db-stub.mjs'
 

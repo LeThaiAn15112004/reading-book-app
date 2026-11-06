@@ -8,7 +8,7 @@
  * Anything it can't handle is refused with a `PdfWriteError` — never written "best effort".
  * Pure Node (no Electron, no UI, no SQLite); runs in the scan worker.
  */
-import { shapeArrowBarbs, type PdfWriteAnnotation } from '@reading-book/book-reader-sdk'
+import { shapeArrowBarbs, type PdfWriteAnnotation } from '@core'
 import { PdfRawObjects, parsePdfJsRef } from './pdf-raw-objects'
 import { buildTypewriterObjects } from './typewriter-pdf'
 import {

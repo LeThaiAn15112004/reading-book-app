@@ -8,7 +8,7 @@
  * a text selection.
  */
 import type { CSSProperties, PointerEvent as ReactPointerEvent, ReactNode } from 'react'
-import { INK_RESIZE_HANDLES, inkHandlePosition, inkToolbarSide, type InkBox } from '@reading-book/book-reader-sdk'
+import { INK_RESIZE_HANDLES, inkHandlePosition, inkToolbarSide, type InkBox } from '@core'
 
 const HANDLE_PX = 10
 

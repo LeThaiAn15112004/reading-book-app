@@ -24,7 +24,7 @@ import {
   packPdfHighlightLocator,
   planTwoWaySync,
   shapeFromDrag,
-} from '@reading-book/book-reader-sdk'
+} from '@core'
 import { invoke } from './electron-stub.mjs'
 import { getDatabase } from './db-stub.mjs'
 

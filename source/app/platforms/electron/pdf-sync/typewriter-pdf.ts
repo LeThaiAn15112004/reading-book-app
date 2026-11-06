@@ -9,7 +9,7 @@ import {
   layoutTypewriter,
   type EmbeddedFontFaceInfo,
   type PdfWriteAnnotation,
-} from '@reading-book/book-reader-sdk'
+} from '@core'
 import { deflateSync } from 'node:zlib'
 import { buildEmbeddedFont, type PdfFontObject } from './pdf-font-embed'
 import { loadTypewriterFace, typewriterFontMetrics } from './typewriter-font-files'

@@ -4,7 +4,7 @@ import {
   normalizeTranslationLanguage,
   resolveTranslationRoute,
   type TtsEngine,
-} from '@reading-book/book-reader-sdk'
+} from '@core'
 import { translationApi, type TranslationErrorCode, type TranslationProgress } from '../../../../bridge'
 import { createWebSpeechEngine } from '../../../../components/reader/tts/webSpeechEngine'
 import { useReadAloudStore } from '../readAloud/readAloudStore'

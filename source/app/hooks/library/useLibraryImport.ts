@@ -2,7 +2,7 @@ import { useCallback, useEffect } from 'react'
 import type {
   ImportClientResult,
   ImportErrorCode,
-} from '@reading-book/book-reader-sdk'
+} from '@core'
 import {
   useLibraryImportStore,
   type ImportToastAction,
