@@ -1,9 +1,9 @@
-import type { ConnectionTestResult } from '../../../../core/src/domain/index.js';
+import type { ConnectionTestResult } from '../../../../../core/src/domain/index.js';
 import type {
   ExternalCatalogEntry,
   ExternalLibraryProvider,
   LinkLibraryOptions,
-} from '../../../../core/src/domain-ports/index.js';
+} from '../../../../../core/src/domain-ports/index.js';
 import type { ExternalLibraryProviderAdapter } from './types.js';
 import {
   GoogleDriveAuthService,

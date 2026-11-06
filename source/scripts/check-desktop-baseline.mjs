@@ -122,7 +122,8 @@ function runGit() {
   const files = `${changed.output}\n${untracked.output}`.split(/\r?\n/).map((f) => f.trim()).filter(Boolean)
   // Spec 009 changes Main on purpose; each changed file must be listed with its reason.
   const approved = JSON.parse(readFileSync(path.join(sourceRoot, 'scripts/desktop-main-changes.json'), 'utf8')).files
-  const unexpected = files.filter((f) => !(f in approved))
+  // A key ending in "/" approves every file under that folder (a whole folder moved into electron/).
+  const unexpected = files.filter((f) => !(f in approved) && !Object.keys(approved).some((k) => k.endsWith('/') && f.startsWith(k)))
   record('git', `electron/ changes since ${base} all approved`, changed.ok && untracked.ok && unexpected.length === 0,
     unexpected.length
       ? `${unexpected.length} unapproved: ${unexpected.slice(0, 5).join(', ')}${unexpected.length > 5 ? ', …' : ''}`

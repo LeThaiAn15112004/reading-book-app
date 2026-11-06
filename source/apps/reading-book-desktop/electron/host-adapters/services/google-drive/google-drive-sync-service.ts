@@ -300,6 +300,7 @@ export class GoogleDriveSyncService {
 
         // Safety: stop if we get an empty response with no continuation token
         if (!result.nextPageToken && !result.newStartPageToken) break;
+      // eslint-disable-next-line no-constant-condition -- host-adapters moved under Desktop lint (spec 009 T024); code unchanged
       } while (true);
 
       nextPageToken = newStartPageToken ?? cursor;

@@ -7,14 +7,14 @@ import type {
   ExternalLibraryProvider,
   LinkLibraryOptions,
 } from '@reading-book/book-reader-sdk';
-import { CompositeExternalLibraryConnector } from '../../../../book-reader-sdk/host-adapters/external-libraries/composite-connector.js';
+import { CompositeExternalLibraryConnector } from '../../../electron/host-adapters/external-libraries/composite-connector.js';
 import {
   getAllExternalLibrariesStatus,
   linkExternalLibrary,
   pullExternalCatalog,
   testExternalLibraryConnection,
   unlinkExternalLibrary,
-} from '../../../../book-reader-sdk/host-adapters/services/external-library.js';
+} from '../../../electron/host-adapters/services/external-library.js';
 
 let defaultConnectorInstance: ExternalLibraryConnector | null = null;
 

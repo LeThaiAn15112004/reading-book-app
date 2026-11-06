@@ -13,7 +13,7 @@ import {
   isSdkError,
   type TranslationLoadProgress,
 } from '@reading-book/book-reader-sdk'
-import { createTransformersTranslationEngineLoader } from '../../../book-reader-sdk/host-adapters/translation'
+import { createTransformersTranslationEngineLoader } from '../host-adapters/translation'
 import type { TranslationErrorCode } from '../ipc/api-types'
 import type {
   TranslationWorkerData,

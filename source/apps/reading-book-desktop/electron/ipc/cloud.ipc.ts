@@ -8,20 +8,20 @@ import {
   DropboxDownloadService,
   generatePkcePair as generateDropboxPkcePair,
   type DropboxStoredTokens,
-} from '../../../book-reader-sdk/host-adapters/services/dropbox/index.js'
+} from '../host-adapters/services/dropbox/index.js'
 import {
   GoogleDriveAuthService,
   GoogleDriveDownloadService,
   generateGoogleDrivePkcePair,
   type GoogleDriveStoredTokens,
-} from '../../../book-reader-sdk/host-adapters/services/google-drive/index.js'
+} from '../host-adapters/services/google-drive/index.js'
 import {
   OneDriveAuthService,
   OneDriveDownloadService,
   generateOneDrivePkcePair,
   type OneDriveStoredTokens,
-} from '../../../book-reader-sdk/host-adapters/services/onedrive/index.js'
-import type { DownloadProgressListener } from '../../../book-reader-sdk/host-adapters/services/download-progress.js'
+} from '../host-adapters/services/onedrive/index.js'
+import type { DownloadProgressListener } from '../host-adapters/services/download-progress.js'
 import {
   GOOGLE_OAUTH_LOOPBACK_REDIRECT_URI,
   OAUTH_REDIRECT_URI,

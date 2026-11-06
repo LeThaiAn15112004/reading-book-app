@@ -50,7 +50,7 @@ export function checkMobileUiGraph({
         if (!specifier.includes('?') && CODE_EXTENSIONS.concat('').includes(path.extname(bare))) unresolved.push(`${rel(file)}:${line} "${specifier}"`)
         continue
       }
-      if (isInside(target, electronDir) && !allowed.has(norm(target))) {
+      if (isInside(target, electronDir) && !isInside(target, hostAdaptersDir) && !allowed.has(norm(target))) {
         violations.push(violation('R8', file, line, specifier, `the Mobile UI bundle reaches Desktop electron/ runtime code (${rel(target)}); only exceptions.json entries are allowed`))
         continue
       }

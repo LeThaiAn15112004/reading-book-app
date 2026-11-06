@@ -2,14 +2,14 @@ import {
   getProviderDisplayName,
   type ConnectionTestResult,
   type ExternalLibraryInfo,
-} from '../../../../core/src/domain/index.js';
+} from '../../../../../core/src/domain/index.js';
 import type {
   ExternalCatalogEntry,
   ExternalLibraryConnector,
   ExternalLibraryProvider,
   ExternalLibraryStatus,
   LinkLibraryOptions,
-} from '../../../../core/src/domain-ports/index.js';
+} from '../../../../../core/src/domain-ports/index.js';
 import {
   DefaultExternalLibraryRepository,
   type ExternalLibraryRepository,

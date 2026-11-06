@@ -299,6 +299,7 @@ export class DropboxFileService {
       const entry = match.metadata?.metadata;
       if (entry && entry['.tag'] === 'file') {
         const format = detectDropboxBookFormat(entry.name);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- host-adapters moved under Desktop lint (spec 009 T024); code unchanged
         if (SUPPORTED_BOOK_EXTENSIONS.includes(format as any)) {
           results.push({
             ...entry,

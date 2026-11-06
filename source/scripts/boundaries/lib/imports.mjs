@@ -15,7 +15,7 @@ export const sdkDir = coreDir
 export const desktopDir = path.join(appsDir, 'reading-book-desktop')
 export const mobileDir = path.join(appsDir, 'reading-book-mobile')
 export const configDir = path.join(coreDir, 'src/config')
-export const hostAdaptersDir = path.join(appsDir, 'book-reader-sdk/host-adapters')
+export const hostAdaptersDir = path.join(desktopDir, 'electron/host-adapters')
 
 export const CODE_EXTENSIONS = ['.ts', '.tsx', '.mts', '.cts', '.js', '.jsx', '.mjs', '.cjs']
 const SKIPPED_DIRS = new Set(['node_modules', 'dist', 'dist-electron', 'release', '.expo', 'android', 'ios', 'ui-assets', 'coverage'])

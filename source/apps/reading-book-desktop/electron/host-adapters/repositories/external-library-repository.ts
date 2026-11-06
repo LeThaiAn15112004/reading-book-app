@@ -1,5 +1,5 @@
-import { createDefaultProviderInfo, type ExternalLibraryInfo } from '../../../../core/src/domain/index.js';
-import type { ExternalLibraryProvider } from '../../../../core/src/domain-ports/index.js';
+import { createDefaultProviderInfo, type ExternalLibraryInfo } from '../../../../../core/src/domain/index.js';
+import type { ExternalLibraryProvider } from '../../../../../core/src/domain-ports/index.js';
 import {
   createDefaultExternalLibraryStorage,
   type ExternalLibraryStorage,
