@@ -62,6 +62,8 @@ export {
 } from './annotations/locator.js'
 export * from './epub/index.js'
 export type { AsyncSqlDriver, SqlValue, Statement, SyncSqlDriver } from './db/driver.js'
+export { assertMigrationOrder, planMigrations, splitSqlStatements } from './db/migrations.js'
+export type { Migration, MigrationPlan } from './db/migrations.js'
 export * from './persistence/index.js'
 export * from './search/index.js'
 export * from './text/index.js'

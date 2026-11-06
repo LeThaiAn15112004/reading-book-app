@@ -1,4 +1,5 @@
 import type { Database } from 'better-sqlite3'
+import { planMigrations, type Migration } from '@reading-book/book-reader-sdk'
 import migration001 from '../../../../core/src/db/desktop/migrations/001_initial.sql?raw'
 import migration002 from '../../../../core/src/db/desktop/migrations/002_expand_file_formats.sql?raw'
 import migration003 from '../../../../core/src/db/desktop/migrations/003_book_signatures.sql?raw'
@@ -29,11 +30,6 @@ import migration027 from '../../../../core/src/db/desktop/migrations/027_books_m
 import migration028 from '../../../../core/src/db/desktop/migrations/028_book_audio_chapters.sql?raw'
 import migration029 from '../../../../core/src/db/desktop/migrations/029_audio_transcripts.sql?raw'
 import migration030 from '../../../../core/src/db/desktop/migrations/030_audio_transcript_scope.sql?raw'
-
-interface Migration {
-  name: string
-  sql: string
-}
 
 const MIGRATIONS: Migration[] = [
   { name: '001_initial.sql', sql: migration001 },
@@ -84,19 +80,15 @@ export function migrate(db: Database): void {
     );
   `)
 
-  const applied = new Set(
-    (db.prepare('SELECT name FROM schema_migrations').all() as Array<{ name: string }>).map(
-      (row) => row.name,
-    ),
-  )
+  const applied = (db.prepare('SELECT name FROM schema_migrations').all() as Array<{ name: string }>).map((row) => row.name)
+  // Which migrations are pending, and in which order, is core's call; names this build does not list are left alone as before.
+  const { pending } = planMigrations(applied, MIGRATIONS)
 
   const insert = db.prepare(
     'INSERT INTO schema_migrations (name, applied_at) VALUES (?, ?)',
   )
 
-  for (const migration of MIGRATIONS) {
-    if (applied.has(migration.name)) continue
-
+  for (const migration of pending) {
     db.pragma('foreign_keys = OFF')
     try {
       const applyOne = db.transaction(() => {
