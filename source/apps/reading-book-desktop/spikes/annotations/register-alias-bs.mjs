@@ -24,6 +24,14 @@ register(
     encodeURIComponent(`
       import { existsSync } from 'node:fs'
       import { fileURLToPath } from 'node:url'
+      // Main imports JSON without an import attribute (Vite allows it, Node does not): serve it as an ES module.
+      export async function load(url, context, next) {
+        if (url.startsWith('file:') && url.endsWith('.json')) {
+          const { readFileSync } = await import('node:fs')
+          return { format: 'module', source: 'export default ' + readFileSync(fileURLToPath(url), 'utf8'), shortCircuit: true }
+        }
+        return next(url, context)
+      }
       export async function resolve(specifier, context, next) {
         if (specifier === '@reading-book/book-reader-sdk') return { url: ${JSON.stringify(sdk)}, shortCircuit: true }
         if (specifier === '@reading-book/config') return { url: ${JSON.stringify(config)}, shortCircuit: true }
