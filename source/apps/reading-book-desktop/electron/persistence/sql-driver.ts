@@ -10,7 +10,7 @@ export function createSyncSqlDriver(db: SqliteDatabase): SyncSqlDriver {
   return {
     run(statement) {
       const result = db.prepare(statement.sql).run(...bind(statement))
-      return { changes: result.changes, lastInsertRowid: result.lastInsertRowid }
+      return { changes: Number(result.changes), lastInsertRowid: result.lastInsertRowid }
     },
     all<Row>(statement: Statement): Row[] {
       return db.prepare(statement.sql).all(...bind(statement)) as Row[]

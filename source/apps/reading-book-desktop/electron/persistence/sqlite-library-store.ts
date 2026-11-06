@@ -2,200 +2,36 @@ import {
   Author,
   Book,
   BookAuthor,
+  STARTED_LOCATION_LABEL,
   isAudioFormat,
   isDocumentFormat,
-  parseDocumentFormat,
+  isPersistedLocationJson,
+  libraryCodec,
+  libraryStatements as q,
+  normalizeGenreNames,
+  parseGenres,
+  parseReadingState,
+  signatureMetadataPatch,
   validateChapterRecords,
   type AudioChapterRecord,
+  type BookMetadataJson,
+  type BookSignatureInfo,
   type LibraryStore,
+  type ReadingStateJson,
+  type SyncSqlDriver,
 } from '@reading-book/book-reader-sdk'
 import type { Database as SqliteDatabase } from 'better-sqlite3'
 import { randomUUID } from 'node:crypto'
 import path from 'node:path'
-import {
-  normalizeGenreNames,
-  parseGenres,
-  parseMetadata,
-  parseReadingState,
-  signatureInfoFromMetadata,
-  signatureMetadataPatch,
-  type BookMetadataJson,
-  type BookSignatureInfo,
-  type ReadingStateJson,
-} from '@reading-book/book-reader-sdk'
 import { getDatabase } from './db'
-import {
-  STARTED_LOCATION_LABEL,
-  displayLabelFromStoredLocation,
-  isPersistedLocationJson,
-} from '@reading-book/book-reader-sdk'
+import { createSyncSqlDriver } from './sql-driver'
 
-interface BookRow {
-  id: string
-  title: string
-  file_path: string
-  normalized_path: string | null
-  file_format: string
-  cover_path: string | null
-  sha256: string
-  is_favorite: number
-  reading_status: 'reading' | 'completed' | 'not-started'
-  source_url: string | null
-  source_provider: string | null
-  external_id: string | null
-  /** fileSizeBytes, pageCount, description, signatureStatus, … (see books-json.ts). */
-  metadata_json: string
-  /** string[] of genre names, sorted A→Z. */
-  genres_json: string
-  /** Last-read location + per-book display prefs (see books-json.ts). */
-  reading_state_json: string
-  added_at: string
-  updated_at: string
-}
+// Rows, codecs and list shapes are core's (spec 009 T032); re-exported because Main imports them from here.
+export type ReadingSessionSummary = libraryCodec.ReadingSessionSummary
+export type BookListItem = libraryCodec.BookListItem
+export type CollectionListItem = libraryCodec.CollectionListItem
 
-export type ReadingSessionSummary = {
-  /** Human-readable last-read label for Library (never raw CFI JSON). */
-  lastReadLocation?: string
-  /** `reading_state_json.updatedAt` — when the reading state last changed. */
-  lastReadAt?: string
-  /** `reading_state_json.percent` (0–100) — reading progress stored by the Reader. */
-  progressPercent?: number
-}
-
-export type BookListItem = {
-  book: Book
-  readingStatus: 'reading' | 'completed' | 'not-started'
-  /** Comma-joined author display names (empty if none). */
-  authorNames: string
-  /** Genre / subject names (empty if none). */
-  genreNames: string[]
-  session?: ReadingSessionSummary
-}
-
-export type CollectionListItem = {
-  id: string
-  name: string
-  description?: string
-  bookIds: string[]
-  createdAt: string
-  updatedAt: string
-}
-
-const BOOK_COLUMNS = `
-  id, title, file_path, normalized_path, file_format, cover_path, sha256,
-  is_favorite, reading_status, source_url, source_provider, external_id,
-  metadata_json, genres_json, reading_state_json,
-  added_at, updated_at
-`
-
-const INSERT_BOOK_SQL = `
-  INSERT INTO books (
-    id, title, file_path, normalized_path, file_format, cover_path, sha256,
-    is_favorite, source_url, source_provider, external_id,
-    metadata_json, genres_json, added_at, updated_at
-  ) VALUES (
-    @id, @title, @file_path, @normalized_path, @file_format, @cover_path, @sha256,
-    @is_favorite, @source_url, @source_provider, @external_id,
-    @metadata_json, @genres_json, @added_at, @updated_at
-  )
-`
-
-function rowToBook(row: BookRow): Book {
-  const metadata = parseMetadata(row.metadata_json)
-  return new Book({
-    id: row.id,
-    title: row.title,
-    filePath: row.file_path,
-    normalizedPath: row.normalized_path ?? undefined,
-    format: parseDocumentFormat(row.file_format),
-    coverPath: row.cover_path ?? undefined,
-    sha256: row.sha256,
-    fileSizeBytes: metadata.fileSizeBytes ?? undefined,
-    description: metadata.description ?? undefined,
-    pageCount: metadata.pageCount ?? undefined,
-    isFavorite: row.is_favorite === 1,
-    signature: signatureInfoFromMetadata(metadata),
-    sourceUrl: row.source_url ?? undefined,
-    sourceProvider: row.source_provider ?? undefined,
-    externalId: row.external_id ?? undefined,
-    addedAt: row.added_at,
-    updatedAt: row.updated_at,
-  })
-}
-
-/** Book → the `books` columns + JSON blobs. Parameterized (`@name`), never string-built. */
-function bookToRowParams(book: Book, genreNames: readonly string[]) {
-  // undefined members are dropped by JSON.stringify → "absent" in the stored JSON.
-  const metadata: BookMetadataJson = {
-    fileSizeBytes: book.fileSizeBytes,
-    pageCount: book.pageCount,
-    description: book.description,
-    signatureStatus: book.signature?.status,
-    signerName: book.signature?.signerName,
-    signedAt: book.signature?.signedAt,
-    signatureCheckedAt: book.signature?.checkedAt,
-    signatureCheckedSha256: book.signature?.checkedSha256,
-  }
-  return {
-    id: book.id,
-    title: book.title,
-    file_path: book.filePath,
-    normalized_path: book.normalizedPath ?? null,
-    file_format: book.format,
-    cover_path: book.coverPath ?? null,
-    sha256: book.sha256,
-    is_favorite: book.isFavorite ? 1 : 0,
-    source_url: book.sourceUrl ?? null,
-    source_provider: book.sourceProvider ?? null,
-    external_id: book.externalId ?? null,
-    metadata_json: JSON.stringify(metadata),
-    genres_json: JSON.stringify(normalizeGenreNames(genreNames)),
-    added_at: book.addedAt,
-    updated_at: book.updatedAt,
-  }
-}
-
-function summaryFromState(state: ReadingStateJson): ReadingSessionSummary | undefined {
-  const label = displayLabelFromStoredLocation(state.lastReadLocation ?? '')
-  if (!label) return undefined
-  const percent =
-    typeof state.percent === 'number' && Number.isFinite(state.percent)
-      ? Math.min(100, Math.max(0, state.percent))
-      : undefined
-  return {
-    lastReadLocation: label,
-    lastReadAt: state.updatedAt ?? undefined,
-    progressPercent: percent,
-  }
-}
-
-interface AudioChapterRow {
-  id: string
-  book_id: string
-  position: number
-  title: string
-  file_name: string
-  source_path: string
-  file_format: string
-  size_bytes: number
-  sha256: string
-  duration_seconds: number | null
-}
-
-function chapterRowToRecord(r: AudioChapterRow): AudioChapterRecord {
-  return {
-    id: r.id,
-    bookId: r.book_id,
-    position: r.position,
-    title: r.title,
-    fileName: r.file_name,
-    sourcePath: r.source_path,
-    fileFormat: r.file_format,
-    sizeBytes: r.size_bytes,
-    sha256: r.sha256,
-    durationSeconds: r.duration_seconds,
-  }
-}
+type BookRow = libraryCodec.BookRow
 
 /**
  * SQLite LibraryStore — T2.7 find + T2.8 save / linkAuthors / listAll.
@@ -203,20 +39,20 @@ function chapterRowToRecord(r: AudioChapterRow): AudioChapterRecord {
  * (migration 020) instead of separate tables.
  */
 export class SqliteLibraryStore implements LibraryStore {
-  constructor(private readonly db: SqliteDatabase = getDatabase()) {}
+  private readonly sql: SyncSqlDriver
+
+  constructor(db: SqliteDatabase = getDatabase()) {
+    this.sql = createSyncSqlDriver(db)
+  }
 
   async findById(id: string): Promise<Book | undefined> {
-    const row = this.db
-      .prepare(`SELECT ${BOOK_COLUMNS} FROM books WHERE id = ?`)
-      .get(id) as BookRow | undefined
-    return row ? rowToBook(row) : undefined
+    const row = this.sql.get<BookRow>(q.selectBookById(id))
+    return row ? libraryCodec.bookFromRow(row) : undefined
   }
 
   async findBySha256(hash: string): Promise<Book | undefined> {
-    const row = this.db
-      .prepare(`SELECT ${BOOK_COLUMNS} FROM books WHERE sha256 = ?`)
-      .get(hash) as BookRow | undefined
-    return row ? rowToBook(row) : undefined
+    const row = this.sql.get<BookRow>(q.selectBookBySha256(hash))
+    return row ? libraryCodec.bookFromRow(row) : undefined
   }
 
   async findByAuthor(_authorId: string): Promise<Book[]> {
@@ -228,36 +64,23 @@ export class SqliteLibraryStore implements LibraryStore {
     provider: string,
     externalId: string,
   ): Promise<Book | undefined> {
-    const row = this.db
-      .prepare(
-        `SELECT ${BOOK_COLUMNS} FROM books WHERE source_provider = ? AND external_id = ?`,
-      )
-      .get(provider, externalId) as BookRow | undefined
-    return row ? rowToBook(row) : undefined
+    const row = this.sql.get<BookRow>(q.selectBookByProviderAndExternalId(provider, externalId))
+    return row ? libraryCodec.bookFromRow(row) : undefined
   }
 
   async save(book: Book): Promise<void> {
-    this.db.prepare(INSERT_BOOK_SQL).run(bookToRowParams(book, []))
+    this.sql.run(q.insertBook(libraryCodec.bookToRowValues(book, [])))
   }
 
   /**
    * Link book ↔ authors. Caller must ensure each authorId already exists in `authors`.
    */
   async linkAuthors(bookId: string, authors: BookAuthor[]): Promise<void> {
-    const insert = this.db.prepare(
-      `INSERT OR IGNORE INTO book_authors (book_id, author_id, sort_order)
-       VALUES (@book_id, @author_id, @sort_order)`,
-    )
-    const run = this.db.transaction((links: BookAuthor[]) => {
-      for (const link of links) {
-        insert.run({
-          book_id: bookId,
-          author_id: link.authorId,
-          sort_order: link.sortOrder,
-        })
+    this.sql.transaction(() => {
+      for (const link of authors) {
+        this.sql.run(q.insertBookAuthor(bookId, link.authorId, link.sortOrder))
       }
     })
-    run(authors)
   }
 
   /**
@@ -279,14 +102,9 @@ export class SqliteLibraryStore implements LibraryStore {
       throw new Error('Author name must not be empty')
     }
 
-    const existing = this.db
-      .prepare(
-        `SELECT id, name, sort_name, created_at FROM authors
-         WHERE LOWER(name) = LOWER(?) LIMIT 1`,
-      )
-      .get(trimmed) as
-      | { id: string; name: string; sort_name: string | null; created_at: string }
-      | undefined
+    const existing = this.sql.get<{ id: string; name: string; sort_name: string | null; created_at: string }>(
+      q.selectAuthorByName(trimmed),
+    )
 
     if (existing) {
       return new Author({
@@ -298,26 +116,14 @@ export class SqliteLibraryStore implements LibraryStore {
     }
 
     const author = Author.create(randomUUID(), trimmed)
-    this.db
-      .prepare(
-        `INSERT INTO authors (id, name, sort_name, created_at)
-         VALUES (@id, @name, @sort_name, @created_at)`,
-      )
-      .run({
-        id: author.id,
-        name: author.name,
-        sort_name: author.sortName ?? null,
-        created_at: author.createdAt,
-      })
+    this.sql.run(q.insertAuthor(author.id, author.name, author.sortName ?? null, author.createdAt))
     return author
   }
 
   getReadingSessionSummary(bookId: string): ReadingSessionSummary | undefined {
-    const row = this.db
-      .prepare(`SELECT reading_state_json FROM books WHERE id = ?`)
-      .get(bookId) as { reading_state_json: string } | undefined
+    const row = this.sql.get<{ reading_state_json: string }>(q.selectBookReadingState(bookId))
     if (!row) return undefined
-    return summaryFromState(parseReadingState(row.reading_state_json))
+    return libraryCodec.sessionSummaryFromState(parseReadingState(row.reading_state_json))
   }
 
   /**
@@ -325,13 +131,7 @@ export class SqliteLibraryStore implements LibraryStore {
    * overwrites the keys present in `patch` and keeps every other key.
    */
   private patchReadingState(bookId: string, patch: ReadingStateJson): void {
-    this.db
-      .prepare(
-        `UPDATE books
-         SET reading_state_json = json_patch(reading_state_json, @patch)
-         WHERE id = @id`,
-      )
-      .run({ id: bookId, patch: JSON.stringify(patch) })
+    this.sql.run(q.patchReadingState(bookId, patch))
   }
 
   /**
@@ -340,9 +140,7 @@ export class SqliteLibraryStore implements LibraryStore {
    */
   markAsReading(bookId: string, now = new Date().toISOString()): void {
     this.setReadingStatus(bookId, 'reading', now)
-    const row = this.db
-      .prepare(`SELECT reading_state_json FROM books WHERE id = ?`)
-      .get(bookId) as { reading_state_json: string } | undefined
+    const row = this.sql.get<{ reading_state_json: string }>(q.selectBookReadingState(bookId))
     if (!row) return
 
     const current = parseReadingState(row.reading_state_json).lastReadLocation ?? ''
@@ -358,13 +156,7 @@ export class SqliteLibraryStore implements LibraryStore {
     status: 'reading' | 'completed' | 'not-started',
     now = new Date().toISOString(),
   ): void {
-    this.db
-      .prepare(
-        `UPDATE books
-         SET reading_status = ?, updated_at = ?
-         WHERE id = ?`,
-      )
-      .run(status, now, bookId)
+    this.sql.run(q.updateReadingStatus(bookId, status, now))
   }
 
   /**
@@ -372,9 +164,7 @@ export class SqliteLibraryStore implements LibraryStore {
    * equals `books.sha256`. Only the path moves — book id, annotations, chunks and progress stay.
    */
   updateFilePath(bookId: string, filePath: string): void {
-    this.db
-      .prepare(`UPDATE books SET file_path = ?, updated_at = ? WHERE id = ?`)
-      .run(filePath, new Date().toISOString(), bookId)
+    this.sql.run(q.updateFilePath(bookId, filePath, new Date().toISOString()))
   }
 
   /**
@@ -386,13 +176,7 @@ export class SqliteLibraryStore implements LibraryStore {
    */
   updateFileFingerprint(bookId: string, sha256: string, fileSizeBytes: number): boolean {
     try {
-      const result = this.db
-        .prepare(
-          `UPDATE books
-           SET sha256 = @sha256, metadata_json = json_patch(metadata_json, @patch)
-           WHERE id = @id AND sha256 <> @sha256`,
-        )
-        .run({ id: bookId, sha256, patch: JSON.stringify({ fileSizeBytes }) })
+      const result = this.sql.run(q.updateFileFingerprint(bookId, sha256, JSON.stringify({ fileSizeBytes })))
       return result.changes > 0
     } catch {
       return false
@@ -400,19 +184,11 @@ export class SqliteLibraryStore implements LibraryStore {
   }
 
   setCoverPath(bookId: string, coverPath: string): void {
-    this.db
-      .prepare(`UPDATE books SET cover_path = ?, updated_at = ? WHERE id = ?`)
-      .run(coverPath, new Date().toISOString(), bookId)
+    this.sql.run(q.updateCoverPath(bookId, coverPath, new Date().toISOString()))
   }
 
   setFavorite(bookId: string, value: boolean): void {
-    this.db
-      .prepare(
-        `UPDATE books
-         SET is_favorite = ?, updated_at = ?
-         WHERE id = ?`,
-      )
-      .run(value ? 1 : 0, new Date().toISOString(), bookId)
+    this.sql.run(q.updateFavorite(bookId, value, new Date().toISOString()))
   }
 
   /**
@@ -424,10 +200,9 @@ export class SqliteLibraryStore implements LibraryStore {
     authorNames: string[] = [],
     genreNames: string[] = [],
   ): void {
-    const run = this.db.transaction(() => {
+    this.sql.transaction(() => {
       this.insertBookWithAuthors(book, authorNames, genreNames)
     })
-    run()
   }
 
   /**
@@ -453,77 +228,45 @@ export class SqliteLibraryStore implements LibraryStore {
     if (book.format !== first.fileFormat) {
       throw new Error('persistImportedAudiobook: books.file_format must be the first chapter format')
     }
-    const run = this.db.transaction(() => {
+    this.sql.transaction(() => {
       this.insertBookWithAuthors(book, authorNames, genreNames)
-      const insert = this.db.prepare(
-        `INSERT INTO book_audio_chapters (
-           id, book_id, position, title, file_name, source_path, file_format, size_bytes, sha256, duration_seconds
-         ) VALUES (
-           @id, @book_id, @position, @title, @file_name, @source_path, @file_format, @size_bytes, @sha256, @duration_seconds
-         )`,
-      )
       for (const c of chapters) {
-        insert.run({
-          id: c.id,
-          book_id: c.bookId,
-          position: c.position,
-          title: c.title,
-          file_name: c.fileName,
-          source_path: c.sourcePath,
-          file_format: c.fileFormat,
-          size_bytes: c.sizeBytes,
-          sha256: c.sha256,
-          duration_seconds: c.durationSeconds,
-        })
+        this.sql.run(q.insertAudioChapter(libraryCodec.audioChapterToValues(c)))
       }
     })
-    run()
   }
 
   /** Chapters of a multi-chapter audiobook in playback order; `[]` for every other book. */
   listAudioChapters(bookId: string): AudioChapterRecord[] {
-    const rows = this.db
-      .prepare(
-        `SELECT id, book_id, position, title, file_name, source_path, file_format, size_bytes, sha256, duration_seconds
-         FROM book_audio_chapters WHERE book_id = ? ORDER BY position`,
-      )
-      .all(bookId) as AudioChapterRow[]
-    return rows.map(chapterRowToRecord)
+    return this.sql.all<libraryCodec.AudioChapterRow>(q.selectAudioChapters(bookId)).map(libraryCodec.audioChapterFromRow)
   }
 
   /** One chapter of ONE book — never a chapter of another book; `undefined` when there is none. */
   getAudioChapter(bookId: string, chapterId: string): AudioChapterRecord | undefined {
-    const row = this.db
-      .prepare(
-        `SELECT id, book_id, position, title, file_name, source_path, file_format, size_bytes, sha256, duration_seconds
-         FROM book_audio_chapters WHERE book_id = ? AND id = ?`,
-      )
-      .get(bookId, chapterId) as AudioChapterRow | undefined
-    return row ? chapterRowToRecord(row) : undefined
+    const row = this.sql.get<libraryCodec.AudioChapterRow>(q.selectAudioChapter(bookId, chapterId))
+    return row ? libraryCodec.audioChapterFromRow(row) : undefined
   }
 
   /** True when the book is a multi-chapter audiobook (has chapter rows). */
   hasAudioChapters(bookId: string): boolean {
-    return this.db.prepare('SELECT 1 FROM book_audio_chapters WHERE book_id = ? LIMIT 1').get(bookId) !== undefined
+    return this.sql.get(q.selectHasAudioChapters(bookId)) !== undefined
   }
 
   /** Chapter count per multi-chapter audiobook (books without chapters are absent). */
   audioChapterCounts(): Map<string, number> {
-    const rows = this.db
-      .prepare('SELECT book_id, COUNT(*) AS n FROM book_audio_chapters GROUP BY book_id')
-      .all() as Array<{ book_id: string; n: number }>
+    const rows = this.sql.all<{ book_id: string; n: number }>(q.selectAudioChapterCounts())
     return new Map(rows.map((r) => [r.book_id, r.n]))
   }
 
   /** Folder of every registered book file (startup sweep: a folder some book lives in is never "partial"). */
   bookDirectories(): string[] {
-    const rows = this.db.prepare('SELECT file_path FROM books').all() as Array<{ file_path: string }>
+    const rows = this.sql.all<{ file_path: string }>(q.selectBookFilePaths())
     return rows.map((r) => path.dirname(r.file_path))
   }
 
   /** Book row + authors; call inside a transaction. */
   private insertBookWithAuthors(book: Book, authorNames: string[], genreNames: string[]): void {
-    this.db.prepare(INSERT_BOOK_SQL).run(bookToRowParams(book, genreNames))
+    this.sql.run(q.insertBook(libraryCodec.bookToRowValues(book, genreNames)))
 
     const authorLinks: BookAuthor[] = []
     authorNames.forEach((name, index) => {
@@ -540,69 +283,31 @@ export class SqliteLibraryStore implements LibraryStore {
     })
 
     if (authorLinks.length > 0) {
-      const insert = this.db.prepare(
-        `INSERT OR IGNORE INTO book_authors (book_id, author_id, sort_order)
-         VALUES (@book_id, @author_id, @sort_order)`,
-      )
       for (const link of authorLinks) {
-        insert.run({
-          book_id: book.id,
-          author_id: link.authorId,
-          sort_order: link.sortOrder,
-        })
+        this.sql.run(q.insertBookAuthor(book.id, link.authorId, link.sortOrder))
       }
     }
   }
 
   /** All books newest-first, with joined author names; genres + session come from the same row. */
   async listAll(): Promise<BookListItem[]> {
-    const rows = this.db
-      .prepare(
-        `SELECT ${BOOK_COLUMNS} FROM books ORDER BY added_at DESC`,
-      )
-      .all() as BookRow[]
+    const rows = this.sql.all<BookRow>(q.selectAllBooksNewestFirst())
 
     // A row whose format the app no longer supports (e.g. an old DOC/DOCX import) is left out of
     // the list — one such row must not hide the whole library. Its data stays in the database.
-    return rows.filter((row) => isDocumentFormat(row.file_format)).map((row) => ({
-      book: rowToBook(row),
-      readingStatus: row.reading_status,
-      authorNames: this.authorNamesForBook(row.id),
-      genreNames: parseGenres(row.genres_json),
-      session: summaryFromState(parseReadingState(row.reading_state_json)),
-    }))
+    return rows
+      .filter((row) => isDocumentFormat(row.file_format))
+      .map((row) => libraryCodec.bookListItemFromRow(row, this.authorNamesForBook(row.id)))
   }
 
   listCollections(): CollectionListItem[] {
-    const rows = this.db
-      .prepare(
-        `SELECT id, name, description, created_at, updated_at
-         FROM collections
-         ORDER BY updated_at DESC`,
-      )
-      .all() as Array<{
-      id: string
-      name: string
-      description: string | null
-      created_at: string
-      updated_at: string
-    }>
-    const books = this.db.prepare(
-      `SELECT book_id
-       FROM collection_books
-       WHERE collection_id = ?
-       ORDER BY sort_order ASC, added_at ASC`,
-    )
-    return rows.map((row) => ({
-      id: row.id,
-      name: row.name,
-      description: row.description ?? undefined,
-      bookIds: (books.all(row.id) as Array<{ book_id: string }>).map(
-        (item) => item.book_id,
+    const rows = this.sql.all<libraryCodec.CollectionRow>(q.selectCollections())
+    return rows.map((row) =>
+      libraryCodec.collectionFromRow(
+        row,
+        this.sql.all<{ book_id: string }>(q.selectCollectionBookIds(row.id)).map((item) => item.book_id),
       ),
-      createdAt: row.created_at,
-      updatedAt: row.updated_at,
-    }))
+    )
   }
 
   createCollection(input: {
@@ -618,18 +323,9 @@ export class SqliteLibraryStore implements LibraryStore {
       createdAt: now,
       updatedAt: now,
     }
-    this.db
-      .prepare(
-        `INSERT INTO collections (id, name, description, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?)`,
-      )
-      .run(
-        collection.id,
-        collection.name,
-        collection.description ?? null,
-        collection.createdAt,
-        collection.updatedAt,
-      )
+    this.sql.run(
+      q.insertCollection(collection.id, collection.name, collection.description ?? null, collection.createdAt, collection.updatedAt),
+    )
     return collection
   }
 
@@ -638,85 +334,41 @@ export class SqliteLibraryStore implements LibraryStore {
     input: { name: string; description?: string },
   ): CollectionListItem | undefined {
     const now = new Date().toISOString()
-    const result = this.db
-      .prepare(
-        `UPDATE collections
-         SET name = ?, description = ?, updated_at = ?
-         WHERE id = ?`,
-      )
-      .run(
-        input.name.trim(),
-        input.description?.trim() || null,
-        now,
-        collectionId,
-      )
+    const result = this.sql.run(
+      q.updateCollection(collectionId, input.name.trim(), input.description?.trim() || null, now),
+    )
     if (result.changes === 0) return undefined
     return this.listCollections().find((item) => item.id === collectionId)
   }
 
   deleteCollection(collectionId: string): boolean {
-    return (
-      this.db.prepare(`DELETE FROM collections WHERE id = ?`).run(collectionId)
-        .changes > 0
-    )
+    return this.sql.run(q.deleteCollection(collectionId)).changes > 0
   }
 
   addBookToCollection(collectionId: string, bookId: string): void {
     const now = new Date().toISOString()
-    const run = this.db.transaction(() => {
-      const next = this.db
-        .prepare(
-          `SELECT COALESCE(MAX(sort_order), -1) + 1 AS value
-           FROM collection_books
-           WHERE collection_id = ?`,
-        )
-        .get(collectionId) as { value: number }
-      this.db
-        .prepare(
-          `INSERT OR IGNORE INTO collection_books (
-             collection_id, book_id, sort_order, added_at
-           ) VALUES (?, ?, ?, ?)`,
-        )
-        .run(collectionId, bookId, next.value, now)
-      this.db
-        .prepare(`UPDATE collections SET updated_at = ? WHERE id = ?`)
-        .run(now, collectionId)
+    this.sql.transaction(() => {
+      const next = this.sql.get<{ value: number }>(q.selectNextCollectionSortOrder(collectionId)) as { value: number }
+      this.sql.run(q.insertCollectionBook(collectionId, bookId, next.value, now))
+      this.sql.run(q.touchCollection(collectionId, now))
     })
-    run()
   }
 
   removeBookFromCollection(collectionId: string, bookId: string): boolean {
-    const result = this.db
-      .prepare(
-        `DELETE FROM collection_books
-         WHERE collection_id = ? AND book_id = ?`,
-      )
-      .run(collectionId, bookId)
+    const result = this.sql.run(q.deleteCollectionBook(collectionId, bookId))
     if (result.changes > 0) {
-      this.db
-        .prepare(`UPDATE collections SET updated_at = ? WHERE id = ?`)
-        .run(new Date().toISOString(), collectionId)
+      this.sql.run(q.touchCollection(collectionId, new Date().toISOString()))
     }
     return result.changes > 0
   }
 
   authorNamesForBook(bookId: string): string {
-    const rows = this.db
-      .prepare(
-        `SELECT a.name AS name
-         FROM book_authors ba
-         JOIN authors a ON a.id = ba.author_id
-         WHERE ba.book_id = ?
-         ORDER BY ba.sort_order ASC, a.name ASC`,
-      )
-      .all(bookId) as { name: string }[]
+    const rows = this.sql.all<{ name: string }>(q.selectAuthorNamesOfBook(bookId))
     return rows.map((r) => r.name).join(', ')
   }
 
   genreNamesForBook(bookId: string): string[] {
-    const row = this.db
-      .prepare(`SELECT genres_json FROM books WHERE id = ?`)
-      .get(bookId) as { genres_json: string } | undefined
+    const row = this.sql.get<{ genres_json: string }>(q.selectBookGenres(bookId))
     return row ? parseGenres(row.genres_json) : []
   }
 
@@ -729,9 +381,7 @@ export class SqliteLibraryStore implements LibraryStore {
       title?: string
     },
   ): void {
-    const current = this.db
-      .prepare(`SELECT title FROM books WHERE id = ?`)
-      .get(bookId) as { title: string } | undefined
+    const current = this.sql.get<{ title: string }>(q.selectBookTitle(bookId))
     if (!current) return
 
     // Only the keys present in `patch` are touched; `null` deletes the key, so unrelated
@@ -751,20 +401,7 @@ export class SqliteLibraryStore implements LibraryStore {
         ? fields.title.trim()
         : current.title
 
-    this.db
-      .prepare(
-        `UPDATE books
-         SET title = @title,
-             metadata_json = json_patch(metadata_json, @patch),
-             updated_at = @updated_at
-         WHERE id = @id`,
-      )
-      .run({
-        id: bookId,
-        title,
-        patch: JSON.stringify(patch),
-        updated_at: new Date().toISOString(),
-      })
+    this.sql.run(q.updateBookMetadata(bookId, title, JSON.stringify(patch), new Date().toISOString()))
   }
 
   /**
@@ -773,56 +410,36 @@ export class SqliteLibraryStore implements LibraryStore {
    * survives). `updated_at` is left alone: this is derived data, not a user edit.
    */
   saveSignature(bookId: string, info: BookSignatureInfo | undefined): void {
-    this.db
-      .prepare(
-        `UPDATE books
-         SET metadata_json = json_patch(metadata_json, @patch)
-         WHERE id = @id`,
-      )
-      .run({ id: bookId, patch: JSON.stringify(signatureMetadataPatch(info)) })
+    this.sql.run(q.patchMetadata(bookId, JSON.stringify(signatureMetadataPatch(info))))
   }
 
   /** Replace author links for a book (used by metadata backfill after cascade wipe). */
   replaceAuthorsByName(bookId: string, authorNames: string[]): void {
-    const run = this.db.transaction(() => {
-      this.db.prepare(`DELETE FROM book_authors WHERE book_id = ?`).run(bookId)
+    this.sql.transaction(() => {
+      this.sql.run(q.deleteBookAuthors(bookId))
       authorNames.forEach((name, index) => {
         const trimmed = name.trim()
         if (!trimmed) return
         const author = this.findOrCreateAuthorByName(trimmed)
-        this.db
-          .prepare(
-            `INSERT OR IGNORE INTO book_authors (book_id, author_id, sort_order)
-             VALUES (@book_id, @author_id, @sort_order)`,
-          )
-          .run({
-            book_id: bookId,
-            author_id: author.id,
-            sort_order: index,
-          })
+        this.sql.run(q.insertBookAuthor(bookId, author.id, index))
       })
     })
-    run()
   }
 
   /** Replace a book's genres (trimmed, case-insensitively de-duplicated, sorted A→Z). */
   setGenres(bookId: string, genreNames: string[]): void {
-    this.db
-      .prepare(`UPDATE books SET genres_json = @genres WHERE id = @id`)
-      .run({ id: bookId, genres: JSON.stringify(normalizeGenreNames(genreNames)) })
+    this.sql.run(q.updateGenres(bookId, JSON.stringify(normalizeGenreNames(genreNames))))
   }
 
   readingStatusForBook(
     bookId: string,
   ): 'reading' | 'completed' | 'not-started' {
-    const row = this.db
-      .prepare(`SELECT reading_status FROM books WHERE id = ?`)
-      .get(bookId) as { reading_status: BookRow['reading_status'] } | undefined
+    const row = this.sql.get<{ reading_status: libraryCodec.ReadingStatus }>(q.selectBookReadingStatus(bookId))
     return row?.reading_status ?? 'not-started'
   }
 
   async deleteCascade(bookId: string): Promise<void> {
-    this.db.prepare(`DELETE FROM books WHERE id = ?`).run(bookId)
+    this.sql.run(q.deleteBook(bookId))
   }
 }
 

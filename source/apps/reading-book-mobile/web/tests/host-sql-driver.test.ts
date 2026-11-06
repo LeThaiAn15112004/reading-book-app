@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest'
 import { createHostAsyncSqlDriver } from '../src/bridge/host-sql-driver'
 import { createFakeHost } from './fake-host'
 
-const stmt = (sql: string, ...params: Array<string | number | bigint | null | Uint8Array>) => ({ sql, params })
+const stmt = (sql: string, ...params: (string | number | bigint | null | Uint8Array)[]) => ({ sql, params })
 
 async function setup() {
   const host = await createFakeHost()

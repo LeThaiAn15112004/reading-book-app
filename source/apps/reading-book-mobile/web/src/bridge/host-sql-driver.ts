@@ -1,14 +1,17 @@
 /** `SqlDriver` over the host's `sql.*` services (spec 008, T043, T056): what the Mobile stores run on in the app. */
 import type { AsyncSqlDriver, SqlValue, Statement } from '@reading-book/book-reader-sdk'
-import type { SqlDriver, SqlParam, SqlRunResult, SqlStatement } from '../db/sql-driver'
+import type { SqlDriver, SqlRunResult, SqlStatement } from '../db/sql-driver'
 import type { HostClient } from './host-client'
+
+/** What the host's sql.* services bind. */
+type HostParam = string | number | null
 
 export function createHostSqlDriver(client: HostClient): SqlDriver {
   return {
-    query: <Row>(sql: string, params: readonly SqlParam[] = []) => client.call<Row[]>('sql', 'query', { sql, params }),
-    run: (sql: string, params: readonly SqlParam[] = []) => client.call<SqlRunResult>('sql', 'run', { sql, params }),
+    query: <Row>(sql: string, params: readonly SqlValue[] = []) => client.call<Row[]>('sql', 'query', { sql, params: params.map(toHostParam) }),
+    run: (sql: string, params: readonly SqlValue[] = []) => client.call<SqlRunResult>('sql', 'run', { sql, params: params.map(toHostParam) }),
     transaction: (statements: readonly SqlStatement[]) =>
-      client.call<SqlRunResult[]>('sql', 'transaction', { statements: statements.map((s) => ({ sql: s.sql, params: s.params ?? [] })) }),
+      client.call<SqlRunResult[]>('sql', 'transaction', { statements: statements.map((s) => ({ sql: s.sql, params: (s.params ?? []).map(toHostParam) })) }),
   }
 }
 
@@ -18,7 +21,7 @@ export function createHostSqlDriver(client: HostClient): SqlDriver {
  * any RPC. `createHostSqlDriver` above stays for the stores until they move onto core statements (T032+).
  */
 export function createHostAsyncSqlDriver(client: HostClient): AsyncSqlDriver {
-  const params = (statement: Statement): SqlParam[] => statement.params.map(toHostParam)
+  const params = (statement: Statement): HostParam[] => statement.params.map(toHostParam)
   return {
     run: (statement) => client.call<SqlRunResult>('sql', 'run', { sql: statement.sql, params: params(statement) }),
     all: <Row>(statement: Statement) => client.call<Row[]>('sql', 'query', { sql: statement.sql, params: params(statement) }),
@@ -30,7 +33,7 @@ export function createHostAsyncSqlDriver(client: HostClient): AsyncSqlDriver {
   }
 }
 
-function toHostParam(value: SqlValue): SqlParam {
+function toHostParam(value: SqlValue): HostParam {
   if (typeof value === 'bigint') {
     if (value > BigInt(Number.MAX_SAFE_INTEGER) || value < BigInt(Number.MIN_SAFE_INTEGER)) {
       throw new TypeError('The Mobile host cannot bind a bigint outside the safe integer range')
