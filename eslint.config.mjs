@@ -54,6 +54,24 @@ export default tseslint.config(
     rules: { 'react-hooks/rules-of-hooks': 'off' },
   },
   {
+    // R12 (spec 009): UI code imports a platform concern without its suffix; Vite and TypeScript pick the host's file.
+    files: ['source/**/*.{ts,tsx}'],
+    ignores: ['source/app/platforms/**'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: ['**/*.electron', '**/*.electron.*', '**/*.native', '**/*.native.*'],
+              message: 'R12: import the platform concern without its .electron / .native suffix (source/app/platforms).',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
     files: ['source/app/bridge/**'],
     rules: { 'no-restricted-syntax': 'off' },
   },
