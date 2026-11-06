@@ -9,7 +9,7 @@
  *     menu opens once.
  */
 import type { MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent } from 'react'
-import { isMobileHost } from './index'
+import { isMobileHost } from '../platforms/host'
 
 export const LONG_PRESS_MS = 500
 const MOVE_TOLERANCE_PX = 10

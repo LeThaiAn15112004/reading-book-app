@@ -4,7 +4,7 @@ import { ConfirmBookActionDialog } from '../../../Library/components/book/Confir
 import { resetAppSettings } from '../../logic/resetAppSettings'
 import { useUpdatesStore, type UpdateCheckState } from '../../logic/updatesStore'
 import { SettingsCard } from '../layout/SettingsCard'
-import { isFeatureAvailable } from '../../../../platform/index'
+import { isFeatureAvailable } from '../../../../platforms/host'
 
 const RESET_APP_SETTINGS_COPY =
   'Your books, reading progress, annotations, and other personal data will not be affected.'

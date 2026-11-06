@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { isFeatureAvailable, type AppFeature } from '../../../platform/index'
+import { isFeatureAvailable, type AppFeature } from '../../../platforms/host'
 
 /**
  * Settings sidebar sections, in display order. App Language lives inside Appearance; Library view

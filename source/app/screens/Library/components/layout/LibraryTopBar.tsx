@@ -1,5 +1,5 @@
 import { ImportMenu } from '../../../../components/import'
-import { isFeatureAvailable } from '../../../../platform/index'
+import { isFeatureAvailable } from '../../../../platforms/host'
 import { useAnnotationTransferStore } from '../../../Reader/logic/annotationTransferStore'
 import { LibrarySearchBox } from './LibrarySearchBox'
 

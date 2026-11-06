@@ -2,7 +2,7 @@ import { Suspense, lazy, useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { isAudioFormat } from '@reading-book/book-reader-sdk'
 import { libraryApi } from '../bridge'
-import { isMobileHost } from '../platform/index'
+import { isMobileHost } from '../platforms/host'
 import { AudioBookScreen } from './AudioBook/AudioBookScreen'
 import { ReaderScreen } from './Reader/ReaderScreen'
 

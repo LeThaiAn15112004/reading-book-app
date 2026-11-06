@@ -3,7 +3,7 @@ import {
   useSettingsNavStore,
 } from '../../logic/settingsNavStore'
 import { SettingsSectionIcon } from './SettingsSectionIcon'
-import { isMobileHost } from '../../../../platform/index'
+import { isMobileHost } from '../../../../platforms/host'
 
 /** Same chevron paths as the Reader sidebar edge handle (`SidebarEdgeRail`). */
 function ChevronIcon({ collapsed }: { collapsed: boolean }) {

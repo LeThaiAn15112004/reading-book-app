@@ -5,14 +5,11 @@ import { installSecureContextShims } from './secure-context-shims'
 
 declare global {
   interface Window {
-    /** Declares the Mobile host to the shared UI. Electron never sets it. */
-    __READMATE_HOST__?: 'mobile'
     /** T064: bridge calls of this page load, for the journey log. */
     __readmateBridgeLog?: BridgeCallLog
   }
 }
 
-window.__READMATE_HOST__ = 'mobile'
 document.documentElement.dataset.mobileHost = ''
 installSecureContextShims()
 

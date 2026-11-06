@@ -1,7 +1,7 @@
 import { useEffect, useId, useRef, useState } from 'react'
 import { features } from '@reading-book/config'
 import { useZipImportStore, zipJobShortLabel } from '../../hooks/library'
-import { isFeatureAvailable } from '../../platform/index'
+import { isFeatureAvailable } from '../../platforms/host'
 import { SpinnerIcon } from './SpinnerIcon'
 
 export type ImportMenuProps = {

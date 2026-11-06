@@ -19,6 +19,12 @@ register(
           !/\.[cm]?[jt]sx?$/.test(specifier) &&
           context.parentURL?.startsWith('file:')
         ) {
+          // Platform adapters (spec 009): the spikes run the Desktop renderer, so the .electron.ts file of a concern wins.
+
+          const adapter = new URL(specifier + '.electron.ts', context.parentURL)
+
+          if (existsSync(fileURLToPath(adapter))) return { url: adapter.href, shortCircuit: true }
+
           const candidate = new URL(specifier + '.ts', context.parentURL)
           if (existsSync(fileURLToPath(candidate))) return { url: candidate.href, shortCircuit: true }
         }

@@ -1,4 +1,4 @@
-import { isFeatureAvailable, type AppFeature } from '../../../platform/index'
+import { isFeatureAvailable, type AppFeature } from '../../../platforms/host'
 import { useShortcutsStore } from '../../../shortcuts/shortcutsStore'
 import { useAppAppearanceStore } from '../../../theme/appAppearanceStore'
 import { usePdfViewStore } from '../../Reader/logic/pdfView/pdfViewStore'

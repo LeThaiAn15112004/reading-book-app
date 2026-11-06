@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type MouseEvent as ReactMouseEvent } from 'react'
 import { annotationTransferApi } from '../../../../bridge'
-import { isFeatureAvailable, isMobileHost } from '../../../../platform/index'
+import { isFeatureAvailable, isMobileHost } from '../../../../platforms/host'
 import { supportsAnnotationTransfer } from '../../../Reader/logic/annotationTransferStore'
 import type {
   CollectionSummary,

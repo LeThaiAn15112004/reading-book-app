@@ -15,7 +15,7 @@ import {
   SessionFlushBridge,
   useImmersiveReading,
 } from './components/chrome'
-import { isFeatureAvailable } from './platform/index'
+import { isFeatureAvailable } from './platforms/host'
 import { LibraryScreen } from './screens/Library/LibraryScreen'
 import { ReaderRoute } from './screens/ReaderRoute'
 import { SettingsScreen } from './screens/Settings/SettingsScreen'

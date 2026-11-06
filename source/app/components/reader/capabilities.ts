@@ -1,4 +1,4 @@
-import { isMobileHost } from '../../platform/index'
+import { isMobileHost } from '../../platforms/host'
 
 /**
  * What the reader surface for the open book can actually do. The toolbar shows a tool only when the
