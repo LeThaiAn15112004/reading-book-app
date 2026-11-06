@@ -4,7 +4,7 @@
 //       `src/` (the UI is built from Desktop's source, FR-016).
 //   R8  Mobile host code (the React Native app: `src/`, `modules/`, `plugins/`, root config files) imports no
 //       `electron` and no DOM library (`react-dom`).
-//   R11 No Mobile file imports `book-reader-sdk/host-adapters` (until OD-7).
+//   R11 No Mobile file imports `electron/host-adapters` (until OD-7).
 import path from 'node:path'
 import {
   desktopDir, hostAdaptersDir, isInside, isMain, isRelative, listCodeFiles, mobileDir, packageName, runCli, scanImports, sdkDir,
@@ -56,7 +56,7 @@ export function checkAppImports({ desktop = desktopDir, mobile = mobileDir, sdk 
       const intoHostAdapters =
         (target && isInside(target, hostAdapters)) || specifier.startsWith('@reading-book/book-reader-sdk/host-adapters')
       if (intoHostAdapters) {
-        violations.push(violation('R11', file, line, specifier, 'Mobile does not import book-reader-sdk/host-adapters (OD-7)'))
+        violations.push(violation('R11', file, line, specifier, 'Mobile does not import electron/host-adapters (OD-7)'))
       }
     }
   }
