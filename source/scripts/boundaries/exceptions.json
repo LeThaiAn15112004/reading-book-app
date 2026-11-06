@@ -1,5 +1,5 @@
 {
-  "$comment": "Every allowed exception to a boundary rule of spec 008 (T035). Adding one needs a reason and a plan.md Complexity Tracking row.",
+  "$comment": "Every allowed exception to a boundary rule (spec 008 T035, re-based by spec 009 T050). Adding one needs a reason and a plan.md Complexity Tracking row.",
   "exceptions": [
     {
       "rule": "R8",
@@ -7,6 +7,12 @@
       "target": "pdf-sync/pdf-font-embed.ts",
       "importedBy": "app/components/reader/renderers/pdf/typewriterFonts.ts",
       "reason": "Its only import is type-only, so it needs no Electron or Node. Typewriter is hidden on Mobile; moving the file to the SDK would be a Desktop refactor Mobile does not need. plan.md, Complexity Tracking (FR-015)."
+    },
+    {
+      "rule": "R11",
+      "kind": "app-imports",
+      "importedBy": "app/hooks/app/useLinkedLibraries.ts",
+      "reason": "Cloud library linking (Desktop-only feature, flag-gated and not offered on Mobile) imports the host-adapters services from a shared hook; moving the hook behind a platform adapter would be a refactor outside spec 009. It was already reachable from the Mobile UI graph before the move (check-mobile-ui-graph notes it)."
     }
   ]
 }

@@ -1,8 +1,8 @@
 #!/usr/bin/env node
-// R8 / FR-015 (spec 008): the Mobile UI bundle graph contains no Desktop `electron/` runtime code and no `electron`
-// package. The graph is followed from Mobile's web entry through every runtime import (static, re-export, dynamic);
-// type-only imports are erased by the build, so they are allowed and not followed.
-// The one allowed file, `electron/pdf-sync/pdf-font-embed.ts`, is listed in exceptions.json (plan.md, Complexity
+// R8 (spec 008 FR-015, re-pointed by spec 009 T050): the Mobile UI bundle graph contains no Desktop host code
+// (`platforms/electron`) and no `electron` package. The graph is followed from the WebView entry (`platforms/native/main.ts`)
+// through every runtime import (static, re-export, dynamic); type-only imports are erased by the build, so they are allowed
+// and not followed. The one allowed file, `pdf-sync/pdf-font-embed.ts`, is listed in exceptions.json (plan.md, Complexity
 // Tracking); its own runtime imports are still followed and checked.
 import path from 'node:path'
 import {

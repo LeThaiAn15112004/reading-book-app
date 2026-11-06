@@ -9,7 +9,6 @@ const require = createRequire(import.meta.url)
 const ts = require('typescript')
 
 export const sourceRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..')
-export const appsDir = path.join(sourceRoot, 'apps')
 export const coreDir = path.join(sourceRoot, 'core')
 export const appDir = path.join(sourceRoot, 'app')
 export const sdkDir = coreDir

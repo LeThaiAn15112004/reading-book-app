@@ -1,5 +1,6 @@
 #!/usr/bin/env node
-// R2 + R3 (spec 008): SDK `src` imports only `zustand/vanilla` and relative paths that stay inside `src`.
+// R2 + R3 (spec 009 contracts/dependency-rules.md): core `src` imports only `zustand/vanilla` and relative paths that stay inside `src`;
+// a path out of `src` or an `@app` import is the core importing the app (R3).
 // Type-only imports count too: a type from `electron` or an app is still a dependency on it.
 // This replaces the "accident of install layout" found in architecture-audit.md §3.
 import path from 'node:path'
@@ -14,12 +15,12 @@ export function checkSdkImports({ srcDir = path.join(sdkDir, 'src') } = {}) {
       if (isRelative(specifier)) {
         const target = path.resolve(path.dirname(file), specifier.split('?')[0])
         if (!isInside(target, srcDir)) {
-          violations.push(violation('R3', file, line, specifier, 'a relative import leaves SDK src (the SDK never imports an app, config or host-adapters)'))
+          violations.push(violation('R3', file, line, specifier, 'a relative import leaves core src (the core never imports the app or a host folder)'))
         }
-      } else if (specifier.startsWith('@core')) {
-        violations.push(violation('R3', file, line, specifier, 'the SDK never imports config or an app (config already depends on the SDK)'))
+      } else if (specifier === '@app' || specifier.startsWith('@app/')) {
+        violations.push(violation('R3', file, line, specifier, 'the core never imports the app'))
       } else if (!SDK_ALLOWED_PACKAGES.includes(specifier)) {
-        violations.push(violation('R2', file, line, specifier, `SDK src may import only ${SDK_ALLOWED_PACKAGES.join(', ')} and relative paths`))
+        violations.push(violation('R2', file, line, specifier, `core src may import only ${SDK_ALLOWED_PACKAGES.join(', ')} and relative paths`))
       }
     }
   }

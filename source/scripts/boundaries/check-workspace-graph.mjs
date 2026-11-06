@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// R5 / FR-006 (spec 008): the workspace dependency graph is acyclic (apps → config → SDK). Edges come from two
+// R5 (spec 009): the dependency graph of the two code areas is acyclic: app → core, never core → app. Edges come from two
 // sources, because either alone can hide a cycle: manifest dependencies on another workspace package, and imports
 // (relative or alias, type-only included) from one package's files into another package's folder.
 import { readFileSync, existsSync } from 'node:fs'
@@ -10,8 +10,7 @@ import {
 
 /**
  * The code areas of the single project (spec 009): npm workspaces are gone, so the areas are listed here. An area
- * without a manifest is named after its folder. T050 re-points this list when the areas move to `source/core` and
- * `source/app`.
+ * without a manifest is named after its folder.
  */
 export const AREA_DIRS = ['core', 'app']
 
@@ -82,7 +81,7 @@ export function checkWorkspaceGraph({ packages = workspacePackages() } = {}) {
   const edges = workspaceEdges(packages)
   const violations = findCycles(edges).map((cycle) => {
     const first = edges.find((e) => e.from === cycle[0] && e.to === cycle[1])
-    return violation('R5', path.join(sourceRoot, '..', 'package.json'), 0, cycle.join(' -> '), `workspace cycle; first edge from ${first?.evidence ?? '?'}`)
+    return violation('R5', path.join(sourceRoot, '..', 'package.json'), 0, cycle.join(' -> '), `dependency cycle between areas (app may import core, never the reverse); first edge from ${first?.evidence ?? '?'}`)
   })
   return { violations, edges }
 }
