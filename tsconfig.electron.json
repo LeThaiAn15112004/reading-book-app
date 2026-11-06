@@ -45,12 +45,12 @@
   },
   "include": [
     "./source/app",
-    "./source/apps/reading-book-desktop/electron"
+    "./source/app/platforms/electron"
   ],
-  "exclude": ["./source/app/**/*.native.ts", "./source/app/**/*.native.tsx"],
+  "exclude": ["./source/app/**/*.native.ts", "./source/app/**/*.native.tsx", "./source/app/platforms/electron/e2e", "./source/app/platforms/electron/spikes", "./source/app/platforms/electron/scripts", "./source/app/platforms/electron/release", "./source/app/platforms/electron/dist", "./source/app/platforms/electron/dist-electron"],
   "references": [
     {
-      "path": "./source/apps/reading-book-desktop/tsconfig.node.json"
+      "path": "./source/app/platforms/electron/tsconfig.node.json"
     }
   ]
 }

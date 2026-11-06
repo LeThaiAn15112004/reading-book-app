@@ -5,7 +5,7 @@
  */
 
 import { typewriterFontFaces, type EmbeddedFontFaceInfo, type FontMetrics } from '@reading-book/book-reader-sdk'
-import { parseTrueType, ttfFontMetrics, type TtfFace } from '../../../../../apps/reading-book-desktop/electron/pdf-sync/pdf-font-embed'
+import { parseTrueType, ttfFontMetrics, type TtfFace } from '../../../../platforms/electron/pdf-sync/pdf-font-embed'
 
 const urls = import.meta.glob('../../../../assets/fonts/typewriter/*.ttf', { query: '?url', import: 'default', eager: true }) as Record<string, string>
 

@@ -110,21 +110,45 @@ function runChecks() {
 
 // --- Group 2: no Main-process change, no new migration (T027) ---------------------------------------------------
 
+/** Where Main lived at the base commit, and where it lives now (spec 009 T047 moved it with the rest of the Desktop host). */
+const MAIN_AT_BASE = 'source/apps/reading-book-desktop/electron'
+const MAIN_NOW = 'source/app/platforms/electron'
+/** Desktop-host folders and files beside Main (not Main code): they were siblings of electron/ at the base. */
+const NOT_MAIN = ['spikes/', 'e2e/', 'scripts/', 'resources/', 'assets/', 'public/', 'release/', 'dist/', 'dist-electron/', 'node_modules/', 'package.json', 'README.md', '.gitignore', 'tsconfig.node.json']
+
+const normalised = (text) => text.replace(/\r\n/g, '\n')
+
+/** Main files that differ from the base commit, by their current path (a moved file is compared with its old path). */
+function changedMainFiles() {
+  const atBase = git('ls-tree', '-r', '--name-only', base, '--', MAIN_AT_BASE + '/')
+  const baseFiles = new Set(atBase.output.split(/\r?\n/).map((f) => f.trim()).filter(Boolean).map((f) => f.slice(MAIN_AT_BASE.length + 1)))
+  const tracked = git('ls-files', '--cached', '--others', '--exclude-standard', '--', MAIN_NOW + '/')
+  const nowFiles = tracked.output.split(/\r?\n/).map((f) => f.trim()).filter(Boolean).map((f) => f.slice(MAIN_NOW.length + 1))
+    .filter((f) => !NOT_MAIN.some((n) => (n.endsWith('/') ? f.startsWith(n) : f === n)))
+  const changed = []
+  for (const rel of nowFiles) {
+    if (!baseFiles.has(rel)) { changed.push(rel); continue }
+    const before = git('show', `${base}:${MAIN_AT_BASE}/${rel}`)
+    const now = existsSync(path.join(repoRoot, MAIN_NOW, rel)) ? readFileSync(path.join(repoRoot, MAIN_NOW, rel), 'utf8') : null
+    if (!before.ok || now === null || normalised(before.output) !== normalised(now)) changed.push(rel)
+  }
+  const nowSet = new Set(nowFiles)
+  for (const rel of baseFiles) if (!nowSet.has(rel)) changed.push(rel)
+  return { ok: atBase.ok && tracked.ok, files: changed.map((rel) => `${MAIN_NOW}/${rel}`) }
+}
+
 function runGit() {
-  const electron = 'source/apps/reading-book-desktop/electron'
-  const migrations = `${electron}/persistence/migrations` // where they were at the base commit (T029 moved them)
+  const migrations = `${MAIN_AT_BASE}/persistence/migrations` // where they were at the base commit (T029 moved them)
   if (!git('rev-parse', '--verify', '--quiet', `${base}^{commit}`).ok) {
     record('git', `base ${base}`, false, 'commit not found')
     return
   }
-  const changed = git('diff', '--name-only', base, '--', electron)
-  const untracked = git('ls-files', '--others', '--exclude-standard', '--', electron)
-  const files = `${changed.output}\n${untracked.output}`.split(/\r?\n/).map((f) => f.trim()).filter(Boolean)
+  const { ok, files } = changedMainFiles()
   // Spec 009 changes Main on purpose; each changed file must be listed with its reason.
   const approved = JSON.parse(readFileSync(path.join(sourceRoot, 'scripts/desktop-main-changes.json'), 'utf8')).files
   // A key ending in "/" approves every file under that folder (a whole folder moved into electron/).
   const unexpected = files.filter((f) => !(f in approved) && !Object.keys(approved).some((k) => k.endsWith('/') && f.startsWith(k)))
-  record('git', `electron/ changes since ${base} all approved`, changed.ok && untracked.ok && unexpected.length === 0,
+  record('git', `electron/ changes since ${base} all approved`, ok && unexpected.length === 0,
     unexpected.length
       ? `${unexpected.length} unapproved: ${unexpected.slice(0, 5).join(', ')}${unexpected.length > 5 ? ', …' : ''}`
       : `${files.length} approved file(s) (desktop-main-changes.json)`)
@@ -146,6 +170,7 @@ function runGit() {
  */
 export const DESKTOP_MIGRATION_DIRS = [
   'source/apps/reading-book-desktop/electron/persistence/migrations',
+  'source/app/platforms/electron/persistence/migrations',
   'source/core/src/db/desktop/migrations',
 ]
 

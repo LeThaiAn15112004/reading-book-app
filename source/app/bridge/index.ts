@@ -67,4 +67,4 @@ export type {
   AnnotationImportResult,
   AnnotationTransferErrorCode,
   AnnotationTransferProgressDto,
-} from '../../apps/reading-book-desktop/electron/ipc/api-types'
+} from '../platforms/electron/ipc/api-types'

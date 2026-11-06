@@ -61,7 +61,7 @@
     "./source/apps/reading-book-mobile/web/tests",
     "./source/apps/reading-book-mobile/web/vite.config.ts",
     "./source/apps/reading-book-mobile/web/vitest.config.ts",
-    "./source/apps/reading-book-desktop/electron/electron-env.d.ts"
+    "./source/app/platforms/electron/electron-env.d.ts"
   ]
   ,"exclude": ["./source/app/**/*.electron.ts", "./source/app/**/*.electron.tsx"]
 }

@@ -167,6 +167,7 @@ describe('R8: Mobile UI bundle graph', () => {
     return checkMobileUiGraph({
       entries: [path.join(root, 'reading-book-mobile/web/src/main.ts')],
       desktop,
+      electronSubdir: 'electron',
       allowed: new Set(allowedFile ? [norm(path.join(desktop, allowedFile))] : []),
     }).violations
   }

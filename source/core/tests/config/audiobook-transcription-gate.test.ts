@@ -24,7 +24,7 @@ import { describe, expect, it } from 'vitest'
  * the wiring being deleted.
  */
 const featuresPath = fileURLToPath(new URL('../../src/config/features.ts', import.meta.url))
-const desktop = (relative: string): string => fileURLToPath(new URL(`../../../apps/reading-book-desktop/${relative}`, import.meta.url))
+const desktop = (relative: string): string => fileURLToPath(new URL(`../../../app/platforms/electron/${relative}`, import.meta.url))
 
 function committedFeaturesSource(): string {
   try {
@@ -53,7 +53,7 @@ describe('audiobook transcription release gate', () => {
   it('may be ON in the working copy only when a verified FFmpeg artifact exists for at least one platform (FR-017 hides the rest)', () => {
     const source = readFileSync(featuresPath, 'utf8')
     if (!/^\s*audiobookTranscriptionEnabled:\s*true/m.test(source)) return // off: nothing to prove
-    const manifest = JSON.parse(readFileSync(desktop('electron/transcription/ffmpeg-artifacts.json'), 'utf8')) as Record<
+    const manifest = JSON.parse(readFileSync(desktop('transcription/ffmpeg-artifacts.json'), 'utf8')) as Record<
       string,
       { executable: string; files: { name: string; sha256: string }[] }
     >
@@ -66,10 +66,10 @@ describe('audiobook transcription release gate', () => {
   })
 
   it('is enforced at both boundaries: Main refuses start / model download, the audiobook screen hides the entry and the tab', () => {
-    const service = readFileSync(desktop('electron/transcription/transcription-service.ts'), 'utf8')
+    const service = readFileSync(desktop('transcription/transcription-service.ts'), 'utf8')
     expect(service.match(/if \(!isEnabled\(\)\) return failure\('FEATURE_DISABLED'/g)?.length, 'start and downloadModel both check the flag first').toBe(2)
 
-    const runtime = readFileSync(desktop('electron/transcription/transcription-runtime.ts'), 'utf8')
+    const runtime = readFileSync(desktop('transcription/transcription-runtime.ts'), 'utf8')
     expect(runtime).toMatch(/isEnabled:\s*\(\)\s*=>\s*features\.audiobookTranscriptionEnabled\s*&&\s*isTranscriptionPlatformSupported\(\)/)
 
     const screen = readFileSync(fileURLToPath(new URL('../../../app/screens/AudioBook/AudioBookScreen.tsx', import.meta.url)), 'utf8')

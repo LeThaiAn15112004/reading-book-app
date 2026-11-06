@@ -4,7 +4,7 @@
     {
       "rule": "R8",
       "kind": "mobile-ui-graph",
-      "target": "electron/pdf-sync/pdf-font-embed.ts",
+      "target": "pdf-sync/pdf-font-embed.ts",
       "importedBy": "app/components/reader/renderers/pdf/typewriterFonts.ts",
       "reason": "Its only import is type-only, so it needs no Electron or Node. Typewriter is hidden on Mobile; moving the file to the SDK would be a Desktop refactor Mobile does not need. plan.md, Complexity Tracking (FR-015)."
     }

@@ -21,7 +21,7 @@ await build({
 
 // The OFL requires the licence to travel with the fonts; Vite ships only the .ttf files it imports. Same files as
 // Desktop's electron-builder `files`.
-const fontNotices = path.join(appRoot, '..', 'reading-book-desktop', 'assets', 'fonts', 'typewriter')
+const fontNotices = path.join(appRoot, '..', '..', 'app', 'platforms', 'electron', 'assets', 'fonts', 'typewriter')
 for (const notice of ['OFL.txt', 'THIRD_PARTY_FONTS.md']) {
   cpSync(path.join(fontNotices, notice), path.join(dist, 'licenses', 'fonts', notice))
 }

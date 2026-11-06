@@ -13,10 +13,11 @@ export const appsDir = path.join(sourceRoot, 'apps')
 export const coreDir = path.join(sourceRoot, 'core')
 export const appDir = path.join(sourceRoot, 'app')
 export const sdkDir = coreDir
-export const desktopDir = path.join(appsDir, 'reading-book-desktop')
+// The Desktop host (Main, Preload, workers) lives inside the shared UI folder since spec 009 T047.
+export const desktopDir = path.join(appDir, 'platforms/electron')
 export const mobileDir = path.join(appsDir, 'reading-book-mobile')
 export const configDir = path.join(coreDir, 'src/config')
-export const hostAdaptersDir = path.join(desktopDir, 'electron/host-adapters')
+export const hostAdaptersDir = path.join(desktopDir, 'host-adapters')
 
 export const CODE_EXTENSIONS = ['.ts', '.tsx', '.mts', '.cts', '.js', '.jsx', '.mjs', '.cjs']
 const SKIPPED_DIRS = new Set(['node_modules', 'dist', 'dist-electron', 'release', '.expo', 'android', 'ios', 'ui-assets', 'coverage'])

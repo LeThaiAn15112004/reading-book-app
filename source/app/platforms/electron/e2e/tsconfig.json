@@ -1,0 +1,21 @@
+{
+  "compilerOptions": {
+    "paths": {
+      "@reading-book/config": ["../../../../core/src/config/index.ts"],
+      "@reading-book/config/*": ["../../../core/src/config/*"],
+      "@reading-book/book-reader-sdk": ["../../../../core/src/index.ts"],
+      "@reading-book/book-reader-sdk/*": ["../../../core/src/*"]
+    },
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "allowJs": true,
+    "checkJs": false,
+    "strict": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "types": ["node"]
+  },
+  "include": ["**/*.ts", "support/*.mjs"]
+}

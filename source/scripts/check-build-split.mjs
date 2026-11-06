@@ -11,12 +11,11 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..')
-const desktopDir = path.join(repoRoot, 'source/apps/reading-book-desktop')
 const mobileWebDir = path.join(repoRoot, 'source/apps/reading-book-mobile/web')
 const npx = process.platform === 'win32' ? 'npx.cmd' : 'npx'
 
-function build(cwd, outDir) {
-  const r = spawnSync(npx, ['vite', 'build', '--sourcemap', '--outDir', outDir, '--emptyOutDir'], { cwd, encoding: 'utf8', shell: process.platform === 'win32' })
+function build(cwd, outDir, config) {
+  const r = spawnSync(npx, ['vite', 'build', ...(config ? ['--config', config] : []), '--sourcemap', '--outDir', outDir, '--emptyOutDir'], { cwd, encoding: 'utf8', shell: process.platform === 'win32' })
   if (r.status !== 0) throw new Error(`vite build failed in ${cwd}\n${r.stdout}\n${r.stderr}`)
 }
 
@@ -45,7 +44,8 @@ try {
     if (hits.length) failed = true
     return modules
   }
-  build(desktopDir, path.join(tmp, 'desktop'))
+  // Run from the Desktop host folder, as `npm run build` does (vite-plugin-electron reads the package.json there).
+  build(path.join(repoRoot, 'source/app/platforms/electron'), path.join(tmp, 'desktop'), path.join(repoRoot, 'vite.config.ts'))
   build(mobileWebDir, path.join(tmp, 'web'))
   const desktop = report('Desktop renderer', path.join(tmp, 'desktop'), /\.native\.tsx?$/, '.native modules')
   const web = report('Mobile WebView', path.join(tmp, 'web'), /\.electron\.tsx?$/, '.electron modules')

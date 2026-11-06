@@ -5,7 +5,7 @@
  * `api` forwards every access to the current `window.api` instead of capturing it, so the checks that install a
  * fake `window.api` after the modules are loaded (the spikes) still see their own object.
  */
-import type { DesktopApi } from '../../apps/reading-book-desktop/electron/ipc/api-types'
+import type { DesktopApi } from './electron/ipc/api-types'
 
 export type { DesktopApi }
 

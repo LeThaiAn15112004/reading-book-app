@@ -32,7 +32,7 @@ export function checkAppImports({ app = appDir, desktop = desktopDir, mobile = m
     return target
   }
 
-  for (const file of [...listCodeFiles(app), ...listCodeFiles(desktop)]) {
+  for (const file of new Set([...listCodeFiles(app), ...listCodeFiles(desktop)])) {
     for (const { specifier, line } of scanImports(file)) {
       const target = resolve(file, specifier)
       // A `.native` platform adapter is the WebView side of the shared UI: it may import Mobile's WebView-side code (contracts/platform-adapters.md).

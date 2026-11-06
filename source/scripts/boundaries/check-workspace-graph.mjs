@@ -13,7 +13,7 @@ import {
  * without a manifest is named after its folder. T050 re-points this list when the areas move to `source/core` and
  * `source/app`.
  */
-export const AREA_DIRS = ['core', 'apps/reading-book-desktop', 'apps/reading-book-mobile']
+export const AREA_DIRS = ['core', 'app', 'apps/reading-book-mobile']
 
 export function workspacePackages(root = sourceRoot) {
   return AREA_DIRS.map((d) => path.join(root, d))
@@ -41,6 +41,8 @@ export function workspaceEdges(packages) {
     // A nested package's own folder belongs to it, not to its parent.
     const nested = packages.filter((q) => q !== p && isInside(q.dir, p.dir)).map((q) => q.dir)
     for (const file of listCodeFiles(p.dir)) {
+      // A `.native` platform adapter is the WebView half of the shared UI and belongs to the Mobile area (T043/T044).
+      if (/\/platforms\/[^/]+\.native\.tsx?$/.test(file.replaceAll('\\', '/'))) continue
       if (nested.some((d) => isInside(file, d))) continue
       for (const { specifier, line } of scanImports(file)) {
         const target = targetPath(file, specifier)

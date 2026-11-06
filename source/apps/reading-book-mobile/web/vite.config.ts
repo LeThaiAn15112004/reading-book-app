@@ -4,7 +4,6 @@ import react from '@vitejs/plugin-react'
 import { defineConfig, type Plugin } from 'vite'
 
 const workspaceRoot = path.resolve(__dirname, '../../..')
-const desktopRoot = path.join(workspaceRoot, 'apps/reading-book-desktop')
 const appRoot = path.join(workspaceRoot, 'app')
 // The one install folder at the repository root (spec 009): one React 19 for the UI bundle.
 const rootNodeModules = path.join(workspaceRoot, '..', 'node_modules')
@@ -32,7 +31,7 @@ export default defineConfig({
   // Keep Vite's cache in the one install folder, never a second node_modules under web/ (spec 009 FR-006).
   cacheDir: path.join(rootNodeModules, '.vite/mobile-web'),
   base: './',
-  publicDir: path.join(desktopRoot, 'public'),
+  publicDir: path.join(appRoot, 'platforms/electron/public'),
   resolve: {
     // Research R4: the host's own suffix wins, so `host.native.ts` is chosen for `host`.
     extensions: ['.native.tsx', '.native.ts', '.mjs', '.js', '.mts', '.ts', '.jsx', '.tsx', '.json'],

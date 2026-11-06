@@ -22,8 +22,10 @@ export function checkMobileUiGraph({
   entries = [path.join(mobileDir, 'web/src/main.ts')],
   desktop = desktopDir,
   allowed = allowedElectronFiles(),
+  // Main's folder inside `desktop`: the whole host folder in the real tree, an `electron/` subfolder in the test fixtures.
+  electronSubdir = '',
 } = {}) {
-  const electronDir = path.join(desktop, 'electron')
+  const electronDir = path.join(desktop, electronSubdir)
   const violations = []
   const reachedHostAdapters = new Set()
   const unresolved = []
