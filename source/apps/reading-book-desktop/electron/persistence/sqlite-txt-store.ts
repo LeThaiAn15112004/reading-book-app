@@ -1,26 +1,11 @@
-import type { SaveHighlightInput } from '@reading-book/book-reader-sdk'
+import { txtCodec, txtStatements as q, type SaveHighlightInput, type SyncSqlDriver } from '@reading-book/book-reader-sdk'
 import type { Database as SqliteDatabase } from 'better-sqlite3'
 import { getDatabase } from './db'
 import { getOverlayStore, type SqliteOverlayStore } from './sqlite-overlay-store'
+import { createSyncSqlDriver } from './sql-driver'
 
 /** The committed edited copy of one TXT book (`txt_documents`). */
-export interface TxtDocumentRow {
-  bookId: string
-  revision: number
-  contentSha256: string
-  charCount: number
-  sourceSha256?: string
-  updatedAt: string
-}
-
-interface TxtDocumentSqlRow {
-  book_id: string
-  revision: number
-  content_sha256: string
-  char_count: number
-  source_sha256: string | null
-  updated_at: string
-}
+export type TxtDocumentRow = txtCodec.TxtDocumentRow
 
 /** Thrown inside `commit` when the stored revision isn't the one the caller based its change on. */
 export class TxtRevisionConflictError extends Error {
@@ -46,7 +31,7 @@ export interface TxtCommitWrite {
   /** Revision the change is based on; the stored one must still equal it. */
   expectedRevision: number
   /** Present when the text changed: the new current revision's description. */
-  nextDocument?: Omit<TxtDocumentRow, 'bookId' | 'updatedAt'>
+  nextDocument?: txtCodec.TxtDocumentValues
   upserts: readonly SaveHighlightInput[]
   deletedIds: readonly string[]
 }
@@ -58,27 +43,18 @@ export interface TxtCommitWrite {
  * `txt_documents` — see docs/implementation_plan/txt_reader.md §5.
  */
 export class SqliteTxtStore {
+  private readonly sql: SyncSqlDriver
+
   constructor(
-    private readonly db: SqliteDatabase = getDatabase(),
+    db: SqliteDatabase = getDatabase(),
     private readonly overlays: SqliteOverlayStore = getOverlayStore(),
-  ) {}
+  ) {
+    this.sql = createSyncSqlDriver(db)
+  }
 
   getDocument(bookId: string): TxtDocumentRow | undefined {
-    const row = this.db
-      .prepare(
-        `SELECT book_id, revision, content_sha256, char_count, source_sha256, updated_at
-         FROM txt_documents WHERE book_id = ?`,
-      )
-      .get(bookId) as TxtDocumentSqlRow | undefined
-    if (!row) return undefined
-    return {
-      bookId: row.book_id,
-      revision: row.revision,
-      contentSha256: row.content_sha256,
-      charCount: row.char_count,
-      sourceSha256: row.source_sha256 ?? undefined,
-      updatedAt: row.updated_at,
-    }
+    const row = this.sql.get<txtCodec.TxtDocumentSqlRow>(q.selectTxtDocument(bookId))
+    return row ? txtCodec.txtDocumentFromRow(row) : undefined
   }
 
   /** Revision 0 = the original file (no edited copy yet). */
@@ -89,47 +65,21 @@ export class SqliteTxtStore {
   /** All-or-nothing: the revision row, the upserted annotation rows and the deleted ones. */
   commit(write: TxtCommitWrite): void {
     const { bookId } = write
-    this.db.exec('BEGIN IMMEDIATE')
-    try {
+    this.sql.transaction(() => {
       const actual = this.currentRevision(bookId)
       if (actual !== write.expectedRevision) throw new TxtRevisionConflictError(write.expectedRevision, actual)
 
-      const now = new Date().toISOString()
       if (write.nextDocument) {
-        this.db
-          .prepare(
-            `INSERT INTO txt_documents (book_id, revision, content_sha256, char_count, source_sha256, updated_at)
-             VALUES (@book_id, @revision, @content_sha256, @char_count, @source_sha256, @updated_at)
-             ON CONFLICT(book_id) DO UPDATE SET
-               revision = @revision,
-               content_sha256 = @content_sha256,
-               char_count = @char_count,
-               source_sha256 = COALESCE(txt_documents.source_sha256, @source_sha256),
-               updated_at = @updated_at`,
-          )
-          .run({
-            book_id: bookId,
-            revision: write.nextDocument.revision,
-            content_sha256: write.nextDocument.contentSha256,
-            char_count: write.nextDocument.charCount,
-            source_sha256: write.nextDocument.sourceSha256 ?? null,
-            updated_at: now,
-          })
+        this.sql.run(q.upsertTxtDocument(bookId, write.nextDocument, new Date().toISOString()))
       }
 
-      const owner = this.db.prepare(`SELECT book_id FROM notes WHERE id = ?`)
       for (const input of write.upserts) {
-        const existing = input.id ? (owner.get(input.id) as { book_id: string } | undefined) : undefined
+        const existing = input.id ? this.sql.get<{ book_id: string }>(q.selectNoteOwner(input.id)) : undefined
         if (existing && existing.book_id !== bookId) throw new TxtRowOwnershipError(input.id!)
         this.overlays.writeHighlight({ ...input, bookId })
       }
       for (const id of write.deletedIds) this.overlays.deleteHighlightRow(bookId, id)
-
-      this.db.exec('COMMIT')
-    } catch (err) {
-      this.db.exec('ROLLBACK')
-      throw err
-    }
+    }, 'immediate')
   }
 }
 
