@@ -13,6 +13,7 @@
     "source/apps/reading-book-desktop/electron/persistence/sql-driver.ts": "T027: new, SyncSqlDriver over better-sqlite3",
     "source/apps/reading-book-desktop/electron/persistence/migrations/": "T029: the 30 migrations moved byte-identical to source/core/src/db/desktop/migrations (hashes in desktop-migrations.sha256.json)",
     "source/apps/reading-book-desktop/electron/persistence/migrate.ts": "T029: the ?raw imports read the migrations from their new folder (list and order unchanged)",
-    "source/apps/reading-book-desktop/electron/persistence/sqlite-library-store.ts": "T032: SQL and row codecs come from core (libraryStatements / libraryCodec), run through the SyncSqlDriver; control flow and transactions unchanged"
+    "source/apps/reading-book-desktop/electron/persistence/sqlite-library-store.ts": "T032: SQL and row codecs come from core (libraryStatements / libraryCodec), run through the SyncSqlDriver; control flow and transactions unchanged",
+    "source/apps/reading-book-desktop/electron/persistence/sqlite-overlay-store.ts": "T033: SQL and note_json codecs come from core (overlayStatements / overlayCodec), run through the SyncSqlDriver; the manual BEGIN IMMEDIATE blocks are driver.transaction(…, immediate); behaviour unchanged"
   }
 }

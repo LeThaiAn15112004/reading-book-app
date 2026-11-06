@@ -1,20 +1,19 @@
 import {
   Location,
   ReadingSessionState,
+  overlayCodec,
+  overlayStatements as q,
+  libraryStatements,
   type BookmarkRecord,
   type HighlightRecord,
-  type HighlightStyleKind,
   type INoteState,
   type NoteLocator,
-  type NoteSelectionText,
   type OverlayStore,
-  type PdfAnnotation,
   type PdfInkRecord,
   type PdfInkStroke,
   type SaveBookmarkInput,
   type SaveHighlightInput,
-  type MdAnnotation,
-  type TxtAnnotation,
+  type SyncSqlDriver,
 } from '@reading-book/book-reader-sdk'
 import type { Database as SqliteDatabase } from 'better-sqlite3'
 import { createHash, randomUUID } from 'node:crypto'
@@ -30,6 +29,7 @@ import {
   type AudioProgressInput,
 } from '@reading-book/book-reader-sdk'
 import { getDatabase } from './db'
+import { createSyncSqlDriver } from './sql-driver'
 import {
   applyFileFields,
   packPdfHighlightLocator,
@@ -43,114 +43,16 @@ import {
   type TwoWayLedgerEntry,
   type TwoWayPlan,
   packSessionLocation,
-  parsePdfAnnotation,
-  parsePdfInk,
-  parseMdAnnotation,
-  parseTxtAnnotation,
   planEmbeddedAnnotationSync,
-  unpackSessionLocation,
   type EmbeddedAnnotationLedgerEntry,
   type EmbeddedAnnotationSyncOptions,
   type EmbeddedAnnotationSyncStep,
   type ScannedPdfAnnotation,
 } from '@reading-book/book-reader-sdk'
 
-export type SessionRecord = {
-  bookId: string
-  lastReadLocation?: string
-  lastReadLabel?: string
-  percent: number
-  fontFamily?: string
-  fontSize?: number
-  fontWeight?: string
-  lineHeight?: number
-  textAlign?: string
-  layoutMode?: string
-  pageTurnMode?: string
-  marginsEnabled?: boolean
-  marginPreset?: string
-  isLandscape?: boolean
-  updatedAt: string
-}
-
-interface ReadingStateRow {
-  reading_state_json: string
-  /** The parent `books` row's own timestamp — fallback when the state has no `updatedAt` yet. */
-  updated_at: string
-}
-
-function finiteOrUndefined(value: number | null | undefined): number | undefined {
-  return value != null && Number.isFinite(value) ? value : undefined
-}
-
-function trimmedOrUndefined(value: string | null | undefined): string | undefined {
-  return value?.trim() || undefined
-}
-
-/** `books.reading_state_json` → SessionRecord (same normalisation the old table columns got). */
-function recordFromState(
-  bookId: string,
-  state: ReadingStateJson,
-  fallbackUpdatedAt: string,
-): SessionRecord {
-  const unpacked = unpackSessionLocation(state.lastReadLocation ?? '')
-  return {
-    bookId,
-    lastReadLocation: unpacked?.location.toString(),
-    lastReadLabel: unpacked?.label,
-    percent: finiteOrUndefined(state.percent) ?? 0,
-    fontFamily: trimmedOrUndefined(state.fontFamily),
-    fontSize: finiteOrUndefined(state.fontSize),
-    fontWeight: trimmedOrUndefined(state.fontWeight),
-    lineHeight: finiteOrUndefined(state.lineHeight),
-    textAlign: trimmedOrUndefined(state.textAlign),
-    layoutMode: trimmedOrUndefined(state.layoutMode),
-    pageTurnMode: trimmedOrUndefined(state.pageTurnMode),
-    marginsEnabled: state.marginsEnabled ?? undefined,
-    marginPreset: trimmedOrUndefined(state.marginPreset),
-    isLandscape: state.isLandscape === true,
-    updatedAt: state.updatedAt || fallbackUpdatedAt,
-  }
-}
-
-/** Domain state — only exists once a valid Location has been stored. */
-function sessionStateFromJson(
-  bookId: string,
-  state: ReadingStateJson,
-  fallbackUpdatedAt: string,
-): ReadingSessionState | undefined {
-  const unpacked = unpackSessionLocation(state.lastReadLocation ?? '')
-  if (!unpacked) return undefined
-
-  const record = recordFromState(bookId, state, fallbackUpdatedAt)
-  return new ReadingSessionState({
-    bookId,
-    lastReadLocation: unpacked.location,
-    lastReadLabel: unpacked.label,
-    percent: record.percent,
-    fontFamily: record.fontFamily,
-    fontSize: record.fontSize,
-    fontWeight: record.fontWeight,
-    lineHeight: record.lineHeight,
-    textAlign: record.textAlign,
-    layoutMode: record.layoutMode,
-    pageTurnMode: record.pageTurnMode,
-    marginsEnabled: record.marginsEnabled,
-    marginPreset: record.marginPreset,
-    isLandscape: record.isLandscape,
-    updatedAt: record.updatedAt,
-  })
-}
-
-interface NoteRow {
-  id: string
-  book_id: string
-  note_json: string
-  created_at: string
-  updated_at: string
-}
-
-const NOTE_COLUMNS = `id, book_id, note_json, created_at, updated_at`
+// Row types, codecs and the SQL (core `overlayCodec` / `overlayStatements`, spec 009 T033) are shared with Mobile.
+export type SessionRecord = overlayCodec.SessionRecord
+type NoteRow = overlayCodec.NoteRow
 
 /** One annotation row as stored, for the annotations file export. */
 export interface TransferNoteRow {
@@ -162,206 +64,6 @@ export interface TransferNoteRow {
 }
 
 /**
- * Bookmark rows are `notes` rows whose `note_json.group` is `'bookmark'` (migration 019).
- * A missing `group` means `'annotation'` by convention, and `json_extract` yields NULL there —
- * NULL never equals `'bookmark'`, so annotations stay out of every bookmark query while the
- * predicate still matches the expression index `idx_notes_group` verbatim.
- */
-const BOOKMARK_GROUP_PREDICATE = `json_extract(note_json, '$.group') = 'bookmark'`
-
-function rowToBookmarkRecord(row: NoteRow): BookmarkRecord | undefined {
-  let note: INoteState
-  try {
-    note = JSON.parse(row.note_json) as INoteState
-  } catch {
-    return undefined
-  }
-
-  const locator = note.locatorExtended?.locator
-  // A bookmark with no jump target cannot be rendered or jumped to — skip the row rather
-  // than surfacing an entry that would silently do nothing when clicked.
-  if (!locator) return undefined
-
-  return {
-    id: row.id,
-    bookId: row.book_id,
-    locator,
-    label: note.label?.trim() || undefined,
-    excerpt: note.textualValue?.trim() || undefined,
-    createdAt: row.created_at,
-  }
-}
-
-function buildBookmarkNoteJson(input: {
-  locator: NoteLocator
-  label?: string
-  excerpt?: string
-  createdAt: string
-  modifiedAt: string
-}): string {
-  const note: INoteState = {
-    schemaVersion: 1,
-    type: 'bookmark',
-    group: 'bookmark',
-    locatorExtended: { locator: input.locator },
-    textualValue: input.excerpt,
-    label: input.label,
-    created: input.createdAt,
-    modified: input.modifiedAt,
-  }
-  return JSON.stringify(note)
-}
-
-const DEFAULT_HIGHLIGHT_COLOR = '#FFEB3B'
-
-/**
- * Highlight rows are `notes` rows whose group is `'annotation'` (or absent — pre-019 rows
- * default to annotation by convention) and whose type is one of the two styles this feature
- * supports. The explicit `type IN (...)` guard keeps legacy freehand/textbox/stamp rows left
- * over from the deleted overlay system out of every highlight query.
- */
-const HIGHLIGHT_TYPE_PREDICATE = `
-  (json_extract(note_json, '$.group') IS NULL OR json_extract(note_json, '$.group') = 'annotation')
-  AND json_extract(note_json, '$.type') IN ('highlight', 'underline', 'strikethrough', 'squiggly', 'replace', 'insert', 'textbox', 'rectangle', 'ellipse', 'line', 'arrow', 'typewriter', 'attachment')
-`
-
-/**
- * PDF freehand Ink rows: `notes` rows of type `ink`. Deliberately NOT part of `HIGHLIGHT_TYPE_PREDICATE`,
- * so a stroke never reaches highlight queries, the planner, the sidebar or exports (and a highlight
- * delete/save can never touch one). docs/implementation_plan/pdf_freehand_ink_eraser_plan.md.
- */
-const INK_TYPE_PREDICATE = `json_extract(note_json, '$.type') = 'ink'`
-
-function rowToInkRecord(row: NoteRow): PdfInkRecord | undefined {
-  let note: INoteState
-  try {
-    note = JSON.parse(row.note_json) as INoteState
-  } catch {
-    return undefined
-  }
-  const locator = note.locatorExtended?.locator
-  // Re-validated so a hand-edited / corrupt row can't reach the renderer.
-  const ink = note.pdfInk ? parsePdfInk(note.pdfInk) : undefined
-  if (!locator || !ink) return undefined
-  return {
-    id: row.id,
-    bookId: row.book_id,
-    locator,
-    colorHex: note.style?.colorHex?.trim() || '#1E88E5',
-    opacity: typeof note.style?.opacity === 'number' ? note.style.opacity : 1,
-    ink,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
-  }
-}
-
-function buildInkNoteJson(input: {
-  locator: NoteLocator
-  colorHex: string
-  opacity: number
-  ink: PdfInkStroke
-  createdAt: string
-  modifiedAt: string
-}): string {
-  const note: INoteState = {
-    schemaVersion: 1,
-    type: 'ink',
-    group: 'annotation',
-    locatorExtended: { locator: input.locator },
-    pdfInk: input.ink,
-    style: { colorHex: input.colorHex, opacity: input.opacity },
-    created: input.createdAt,
-    modified: input.modifiedAt,
-  }
-  return JSON.stringify(note)
-}
-
-const HIGHLIGHT_STYLE_KINDS: HighlightStyleKind[] = [
-  'highlight',
-  'underline',
-  'strikethrough',
-  'squiggly',
-  'replace',
-  'insert',
-  'textbox',
-  // PDF shapes: rows of the same kind of table, list and history (pdf_shape_tools.md)
-  'rectangle',
-  'ellipse',
-  'line',
-  'arrow',
-  // PDF Typewriter note (specs/005-typewriter-note)
-  'typewriter',
-  // PDF file attachment on a page (specs/007-pdf-file-attachment) — written only by the attachment operations and the live sync
-  'attachment',
-]
-
-function rowToHighlightRecord(row: NoteRow): HighlightRecord | undefined {
-  let note: INoteState
-  try {
-    note = JSON.parse(row.note_json) as INoteState
-  } catch {
-    return undefined
-  }
-
-  const locator = note.locatorExtended?.locator
-  if (!locator) return undefined
-  const styleKind: HighlightStyleKind = HIGHLIGHT_STYLE_KINDS.includes(note.type as HighlightStyleKind)
-    ? (note.type as HighlightStyleKind)
-    : 'highlight'
-
-  return {
-    id: row.id,
-    bookId: row.book_id,
-    locator,
-    styleKind,
-    colorHex: note.style?.colorHex?.trim() || DEFAULT_HIGHLIGHT_COLOR,
-    // A Typewriter note's text is the document itself: offsets of its style runs index it, so it is never trimmed.
-    note: styleKind === 'typewriter' ? (note.note ?? undefined) : note.note?.trim() || undefined,
-    tags: Array.isArray(note.tags) ? note.tags : [],
-    selectionText: note.locatorExtended?.text,
-    // PDF markup geometry; re-validated so a hand-edited / corrupt row can't reach the renderer.
-    pdfAnnotation: note.pdfAnnotation ? parsePdfAnnotation(note.pdfAnnotation, note.note ?? undefined) : undefined,
-    // TXT markup range; same re-validation.
-    txtAnnotation: note.txtAnnotation ? parseTxtAnnotation(note.txtAnnotation) : undefined,
-    // Markdown markup anchor; same re-validation.
-    mdAnnotation: note.mdAnnotation ? parseMdAnnotation(note.mdAnnotation) : undefined,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
-  }
-}
-
-function buildHighlightNoteJson(input: {
-  locator: NoteLocator
-  styleKind: HighlightStyleKind
-  colorHex: string
-  note?: string
-  tags?: string[]
-  selectionText?: NoteSelectionText
-  pdfAnnotation?: PdfAnnotation
-  txtAnnotation?: TxtAnnotation
-  mdAnnotation?: MdAnnotation
-  createdAt: string
-  modifiedAt: string
-}): string {
-  const note: INoteState = {
-    schemaVersion: 1,
-    type: input.styleKind,
-    group: 'annotation',
-    locatorExtended: { locator: input.locator, text: input.selectionText },
-    pdfAnnotation: input.pdfAnnotation,
-    txtAnnotation: input.txtAnnotation,
-    mdAnnotation: input.mdAnnotation,
-    textualValue: input.selectionText?.highlight,
-    note: input.note ?? null,
-    style: { colorHex: input.colorHex },
-    tags: input.tags?.length ? input.tags : undefined,
-    created: input.createdAt,
-    modified: input.modifiedAt,
-  }
-  return JSON.stringify(note)
-}
-
-/**
  * SQLite OverlayStore — reading session state (T4.3), bookmarks (FR-11), and highlights.
  *
  * Bookmarks live in the unified `notes` table (`note_json.group = 'bookmark'`) since migration
@@ -369,15 +71,17 @@ function buildHighlightNoteJson(input: {
  * as `note_json.group = 'annotation'` (or absent) rows with `type` `'highlight'`/`'underline'`.
  */
 export class SqliteOverlayStore implements OverlayStore {
-  constructor(private readonly db: SqliteDatabase = getDatabase()) {}
+  private readonly sql: SyncSqlDriver
+
+  constructor(db: SqliteDatabase = getDatabase()) {
+    this.sql = createSyncSqlDriver(db)
+  }
 
   /** Reading state lives in `books.reading_state_json` (migration 020) — no separate session table. */
   private readState(
     bookId: string,
   ): { state: ReadingStateJson; bookUpdatedAt: string } | undefined {
-    const row = this.db
-      .prepare(`SELECT reading_state_json, updated_at FROM books WHERE id = ?`)
-      .get(bookId) as ReadingStateRow | undefined
+    const row = this.sql.get<{ reading_state_json: string; updated_at: string }>(q.selectReadingStateRow(bookId))
     if (!row) return undefined
     return {
       state: parseReadingState(row.reading_state_json),
@@ -391,7 +95,7 @@ export class SqliteOverlayStore implements OverlayStore {
 
     const found = this.readState(id)
     if (!found) return undefined
-    return sessionStateFromJson(id, found.state, found.bookUpdatedAt)
+    return overlayCodec.sessionStateFromReadingState(id, found.state, found.bookUpdatedAt)
   }
 
   async getSessionRecord(bookId: string): Promise<SessionRecord | undefined> {
@@ -400,16 +104,14 @@ export class SqliteOverlayStore implements OverlayStore {
 
     const found = this.readState(id)
     if (!found) return undefined
-    return recordFromState(id, found.state, found.bookUpdatedAt)
+    return overlayCodec.sessionRecordFromState(id, found.state, found.bookUpdatedAt)
   }
 
   /** Audiobook position / rate of one book; `undefined` when none is saved (or it is not an audiobook). */
   async getAudioProgress(bookId: string): Promise<AudioProgress | undefined> {
     const id = bookId.trim()
     if (!id) return undefined
-    const row = this.db
-      .prepare('SELECT file_format, reading_state_json FROM books WHERE id = ?')
-      .get(id) as { file_format: string; reading_state_json: string } | undefined
+    const row = this.sql.get<{ file_format: string; reading_state_json: string }>(q.selectFormatAndReadingState(id))
     if (!row || !isAudioFormat(row.file_format)) return undefined
     return parseAudioProgress(parseReadingState(row.reading_state_json))
   }
@@ -426,23 +128,16 @@ export class SqliteOverlayStore implements OverlayStore {
     // A track-relative position is only meaningful together with ITS track: a multi-chapter audiobook needs a `trackId`
     // that belongs to this very book, and a single-file audiobook must not carry one. Anything else is refused here,
     // whatever the renderer sent.
-    const multi = this.db.prepare('SELECT 1 FROM book_audio_chapters WHERE book_id = ? LIMIT 1').get(id) !== undefined
+    const multi = this.sql.get(libraryStatements.selectHasAudioChapters(id)) !== undefined
     if (multi) {
       if (!input.trackId) return false
-      const owned = this.db.prepare('SELECT 1 FROM book_audio_chapters WHERE id = ? AND book_id = ?').get(input.trackId, id)
+      const owned = this.sql.get(q.selectChapterOfBook(input.trackId, id))
       if (owned === undefined) return false
     } else if (input.trackId !== undefined) {
       return false
     }
     const now = new Date().toISOString()
-    const result = this.db
-      .prepare(
-        `UPDATE books
-         SET reading_state_json = json_patch(reading_state_json, @patch),
-             updated_at = @now
-         WHERE id = @id AND file_format IN ('mp3', 'm4a', 'm4b', 'aac', 'wav', 'flac', 'ogg', 'opus')`,
-      )
-      .run({ id, patch: JSON.stringify(audioProgressPatch(input, now)), now })
+    const result = this.sql.run(q.updateAudioProgress(id, JSON.stringify(audioProgressPatch(input, now)), now))
     return Number(result.changes) > 0
   }
 
@@ -464,58 +159,15 @@ export class SqliteOverlayStore implements OverlayStore {
       }
     }
 
-    const patch: ReadingStateJson = {
-      updatedAt: record.updatedAt || new Date().toISOString(),
-      // Location and percent move together: percent is meaningless without the location it measures.
-      lastReadLocation: packedLocation,
-      percent:
-        packedLocation !== undefined
-          ? ReadingSessionState.clampPercent(record.percent)
-          : undefined,
-      fontFamily: record.fontFamily,
-      fontSize: record.fontSize,
-      fontWeight: record.fontWeight,
-      lineHeight: record.lineHeight,
-      textAlign: record.textAlign,
-      layoutMode: record.layoutMode,
-      pageTurnMode: record.pageTurnMode,
-      marginsEnabled: record.marginsEnabled,
-      marginPreset: record.marginPreset,
-      isLandscape: record.isLandscape,
-    }
+    const patch = overlayCodec.preferencesPatch(record, packedLocation, new Date().toISOString())
 
-    this.db
-      .prepare(
-        `UPDATE books
-         SET reading_state_json = json_patch(reading_state_json, @patch),
-             updated_at = @now
-         WHERE id = @id`,
-      )
-      .run({
-        id: record.bookId,
-        patch: JSON.stringify(patch),
-        now: new Date().toISOString(),
-      })
+    this.sql.run(q.patchSessionPreferences(record.bookId, JSON.stringify(patch), new Date().toISOString()))
   }
 
   /** Full overwrite of the reading state, guarded against out-of-order writes. */
   async saveSessionState(s: ReadingSessionState): Promise<void> {
     const updatedAt = s.updatedAt || new Date().toISOString()
-    const state: ReadingStateJson = {
-      lastReadLocation: packSessionLocation(s.lastReadLocation, s.lastReadLabel),
-      percent: ReadingSessionState.clampPercent(s.percent),
-      fontFamily: s.fontFamily,
-      fontSize: s.fontSize,
-      fontWeight: s.fontWeight,
-      lineHeight: s.lineHeight,
-      textAlign: s.textAlign,
-      layoutMode: s.layoutMode,
-      pageTurnMode: s.pageTurnMode,
-      marginsEnabled: s.marginsEnabled,
-      marginPreset: s.marginPreset,
-      isLandscape: s.isLandscape === true,
-      updatedAt,
-    }
+    const state = overlayCodec.readingStateOfSession(s, updatedAt, packSessionLocation(s.lastReadLocation, s.lastReadLabel))
 
     // Renderer-side autosave already serializes writes to a single in-flight IPC call (see
     // useReadingSessionAutosave's inFlightRef chain), so the `AND …` guard below is
@@ -525,37 +177,17 @@ export class SqliteOverlayStore implements OverlayStore {
     // ISO-8601 string (fixed-width, so plain text comparison is chronological); a write older
     // than the state already on disk is silently dropped instead of clobbering it. It compares
     // the state's own updatedAt, not books.updated_at, which metadata edits also bump.
-    this.db
-      .prepare(
-        `UPDATE books
-         SET reading_state_json = @json,
-             updated_at = @now
-         WHERE id = @id
-           AND COALESCE(json_extract(reading_state_json, '$.updatedAt'), '') <= @updated_at`,
-      )
-      .run({
-        id: s.bookId,
-        json: JSON.stringify(state),
-        now: new Date().toISOString(),
-        updated_at: updatedAt,
-      })
+    this.sql.run(q.overwriteSessionState(s.bookId, JSON.stringify(state), new Date().toISOString(), updatedAt))
   }
 
   async listBookmarks(bookId: string): Promise<BookmarkRecord[]> {
     const id = bookId.trim()
     if (!id) return []
 
-    const rows = this.db
-      .prepare(
-        `SELECT ${NOTE_COLUMNS}
-         FROM notes
-         WHERE book_id = ? AND ${BOOKMARK_GROUP_PREDICATE}
-         ORDER BY created_at ASC`,
-      )
-      .all(id) as NoteRow[]
+    const rows = this.sql.all<NoteRow>(q.selectBookmarks(id))
 
     return rows
-      .map(rowToBookmarkRecord)
+      .map(overlayCodec.bookmarkFromRow)
       .filter((b): b is BookmarkRecord => b !== undefined)
   }
 
@@ -569,17 +201,13 @@ export class SqliteOverlayStore implements OverlayStore {
 
     // An update must not rewrite when the bookmark was first placed; only an insert dates it.
     const existingCreatedAt = existingId
-      ? (
-          this.db
-            .prepare(`SELECT created_at FROM notes WHERE id = ? AND book_id = ?`)
-            .get(existingId, bookId) as { created_at: string } | undefined
-        )?.created_at
+      ? this.sql.get<{ created_at: string }>(q.selectNoteCreatedAt(existingId, bookId))?.created_at
       : undefined
     const createdAt = input.createdAt?.trim() || existingCreatedAt || now
 
     const label = input.label?.trim() || undefined
     const excerpt = input.excerpt?.trim() || undefined
-    const noteJson = buildBookmarkNoteJson({
+    const noteJson = overlayCodec.buildBookmarkNoteJson({
       locator: input.locator,
       label,
       excerpt,
@@ -587,24 +215,8 @@ export class SqliteOverlayStore implements OverlayStore {
       modifiedAt: now,
     })
 
-    const result = this.db
-      .prepare(
-        `INSERT INTO notes (id, book_id, note_json, created_at, updated_at)
-         VALUES (@id, @book_id, @note_json, @created_at, @updated_at)
-         ON CONFLICT(id) DO UPDATE SET
-           note_json = @note_json,
-           updated_at = @updated_at
-         -- Guard against an id that belongs to an annotation row: a bookmark write must
-         -- never silently convert someone's highlight/note into a bookmark.
-         WHERE ${BOOKMARK_GROUP_PREDICATE}`,
-      )
-      .run({
-        id,
-        book_id: bookId,
-        note_json: noteJson,
-        created_at: createdAt,
-        updated_at: now,
-      })
+    // The upsert's guard keeps an id that belongs to an annotation row from being converted into a bookmark.
+    const result = this.sql.run(q.upsertBookmark(id, bookId, noteJson, createdAt, now))
 
     if (result.changes === 0) {
       throw new Error(`saveBookmark: note ${id} exists but is not a bookmark`)
@@ -618,12 +230,7 @@ export class SqliteOverlayStore implements OverlayStore {
     const noteId = id.trim()
     if (!book || !noteId) return false
 
-    const result = this.db
-      .prepare(
-        `DELETE FROM notes
-         WHERE id = ? AND book_id = ? AND ${BOOKMARK_GROUP_PREDICATE}`,
-      )
-      .run(noteId, book)
+    const result = this.sql.run(q.deleteBookmark(noteId, book))
 
     return result.changes > 0
   }
@@ -632,17 +239,10 @@ export class SqliteOverlayStore implements OverlayStore {
     const id = bookId.trim()
     if (!id) return []
 
-    const rows = this.db
-      .prepare(
-        `SELECT ${NOTE_COLUMNS}
-         FROM notes
-         WHERE book_id = ? AND ${HIGHLIGHT_TYPE_PREDICATE}
-         ORDER BY created_at ASC`,
-      )
-      .all(id) as NoteRow[]
+    const rows = this.sql.all<NoteRow>(q.selectHighlights(id))
 
     return rows
-      .map(rowToHighlightRecord)
+      .map(overlayCodec.highlightFromRow)
       .filter((h): h is HighlightRecord => h !== undefined)
   }
 
@@ -654,14 +254,7 @@ export class SqliteOverlayStore implements OverlayStore {
   listAnnotationsForTransfer(bookId: string): TransferNoteRow[] {
     const id = bookId.trim()
     if (!id) return []
-    const rows = this.db
-      .prepare(
-        `SELECT ${NOTE_COLUMNS}
-         FROM notes
-         WHERE book_id = ? AND ${HIGHLIGHT_TYPE_PREDICATE}
-         ORDER BY created_at ASC`,
-      )
-      .all(id) as NoteRow[]
+    const rows = this.sql.all<NoteRow>(q.selectHighlights(id))
     const out: TransferNoteRow[] = []
     for (const row of rows) {
       try {
@@ -677,9 +270,7 @@ export class SqliteOverlayStore implements OverlayStore {
   countAnnotationsForTransfer(bookId: string): number {
     const id = bookId.trim()
     if (!id) return 0
-    const row = this.db
-      .prepare(`SELECT COUNT(*) AS n FROM notes WHERE book_id = ? AND ${HIGHLIGHT_TYPE_PREDICATE}`)
-      .get(id) as { n: number }
+    const row = this.sql.get<{ n: number }>(q.countHighlights(id)) as { n: number }
     return row.n
   }
 
@@ -693,9 +284,7 @@ export class SqliteOverlayStore implements OverlayStore {
     const id = bookId.trim()
     const hash = createHash('sha256')
     if (!id) return hash.digest('hex')
-    const rows = this.db
-      .prepare(`SELECT id, updated_at FROM notes WHERE book_id = ? AND ${HIGHLIGHT_TYPE_PREDICATE} ORDER BY id`)
-      .all(id) as Array<{ id: string; updated_at: string }>
+    const rows = this.sql.all<{ id: string; updated_at: string }>(q.selectHighlightStamps(id))
     for (const r of rows) hash.update(r.id).update('\u0000').update(r.updated_at).update('\n')
     return `${rows.length}:${hash.digest('hex')}`
   }
@@ -703,8 +292,7 @@ export class SqliteOverlayStore implements OverlayStore {
   /** Which of these note ids already exist in ANY book (a reused id would be overwritten by `writeHighlight`'s upsert). */
   existingNoteIds(ids: readonly string[]): Set<string> {
     const found = new Set<string>()
-    const select = this.db.prepare(`SELECT id FROM notes WHERE id = ?`)
-    for (const id of ids) if (select.get(id)) found.add(id)
+    for (const id of ids) if (this.sql.get(q.selectNoteIdExists(id))) found.add(id)
     return found
   }
 
@@ -714,26 +302,18 @@ export class SqliteOverlayStore implements OverlayStore {
 
   /** Is `id` a file-attachment row of `bookId`? Those are written only by the attachment operations and the live sync (specs/007). */
   isAttachmentRow(bookId: string, id: string): boolean {
-    const row = this.db
-      .prepare(`SELECT 1 AS hit FROM notes WHERE id = ? AND book_id = ? AND json_extract(note_json, '$.type') = 'attachment'`)
-      .get(id.trim(), bookId.trim()) as { hit: number } | undefined
-    return row !== undefined
+    return this.sql.get<{ hit: number }>(q.selectIsAttachment(id.trim(), bookId.trim())) !== undefined
   }
 
   /** Is `id` an annotation row (any kind) of `bookId`? */
   hasAnnotationRow(bookId: string, id: string): boolean {
-    const row = this.db
-      .prepare(`SELECT 1 AS hit FROM notes WHERE id = ? AND book_id = ? AND ${HIGHLIGHT_TYPE_PREDICATE}`)
-      .get(id.trim(), bookId.trim()) as { hit: number } | undefined
-    return row !== undefined
+    return this.sql.get<{ hit: number }>(q.selectIsAnnotation(id.trim(), bookId.trim())) !== undefined
   }
 
   /** A file-attachment row of `bookId` (specs/007), or undefined. */
   getAttachmentRow(bookId: string, id: string): HighlightRecord | undefined {
-    const row = this.db
-      .prepare(`SELECT ${NOTE_COLUMNS} FROM notes WHERE id = ? AND book_id = ? AND json_extract(note_json, '$.type') = 'attachment'`)
-      .get(id.trim(), bookId.trim()) as NoteRow | undefined
-    return row ? rowToHighlightRecord(row) : undefined
+    const row = this.sql.get<NoteRow>(q.selectAttachmentRow(id.trim(), bookId.trim()))
+    return row ? overlayCodec.highlightFromRow(row) : undefined
   }
 
   /**
@@ -744,20 +324,15 @@ export class SqliteOverlayStore implements OverlayStore {
   commitAttachmentChange(bookId: string, rowId: string, change: { op: 'move'; input: SaveHighlightInput } | { op: 'delete' }): HighlightRecord | null {
     const book = bookId.trim()
     const id = rowId.trim()
-    this.db.exec('BEGIN IMMEDIATE')
-    try {
+    return this.sql.transaction(() => {
       let result: HighlightRecord | null = null
       if (change.op === 'move') result = this.writeHighlight({ ...change.input, id, bookId: book })
       else {
-        this.db.prepare(`DELETE FROM pdf_embedded_annotations WHERE book_id = ? AND note_id = ?`).run(book, id)
+        this.sql.run(q.deleteLedgerByNote(book, id))
         this.deleteHighlightRow(book, id)
       }
-      this.db.exec('COMMIT')
       return result
-    } catch (err) {
-      this.db.exec('ROLLBACK')
-      throw err
-    }
+    }, 'immediate')
   }
 
   /**
@@ -774,16 +349,12 @@ export class SqliteOverlayStore implements OverlayStore {
 
     // An update must not rewrite when the highlight was first created; only an insert dates it.
     const existingCreatedAt = existingId
-      ? (
-          this.db
-            .prepare(`SELECT created_at FROM notes WHERE id = ? AND book_id = ?`)
-            .get(existingId, bookId) as { created_at: string } | undefined
-        )?.created_at
+      ? this.sql.get<{ created_at: string }>(q.selectNoteCreatedAt(existingId, bookId))?.created_at
       : undefined
     const createdAt = input.createdAt?.trim() || existingCreatedAt || now
 
     const note = input.styleKind === 'typewriter' ? input.note : input.note?.trim() || undefined
-    const noteJson = buildHighlightNoteJson({
+    const noteJson = overlayCodec.buildHighlightNoteJson({
       locator: input.locator,
       styleKind: input.styleKind,
       colorHex: input.colorHex,
@@ -797,24 +368,8 @@ export class SqliteOverlayStore implements OverlayStore {
       modifiedAt: now,
     })
 
-    const result = this.db
-      .prepare(
-        `INSERT INTO notes (id, book_id, note_json, created_at, updated_at)
-         VALUES (@id, @book_id, @note_json, @created_at, @updated_at)
-         ON CONFLICT(id) DO UPDATE SET
-           note_json = @note_json,
-           updated_at = @updated_at
-         -- Guard against an id that belongs to a bookmark row: a highlight write must never
-         -- silently convert a bookmark into a highlight.
-         WHERE (json_extract(note_json, '$.group') IS NULL OR json_extract(note_json, '$.group') = 'annotation')`,
-      )
-      .run({
-        id,
-        book_id: bookId,
-        note_json: noteJson,
-        created_at: createdAt,
-        updated_at: now,
-      })
+    // The upsert's guard keeps an id that belongs to a bookmark row from being converted into a highlight.
+    const result = this.sql.run(q.upsertHighlight(id, bookId, noteJson, createdAt, now))
 
     if (result.changes === 0) {
       throw new Error(`saveHighlight: note ${id} exists but is not an annotation`)
@@ -840,10 +395,8 @@ export class SqliteOverlayStore implements OverlayStore {
   async listInk(bookId: string): Promise<PdfInkRecord[]> {
     const id = bookId.trim()
     if (!id) return []
-    const rows = this.db
-      .prepare(`SELECT ${NOTE_COLUMNS} FROM notes WHERE book_id = ? AND ${INK_TYPE_PREDICATE} ORDER BY created_at ASC, rowid ASC`)
-      .all(id) as NoteRow[]
-    return rows.map(rowToInkRecord).filter((r): r is PdfInkRecord => r !== undefined)
+    const rows = this.sql.all<NoteRow>(q.selectInk(id))
+    return rows.map(overlayCodec.inkFromRow).filter((r): r is PdfInkRecord => r !== undefined)
   }
 
   /** Insert or update one stroke. Null when `id` belongs to a row that is not an Ink stroke (never converted). */
@@ -862,26 +415,12 @@ export class SqliteOverlayStore implements OverlayStore {
     const existingId = input.id?.trim()
     const id = existingId || randomUUID()
     const existingCreatedAt = existingId
-      ? (this.db.prepare(`SELECT created_at FROM notes WHERE id = ? AND book_id = ?`).get(existingId, bookId) as { created_at: string } | undefined)?.created_at
+      ? this.sql.get<{ created_at: string }>(q.selectNoteCreatedAt(existingId, bookId))?.created_at
       : undefined
     const createdAt = input.createdAt?.trim() || existingCreatedAt || now
-    const result = this.db
-      .prepare(
-        `INSERT INTO notes (id, book_id, note_json, created_at, updated_at)
-         VALUES (@id, @book_id, @note_json, @created_at, @updated_at)
-         ON CONFLICT(id) DO UPDATE SET
-           note_json = @note_json,
-           updated_at = @updated_at
-         -- An ink write must never convert another kind of row (highlight, bookmark) into a stroke.
-         WHERE ${INK_TYPE_PREDICATE} AND book_id = @book_id`,
-      )
-      .run({
-        id,
-        book_id: bookId,
-        note_json: buildInkNoteJson({ locator: input.locator, colorHex: input.colorHex, opacity: input.opacity, ink: input.ink, createdAt, modifiedAt: now }),
-        created_at: createdAt,
-        updated_at: now,
-      })
+    // The upsert's guard keeps another kind of row (highlight, bookmark) from being converted into a stroke.
+    const noteJson = overlayCodec.buildInkNoteJson({ locator: input.locator, colorHex: input.colorHex, opacity: input.opacity, ink: input.ink, createdAt, modifiedAt: now })
+    const result = this.sql.run(q.upsertInk(id, bookId, noteJson, createdAt, now))
     if (result.changes === 0) return null
     return { id, bookId, locator: input.locator, colorHex: input.colorHex, opacity: input.opacity, ink: input.ink, createdAt, updatedAt: now }
   }
@@ -890,7 +429,7 @@ export class SqliteOverlayStore implements OverlayStore {
     const book = bookId.trim()
     const noteId = id.trim()
     if (!book || !noteId) return false
-    return this.db.prepare(`DELETE FROM notes WHERE id = ? AND book_id = ? AND ${INK_TYPE_PREDICATE}`).run(noteId, book).changes > 0
+    return this.sql.run(q.deleteInk(noteId, book)).changes > 0
   }
 
   async deleteHighlight(bookId: string, id: string): Promise<boolean> {
@@ -903,12 +442,7 @@ export class SqliteOverlayStore implements OverlayStore {
     const noteId = id.trim()
     if (!book || !noteId) return false
 
-    const result = this.db
-      .prepare(
-        `DELETE FROM notes
-         WHERE id = ? AND book_id = ? AND ${HIGHLIGHT_TYPE_PREDICATE}`,
-      )
-      .run(noteId, book)
+    const result = this.sql.run(q.deleteHighlight(noteId, book))
 
     return result.changes > 0
   }
@@ -927,11 +461,9 @@ export class SqliteOverlayStore implements OverlayStore {
    */
   /** Ledger rows with their two-way state (base snapshot, conflict) — pdf_annotation_two_way_sync.md. */
   listTwoWayLedger(bookId: string): TwoWayLedgerEntry[] {
-    const rows = this.db
-      .prepare(
-        `SELECT source_key, note_id, source_hash, note_hash, base_json, conflict_json FROM pdf_embedded_annotations WHERE book_id = ?`,
-      )
-      .all(bookId.trim()) as Array<{ source_key: string; note_id: string; source_hash: string; note_hash: string; base_json: string | null; conflict_json: string | null }>
+    const rows = this.sql.all<{ source_key: string; note_id: string; source_hash: string; note_hash: string; base_json: string | null; conflict_json: string | null }>(
+      q.selectTwoWayLedger(bookId.trim()),
+    )
     return rows.map((r) => {
       const entry: TwoWayLedgerEntry = { sourceKey: r.source_key, noteId: r.note_id, sourceHash: r.source_hash, noteHash: r.note_hash }
       try {
@@ -963,14 +495,13 @@ export class SqliteOverlayStore implements OverlayStore {
     if (entries.length === 0) return null
     const current = this.listHighlightRecordsSync(book).find((r) => r.id === noteId)
     const result: { updated?: HighlightRecord; deleted?: string } = {}
-    this.db.exec('BEGIN IMMEDIATE')
-    try {
+    this.sql.transaction(() => {
       for (const entry of entries) {
         const conflict = entry.conflict!
         if (choice === 'use-pdf') {
           if (conflict.kind === 'removed-in-file' || !conflict.item) {
-            this.db.prepare(`DELETE FROM notes WHERE id = ? AND book_id = ? AND ${HIGHLIGHT_TYPE_PREDICATE}`).run(noteId, book)
-            this.db.prepare(`DELETE FROM pdf_embedded_annotations WHERE book_id = ? AND source_key = ?`).run(book, entry.sourceKey)
+            this.sql.run(q.deleteHighlight(noteId, book))
+            this.sql.run(q.deleteLedgerByKey(book, entry.sourceKey))
             result.deleted = noteId
             continue
           }
@@ -983,32 +514,24 @@ export class SqliteOverlayStore implements OverlayStore {
           if (!current) continue
           if (conflict.kind === 'removed-in-file') {
             // Forget the link: the row then counts as made in Readmate and is added to the file again.
-            this.db.prepare(`DELETE FROM pdf_embedded_annotations WHERE book_id = ? AND source_key = ?`).run(book, entry.sourceKey)
+            this.sql.run(q.deleteLedgerByKey(book, entry.sourceKey))
           } else if (conflict.item) {
             // Base = the file as it is now + an app side that differs from the row: the next cycle sees
             // only the app side as changed and rewrites the file annotation from the row.
             const base = syncBase(conflict.item, current)
             const forcedApp = { kind: base.app.kind, color: '\u0000', text: '\u0000', geometry: '\u0000' }
-            this.db
-              .prepare(`UPDATE pdf_embedded_annotations SET base_json = ?, conflict_json = NULL, synced_at = ? WHERE book_id = ? AND source_key = ?`)
-              .run(JSON.stringify({ file: base.file, app: forcedApp }), new Date().toISOString(), book, entry.sourceKey)
+            this.sql.run(q.updateLedgerBase(book, entry.sourceKey, JSON.stringify({ file: base.file, app: forcedApp }), new Date().toISOString()))
           }
           result.updated = current
         }
       }
-      this.db.exec('COMMIT')
-    } catch (err) {
-      this.db.exec('ROLLBACK')
-      throw err
-    }
+    }, 'immediate')
     return result
   }
 
   private listHighlightRecordsSync(bookId: string): HighlightRecord[] {
-    const rows = this.db
-      .prepare(`SELECT ${NOTE_COLUMNS} FROM notes WHERE book_id = ? AND ${HIGHLIGHT_TYPE_PREDICATE} ORDER BY created_at ASC`)
-      .all(bookId) as NoteRow[]
-    return rows.map(rowToHighlightRecord).filter((h): h is HighlightRecord => h !== undefined)
+    const rows = this.sql.all<NoteRow>(q.selectHighlights(bookId))
+    return rows.map(overlayCodec.highlightFromRow).filter((h): h is HighlightRecord => h !== undefined)
   }
 
   private upsertTwoWayLedger(
@@ -1020,25 +543,18 @@ export class SqliteOverlayStore implements OverlayStore {
     conflict: SyncConflict | null,
   ): void {
     const now = new Date().toISOString()
-    this.db
-      .prepare(
-        `INSERT INTO pdf_embedded_annotations
-           (book_id, source_key, note_id, source_hash, note_hash, base_json, conflict_json, imported_at, synced_at)
-         VALUES (@book_id, @source_key, @note_id, @source_hash, @note_hash, @base_json, @conflict_json, @now, @now)
-         ON CONFLICT(book_id, source_key) DO UPDATE SET
-           note_id = @note_id, source_hash = @source_hash, note_hash = @note_hash,
-           base_json = @base_json, conflict_json = @conflict_json, synced_at = @now`,
-      )
-      .run({
-        book_id: bookId,
-        source_key: key,
-        note_id: noteId,
-        source_hash: embeddedAnnotationSourceHash(item),
-        note_hash: highlightContentHash(row),
-        base_json: JSON.stringify(syncBase(item, row)),
-        conflict_json: conflict ? JSON.stringify(conflict) : null,
+    this.sql.run(
+      q.upsertTwoWayLedger(
+        bookId,
+        key,
+        noteId,
+        embeddedAnnotationSourceHash(item),
+        highlightContentHash(row),
+        JSON.stringify(syncBase(item, row)),
+        conflict ? JSON.stringify(conflict) : null,
         now,
-      })
+      ),
+    )
   }
 
   /**
@@ -1049,22 +565,23 @@ export class SqliteOverlayStore implements OverlayStore {
    */
   applyTwoWaySync(bookId: string, plan: TwoWayPlan, items: readonly ScannedPdfAnnotation[], after: readonly ScannedPdfAnnotation[] | null): TwoWaySyncOutcome | null {
     const book = bookId.trim()
-    const row = this.db.prepare(`SELECT file_format FROM books WHERE id = ?`).get(book) as { file_format: string } | undefined
+    const row = this.sql.get<{ file_format: string }>(q.selectBookFormat(book))
     if (!row || row.file_format !== 'pdf') return null
     const outcome: TwoWaySyncOutcome = { inserted: [], updated: [], deleted: [], conflicts: [] }
     const keys = embeddedAnnotationIdentities(items).map((i) => i.key)
     const itemByKey = new Map(keys.map((k, i) => [k, items[i]!]))
     const writtenIds = new Set(plan.writtenRows.map((w) => w.noteId))
     const wrote = after !== null
-    const dropLedger = this.db.prepare(`DELETE FROM pdf_embedded_annotations WHERE book_id = ? AND source_key = ?`)
+    const dropLedger = (bookId: string, key: string): void => {
+      this.sql.run(q.deleteLedgerByKey(bookId, key))
+    }
 
-    this.db.exec('BEGIN IMMEDIATE')
-    try {
+    this.sql.transaction(() => {
       for (const noteId of plan.rowDeletes) {
-        if (this.db.prepare(`DELETE FROM notes WHERE id = ? AND book_id = ? AND ${HIGHLIGHT_TYPE_PREDICATE}`).run(noteId, book).changes > 0) outcome.deleted.push(noteId)
+        if (this.sql.run(q.deleteHighlight(noteId, book)).changes > 0) outcome.deleted.push(noteId)
       }
-      for (const key of plan.ledgerDrops) dropLedger.run(book, key)
-      if (wrote) for (const key of plan.ledgerDropsAfterWrite) dropLedger.run(book, key)
+      for (const key of plan.ledgerDrops) dropLedger(book, key)
+      if (wrote) for (const key of plan.ledgerDropsAfterWrite) dropLedger(book, key)
 
       const records = new Map(this.listHighlightRecordsSync(book).map((r) => [r.id, r]))
       for (const { noteId, next, expectedHash } of plan.rowUpdates) {
@@ -1100,11 +617,11 @@ export class SqliteOverlayStore implements OverlayStore {
         if (current) this.upsertTwoWayLedger(book, key, noteId, item, current, null)
       }
       for (const { key, noteId, conflict } of plan.conflicts) {
-        this.db.prepare(`UPDATE pdf_embedded_annotations SET conflict_json = ?, synced_at = ? WHERE book_id = ? AND source_key = ?`).run(JSON.stringify(conflict), new Date().toISOString(), book, key)
+        this.sql.run(q.setLedgerConflict(book, key, JSON.stringify(conflict), new Date().toISOString()))
         outcome.conflicts.push({ noteId, conflict })
       }
       for (const key of plan.conflictsCleared) {
-        this.db.prepare(`UPDATE pdf_embedded_annotations SET conflict_json = NULL WHERE book_id = ? AND source_key = ?`).run(book, key)
+        this.sql.run(q.clearLedgerConflict(book, key))
       }
       for (const { key, noteId, item } of plan.baseRefresh) {
         const current = records.get(noteId)
@@ -1115,7 +632,7 @@ export class SqliteOverlayStore implements OverlayStore {
         for (const { noteId, row: written, oldKeys, names } of plan.writtenRows) {
           // Even when the row was deleted while this cycle ran: its entry then is a tombstone, so the
           // next cycle removes the annotation from the file instead of importing it back as a new row.
-          for (const key of oldKeys) dropLedger.run(book, key)
+          for (const key of oldKeys) dropLedger(book, key)
           // The base / hash record what was WRITTEN: an edit made meanwhile stays "changed" and is
           // written by the next cycle.
           after.forEach((item, i) => {
@@ -1123,19 +640,13 @@ export class SqliteOverlayStore implements OverlayStore {
           })
         }
       }
-      this.db.exec('COMMIT')
-    } catch (err) {
-      this.db.exec('ROLLBACK')
-      throw err
-    }
+    }, 'immediate')
     return outcome
   }
 
   /** The book's import-ledger rows (which embedded annotation became which `notes` row). */
   listEmbeddedLedger(bookId: string): EmbeddedAnnotationLedgerEntry[] {
-    const rows = this.db
-      .prepare(`SELECT source_key, note_id, source_hash, note_hash FROM pdf_embedded_annotations WHERE book_id = ?`)
-      .all(bookId.trim()) as Array<{ source_key: string; note_id: string; source_hash: string; note_hash: string }>
+    const rows = this.sql.all<{ source_key: string; note_id: string; source_hash: string; note_hash: string }>(q.selectEmbeddedLedger(bookId.trim()))
     return rows.map((r) => ({ sourceKey: r.source_key, noteId: r.note_id, sourceHash: r.source_hash, noteHash: r.note_hash }))
   }
 
@@ -1145,9 +656,7 @@ export class SqliteOverlayStore implements OverlayStore {
     options: EmbeddedAnnotationSyncOptions = {},
   ): EmbeddedPdfSyncOutcome | null {
     const book = bookId.trim()
-    const row = this.db.prepare(`SELECT file_format FROM books WHERE id = ?`).get(book) as
-      | { file_format: string }
-      | undefined
+    const row = this.sql.get<{ file_format: string }>(q.selectBookFormat(book))
     if (!row || row.file_format !== 'pdf') return null
 
     const outcome: EmbeddedPdfSyncOutcome = {
@@ -1164,23 +673,16 @@ export class SqliteOverlayStore implements OverlayStore {
     // Nothing scanned and nothing that could be deleted: no transaction at all.
     if (items.length === 0 && !options.complete) return outcome
 
-    this.db.exec('BEGIN IMMEDIATE')
-    try {
+    this.sql.transaction(() => {
       const ledger = new Map<string, EmbeddedAnnotationLedgerEntry>()
-      const ledgerRows = this.db
-        .prepare(
-          `SELECT source_key, note_id, source_hash, note_hash FROM pdf_embedded_annotations WHERE book_id = ?`,
-        )
-        .all(book) as Array<{ source_key: string; note_id: string; source_hash: string; note_hash: string }>
+      const ledgerRows = this.sql.all<{ source_key: string; note_id: string; source_hash: string; note_hash: string }>(q.selectEmbeddedLedger(book))
       for (const r of ledgerRows) {
         ledger.set(r.source_key, { sourceKey: r.source_key, noteId: r.note_id, sourceHash: r.source_hash, noteHash: r.note_hash })
       }
       const current = new Map<string, HighlightRecord>()
-      const noteRows = this.db
-        .prepare(`SELECT ${NOTE_COLUMNS} FROM notes WHERE book_id = ? AND ${HIGHLIGHT_TYPE_PREDICATE}`)
-        .all(book) as NoteRow[]
+      const noteRows = this.sql.all<NoteRow>(q.selectHighlightsUnordered(book))
       for (const noteRow of noteRows) {
-        const record = rowToHighlightRecord(noteRow)
+        const record = overlayCodec.highlightFromRow(noteRow)
         if (record) current.set(record.id, record)
       }
 
@@ -1195,43 +697,23 @@ export class SqliteOverlayStore implements OverlayStore {
       )
 
       const now = new Date().toISOString()
-      const upsertLedger = this.db.prepare(
-        `INSERT INTO pdf_embedded_annotations
-           (book_id, source_key, note_id, source_hash, note_hash, imported_at, synced_at)
-         VALUES (@book_id, @source_key, @note_id, @source_hash, @note_hash, @now, @now)
-         ON CONFLICT(book_id, source_key) DO UPDATE SET
-           note_id = @note_id,
-           source_hash = @source_hash,
-           note_hash = @note_hash,
-           synced_at = @now`,
-      )
       const write = (step: EmbeddedAnnotationSyncStep, noteId: string | undefined): HighlightRecord => {
         const highlight = highlightFromEmbeddedAnnotation(step.item)
         const saved = this.writeHighlight({ ...highlight, id: noteId, bookId: book })
-        upsertLedger.run({
-          book_id: book,
-          source_key: step.key,
-          note_id: saved.id,
-          source_hash: embeddedAnnotationSourceHash(step.item),
-          note_hash: highlightContentHash(saved),
-          now,
-        })
+        this.sql.run(
+          q.upsertEmbeddedLedger(book, step.key, saved.id, embeddedAnnotationSourceHash(step.item), highlightContentHash(saved), now),
+        )
         return saved
       }
-      const rekey = this.db.prepare(
-        `UPDATE pdf_embedded_annotations SET source_key = ?, synced_at = ? WHERE book_id = ? AND source_key = ?`,
-      )
-      for (const { from, to } of plan.rekeys) rekey.run(to, now, book, from)
+      for (const { from, to } of plan.rekeys) this.sql.run(q.rekeyLedger(book, from, to, now))
       for (const step of plan.inserts) outcome.inserted.push(write(step, undefined))
       for (const step of plan.updates) outcome.updated.push(write(step, step.noteId))
 
-      const deleteLedger = this.db.prepare(`DELETE FROM pdf_embedded_annotations WHERE book_id = ? AND source_key = ?`)
-      const deleteNote = this.db.prepare(`DELETE FROM notes WHERE id = ? AND book_id = ? AND ${HIGHLIGHT_TYPE_PREDICATE}`)
       for (const { key, noteId } of plan.deletions) {
-        if (deleteNote.run(noteId, book).changes > 0) outcome.deleted.push(noteId)
-        deleteLedger.run(book, key)
+        if (this.sql.run(q.deleteHighlight(noteId, book)).changes > 0) outcome.deleted.push(noteId)
+        this.sql.run(q.deleteLedgerByKey(book, key))
       }
-      for (const key of plan.tombstonesCleared) deleteLedger.run(book, key)
+      for (const key of plan.tombstonesCleared) this.sql.run(q.deleteLedgerByKey(book, key))
 
       outcome.unchanged = plan.unchanged
       outcome.keptAppEdits = plan.keptAppEdits
@@ -1239,11 +721,7 @@ export class SqliteOverlayStore implements OverlayStore {
       outcome.managedIndices = plan.managed
       outcome.rekeyed = plan.rekeys.length
       outcome.keptAppEditsOnRemoval = plan.keptAppEditsOnRemoval
-      this.db.exec('COMMIT')
-    } catch (err) {
-      this.db.exec('ROLLBACK')
-      throw err
-    }
+    }, 'immediate')
     return outcome
   }
 }

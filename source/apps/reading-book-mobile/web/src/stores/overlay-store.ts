@@ -23,75 +23,35 @@ import {
   ReadingSessionState,
   isConsistentMdHighlight,
   isConsistentPdfHighlight,
+  overlayCodec,
+  overlayStatements as q,
   packSessionLocation,
   parseMdAnnotation,
   parsePdfAnnotation,
   parseReadingState,
   parseTxtAnnotation,
-  unpackSessionLocation,
   type BookmarkRecord,
   type HighlightRecord,
   type HighlightStyleKind,
-  type INoteState,
-  type MdAnnotation,
-  type NoteLocator,
-  type NoteSelectionText,
   type OverlayStore,
-  type PdfAnnotation,
   type ReadingStateJson,
   type SaveBookmarkInput,
   type SaveHighlightInput,
-  type TxtAnnotation,
 } from '@reading-book/book-reader-sdk'
-import { queryOne, type SqlDriver } from '../db/sql-driver'
+import type { SqlDriver, SqlStatement } from '../db/sql-driver'
 
-interface NoteRow {
-  id: string
-  book_id: string
-  note_json: string
-  created_at: string
-  updated_at: string
-}
+// The SQL (core `overlayStatements`) and the `note_json` / reading-state codecs (core `overlayCodec`) are shared with
+// Desktop's store (spec 009 T033); this store keeps Mobile's validation and its async control flow.
+type NoteRow = overlayCodec.NoteRow
+export type SessionRecord = overlayCodec.SessionRecord
 
-const NOTE_COLUMNS = 'id, book_id, note_json, created_at, updated_at'
-
-/** Desktop's `SessionRecord` (sqlite-overlay-store.ts): the DTO-facing reading state of one book. */
-export interface SessionRecord {
-  bookId: string
-  lastReadLocation?: string
-  lastReadLabel?: string
-  percent: number
-  fontFamily?: string
-  fontSize?: number
-  fontWeight?: string
-  lineHeight?: number
-  textAlign?: string
-  layoutMode?: string
-  pageTurnMode?: string
-  marginsEnabled?: boolean
-  marginPreset?: string
-  isLandscape?: boolean
-  updatedAt: string
-}
-
-/** Same predicates as Desktop's store, verbatim, so the same rows are selected (and `idx_notes_group` is used). */
-const BOOKMARK_GROUP_PREDICATE = `json_extract(note_json, '$.group') = 'bookmark'`
-const HIGHLIGHT_TYPE_PREDICATE = `
-  (json_extract(note_json, '$.group') IS NULL OR json_extract(note_json, '$.group') = 'annotation')
-  AND json_extract(note_json, '$.type') IN ('highlight', 'underline', 'strikethrough', 'squiggly', 'replace', 'insert', 'textbox', 'rectangle', 'ellipse', 'line', 'arrow', 'typewriter', 'attachment')
-`
-const ANNOTATION_GROUP_GUARD = `(json_extract(note_json, '$.group') IS NULL OR json_extract(note_json, '$.group') = 'annotation')`
-
-/** Every kind Desktop lists (read side). */
-const LISTED_STYLE_KINDS: readonly HighlightStyleKind[] = [
-  'highlight', 'underline', 'strikethrough', 'squiggly', 'replace', 'insert', 'textbox',
-  'rectangle', 'ellipse', 'line', 'arrow', 'typewriter', 'attachment',
-]
+const queryOne = async <Row>(db: SqlDriver, statement: SqlStatement): Promise<Row | undefined> =>
+  (await db.query<Row>(statement.sql, statement.params))[0]
+const queryAll = <Row>(db: SqlDriver, statement: SqlStatement): Promise<Row[]> => db.query<Row>(statement.sql, statement.params)
+const runOne = (db: SqlDriver, statement: SqlStatement) => db.run(statement.sql, statement.params)
 
 /** Kinds Mobile creates in the first release: text markup only (contracts/phone-ui.md, scope). */
 export const MOBILE_WRITABLE_STYLE_KINDS: readonly HighlightStyleKind[] = ['highlight', 'underline', 'strikethrough', 'squiggly']
-
-const DEFAULT_HIGHLIGHT_COLOR = '#FFEB3B'
 
 export class OverlayValidationError extends Error {
   constructor(message: string) {
@@ -102,95 +62,6 @@ export class OverlayValidationError extends Error {
 
 const newId = () => globalThis.crypto.randomUUID()
 const nowIso = () => new Date().toISOString()
-
-function parseNote(row: NoteRow): INoteState | undefined {
-  try {
-    return JSON.parse(row.note_json) as INoteState
-  } catch {
-    return undefined
-  }
-}
-
-function rowToBookmarkRecord(row: NoteRow): BookmarkRecord | undefined {
-  const note = parseNote(row)
-  const locator = note?.locatorExtended?.locator
-  if (!note || !locator) return undefined
-  return {
-    id: row.id,
-    bookId: row.book_id,
-    locator,
-    label: note.label?.trim() || undefined,
-    excerpt: note.textualValue?.trim() || undefined,
-    createdAt: row.created_at,
-  }
-}
-
-function rowToHighlightRecord(row: NoteRow): HighlightRecord | undefined {
-  const note = parseNote(row)
-  const locator = note?.locatorExtended?.locator
-  if (!note || !locator) return undefined
-  const styleKind: HighlightStyleKind = LISTED_STYLE_KINDS.includes(note.type as HighlightStyleKind) ? (note.type as HighlightStyleKind) : 'highlight'
-  return {
-    id: row.id,
-    bookId: row.book_id,
-    locator,
-    styleKind,
-    colorHex: note.style?.colorHex?.trim() || DEFAULT_HIGHLIGHT_COLOR,
-    note: styleKind === 'typewriter' ? (note.note ?? undefined) : note.note?.trim() || undefined,
-    tags: Array.isArray(note.tags) ? note.tags : [],
-    selectionText: note.locatorExtended?.text,
-    pdfAnnotation: note.pdfAnnotation ? parsePdfAnnotation(note.pdfAnnotation, note.note ?? undefined) : undefined,
-    txtAnnotation: note.txtAnnotation ? parseTxtAnnotation(note.txtAnnotation) : undefined,
-    mdAnnotation: note.mdAnnotation ? parseMdAnnotation(note.mdAnnotation) : undefined,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
-  }
-}
-
-function bookmarkNoteJson(input: { locator: NoteLocator; label?: string; excerpt?: string; createdAt: string; modifiedAt: string }): string {
-  const note: INoteState = {
-    schemaVersion: 1,
-    type: 'bookmark',
-    group: 'bookmark',
-    locatorExtended: { locator: input.locator },
-    textualValue: input.excerpt,
-    label: input.label,
-    created: input.createdAt,
-    modified: input.modifiedAt,
-  }
-  return JSON.stringify(note)
-}
-
-function highlightNoteJson(input: {
-  locator: NoteLocator
-  styleKind: HighlightStyleKind
-  colorHex: string
-  note?: string
-  tags?: string[]
-  selectionText?: NoteSelectionText
-  pdfAnnotation?: PdfAnnotation
-  txtAnnotation?: TxtAnnotation
-  mdAnnotation?: MdAnnotation
-  createdAt: string
-  modifiedAt: string
-}): string {
-  const note: INoteState = {
-    schemaVersion: 1,
-    type: input.styleKind,
-    group: 'annotation',
-    locatorExtended: { locator: input.locator, text: input.selectionText },
-    pdfAnnotation: input.pdfAnnotation,
-    txtAnnotation: input.txtAnnotation,
-    mdAnnotation: input.mdAnnotation,
-    textualValue: input.selectionText?.highlight,
-    note: input.note ?? null,
-    style: { colorHex: input.colorHex },
-    tags: input.tags?.length ? input.tags : undefined,
-    created: input.createdAt,
-    modified: input.modifiedAt,
-  }
-  return JSON.stringify(note)
-}
 
 /** Main's checks of `overlay:saveHighlight`, on the store input; SDK functions only. */
 export function validateHighlightInput(input: SaveHighlightInput): void {
@@ -222,7 +93,7 @@ export class MobileOverlayStore implements OverlayStore {
   constructor(private readonly db: SqlDriver) {}
 
   private async readState(bookId: string): Promise<{ state: ReadingStateJson; bookUpdatedAt: string } | undefined> {
-    const row = await queryOne<{ reading_state_json: string; updated_at: string }>(this.db, 'SELECT reading_state_json, updated_at FROM books WHERE id = ?', [bookId])
+    const row = await queryOne<{ reading_state_json: string; updated_at: string }>(this.db, q.selectReadingStateRow(bookId))
     return row ? { state: parseReadingState(row.reading_state_json), bookUpdatedAt: row.updated_at } : undefined
   }
 
@@ -231,53 +102,14 @@ export class MobileOverlayStore implements OverlayStore {
     if (!id) return undefined
     const found = await this.readState(id)
     if (!found) return undefined
-    const { state, bookUpdatedAt } = found
-    const unpacked = unpackSessionLocation(state.lastReadLocation ?? '')
-    if (!unpacked) return undefined
-    const num = (v: number | null | undefined) => (v != null && Number.isFinite(v) ? v : undefined)
-    const text = (v: string | null | undefined) => v?.trim() || undefined
-    return new ReadingSessionState({
-      bookId: id,
-      lastReadLocation: unpacked.location,
-      lastReadLabel: unpacked.label,
-      percent: num(state.percent) ?? 0,
-      fontFamily: text(state.fontFamily),
-      fontSize: num(state.fontSize),
-      fontWeight: text(state.fontWeight),
-      lineHeight: num(state.lineHeight),
-      textAlign: text(state.textAlign),
-      layoutMode: text(state.layoutMode),
-      pageTurnMode: text(state.pageTurnMode),
-      marginsEnabled: state.marginsEnabled ?? undefined,
-      marginPreset: text(state.marginPreset),
-      isLandscape: state.isLandscape === true,
-      updatedAt: state.updatedAt || bookUpdatedAt,
-    })
+    return overlayCodec.sessionStateFromReadingState(id, found.state, found.bookUpdatedAt)
   }
 
   /** Full overwrite of the reading state; a write older than the stored state is dropped (Desktop's guard). */
   async saveSessionState(s: ReadingSessionState): Promise<void> {
     const updatedAt = s.updatedAt || nowIso()
-    const state: ReadingStateJson = {
-      lastReadLocation: packSessionLocation(s.lastReadLocation, s.lastReadLabel),
-      percent: ReadingSessionState.clampPercent(s.percent),
-      fontFamily: s.fontFamily,
-      fontSize: s.fontSize,
-      fontWeight: s.fontWeight,
-      lineHeight: s.lineHeight,
-      textAlign: s.textAlign,
-      layoutMode: s.layoutMode,
-      pageTurnMode: s.pageTurnMode,
-      marginsEnabled: s.marginsEnabled,
-      marginPreset: s.marginPreset,
-      isLandscape: s.isLandscape === true,
-      updatedAt,
-    }
-    await this.db.run(
-      `UPDATE books SET reading_state_json = ?, updated_at = ?
-       WHERE id = ? AND COALESCE(json_extract(reading_state_json, '$.updatedAt'), '') <= ?`,
-      [JSON.stringify(state), nowIso(), s.bookId, updatedAt],
-    )
+    const state = overlayCodec.readingStateOfSession(s, updatedAt, packSessionLocation(s.lastReadLocation, s.lastReadLabel))
+    await runOne(this.db, q.overwriteSessionState(s.bookId, JSON.stringify(state), nowIso(), updatedAt))
   }
 
   /**
@@ -289,27 +121,7 @@ export class MobileOverlayStore implements OverlayStore {
     if (!id) return undefined
     const found = await this.readState(id)
     if (!found) return undefined
-    const { state, bookUpdatedAt } = found
-    const unpacked = unpackSessionLocation(state.lastReadLocation ?? '')
-    const num = (v: number | null | undefined) => (v != null && Number.isFinite(v) ? v : undefined)
-    const text = (v: string | null | undefined) => v?.trim() || undefined
-    return {
-      bookId: id,
-      lastReadLocation: unpacked?.location.toString(),
-      lastReadLabel: unpacked?.label,
-      percent: num(state.percent) ?? 0,
-      fontFamily: text(state.fontFamily),
-      fontSize: num(state.fontSize),
-      fontWeight: text(state.fontWeight),
-      lineHeight: num(state.lineHeight),
-      textAlign: text(state.textAlign),
-      layoutMode: text(state.layoutMode),
-      pageTurnMode: text(state.pageTurnMode),
-      marginsEnabled: state.marginsEnabled ?? undefined,
-      marginPreset: text(state.marginPreset),
-      isLandscape: state.isLandscape === true,
-      updatedAt: state.updatedAt || bookUpdatedAt,
-    }
+    return overlayCodec.sessionRecordFromState(id, found.state, found.bookUpdatedAt)
   }
 
   /**
@@ -325,34 +137,16 @@ export class MobileOverlayStore implements OverlayStore {
         // A settings-only save must preserve the existing location.
       }
     }
-    const patch: ReadingStateJson = {
-      updatedAt: record.updatedAt || nowIso(),
-      lastReadLocation: packedLocation,
-      percent: packedLocation !== undefined ? ReadingSessionState.clampPercent(record.percent) : undefined,
-      fontFamily: record.fontFamily,
-      fontSize: record.fontSize,
-      fontWeight: record.fontWeight,
-      lineHeight: record.lineHeight,
-      textAlign: record.textAlign,
-      layoutMode: record.layoutMode,
-      pageTurnMode: record.pageTurnMode,
-      marginsEnabled: record.marginsEnabled,
-      marginPreset: record.marginPreset,
-      isLandscape: record.isLandscape,
-    }
-    const result = await this.db.run('UPDATE books SET reading_state_json = json_patch(reading_state_json, ?), updated_at = ? WHERE id = ?', [
-      JSON.stringify(patch),
-      nowIso(),
-      record.bookId,
-    ])
+    const patch = overlayCodec.preferencesPatch(record, packedLocation, nowIso())
+    const result = await runOne(this.db, q.patchSessionPreferences(record.bookId, JSON.stringify(patch), nowIso()))
     return result.changes > 0
   }
 
   async listBookmarks(bookId: string): Promise<BookmarkRecord[]> {
     const id = bookId.trim()
     if (!id) return []
-    const rows = await this.db.query<NoteRow>(`SELECT ${NOTE_COLUMNS} FROM notes WHERE book_id = ? AND ${BOOKMARK_GROUP_PREDICATE} ORDER BY created_at ASC`, [id])
-    return rows.map(rowToBookmarkRecord).filter((b): b is BookmarkRecord => b !== undefined)
+    const rows = await queryAll<NoteRow>(this.db, q.selectBookmarks(id))
+    return rows.map(overlayCodec.bookmarkFromRow).filter((b): b is BookmarkRecord => b !== undefined)
   }
 
   async saveBookmark(input: SaveBookmarkInput): Promise<BookmarkRecord> {
@@ -369,13 +163,8 @@ export class MobileOverlayStore implements OverlayStore {
     const createdAt = input.createdAt?.trim() || (existingId ? await this.createdAtOf(existingId, bookId) : undefined) || now
     const label = input.label?.trim() || undefined
     const excerpt = input.excerpt?.trim() || undefined
-    const noteJson = bookmarkNoteJson({ locator: input.locator, label, excerpt, createdAt, modifiedAt: now })
-    const result = await this.db.run(
-      `INSERT INTO notes (id, book_id, note_json, created_at, updated_at) VALUES (?, ?, ?, ?, ?)
-       ON CONFLICT(id) DO UPDATE SET note_json = excluded.note_json, updated_at = excluded.updated_at
-       WHERE ${BOOKMARK_GROUP_PREDICATE}`,
-      [id, bookId, noteJson, createdAt, now],
-    )
+    const noteJson = overlayCodec.buildBookmarkNoteJson({ locator: input.locator, label, excerpt, createdAt, modifiedAt: now })
+    const result = await runOne(this.db, q.upsertBookmark(id, bookId, noteJson, createdAt, now))
     if (result.changes === 0) throw new Error(`saveBookmark: note ${id} exists but is not a bookmark`)
     return { id, bookId, locator: input.locator, label, excerpt, createdAt }
   }
@@ -384,15 +173,15 @@ export class MobileOverlayStore implements OverlayStore {
     const book = bookId.trim()
     const noteId = id.trim()
     if (!book || !noteId) return false
-    const result = await this.db.run(`DELETE FROM notes WHERE id = ? AND book_id = ? AND ${BOOKMARK_GROUP_PREDICATE}`, [noteId, book])
+    const result = await runOne(this.db, q.deleteBookmark(noteId, book))
     return result.changes > 0
   }
 
   async listHighlights(bookId: string): Promise<HighlightRecord[]> {
     const id = bookId.trim()
     if (!id) return []
-    const rows = await this.db.query<NoteRow>(`SELECT ${NOTE_COLUMNS} FROM notes WHERE book_id = ? AND ${HIGHLIGHT_TYPE_PREDICATE} ORDER BY created_at ASC`, [id])
-    return rows.map(rowToHighlightRecord).filter((h): h is HighlightRecord => h !== undefined)
+    const rows = await queryAll<NoteRow>(this.db, q.selectHighlights(id))
+    return rows.map(overlayCodec.highlightFromRow).filter((h): h is HighlightRecord => h !== undefined)
   }
 
   async saveHighlight(input: SaveHighlightInput): Promise<HighlightRecord> {
@@ -404,7 +193,7 @@ export class MobileOverlayStore implements OverlayStore {
     const createdAt = input.createdAt?.trim() || (existingId ? await this.createdAtOf(existingId, bookId) : undefined) || now
     const colorHex = input.colorHex.trim()
     const note = input.note?.trim() || undefined
-    const noteJson = highlightNoteJson({
+    const noteJson = overlayCodec.buildHighlightNoteJson({
       locator: input.locator,
       styleKind: input.styleKind,
       colorHex,
@@ -417,12 +206,7 @@ export class MobileOverlayStore implements OverlayStore {
       createdAt,
       modifiedAt: now,
     })
-    const result = await this.db.run(
-      `INSERT INTO notes (id, book_id, note_json, created_at, updated_at) VALUES (?, ?, ?, ?, ?)
-       ON CONFLICT(id) DO UPDATE SET note_json = excluded.note_json, updated_at = excluded.updated_at
-       WHERE ${ANNOTATION_GROUP_GUARD}`,
-      [id, bookId, noteJson, createdAt, now],
-    )
+    const result = await runOne(this.db, q.upsertHighlight(id, bookId, noteJson, createdAt, now))
     if (result.changes === 0) throw new Error(`saveHighlight: note ${id} exists but is not an annotation`)
     return {
       id,
@@ -445,12 +229,12 @@ export class MobileOverlayStore implements OverlayStore {
     const book = bookId.trim()
     const noteId = id.trim()
     if (!book || !noteId) return false
-    const result = await this.db.run(`DELETE FROM notes WHERE id = ? AND book_id = ? AND ${HIGHLIGHT_TYPE_PREDICATE}`, [noteId, book])
+    const result = await runOne(this.db, q.deleteHighlight(noteId, book))
     return result.changes > 0
   }
 
   /** An update keeps the row's first creation time; only an insert dates it. */
   private async createdAtOf(id: string, bookId: string): Promise<string | undefined> {
-    return (await queryOne<{ created_at: string }>(this.db, 'SELECT created_at FROM notes WHERE id = ? AND book_id = ?', [id, bookId]))?.created_at
+    return (await queryOne<{ created_at: string }>(this.db, q.selectNoteCreatedAt(id, bookId)))?.created_at
   }
 }
