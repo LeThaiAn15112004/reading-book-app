@@ -6,7 +6,7 @@
  * migration leaves nothing behind and is retried on the next start. The batch holds single statements only (the
  * host's `sql.run` rule), so a migration file is split by `splitSqlStatements`.
  */
-import baseline001 from './migrations/001_baseline.sql?raw'
+import baseline001 from '../../../../../core/src/db/mobile/migrations/001_baseline.sql?raw'
 import type { SqlDriver, SqlStatement } from './sql-driver'
 
 export interface Migration {

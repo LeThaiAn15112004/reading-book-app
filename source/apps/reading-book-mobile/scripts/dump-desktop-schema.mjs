@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Dumps the real schema of a fully migrated Desktop database (spec 008, T040), as the source for Mobile's baseline
-// (`web/src/db/migrations/001_baseline.sql`, T041). The column lists come from SQLite itself, not from reading
+// (`source/core/src/db/mobile/migrations/001_baseline.sql`, T041). The column lists come from SQLite itself, not from reading
 // migration text, because many tables were rebuilt across Desktop's migrations.
 //
 //   node scripts/dump-desktop-schema.mjs                      # apply Desktop's migrations to :memory: and dump
