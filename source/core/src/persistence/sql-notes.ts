@@ -5,7 +5,8 @@ import type { HighlightRecord, HighlightStyleKind } from '../domain/annotation/h
 import type { NoteLocator, NoteSelectionText } from '../domain/annotation/note.js'
 import type { OverlayStore, SaveBookmarkInput, SaveHighlightInput } from '../domain-ports/overlay-store.js'
 
-export type SqlValue = string | number | null | Uint8Array
+import type { SqlValue } from '../db/driver.js'
+export type { SqlValue }
 
 /**
  * The only thing the SDK needs from a SQLite driver. Positional `?` parameters, async results —
