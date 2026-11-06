@@ -15,7 +15,8 @@ export const appDir = path.join(sourceRoot, 'app')
 export const sdkDir = coreDir
 // The Desktop host (Main, Preload, workers) lives inside the shared UI folder since spec 009 T047.
 export const desktopDir = path.join(appDir, 'platforms/electron')
-export const mobileDir = path.join(appsDir, 'reading-book-mobile')
+// The Mobile host (React Native app, WebView entry, bridge, stores) lives in the shared UI folder since spec 009 T048.
+export const mobileDir = path.join(appDir, 'platforms/native')
 export const configDir = path.join(coreDir, 'src/config')
 export const hostAdaptersDir = path.join(desktopDir, 'host-adapters')
 

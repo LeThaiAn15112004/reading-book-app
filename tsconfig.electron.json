@@ -47,7 +47,7 @@
     "./source/app",
     "./source/app/platforms/electron"
   ],
-  "exclude": ["./source/app/**/*.native.ts", "./source/app/**/*.native.tsx", "./source/app/platforms/electron/e2e", "./source/app/platforms/electron/spikes", "./source/app/platforms/electron/scripts", "./source/app/platforms/electron/release", "./source/app/platforms/electron/dist", "./source/app/platforms/electron/dist-electron"],
+  "exclude": ["./source/app/**/*.native.ts", "./source/app/**/*.native.tsx", "./source/app/platforms/native", "./source/app/platforms/electron/e2e", "./source/app/platforms/electron/spikes", "./source/app/platforms/electron/scripts", "./source/app/platforms/electron/release", "./source/app/platforms/electron/dist", "./source/app/platforms/electron/dist-electron"],
   "references": [
     {
       "path": "./source/app/platforms/electron/tsconfig.node.json"

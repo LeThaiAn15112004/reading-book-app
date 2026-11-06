@@ -10,8 +10,8 @@ module.exports = function (api) {
         'module-resolver',
         {
           alias: {
-            '^@/assets/(.*)$': './source/apps/reading-book-mobile/assets/\\1',
-            '^@/(.*)$': './source/apps/reading-book-mobile/src/\\1',
+            '^@/assets/(.*)$': './source/app/platforms/native/assets/\\1',
+            '^@/(.*)$': './source/app/platforms/native/\\1',
           },
         },
       ],

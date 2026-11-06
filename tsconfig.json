@@ -9,14 +9,17 @@
       "@app/*": ["./source/app/*"],
       "@reading-book/book-reader-sdk": ["./source/core/src/index.ts"],
       "@reading-book/book-reader-sdk/*": ["./source/core/src/*"],
-      "@/*": ["./source/apps/reading-book-mobile/src/*"],
-      "@/assets/*": ["./source/apps/reading-book-mobile/assets/*"]
+      "@/*": ["./source/app/platforms/native/*"],
+      "@/assets/*": ["./source/app/platforms/native/assets/*"]
     }
   },
   "include": [
-    "source/apps/reading-book-mobile/src/**/*.ts",
-    "source/apps/reading-book-mobile/src/**/*.tsx",
-    "source/apps/reading-book-mobile/modules/*/index.ts",
+    "source/app/platforms/native/host/**/*.ts",
+    "source/app/platforms/native/routes/**/*.ts",
+    "source/app/platforms/native/routes/**/*.tsx",
+    "source/app/platforms/native/services/**/*.ts",
+    "source/app/platforms/native/env.d.ts",
+    "source/app/platforms/native/modules/*/index.ts",
     ".expo/types/**/*.ts",
     "expo-env.d.ts"
   ]

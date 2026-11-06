@@ -2,7 +2,7 @@
 const path = require('node:path')
 const { getDefaultConfig } = require('expo/metro-config')
 
-const mobileDir = path.join(__dirname, 'source', 'apps', 'reading-book-mobile')
+const mobileDir = path.join(__dirname, 'source', 'app', 'platforms', 'native')
 const { withUiMiddleware } = require(path.join(mobileDir, 'scripts', 'ui-middleware.cjs'))
 
 /** @type {import('expo/metro-config').MetroConfig} */
@@ -19,7 +19,7 @@ const blocked = [
   path.join(__dirname, 'source', 'app', 'platforms', 'electron', 'release'),
   path.join(__dirname, 'source', 'app', 'platforms', 'electron', 'e2e'),
   path.join(__dirname, 'source', 'app', 'platforms', 'electron', 'spikes'),
-  path.join(mobileDir, 'web', 'dist'),
+  path.join(mobileDir, 'web-dist'),
   path.join(mobileDir, 'android'),
   path.join(mobileDir, 'modules', 'local-server', 'ui-assets'),
   path.join(mobileDir, 'modules', 'local-server', 'android', 'build'),
@@ -29,7 +29,7 @@ config.resolver.blockList = [...[config.resolver.blockList ?? []].flat(), ...blo
 // Expo Go only: serve the built WebView UI at /readmate-ui (spec 008, research R11).
 config.server = {
   ...config.server,
-  enhanceMiddleware: withUiMiddleware(path.join(mobileDir, 'web', 'dist'), config.server?.enhanceMiddleware),
+  enhanceMiddleware: withUiMiddleware(path.join(mobileDir, 'web-dist'), config.server?.enhanceMiddleware),
 }
 
 module.exports = config

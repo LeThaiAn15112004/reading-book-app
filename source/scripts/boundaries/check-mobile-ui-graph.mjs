@@ -19,7 +19,7 @@ export function allowedElectronFiles(exceptions = loadExceptions(), root = deskt
 }
 
 export function checkMobileUiGraph({
-  entries = [path.join(mobileDir, 'web/src/main.ts')],
+  entries = [path.join(mobileDir, 'main.ts')],
   desktop = desktopDir,
   allowed = allowedElectronFiles(),
   // Main's folder inside `desktop`: the whole host folder in the real tree, an `electron/` subfolder in the test fixtures.
@@ -64,7 +64,7 @@ export function checkMobileUiGraph({
 
 if (isMain(import.meta.url)) {
   const result = checkMobileUiGraph()
-  const notes = [`${result.files} files reached from web/src/main.ts`]
+  const notes = [`${result.files} files reached from the Mobile main.ts`]
   if (result.reachedHostAdapters.length) {
     notes.push(`${result.reachedHostAdapters.length} host-adapters files reached through Desktop's UI source (not a Mobile import, so not an R11 violation), first: ${result.reachedHostAdapters[0]}`)
   }

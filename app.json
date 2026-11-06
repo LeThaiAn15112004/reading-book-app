@@ -4,13 +4,13 @@
     "slug": "reading-book-mobile",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./source/apps/reading-book-mobile/assets/images/icon.png",
+    "icon": "./source/app/platforms/native/assets/images/icon.png",
     "scheme": "readmate-reader",
     "userInterfaceStyle": "automatic",
     "ios": {
       "bundleIdentifier": "com.anle.readmate",
       "deploymentTarget": "18.2",
-      "icon": "./source/apps/reading-book-mobile/assets/expo.icon",
+      "icon": "./source/app/platforms/native/assets/expo.icon",
       "infoPlist": {
         "NSAppTransportSecurity": {
           "NSAllowsLocalNetworking": true
@@ -21,29 +21,29 @@
       "package": "com.anle.readmate",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./source/apps/reading-book-mobile/assets/images/android-icon-foreground.png",
-        "backgroundImage": "./source/apps/reading-book-mobile/assets/images/android-icon-background.png",
-        "monochromeImage": "./source/apps/reading-book-mobile/assets/images/android-icon-monochrome.png"
+        "foregroundImage": "./source/app/platforms/native/assets/images/android-icon-foreground.png",
+        "backgroundImage": "./source/app/platforms/native/assets/images/android-icon-background.png",
+        "monochromeImage": "./source/app/platforms/native/assets/images/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false
     },
     "web": {
       "output": "static",
-      "favicon": "./source/apps/reading-book-mobile/assets/images/favicon.png"
+      "favicon": "./source/app/platforms/native/assets/images/favicon.png"
     },
     "plugins": [
-      ["expo-router", { "root": "./source/apps/reading-book-mobile/src/app" }],
+      ["expo-router", { "root": "./source/app/platforms/native/routes" }],
       [
         "expo-splash-screen",
         {
           "backgroundColor": "#208AEF",
-          "image": "./source/apps/reading-book-mobile/assets/images/splash-icon.png",
+          "image": "./source/app/platforms/native/assets/images/splash-icon.png",
           "imageWidth": 76
         }
       ],
       "expo-sqlite",
-      "./source/apps/reading-book-mobile/plugins/with-loopback-cleartext.js",
-      "./source/apps/reading-book-mobile/plugins/with-short-native-build-dir.js",
+      "./source/app/platforms/native/plugins/with-loopback-cleartext.js",
+      "./source/app/platforms/native/plugins/with-short-native-build-dir.js",
       "expo-image",
       "expo-status-bar",
       [

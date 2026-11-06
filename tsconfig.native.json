@@ -57,11 +57,11 @@
   },
   "include": [
     "./source/app/**/*.d.ts",
-    "./source/apps/reading-book-mobile/web/src",
-    "./source/apps/reading-book-mobile/web/tests",
-    "./source/apps/reading-book-mobile/web/vite.config.ts",
-    "./source/apps/reading-book-mobile/web/vitest.config.ts",
+    "./source/app/platforms/native",
+    "./source/app/platforms/native/tests",
+    "./vite.native.config.ts",
+    "./source/app/platforms/native/vitest.config.ts",
     "./source/app/platforms/electron/electron-env.d.ts"
   ]
-  ,"exclude": ["./source/app/**/*.electron.ts", "./source/app/**/*.electron.tsx"]
+  ,"exclude": ["./source/app/**/*.electron.ts", "./source/app/**/*.electron.tsx", "./source/app/platforms/native/host", "./source/app/platforms/native/routes", "./source/app/platforms/native/services", "./source/app/platforms/native/modules", "./source/app/platforms/native/plugins", "./source/app/platforms/native/scripts", "./source/app/platforms/native/assets"]
 }

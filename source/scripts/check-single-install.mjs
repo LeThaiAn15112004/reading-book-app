@@ -16,7 +16,6 @@ const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'
 export const KEPT_MANIFESTS = {
   'source/core/package.json': 'only "type": "module", so Node runs the core TypeScript as ES modules in the spikes',
   'source/app/platforms/electron/package.json': 'Electron reads name / main (the name sets userData)',
-  'source/apps/reading-book-mobile/package.json': 'kept until the Mobile host moves (US4); Expo now reads the root one',
 }
 
 const SKIP = new Set(['.git', 'android', 'ios', '.expo', 'dist', 'dist-electron', 'release', '.gradle', 'build', '.cxx'])

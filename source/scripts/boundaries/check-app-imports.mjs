@@ -17,8 +17,10 @@ const DOM_LIBRARIES = ['react-dom']
 /** Where a Mobile file sits: the web UI build, build tooling, or the React Native host. */
 export function mobileArea(file, root = mobileDir) {
   const r = path.relative(root, file).replaceAll('\\', '/')
-  if (r.startsWith('web/')) return 'web'
+  if (r.startsWith('web/')) return 'web' // the layout of the test fixtures (before spec 009 T048)
   if (r.startsWith('scripts/')) return 'tooling'
+  // The WebView side of the Mobile folder; everything else (host/, routes/, services/, modules/, plugins/) is the React Native host.
+  if (/^(bridge|stores|db|feasibility|tests)\//.test(r) || /^[^/]+\.(ts|html)$/.test(r) && !/^eslint/.test(r) && r !== 'env.d.ts') return 'web'
   return 'host'
 }
 
@@ -32,7 +34,9 @@ export function checkAppImports({ app = appDir, desktop = desktopDir, mobile = m
     return target
   }
 
+  // The Mobile folder is checked below with its own rules (it sits inside `app`).
   for (const file of new Set([...listCodeFiles(app), ...listCodeFiles(desktop)])) {
+    if (isInside(file, mobile)) continue
     for (const { specifier, line } of scanImports(file)) {
       const target = resolve(file, specifier)
       // A `.native` platform adapter is the WebView side of the shared UI: it may import Mobile's WebView-side code (contracts/platform-adapters.md).

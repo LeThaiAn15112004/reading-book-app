@@ -19,6 +19,8 @@ export default tseslint.config(
     ignores: [
       '**/dist', '**/dist-electron', '**/release', '**/playwright-report', '**/test-results', '**/node_modules',
       '**/*.js', '**/*.mjs', '**/*.cjs',
+      // The Mobile folder has its own Expo ESLint config (`npm run mobile:lint`).
+      'source/app/platforms/native/**',
     ],
   },
   {

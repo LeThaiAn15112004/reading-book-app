@@ -11,7 +11,6 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..')
-const mobileWebDir = path.join(repoRoot, 'source/apps/reading-book-mobile/web')
 const npx = process.platform === 'win32' ? 'npx.cmd' : 'npx'
 
 function build(cwd, outDir, config) {
@@ -46,7 +45,7 @@ try {
   }
   // Run from the Desktop host folder, as `npm run build` does (vite-plugin-electron reads the package.json there).
   build(path.join(repoRoot, 'source/app/platforms/electron'), path.join(tmp, 'desktop'), path.join(repoRoot, 'vite.config.ts'))
-  build(mobileWebDir, path.join(tmp, 'web'))
+  build(repoRoot, path.join(tmp, 'web'), path.join(repoRoot, 'vite.native.config.ts'))
   const desktop = report('Desktop renderer', path.join(tmp, 'desktop'), /\.native\.tsx?$/, '.native modules')
   const web = report('Mobile WebView', path.join(tmp, 'web'), /\.electron\.tsx?$/, '.electron modules')
   // Sanity: each build does contain its own side, so a zero above is not an empty scan.

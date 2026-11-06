@@ -5,9 +5,9 @@
  * `files.readChunk` in 1 MiB base64 chunks up to 20 MB per book. Covers are server URLs built per launch, or
  * `data:` URLs in Expo Go. Nothing here ever sees a filesystem path.
  */
-import { base64ToBytes } from '../../apps/reading-book-mobile/src/host/encoding'
-import { DEV_CHUNK_MAX_BYTES } from '../../apps/reading-book-mobile/src/host/protocol'
-import { HostCallError } from '../../apps/reading-book-mobile/web/src/bridge/host-client'
+import { base64ToBytes } from './native/host/encoding'
+import { DEV_CHUNK_MAX_BYTES } from './native/host/protocol'
+import { HostCallError } from './native/bridge/host-client'
 import type { BookContentBoot, BookContentHost, BookContentSource } from './storage-types'
 
 export type { BookContentBoot, BookContentHost, BookContentSource }

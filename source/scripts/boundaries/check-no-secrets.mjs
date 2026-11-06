@@ -17,7 +17,7 @@ export const DEFAULT_OUTPUTS = [
   path.join(desktopDir, 'dist'),
   path.join(desktopDir, 'dist-electron'),
   path.join(desktopDir, 'release'),
-  path.join(mobileDir, 'web/dist'),
+  path.join(mobileDir, 'web-dist'),
   path.join(mobileDir, 'modules/local-server/ui-assets'),
 ]
 
