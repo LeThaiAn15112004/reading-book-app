@@ -4,6 +4,20 @@
 
 **Input**: Feature specification from `specs/008-shared-core-architecture/spec.md`
 
+> **Paths moved by spec 009** (`specs/009-single-project-monorepo/`, 2026-11-07): this plan is kept as written; the paths below are where its parts live now.
+>
+> | Spec 008 path | Since spec 009 |
+> |---|---|
+> | `source/apps/book-reader-sdk/src`, `…/tests` (incl. `tests/contracts/`) | `source/core/src`, `source/core/tests` (import `@core`) |
+> | `source/packages/config` | `source/core/src/config` |
+> | `source/apps/reading-book-desktop/src` (shared UI) | `source/app` (import `@app/*`) |
+> | `source/apps/reading-book-desktop/src/platform/` | `source/app/platforms/host.*`, `longPress.*` (platform adapters) |
+> | `source/apps/reading-book-desktop/electron` | `source/app/platforms/electron` |
+> | `source/apps/reading-book-mobile/src/{app,host}`, `modules/` | `source/app/platforms/native/{routes,host}`, `modules/` |
+> | `source/apps/reading-book-mobile/web/src/{main.ts,bridge,stores,db}`, `web/tests` | `source/app/platforms/native/{main.ts,bridge,stores,db}`, `native/tests` |
+> | `reading-book-mobile/web/vite.config.ts` | `vite.config.ts` / `vite.native.config.ts` at the repository root |
+> | `npm ci` in `source/`, `-w <workspace>` | `npm ci` at the repository root; one manifest, no workspaces |
+
 ## Summary
 
 Run Desktop's existing React UI (`reading-book-desktop/src`) unchanged in structure inside a WebView in the Expo app. A second Vite build in the Mobile workspace uses that source as input and ships its output inside the app. A Mobile Bridge installs `window.api` before the UI starts, so `src/bridge/*` and the 52 UI files that import it need no change for this reason.
@@ -103,7 +117,7 @@ source/apps/reading-book-desktop/src/   # additive, plus FR-012c steps
 source/apps/book-reader-sdk/tests/contracts/   # fixtures shared by both apps
 ```
 
-**Structure Decision**: Keep the current workspaces; move nothing. The WebView code lives in `reading-book-mobile/web`, as Mobile's own code, and takes the Desktop UI as build input.
+**Structure Decision** (spec 008; superseded by spec 009, which moved everything into one project, see the table at the top): Keep the current workspaces; move nothing. The WebView code lives in `reading-book-mobile/web`, as Mobile's own code, and takes the Desktop UI as build input.
 
 ## macOS and iOS Compatibility Rules
 
