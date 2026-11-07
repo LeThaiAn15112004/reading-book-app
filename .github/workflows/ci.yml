@@ -13,9 +13,9 @@ permissions:
 
 jobs:
   checks:
-    name: Typecheck · Lint · Test
+    name: Typecheck · Lint · Test · Build
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     env:
       # Typecheck / lint / unit tests never launch Electron — skip the ~100 MB binary download.
       ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
@@ -37,7 +37,8 @@ jobs:
         if: (success() || failure()) && steps.install.outcome == 'success'
         run: npm run check:single-install
 
-      # Each check runs even when an earlier check failed, so one push reports every problem.
+      # Spec 009 (FR-018): the same checks as `npm run check`, one step each so one push reports every problem
+      # (each runs even when an earlier one failed). Keep this list in step with the "check" script in package.json.
       - name: SDK · typecheck
         if: (success() || failure()) && steps.install.outcome == 'success'
         run: npm run sdk:typecheck
@@ -58,6 +59,9 @@ jobs:
       - name: Desktop · lint
         if: (success() || failure()) && steps.install.outcome == 'success'
         run: npm run desktop:lint
+      - name: Desktop · e2e typecheck (compile only)
+        if: (success() || failure()) && steps.install.outcome == 'success'
+        run: npm run e2e:typecheck
 
       - name: Mobile · typecheck host
         if: (success() || failure()) && steps.install.outcome == 'success'
@@ -66,6 +70,9 @@ jobs:
       - name: Mobile · typecheck web UI
         if: (success() || failure()) && steps.install.outcome == 'success'
         run: npm run mobile:typecheck:web
+      - name: Mobile · lint
+        if: (success() || failure()) && steps.install.outcome == 'success'
+        run: npm run mobile:lint
 
       # Mobile stores against the Desktop data contract, on node:sqlite (spec 008, US4).
       - name: Mobile · test
@@ -80,3 +87,20 @@ jobs:
       - name: Boundaries · import rules, graphs, secrets
         if: (success() || failure()) && steps.install.outcome == 'success'
         run: npm run check:boundaries
+
+      - name: Platform adapters · same exports on both hosts
+        if: (success() || failure()) && steps.install.outcome == 'success'
+        run: npm run check:platform-adapters
+
+      - name: Desktop · build (renderer + Main)
+        if: (success() || failure()) && steps.install.outcome == 'success'
+        run: npm run build
+
+      - name: Build split · no .native in Desktop, no .electron in the WebView
+        if: (success() || failure()) && steps.install.outcome == 'success'
+        run: npm run check:build-split
+
+      # electron-builder.json5 lists Main's externals; the block must be the same on every OS (spec 009 T051).
+      - name: Desktop package · node_modules allowlist matches npm ls
+        if: (success() || failure()) && steps.install.outcome == 'success'
+        run: npm run check:package-deps
