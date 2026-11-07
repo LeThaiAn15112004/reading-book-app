@@ -156,10 +156,10 @@ G-base all pass.
 
 **Independent Test**: Desktop baseline + packaged app + Expo Go journey.
 
-- [ ] T051 [US5] Packaging (research R6): `electron-builder.json5` `files` = `dist`, `dist-electron`, the typewriter fonts, `!node_modules/**` + allowlist of Main externals (`better-sqlite3`, `music-metadata`, `@huggingface/transformers`, `onnxruntime-node`, `sharp` and their runtime dependencies, resolved by a script from `npm ls --prod`)
-- [ ] T052 [US5] Add `source/scripts/check-desktop-package.mjs`: lists the packaged `app.asar` and fails on `react-native`, `expo`, `platforms/native`; root `package` runs it after electron-builder (FR-017)
-- [ ] T053 [US5] Run `npm run package` on Windows: installer builds, installs, starts, opens a copy of the pre-change library (SC-005); compare installer size with the last pre-009 build; record in `quickstart.md` §Results
-- [ ] T054 [US5] Run `npm run check:desktop-baseline` at the end state (25/25 incl. the pre-change library and the migration hashes of T002); record in `quickstart.md` §Results
+- [X] T051 [US5] Packaging (research R6): `electron-builder.json5` `files` = `dist`, `dist-electron`, the typewriter fonts, `!node_modules/**` + allowlist of Main externals (`better-sqlite3`, `music-metadata`, `@huggingface/transformers`, `onnxruntime-node`, `sharp` and their runtime dependencies, resolved by a script from `npm ls --prod`)
+- [X] T052 [US5] Add `source/scripts/check-desktop-package.mjs`: lists the packaged `app.asar` and fails on `react-native`, `expo`, `platforms/native`; root `package` runs it after electron-builder (FR-017)
+- [X] T053 [US5] Run `npm run package` on Windows: installer builds, installs, starts, opens a copy of the pre-change library (SC-005); compare installer size with the last pre-009 build; record in `quickstart.md` §Results
+- [X] T054 [US5] Run `npm run check:desktop-baseline` at the end state (25/25 incl. the pre-change library and the migration hashes of T002); record in `quickstart.md` §Results
 - [ ] T055 [US5] Ask the user to run the Expo Go journey (import, open each format, highlight, restart) and, with their agreement, Desktop E2E; record both against the pre-009 results in `quickstart.md` §Results (SC-007)
 - [ ] T056 [US5] Build the Android APK from the root (`npm run android`, or `cd android && ./gradlew assembleDebug -PreactNativeArchitectures=arm64-v8a,x86_64 --no-parallel`); record in `quickstart.md` §Results and in `specs/008-shared-core-architecture/m5-results.md` (closes spec 008 T092 if it builds)
 

@@ -88,7 +88,12 @@ into: scripts do it for you.
 - `npm run check` — the whole gate: single-install, typecheck (core, core tests, Desktop, e2e, Mobile host, Mobile
   WebView), lint, tests (core + Mobile), boundaries, platform-adapters, builds, build-split. Keep it green before pushing.
 - `npm run typecheck`, `npm run lint` (`desktop:lint` = ESLint on `source/app` with `--max-warnings 0`, plus `mobile:lint`).
-- `npm run build` — Desktop renderer + Main bundles (`vite build`); `npm run package` — also runs `electron-builder`;
+- `npm run build` — Desktop renderer + Main bundles (`vite build`); `npm run package` — also runs `electron-builder`
+  (output in `source/app/platforms/electron/release/<version>/`), framed by two checks: `check:package-deps` (the
+  `node_modules` allowlist in `electron-builder.json5` = Main's Vite externals + their runtime deps from `npm ls`; after a
+  dependency change run `node source/scripts/desktop-package-deps.mjs --write`) and `check:desktop-package` (`app.asar`
+  has no `react-native` / `expo` / `platforms/native`, and has Main's entry and externals). The package keeps the
+  pre-009 identity through `extraMetadata` (name `reading-book-desktop` → same userData, version `0.0.0`);
   `npm run preview` — preview the built renderer.
 - Desktop spikes (standalone node scripts under `source/app/platforms/electron/spikes/`, not part of the app build; the
   `spike:*` scripts run from that folder):
