@@ -154,3 +154,7 @@ vite.config.ts.timestamp-*
 .expo/
 expo-env.d.ts
 .metro-health-check*
+
+# Locally built APKs for device testing (spec 008)
+/source/app/platforms/native/apk/
+*.apk
