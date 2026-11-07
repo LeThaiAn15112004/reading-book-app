@@ -1,8 +1,8 @@
 # Software Design Specification (SDS)
 
 **Sản phẩm:** Reading Book App — Trình đọc sách / tài liệu thông minh (Trợ lý tri thức cá nhân)  
-**Phiên bản tài liệu:** 1.25  
-**Ngày:** 2026-09-29  
+**Phiên bản tài liệu:** 1.27  
+**Ngày:** 2026-11-07  
 **Trạng thái:** Draft — căn cứ SRS + Design Plan (MVP Free Core) + mockups  
 **Tài liệu liên quan:** [SRS.md](./SRS.md), [docs/mockups/](../mockups/)  
 **Changelog 1.2:** Import từ URL (direct file → sandbox) đưa vào MVP — SDS §1.2, §2.6–2.8, §3.5–3.7; SRS FR-13 / UC-01 / WF-02.  
@@ -54,6 +54,14 @@
 - `packages/domain` và `packages/shared` **không còn**: đã gộp vào `source/apps/book-reader-sdk` (§2.7, §2.11). Migration hiện là `001`–`030` (§3.10). App prefs: renderer `localStorage` (mỗi store zustand một key) + vài file JSON do Main sở hữu — **không** `electron-store`, **không** MMKV (§2.10, §3.6).
 - Quy tắc phụ thuộc của SDK: tsconfig (`lib: ES2022`, `types: []`) chỉ chặn biến toàn cục Node/DOM; import package bị chặn bởi `npm run check:boundaries` (`source/scripts/boundaries/`).
 - **Mobile** (§2.12 mới): host React Native + WebView chạy lại **chính UI desktop** (`reading-book-desktop/src`) với `window.api` riêng (Mobile Bridge); schema Mobile riêng, kiểm bằng contract fixtures; không copy file desktop nào.
+
+**Changelog 1.27 (2026-11-07, spec 009):** Một project cho Desktop và Mobile (`specs/009-single-project-monorepo/`):
+- Một `package.json`, một `node_modules`, một `package-lock.json` ở **gốc repo**; không còn npm workspaces, `source/apps`, `source/packages`. Lệnh chạy từ gốc: `npm run dev` (Desktop), `npm run dev:mobile`, `npm run check`.
+- `book-reader-sdk` + `packages/config` → **`source/core`** (import `@core`; config ở `source/core/src/config`, SQL / migration dùng chung ở `source/core/src/db`). Không còn bản build SDK: app dùng thẳng mã nguồn.
+- UI dùng chung (trước là `reading-book-desktop/src`) → **`source/app`** (import `@app/*`); host Desktop → `source/app/platforms/electron`, host Mobile → `source/app/platforms/native`.
+- **Platform adapter** (`source/app/platforms/<concern>.electron.ts` / `.native.ts`: `host`, `longPress`, `api`, `storage`, `window`): UI import không có hậu tố, Vite / TypeScript chọn file theo host. Luật phụ thuộc R1–R3, R5–R9, R11, R12 (§2.11) kiểm bằng `npm run check:boundaries`; `check:build-split` chứng minh hai bundle không chứa mã host của nhau.
+- Gói Desktop chỉ kèm `node_modules` mà Main nạp lúc chạy (`check:package-deps`, `check:desktop-package`), giữ nguyên danh tính `reading-book-desktop` / `0.0.0` (cùng thư mục userData). Không đổi schema: 30 migration Desktop giống từng byte.
+- Cập nhật §1.1, §1.2, §2.7, §2.10, §2.10.1, §2.11, §2.12, §3.10 (đường dẫn). Các changelog cũ giữ nguyên đường dẫn của thời điểm đó.
 
 ---
 
@@ -109,7 +117,7 @@
 Tài liệu SDS này mô tả **kiến trúc và thiết kế chi tiết** cho dự án **reading-book-app**, nhằm:
 
 - Chuyển các yêu cầu trong [SRS](./SRS.md) thành quyết định kỹ thuật cụ thể (component, data model, persistence, IPC, reader engine).
-- Thống nhất cách triển khai giữa `source/apps/reading-book-desktop`, `source/apps/reading-book-mobile` và các package dùng chung (`domain`, `shared`, `config`).
+- Thống nhất cách triển khai giữa host Desktop (`source/app/platforms/electron`), host Mobile (`source/app/platforms/native`), UI dùng chung (`source/app`) và core dùng chung (`source/core`).
 - Làm cơ sở cho backlog Phase 1, review thiết kế, và nghiệm thu kiến trúc trước khi mở rộng AI / Linked libraries.
 
 Đối tượng đọc: architect, developer, tech lead, tester (phần liên quan contract & boundary).
@@ -163,7 +171,7 @@ MVP **chấp nhận 6 định dạng**:
 |                                                                                          | OCR hàng loạt PDF scan chất lượng thấp (spike riêng nếu cần) |
 
 
-**Nền tảng MVP:** `source/apps/reading-book-desktop` (Electron + Vite + React + TypeScript).  
+**Nền tảng MVP:** Desktop — UI `source/app` + host `source/app/platforms/electron` (Electron + Vite + React + TypeScript).  
 **Mobile (Expo):** cùng domain model đa định dạng; adapter storage / UI map theo IA — triển khai sau khi desktop MVP ổn.
 
 Nguyên tắc bất biến xuyên suốt thiết kế (theo SRS BR-01, BR-02):
@@ -325,22 +333,22 @@ Ports & Adapters — Document / Overlay / Extensibility
 
 Domain chỉ nói: “mở sách”, “lưu highlight tại `Location`” — không biết PDF canvas hay EPUB CFI.
 
-> **Không còn port `OverlayPainter` riêng** (đã có ở các bản SDS trước `1.22`). Việc "vẽ lại" một highlight/underline/strikethrough/textbox khi trang re-render nằm **bên trong** `DocumentRenderer` của từng format — với EPUB là API annotation có sẵn của epub.js (`rendition.annotations`, xem `EpubjsHandle.applyHighlight/removeHighlight/flashHighlight` trong `apps/reading-book-desktop/src/reader/renderers/epub/openEpubjs.ts`), không phải một lớp DOM/Canvas overlay tách biệt do app tự vẽ. PDF chưa có `DocumentRenderer` (chỉ có adapter import metadata) nên chưa có cơ chế vẽ overlay tương ứng.
+> **Không còn port `OverlayPainter` riêng** (đã có ở các bản SDS trước `1.22`). Việc "vẽ lại" một highlight/underline/strikethrough/textbox khi trang re-render nằm **bên trong** `DocumentRenderer` của từng format — với EPUB là API annotation có sẵn của epub.js (`rendition.annotations`, xem `EpubjsHandle.applyHighlight/removeHighlight/flashHighlight` trong `source/app/components/reader/renderers/epub/openEpubjs.ts`), không phải một lớp DOM/Canvas overlay tách biệt do app tự vẽ. PDF chưa có `DocumentRenderer` (chỉ có adapter import metadata) nên chưa có cơ chế vẽ overlay tương ứng.
 
-### 2.7. Ánh xạ sang monorepo
+### 2.7. Ánh xạ sang repository (spec 009: một project)
 
 
-| Thành phần repo                             | Lớp kiến trúc                                              |
-| ------------------------------------------- | ---------------------------------------------------------- |
-| `source/apps/reading-book-desktop/src`      | Presentation (Renderer)                                    |
-| `source/apps/reading-book-desktop/electron` | Infrastructure (Main + Preload)                            |
-| `source/apps/reading-book-mobile/src`       | Infrastructure Mobile (host React Native: WebView, host services, local server) — §2.12 |
-| `source/apps/reading-book-mobile/web`       | Infrastructure Mobile phía WebView (Mobile Bridge = `window.api`, store SQLite) — §2.12 |
-| `source/apps/book-reader-sdk/src`           | Domain models + ports + Application (thay cho `packages/domain` + `packages/shared` cũ, đã xoá) |
-| `source/apps/book-reader-sdk/host-adapters` | Infrastructure phía Node (cloud provider, translation engine) — desktop Main import |
-| `source/packages/config`                    | Config dùng chung                                          |
+| Thành phần repo                                      | Lớp kiến trúc                                              |
+| ---------------------------------------------------- | ---------------------------------------------------------- |
+| `source/app` (`screens`, `components`, `hooks`, `bridge`, `theme`, `styles`) | Presentation (UI dùng chung cho Desktop và WebView Mobile) |
+| `source/app/platforms/<concern>.{electron,native}.ts` | Platform adapter (biên host: `host`, `longPress`, `api`, `storage`, `window`) |
+| `source/app/platforms/electron`                      | Infrastructure Desktop (Main + Preload, IPC, SQLite, adapter định dạng, `host-adapters/`) |
+| `source/app/platforms/native`                        | Infrastructure Mobile (host React Native + phía WebView: Mobile Bridge, store SQLite) — §2.12 |
+| `source/core/src` (`domain`, `domain-ports`, `ports`, `services`, `stores`, `app-models`…) | Domain models + ports + Application |
+| `source/core/src/config`                             | Config dùng chung (formats, theme tokens, feature flags, OAuth config) |
+| `source/core/src/db`                                 | Cổng SQL driver + câu lệnh, codec, migration dùng chung (Desktop + Mobile) |
 
-> **Lưu ý (1.26):** sơ đồ PlantUML bên dưới vẽ theo cấu trúc cũ (`packages/domain`, `packages/shared`); bảng trên là hiện trạng.
+> **Lưu ý (1.27):** sơ đồ PlantUML bên dưới vẽ theo cấu trúc cũ (`packages/domain`, `packages/shared`); bảng trên là hiện trạng.
 
 
 Monorepo Package Map — `source/`
@@ -386,7 +394,7 @@ MVP giữ port trống (`NoOp*`) để UI/feature flag không phải đập lạ
 | ---------------------- | ------------------------------------------------------ |
 | Kiểu kiến trúc logic   | **Layered** + Ports & Adapters ở biên                  |
 | Desktop process        | Electron Main / Preload / Renderer                     |
-| Chia sẻ desktop–mobile | Domain + Application trong `book-reader-sdk`; Mobile chạy lại UI desktop trong WebView (§2.12) |
+| Chia sẻ desktop–mobile | Domain + Application trong `source/core`; Mobile chạy lại UI desktop trong WebView (§2.12) |
 | Đa định dạng           | Pluggable Document Adapter / Renderer (renderer tự vẽ overlay mark qua API riêng của engine, không có port `OverlayPainter` tách biệt) |
 | **EPUB engine (desktop)** | **`epubjs` (epub.js) ^0.3.93** — spike T3.1 xác nhận 2026-07-27 (xem §2.10.1) |
 | Persistence MVP        | SQLite (+ FTS5) overlay sách phía Main; **app prefs** = `localStorage` của renderer + file JSON do Main sở hữu (desktop) / `localStorage` của WebView (mobile) |
@@ -404,126 +412,45 @@ MVP giữ port trống (`NoOp*`) để UI/feature flag không phải đập lạ
 | **Lý do** | Mở EPUB từ `ArrayBuffer` / binary; TOC + spine; CFI (`cfiBase` / `currentLocation` / `EpubCFI`); `rendition.themes` inject CSS runtime (không ghi đè file); selection API; Vite/Electron ổn; khớp mặc định design (`docs/plan/02_Design.md`). |
 | **Loại — foliate-js** | Đủ năng lực (kể cả `search.js`) nhưng README cảnh báo API chưa ổn định / không semver — rủi ro MVP cao hơn. |
 | **Loại — baseline JSZip+iframe** | Không có CFI → chặn T4.1 resume và G5 highlight. |
-| **Biên tích hợp** | Chỉ Infrastructure UI: `apps/reading-book-desktop/src/reader/renderers/epub/` (theo §2.11). Domain chỉ thấy `DocumentRenderer` + `Location` CFI — **không** import `epubjs`. |
+| **Biên tích hợp** | Chỉ Infrastructure UI: `source/app/components/reader/renderers/epub/` (theo §2.11). Domain chỉ thấy `DocumentRenderer` + `Location` CFI — **không** import `epubjs`. |
 | **Electron** | Renderer nhận bytes/Blob qua Main IPC allowlist — kênh **`library:openBookContent`** (T3.4); không đọc path tùy ý. Spike harness: `#/spike/epub` + `spikes/epub-engine/MATRIX.md` (không gắn Library → Reader). |
 
-Chi tiết ma trận Pass/Fail: [`source/apps/reading-book-desktop/spikes/epub-engine/MATRIX.md`](../../source/apps/reading-book-desktop/spikes/epub-engine/MATRIX.md).
+Chi tiết ma trận Pass/Fail: [`source/app/platforms/electron/spikes/epub-engine/MATRIX.md`](../../source/app/platforms/electron/spikes/epub-engine/MATRIX.md).
 
 
-### 2.11. Cấu trúc folder dự án (`source/`)
+### 2.11. Cấu trúc folder dự án (spec 009)
 
-> **Hiện trạng (1.26):** `packages/domain` và `packages/shared` đã gộp vào `apps/book-reader-sdk` và bị xoá; chỉ còn `packages/config`. Cây dưới đây là **cấu trúc mục tiêu ban đầu**, giữ để tham khảo; cấu trúc thật xem `CLAUDE.md` ở gốc repo.
-
-Monorepo ban đầu có skeleton (`apps/*`, `packages/{domain,shared,config}`). Dưới đây là **cấu trúc mục tiêu** bám layered architecture (§2.3–2.7). Folder đánh dấu `(MVP)` ưu tiên Phase 1; `(P2)` / `(P3)` chỉ cần port/stub.
+Một project: `package.json`, `node_modules`, `package-lock.json`, `tsconfig*.json`, `vite.config.ts` (Desktop),
+`vite.native.config.ts` (WebView Mobile), `electron-builder.json5`, `app.json` / `babel.config.js` / `metro.config.js`
+(Expo) và `eslint.config.mjs` đều ở **gốc repo**. Cây dưới là hiện trạng (chi tiết hơn: `CLAUDE.md` ở gốc repo). Cấu
+trúc mục tiêu ban đầu (`apps/*`, `packages/{domain,shared,config}`) xem các bản SDS trước 1.27.
 
 ```text
 source/
-├── package.json                          # workspace root
-├── apps/
-│   ├── reading-book-desktop/             # MVP primary
-│   │   ├── electron/                     # Infrastructure — Main + Preload
-│   │   │   ├── main.ts
-│   │   │   ├── preload.ts
-│   │   │   ├── ipc/                      # (MVP) channel handlers hẹp
-│   │   │   │   ├── library.ipc.ts
-│   │   │   │   ├── import.ipc.ts
-│   │   │   │   └── overlay.ipc.ts
-│   │   │   ├── persistence/              # (MVP) SQLite + FTS5 phía Main
-│   │   │   │   ├── db.ts
-│   │   │   │   ├── migrations/
-│   │   │   │   └── repositories/
-│   │   │   ├── files/                    # (MVP) kiểm tra path sách (app-owned / tham chiếu), copy URL·cloud, relink
-│   │   │   │   └── sandbox.ts
-│   │   │   └── adapters/                 # (MVP) document importers theo format
-│   │   │       ├── epub.adapter.ts
-│   │   │       ├── pdf.adapter.ts
-│   │   │       ├── txt.adapter.ts
-│   │   │       └── md.adapter.ts
-│   │   ├── src/                          # Presentation — Renderer (React)
-│   │   │   ├── main.tsx
-│   │   │   ├── App.tsx
-│   │   │   ├── screens/                  # (MVP) map IA — chỉ màn hình “ở lâu”
-│   │   │   │   ├── Library/
-│   │   │   │   ├── Reader/                   # gồm panel Note / Comment / Bookmark scoped bookId
-│   │   │   │   └── Settings/                 # SCR-06 App Settings
-│   │   │   ├── components/               # UI thuần (chrome, progress, menus)
-│   │   │   │   └── import/               # (MVP) ImportDialog / ImportSheet — không phải screen
-│   │   │   │       ├── ImportMenu.tsx      # split button / Add menu
-│   │   │   │       ├── UrlImportDialog.tsx # modal (desktop) / bottom sheet (mobile)
-│   │   │   │       ├── ImportProgress.tsx
-│   │   │   │       └── ImportConflictDialog.tsx
-│   │   │   ├── features/                 # glue UI ↔ use cases (hooks mỏng)
-│   │   │   ├── reader/                   # Reader shell + chọn renderer
-│   │   │   │   ├── ReaderShell.tsx
-│   │   │   │   └── renderers/            # epub (MVP) | pdf | txt | md | docx | doc — mỗi renderer tự vẽ
-│   │   │   │       │                     #   overlay mark qua API riêng (không có `overlays/` port tách biệt)
-│   │   │   │       └── epub/             # openEpubjs.ts, cfi/, previews/, progress/, store/
-│   │   │   ├── bridge/                   # typed wrappers gọi window.api (IPC)
-│   │   │   ├── stores/                   # UI state (Zustand…) — không chứa SQL
-│   │   │   ├── styles/                   # theme tokens CSS variables
-│   │   │   └── assets/
-│   │   ├── index.html
-│   │   ├── vite.config.ts
-│   │   ├── electron-builder.json5
-│   │   └── package.json
-│   │
-│   └── reading-book-mobile/              # sau desktop ổn — cùng domain
-│       ├── src/
-│       │   ├── app/                      # Expo Router screens
-│       │   ├── components/
-│       │   ├── features/                 # gọi shared use cases
-│       │   ├── constants/
-│       │   └── hooks/
-│       ├── assets/
-│       └── package.json
-│
-└── packages/
-    ├── domain/                           # Domain models + ports (không I/O)
-    │   ├── book.ts
-    │   ├── author.ts                     # Author + BookAuthor
-    │   ├── collection.ts                 # Collection + CollectionBook
-    │   ├── location.ts                   # CFI | page-rect | text-offset | …
-    │   ├── reading-session-state.ts
-    │   ├── annotation/                   # highlight.ts, bookmark.ts, note.ts (INoteState) — xem §3
-    │   ├── book-chunk.ts
-    │   ├── preferences.ts
-    │   ├── document-format.ts            # epub | pdf | txt | md | docx | doc
-    │   ├── ports/                        # interface Ports (§2.6)
-    │   │   ├── document-importer.ts
-    │   │   ├── document-renderer.ts
-    │   │   ├── overlay-store.ts          # bookmarks/highlights CRUD — vẽ lại thuộc DocumentRenderer, không phải port riêng
-    │   │   ├── location-codec.ts
-    │   │   ├── library-store.ts
-    │   │   ├── collection-store.ts
-    │   │   ├── ai-provider.ts            # (P2) NoOp ở MVP
-    │   │   └── external-library-connector.ts  # (P3) NoOp ở MVP; thay SyncService account-based
-    │   └── index.ts
-    │
-    ├── shared/                           # Domain helpers + Application (platform-agnostic)
-    │   ├── models/                       # entity helpers, invariants BR-01/BR-02
-    │   ├── services/                     # Application use cases
-    │   │   ├── import-book.ts
-    │   │   ├── open-reader.ts
-    │   │   ├── save-reading-session-state.ts
-    │   │   ├── create-collection.ts
-    │   │   └── manage-collection-books.ts
-    │   │   # Highlight/note/bookmark CRUD KHÔNG đi qua use case riêng ở đây — logic sống trong
-    │   │   # apps/reading-book-desktop/src/screens/Reader/logic/hooks/{useReaderHighlights,useReaderBookmarks}.ts,
-    │   │   # gọi thẳng `overlayApi` (bridge IPC) → `OverlayStore` (§2.6). `add-highlight.ts` /
-    │   │   # `add-note.ts` / `list-annotations.ts` từng có ở đây đã bị xóa cùng đợt refactor 1.22.
-    │   ├── repositories/                 # interface-facing helpers (không SQLite cụ thể)
-    │   ├── readers/                      # registry format → codec / normalized kind
-    │   ├── storage/                      # abstractions path/key (inject từ app)
-    │   ├── constants/
-    │   ├── utils/
-    │   ├── hooks/                        # hooks thuần logic (không Electron API)
-    │   └── index.ts
-    │
-    └── config/                           # theme tokens, feature flags, supported formats
-        ├── theme.ts
-        ├── formats.ts
-        ├── features.ts                   # aiEnabled, externalLibrariesEnabled stubs
-        └── index.ts
+├── core/                         # @core — không Node / DOM / React / Electron / engine (R1–R3)
+│   ├── src/
+│   │   ├── domain/ domain-ports/ ports/      # models + ports (§2.6)
+│   │   ├── services/ stores/                 # Application: use cases + store (zustand/vanilla)
+│   │   ├── app-models/ annotations/ cfi/ epub/ txt/ md/ typewriter/ audio/ transcription/ …
+│   │   ├── config/                           # formats, theme tokens, feature flags, OAuth config
+│   │   └── db/                               # driver.ts (SyncSqlDriver / AsyncSqlDriver), library/ overlay/ txt/
+│   │                                         #   audio/ transcript/ (câu lệnh + codec), desktop/migrations (001–030),
+│   │                                         #   mobile/migrations, migrations.ts
+│   └── tests/                                # vitest (unit + integration + contract fixtures)
+├── app/                          # @app/* — UI dùng chung (renderer Desktop = UI trong WebView Mobile)
+│   ├── App.tsx main.tsx index.html
+│   ├── screens/                  # Library, Reader (+ phone/MobileReaderScreen.tsx), Settings, Splash, AudioBook
+│   ├── components/               # reader/ (renderers/<fmt>, chrome, interaction, pageturn, tts), chrome/, import/ …
+│   ├── hooks/ bridge/ theme/ styles/ (phone.css) utils/ shortcuts/
+│   └── platforms/
+│       ├── host|longPress|api|storage|window.{electron,native}.ts   # platform adapter (cùng tên export)
+│       ├── electron/             # host Desktop: main.ts, preload.ts, ipc/, persistence/, adapters/, host-adapters/,
+│       │                         #   files/, pdf-sync/, audio/, transcription/, … ; build ra dist/, dist-electron/, release/
+│       └── native/               # host Mobile: routes/ (Expo Router), host/ (rpc, sql/files/app service, local server),
+│                                 #   modules/local-server (Kotlin/Swift); phía WebView: main.ts, create-api.ts,
+│                                 #   bridge/, stores/, db/
+└── scripts/                      # check:boundaries, check-platform-adapters, check-build-split,
+                                  #   check-desktop-baseline, check-single-install, desktop-package-deps, check-desktop-package
 ```
 
 
@@ -531,41 +458,27 @@ source/
 #### Ánh xạ folder → lớp
 
 
-| Folder                                           | Lớp                                                        |
-| ------------------------------------------------ | ---------------------------------------------------------- |
-| `apps/*/src/screens`, `components`, `reader`     | Presentation                                               |
-| `apps/reading-book-desktop/src/bridge`, `stores` | Presentation boundary                                      |
-| `apps/book-reader-sdk/src/services`, `stores`    | Application                                                |
-| `apps/book-reader-sdk/src/domain`, `app-models`  | Domain models / helpers                                    |
-| `apps/book-reader-sdk/src/domain-ports`, `ports` | Ports (contracts)                                          |
-| `apps/reading-book-mobile/src`, `web/src`        | Infrastructure (mobile: host + Mobile Bridge)              |
-| `apps/reading-book-desktop/electron/**`          | Infrastructure (desktop)                                   |
-| `apps/*/src/reader/renderers`                    | Infrastructure phía UI (engine + overlay mark của engine đó, không có port `overlays` tách biệt) |
+| Folder                                                   | Lớp                                                        |
+| -------------------------------------------------------- | ---------------------------------------------------------- |
+| `source/app/screens`, `components`, `hooks`              | Presentation                                               |
+| `source/app/bridge`, `source/app/platforms/api.*.ts`      | Presentation boundary (gọi `api` của host, không chạm `window.api` ngoài `api.electron.ts`) |
+| `source/core/src/services`, `stores`                     | Application                                                |
+| `source/core/src/domain`, `app-models`                   | Domain models / helpers                                    |
+| `source/core/src/domain-ports`, `ports`, `db/driver.ts`  | Ports (contracts)                                          |
+| `source/app/platforms/native/**`                         | Infrastructure (Mobile: host + Mobile Bridge)              |
+| `source/app/platforms/electron/**`                       | Infrastructure (Desktop)                                   |
+| `source/app/components/reader/renderers`                 | Infrastructure phía UI (engine + overlay mark của engine đó, không có port `overlays` tách biệt) |
 
 
 
 
 #### Quy tắc đặt code
 
-1. **Không** import `electron` / `better-sqlite3` / React / engine từ `book-reader-sdk/src` (kiểm bằng `npm run check:boundaries`).
-2. **Không** viết SQL / `fs` trong `apps/*/src/screens`.
-3. Format mới = thêm file dưới `electron/adapters` (nếu cần native) + `src/reader/renderers/<fmt>` (renderer tự lo overlay mark của mình) + đăng ký trong `electron/adapters/importer-registry.ts` + `config/formats`.
-4. Mobile chỉ thay Infrastructure (host Expo, Mobile Bridge, SQLite riêng); **không copy** UI hay use case — WebView chạy lại `reading-book-desktop/src` (§2.12).
-
-
-
-#### Hiện trạng vs mục tiêu
-
-> **Đã lỗi thời (1.26):** bảng dưới là tình trạng lúc lập kế hoạch MVP. Hiện tại desktop đã xây xong, `packages/domain` / `packages/shared` đã gộp vào `book-reader-sdk`, và Mobile là host + WebView (§2.12).
-
-
-| Đã có trên đĩa                                                                    | Còn cần tạo khi implement MVP                    |
-| --------------------------------------------------------------------------------- | ------------------------------------------------ |
-| `apps/reading-book-desktop` (scaffold Electron+Vite)                              | `src/screens`, `reader`, `bridge`, `electron/ipc |
-| `apps/reading-book-mobile` (Expo scaffold)                                        | map screens theo IA khi tới phase mobile         |
-| `packages/domain` (models OOP)                                                    | ports thật (`ports/`)                            |
-| `packages/shared/{models,services,repositories,readers,storage,…}`                | use cases thật                                   |
-| `packages/config`                                                                 | theme / formats / feature flags                  |
+1. **Không** import `electron` / `better-sqlite3` / React / engine / Node / DOM từ `source/core/src`; core không import app (R1–R3, R5 — `npm run check:boundaries`).
+2. **Không** viết SQL / `fs` trong `source/app/screens` / `components`; SQL dùng chung nằm trong `source/core/src/db`.
+3. Format mới = thêm file dưới `platforms/electron/adapters` + `components/reader/renderers/<fmt>` (renderer tự lo overlay mark của mình) + đăng ký trong `platforms/electron/adapters/importer-registry.ts` + `source/core/src/config/formats.ts`.
+4. Mobile chỉ thay Infrastructure (host Expo, Mobile Bridge, SQLite riêng); **không copy** UI hay use case — WebView chạy lại `source/app` (§2.12).
+5. Khác biệt giữa hai host đi qua **platform adapter**: UI import `@app/platforms/<concern>` (không hậu tố). `platforms/electron/**` và `platforms/native/**` không import nhau (R7); không import file `*.electron` / `*.native` từ ngoài `source/app/platforms` (R12); chỉ `api.electron.ts` đọc `window.api` (R9).
 
 
 
@@ -574,17 +487,18 @@ source/
 Chi tiết: `specs/008-shared-core-architecture/` (spec, plan, contracts) và `docs/implementation_plan/mobile_webview.md`.
 
 ```text
-React Native host (reading-book-mobile/src)        WebView (reading-book-mobile/web + reading-book-desktop/src)
-  app/index.tsx  → WebView + boot values             web/src/main.ts: __READMATE_HOST__ = 'mobile', window.api, import src/main.tsx
-  host/rpc.ts    → sql.* / files.* / app.*  ⇄ postMessage ⇄  web/src/bridge/*  (Mobile Bridge, kiểu = DesktopApi)
+React Native host (source/app/platforms/native)    WebView (platforms/native/main.ts + source/app)
+  routes/index.tsx → WebView + boot values           main.ts: __READMATE_HOST__ = 'mobile', api qua platforms/api.native.ts, import @app/main
+  host/rpc.ts    → sql.* / files.* / app.*  ⇄ postMessage ⇄  bridge/*  (Mobile Bridge, kiểu = DesktopApi)
   modules/local-server (Kotlin/Swift) ── HTTP 127.0.0.1 + token ──▶ UI, byte sách, cover (Range 206 / 416)
-  expo-sqlite, expo-file-system                      web/src/stores/* (SQLite qua host), web/src/db/* (schema Mobile)
+  expo-sqlite, expo-file-system                      stores/* (SQLite qua host), db/* (schema Mobile; câu lệnh từ source/core/src/db)
 ```
 
-- **Không có lớp Presentation riêng cho Mobile**: màn hình, renderer, store UI là của desktop. Nhánh phone nằm sau `isMobileHost()` (`src/platform/`), CSS trong `src/styles/phone.css`; Reader riêng `src/screens/Reader/phone/MobileReaderScreen.tsx` (lazy) dùng chung hook lõi `src/screens/Reader/logic/reader-core/`.
+- **Không có lớp Presentation riêng cho Mobile**: màn hình, renderer, store UI là của desktop. Nhánh phone nằm sau `isMobileHost()` (`source/app/platforms/host.*`), CSS trong `source/app/styles/phone.css`; Reader riêng `source/app/screens/Reader/phone/MobileReaderScreen.tsx` (lazy) dùng chung hook lõi `source/app/screens/Reader/logic/reader-core/`.
 - **Thư viện copy**: sách import được copy vào `books/{uuid}/file` của app; không tham chiếu file của người dùng, không ghi vào file sách.
 - **Bản đầu**: EPUB, PDF, TXT (chỉ đọc), Markdown; bookmark, highlight, note, vị trí đọc, giao diện đọc. Mọi channel khác trả `NOT_AVAILABLE_ON_PLATFORM` và bị ẩn trên UI.
-- **Quy tắc phụ thuộc** R1–R11 (spec 008) kiểm bằng `npm run check:boundaries`.
+- **Quy tắc phụ thuộc** R1–R3, R5–R9, R11, R12 (spec 009, `specs/009-single-project-monorepo/contracts/dependency-rules.md`) kiểm bằng `npm run check:boundaries`; bundle WebView không chứa module `.electron` (`npm run check:build-split`).
+- **Chạy**: `npm run dev:mobile` (Expo Go, chỉ để phát triển), `npm run android` (bản native có local server) — từ gốc repo.
 
 ---
 
@@ -748,7 +662,7 @@ Database Diagram — SQLite Overlay Schema (MVP)
 
 ### 3.10. Catalog bảng & thuộc tính (SQLite)
 
-Catalog vật lý khớp migration desktop [`001_initial.sql`](../../source/apps/reading-book-desktop/electron/persistence/migrations/001_initial.sql) qua [`019_bookmarks_notes_merge.sql`](../../source/apps/reading-book-desktop/electron/persistence/migrations/019_bookmarks_notes_merge.sql); **các migration `020`–`030`** (cloud provenance, FTS chunks, chữ ký, ledger annotation PDF nhúng, two-way sync, TXT edited copy, định dạng audio, `book_audio_chapters`, `audio_transcripts`) chưa được mô tả đủ trong catalog này — xem `electron/persistence/migrations/` và `CLAUDE.md`. **Mobile có schema riêng** (`reading-book-mobile/web/src/db/`, OD-3 của spec 008): cùng ý nghĩa dữ liệu với desktop, kiểm bằng contract fixtures (`book-reader-sdk/tests/contracts/`), không chạy migration của desktop. **App settings không nằm trong catalog này** — xem §3.6.
+Catalog vật lý khớp migration desktop [`001_initial.sql`](../../source/core/src/db/desktop/migrations/001_initial.sql) qua [`019_bookmarks_notes_merge.sql`](../../source/core/src/db/desktop/migrations/019_bookmarks_notes_merge.sql); **các migration `020`–`030`** (cloud provenance, FTS chunks, chữ ký, ledger annotation PDF nhúng, two-way sync, TXT edited copy, định dạng audio, `book_audio_chapters`, `audio_transcripts`) chưa được mô tả đủ trong catalog này — xem `electron/persistence/migrations/` và `CLAUDE.md`. **Mobile có schema riêng** (`source/app/platforms/native/db/`, OD-3 của spec 008): cùng ý nghĩa dữ liệu với desktop, kiểm bằng contract fixtures (`book-reader-sdk/tests/contracts/`), không chạy migration của desktop. **App settings không nằm trong catalog này** — xem §3.6.
 
 **Quy ước chung**
 
