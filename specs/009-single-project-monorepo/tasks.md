@@ -160,18 +160,18 @@ G-base all pass.
 - [X] T052 [US5] Add `source/scripts/check-desktop-package.mjs`: lists the packaged `app.asar` and fails on `react-native`, `expo`, `platforms/native`; root `package` runs it after electron-builder (FR-017)
 - [X] T053 [US5] Run `npm run package` on Windows: installer builds, installs, starts, opens a copy of the pre-change library (SC-005); compare installer size with the last pre-009 build; record in `quickstart.md` §Results
 - [X] T054 [US5] Run `npm run check:desktop-baseline` at the end state (25/25 incl. the pre-change library and the migration hashes of T002); record in `quickstart.md` §Results
-- [ ] T055 [US5] Ask the user to run the Expo Go journey (import, open each format, highlight, restart) and, with their agreement, Desktop E2E; record both against the pre-009 results in `quickstart.md` §Results (SC-007)
+- [X] T055 [US5] Ask the user to run the Expo Go journey (import, open each format, highlight, restart) and, with their agreement, Desktop E2E; record both against the pre-009 results in `quickstart.md` §Results (SC-007)
 - [X] T056 [US5] Build the Android APK from the root (`npm run android`, or `cd android && ./gradlew assembleDebug -PreactNativeArchitectures=arm64-v8a,x86_64 --no-parallel`); record in `quickstart.md` §Results and in `specs/008-shared-core-architecture/m5-results.md` (closes spec 008 T092 if it builds)
 
 ---
 
 ## Phase 8: Polish & Cross-Cutting Concerns
 
-- [ ] T057 Rewrite `.github/workflows/ci.yml`: no `working-directory: source`, `cache-dependency-path: package-lock.json`, `npm ci` at the root, then `npm run check` (+ `check:single-install`) (FR-018)
-- [ ] T058 [P] Update `CLAUDE.md`: repository structure, commands, dependency rule, path aliases, Mobile section, every `source/apps/…` path (FR-021)
-- [ ] T059 [P] Update `README.md` (root) with quickstart.md §1–§2, and turn `source/apps/reading-book-mobile/README.md` / `book-reader-sdk/README.md` content into sections of the root README or `docs/` (their folders no longer exist)
-- [ ] T060 [P] Update `docs/software/SDS.md` §2.7, §2.11, §2.12 and changelog 1.27; `docs/implementation_plan/mobile_webview.md` feature map paths
-- [ ] T061 [P] Update path references in `specs/008-shared-core-architecture/{plan.md,contracts/*.md,quickstart.md}` with a note that spec 009 moved them (history sections stay as written)
+- [X] T057 Rewrite `.github/workflows/ci.yml`: no `working-directory: source`, `cache-dependency-path: package-lock.json`, `npm ci` at the root, then `npm run check` (+ `check:single-install`) (FR-018)
+- [X] T058 [P] Update `CLAUDE.md`: repository structure, commands, dependency rule, path aliases, Mobile section, every `source/apps/…` path (FR-021)
+- [X] T059 [P] Update `README.md` (root) with quickstart.md §1–§2, and turn `source/apps/reading-book-mobile/README.md` / `book-reader-sdk/README.md` content into sections of the root README or `docs/` (their folders no longer exist)
+- [X] T060 [P] Update `docs/software/SDS.md` §2.7, §2.11, §2.12 and changelog 1.27; `docs/implementation_plan/mobile_webview.md` feature map paths
+- [X] T061 [P] Update path references in `specs/008-shared-core-architecture/{plan.md,contracts/*.md,quickstart.md}` with a note that spec 009 moved them (history sections stay as written)
 - [ ] T062 Final run of quickstart.md §1–§5 from a fresh clone; fill §Results with SC-001 … SC-008; report to the user
 
 ---
