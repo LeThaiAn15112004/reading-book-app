@@ -7,7 +7,9 @@
 import { typewriterFontFaces, type EmbeddedFontFaceInfo, type FontMetrics } from '@core'
 import { parseTrueType, ttfFontMetrics, type TtfFace } from '../../../../platforms/electron/pdf-sync/pdf-font-embed'
 
-const urls = import.meta.glob('../../../../assets/fonts/typewriter/*.ttf', { query: '?url', import: 'default', eager: true }) as Record<string, string>
+// The SAME files Main embeds (pdf-sync/typewriter-font-files.ts). A glob that matches nothing fails silently at build
+// time, and every Typewriter note then fails with "Typewriter font missing" (check-desktop-package guards it).
+const urls = import.meta.glob('../../../../platforms/electron/assets/fonts/typewriter/*.ttf',{ query: '?url', import: 'default', eager: true }) as Record<string, string>
 
 const parsed = new Map<string, TtfFace>()
 let loading: Promise<void> | undefined

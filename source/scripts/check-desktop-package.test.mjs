@@ -36,9 +36,11 @@ describe('check-desktop-package', () => {
   })
 
   test('missing required paths are reported', () => {
-    const { missing } = checkPackagedPaths(REQUIRED.filter((p) => !p.includes('better-sqlite3')))
+    const font = 'source/app/platforms/electron/dist/assets/NotoSans-Regular-AbC123.ttf'
+    const { missing } = checkPackagedPaths([...REQUIRED.filter((p) => !p.includes('better-sqlite3')), font])
     assert.deepEqual(missing, ['node_modules/better-sqlite3/package.json'])
-    assert.deepEqual(checkPackagedPaths(REQUIRED).missing, [])
+    assert.deepEqual(checkPackagedPaths([...REQUIRED, font]).missing, [])
+    assert.match(checkPackagedPaths(REQUIRED).missing.join(), /Typewriter fonts/)
   })
 
   test('the asar index is read', () => {

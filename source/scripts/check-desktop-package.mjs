@@ -55,6 +55,9 @@ export function checkPackagedPaths(paths) {
     if (reason) forbidden.push({ path: p, reason })
   }
   const missing = REQUIRED.filter((p) => !set.has(p))
+  // The renderer's Typewriter fonts are an import.meta.glob: a stale path builds fine and ships no font.
+  const rendererFont = new RegExp(`^${HOST}/dist/assets/NotoSans-Regular-[^/]+\\.ttf$`)
+  if (![...set].some((p) => rendererFont.test(p))) missing.push(`${HOST}/dist/assets/NotoSans-Regular-*.ttf (renderer Typewriter fonts)`)
   return { forbidden, missing, count: set.size }
 }
 
