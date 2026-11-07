@@ -172,7 +172,7 @@ G-base all pass.
 - [X] T059 [P] Update `README.md` (root) with quickstart.md §1–§2, and turn `source/apps/reading-book-mobile/README.md` / `book-reader-sdk/README.md` content into sections of the root README or `docs/` (their folders no longer exist)
 - [X] T060 [P] Update `docs/software/SDS.md` §2.7, §2.11, §2.12 and changelog 1.27; `docs/implementation_plan/mobile_webview.md` feature map paths
 - [X] T061 [P] Update path references in `specs/008-shared-core-architecture/{plan.md,contracts/*.md,quickstart.md}` with a note that spec 009 moved them (history sections stay as written)
-- [ ] T062 Final run of quickstart.md §1–§5 from a fresh clone; fill §Results with SC-001 … SC-008; report to the user
+- [X] T062 Final run of quickstart.md §1–§5 from a fresh clone; fill §Results with SC-001 … SC-008; report to the user
 
 ---
 
