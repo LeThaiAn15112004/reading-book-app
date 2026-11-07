@@ -155,7 +155,7 @@ platforms at install (−157 MB on Windows), or making translation / transcripti
 
 ### Final run from a fresh clone (T062, 2026-11-07)
 
-`git clone` of the repository at `6d795d5` (then `ee832f3`, see SC-001 row) into `%LOCALAPPDATA%b009-fresh`, Windows 11, Node 22.13.
+`git clone` of the repository at `6d795d5` (then `ee832f3`, see SC-001 row) into `%LOCALAPPDATA%\rb009-fresh`, Windows 11, Node 22.13.
 
 | Criterion | Result |
 |---|---|
