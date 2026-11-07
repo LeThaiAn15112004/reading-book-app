@@ -1,4 +1,4 @@
-#!/usr/bin/env node
+// No shebang: tests/contract-conformance.test.ts imports this file and vitest (spec 009 layout) fails on one. Run it with `node`.
 // Dumps the real schema of a fully migrated Desktop database (spec 008, T040), as the source for Mobile's baseline
 // (`source/core/src/db/mobile/migrations/001_baseline.sql`, T041). The column lists come from SQLite itself, not from reading
 // migration text, because many tables were rebuilt across Desktop's migrations.
