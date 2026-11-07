@@ -124,10 +124,13 @@ function main() {
     return
   }
   if (!existsSync(BUILDER_CONFIG)) throw new Error('electron-builder.json5 not found at the repository root')
-  const current = readFileSync(BUILDER_CONFIG, 'utf8')
+  // Compare with LF only: a Windows checkout (core.autocrlf) has CRLF, which is not a difference in the allowlist.
+  const raw = readFileSync(BUILDER_CONFIG, 'utf8')
+  const eol = raw.includes('\r\n') ? '\r\n' : '\n'
+  const current = raw.replaceAll('\r\n', '\n')
   const next = replaceBlock(current, renderBlock(folders))
   if (args.has('--write')) {
-    if (next !== current) writeFileSync(BUILDER_CONFIG, next)
+    if (next !== current) writeFileSync(BUILDER_CONFIG, next.replaceAll('\n', eol))
     console.log(`electron-builder.json5: ${folders.length} node_modules folders for Main's externals${next === current ? ' (unchanged)' : ' (updated)'}`)
     return
   }
