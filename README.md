@@ -107,6 +107,8 @@ Các lệnh khác:
 ## Ghi chú kỹ thuật
 
 - Một project duy nhất (không dùng npm workspaces); alias `@core` trỏ tới `source/core/src`, `@app` tới `source/app`.
+- Core dùng chung (cấu trúc, port, driver SQL, cách host dùng): `docs/software/core.md`. Kiến trúc tổng thể: `docs/software/SDS.md`.
+- Khác biệt giữa hai host đi qua platform adapter `source/app/platforms/<concern>.electron.ts` / `.native.ts`.
 - Desktop dùng Electron + Vite + React + TypeScript.
 - Mobile dùng Expo Router + React Native, WebView chạy cùng giao diện React với Desktop.
 
