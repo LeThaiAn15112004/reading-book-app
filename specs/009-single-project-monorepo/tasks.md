@@ -161,7 +161,7 @@ G-base all pass.
 - [X] T053 [US5] Run `npm run package` on Windows: installer builds, installs, starts, opens a copy of the pre-change library (SC-005); compare installer size with the last pre-009 build; record in `quickstart.md` §Results
 - [X] T054 [US5] Run `npm run check:desktop-baseline` at the end state (25/25 incl. the pre-change library and the migration hashes of T002); record in `quickstart.md` §Results
 - [ ] T055 [US5] Ask the user to run the Expo Go journey (import, open each format, highlight, restart) and, with their agreement, Desktop E2E; record both against the pre-009 results in `quickstart.md` §Results (SC-007)
-- [ ] T056 [US5] Build the Android APK from the root (`npm run android`, or `cd android && ./gradlew assembleDebug -PreactNativeArchitectures=arm64-v8a,x86_64 --no-parallel`); record in `quickstart.md` §Results and in `specs/008-shared-core-architecture/m5-results.md` (closes spec 008 T092 if it builds)
+- [X] T056 [US5] Build the Android APK from the root (`npm run android`, or `cd android && ./gradlew assembleDebug -PreactNativeArchitectures=arm64-v8a,x86_64 --no-parallel`); record in `quickstart.md` §Results and in `specs/008-shared-core-architecture/m5-results.md` (closes spec 008 T092 if it builds)
 
 ---
 

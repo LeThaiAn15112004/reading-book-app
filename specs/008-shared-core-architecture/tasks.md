@@ -241,7 +241,7 @@ Effect order did change (R7): `useReaderCore` runs before the TXT store, relink,
 
 **Required before the first release counts as complete. Failures here may reopen bridge or M2 decisions, and must be reported to the user.**
 
-- [ ] T092 [US3] Run `npm run build:web`, then `npx expo run:android` in `source/apps/reading-book-mobile/`; capture the full log, find the root cause of the failure the user has seen, fix it, and record both in `specs/008-shared-core-architecture/m5-results.md`. The app must use the local server, not the Metro route
+- [X] T092 [US3] Run `npm run build:web`, then `npx expo run:android` in `source/apps/reading-book-mobile/`; capture the full log, find the root cause of the failure the user has seen, fix it, and record both in `specs/008-shared-core-architecture/m5-results.md`. The app must use the local server, not the Metro route
 - [ ] T017 [US3] On that build, record whether `file://` module scripts and the PDF.js worker run, using the `EXPO_PUBLIC_UI_ROUTE=file` branch in `source/apps/reading-book-mobile/src/app/index.tsx`, in `specs/008-shared-core-architecture/m2-results.md`; a failure is acceptable, as the local server is the chosen route
 - [ ] T093 [US3] On that build, networking off, run every item T024 listed as unverified, and rerun the 4-format check and T023 in `specs/008-shared-core-architecture/m2-results.md`; finally close OD-10, set `minSdkVersion` in `source/apps/reading-book-mobile/app.json` if needed, and record the book size limit and `localStorage` durability
 - [ ] T074 [US3] Run all of `quickstart.md` section 5 on that build, and record results in `specs/008-shared-core-architecture/m5-results.md` (SC-004 Android, SC-010)

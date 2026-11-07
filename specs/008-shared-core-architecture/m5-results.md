@@ -90,3 +90,15 @@ host reads the `content://` document (ACTION_OPEN_DOCUMENT → SAF, which `File.
 `files.stage`; `discardUri` never deletes a `content://` URI. iOS keeps the cache copy. `READ_FAILED` now carries the
 underlying error text, and the bridge logs it (`[bridge] import: copying the picked file failed`). **Confirmed on the
 device** by the user on 2026-11-05 (Expo Go, started from the repository root after spec 009 T018): import works.
+
+## T092 closed by spec 009 T056 (2026-11-07)
+
+Built from the repository root after spec 009 moved Mobile to `source/app/platforms/native`: `npx expo prebuild -p android
+--no-install`, `npm run build:web`, then in `android/` `./gradlew assembleDebug -PreactNativeArchitectures=arm64-v8a,x86_64
+--no-parallel`. The first run (22 min, 337 tasks) stopped on cause 3 again (`react-native-screens:configureCMakeDebug[x86_64]`:
+`generate_cxx_metadata_*_timing.txt` held by another process; VS Code was open with two busy Gradle daemons). The same
+command run again: **BUILD SUCCESSFUL in 7 m 46 s**, `android/app/build/outputs/apk/debug/app-debug.apk` = 147,712,646 B
+(arm64-v8a + x86_64 native libraries, the WebView UI under `assets/web-ui/` incl. `index.html` and the Typewriter fonts).
+**Fix 2 is now proven**: the CMake staging folders were created under `%LOCALAPPDATA%\rmcxx` (`expo-modules-core`,
+`react-native-gesture-handler`, `-reanimated`, `-screens`, `-worklets`) and ninja no longer reports "still dirty".
+Not done here: installing the APK and checking it uses the local server (needs a device or emulator: T017, T093, T074).
