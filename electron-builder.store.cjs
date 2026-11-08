@@ -16,10 +16,6 @@ const { _doc, ...appxIdentity } = identity
 
 module.exports = {
   extends: './electron-builder.json5',
-  directories: {
-    // Generated icons (store:icons): appx/ logos for the package, icon.ico for the window / NSIS.
-    buildResources: 'source/app/platforms/electron/build-resources',
-  },
   win: {
     // PowerShell cannot read inside app.asar, so the startup-task bridge ships as a real file:
     // {resources}/store/startup-task.ps1 (background/store-startup-task.ts).

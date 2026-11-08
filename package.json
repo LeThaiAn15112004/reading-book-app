@@ -9,7 +9,7 @@
     "dev:all": "concurrently -n desktop,mobile -c blue,green \"npm run dev\" \"npm run dev:mobile\"",
     "dev:web": "vite build --watch --config vite.native.config.ts",
     "build": "cd source/app/platforms/electron && vite build --config ../../../../vite.config.ts",
-    "package": "tsc -p tsconfig.electron.json && npm run check:package-deps && npm run build && electron-builder && npm run check:desktop-package",
+    "package": "npm run store:icons && tsc -p tsconfig.electron.json && npm run check:package-deps && npm run build && electron-builder && npm run check:desktop-package",
     "preview": "cd source/app/platforms/electron && vite preview --config ../../../../vite.config.ts",
     "build:web": "node source/app/platforms/native/scripts/build-web.mjs",
     "build:web:feasibility": "node source/app/platforms/native/scripts/build-web.mjs --feasibility",

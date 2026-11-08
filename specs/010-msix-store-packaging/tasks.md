@@ -318,7 +318,7 @@ stops with `icon_master_invalid`.
 
 ### Tests for User Story 3
 
-- [ ] T041 [P] [US3] Write `ST/icons.test.mjs` (`node --test`):
+- [X] T041 [P] [US3] Write `ST/icons.test.mjs` (`node --test`):
   - `expectedAssets()` returns exactly the rows of contracts/store-icons.md (count them: 6 logos × 5 scales + 5 targetsizes × 3 variants = 45 PNGs, plus `icon.ico`);
   - `validateMaster({ width, height, hasAlpha })` rejects 512×512, 1024×1000 and an image without alpha (rule "square, ≥ 1024 px, has alpha");
   - `writeIco([{ size, png }])` produces a valid header (reserved 0, type 1, count 7) and the directory entries (size 256 written as 0);
@@ -326,21 +326,27 @@ stops with `icon_master_invalid`.
 
 ### Implementation for User Story 3
 
-- [ ] T042 [US3] Implement `ST/generate-icons.mjs`:
+- [X] T042 [US3] Implement `ST/generate-icons.mjs`:
   - `MASTER_ICON = 'source/app/platforms/native/assets/images/icon.png'`, optional `MASTER_ICON_LIGHT`;
   - `expectedAssets()` follows the table in contracts/store-icons.md: file names `<Logo>.scale-<n>.png` and `Square44x44Logo.targetsize-<n>[_altform-unplated|_altform-lightunplated].png`; `content` 100 % for StoreLogo / targetsize, 66 % otherwise; wide logos are centred, sized by height;
   - render each asset with `sharp`: resize the master to the content box (`kernel: lanczos3`), `extend` it onto a transparent canvas of the exact size, write a PNG;
   - empty and rewrite `EL/build-resources/appx/`, copy `EL/store/appxmanifest.xml` into `EL/build-resources/` (T008), and write `EL/build-resources/icon.ico` via `ico-writer.mjs` (16, 24, 32, 48, 64, 128, 256);
   - an invalid master → print `icon_master_invalid` (contracts/store-build.md) and exit 1.
-- [ ] T043 [P] [US3] Implement `ST/ico-writer.mjs` `writeIco(entries)`: an ICONDIR plus one ICONDIRENTRY per image (width/height byte, 0 for 256), PNG payloads, offsets correct. T041 must pass
-- [ ] T044 [US3] Implement `ST/check-store-icons.mjs`: for every `expectedAssets()` row, check that the file exists, `sharp(file).metadata()` has the exact width/height, and `stats()` shows a max alpha > 0; `icon.ico` has 7 entries. List every failure, exit 1
-- [ ] T045 [US3] Wire it in:
+- [X] T043 [P] [US3] Implement `ST/ico-writer.mjs` `writeIco(entries)`: an ICONDIR plus one ICONDIRENTRY per image (width/height byte, 0 for 256), PNG payloads, offsets correct. T041 must pass
+- [X] T044 [US3] Implement `ST/check-store-icons.mjs`: for every `expectedAssets()` row, check that the file exists, `sharp(file).metadata()` has the exact width/height, and `stats()` shows a max alpha > 0; `icon.ico` has 7 entries. List every failure, exit 1
+- [X] T045 [US3] Wire it in:
   - `store:icons` = `node ST/generate-icons.mjs && node ST/check-store-icons.mjs`;
   - `package-store.mjs` step 3 runs it (replace the T015 placeholder);
   - prefix `npm run package` with `npm run store:icons &&`;
   - in `electron-builder.json5` set `directories.buildResources` to `source/app/platforms/electron/build-resources` and `win.icon` to `source/app/platforms/electron/build-resources/icon.ico`.
 
   `npm run package` must still pass `check:desktop-package`.
+
+  _Done 2026-11-08: the 45 logos + `icon.ico` are generated and checked (`check-store-icons: OK`), and both configs
+  resolve with the new `buildResources` / `win.icon`. `electron-builder.store.cjs` no longer repeats
+  `buildResources` (it is inherited). **Not run:** `npm run package` (a real packaging build). It is checked with
+  T018 / T073 on Windows. **Note:** the master (`MASTER_ICON`, the Mobile `icon.png`) is Expo's template app icon,
+  not Readmate art. Replace it before any submission (T046)._
 - [ ] T046 [US3] Set the window icon in development too: if `BrowserWindow` creation in `EL/main.ts` has no `icon`, leave it (packaged builds take the exe icon). Do not add a runtime dependency on `build-resources/`. Then rebuild the test-signed package and fill the smoke-test row "Start and taskbar icons look sharp in light and dark themes" (FR-012). If the art is unreadable on one theme, add `MASTER_ICON_LIGHT` art and regenerate
 
 **Checkpoint**: the package and the NSIS installer carry the Readmate icon.

@@ -86,14 +86,9 @@ async function main(argv) {
   const version = inputs.version
   const env = unsignedChildEnv(process.env)
 
-  // Icons (US3, T045 makes this generate + check; until then sample logos are used with a warning).
-  const iconScript = path.join(here, 'generate-icons.mjs')
-  if (existsSync(path.join(HOST, 'build-resources/appx'))) {
-    step('store icons', [node, iconScript], { env })
-    step('store icons check', [node, path.join(here, 'check-store-icons.mjs')], { env })
-  } else {
-    console.warn('⚠ package:store — no build-resources/appx/ yet (spec 010 US3): electron-builder will use its sample logos.')
-  }
+  // Icons (US3): every Store logo + icon.ico from the master icon, then their exact sizes are checked.
+  step('store icons', [node, path.join(here, 'generate-icons.mjs')], { env })
+  step('store icons check', [node, path.join(here, 'check-store-icons.mjs')], { env })
 
   step('tsc (Desktop)', [node, bin('typescript/bin/tsc'), '-p', 'tsconfig.electron.json'], { env })
   step('check:package-deps', [node, path.join(repoRoot, 'source/scripts/desktop-package-deps.mjs')], { env })
