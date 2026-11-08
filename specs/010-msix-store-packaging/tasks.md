@@ -364,23 +364,23 @@ direct build is running.
 
 ### Tests for User Story 6
 
-- [ ] T047 [P] [US6] Write `CORE/tests/store-import/plan.test.ts` for `planImport(source, { freeBytes })`:
+- [X] T047 [P] [US6] Write `CORE/tests/store-import/plan.test.ts` for `planImport(source, { freeBytes })`:
   - only allowlisted entries are copied: `reading-book.db`, `books/`, `covers/`, `txt-edits/`, `background-prefs.json`, `notification-prefs.json`, `reading-reminder-state.json`, `Local Storage/`;
   - `cloud-tokens`, `models/`, `transcription-models/`, `attachment-tmp/`, `attachment-staging/`, `zip-import-tmp/`, `Cache/`, `GPUCache/`, `Session Storage/` and unknown entries go to `skip`;
   - `hasWal: true` → refuse `source_busy`;
   - `freeBytes < totalBytes * 1.1` → refuse `no_space`;
   - no `reading-book.db` → no plan (`null`).
-- [ ] T048 [P] [US6] Write `CORE/tests/store-import/rewrite-root.test.ts` for `rewriteRoot(value, fromRoot, toRoot)`:
+- [X] T048 [P] [US6] Write `CORE/tests/store-import/rewrite-root.test.ts` for `rewriteRoot(value, fromRoot, toRoot)`:
   - `C:\Users\a\AppData\Roaming\reading-book-desktop\books\x\file` → the same path under `…\Readmate Reader Store\books\x\file`;
   - case-insensitive (`c:\users\A\…`), and `/` treated as equal to `\`;
   - only whole segments count: `…\reading-book-desktop2\x` → `null`;
   - the root itself → `toRoot`;
   - `D:\Books\a.pdf` → `null`;
   - empty or `null` input → `null`.
-- [ ] T049 [P] [US6] Write `CORE/tests/store-import/schema.test.ts`:
+- [X] T049 [P] [US6] Write `CORE/tests/store-import/schema.test.ts`:
   - `isNewerSchema(sourceNames, knownNames)`: true when any source name is not in `knownNames`, false when the source is a subset;
   - `verifyCounts(source, staged)`: equal → ok; any table differs → `{ refuse: 'integrity', table }`.
-- [ ] T050 [P] [US6] Write `CORE/tests/store-import/marker.test.ts` for `decideOnLaunch({ storeDbExists, marker, sourceDbExists, storeLibraryEmpty })` (data-model §5), covering every arrow of the state machine:
+- [X] T050 [P] [US6] Write `CORE/tests/store-import/marker.test.ts` for `decideOnLaunch({ storeDbExists, marker, sourceDbExists, storeLibraryEmpty })` (data-model §5), covering every arrow of the state machine:
   - no db + no marker + source → `offer`;
   - no db + `declined` → `none`;
   - no db + `pending` → `importWithoutAsking`;
@@ -390,7 +390,7 @@ direct build is running.
 
 ### Implementation for User Story 6
 
-- [ ] T051 [US6] Implement in `CORE/src/store-import/`:
+- [X] T051 [US6] Implement in `CORE/src/store-import/`:
   - `allowlist.ts` (the T047 lists as constants, with the comment "confirmed by grep of json-prefs-file.ts users on <date>");
   - `plan.ts` (`planImport`);
   - `rewrite-root.ts`;
@@ -398,7 +398,20 @@ direct build is running.
   - `marker.ts` (`StoreImportMarker` type from data-model §5, exactly `{ version: 1, state: 'pending' | 'declined' | 'done', at, source?, copied? }`, plus `parseMarker`, `decideOnLaunch`).
 
   Re-export from `index.ts`. T047–T050 pass; `npm run sdk:typecheck` and `npm run check:boundaries` pass.
-- [ ] T052 [US6] Confirm the allowlist against the code: list every file name passed to `json-prefs-file.ts` (`grep -rn "json-prefs-file\|prefsFile" EL --include=*.ts`) and check the table names in `COUNTED_TABLES` against `CORE/src/db/desktop/migrations/*.sql`. Update `allowlist.ts` and contracts/store-import.md if they differ
+
+  _Done 2026-11-08, two deviations:_
+  - _Renamed to avoid clashing with annotation-transfer's exports: `planImport` → `planStoreImport`,
+    `ImportPlan` / `ImportSource` / `ImportSourceEntry` / `ImportRefusal` → `StoreImport…`._
+  - _`decideOnLaunch` follows data-model §5 rather than the T050 bullet "db exists → `none` whatever the marker": a
+    `pending` marker (the Settings entry) with an empty Store library answers `importWithoutAsking` even when the
+    Store database exists. After "Start empty" the Store build has created an empty one, so otherwise the Settings
+    entry could never work. When T057 / T059 run that case, they must remove the empty Store database first.
+    `neededBytes` uses integer arithmetic (`6600 * 1.1` is `7260.000000000001`)._
+- [X] T052 [US6] Confirm the allowlist against the code: list every file name passed to `json-prefs-file.ts` (`grep -rn "json-prefs-file\|prefsFile" EL --include=*.ts`) and check the table names in `COUNTED_TABLES` against `CORE/src/db/desktop/migrations/*.sql`. Update `allowlist.ts` and contracts/store-import.md if they differ
+
+  _Done 2026-11-08: they match. The `json-prefs-file.ts` users are `background-prefs.json`,
+  `notification-prefs.json` and `reading-reminder-state.json`. Every `userData` entry in `EL/` is either allowlisted or
+  in `STORE_IMPORT_NEVER`. The six counted tables are created by migrations 001, 025, 028 and 029._
 - [ ] T053 [US6] Create `EL/spikes/store-import.mjs` (`spike:store:import`). Like `spike:audio:migration`, it relaunches itself with the app's Electron binary in `ELECTRON_RUN_AS_NODE` mode for better-sqlite3. On temp folders, with a real migrated schema plus sample rows (managed book, referenced book, cover, TXT revision, notes, a `Local Storage/` dir, `cloud-tokens`), it runs the host functions of T054–T057 directly. Scenarios:
   1. success: rows, counts and files are equal, managed paths are rewritten, referenced paths are unchanged, no TEXT value under the old root;
   2. a `-wal` exists in the source → `source_busy`, nothing created;

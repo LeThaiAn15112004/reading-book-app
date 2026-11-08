@@ -20,7 +20,7 @@ read streams touch it.
 | `books/` | yes | managed copies |
 | `covers/` | yes | |
 | `txt-edits/` | yes | TXT edited-copy revisions |
-| `background-prefs.json`, `notification-prefs.json`, `reading-reminder-state.json` | yes, if present | Main prefs (`json-prefs-file.ts`); the tasks phase confirms the list with a grep |
+| `background-prefs.json`, `notification-prefs.json`, `reading-reminder-state.json` | yes, if present | Main prefs (`json-prefs-file.ts`); list confirmed by grep on 2026-11-08 (T052) |
 | `Local Storage/` | yes | renderer preferences (Appearance, Library browse, reading defaults …) |
 | `cloud-tokens` | **no** | per-app protected; linked accounts show "Sign in again" |
 | `models/`, `transcription-models/` | no | re-downloadable |
