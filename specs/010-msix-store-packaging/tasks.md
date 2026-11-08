@@ -321,7 +321,7 @@ S1, S2 and S4 pass, and every row of `docs/store/smoke-tests.md` passes.
     `NOT_AVAILABLE_ON_PLATFORM`._
   - _`startup-task.ps1` was run outside a package: it loads the WinRT types and answers
     `{"error":"Element not found…"}`, exit 1. Run inside the package = S2 (T037/T038)._
-- [ ] T035 [P] [US2] Fill `docs/store/smoke-tests.md` (FR-019): one row per feature, with columns `Check | How | 1.0.0`. Rows:
+- [X] T035 [P] [US2] Fill `docs/store/smoke-tests.md` (FR-019): one row per feature, with columns `Check | How | 1.0.0`. Rows:
   - import a local EPUB / PDF / TXT / MD;
   - each format opens and remembers its position;
   - a PDF highlight is written into the user's own file;
@@ -335,7 +335,13 @@ S1, S2 and S4 pass, and every row of `docs/store/smoke-tests.md` passes.
   - Settings → Updates names the Microsoft Store;
   - Start and taskbar icons look sharp in light and dark themes;
   - uninstall leaves the books in Documents and the PDF annotations in place.
-- [ ] T036 [US2] Verify that `AdvancedSettings.tsx` `CHANNEL_NOTE['microsoft-store']` and `EL/updates/update-service.ts` need no change (FR-008). If the text promises anything the Store build cannot do, adjust it
+- [X] T036 [US2] Verify that `AdvancedSettings.tsx` `CHANNEL_NOTE['microsoft-store']` and `EL/updates/update-service.ts` need no change (FR-008). If the text promises anything the Store build cannot do, adjust it
+
+  _Done 2026-11-09, no change needed. `update-service.ts` has no provider for `microsoft-store`, so it answers
+  `unavailable`. The card then shows "Update check not available yet" and "This copy was installed from the Microsoft
+  Store, which delivers updates. Checking the Store from inside the app is not supported yet." That is true, it names
+  the Store as the channel (FR-008, US2 AS 5), and no other update route exists. The current version now shows
+  `1.0.0` (T009)._
 - [ ] T037 [US2] Create `EL/spikes/store-packaged.mjs` (`spike:store:packaged`, guided, Windows only). It finds the installed package with `Get-AppxPackage *ReadmateReader*` and runs:
   - **S1**: hash `%APPDATA%\reading-book-desktop` (if present) → ask the user to use the Store app for one minute and quit → hash again: identical. `%APPDATA%\Readmate Reader Store` must not exist outside the package view, and `%LOCALAPPDATA%\Packages\<PFN>\LocalCache\Roaming\Readmate Reader Store\reading-book.db` must exist;
   - **S2**: run `startup-task.ps1 get` through `Invoke-CommandInDesktopPackage` (state printed); ask the user to link a cloud account and confirm; ask them to trigger a reminder toast and confirm the name and icon; after turning Start at Login on and signing out and in, read `--hidden-at-startup` from the process command line (`Get-CimInstance Win32_Process`);
