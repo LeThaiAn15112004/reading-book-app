@@ -35,10 +35,10 @@ fallback, so no decision is left open.
 own Windows kit bundle), with the artifact name ending in `.msix`
 (`"artifactName": "${productName}-Windows-${version}-Store.msix"`): `makeappx pack` writes the same package format
 whatever the extension, and Partner Center accepts `.msix` uploads. The Store build has its **own config file**
-`electron-builder.store.json5` that `extends` the base `electron-builder.json5` and only overrides `win.target`,
+`electron-builder.store.cjs` that `extends` the base `electron-builder.json5` and only overrides `win.target`,
 `artifactName`, `directories.buildResources` and adds the `appx` block. A wrapper script
 `source/scripts/store/package-store.mjs` validates the inputs (R2, R3, R10), generates the icons (R9), then runs
-`electron-builder --win --config electron-builder.store.json5` and the existing post-checks.
+`electron-builder --win --config electron-builder.store.cjs` and the existing post-checks.
 
 **Rationale**: No new dependency; it reuses the same `files` allowlist, `extraResources` (FFmpeg) and `afterPack`
 hook, so FR-005 ("same content rules") comes for free. `appx` already emits `windows.protocol` from `protocols`,
@@ -50,7 +50,9 @@ needs a separately installed Windows SDK); `electron-windows-store` (deprecated,
 
 ## R2 — Store identity: one place, placeholders block the build
 
-**Decision**: The `appx` block of `electron-builder.store.json5` is the single place for `identityName`,
+**Decision**: `source/app/platforms/electron/store/store-identity.json` (plain JSON, read by both the Store config
+`electron-builder.store.cjs` — which `extends` the base config and builds its `appx` block from it — and by the checks;
+`json5` is not a direct dependency, so the scripts never parse the base `.json5`) is the single place for `identityName`,
 `publisher` (`CN=…` exactly as shown on Partner Center → Product identity), `publisherDisplayName`,
 `applicationId` (`ReadmateReader`), `displayName`, `languages` (`["en-US", "vi-VN"]`), `backgroundColor`
 (`transparent`), `minVersion` `10.0.17763.0` (1809), `maxVersionTested` `10.0.26100.0`, `capabilities`
@@ -208,7 +210,8 @@ import from the renderer (the database and `Local Storage` are already open by t
 
 ## R9 — Icons
 
-**Decision**: `source/scripts/store/generate-icons.mjs` uses `sharp` (already installed: it is a Main external) to
+**Decision**: `source/scripts/store/generate-icons.mjs` uses `sharp` (already installed, 0.35.5, through `@huggingface/transformers`; declared as a `devDependency` at
+that exact version so the build script does not rely on a transitive package — no new download) to
 generate, from one master PNG (path in one constant; first release: the 1024 × 1024 Mobile icon
 `source/app/platforms/native/assets/images/icon.png`), into the git-ignored
 `source/app/platforms/electron/build-resources/`:

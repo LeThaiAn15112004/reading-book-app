@@ -5,7 +5,7 @@
 No SQLite migration. No change to any existing table or column. New data is build configuration, two JSON files in
 the Store build's own `userData`, and Markdown records under `docs/store/`.
 
-## 1. Store identity *(build config — `electron-builder.store.json5`, block `appx`)*
+## 1. Store identity *(`source/app/platforms/electron/store/store-identity.json`, turned into the `appx` block by `electron-builder.store.cjs`)*
 
 | Field | Example | Rule (checked by `check-store-config.mjs`) |
 |---|---|---|

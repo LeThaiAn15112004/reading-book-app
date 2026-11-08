@@ -7,7 +7,7 @@
 ## Prerequisites
 
 - Windows 10 1809+ or Windows 11 x64, `npm install` done at the repository root.
-- For §3–§6: the identity values from Partner Center → Product identity in `electron-builder.store.json5` (until then,
+- For §3–§6: the identity values from Partner Center → Product identity in `electron-builder.store.cjs` (until then,
   §1 and §2 still run).
 - For §3: a test certificate (created once, outside the repository):
 

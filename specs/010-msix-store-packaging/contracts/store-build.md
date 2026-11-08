@@ -5,7 +5,7 @@
 | Command | Platform | Does | Exit |
 |---|---|---|---|
 | `npm run package` | any (installer: Windows) | unchanged NSIS / dmg / AppImage build; now also runs `store:icons` first (for `win.icon`) | as today |
-| `npm run package:store` | Windows | `check-store-config` → `store:icons` + `check-store-icons` → `tsc` + `check:package-deps` + `build` → `electron-builder --win --config electron-builder.store.json5` → `check:desktop-package` on the Store app dir → prints package path + SHA-256 | 0 = package written |
+| `npm run package:store` | Windows | `check-store-config` → `store:icons` + `check-store-icons` → `tsc` + `check:package-deps` + `build` → `electron-builder --win --config electron-builder.store.cjs` → `check:desktop-package` on the Store app dir → prints package path + SHA-256 | 0 = package written |
 | `npm run package:store -- --test-sign` | Windows | same, and signs with the test certificate (env below) | 0 = signed package written |
 | `npm run store:icons` | any | regenerate `source/app/platforms/electron/build-resources/` from the master icon | 0 / 1 |
 | `npm run store:wack` | Windows, elevated | Windows App Certification Kit on the newest package → `docs/store/wack/<version>.xml` + summary line | 0 = no failed required test |
@@ -42,7 +42,8 @@ output says: `Unsigned package for Partner Center upload. It cannot be installed
 
 | Path | Tracked | Content |
 |---|---|---|
-| `electron-builder.store.json5` | yes | `extends: "./electron-builder.json5"`; `win.target: [{ target: "appx", arch: ["x64"] }]`; `appx` block (data-model §1); `artifactName: "${productName}-Windows-${version}-Store.msix"`; `directories.buildResources` |
+| `source/app/platforms/electron/store/store-identity.json` | yes | data-model §1 values (placeholders until Partner Center) |
+| `electron-builder.store.cjs` | yes | `extends: "./electron-builder.json5"`; `appx` built from `store-identity.json`; `win.target: [{ target: "appx", arch: ["x64"] }]`;  `artifactName: "${productName}-Windows-${version}-Store.msix"`; `directories.buildResources` |
 | `source/app/platforms/electron/store/appx-extensions.xml` | yes | the startup task (packaged-runtime contract) |
 | `source/app/platforms/electron/build-resources/` | **no** (gitignored) | generated icons |
 | `source/scripts/store/*.mjs` | yes | wrapper, checks, icon generator, ICO writer, WACK runner |

@@ -8,7 +8,7 @@
 ## Summary
 
 Build a Microsoft Store package (`.msix`, x64) of the Desktop app next to the unchanged NSIS installer, using
-electron-builder 26.18's own `appx` target through a separate `electron-builder.store.json5` that extends the base
+electron-builder 26.18's own `appx` target through a separate `electron-builder.store.cjs` that extends the base
 config (R1). A wrapper `npm run package:store` validates the Partner Center identity and the Store version
 (placeholders and `0.0.0` stop the build; R2, R3), generates every Store logo and the desktop `.ico` from one master
 icon with `sharp` (R9), and optionally test-signs with a self-signed certificate kept outside the repository (R10).
@@ -27,7 +27,8 @@ submission log) live in `docs/store/`.
 Windows PowerShell 5.1 script (startup task state)
 
 **Primary Dependencies**: existing only: `electron-builder` 26.18.0 (`appx` target, bundled `makeappx` / `makepri` /
-`signtool`), Electron 39.8.10, `sharp` (already installed as a Main external, used here by a build script only),
+`signtool`), Electron 39.8.10, `sharp` 0.35.5 (already installed through `@huggingface/transformers`; declared as a devDependency at that
+version for the icon script — no new download),
 `better-sqlite3` (staged import database). **No new dependency.** Windows SDK App Certification Kit for `store:wack`
 (maintainer tool, not a project dependency).
 
@@ -69,7 +70,7 @@ gates below are the repository's binding rules from `CLAUDE.md` (research R12).
 | G2 Host separation (R7, R8, R11, R12) | ✅ Store code lives only on the Desktop side | ✅ the new IPC group is answered by Mobile `unavailable.ts` (`NOT_AVAILABLE_ON_PLATFORM`); no `.electron` import outside `platforms/` |
 | G3 IPC four places | ✅ planned | ✅ `StoreImportChannels` + `BackgroundChannels.openStartupSettings`: `channels.ts`, `*.ipc.ts`, `preload.ts` / `api-types.ts`, `bridge/` |
 | G4 Read-only / overlay invariant | ✅ no book write path changes | ✅ referenced files are never copied or touched; managed copies are copied into the Store folder; the source data is read only |
-| G5 No new dependency | ✅ | ✅ (`sharp` and electron-builder are already installed) |
+| G5 No new dependency | ✅ | ✅ nothing new is downloaded; `sharp` (already in `node_modules`) is declared as a devDependency at its installed version |
 | G6 Secrets stay out | ✅ | ✅ upload package unsigned; `.pfx` outside the repo, env-only password, `check:store-secrets` in `npm run check`, `.gitignore` entries |
 | G7 Main-process changes approved | ⚠️ needed | ✅ the tasks phase adds entries for `main.ts`, `background/login-item.ts`, the new modules and every `shell.*` call routed through `pathForOtherApps` |
 | G8 CI / check green, E2E manual | ✅ | ✅ Store scripts skip outside Windows; only cross-platform checks join `npm run check` |
@@ -100,7 +101,7 @@ specs/010-msix-store-packaging/
 
 ```text
 electron-builder.json5                     # extraMetadata.version → 1.0.0; win.icon; buildResources (base)
-electron-builder.store.json5               # NEW: extends base; appx target (.msix), identity, extensions, extraResources
+electron-builder.store.cjs                # NEW: extends base; reads store/store-identity.json; appx target (.msix), identity, extensions, extraResources
 package.json                               # scripts: package:store, store:icons, store:wack, check:store-config,
                                            #          check:store-secrets, spike:store:import, spike:store:packaged
 .gitignore                                 # *.pfx, *.p12, .readmate-signing/, build-resources/
