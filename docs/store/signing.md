@@ -67,6 +67,11 @@ What the build does with them (`source/scripts/store/test-sign.mjs`):
 Without `--test-sign`, all signing variables are removed from every child, so a stray `CSC_LINK` can never sign the
 upload package.
 
+**What gets signed:** `Readmate Reader.exe`, other `.exe` files of the app, and the `.msix` itself. **Not** the bundled
+`ffmpeg.exe` (`win.signExts: ["!ffmpeg.exe"]`): its trust anchor is the SHA-256 in
+`transcription/ffmpeg-artifacts.json`, and signing would change its bytes, so `afterPack` would stop the build with
+`INTEGRITY_FAILED`. See `docs/implementation_plan/ffmpeg_packaging.md` "Code signing".
+
 ## 4. Renew or remove
 
 - Renew: create a new certificate (step 1) before `NotAfter`; the build warns 30 days ahead.

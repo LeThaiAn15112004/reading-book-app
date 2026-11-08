@@ -78,6 +78,29 @@ backend or container that decodes audio, so no image is built.
 - `npm run spike:transcription:main` — decoder logic with a fake process (self-test cases included).
 - Packaging: `npx vite build` then `npx electron-builder --dir --win --x64` (the `afterPack` line reports the check).
 
+## Code signing (decided 2026-11-08, spec 010)
+
+**`ffmpeg.exe` is never Authenticode-signed.** `electron-builder.json5` → `win.signExts: ["!ffmpeg.exe"]`.
+
+- Why it matters: electron-builder signs every `.exe` it copies through `win.extraResources` (app-builder-lib
+  `createTransformerForExtraFiles` → `shouldSignFile`). Signing rewrites the file, so its SHA-256 no longer equals
+  `transcription/ffmpeg-artifacts.json`. `afterPack` (`verify-packaged-ffmpeg.mjs`) then refuses the build with
+  `INTEGRITY_FAILED`, and at run time the app would refuse the decoder too. This first happened on the first
+  test-signed Store build (`npm.cmd run package:store -- --test-sign`).
+- Why exclude rather than sign it first: the trust anchor for this binary is the pinned SHA-256, checked by `afterPack`
+  and by the app before every spawn. A signature adds nothing to that, and signing a rebuilt LGPL binary before
+  staging would tie the recorded hash (and the "exact bytes from this source" story of the LGPL notice) to a
+  certificate. Option B (sign before `stage-ffmpeg.mjs`) stays possible later, but needs the owner's decision because
+  of the LGPL notes above.
+- How `signExts` works (app-builder-lib 26.18 `WinPackager.shouldSignFile`): `"!x"` = a file whose path ends in `x`
+  is not signed. Every other `.exe` is still signed: the app's own `Readmate Reader.exe` (signed through
+  `signAndEditResources`, which does not consult `signExts`), anything in `app.asar.unpacked`, the NSIS installer and
+  the Store `.msix`. `startup-task.ps1` is not an `.exe` and was never signed.
+- Microsoft Store: the `.msix` signature covers every file in the package (block map), so an unsigned `ffmpeg.exe`
+  inside a signed package is normal.
+- Do not "fix" an `INTEGRITY_FAILED` on a signed build by re-staging with the signed hash. Check that `signExts` still
+  contains `!ffmpeg.exe` instead.
+
 ## Still open (owner / release)
 
 - LGPL distribution obligations (T001b): host the exact `ffmpeg-9.0.2.tar.xz` next to the installers (the README in
@@ -85,10 +108,7 @@ backend or container that decodes audio, so no image is built.
   the EULA; the AAC/M4B patent question; owner/legal sign-off.
 - Whether `resources/ffmpeg/win32-x64/ffmpeg.exe` (≈ 4 MB) is committed (or Git LFS / CI artifact): without it a clean
   clone cannot package Windows (`afterPack` fails by design).
-- Windows code signing: electron-builder also runs signtool over `ffmpeg.exe`. Today there is no certificate, so it is
-  unchanged; with one, the signed bytes no longer match the manifest and the app refuses the decoder
-  (`INTEGRITY_FAILED`). Sign `ffmpeg.exe` before `stage-ffmpeg.mjs` (so the manifest records the signed hash) or exclude
-  it from electron-builder signing — decide before the first signed release.
+- ~~Windows code signing~~ — **decided 2026-11-08, see "Code signing" below.**
 - The NSIS installer itself was not built/installed in this pass (only `--dir`).
 - A run on a really clean Windows (VM / Windows Sandbox — not available on Windows 11 Home here).
 - macOS builds (above).

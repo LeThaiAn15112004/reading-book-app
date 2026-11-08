@@ -174,6 +174,12 @@
   "win": {
     // Spec 010 T045: the Readmate icon for the window, taskbar and NSIS installer (generated from the master icon).
     "icon": "source/app/platforms/electron/build-resources/icon.ico",
+    // Never Authenticode-sign the bundled FFmpeg (docs/implementation_plan/ffmpeg_packaging.md "Code signing"): its
+    // trust anchor is the SHA-256 in transcription/ffmpeg-artifacts.json, checked by afterPack and at run time, and a
+    // signature would change those bytes (INTEGRITY_FAILED). electron-builder signs every .exe it copies through
+    // extraResources unless excluded; "!x" = files ending in x are not signed (app-builder-lib shouldSignFile). The app's
+    // own exe and the Store .msix are signed as before.
+    "signExts": ["!ffmpeg.exe"],
     // Our own LGPL FFmpeg for transcription, as real files outside the asar: {resources}/ffmpeg/win32-x64/ffmpeg.exe.
     // macOS gets the same entry ("darwin-${arch}") once a Mac build exists; nothing is shipped for macOS / Linux yet.
     "extraResources": [

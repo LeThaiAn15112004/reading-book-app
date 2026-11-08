@@ -55,3 +55,25 @@ _Results of the Windows validation tasks (T018, T023, T038, T040, T064, T070) ar
 - **Signed build with the real test certificate + `Add-AppxPackage`: not done yet.** `READMATE_STORE_TEST_PFX` /
   `READMATE_STORE_TEST_PFX_PASSWORD` were set in the maintainer's own PowerShell window, which the agent's shell does
   not inherit (checked: not set at process or User scope). To be run in that window — `docs/store/signing.md` §3.
+
+### T023 — signed build, FFmpeg exclusion (2026-11-08)
+
+- The maintainer's signed build stopped in `afterPack` with `INTEGRITY_FAILED`: electron-builder had Authenticode-signed
+  `resources/ffmpeg/win32-x64/ffmpeg.exe` (copied via `win.extraResources`), so its SHA-256 no longer matched
+  `transcription/ffmpeg-artifacts.json`. Decision (maintainer): **do not sign `ffmpeg.exe`** →
+  `electron-builder.json5` `win.signExts: ["!ffmpeg.exe"]`; reasons in `docs/implementation_plan/ffmpeg_packaging.md`
+  "Code signing".
+- Checked with app-builder-lib 26.18's real `WinPackager.shouldSignFile` on both configs: `ffmpeg.exe` (source and
+  `win-unpacked`, `\` and `/`) → not signed; `Readmate Reader.exe`, other `.exe`, the `.msix` → signed.
+- Real signed build (`npm.cmd run package:store -- --test-sign`) with a **throwaway** certificate whose subject is the
+  publisher (file only, never in a certificate store; the maintainer's certificate was not available to the agent's
+  shell): `afterPack` → `FFmpeg win32-x64: 1 file(s) verified` **PASS**; `win-unpacked\resources\ffmpeg\win32-x64\ffmpeg.exe`
+  → `NotSigned` **PASS**; `win-unpacked\Readmate Reader.exe` → signed by `CN=E2395284-7996-4927-857C-B41F415D298E`
+  **PASS** (`UnknownError` only because the throwaway root is not trusted). The raw password is not in the log
+  (electron-builder prints the SHA-256 of the password in the signtool command line).
+- **New blocker — the `.msix` itself is not signed:** `SignTool Error: A required function is not present`.
+  electron-builder's default toolset (`toolsets.winCodeSign` `0.0.0` → winCodeSign-2.6.0) ships `signtool.exe`
+  `WinBuild.160101` (Windows 10 1511 era), which predates MSIX (1809); no Windows SDK is installed here. Options:
+  `toolsets.winCodeSign: "1.1.0"` (electron-builder's Windows Kits 10.0.26100 bundle, checksum-pinned, labelled beta)
+  or install the Windows SDK and set `SIGNTOOL_PATH`. Awaiting the maintainer's choice; T023 stays open
+  (install with `Add-AppxPackage` not done).
