@@ -87,3 +87,23 @@ _Results of the Windows validation tasks (T018, T023, T038, T040, T064, T070) ar
 - **Still to do for T023:** build with the maintainer's real (trusted) test certificate in their own PowerShell window and
   install with `Add-AppxPackage`; confirm the app opens.
 
+- **Installed with the maintainer's real test certificate — PASS (2026-11-08).** `Get-AppxPackage *ReadmateReader*`:
+  Name `anthaile.ReadMateReader`, PackageFullName `anthaile.ReadMateReader_1.0.0.0_x64__dpq7cpm4v6h3j`,
+  PackageFamilyName `anthaile.ReadMateReader_dpq7cpm4v6h3j`, InstallLocation
+  `C:\Program Files\WindowsApps\anthaile.ReadMateReader_1.0.0.0_x64__dpq7cpm4v6h3j`, Status `Ok`, SignatureKind
+  `Developer`, AppId `ReadmateReader`. Opened: `Microsoft-Windows-AppModel-Runtime/Admin` event 201 "Created process
+  31236 for application anthaile.ReadMateReader_dpq7cpm4v6h3j!ReadmateReader" at 21:16:42, container destroyed
+  (event 217) at 21:33:08 — ran ~16 min, no crash. **T023 done.**
+
+### ⚠ Finding: the Store build wrote into the installer build's data (R4 confirmed, 2026-11-08)
+
+- During that run (21:16:42–21:33:08) these files of the **direct build's** `%APPDATA%\reading-book-desktop` changed:
+  `reading-book.db-shm` 21:16:43, `Preferences` 21:16:53, `Network` 21:26, `reading-book.db-wal` 21:32:47 (4 MB).
+  The package's private `LocalCache\Roaming` holds only `Microsoft\…` — no `reading-book-desktop`.
+- Cause: T026–T027 (US2) are not implemented, so the package still uses userData `reading-book-desktop`; Windows lets a
+  packaged app modify EXISTING files of the real AppData in place (research R4). This is exactly why R4 gives the
+  Store build its own `Readmate Reader Store` folder.
+- Status: the database, `-wal` and `-shm` are together in the real folder (consistent), but FR-014 ("never change the
+  direct build's data") is violated by this pre-US2 package. **Do not launch a Store package again until T026–T027 are
+  in it** and spike S1 (T037/T038) passes. Back up `%APPDATA%\reading-book-desktop` first.
+- The smoke tests (T035/T040) were therefore NOT started; the agent did not launch the app.

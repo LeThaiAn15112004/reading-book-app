@@ -211,7 +211,7 @@ the build log contain no `.pfx` and no password.
   - set the two variables for one shell session only;
   - renew it on expiry and remove it from the store;
   - why the upload package is unsigned (the Store signs it).
-- [ ] T023 [US4] Validate on Windows (quickstart §3, signed part):
+- [X] T023 [US4] Validate on Windows (quickstart §3, signed part):
   - signed build → `Add-AppxPackage` succeeds;
   - a certificate with subject `CN=Wrong` → `cert_subject_mismatch`, no package;
   - `git status --ignored` shows the `.pfx` only outside the repository;
@@ -222,6 +222,12 @@ the build log contain no `.pfx` and no password.
   _Partly done 2026-11-08. The wrong-subject case passes (no package, no password in the log) and no `.pfx` is
   tracked. The signed build and `Add-AppxPackage` with the real test certificate are still to be run in the shell
   where the two variables are set; T018's re-run is also pending._
+
+  _Completed 2026-11-08: the package was signed with the maintainer's certificate (after `!ffmpeg.exe` in `signExts`,
+  `6e55f74`, and `toolsets.winCodeSign` `1.1.0`, `8466166`), installed (`Status Ok`, `SignatureKind Developer`) and
+  opened (AppModel-Runtime events, ran about 16 min). **That run wrote into the direct build's real
+  `%APPDATA%eading-book-desktop` (R4).** T026–T027 must be in any package before it is launched again; see the
+  implementation map._
 
 **Checkpoint**: a test-signed package installs locally.
 
