@@ -19,6 +19,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { checkStoreConfig, loadStoreInputs } from './check-store-config.mjs'
 import { requireWindows } from './platform-guard.mjs'
+import { readPfxSubject, resolveTestSigning } from './test-sign.mjs'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
 const repoRoot = path.resolve(here, '../../..')
@@ -26,8 +27,19 @@ const HOST = path.join(repoRoot, 'source/app/platforms/electron')
 const node = process.execPath
 const bin = (rel) => path.join(repoRoot, 'node_modules', rel)
 
-/** Variables electron-builder reads to sign; removed from an unsigned build's child environment. */
-export const SIGNING_ENV_VARS = ['CSC_LINK', 'CSC_KEY_PASSWORD', 'WIN_CSC_LINK', 'WIN_CSC_KEY_PASSWORD', 'CSC_NAME']
+/**
+ * Variables that can sign or hold signing secrets; removed from EVERY child's environment. The electron-builder child
+ * of a --test-sign build gets back only WIN_CSC_LINK / WIN_CSC_KEY_PASSWORD (test-sign.mjs).
+ */
+export const SIGNING_ENV_VARS = [
+  'CSC_LINK',
+  'CSC_KEY_PASSWORD',
+  'WIN_CSC_LINK',
+  'WIN_CSC_KEY_PASSWORD',
+  'CSC_NAME',
+  'READMATE_STORE_TEST_PFX',
+  'READMATE_STORE_TEST_PFX_PASSWORD',
+]
 
 /** The child environment of an unsigned build: the parent's, without any signing variable. */
 export function unsignedChildEnv(env) {
@@ -70,10 +82,6 @@ function step(name, args, { cwd = repoRoot, env } = {}) {
 
 async function main(argv) {
   requireWindows('package:store')
-  if (argv.includes('--test-sign')) {
-    console.error('package:store: --test-sign is not implemented yet (spec 010 US4, T019–T021). Nothing built.')
-    return 1
-  }
 
   console.log('▶ package:store — check-store-config')
   const inputs = loadStoreInputs()
@@ -86,6 +94,25 @@ async function main(argv) {
   const version = inputs.version
   const env = unsignedChildEnv(process.env)
 
+  // Test signing (US4): decided BEFORE anything is built; a wrong certificate builds nothing.
+  const signing = resolveTestSigning({
+    argv,
+    env: process.env,
+    repoRoot,
+    publisher: inputs.identity.publisher,
+    readSubject: readPfxSubject,
+  })
+  if (signing.signing) {
+    console.log('▶ package:store — test certificate')
+    for (const w of signing.warnings) console.warn(`⚠ ${w}`)
+    if (signing.errors.length > 0) {
+      console.error(`test signing: ${signing.errors.length} problem(s), nothing built:`)
+      for (const e of signing.errors) console.error(`  [${e.code}] ${e.message}`)
+      return 1
+    }
+    console.log(`  subject ${signing.subject} = appx.publisher`)
+  }
+
   // Icons (US3): every Store logo + icon.ico from the master icon, then their exact sizes are checked.
   step('store icons', [node, path.join(here, 'generate-icons.mjs')], { env })
   step('store icons check', [node, path.join(here, 'check-store-icons.mjs')], { env })
@@ -93,7 +120,9 @@ async function main(argv) {
   step('tsc (Desktop)', [node, bin('typescript/bin/tsc'), '-p', 'tsconfig.electron.json'], { env })
   step('check:package-deps', [node, path.join(repoRoot, 'source/scripts/desktop-package-deps.mjs')], { env })
   step('vite build', [node, bin('vite/bin/vite.js'), 'build', '--config', path.join(repoRoot, 'vite.config.ts')], { cwd: HOST, env })
-  step('electron-builder (appx)', [node, bin('electron-builder/cli.js'), '--win', 'appx', '--config', 'electron-builder.store.cjs'], { env })
+  step('electron-builder (appx)', [node, bin('electron-builder/cli.js'), '--win', 'appx', '--config', 'electron-builder.store.cjs'], {
+    env: signing.env ? { ...env, ...signing.env } : env,
+  })
 
   const out = releasePaths(version)
   step('check-desktop-package', [node, path.join(repoRoot, 'source/scripts/check-desktop-package.mjs'), out.asar], { env })
@@ -105,7 +134,7 @@ async function main(argv) {
 
   console.log(`\n✔ ${out.msix}`)
   console.log(`  SHA-256 ${await sha256(out.msix)}`)
-  console.log(`  ${UNSIGNED_NOTE}`)
+  console.log(signing.env ? `  Signed with the test certificate ${signing.subject} (sideload only).` : `  ${UNSIGNED_NOTE}`)
   return 0
 }
 

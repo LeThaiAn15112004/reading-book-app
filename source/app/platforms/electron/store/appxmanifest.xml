@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Spec 010: electron-builder 26.18 appx template (templates/appx/appxmanifest.xml) + the uap10 namespace, needed by
-     uap10:Parameters in appx-extensions.xml. Keep every ${macro}; electron-builder fills them. -->
+     uap10:Parameters in appx-extensions.xml. Keep every macro placeholder; electron-builder fills them (and expands
+     ANY dollar-brace text in this file, comments included, so never write one in a comment). -->
 <!--suppress XmlUnusedNamespaceDeclaration -->
 <Package
    xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"

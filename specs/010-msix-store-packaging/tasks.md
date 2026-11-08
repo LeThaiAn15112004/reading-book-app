@@ -177,7 +177,7 @@ the build log contain no `.pfx` and no password.
 
 ### Tests for User Story 4
 
-- [ ] T019 [P] [US4] Write `ST/test-sign.test.mjs` (`node --test`) for `resolveTestSigning({ argv, env, repoRoot, readSubject, publisher })` with `readSubject` stubbed:
+- [X] T019 [P] [US4] Write `ST/test-sign.test.mjs` (`node --test`) for `resolveTestSigning({ argv, env, repoRoot, readSubject, publisher })` with `readSubject` stubbed:
   - `--test-sign` without `READMATE_STORE_TEST_PFX` or `READMATE_STORE_TEST_PFX_PASSWORD` → error naming the missing variable;
   - a PFX path inside `repoRoot` → `cert_in_repo`;
   - subject ≠ `publisher` → `cert_subject_mismatch` with both values;
@@ -187,16 +187,20 @@ the build log contain no `.pfx` and no password.
 
 ### Implementation for User Story 4
 
-- [ ] T020 [US4] Implement `ST/test-sign.mjs`:
+- [X] T020 [US4] Implement `ST/test-sign.mjs`:
   - `resolveTestSigning` (T019);
   - `readPfxSubject(pfxPath, password)`: spawn `powershell.exe -NoProfile -NonInteractive -Command` with a fixed script that reads the password from an environment variable passed only to that child (never on the command line), runs `Get-PfxData`, and prints `{ subject, notAfter }` as JSON.
-- [ ] T021 [US4] Wire `--test-sign` into `ST/package-store.mjs`:
+- [X] T021 [US4] Wire `--test-sign` into `ST/package-store.mjs`:
   - before building, call `resolveTestSigning`;
   - pass the returned `env` only to the electron-builder child;
   - after the build, print `Signed with the test certificate <subject> (sideload only).`.
 
+  _Done 2026-11-08: `READMATE_STORE_TEST_PFX*` and `CSC_NAME` are also removed from every child, and only the
+  electron-builder child gets `WIN_CSC_*` back. The certificate is read with .NET `X509Certificate2` (not
+  `Get-PfxData`, which needs the PKI module), and SHA-256-only signing is pinned in the Store config._
+
   Without `--test-sign`, strip `WIN_CSC_LINK`, `CSC_LINK`, `WIN_CSC_KEY_PASSWORD` and `CSC_KEY_PASSWORD` from the child environment, so that a stray variable never signs the upload package. Confirm with `npx electron-builder --help` / electron-builder logs that the appx target signs when `WIN_CSC_LINK` is set and that the manifest publisher equals the certificate subject.
-- [ ] T022 [US4] Write `docs/store/signing.md`:
+- [X] T022 [US4] Write `docs/store/signing.md`:
   - create the test certificate (quickstart Prerequisites commands);
   - trust it in `Cert:\LocalMachine\TrustedPeople`;
   - set the two variables for one shell session only;
@@ -209,6 +213,10 @@ the build log contain no `.pfx` and no password.
   - search the full build output for the password → no hit.
 
   Record the results in `docs/implementation_plan/msix_store_packaging.md`.
+
+  _Partly done 2026-11-08. The wrong-subject case passes (no package, no password in the log) and no `.pfx` is
+  tracked. The signed build and `Add-AppxPackage` with the real test certificate are still to be run in the shell
+  where the two variables are set; T018's re-run is also pending._
 
 **Checkpoint**: a test-signed package installs locally.
 

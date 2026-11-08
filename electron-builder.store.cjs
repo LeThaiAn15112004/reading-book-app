@@ -20,6 +20,9 @@ module.exports = {
     // PowerShell cannot read inside app.asar, so the startup-task bridge ships as a real file:
     // {resources}/store/startup-task.ps1 (background/store-startup-task.ts).
     extraResources: [{ from: `${STORE_DIR}/startup-task.ps1`, to: 'store/startup-task.ps1' }],
+    // Test signing (--test-sign) only: electron-builder picks SHA-256-only signing for files named *.appx, not *.msix,
+    // and an MSIX cannot carry the default SHA-1 + SHA-256 dual signature.
+    signtoolOptions: { signingHashAlgorithms: ['sha256'] },
   },
   appx: {
     ...appxIdentity,
