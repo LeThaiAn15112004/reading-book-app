@@ -85,6 +85,10 @@
     "source/app/platforms/electron/wordcount/word-count-service.ts": "T049: import name @reading-book/* replaced by @core/* (import specifier only)",
     "source/app/platforms/electron/zip-import/zip-audiobook-importer.ts": "T049: import name @reading-book/* replaced by @core/* (import specifier only)",
     "source/app/platforms/electron/zip-import/zip-import-service.ts": "T049: import name @reading-book/* replaced by @core/* (import specifier only)",
-    "source/app/platforms/electron/zip-import/zip-reader.ts": "T049: import name @reading-book/* replaced by @core/* (import specifier only)"
+    "source/app/platforms/electron/zip-import/zip-reader.ts": "T049: import name @reading-book/* replaced by @core/* (import specifier only)",
+    "source/app/platforms/electron/store/store-identity.json": "spec 010 T006: new, Microsoft Store package identity (placeholders until Partner Center); read by electron-builder.store.cjs and check-store-config.mjs, not by Main",
+    "source/app/platforms/electron/store/appx-extensions.xml": "spec 010 T007: new, Store manifest extension (startup task ReadmateReaderStartup); packaging input only",
+    "source/app/platforms/electron/store/appxmanifest.xml": "spec 010 T007: new, electron-builder's appx manifest template + the uap10 namespace; packaging input only",
+    "source/app/platforms/electron/store/startup-task.ps1": "spec 010 T008: new, Start at Login bridge for the Store build (placeholder until T030), shipped via extraResources"
   }
 }

@@ -1,0 +1,6 @@
+        <!-- Spec 010 (contracts/packaged-runtime.md): Start at Login for the Store build. The task starts disabled;
+             the app enables it through StartupTask.RequestEnableAsync (store-startup-task.ts). uap10:Parameters passes
+             the same hidden-start flag as the direct build's login item (Windows 10 2004+; ignored on older Windows). -->
+        <desktop:Extension Category="windows.startupTask" Executable="app\Readmate Reader.exe" EntryPoint="Windows.FullTrustApplication" uap10:Parameters="--hidden-at-startup">
+          <desktop:StartupTask TaskId="ReadmateReaderStartup" Enabled="false" DisplayName="Readmate Reader" />
+        </desktop:Extension>

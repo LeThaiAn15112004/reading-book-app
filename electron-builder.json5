@@ -10,9 +10,12 @@
   },
   // Spec 009 T051 (research R6): the root package.json is shared with Mobile (its "main" is Expo's entry). The packaged
   // app keeps the pre-009 identity: same name / version (app.getVersion() drives the update check) and Main's entry.
+  // Spec 010 T009 (research R3): `version` is the ONE release version of the NSIS installer and the Store package
+  // (Store form = version + ".0"; MAJOR >= 1, checked by source/scripts/store/check-store-config.mjs). userData
+  // follows `name`, so raising the version never moves the direct build's data.
   "extraMetadata": {
     "name": "reading-book-desktop",
-    "version": "0.0.0",
+    "version": "1.0.0",
     "main": "source/app/platforms/electron/dist-electron/main.js"
   },
   "files": [

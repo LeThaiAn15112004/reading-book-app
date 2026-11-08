@@ -64,17 +64,27 @@ US2 (P1)**, because a package can only be installed for testing once it is signe
 
 **⚠️ CRITICAL**: no user story starts before this phase is done.
 
-- [ ] T006 Create `EL/store/store-identity.json` with the fields of data-model §1, the placeholder `__FROM_PARTNER_CENTER__` for `identityName`, `publisher` and `publisherDisplayName`, and these fixed values: `applicationId` `ReadmateReader`, `displayName` `Readmate Reader`, `languages` `["en-US", "vi-VN"]`, `backgroundColor` `transparent`, `minVersion` `10.0.17763.0`, `maxVersionTested` `10.0.26100.0`, `capabilities` `["runFullTrust"]`, `addAutoLaunchExtension` `false`
-- [ ] T007 Create `EL/store/appx-extensions.xml` with exactly the `desktop:Extension` / `desktop:StartupTask TaskId="ReadmateReaderStartup" Enabled="false"` element and `uap10:Parameters="--hidden-at-startup"` from contracts/packaged-runtime.md. Then create `EL/store/appxmanifest.xml` from `node_modules/app-builder-lib/templates/appx/appxmanifest.xml`: keep every `${macro}` and add `xmlns:uap10="http://schemas.microsoft.com/appx/manifest/uap/windows10/10"` plus `IgnorableNamespaces="uap10"` on `<Package>`
-- [ ] T008 Create `electron-builder.store.cjs` (CommonJS, read by `electron-builder --config`). It must:
+- [X] T006 Create `EL/store/store-identity.json` with the fields of data-model §1, the placeholder `__FROM_PARTNER_CENTER__` for `identityName`, `publisher` and `publisherDisplayName`, and these fixed values: `applicationId` `ReadmateReader`, `displayName` `Readmate Reader`, `languages` `["en-US", "vi-VN"]`, `backgroundColor` `transparent`, `minVersion` `10.0.17763.0`, `maxVersionTested` `10.0.26100.0`, `capabilities` `["runFullTrust"]`, `addAutoLaunchExtension` `false`
+- [X] T007 Create `EL/store/appx-extensions.xml` with exactly the `desktop:Extension` / `desktop:StartupTask TaskId="ReadmateReaderStartup" Enabled="false"` element and `uap10:Parameters="--hidden-at-startup"` from contracts/packaged-runtime.md. Then create `EL/store/appxmanifest.xml` from `node_modules/app-builder-lib/templates/appx/appxmanifest.xml`: keep every `${macro}` and add `xmlns:uap10="http://schemas.microsoft.com/appx/manifest/uap/windows10/10"` plus `IgnorableNamespaces="uap10"` on `<Package>`
+- [X] T008 Create `electron-builder.store.cjs` (CommonJS, read by `electron-builder --config`). It must:
   - set `extends: './electron-builder.json5'` and override `win.target` → `[{ target: 'appx', arch: ['x64'] }]`;
   - repeat the FFmpeg entry in `win.extraResources`, because arrays replace and do not merge, and add `{ from: 'source/app/platforms/electron/store/startup-task.ps1', to: 'store/startup-task.ps1' }`;
   - set `directories.buildResources` → `source/app/platforms/electron/build-resources` and keep the base `directories.output`;
   - add `appx` = the contents of `EL/store/store-identity.json` + `customExtensionsPath`, `customManifestPath` (paths of T007; `customManifestPath` is resolved against `buildResources`, so `generate-icons.mjs` also copies `appxmanifest.xml` there, T042) + `artifactName: '${productName}-Windows-${version}-Store.msix'`.
 
   Verify with `npx electron-builder --config electron-builder.store.cjs --win dir` that it resolves (this needs T009's version)
-- [ ] T009 Raise `extraMetadata.version` in `electron-builder.json5` from `0.0.0` to `1.0.0` (research R3) and update the matching `version` in `EL/package.json` if `check-desktop-package.mjs` / `check-desktop-baseline.mjs` compare them. If any recorded baseline asserts `0.0.0`, update that expectation and give the reason (`spec 010 T009: Store-valid release version; userData follows extraMetadata.name, unchanged`). Do not loosen any check
-- [ ] T010 Run `npm run check` and `npm run check:desktop-baseline`; both green
+
+  _Done 2026-11-08, two deviations found while implementing:_
+  - _electron-builder concatenates arrays when merging configs, it does not replace them. So `win.extraResources`
+    only adds the `.ps1` (the FFmpeg entry is inherited, not repeated), and `package-store.mjs` passes `--win appx`
+    (command-line targets replace the base `nsis` target)._
+  - _`customManifestPath` falls back to a path relative to the project, so the manifest stays in `EL/store/` and is
+    not copied into `build-resources/` (this removes the T008 → T042 ordering issue, analysis F5)._
+
+  _Checked by resolving the merged config with electron-builder's own `getConfig` (no build). The
+  `--win dir` packaging run was NOT done: it is a real Windows build, so it moves to T018._
+- [X] T009 Raise `extraMetadata.version` in `electron-builder.json5` from `0.0.0` to `1.0.0` (research R3) and update the matching `version` in `EL/package.json` if `check-desktop-package.mjs` / `check-desktop-baseline.mjs` compare them. If any recorded baseline asserts `0.0.0`, update that expectation and give the reason (`spec 010 T009: Store-valid release version; userData follows extraMetadata.name, unchanged`). Do not loosen any check
+- [X] T010 Run `npm run check` and `npm run check:desktop-baseline`; both green
 
 **Checkpoint**: the Store config resolves, and every existing check is green.
 
