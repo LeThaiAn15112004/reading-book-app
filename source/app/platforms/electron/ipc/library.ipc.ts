@@ -29,6 +29,7 @@ import type {
   RelinkBookResult,
   UpdateBookMetadataInput,
 } from './api-types'
+import { pathForOtherApps } from '../files/external-path'
 import { LibraryChannels } from './channels'
 
 function toSummaryDto(
@@ -240,7 +241,8 @@ export function registerLibraryIpc(): void {
       // Path check only (no disk access): for a moved file this still opens the last known folder.
       const checked = checkRegisteredBookPath(book.filePath, book.format)
       if (!checked.ok) return { ok: false }
-      shell.showItemInFolder(checked.path)
+      // Spec 010: a managed copy lives under userData (virtualised in the Store build); the user's own files are unchanged.
+      shell.showItemInFolder(pathForOtherApps(checked.path))
       return { ok: true }
     },
   )
@@ -255,7 +257,8 @@ export function registerLibraryIpc(): void {
       const checked = checkRegisteredBookPath(book.filePath, book.format)
       if (!checked.ok) return { ok: false }
       // A multi-chapter audiobook is a folder of files: copying chapter 0's path would name only a part of it.
-      clipboard.writeText(getLibraryStore().hasAudioChapters(book.id) ? path.dirname(checked.path) : checked.path)
+      // Spec 010: the copied path is for other programs too — map a managed copy's virtualised path (Store build).
+      clipboard.writeText(pathForOtherApps(getLibraryStore().hasAudioChapters(book.id) ? path.dirname(checked.path) : checked.path))
       return { ok: true }
     },
   )

@@ -5,6 +5,7 @@ import { clearBookChunkCache, isBookChunkingActive } from '../chunking/book-chun
 import { ensureBooksSandbox, getBooksSandboxPath } from '../files/sandbox'
 import { getDatabase } from '../persistence/db'
 import { listSpeechModelUsage } from '../transcription/speech-model-usage'
+import { pathForOtherApps } from '../files/external-path'
 import { getSpeechModelsDir, removeSpeechModel as removeSpeechModelFiles } from '../transcription/transcription-runtime'
 import {
   getTranslationModelsDir,
@@ -224,7 +225,8 @@ export async function removeSpeechModel(modelId: unknown): Promise<RemoveSpeechM
 /** Open the managed-books folder in the OS file manager (path never comes from the renderer). */
 export async function openBooksFolder(): Promise<OkResult> {
   try {
-    const error = await shell.openPath(ensureBooksSandbox())
+    // Spec 010: {userData}/books is virtualised in the Store build; Explorer needs the real per-package folder.
+    const error = await shell.openPath(pathForOtherApps(ensureBooksSandbox()))
     return { ok: error === '' }
   } catch {
     return { ok: false }

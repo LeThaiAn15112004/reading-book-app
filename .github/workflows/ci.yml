@@ -98,6 +98,10 @@ jobs:
         if: (success() || failure()) && steps.install.outcome == 'success'
         run: npm run check:store-secrets
 
+      - name: Store · app-owned paths mapped before reaching other apps
+        if: (success() || failure()) && steps.install.outcome == 'success'
+        run: npm run check:external-paths
+
       - name: Platform adapters · same exports on both hosts
         if: (success() || failure()) && steps.install.outcome == 'success'
         run: npm run check:platform-adapters

@@ -1,3 +1,6 @@
+// Spec 010 T027: MUST stay the first import — the Store (MSIX) build switches userData to its own folder before any
+// other module, or the single-instance lock below, can use the direct build's folder (store/store-runtime.ts).
+import './store/store-userdata-first'
 import { app, BrowserWindow, Menu, ipcMain, powerMonitor } from 'electron'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
@@ -33,6 +36,7 @@ import type { BookInProgress } from './reminders/reading-activity'
 import { startReadingReminders, stopReadingReminders } from './reminders/reading-reminders'
 import { handleOAuthCallbackUrl } from './ipc/cloud.ipc'
 import { closeDatabase, openDatabase } from './persistence/db'
+import { isStoreBuild } from './store/store-runtime'
 import { backfillLibraryMetadataFromFiles } from './persistence/backfill-library-metadata'
 import {
   TITLE_BAR_OVERLAY_HEIGHT,
@@ -67,6 +71,8 @@ registerCoverSchemePrivileged([MD_ASSET_SCHEME, AUDIO_SCHEME])
 // E2E runs (READMATE_E2E=1) must not re-point the user's real OS handler at the test binary.
 if (process.env.READMATE_E2E === '1') {
   // no OS registration
+} else if (isStoreBuild()) {
+  // Spec 010: the MSIX manifest declares readmate-reader: (windows.protocol); a registry write would only be virtualised.
 } else if (process.defaultApp) {
   if (process.argv.length >= 2) {
     app.setAsDefaultProtocolClient(OAUTH_CUSTOM_SCHEME, process.execPath, [path.resolve(process.argv[1])])
@@ -438,7 +444,9 @@ app.on('will-quit', () => {
 })
 
 app.whenReady().then(async () => {
-  if (process.platform === 'win32') {
+  // Spec 010: the Store package gives the process its AUMID (<PFN>!ReadmateReader); setting another one would break
+  // its notifications.
+  if (process.platform === 'win32' && !isStoreBuild()) {
     app.setAppUserModelId(app.isPackaged ? APP_USER_MODEL_ID : process.execPath)
   }
   installApplicationMenu()

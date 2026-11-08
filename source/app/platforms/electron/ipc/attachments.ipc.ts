@@ -12,6 +12,7 @@ import { changePdfAttachment, createPdfAttachment, type AttachmentChangeDeps, ty
 import type { AttachmentChangeOutput } from '../pdf-sync/pdf-annotation-scan.worker'
 import type { AttachmentUpdatePlan } from '../pdf-sync/pdf-incremental-writer'
 import type { AttachmentActionResult, ChangePdfAttachmentResultDto, CreatePdfAttachmentResultDto, ListAttachmentsResult } from './api-types'
+import { pathForOtherApps } from '../files/external-path'
 import { AttachmentChannels } from './channels'
 import { pdfFileOperations, runInScanWorker, toHighlightDto } from './overlay.ipc'
 
@@ -51,7 +52,8 @@ function attachmentService(senderWindow: () => BrowserWindow | undefined): Attac
     extract: (bytes, attachmentId) =>
       runInScanWorker<PdfAttachmentExtractResult>({ kind: 'attachment-extract', bytes, attachmentId }),
     tempRoot: attachmentTempRoot(),
-    openPath: (file) => shell.openPath(file),
+    // Spec 010: the temp copy lives under userData — virtualised in the Store build, so map it for the default app.
+    openPath: (file) => shell.openPath(pathForOtherApps(file)),
     chooseSaveTarget: async (suggestedName) => {
       const parent = senderWindow()
       const options: Electron.SaveDialogOptions = {

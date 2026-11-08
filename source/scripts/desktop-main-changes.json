@@ -47,10 +47,10 @@
     "source/app/platforms/electron/ipc/audio.ipc.ts": "T049: import name @reading-book/* replaced by @core/* (import specifier only)",
     "source/app/platforms/electron/ipc/graphics.ipc.ts": "T049: import name @reading-book/* replaced by @core/* (import specifier only)",
     "source/app/platforms/electron/ipc/import.ipc.ts": "T049: import name @reading-book/* replaced by @core/* (import specifier only)",
-    "source/app/platforms/electron/ipc/library.ipc.ts": "T049: import name @reading-book/* replaced by @core/* (import specifier only)",
+    "source/app/platforms/electron/ipc/library.ipc.ts": "T049: import name @reading-book/* replaced by @core/* (import specifier only) | spec 010 T028: Show in folder and Copy file path go through pathForOtherApps",
     "source/app/platforms/electron/ipc/transcription.ipc.ts": "T049: import name @reading-book/* replaced by @core/* (import specifier only)",
     "source/app/platforms/electron/ipc/zip-import.ipc.ts": "T049: import name @reading-book/* replaced by @core/* (import specifier only)",
-    "source/app/platforms/electron/main.ts": "T049: import name @reading-book/* replaced by @core/* (import specifier only)",
+    "source/app/platforms/electron/main.ts": "T049: import name @reading-book/* replaced by @core/* (import specifier only) | spec 010 T027: first import store/store-userdata-first (Store build: own userData before anything reads it); Store build skips setAsDefaultProtocolClient (the MSIX declares the scheme) and setAppUserModelId (the package gives the AUMID)",
     "source/app/platforms/electron/md/md-asset-files.ts": "T049: import name @reading-book/* replaced by @core/* (import specifier only)",
     "source/app/platforms/electron/oauth/google-loopback-server.ts": "T049: import name @reading-book/* replaced by @core/* (import specifier only)",
     "source/app/platforms/electron/pdf-sync/pdf-annotation-export.ts": "T049: import name @reading-book/* replaced by @core/* (import specifier only)",
@@ -89,6 +89,13 @@
     "source/app/platforms/electron/store/store-identity.json": "spec 010 T006: new, Microsoft Store package identity (placeholders until Partner Center); read by electron-builder.store.cjs and check-store-config.mjs, not by Main",
     "source/app/platforms/electron/store/appx-extensions.xml": "spec 010 T007: new, Store manifest extension (startup task ReadmateReaderStartup); packaging input only",
     "source/app/platforms/electron/store/appxmanifest.xml": "spec 010 T007: new, electron-builder's appx manifest template + the uap10 namespace; packaging input only",
-    "source/app/platforms/electron/store/startup-task.ps1": "spec 010 T008: new, Start at Login bridge for the Store build (placeholder until T030), shipped via extraResources"
+    "source/app/platforms/electron/store/startup-task.ps1": "spec 010 T008: new, Start at Login bridge for the Store build (placeholder until T030), shipped via extraResources",
+    "source/app/platforms/electron/store/store-runtime.ts": "spec 010 T026: new, isStoreBuild() + applyStoreUserData() (userData 'Readmate Reader Store' when process.windowsStore)",
+    "source/app/platforms/electron/store/store-userdata-first.ts": "spec 010 T027: new, side-effect module imported first by main.ts",
+    "source/app/platforms/electron/files/external-path.ts": "spec 010 T026: new, pathForOtherApps — maps a virtualised Store userData path to its real per-package path",
+    "source/app/platforms/electron/files/external-path-core.mjs": "spec 010 T026: new, pure helpers of pathForOtherApps (PFN from the exe path, path mapping), tested by node --test",
+    "source/app/platforms/electron/files/external-path-core.d.mts": "spec 010 T026: new, types of external-path-core.mjs",
+    "source/app/platforms/electron/ipc/attachments.ipc.ts": "spec 010 T028: the attachment temp copy is opened through pathForOtherApps",
+    "source/app/platforms/electron/storage/storage-service.ts": "spec 010 T028: Open books folder goes through pathForOtherApps"
   }
 }

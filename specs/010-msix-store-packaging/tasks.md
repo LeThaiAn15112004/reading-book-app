@@ -226,7 +226,8 @@ the build log contain no `.pfx` and no password.
   _Completed 2026-11-08: the package was signed with the maintainer's certificate (after `!ffmpeg.exe` in `signExts`,
   `6e55f74`, and `toolsets.winCodeSign` `1.1.0`, `8466166`), installed (`Status Ok`, `SignatureKind Developer`) and
   opened (AppModel-Runtime events, ran about 16 min). **That run wrote into the direct build's real
-  `%APPDATA%eading-book-desktop` (R4).** T026–T027 must be in any package before it is launched again; see the
+  `%APPDATA%
+eading-book-desktop` (R4).** T026–T027 must be in any package before it is launched again; see the
   implementation map._
 
 **Checkpoint**: a test-signed package installs locally.
@@ -243,7 +244,7 @@ S1, S2 and S4 pass, and every row of `docs/store/smoke-tests.md` passes.
 
 ### Tests for User Story 2
 
-- [ ] T024 [P] [US2] Write `ST/external-path.test.mjs` (`node --test`, imports the pure helper from T026). `packageFamilyNameFromExecPath`:
+- [X] T024 [P] [US2] Write `ST/external-path.test.mjs` (`node --test`, imports the pure helper from T026). `packageFamilyNameFromExecPath`:
   - `C:\Program Files\WindowsApps\12345Readmate.ReadmateReader_1.0.0.0_x64__8wekyb3d8bbwe\app\Readmate Reader.exe` → `12345Readmate.ReadmateReader_8wekyb3d8bbwe`;
   - a non-WindowsApps path → `null`;
   - a malformed folder name → `null`.
@@ -252,24 +253,34 @@ S1, S2 and S4 pass, and every row of `docs/store/smoke-tests.md` passes.
   - a path inside `userData` (case-insensitive, `/` = `\`) → `%LOCALAPPDATA%\Packages\<pfn>\LocalCache\Roaming\Readmate Reader Store\<relative>`;
   - a sibling folder `…\Readmate Reader Store2\x` → unchanged;
   - `pfn` null → unchanged.
-- [ ] T025 [P] [US2] Write `ST/check-external-paths.test.mjs` (`node --test`) on fixture source files: a `shell.openPath(x)` / `shell.showItemInFolder(x)` / `shell.openExternal(pathToFileURL(x)...)` whose argument is not wrapped in `pathForOtherApps(` → reported with file:line; a wrapped call and `shell.openExternal('https://…')` / `'ms-settings:…'` → not reported. A `// external-path: user-chosen` comment on the line before exempts a call to a path the user picked
+- [X] T025 [P] [US2] Write `ST/check-external-paths.test.mjs` (`node --test`) on fixture source files: a `shell.openPath(x)` / `shell.showItemInFolder(x)` / `shell.openExternal(pathToFileURL(x)...)` whose argument is not wrapped in `pathForOtherApps(` → reported with file:line; a wrapped call and `shell.openExternal('https://…')` / `'ms-settings:…'` → not reported. A `// external-path: user-chosen` comment on the line before exempts a call to a path the user picked
 
 ### Implementation for User Story 2
 
-- [ ] T026 [US2] Create `EL/store/store-runtime.ts` exporting:
+- [X] T026 [US2] Create `EL/store/store-runtime.ts` exporting:
   - `isStoreBuild()` (= `process.windowsStore === true`);
   - `STORE_USER_DATA_DIR_NAME = 'Readmate Reader Store'`, `DIRECT_USER_DATA_DIR_NAME = 'reading-book-desktop'`;
   - `applyStoreUserData()`, which calls `app.setPath('userData', path.join(app.getPath('appData'), STORE_USER_DATA_DIR_NAME))` in the Store build.
 
   Also create `EL/files/external-path-core.mjs` (pure, no Electron: `packageFamilyNameFromExecPath`, `mapForOtherApps`, so T024 can import it) and `EL/files/external-path.ts` (`pathForOtherApps(p)`, which calls the pure helpers with `app.getPath('userData')`, `process.env.LOCALAPPDATA` and `process.execPath`, and logs one warning when the PFN cannot be parsed). T024 must pass.
-- [ ] T027 [US2] Edit `EL/main.ts` (contracts/packaged-runtime.md "start order"):
+- [X] T027 [US2] Edit `EL/main.ts` (contracts/packaged-runtime.md "start order"):
   - make `import './store/store-userdata-first'` the **first import**. That is a new 3-line module `EL/store/store-userdata-first.ts` calling `applyStoreUserData()`; ESM evaluates imports in order, so it runs before any module that reads `userData`;
   - wrap the `setAsDefaultProtocolClient` block (lines 68–76) in `if (!isStoreBuild())`;
   - in `whenReady`, skip `app.setAppUserModelId` when `isStoreBuild()`.
 
   Grep `EL/**/*.ts` for top-level (module-scope) `app.getPath('userData')` reads that run before the setPath, and fix any you find by moving them into functions.
-- [ ] T028 [US2] Route every `shell.openPath`, `shell.showItemInFolder` and `shell.openExternal(file:…)` in `EL/**` (excluding `spikes/`, `e2e/`) whose argument can be an app-owned path through `pathForOtherApps`. 8 call sites as of 2026-11-08; list them first with `grep -rn "shell\.\(openPath\|showItemInFolder\|openExternal\)" EL --include=*.ts`. Mark a user-chosen path (e.g. an export target) with the `// external-path: user-chosen` comment instead
-- [ ] T029 [US2] Implement `ST/check-external-paths.mjs` (rules of T025) over `EL/**/*.ts` excluding `spikes/`, `e2e/`. Add `npm run check:external-paths` to the `check` script next to `check:store-secrets`. T025 must pass, and the real tree must pass after T028
+
+  _Done 2026-11-09: there are no module-scope `userData` reads (every one is inside a function). The first-import
+  rule still matters for `requestSingleInstanceLock()`, which is module-scope and follows userData. Checked in the
+  built `dist-electron/main.js`: the `applyStoreUserData()` call is the first top-level statement after the external
+  imports (offset 2.7 k, scheme registration 121 k, the lock 414 k)._
+- [X] T028 [US2] Route every `shell.openPath`, `shell.showItemInFolder` and `shell.openExternal(file:…)` in `EL/**` (excluding `spikes/`, `e2e/`) whose argument can be an app-owned path through `pathForOtherApps`. 8 call sites as of 2026-11-08; list them first with `grep -rn "shell\.\(openPath\|showItemInFolder\|openExternal\)" EL --include=*.ts`. Mark a user-chosen path (e.g. an export target) with the `// external-path: user-chosen` comment instead
+
+  _Done 2026-11-09. Of the 8 grep hits, 2 are comments and 3 are web URLs (`openExternal` of an http(s) / OAuth URL).
+  3 take app-owned paths and are wrapped: the attachment temp copy (`attachments.ipc.ts`), Show in folder
+  (`library.ipc.ts`), and Open books folder (`storage-service.ts`). Also wrapped: the value `copyFilePath` puts on the
+  clipboard (`library.ipc.ts`), which other programs read too. No user-chosen path needed the exemption comment._
+- [X] T029 [US2] Implement `ST/check-external-paths.mjs` (rules of T025) over `EL/**/*.ts` excluding `spikes/`, `e2e/`. Add `npm run check:external-paths` to the `check` script next to `check:store-secrets`. T025 must pass, and the real tree must pass after T028
 - [ ] T030 [P] [US2] Write `EL/store/startup-task.ps1` (Windows PowerShell 5.1, no external module):
   - one positional argument `get` | `enable` | `disable`;
   - load `[Windows.ApplicationModel.StartupTask, Windows.ApplicationModel, ContentType=WindowsRuntime]`;
