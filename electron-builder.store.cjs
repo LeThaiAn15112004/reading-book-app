@@ -16,6 +16,10 @@ const { _doc, ...appxIdentity } = identity
 
 module.exports = {
   extends: './electron-builder.json5',
+  // Windows Kits 10.0.26100 (signtool / makeappx / makepri), checksum-pinned by app-builder-lib. The default toolset
+  // (winCodeSign-2.6.0) ships a 2016 signtool that cannot sign an .msix ("A required function is not present").
+  // Store config only: the NSIS build keeps the default toolset. Labelled beta by electron-builder 26.18.
+  toolsets: { winCodeSign: '1.1.0' },
   win: {
     // PowerShell cannot read inside app.asar, so the startup-task bridge ships as a real file:
     // {resources}/store/startup-task.ps1 (background/store-startup-task.ts).

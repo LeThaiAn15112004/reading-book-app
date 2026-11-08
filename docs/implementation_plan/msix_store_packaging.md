@@ -77,3 +77,13 @@ _Results of the Windows validation tasks (T018, T023, T038, T040, T064, T070) ar
   `toolsets.winCodeSign: "1.1.0"` (electron-builder's Windows Kits 10.0.26100 bundle, checksum-pinned, labelled beta)
   or install the Windows SDK and set `SIGNTOOL_PATH`. Awaiting the maintainer's choice; T023 stays open
   (install with `Add-AppxPackage` not done).
+- **Blocker fixed (maintainer chose option 1):** `electron-builder.store.cjs` → `toolsets: { winCodeSign: '1.1.0' }`
+  (Windows Kits 10.0.26100 bundle; Store config only, NSIS keeps the default). Signed rebuild with the same throwaway
+  publisher-subject certificate — **PASS**: exit 0; `afterPack` FFmpeg verified; `check-store-package` 15/15;
+  `.msix` signed by `CN=E2395284-7996-4927-857C-B41F415D298E` (throwaway thumbprint `E93CA27B…5F32`, `UnknownError` =
+  untrusted throwaway root); `Readmate Reader.exe` signed; `ffmpeg.exe` `NotSigned`; raw password not in the log;
+  "Signed with the test certificate … (sideload only)." printed. SHA-256 of that throwaway-signed package:
+  `42b4d8acc4f74efc107a7f761a5b0bb521a8abd95feb7d416d801cb852b71f2a` (not for distribution).
+- **Still to do for T023:** build with the maintainer's real (trusted) test certificate in their own PowerShell window and
+  install with `Add-AppxPackage`; confirm the app opens.
+

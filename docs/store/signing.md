@@ -67,6 +67,10 @@ What the build does with them (`source/scripts/store/test-sign.mjs`):
 Without `--test-sign`, all signing variables are removed from every child, so a stray `CSC_LINK` can never sign the
 upload package.
 
+**Signing tool:** the Store config uses electron-builder's `toolsets.winCodeSign: "1.1.0"` (Windows Kits 10.0.26100).
+The default toolset's 2016 `signtool.exe` cannot sign an `.msix` ("SignTool Error: A required function is not
+present").
+
 **What gets signed:** `Readmate Reader.exe`, other `.exe` files of the app, and the `.msix` itself. **Not** the bundled
 `ffmpeg.exe` (`win.signExts: ["!ffmpeg.exe"]`): its trust anchor is the SHA-256 in
 `transcription/ffmpeg-artifacts.json`, and signing would change its bytes, so `afterPack` would stop the build with
