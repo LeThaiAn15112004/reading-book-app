@@ -158,3 +158,10 @@ expo-env.d.ts
 # Locally built APKs for device testing (spec 008)
 /source/app/platforms/native/apk/
 *.apk
+
+# Spec 010: Microsoft Store package — test-signing certificates never enter the repository; generated icons
+*.pfx
+*.p12
+.readmate-signing/
+source/app/platforms/electron/build-resources/
+source/app/platforms/electron/store/.cache/
