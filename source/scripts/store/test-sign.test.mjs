@@ -5,7 +5,7 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { after, describe, it } from 'node:test'
-import { resolveTestSigning } from './test-sign.mjs'
+import { resolveTestSigning, testSignRequest } from './test-sign.mjs'
 
 const PUBLISHER = 'CN=E2395284-7996-4927-857C-B41F415D298E'
 const PASSWORD = 'pa$$-w0rd-never-printed'
@@ -106,9 +106,54 @@ describe('resolveTestSigning', () => {
     assert.deepEqual(codes(r), ['test_sign_cert_expired'])
   })
 
+  // Regression (2026-11-08): `npm run package:store -- --test-sign` typed in Windows PowerShell (npm.ps1) drops the
+  // "--": the script got NO argument, npm set npm_config_test_sign=true, and the build went out unsigned silently.
+  it('npm-swallowed flag (no argv, npm_config_test_sign=true) still signs, with a warning that explains it', () => {
+    const r = run({
+      argv: [],
+      env: { npm_config_test_sign: 'true', READMATE_STORE_TEST_PFX: pfxOutside, READMATE_STORE_TEST_PFX_PASSWORD: PASSWORD },
+    })
+    assert.equal(r.signing, true)
+    assert.deepEqual(r.errors, [])
+    assert.deepEqual(r.env, { WIN_CSC_LINK: pfxOutside, WIN_CSC_KEY_PASSWORD: PASSWORD })
+    assert.equal(r.warnings.length, 1)
+    assert.match(r.warnings[0], /PowerShell drops the "--"/)
+    assert.match(r.warnings[0], /npm\.cmd run package:store -- --test-sign/)
+  })
+  it('npm-swallowed flag with a wrong certificate still stops with cert_subject_mismatch (never unsigned)', () => {
+    const r = run({
+      argv: [],
+      env: { npm_config_test_sign: 'true', READMATE_STORE_TEST_PFX: pfxOutside, READMATE_STORE_TEST_PFX_PASSWORD: PASSWORD },
+      readSubject: subject('CN=Wrong'),
+    })
+    assert.equal(r.signing, true)
+    assert.deepEqual(codes(r), ['cert_subject_mismatch'])
+  })
+  it('npm-swallowed flag without the variables → error, not an unsigned build', () => {
+    const r = run({ argv: [], env: { npm_config_test_sign: 'true' } })
+    assert.equal(r.signing, true)
+    assert.deepEqual(codes(r), ['test_sign_env_missing', 'test_sign_env_missing'])
+  })
+
   it('no returned text ever contains the password', () => {
     for (const r of [run(), run({ readSubject: subject('CN=Wrong') }), run({ env: { READMATE_STORE_TEST_PFX: pfxInside, READMATE_STORE_TEST_PFX_PASSWORD: PASSWORD } })]) {
       assert.ok(!everyText(r).includes(PASSWORD))
     }
+  })
+})
+
+describe('testSignRequest', () => {
+  it('argv wins and needs no npm config', () => {
+    assert.equal(testSignRequest(['--test-sign'], {}), 'argv')
+    assert.equal(testSignRequest(['--test-sign'], { npm_config_test_sign: 'true' }), 'argv')
+  })
+  it('npm_config_test_sign=true (flag swallowed by npm) → npm-config', () => {
+    assert.equal(testSignRequest([], { npm_config_test_sign: 'true' }), 'npm-config')
+  })
+  it('absent, empty or "false" → no signing', () => {
+    assert.equal(testSignRequest([], {}), null)
+    assert.equal(testSignRequest([], { npm_config_test_sign: '' }), null)
+    assert.equal(testSignRequest([], { npm_config_test_sign: 'false' }), null)
+    assert.equal(testSignRequest(['--test-signed'], {}), null)
   })
 })

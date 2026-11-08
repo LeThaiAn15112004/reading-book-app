@@ -25,14 +25,35 @@ function isInside(root, candidate) {
 }
 
 /**
+ * Whether this run asks for test signing, and how. `npm run package:store -- --test-sign` typed in Windows PowerShell
+ * goes through npm.ps1, which drops the `--`: npm then takes `--test-sign` as ITS OWN config ("npm warn Unknown cli
+ * config"), the script receives no argument, and npm sets `npm_config_test_sign=true` in its environment instead.
+ * That form is honoured too (and reported), so the request is never lost silently.
+ * Returns `null` (unsigned) | `'argv'` | `'npm-config'`.
+ */
+export function testSignRequest(argv, env) {
+  if (argv.includes('--test-sign')) return 'argv'
+  const npmFlag = env?.npm_config_test_sign
+  if (typeof npmFlag === 'string' && npmFlag !== '' && npmFlag.toLowerCase() !== 'false') return 'npm-config'
+  return null
+}
+
+/**
  * Pure decision (readSubject injected). Returns
  * `{ signing: false }` without --test-sign, else
  * `{ signing: true, errors: {code, message}[], warnings: string[], subject?, env? }` — `env` only when there is no error.
  */
 export function resolveTestSigning({ argv, env, repoRoot, publisher, readSubject, now = new Date() }) {
-  if (!argv.includes('--test-sign')) return { signing: false, errors: [], warnings: [] }
+  const requestedBy = testSignRequest(argv, env)
+  if (!requestedBy) return { signing: false, requestedBy: null, errors: [], warnings: [] }
   const errors = []
   const warnings = []
+  if (requestedBy === 'npm-config') {
+    warnings.push(
+      '--test-sign reached npm, not this script (Windows PowerShell drops the "--" of `npm run … -- --test-sign`); ' +
+        'taken from npm_config_test_sign. To pass it directly, run `npm.cmd run package:store -- --test-sign`.',
+    )
+  }
   const pfx = env.READMATE_STORE_TEST_PFX
   const password = env.READMATE_STORE_TEST_PFX_PASSWORD
   for (const [name, value] of [
@@ -74,6 +95,7 @@ export function resolveTestSigning({ argv, env, repoRoot, publisher, readSubject
   if (errors.length) return { signing: true, errors, warnings, subject }
   return { signing: true, errors, warnings, subject, env: { WIN_CSC_LINK: pfx, WIN_CSC_KEY_PASSWORD: password } }
 }
+
 
 // Fixed script: the path and password come only from this child's environment, never from its command line.
 const READ_PFX_SCRIPT = [

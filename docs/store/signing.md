@@ -41,6 +41,18 @@ Add-AppxPackage "source\app\platforms\electron\release\<version>\Readmate Reader
 Variables set in one terminal window are not visible to another one (or to an agent's shell) — run the build in the
 window where you set them.
 
+**Windows PowerShell and `--`:** `npm` there is the `npm.ps1` wrapper, and PowerShell drops the `--` of
+`npm run package:store -- --test-sign`. npm then prints `npm warn Unknown cli config "--test-sign"`, keeps the flag
+for itself and runs the script without it. The build still honours that form (it reads `npm_config_test_sign` and
+prints a ⚠ line saying so), but the direct way is:
+
+```powershell
+npm.cmd run package:store -- --test-sign
+```
+
+Every build prints its signing decision: `▶ package:store — test certificate` + `subject … = appx.publisher` when
+signing, `▶ package:store — signing: none …` when not.
+
 What the build does with them (`source/scripts/store/test-sign.mjs`):
 
 - refuses, before building anything: a missing variable (`test_sign_env_missing`), a relative or missing path

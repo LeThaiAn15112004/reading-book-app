@@ -3,6 +3,8 @@
 //
 //   npm run package:store                 # unsigned package for the Partner Center upload
 //   npm run package:store -- --test-sign  # signed with the local test certificate (spec 010 US4, T019–T021)
+//   (Windows PowerShell drops the "--" for npm.ps1; the flag then arrives as npm_config_test_sign and is still
+//    honoured — `npm.cmd run package:store -- --test-sign` passes it directly. See test-sign.mjs testSignRequest.)
 //
 // Steps, each stopping the run with its name when it fails:
 //   1. Windows only (platform-guard)          5. electron-builder --win appx --config electron-builder.store.cjs
@@ -111,6 +113,9 @@ async function main(argv) {
       return 1
     }
     console.log(`  subject ${signing.subject} = appx.publisher`)
+  } else {
+    // Never silent: an unsigned build says so before it starts.
+    console.log('▶ package:store — signing: none (unsigned upload package; add --test-sign to sign for sideloading)')
   }
 
   // Icons (US3): every Store logo + icon.ico from the master icon, then their exact sizes are checked.
