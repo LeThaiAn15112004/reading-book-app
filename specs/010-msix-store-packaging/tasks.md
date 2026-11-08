@@ -101,7 +101,7 @@ real (or realistic test) identity values it writes `release/1.0.0/Readmate Reade
 
 ### Tests for User Story 1
 
-- [ ] T011 [P] [US1] Write `ST/check-store-config.test.mjs` (`node --test`), one case per error code in contracts/store-build.md "Errors" that this script owns:
+- [X] T011 [P] [US1] Write `ST/check-store-config.test.mjs` (`node --test`), one case per error code in contracts/store-build.md "Errors" that this script owns:
   - `identity_placeholder` for each of the 3 placeholder fields and for `YourAppID`;
   - `identity_shape` for: `identityName` "3–50 chars `[A-Za-z0-9.-]`" (too short, too long, `_`), `publisher` "starts with `CN=`", `applicationId` "letters/digits/periods, starts with a letter, not a reserved name" (`CON`, `1App`), `capabilities` "exactly this list" (`["runFullTrust","webcam"]`), `addAutoLaunchExtension` "must be false", "min ≤ max" for `minVersion` / `maxVersionTested`;
   - `version_invalid` for `0.0.0`, `1.0`, `1.0.0.1`, `1.70000.0`, `0.9.0` (rule "`MAJOR.MINOR.PATCH`, numeric, each ≤ 65535, `MAJOR ≥ 1`");
@@ -109,18 +109,22 @@ real (or realistic test) identity values it writes `release/1.0.0/Readmate Reade
   - `extensions_invalid` when `appx-extensions.xml` has no `ReadmateReaderStartup`;
   - all errors reported together in one run;
   - `--allow-placeholders` passes placeholders but still fails a bad shape.
-- [ ] T012 [P] [US1] Write `ST/check-store-secrets.test.mjs` (`node --test`) on a temporary git repo: a tracked `x.pfx`, `x.p12`, or a file with `-----BEGIN PRIVATE KEY-----` / `-----BEGIN RSA PRIVATE KEY-----` → fail naming the file; an ignored (untracked) `.pfx` → pass
+- [X] T012 [P] [US1] Write `ST/check-store-secrets.test.mjs` (`node --test`) on a temporary git repo: a tracked `x.pfx`, `x.p12`, or a file with `-----BEGIN PRIVATE KEY-----` / `-----BEGIN RSA PRIVATE KEY-----` → fail naming the file; an ignored (untracked) `.pfx` → pass
 
 ### Implementation for User Story 1
 
-- [ ] T013 [US1] Implement `ST/check-store-config.mjs`:
+- [X] T013 [US1] Implement `ST/check-store-config.mjs`:
   - export `checkStoreConfig({ identity, version, extensionsXml, submissionsMd, allowPlaceholders })` returning `{ errors: { code, message }[] }`, with the message shapes of contracts/store-build.md;
   - read the version from the `extraMetadata` block of `electron-builder.json5` with one regex (no json5 parse);
   - read the last version from the last data row of `docs/store/submissions.md`;
   - CLI flags `--allow-placeholders` and `--self-test` (`--self-test` runs `node --test ST/check-store-config.test.mjs`);
   - exit 1 when there are errors, after printing all of them. T011 must pass.
-- [ ] T014 [US1] Implement `ST/check-store-secrets.mjs`: `git ls-files` and scan for `*.pfx`, `*.p12` and private-key PEM headers in tracked text files (skip binary files and `node_modules`). Exit 1 listing each hit. T012 must pass
-- [ ] T015 [US1] Implement `ST/package-store.mjs` (no signing yet, T019 adds it):
+
+  _Done 2026-11-08, one deviation (analysis F1): the "last version" is the last row whose **Result** says the package
+  was sent to the Store (`submitted` / `certified` / `published` / `rejected`). A row that `store:wack` adds before
+  submitting does not block rebuilding that version. `--self-test` runs every `source/scripts/store/*.test.mjs`._
+- [X] T014 [US1] Implement `ST/check-store-secrets.mjs`: `git ls-files` and scan for `*.pfx`, `*.p12` and private-key PEM headers in tracked text files (skip binary files and `node_modules`). Exit 1 listing each hit. T012 must pass
+- [X] T015 [US1] Implement `ST/package-store.mjs` (no signing yet, T019 adds it):
   1. `requireWindows`;
   2. `checkStoreConfig` without placeholders allowed → print all errors and exit 1;
   3. `npm run store:icons` (a no-op until US3: until then it only checks that `build-resources/appx/` exists, else warns that electron-builder's sample logos will be used);
@@ -130,8 +134,13 @@ real (or realistic test) identity values it writes `release/1.0.0/Readmate Reade
   7. `node ST/check-store-package.mjs <msix>` (T016);
   8. print the package path, its SHA-256 and the "Unsigned package for Partner Center upload…" line from contracts/store-build.md.
 
+  _Done 2026-11-08: `--test-sign` answers "not implemented yet (US4)" until T021. Signing variables are already
+  removed from every child environment. Children are spawned with `node <bin>` (tsc, vite, electron-builder CLI)
+  rather than `npm`, because Node 22 will not spawn `.cmd` files without a shell. Only the placeholder path was run
+  (it stops before building, US1 AS 2); a real build is T018._
+
   Every child runs with `spawn` and an argv array; a step that fails stops with that step's name.
-- [ ] T016 [US1] Create `ST/check-store-package.mjs <file.msix>` (Windows): extract `AppxManifest.xml` with the system `tar.exe -xf <msix> AppxManifest.xml -C <tmp>`. Assert:
+- [X] T016 [US1] Create `ST/check-store-package.mjs <file.msix>` (Windows): extract `AppxManifest.xml` with the system `tar.exe -xf <msix> AppxManifest.xml -C <tmp>`. Assert:
   - `Identity` `Name` / `Publisher` / `Version` (`<extraMetadata.version>.0`) equal `store-identity.json` + version;
   - `ProcessorArchitecture="x64"`;
   - the `Capabilities` children are exactly `rescap:Capability Name="runFullTrust"`;
@@ -141,7 +150,11 @@ real (or realistic test) identity values it writes `release/1.0.0/Readmate Reade
   - running `tar -tf` on the package lists `app/resources/ffmpeg/win32-x64/ffmpeg.exe` and `app/resources/store/startup-task.ps1`, and no `cloud-oauth-secrets.json` / `client_secret_*.json`.
 
   Print one line per assertion; exit 1 on any failure.
-- [ ] T017 [US1] Add `npm run check:store-config -- --allow-placeholders --self-test && npm run check:store-secrets` to the `check` script in `package.json`, after `check:boundaries`. Confirm that `.github/workflows/ci.yml` runs the same steps. If CI lists steps one by one, add these two
+
+  _Done 2026-11-08: pure `checkManifest` / `checkListing` with 13 `node --test` cases
+  (`check-store-package.test.mjs`); package entry names are percent-decoded. Not run against a real `.msix` yet
+  (T018)._
+- [X] T017 [US1] Add `npm run check:store-config -- --allow-placeholders --self-test && npm run check:store-secrets` to the `check` script in `package.json`, after `check:boundaries`. Confirm that `.github/workflows/ci.yml` runs the same steps. If CI lists steps one by one, add these two
 - [ ] T018 [US1] Validate on Windows (quickstart §1 and §3, unsigned part):
   - with placeholders, `npm run package:store` fails listing 3 fields;
   - with temporary test identity values (`identityName` `ReadmateTest.ReadmateReader`, `publisher` `CN=Readmate Test`, `publisherDisplayName` `Readmate Test`, never committed), it writes the `.msix` and T016 passes;

@@ -88,6 +88,16 @@ jobs:
         if: (success() || failure()) && steps.install.outcome == 'success'
         run: npm run check:boundaries
 
+      # Spec 010: Microsoft Store package inputs (placeholders allowed until Partner Center) + no tracked signing secret.
+      # Building the .msix itself is Windows-only and not part of CI.
+      - name: Store · config shapes and self-tests
+        if: (success() || failure()) && steps.install.outcome == 'success'
+        run: npm run check:store-config -- --allow-placeholders --self-test
+
+      - name: Store · no tracked signing secrets
+        if: (success() || failure()) && steps.install.outcome == 'success'
+        run: npm run check:store-secrets
+
       - name: Platform adapters · same exports on both hosts
         if: (success() || failure()) && steps.install.outcome == 'success'
         run: npm run check:platform-adapters
