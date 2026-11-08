@@ -96,6 +96,7 @@ import {
 import { PdfPageAttachments } from './PdfAttachmentLayer'
 import { attachmentPinAt, type PdfAttachmentPin } from './attachmentPins'
 import { PAD_PX, PAGE_GAP_PX, PDF_TO_CSS, type PdfPageCssSize } from './pdfLayout'
+import { isTypingTarget } from '../../../../shortcuts/iframeKeydown'
 // `?url` makes Vite emit the worker as a local asset in dist/ — never loaded from a CDN.
 import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
 import 'pdfjs-dist/web/pdf_viewer.css'
@@ -120,6 +121,9 @@ const NO_INK: readonly PdfInkLayerMark[] = []
 const FALLBACK_SIZE: PageSize = { w: 595, h: 842 }
 /** Duration of one page-turn in paged flow. */
 const PAGE_TURN_MS = 480
+/** Paged flow: one ↑ / ↓ press scrolls this share of the view's height (at least ARROW_SCROLL_MIN_PX). */
+const ARROW_SCROLL_FRACTION = 0.1
+const ARROW_SCROLL_MIN_PX = 40
 
 type PageSize = { w: number; h: number }
 
@@ -1363,6 +1367,26 @@ export function PdfRenderer({
       setLeaving(null)
     }
   }, [spread])
+
+  // Paged flow: ← / → turn the page (the Reader's Next / Previous Page shortcuts), ↑ / ↓ scroll
+  // within the spread on screen — a zoomed page is taller than the view. Bubble phase, so the
+  // app-level shortcuts (capture phase) run first; same guards as they use for bare keys.
+  useEffect(() => {
+    if (!paged) return
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return
+      if (event.defaultPrevented || event.isComposing) return
+      if (event.ctrlKey || event.altKey || event.metaKey || event.shiftKey) return
+      if (isTypingTarget(event.target) || document.querySelector('[aria-modal="true"]')) return
+      const root = getScrollRootRef.current()
+      if (!root || root.scrollHeight <= root.clientHeight) return
+      event.preventDefault()
+      const step = Math.max(ARROW_SCROLL_MIN_PX, Math.round(root.clientHeight * ARROW_SCROLL_FRACTION))
+      root.scrollBy({ top: event.key === 'ArrowDown' ? step : -step })
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [paged])
 
   // The turned-away row is hidden by now: release its finished animation.
   useEffect(() => {
