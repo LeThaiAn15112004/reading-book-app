@@ -50,10 +50,24 @@ export type ReminderOpenBookDto = { bookId: string; title: string }
 export type TestReminderResult = { status: 'sent' | 'blocked' | 'failed' }
 
 /**
+ * Spec 010 (data-model §7): Start at Login of the Microsoft Store build is the package's startup task; its Windows
+ * state. Only `enabled` / `disabled` can be changed by the app; the others belong to the user (Windows Settings →
+ * Startup), a policy, or Windows (`managedByWindows`: the state could not be read).
+ */
+export type StartAtLoginState =
+  | 'enabled'
+  | 'disabled'
+  | 'disabledByUser'
+  | 'disabledByPolicy'
+  | 'enabledByPolicy'
+  | 'managedByWindows'
+
+/**
  * Settings → Background / System Tray → Start at Login. The OS login-item list is the source of
  * truth (`app.getLoginItemSettings()`); `supported: false` on Linux, where Electron can't set it.
+ * `state` is set by the Store build only; the direct build sends `{ supported, enabled }`.
  */
-export type StartAtLoginDto = { supported: boolean; enabled: boolean }
+export type StartAtLoginDto = { supported: boolean; enabled: boolean; state?: StartAtLoginState }
 
 /**
  * Settings → Background & System Tray. `runInBackground` (close button hides the window) only
@@ -1234,6 +1248,8 @@ export interface DesktopApi {
     resetPrefs(): Promise<BackgroundPrefsResult>
     getStartAtLogin(): Promise<StartAtLoginDto>
     setStartAtLogin(enabled: boolean): Promise<StartAtLoginDto>
+    /** Store build only (spec 010): open Windows Settings → Apps → Startup; `{ ok: false }` elsewhere. */
+    openStartupSettings(): Promise<OkResult>
     quit(): Promise<OkResult>
   }
   updates: {

@@ -42,7 +42,7 @@
     "source/app/platforms/electron/files/open-book-content.ts": "T049: import name @reading-book/* replaced by @core/* (import specifier only)",
     "source/app/platforms/electron/files/relink-book.ts": "T049: import name @reading-book/* replaced by @core/* (import specifier only)",
     "source/app/platforms/electron/files/sandbox.ts": "T049: import name @reading-book/* replaced by @core/* (import specifier only)",
-    "source/app/platforms/electron/ipc/api-types.ts": "T049: import name @reading-book/* replaced by @core/* (import specifier only)",
+    "source/app/platforms/electron/ipc/api-types.ts": "T049: import name @reading-book/* replaced by @core/* (import specifier only) | spec 010 T032–T033: StartAtLoginDto.state (Store build only) + background.openStartupSettings",
     "source/app/platforms/electron/ipc/app.ipc.ts": "T049: import name @reading-book/* replaced by @core/* (import specifier only)",
     "source/app/platforms/electron/ipc/audio.ipc.ts": "T049: import name @reading-book/* replaced by @core/* (import specifier only)",
     "source/app/platforms/electron/ipc/graphics.ipc.ts": "T049: import name @reading-book/* replaced by @core/* (import specifier only)",
@@ -89,13 +89,20 @@
     "source/app/platforms/electron/store/store-identity.json": "spec 010 T006: new, Microsoft Store package identity (placeholders until Partner Center); read by electron-builder.store.cjs and check-store-config.mjs, not by Main",
     "source/app/platforms/electron/store/appx-extensions.xml": "spec 010 T007: new, Store manifest extension (startup task ReadmateReaderStartup); packaging input only",
     "source/app/platforms/electron/store/appxmanifest.xml": "spec 010 T007: new, electron-builder's appx manifest template + the uap10 namespace; packaging input only",
-    "source/app/platforms/electron/store/startup-task.ps1": "spec 010 T008: new, Start at Login bridge for the Store build (placeholder until T030), shipped via extraResources",
+    "source/app/platforms/electron/store/startup-task.ps1": "spec 010 T030: Start at Login bridge of the Store build — WinRT StartupTask get / enable / disable, one JSON line; shipped via extraResources",
     "source/app/platforms/electron/store/store-runtime.ts": "spec 010 T026: new, isStoreBuild() + applyStoreUserData() (userData 'Readmate Reader Store' when process.windowsStore)",
     "source/app/platforms/electron/store/store-userdata-first.ts": "spec 010 T027: new, side-effect module imported first by main.ts",
     "source/app/platforms/electron/files/external-path.ts": "spec 010 T026: new, pathForOtherApps — maps a virtualised Store userData path to its real per-package path",
     "source/app/platforms/electron/files/external-path-core.mjs": "spec 010 T026: new, pure helpers of pathForOtherApps (PFN from the exe path, path mapping), tested by node --test",
     "source/app/platforms/electron/files/external-path-core.d.mts": "spec 010 T026: new, types of external-path-core.mjs",
     "source/app/platforms/electron/ipc/attachments.ipc.ts": "spec 010 T028: the attachment temp copy is opened through pathForOtherApps",
-    "source/app/platforms/electron/storage/storage-service.ts": "spec 010 T028: Open books folder goes through pathForOtherApps"
+    "source/app/platforms/electron/storage/storage-service.ts": "spec 010 T028: Open books folder goes through pathForOtherApps",
+    "source/app/platforms/electron/background/store-startup-task.ts": "spec 010 T031: new, runs startup-task.ps1 (argv array, no shell, 10 s timeout) for the Store build's Start at Login",
+    "source/app/platforms/electron/background/startup-task-core.mjs": "spec 010 T031: new, pure StartupTaskState → StartAtLoginDto mapping and the never-override rule (FR-007), node --test",
+    "source/app/platforms/electron/background/startup-task-core.d.mts": "spec 010 T031: new, types of startup-task-core.mjs",
+    "source/app/platforms/electron/background/login-item.ts": "spec 010 T032: readStartAtLogin / changeStartAtLogin delegate to the startup task in the Store build (sync direct-build API unchanged)",
+    "source/app/platforms/electron/ipc/background.ipc.ts": "spec 010 T032–T033: Start at Login handlers async (Store startup task); new background:openStartupSettings (Store build only, fixed ms-settings URI)",
+    "source/app/platforms/electron/ipc/channels.ts": "spec 010 T033: BackgroundChannels.openStartupSettings",
+    "source/app/platforms/electron/preload.ts": "spec 010 T033: background.openStartupSettings"
   }
 }

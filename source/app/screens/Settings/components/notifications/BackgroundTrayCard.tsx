@@ -1,5 +1,5 @@
 import { useEffect, type ReactNode } from 'react'
-import { useBackgroundStore } from '../../logic/backgroundStore'
+import { canChangeStartAtLogin, useBackgroundStore } from '../../logic/backgroundStore'
 import { SettingsCard } from '../layout/SettingsCard'
 import { SettingsSwitch } from '../layout/SettingsSwitch'
 
@@ -7,6 +7,24 @@ const isMac = typeof navigator !== 'undefined' && /Mac/i.test(navigator.platform
 const TRAY_NAME = isMac ? 'menu bar' : 'system tray'
 
 const CARD_TITLE = 'Background / System Tray'
+
+/**
+ * Spec 010: why the Store build's Start at Login switch can't be changed here, or null when it can. The startup task
+ * is Windows' to decide in these states; the app never overrides it (FR-007).
+ */
+function startAtLoginLockedReason(state: string | undefined): string | null {
+  switch (state) {
+    case 'disabledByUser':
+      return 'Turned off in Windows Settings → Startup. Turn it back on there.'
+    case 'disabledByPolicy':
+    case 'enabledByPolicy':
+      return 'Set by your organisation.'
+    case 'managedByWindows':
+      return 'Managed by Windows. Change it in Windows Settings → Startup.'
+    default:
+      return null
+  }
+}
 
 /** One labelled row of the card; rows after the first get a divider. */
 function Row({
@@ -56,10 +74,23 @@ export function BackgroundTrayCard() {
   const savingStartAtLogin = useBackgroundStore((s) => s.savingStartAtLogin)
   const startAtLoginFailed = useBackgroundStore((s) => s.startAtLoginFailed)
   const setStartAtLogin = useBackgroundStore((s) => s.setStartAtLogin)
+  const refreshStartAtLogin = useBackgroundStore((s) => s.refreshStartAtLogin)
+  const openStartupSettings = useBackgroundStore((s) => s.openStartupSettings)
 
   useEffect(() => {
     void load()
   }, [load])
+
+  // Start at Login can be changed outside the app (Windows Settings → Startup, the login items): read it again when
+  // the window comes back to the front.
+  useEffect(() => {
+    const onFocus = () => void refreshStartAtLogin()
+    window.addEventListener('focus', onFocus)
+    return () => window.removeEventListener('focus', onFocus)
+  }, [refreshStartAtLogin])
+
+  const loginLockedReason = startAtLogin?.supported ? startAtLoginLockedReason(startAtLogin.state) : null
+  const loginCanChange = canChangeStartAtLogin(startAtLogin)
 
   if (!prefs) {
     return (
@@ -141,20 +172,33 @@ export function BackgroundTrayCard() {
           description={
             !startAtLogin?.supported
               ? 'Not available on this system.'
-              : startAtLoginFailed
+              : loginLockedReason
+                ? loginLockedReason
+                : startAtLoginFailed
                 ? 'Your system didn’t accept this change. Check your startup apps settings.'
                 : prefs.showTray
                   ? `Tự động chạy ứng dụng ngầm khi bật máy tính để các tính năng nhắc nhở hoạt động chính xác. Starts hidden in the ${TRAY_NAME}.`
                   : `Tự động chạy ứng dụng ngầm khi bật máy tính để các tính năng nhắc nhở hoạt động chính xác. Without the ${TRAY_NAME} icon the window opens at login instead of staying hidden.`
           }
           control={
-            <SettingsSwitch
-              checked={startAtLogin?.enabled ?? false}
-              onChange={(next) => void setStartAtLogin(next)}
-              labelledBy="background-login-label"
-              describedBy="background-login-desc"
-              disabled={!startAtLogin?.supported || savingStartAtLogin}
-            />
+            <div className="flex shrink-0 flex-col items-end gap-2">
+              <SettingsSwitch
+                checked={startAtLogin?.enabled ?? false}
+                onChange={(next) => void setStartAtLogin(next)}
+                labelledBy="background-login-label"
+                describedBy="background-login-desc"
+                disabled={!loginCanChange || savingStartAtLogin}
+              />
+              {loginLockedReason ? (
+                <button
+                  type="button"
+                  className="cursor-pointer border-none bg-transparent p-0 text-[12px] font-semibold text-lib-accent underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-lib-accent"
+                  onClick={() => void openStartupSettings()}
+                >
+                  Open Startup settings
+                </button>
+              ) : null}
+            </div>
           }
         />
 

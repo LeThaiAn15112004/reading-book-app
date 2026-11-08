@@ -281,7 +281,7 @@ S1, S2 and S4 pass, and every row of `docs/store/smoke-tests.md` passes.
   (`library.ipc.ts`), and Open books folder (`storage-service.ts`). Also wrapped: the value `copyFilePath` puts on the
   clipboard (`library.ipc.ts`), which other programs read too. No user-chosen path needed the exemption comment._
 - [X] T029 [US2] Implement `ST/check-external-paths.mjs` (rules of T025) over `EL/**/*.ts` excluding `spikes/`, `e2e/`. Add `npm run check:external-paths` to the `check` script next to `check:store-secrets`. T025 must pass, and the real tree must pass after T028
-- [ ] T030 [P] [US2] Write `EL/store/startup-task.ps1` (Windows PowerShell 5.1, no external module):
+- [X] T030 [P] [US2] Write `EL/store/startup-task.ps1` (Windows PowerShell 5.1, no external module):
   - one positional argument `get` | `enable` | `disable`;
   - load `[Windows.ApplicationModel.StartupTask, Windows.ApplicationModel, ContentType=WindowsRuntime]`;
   - await `IAsyncOperation` through `[System.WindowsRuntimeSystemExtensions]::AsTask` by reflection;
@@ -289,14 +289,14 @@ S1, S2 and S4 pass, and every row of `docs/store/smoke-tests.md` passes.
   - `enable` = `RequestEnableAsync()`, `disable` = `Disable()`;
   - print exactly one line `{"state":"<Enabled|Disabled|DisabledByUser|DisabledByPolicy|EnabledByPolicy>"}`, or `{"error":"<message>"}` with exit 1;
   - no other output (`$ProgressPreference='SilentlyContinue'`, errors caught).
-- [ ] T031 [US2] Create `EL/background/store-startup-task.ts`:
+- [X] T031 [US2] Create `EL/background/store-startup-task.ts`:
   - spawn `powershell.exe` with argv `['-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-File', path.join(process.resourcesPath,'store','startup-task.ps1'), op]`, `windowsHide: true`, a 10 s timeout (kill on timeout);
   - parse the last stdout line;
   - map `Enabled` → `{ supported: true, enabled: true, state: 'enabled' }`, `Disabled` → `disabled`, `DisabledByUser` → `disabledByUser` (enabled false), `DisabledByPolicy` → `disabledByPolicy`, `EnabledByPolicy` → `enabledByPolicy` (enabled true);
   - timeout / error / unparsable → `{ supported: true, enabled: false, state: 'managedByWindows' }`;
   - `setStartAtLogin(true)` while the state is `disabledByUser` / `disabledByPolicy` returns the current state without calling `enable` (FR-007).
-- [ ] T032 [US2] Edit `EL/background/login-item.ts`: in the Store build, `getStartAtLogin` / `setStartAtLogin` delegate to `store-startup-task.ts` (make both IPC handlers `async` if they are not; keep the channel names). `wasLaunchedAtLogin` keeps reading `--hidden-at-startup`. Extend `StartAtLoginDto` in `EL/ipc/api-types.ts` to `{ supported: boolean; enabled: boolean; state?: 'enabled' | 'disabled' | 'disabledByUser' | 'disabledByPolicy' | 'enabledByPolicy' | 'managedByWindows' }` (data-model §7). The direct build never sets `state`
-- [ ] T033 [US2] Add the channel `BackgroundChannels.openStartupSettings` (`background:openStartupSettings`):
+- [X] T032 [US2] Edit `EL/background/login-item.ts`: in the Store build, `getStartAtLogin` / `setStartAtLogin` delegate to `store-startup-task.ts` (make both IPC handlers `async` if they are not; keep the channel names). `wasLaunchedAtLogin` keeps reading `--hidden-at-startup`. Extend `StartAtLoginDto` in `EL/ipc/api-types.ts` to `{ supported: boolean; enabled: boolean; state?: 'enabled' | 'disabled' | 'disabledByUser' | 'disabledByPolicy' | 'enabledByPolicy' | 'managedByWindows' }` (data-model §7). The direct build never sets `state`
+- [X] T033 [US2] Add the channel `BackgroundChannels.openStartupSettings` (`background:openStartupSettings`):
   - constant in `EL/ipc/channels.ts`;
   - handler in the background IPC file: Store build only, `shell.openExternal('ms-settings:startupapps')`, otherwise `{ ok: false }`;
   - `openStartupSettings(): Promise<{ ok: boolean }>` in `DesktopApi` (`EL/ipc/api-types.ts`) and `EL/preload.ts`;
@@ -304,12 +304,23 @@ S1, S2 and S4 pass, and every row of `docs/store/smoke-tests.md` passes.
   - Mobile: add the method to the Mobile `api` (`source/app/platforms/native/bridge/`, wherever the background group is built), answering `NOT_AVAILABLE_ON_PLATFORM`.
 
   Run `npm run mobile:typecheck:web`.
-- [ ] T034 [US2] Update the Start at Login row in Settings → Background (find it with `grep -rn "StartAtLogin" source/app/screens/Settings`):
+- [X] T034 [US2] Update the Start at Login row in Settings → Background (find it with `grep -rn "StartAtLogin" source/app/screens/Settings`):
   - derive `canChange = state === undefined || state === 'enabled' || state === 'disabled'`;
   - when `!canChange`, disable the toggle and show "Turned off in Windows Settings → Startup" (`disabledByUser`), "Set by your organisation" (`disabledByPolicy` / `enabledByPolicy`) or "Managed by Windows" (`managedByWindows`);
   - show the button **Open Startup settings**, calling the bridge from T033.
 
   Re-read the state when the window regains focus.
+
+  _Done 2026-11-09 (T030–T034):_
+  - _The pure mapping is in `background/startup-task-core.mjs` (+ `.d.mts`, 11 `node --test` cases); the renderer
+    keeps its own copy of the "can the app change it?" rule (`canChangeStartAtLogin` in `backgroundStore.ts`),
+    because it may not import Main code._
+  - _`login-item.ts` keeps its sync direct-build API, which the `spike:settings:background` spike uses (17/17 still
+    pass). New async `readStartAtLogin` / `changeStartAtLogin` delegate in the Store build._
+  - _Mobile needed no code: `background` is an `unavailableGroup` Proxy, so `openStartupSettings` answers
+    `NOT_AVAILABLE_ON_PLATFORM`._
+  - _`startup-task.ps1` was run outside a package: it loads the WinRT types and answers
+    `{"error":"Element not found…"}`, exit 1. Run inside the package = S2 (T037/T038)._
 - [ ] T035 [P] [US2] Fill `docs/store/smoke-tests.md` (FR-019): one row per feature, with columns `Check | How | 1.0.0`. Rows:
   - import a local EPUB / PDF / TXT / MD;
   - each format opens and remembers its position;

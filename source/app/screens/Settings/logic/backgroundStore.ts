@@ -19,10 +19,25 @@ type BackgroundState = {
   setShowTray: (showTray: boolean) => Promise<void>
   setRunInBackground: (runInBackground: boolean) => Promise<void>
   setStartAtLogin: (enabled: boolean) => Promise<void>
+  /** Read the OS state again (Store build: the user may have changed it in Windows Settings meanwhile). */
+  refreshStartAtLogin: () => Promise<void>
+  /** Store build: open Windows Settings → Startup (where a task the user turned off is turned back on). */
+  openStartupSettings: () => Promise<void>
   /** Quit for real (same as the tray's "Quit Readmate"). */
   quit: () => Promise<void>
   /** Settings → Advanced → Reset App Settings: Main writes its own defaults. */
   reset: () => Promise<boolean>
+}
+
+/**
+ * Spec 010: whether the app itself may switch Start at Login. The direct build has no `state` (always yes); the Store
+ * build's startup task can only be switched from `enabled` / `disabled` — the other states belong to the user
+ * (Windows Settings → Startup), a policy, or Windows.
+ */
+export function canChangeStartAtLogin(startAtLogin: StartAtLogin | null): boolean {
+  if (!startAtLogin?.supported) return false
+  const state = startAtLogin.state
+  return state === undefined || state === 'enabled' || state === 'disabled'
 }
 
 /**
@@ -73,7 +88,7 @@ export const useBackgroundStore = create<BackgroundState>()((set, get) => {
 
     setStartAtLogin: async (enabled) => {
       const previous = get().startAtLogin
-      if (!previous?.supported || get().savingStartAtLogin) return
+      if (!canChangeStartAtLogin(previous) || !previous || get().savingStartAtLogin) return
       set({ startAtLogin: { ...previous, enabled }, savingStartAtLogin: true, startAtLoginFailed: false })
       try {
         const actual = await backgroundApi.setStartAtLogin(enabled)
@@ -82,6 +97,23 @@ export const useBackgroundStore = create<BackgroundState>()((set, get) => {
         set({ startAtLogin: previous, startAtLoginFailed: true })
       } finally {
         set({ savingStartAtLogin: false })
+      }
+    },
+
+    refreshStartAtLogin: async () => {
+      if (get().savingStartAtLogin) return
+      try {
+        set({ startAtLogin: await backgroundApi.getStartAtLogin() })
+      } catch {
+        // keep what is shown; the next load / change reports a failure
+      }
+    },
+
+    openStartupSettings: async () => {
+      try {
+        await backgroundApi.openStartupSettings()
+      } catch {
+        // nothing to undo; the card keeps showing the current state
       }
     },
 

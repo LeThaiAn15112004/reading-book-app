@@ -11,5 +11,7 @@ export const backgroundApi = {
   resetPrefs: () => api.background.resetPrefs(),
   getStartAtLogin: () => api.background.getStartAtLogin(),
   setStartAtLogin: (enabled: boolean) => api.background.setStartAtLogin(enabled),
+  /** Store build (spec 010): Windows Settings → Startup. */
+  openStartupSettings: () => api.background.openStartupSettings(),
   quit: () => api.background.quit(),
 }

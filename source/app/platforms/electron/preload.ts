@@ -287,6 +287,7 @@ const api: DesktopApi = {
     resetPrefs: () => ipcRenderer.invoke(BackgroundChannels.resetPrefs),
     getStartAtLogin: () => ipcRenderer.invoke(BackgroundChannels.getStartAtLogin),
     setStartAtLogin: (enabled) => ipcRenderer.invoke(BackgroundChannels.setStartAtLogin, enabled),
+    openStartupSettings: () => ipcRenderer.invoke(BackgroundChannels.openStartupSettings),
     quit: () => ipcRenderer.invoke(BackgroundChannels.quit),
   },
   updates: {

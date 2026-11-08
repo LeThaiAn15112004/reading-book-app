@@ -173,6 +173,8 @@ export const BackgroundChannels = {
   /** Renderer → main: Start at Login (OS login item; launched hidden in the tray). */
   getStartAtLogin: 'background:getStartAtLogin',
   setStartAtLogin: 'background:setStartAtLogin',
+  /** Renderer → main (Store build, spec 010): open Windows Settings → Startup. */
+  openStartupSettings: 'background:openStartupSettings',
   /** Renderer → main: quit for real (raises the quitting flag first, like the tray's Quit). */
   quit: 'background:quit',
 } as const

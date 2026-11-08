@@ -1,6 +1,8 @@
 import { app } from 'electron'
 import path from 'node:path'
 import type { StartAtLoginDto } from '../ipc/api-types'
+import { isStoreBuild } from '../store/store-runtime'
+import { getStoreStartAtLogin, setStoreStartAtLogin } from './store-startup-task'
 
 /**
  * Settings → Background / System Tray → Start at Login. The OS login-item list is the source of
@@ -37,6 +39,18 @@ export function setStartAtLogin(enabled: boolean): StartAtLoginDto {
     app.setLoginItemSettings({ openAtLogin: enabled })
   }
   return getStartAtLogin()
+}
+
+/**
+ * Spec 010 T032: what the IPC handlers call. The Store (MSIX) build has no login item — its Start at Login is the
+ * package's startup task (store-startup-task.ts, with the Windows state); the direct build keeps the login item above.
+ */
+export function readStartAtLogin(): Promise<StartAtLoginDto> {
+  return isStoreBuild() ? getStoreStartAtLogin() : Promise.resolve(getStartAtLogin())
+}
+
+export function changeStartAtLogin(enabled: boolean): Promise<StartAtLoginDto> {
+  return isStoreBuild() ? setStoreStartAtLogin(enabled) : Promise.resolve(setStartAtLogin(enabled))
 }
 
 /** This process was started by the OS at login (so it should stay hidden in the tray). */

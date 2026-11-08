@@ -1,11 +1,12 @@
-import { ipcMain } from 'electron'
+import { ipcMain, shell } from 'electron'
 import {
   getBackgroundPrefs,
   quitApp,
   resetBackgroundPrefs,
   updateBackgroundPrefs,
 } from '../background/background-mode'
-import { getStartAtLogin, setStartAtLogin } from '../background/login-item'
+import { changeStartAtLogin, readStartAtLogin } from '../background/login-item'
+import { isStoreBuild } from '../store/store-runtime'
 import type { BackgroundPrefsDto, BackgroundPrefsResult, OkResult, StartAtLoginDto } from './api-types'
 import { BackgroundChannels } from './channels'
 
@@ -38,23 +39,35 @@ export function registerBackgroundIpc(): void {
     (_event, patch: unknown): BackgroundPrefsResult =>
       persist(() => updateBackgroundPrefs(patchFrom(patch))),
   )
-  ipcMain.handle(BackgroundChannels.resetPrefs, (): BackgroundPrefsResult => {
-    // Start at Login defaults to off; it lives in the OS login items, not in the prefs file.
+  ipcMain.handle(BackgroundChannels.resetPrefs, async (): Promise<BackgroundPrefsResult> => {
+    // Start at Login defaults to off; it lives in the OS login items (Store build: the startup task), not in the prefs
+    // file. A task turned off by the user or a policy is left as Windows has it.
     try {
-      setStartAtLogin(false)
+      await changeStartAtLogin(false)
     } catch (err) {
       console.error('Start at Login could not be turned off:', err)
     }
     return persist(() => resetBackgroundPrefs())
   })
-  ipcMain.handle(BackgroundChannels.getStartAtLogin, (): StartAtLoginDto => getStartAtLogin())
-  ipcMain.handle(BackgroundChannels.setStartAtLogin, (_event, enabled: unknown): StartAtLoginDto => {
-    if (typeof enabled !== 'boolean') return getStartAtLogin()
+  ipcMain.handle(BackgroundChannels.getStartAtLogin, (): Promise<StartAtLoginDto> => readStartAtLogin())
+  ipcMain.handle(BackgroundChannels.setStartAtLogin, async (_event, enabled: unknown): Promise<StartAtLoginDto> => {
+    if (typeof enabled !== 'boolean') return readStartAtLogin()
     try {
-      return setStartAtLogin(enabled)
+      return await changeStartAtLogin(enabled)
     } catch (err) {
       console.error('Start at Login could not be changed:', err)
-      return getStartAtLogin()
+      return readStartAtLogin()
+    }
+  })
+  // Spec 010 T033: the Store build's Start at Login can be turned off by the user in Windows Settings → Startup, where
+  // only they can turn it back on. Fixed URI, nothing from the renderer.
+  ipcMain.handle(BackgroundChannels.openStartupSettings, async (): Promise<OkResult> => {
+    if (!isStoreBuild()) return { ok: false }
+    try {
+      await shell.openExternal('ms-settings:startupapps')
+      return { ok: true }
+    } catch {
+      return { ok: false }
     }
   })
   ipcMain.handle(BackgroundChannels.quit, (): OkResult => {
