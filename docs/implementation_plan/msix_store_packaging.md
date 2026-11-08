@@ -23,7 +23,16 @@ _Results of the Windows validation tasks (T018, T023, T038, T040, T064, T070) ar
   expands every dollar-brace in the template, comments included. Fixed in the comment (23 known macros left, 0
   unknown). Steps before it passed: config, icons, tsc, package-deps, vite build, `win-unpacked/` + `afterPack` FFmpeg
   hash check.
-- **Re-run after the fix: not done yet.** No `.msix` exists yet; `check-store-package` has not run on a real package.
+- **Re-run after the fix — PASS.** Built by the maintainer at 19:27 (unsigned, see T023 for why):
+  `source/app/platforms/electron/release/1.0.0/Readmate Reader-Windows-1.0.0-Store.msix`, 348,903,616 bytes,
+  SHA-256 `64ecd6c90afae1b1bd8e00062af3649b68c478e4e56caf78d980d120c884ad7d`, Authenticode `NotSigned`.
+  `check-store-package` on it: 15/15 PASS — Identity Name / Publisher / Version (`1.0.0.0`), ProcessorArchitecture x64,
+  Capabilities = runFullTrust only, one `windows.protocol` `readmate-reader`, one `windows.startupTask`
+  `ReadmateReaderStartup`, MinVersion `10.0.17763.0`, Windows.Desktop, contains `AppxManifest.xml`,
+  `app/resources/app.asar`, `app/resources/ffmpeg/win32-x64/ffmpeg.exe`, `app/resources/store/startup-task.ps1`, no
+  OAuth secret files.
+- A leftover `~1admate Reader-Windows-1.0.0-Store.msix` (183 MB, 19:09) from an interrupted build sits next to it; it
+  is not a valid package (git-ignored output; delete it).
 
 ### T023 — test signing (2026-11-08)
 
@@ -37,6 +46,12 @@ _Results of the Windows validation tasks (T018, T023, T038, T040, T064, T070) ar
   PowerShell + .NET `X509Certificate2`) was used. The password does not appear in the build log.
 - **No secret tracked — PASS.** `git ls-files` lists no `.pfx` / `.p12`; `git status --ignored` shows none inside the
   repository; `check:store-secrets`: OK.
+- **Why the maintainer's `npm run package:store -- --test-sign` came out unsigned (2026-11-08, reproduced):** Windows
+  PowerShell 5.1 runs `npm.ps1`, which drops the `--`; npm took `--test-sign` as its own config (`npm warn Unknown cli
+  config "--test-sign"`), the script got no argument and built unsigned without saying so. Fixed: the flag is also read
+  from `npm_config_test_sign` (with a ⚠ line), every build prints its signing decision, regression tests added. Checked
+  with the exact PowerShell form and the `CN=Wrong` certificate: the build now reaches "test certificate" and stops
+  with `cert_subject_mismatch`. Direct form: `npm.cmd run package:store -- --test-sign`.
 - **Signed build with the real test certificate + `Add-AppxPackage`: not done yet.** `READMATE_STORE_TEST_PFX` /
   `READMATE_STORE_TEST_PFX_PASSWORD` were set in the maintainer's own PowerShell window, which the agent's shell does
   not inherit (checked: not set at process or User scope). To be run in that window — `docs/store/signing.md` §3.

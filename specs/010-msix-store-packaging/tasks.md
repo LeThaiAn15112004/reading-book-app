@@ -155,12 +155,17 @@ real (or realistic test) identity values it writes `release/1.0.0/Readmate Reade
   (`check-store-package.test.mjs`); package entry names are percent-decoded. Not run against a real `.msix` yet
   (T018)._
 - [X] T017 [US1] Add `npm run check:store-config -- --allow-placeholders --self-test && npm run check:store-secrets` to the `check` script in `package.json`, after `check:boundaries`. Confirm that `.github/workflows/ci.yml` runs the same steps. If CI lists steps one by one, add these two
-- [ ] T018 [US1] Validate on Windows (quickstart §1 and §3, unsigned part):
+- [X] T018 [US1] Validate on Windows (quickstart §1 and §3, unsigned part):
   - with placeholders, `npm run package:store` fails listing 3 fields;
   - with temporary test identity values (`identityName` `ReadmateTest.ReadmateReader`, `publisher` `CN=Readmate Test`, `publisherDisplayName` `Readmate Test`, never committed), it writes the `.msix` and T016 passes;
   - `npm run package` still writes the NSIS installer.
 
   Record the outcome in `docs/implementation_plan/msix_store_packaging.md`.
+
+  _Done 2026-11-08 with the REAL Partner Center identity (`anthaile.ReadMateReader`), not test values. The first run
+  failed on a literal dollar-brace in the manifest comment (fixed in `017a789`). The re-run wrote the `.msix`, and
+  `check-store-package` passed 15/15 (SHA-256 `64ecd6c9…84ad7d`). Placeholders stopping the build was checked earlier
+  (US1). `npm run package` (NSIS) was not re-run in this step._
 
 **Checkpoint**: an unsigned Store package can be built, and its identity and content are checked.
 

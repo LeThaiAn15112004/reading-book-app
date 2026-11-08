@@ -1,8 +1,8 @@
 {
   "_doc": "Spec 010 (data-model §1). The single place for the Microsoft Store package identity. identityName, publisher and publisherDisplayName come from Partner Center → Product identity; until they are copied here, `npm run package:store` stops (check-store-config.mjs). These values are public (they are in every installed manifest), so they live in the repository.",
-  "identityName": "__FROM_PARTNER_CENTER__",
-  "publisher": "__FROM_PARTNER_CENTER__",
-  "publisherDisplayName": "__FROM_PARTNER_CENTER__",
+  "identityName": "anthaile.ReadMateReader",
+  "publisher": "CN=E2395284-7996-4927-857C-B41F415D298E",
+  "publisherDisplayName": "anthaile",
   "applicationId": "ReadmateReader",
   "displayName": "Readmate Reader",
   "languages": ["en-US", "vi-VN"],
