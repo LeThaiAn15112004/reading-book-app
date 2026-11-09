@@ -22,6 +22,17 @@ test('E2E 7 — EPUB TOC still highlights the current chapter by href', async ({
   await expect(content.getByRole('heading', { name: 'Chapter One' })).toBeVisible()
   await openContents(page)
   await waitForStableBox(page.locator('iframe').first())
+
+  // A freshly opened book shows the synthetic cover first (EpubRenderer withSyntheticCoverNav: href '', label
+  // 'Cover'); the Chapter One iframe is already mounted under it. On the cover no TOC entry is the current location.
+  const cover = page.getByRole('img', { name: 'Book cover' })
+  await expect(cover).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Previous page' })).toBeDisabled()
+  await expect(activeTocEntry(page)).toHaveCount(0)
+
+  // Leave the cover: the first chapter becomes the current location.
+  await page.getByRole('button', { name: 'Next page' }).click()
+  await expect(cover).toBeHidden()
   await expectActiveTocEntry(page, 'Chapter One')
 
   // A TOC jump issued soon after the book / sidebar opened can be dropped by epub.js (pre-existing,

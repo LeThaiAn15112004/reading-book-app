@@ -1,9 +1,16 @@
 import type { EpubTocItem } from '../../../../components/reader/renderers/epub'
+import { normalizeHrefForLocation } from '../../../../components/reader/renderers/epub/href'
 import { MobileSheet, MobileSheetRow } from './MobileSheet'
 
 interface FlatTocItem {
   item: EpubTocItem
   depth: number
+}
+
+/** Same href rule as Desktop's TocSidebar: both sides normalised by the one shared function; empty never matches. */
+function hrefMatches(itemHref: string | undefined, activeHref: string | undefined): boolean {
+  if (!itemHref || !activeHref) return false
+  return normalizeHrefForLocation(itemHref) === normalizeHrefForLocation(activeHref)
 }
 
 function flatten(items: readonly EpubTocItem[], depth = 0, out: FlatTocItem[] = []): FlatTocItem[] {
@@ -41,7 +48,7 @@ export function MobileTocSheet({
           <MobileSheetRow
             key={item.id}
             indent={Math.min(depth, 4)}
-            active={(activeId != null && item.id === activeId) || (activeHref != null && item.href === activeHref)}
+            active={(activeId != null && item.id === activeId) || hrefMatches(item.href, activeHref)}
             onSelect={() => {
               onSelect(item)
               onClose()

@@ -200,7 +200,7 @@ test('E: links of a table of contents inside the book scroll to their heading (V
 }) => {
   test.setTimeout(180_000)
   const { page, app } = reader
-  const filler = 'Đoạn văn dài để tạo khoảng cuộn, có tiếng Việt, 日本語 và emoji 🌳.\n\n'.repeat(450)
+  const filler = 'Đoạn văn dài để tạo khoảng cuộn, có tiếng Việt, 日本語 và emoji 🌳.\n\n'.repeat(520)
   const text = [
     '# Tài liệu',
     '',
