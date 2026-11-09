@@ -19,7 +19,7 @@ Sample books: one EPUB, one PDF with a text layer and a `/Lang` (e.g. a French P
 PDF page, one TXT (editable), one Markdown with a code block and a table. Translation model may download on first use.
 
 | # | Steps | Expected | Spec |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | 1 | TXT: toolbar → Translate, select a sentence | panel opens with that sentence, translating | US1-1/2, SC-001 |
 | 2 | TXT, mode on: type, paste, Ctrl+Z | nothing changes; save status shows no new save | US1-5, FR-005, SC-003 |
 | 3 | TXT: Esc (or click Translate again), then type | mode off; typing edits the text at once | US1-4/6 |
