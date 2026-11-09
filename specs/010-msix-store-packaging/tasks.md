@@ -348,7 +348,22 @@ S1, S2 and S4 pass, and every row of `docs/store/smoke-tests.md` passes.
   - **S4**: ask the user to open a PDF attachment and "Show in folder" on a managed book, and confirm.
 
   Print pass / fail per scenario.
+
+  _Not built yet (2026-11-09). S1 was run by hand by the maintainer instead (T038). Decision: the manual S1 is enough
+  to unblock S2 / S4 and the smoke tests now. The script is still required **before T064**, because S3 has to
+  hash the whole direct folder before and after an import, with the direct build running, and a hand-run hash of
+  one file is not enough for that. Scope it then to what a script can check (folder hashes, the private DB,
+  `startup-task.ps1 get` in the package, the `--hidden-at-startup` command line) and keep the UI steps as prompts._
 - [ ] T038 [US2] Run S1, S2 and S4 on a test-signed package (verify-first items of research R4–R7). For each failure, apply the fallback written in research.md (R5: `managedByWindows` + `Enabled="true"`; hidden start → known limitation in `docs/store/checklist.md`), and record the result under the matching R-section of `research.md` as "Verified 2026-mm-dd: …"
+
+  _In progress 2026-11-09 (package `anthaile.ReadMateReader_1.0.0.0_x64__dpq7cpm4v6h3j` with T026–T034, reinstalled
+  2026-11-09 ~11:17):_
+  - _**S1 PASS, run by hand, not through the T037 script.** Deviations: only `reading-book.db` was hashed, not the
+    whole folder. The agent added a LastWriteTime check of every file in the direct folder (WAL / SHM / Preferences
+    included). Use was "a few seconds", but the process lived 7 min 19 s. Details in R4 and the implementation map._
+  - _**S2 partly done:** `startup-task.ps1 get` inside the package answers `{"state":"Disabled"}` (R5, first half).
+    Cloud sign-in, reminder toast and the hidden start at login need the maintainer in the UI._
+  - _**S4 not started:** UI only._
 - [ ] T039 [US2] Add `desktop-main-changes.json` entries for every `EL/` file changed in this phase (`main.ts`, `background/login-item.ts`, `background/store-startup-task.ts`, the background IPC file, `ipc/api-types.ts`, `ipc/channels.ts`, `preload.ts`, `files/external-path*.{ts,mjs}`, `store/*`, each file of T028). Run `npm run check:desktop-baseline`
 - [ ] T040 [US2] Run the full `docs/store/smoke-tests.md` on a clean machine or VM and fill in column `1.0.0`. Every row passes, or is fixed before moving on (SC-003)
 

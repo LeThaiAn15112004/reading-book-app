@@ -10,7 +10,7 @@
 
 | # | Check | How | 1.0.0 |
 |---|---|---|---|
-| 1 | Own data folder | Start the app once, quit. `%LOCALAPPDATA%\Packages\<PFN>\LocalCache\Roaming\Readmate Reader Store\reading-book.db` exists; `%APPDATA%\reading-book-desktop` (if present) has the same file hashes as before (`spike:store:packaged` S1). | — |
+| 1 | Own data folder | Start the app once, quit. `%LOCALAPPDATA%\Packages\<PFN>\LocalCache\Roaming\Readmate Reader Store\reading-book.db` exists; `%APPDATA%\reading-book-desktop` (if present) has the same file hashes as before (`spike:store:packaged` S1). | pass 2026-11-09 (manual; `.db` hash + LastWriteTime of the whole folder, T038) |
 | 2 | Import a local EPUB | Library → Import → a `.epub` from Documents. The book appears; its path stays the original one (book menu → Copy file path). | — |
 | 3 | Import a local PDF | Same with a `.pdf`. | — |
 | 4 | Import a local TXT | Same with a `.txt`. | — |

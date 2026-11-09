@@ -107,3 +107,57 @@ _Results of the Windows validation tasks (T018, T023, T038, T040, T064, T070) ar
   direct build's data") is violated by this pre-US2 package. **Do not launch a Store package again until T026–T027 are
   in it** and spike S1 (T037/T038) passes. Back up `%APPDATA%\reading-book-desktop` first.
 - The smoke tests (T035/T040) were therefore NOT started; the agent did not launch the app.
+
+### T038 — S1 own data folder (2026-11-09) — PASS (manual)
+
+Package `anthaile.ReadMateReader_1.0.0.0_x64__dpq7cpm4v6h3j`, rebuilt with T026–T034 and reinstalled (installed
+`app.asar` dated 2026-11-09 11:17:26), `SignatureKind Developer`, `Status Ok`.
+
+- **Maintainer (by hand):** `Get-FileHash %APPDATA%\reading-book-desktop\reading-book.db` before the session gave
+  `8634DE1D…398BD1`. They opened the Store app, used it, quit fully. The hash after was the same `8634DE1D…398BD1`.
+  `Test-Path …\LocalCache\Roaming\Readmate Reader Store\reading-book.db` → `True`.
+- **Agent (checked afterwards):**
+  - The AppModel-Runtime log has the session as event 201 "Created process 8132" at 11:21:36 and event 217
+    "Destroyed … container" at 11:28:55.
+  - In `%APPDATA%\reading-book-desktop` (recursive), the newest LastWriteTime is `reading-book.db` at 00:39:46, before
+    the session. No file changed between 11:21:36 and 11:28:55. That includes `-wal`, `-shm` and `Preferences`, the
+    files changed in the 2026-11-08 incident.
+  - The current hash of `reading-book.db` is `8634DE1DEB2D862797677D183ACF89714BA325E66EA95DE036D973001D398BD1`.
+  - `Test-Path "$env:APPDATA\Readmate Reader Store"` from a normal shell (outside the package view) → `False`.
+  - The private folder `…\Packages\anthaile.ReadMateReader_dpq7cpm4v6h3j\LocalCache\Roaming\Readmate Reader Store\`
+    holds `reading-book.db` (294,912 bytes, 11:28:54), `Preferences`, `Local State`, `DIPS` and `SharedStorage`.
+- **Deviations from S1 as written in T037:**
+  1. It was run by hand, not through `spike:store:packaged`. **T037 is still not built.** It is not needed to go on
+     with S2 / S4, but it is needed before T064, because S3 must hash the whole folder with the direct build running.
+  2. Only `reading-book.db` was hashed, not the whole folder. With WAL, a write would show up first in `-wal` / `-shm`,
+     not in the `.db` file. The LastWriteTime check of every file covers this, but it is weaker than per-file hashes.
+  3. "One minute of use" in T037 became "a few seconds". The process itself lived 7 min 19 s.
+  4. This was not a clean machine. That is fine for T038. A clean machine is T040.
+- **Result: S1 PASS.** R4 is verified (research.md R4 "Verified 2026-11-09"). The R4 block on launching the package is
+  lifted.
+
+- **Side note: a second run of the pre-T026 package.** The log also shows a Store run from 2026-11-08 22:53:24 to
+  2026-11-09 00:40:06. That run started before commit `054a8c8` (T026–T029, 00:21), so it was still the old package.
+  Files in the direct folder changed during that window: `Local Storage` 22:54, `DIPS-wal` 23:53, caches 00:38,
+  `reading-book.db-wal` 00:39:45, `reading-book.db` 00:39:46. It cannot be told which process wrote them. `npm run dev`
+  also uses `reading-book-desktop` (`source/app/platforms/electron/package.json`), no NSIS build is installed, and dev
+  work was going on at that time. The `.db` and `-wal` are together and consistent. The S1 baseline was taken after
+  this window.
+
+### T038 — S2 startup task, inside the package (2026-11-09) — first part PASS
+
+- The installed `AppxManifest.xml` has `desktop:StartupTask TaskId="ReadmateReaderStartup" Enabled="false"
+  DisplayName="Readmate Reader"`, the startup extension carries `uap10:Parameters="--hidden-at-startup"`, and it has
+  `uap:Protocol Name="readmate-reader"`.
+- `Invoke-CommandInDesktopPackage -PackageFamilyName anthaile.ReadMateReader_dpq7cpm4v6h3j -AppId ReadmateReader
+  -Command cmd.exe -Args '/c powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File
+  "<install>\app\resources\store\startup-task.ps1" get > <file>'` gave `{"state":"Disabled"}`. As a control, the same
+  script outside the package gives `{"error":"Element not found. (Exception from HRESULT: 0x80070490)"}`. **A
+  PowerShell child with package identity resolves the task.** The R5 fallback (`managedByWindows` + `Enabled="true"`)
+  is not needed so far. Developer Mode is on (`AllowDevelopmentWithoutDevLicense = 1`).
+- **Risk for cloud sign-in:** `HKCU\Software\Classes\readmate-reader` exists with `URL Protocol` but no
+  `shell\open\command`. It is probably left over from an older `setAsDefaultProtocolClient` call by the dev or direct
+  build. The agent did not touch it. If the browser does not return to the Store app, suspect this key first. Do not
+  delete it without the maintainer's consent.
+- Still to do (the maintainer, in the UI): cloud sign-in, reminder toast, Start at Login + `--hidden-at-startup`, and
+  S4. Steps are in smoke-tests rows 8, 9, 11, 13, 14 and 15.

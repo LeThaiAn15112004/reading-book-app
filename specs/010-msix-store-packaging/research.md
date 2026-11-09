@@ -105,6 +105,15 @@ before `requestSingleInstanceLock()` and before anything reads `userData`. The f
 unaffected: book files are never under it). *(verify: S1 — after a full session the direct build's folder hashes are
 unchanged and no `Readmate Reader Store` folder exists outside the package view)*
 
+**Verified 2026-11-09 (S1, by hand, not through the `spike:store:packaged` script):** package with T026–T027, Store
+process 11:21:36 → container destroyed 11:28:55 (AppModel-Runtime events 201 / 217). `reading-book.db` of
+`%APPDATA%\reading-book-desktop` had SHA-256 `8634DE1D…398BD1` before and after, checked by the maintainer. No file
+anywhere in that folder has a LastWriteTime after 00:39:46, which is before the session, so `-wal`, `-shm` and
+`Preferences` (the files changed in the 2026-11-08 incident) were not touched either. The new folder exists only in
+the package view, as `%LOCALAPPDATA%\Packages\anthaile.ReadMateReader_dpq7cpm4v6h3j\LocalCache\Roaming\Readmate Reader
+Store\` (`reading-book.db` 294,912 bytes, `Preferences`, `Local State`, `DIPS`, `SharedStorage`). `Test-Path
+"$env:APPDATA\Readmate Reader Store"` from a normal shell → `False`. The decision holds.
+
 **Alternatives considered**: keep the name and rely on virtualization (unsafe, above); disable write virtualization
 with the restricted `unvirtualizedResources` capability (shares the real folders with the direct build, data
 survives uninstall, extra restricted capability to justify).
@@ -123,6 +132,14 @@ the app's own task. States map to `StartAtLoginDto.state`: `Enabled`, `Disabled`
 `DisabledByPolicy`, `EnabledByPolicy`. When the state is `DisabledByUser` / `DisabledByPolicy` the toggle is shown
 off, cannot be switched on, and offers "Open Windows Startup settings" (`ms-settings:startupapps`).
 *(verify: S2 — PowerShell child resolves the task; `uap10:Parameters` arrives in `process.argv`)*
+
+**Partly verified 2026-11-09:** in the installed manifest, `desktop:StartupTask TaskId="ReadmateReaderStartup"
+Enabled="false"` is present and the extension carries `uap10:Parameters="--hidden-at-startup"`. The command
+`Invoke-CommandInDesktopPackage -AppId ReadmateReader` → `cmd /c powershell … startup-task.ps1 get` returned
+`{"state":"Disabled"}`. The same script run outside the package returns `Element not found`. So a PowerShell child
+inside the package resolves the app's task, and the `managedByWindows` fallback is not needed so far. Still to do:
+check the same from the app's own child process (the Settings switch is not "Managed by Windows"), check that
+`enable` works, and check `--hidden-at-startup` in the command line after signing out and back in.
 
 **Fallbacks**: if the PowerShell child does not get package identity → the toggle becomes "Managed by Windows" with
 the Settings button and the task is declared `Enabled="true"` (Windows enables it after first launch; the user turns
