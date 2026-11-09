@@ -1715,6 +1715,11 @@ export function ReaderScreen() {
                 pdfSelectionMenu.close()
                 pdfHighlights.commitMarkupSelection(selection, tool)
               }}
+              translateModeActive={translation.mode}
+              onTranslateSelection={(selection) => {
+                pdfSelectionMenu.close()
+                translation.openForSelection(selection)
+              }}
               hiddenEmbeddedAnnotationIds={pdfHighlights.hiddenEmbeddedObjectIds}
               inkStrokes={pdfInk.strokes}
               selectedInkId={pdfInk.selectedId}

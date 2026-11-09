@@ -95,8 +95,8 @@ check('placeholder is a strict subset of EPUB, apart from Page layout', () => {
   for (const c of placeholder) if (c !== 'pageLayout') assert.ok(epub.has(c), c)
   assert.ok(placeholder.size - 1 < epub.size)
 })
-check('PDF = placeholder + search + text markup + freehand ink + shapes + file attachments + attachments − Aa (no audio / translate yet)', () => {
-  const expected = [...placeholder, 'search', 'markupAnnotations', 'inkAnnotations', 'shapeAnnotations', 'typewriterAnnotations', 'fileAttachments', 'attachments'].filter((c) => c !== 'readingSettings')
+check('PDF = placeholder + search + translate + text markup + freehand ink + shapes + file attachments + attachments − Aa (no audio)', () => {
+  const expected = [...placeholder, 'search', 'translate', 'markupAnnotations', 'inkAnnotations', 'shapeAnnotations', 'typewriterAnnotations', 'fileAttachments', 'attachments'].filter((c) => c !== 'readingSettings')
   assert.deepEqual([...pdf].sort(), expected.sort())
 })
 check('File Attachment tool (specs/007 SC-007): PDF only — never EPUB, TXT, Markdown, MP3 or another audio format', () => {
@@ -147,9 +147,9 @@ check('only renderer-independent tools', () => {
   ])
 })
 
-check('PDF layout: Search in the navigate group, the inline Annotation icons, the Freehand group (Freehand + Shapes + Eraser), no Settings group', () => {
+check('PDF layout: Search + Translate in the navigate group, the inline Annotation icons, the Freehand group (Freehand + Shapes + Eraser), no Settings group', () => {
   assert.deepEqual(shape(resolveToolbarLayout(pdf, 0)), [
-    'navigate:inline[hand,select,search]',
+    'navigate:inline[hand,select,search,translate]',
     'annotation:inline[highlight,underline,squiggly,strikethrough,replace,insert]',
     'freehand:inline[pen,shape,eraser,typewriter,fileAttachment]',
     'tools:inline[snapshot,wordCount]',

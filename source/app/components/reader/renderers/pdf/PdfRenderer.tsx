@@ -227,6 +227,9 @@ export interface PdfRendererProps {
    * selected — the selection to mark with that tool.
    */
   onMarkupSelection?: (selection: PdfSelectionInfo, tool: MarkupTool) => void
+  /** Toolbar Translate mode (spec 011): a press that leaves text selected goes to `onTranslateSelection`. */
+  translateModeActive?: boolean
+  onTranslateSelection?: (selection: PdfSelectionInfo) => void
   /** Insert Text tool: a click (or the end of a drag) at an insertion point between glyphs. */
   onInsertPoint?: (point: PdfInsertionPoint) => void
   /**
@@ -427,6 +430,8 @@ export function PdfRenderer({
   onAnnotationContextMenu,
   onBlankClick,
   onMarkupSelection,
+  translateModeActive = false,
+  onTranslateSelection,
   onInsertPoint,
   hiddenEmbeddedAnnotationIds,
   pagesPerView = 1,
@@ -676,6 +681,10 @@ export function PdfRenderer({
   outlinesOnRef.current = outlinesOn
   const onMarkupSelectionRef = useRef(onMarkupSelection)
   onMarkupSelectionRef.current = onMarkupSelection
+  const translateModeRef = useRef(translateModeActive)
+  translateModeRef.current = translateModeActive
+  const onTranslateSelectionRef = useRef(onTranslateSelection)
+  onTranslateSelectionRef.current = onTranslateSelection
   const onInsertPointRef = useRef(onInsertPoint)
   onInsertPointRef.current = onInsertPoint
   const onAnnotationClickRef = useRef(onAnnotationClick)
@@ -2472,6 +2481,15 @@ export function PdfRenderer({
     // Only a selection THIS press made: a press that landed on non-selectable space (a gap, the
     // `.endOfContent` filler) leaves an older selection untouched, and committing that one would
     // mark text the user never dragged.
+    // Translate mode (spec 011): same "only a selection THIS press made" rule as markup. A page without a text layer
+    // never yields a selection, so nothing happens there (FR-010).
+    if (translateModeRef.current && !gesture.pan && rootRef.current && selectionChangedSince(gesture.selectionAtDown)) {
+      const selection = readPdfSelection(rootRef.current)
+      if (selection) {
+        onTranslateSelectionRef.current?.(selection)
+        return
+      }
+    }
     if (tool && !gesture.pan && rootRef.current && selectionChangedSince(gesture.selectionAtDown)) {
       const selection = readPdfSelection(rootRef.current)
       if (selection) {

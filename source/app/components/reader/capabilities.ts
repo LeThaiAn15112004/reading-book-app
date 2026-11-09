@@ -68,7 +68,8 @@ const SURFACE_CAPABILITIES: Record<ReaderSurface, readonly ReaderCapability[]> =
   // normalized rects (docs/implementation_plan/pdf_text_annotations.md). No `readingSettings`: every
   // Aa option is EPUB reflow (font, size, margins…) and does nothing to a fixed-layout page; zoom
   // lives in the footer.
-  pdf: ['interaction', 'pan', 'search', 'markupAnnotations', 'snapshot', 'wordCount', 'pageLayout', 'inkAnnotations', 'shapeAnnotations', 'typewriterAnnotations', 'fileAttachments', 'attachments'],
+  // Translate (spec 011): selection menu + Translate mode on the text layer.
+  pdf: ['interaction', 'pan', 'search', 'translate', 'markupAnnotations', 'snapshot', 'wordCount', 'pageLayout', 'inkAnnotations', 'shapeAnnotations', 'typewriterAnnotations', 'fileAttachments', 'attachments'],
   // TXT: one continuous, editable text. No Hand / Select tools (the text box is live: click = caret,
   // drag = selection); the Edit tool is the way back from a markup tool, no page layout (there are no pages), no search painting / read aloud.
   // Translate (spec 011): selection menu + Translate mode; the text is read-only while the mode is on. Markup is stored as
