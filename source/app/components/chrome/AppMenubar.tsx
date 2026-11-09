@@ -8,6 +8,11 @@ import {
 } from 'react'
 import { createPortal } from 'react-dom'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
+import type { ExternalLibraryProvider } from '@core'
+import {
+  cloudProviderUnavailableLabel,
+  useCloudProviderAvailability,
+} from '../../hooks/app/cloudProviderAvailabilityStore'
 import { flushRegisteredSession } from '../../screens/Reader/logic'
 import {
   useAppNav,
@@ -29,10 +34,14 @@ const PRIMARY_ITEMS: readonly NavItem[] = [
 
 type CloudProviderNavId = 'cloud-google-drive' | 'cloud-dropbox' | 'cloud-onedrive'
 
-const CLOUD_PROVIDER_ITEMS: readonly { id: CloudProviderNavId; label: string }[] = [
-  { id: 'cloud-google-drive', label: 'Google Drive' },
-  { id: 'cloud-dropbox', label: 'Dropbox' },
-  { id: 'cloud-onedrive', label: 'OneDrive' },
+const CLOUD_PROVIDER_ITEMS: readonly {
+  id: CloudProviderNavId
+  label: string
+  provider: ExternalLibraryProvider
+}[] = [
+  { id: 'cloud-google-drive', label: 'Google Drive', provider: 'google_drive' },
+  { id: 'cloud-dropbox', label: 'Dropbox', provider: 'dropbox' },
+  { id: 'cloud-onedrive', label: 'OneDrive', provider: 'onedrive' },
 ]
 
 const CLOUD_MENU_CLOSE_DELAY_MS = 300
@@ -65,6 +74,8 @@ function CloudSourcesMenuItem({
 }) {
   const [open, setOpen] = useState(false)
   const [menuPos, setMenuPos] = useState<{ left: number; top: number } | null>(null)
+  // Spec 010 KL-1: a provider this build does not offer is listed but cannot be opened (no Connect button anywhere).
+  const availability = useCloudProviderAvailability()
   const wrapperRef = useRef<HTMLDivElement>(null)
   const buttonRef = useRef<HTMLButtonElement>(null)
   const menuRef = useRef<HTMLDivElement>(null)
@@ -197,20 +208,30 @@ function CloudSourcesMenuItem({
                 }}
                 aria-hidden
               />
-              {CLOUD_PROVIDER_ITEMS.map((item) => (
-                <button
-                  key={item.id}
-                  type="button"
-                  role="menuitem"
-                  className="flex h-8 w-full cursor-pointer items-center rounded-md border-none bg-transparent px-2.5 text-left text-[13px] text-lib-text-strong transition-colors hover:bg-white/5 focus-visible:bg-white/5 focus-visible:outline-none"
-                  onClick={() => {
-                    setOpen(false)
-                    onSelectProvider(item.id)
-                  }}
-                >
-                  {item.label}
-                </button>
-              ))}
+              {CLOUD_PROVIDER_ITEMS.map((item) => {
+                const unavailable = cloudProviderUnavailableLabel(availability[item.provider])
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    role="menuitem"
+                    disabled={unavailable !== null}
+                    aria-disabled={unavailable !== null}
+                    title={unavailable ? `${item.label} — ${unavailable}` : undefined}
+                    className="flex h-8 w-full cursor-pointer items-center justify-between gap-2 rounded-md border-none bg-transparent px-2.5 text-left text-[13px] text-lib-text-strong transition-colors hover:bg-white/5 focus-visible:bg-white/5 focus-visible:outline-none disabled:cursor-default disabled:text-lib-muted disabled:hover:bg-transparent"
+                    onClick={() => {
+                      if (unavailable) return
+                      setOpen(false)
+                      onSelectProvider(item.id)
+                    }}
+                  >
+                    <span>{item.label}</span>
+                    {unavailable ? (
+                      <span className="text-[11px] font-medium text-lib-muted">{unavailable}</span>
+                    ) : null}
+                  </button>
+                )
+              })}
             </div>,
             document.body,
           )

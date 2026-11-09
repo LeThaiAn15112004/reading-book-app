@@ -72,6 +72,8 @@ export const CloudChannels = {
   cancelDownload: 'cloud:cancelDownload',
   /** Main → renderer: streamed byte progress while a cloud download is in flight. */
   downloadProgress: 'cloud:downloadProgress',
+  /** Which providers this build offers (spec 010 KL-1). */
+  getProviderAvailability: 'cloud:getProviderAvailability',
 } as const
 
 export const OverlayChannels = {

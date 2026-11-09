@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { NavFilterId } from '@core'
+import { useCloudProviderAvailabilityStore } from '../app/cloudProviderAvailabilityStore.js'
 import {
   CLOUD_STUB_NAV_PROVIDER,
   navIdForView,
@@ -47,7 +48,10 @@ export function useLibraryView(options: UseLibraryViewOptions = {}) {
       return
     }
     if (isCloudStubNavId(id)) {
-      setView({ kind: 'cloud-sources', provider: CLOUD_STUB_NAV_PROVIDER[id] })
+      const provider = CLOUD_STUB_NAV_PROVIDER[id]
+      // Spec 010 KL-1: never open the screen (and its Connect button) of a provider this build does not offer.
+      if (!useCloudProviderAvailabilityStore.getState().availability[provider].available) return
+      setView({ kind: 'cloud-sources', provider })
       return
     }
     onComingSoon?.()

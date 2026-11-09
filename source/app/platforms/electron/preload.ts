@@ -339,6 +339,7 @@ const api: DesktopApi = {
       ipcRenderer.invoke(CloudChannels.downloadAndImport, provider, entry),
     cancelDownload: (externalId) =>
       ipcRenderer.invoke(CloudChannels.cancelDownload, externalId),
+    getProviderAvailability: () => ipcRenderer.invoke(CloudChannels.getProviderAvailability),
     onDownloadProgress: (handler) => {
       const listener = (
         _event: Electron.IpcRendererEvent,

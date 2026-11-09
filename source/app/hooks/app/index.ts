@@ -36,5 +36,11 @@ export type {
 } from './GlobalReadingPrefsContext.js'
 
 export { useLinkedLibraries } from './useLinkedLibraries.js'
+export {
+  cloudProviderUnavailableLabel,
+  useCloudProviderAvailability,
+  useCloudProviderAvailabilityStore,
+} from './cloudProviderAvailabilityStore.js'
+export type { CloudProviderAvailability } from './cloudProviderAvailabilityStore.js'
 export type { UseLinkedLibrariesOptions } from './useLinkedLibraries.js'
 

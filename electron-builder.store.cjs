@@ -9,6 +9,7 @@
 // only ADDS the startup-task script; the base FFmpeg entry is inherited and must not be repeated.
 const path = require('node:path')
 const identity = require('./source/app/platforms/electron/store/store-identity.json')
+const { EMBEDDED_KEY, resolveCloudPublicIds } = require('./source/scripts/store/cloud-public-ids.cjs')
 
 const STORE_DIR = 'source/app/platforms/electron/store'
 
@@ -16,6 +17,10 @@ const { _doc, ...appxIdentity } = identity
 
 module.exports = {
   extends: './electron-builder.json5',
+  // Public OAuth client IDs (Dropbox app key, Entra ID client ID; never a secret) → app.asar/package.json, read by Main
+  // in config/cloud-oauth-config.ts (KL-1). Objects merge, so the base name / version / main are kept. Only values that
+  // passed every check are here; package-store.mjs stops before building when one is missing or wrong.
+  extraMetadata: { [EMBEDDED_KEY]: resolveCloudPublicIds().ids },
   // Windows Kits 10.0.26100 (signtool / makeappx / makepri), checksum-pinned by app-builder-lib. The default toolset
   // (winCodeSign-2.6.0) ships a 2016 signtool that cannot sign an .msix ("A required function is not present").
   // Store config only: the NSIS build keeps the default toolset. Labelled beta by electron-builder 26.18.

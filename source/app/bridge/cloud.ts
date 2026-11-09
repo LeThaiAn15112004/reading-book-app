@@ -13,6 +13,8 @@ export const cloudApi = {
     entry: Parameters<typeof api.cloud.downloadAndImport>[1],
   ) => api.cloud.downloadAndImport(provider, entry),
   cancelDownload: (externalId: string) => api.cloud.cancelDownload(externalId),
+  /** Which providers this build offers (spec 010 KL-1). */
+  getProviderAvailability: () => api.cloud.getProviderAvailability(),
   onDownloadProgress: (
     handler: Parameters<typeof api.cloud.onDownloadProgress>[0],
   ) => api.cloud.onDownloadProgress(handler),

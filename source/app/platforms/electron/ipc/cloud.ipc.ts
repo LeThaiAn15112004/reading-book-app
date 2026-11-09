@@ -27,7 +27,11 @@ import {
   OAUTH_REDIRECT_URI,
   isSupportedExtension,
 } from '@core/config'
-import { loadDropboxOAuthCredentials, loadOneDriveOAuthCredentials } from '../config/cloud-oauth-config'
+import {
+  getCloudProviderAvailability,
+  loadDropboxOAuthCredentials,
+  loadOneDriveOAuthCredentials,
+} from '../config/cloud-oauth-config'
 import { loadGoogleOAuthCredentials } from '../config/google-oauth-config'
 import { sanitizeFilename } from '../files/metadata-filename'
 import { openGoogleOAuthViaLoopback } from '../oauth/google-loopback-server'
@@ -44,6 +48,7 @@ import {
 import type {
   CloudCatalogEntryDto,
   CloudConnectResult,
+  CloudProviderAvailabilityDto,
   CloudDownloadProgressDto,
   CloudDownloadResult,
   CloudProviderDto,
@@ -263,6 +268,10 @@ export function handleOAuthCallbackUrl(url: string): boolean {
 }
 
 async function connect(provider: CloudProviderDto): Promise<CloudConnectResult> {
+  // Spec 010 KL-1: a provider this build does not offer (Google Drive in a packaged build) never starts a sign-in.
+  if (!getCloudProviderAvailability()[provider].available) {
+    return { ok: false, errorMessage: 'This cloud source is not available in this version of Readmate yet.' }
+  }
   const kit = getKits()[provider]
   const state = randomUUID()
   const { codeVerifier, codeChallenge } = await pkceGenerators[provider]()
@@ -546,6 +555,12 @@ export function registerCloudIpc(): void {
         },
       )
     },
+  )
+
+  ipcMain.removeHandler(CloudChannels.getProviderAvailability)
+  ipcMain.handle(
+    CloudChannels.getProviderAvailability,
+    (): CloudProviderAvailabilityDto => getCloudProviderAvailability(),
   )
 
   ipcMain.removeHandler(CloudChannels.cancelDownload)

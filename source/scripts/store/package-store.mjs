@@ -9,6 +9,7 @@
 // Steps, each stopping the run with its name when it fails:
 //   1. Windows only (platform-guard)          5. electron-builder --win appx --config electron-builder.store.cjs
 //   2. check-store-config (no placeholders)   6. check-desktop-package on release/<v>/win-unpacked/resources/app.asar
+//      + public cloud client IDs (KL-1)          + the cloud IDs read back from that app.asar's package.json
 //   3. store icons                            7. check-store-package on the .msix
 //   4. tsc + check:package-deps + vite build  8. print the package path + SHA-256
 //
@@ -17,11 +18,15 @@
 import { spawnSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { createReadStream, existsSync } from 'node:fs'
+import { createRequire } from 'node:module'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { checkStoreConfig, loadStoreInputs } from './check-store-config.mjs'
 import { requireWindows } from './platform-guard.mjs'
 import { readPfxSubject, resolveTestSigning } from './test-sign.mjs'
+
+const require = createRequire(import.meta.url)
+const { PUBLIC_IDS, readAsarFile, resolveCloudPublicIds, verifyEmbedded } = require('./cloud-public-ids.cjs')
 
 const here = path.dirname(fileURLToPath(import.meta.url))
 const repoRoot = path.resolve(here, '../../..')
@@ -96,6 +101,16 @@ async function main(argv) {
   const version = inputs.version
   const env = unsignedChildEnv(process.env)
 
+  // Public cloud client IDs (KL-1): Dropbox + OneDrive sign-in need them in the package. Never a secret.
+  console.log('▶ package:store — cloud client IDs')
+  const cloud = resolveCloudPublicIds({ env: process.env })
+  if (cloud.errors.length > 0) {
+    console.error(`cloud client IDs: ${cloud.errors.length} problem(s), nothing built:`)
+    for (const e of cloud.errors) console.error(`  [${e.code}] ${e.message}`)
+    return 1
+  }
+  for (const row of PUBLIC_IDS) console.log(`  ${row.label}: from ${cloud.sources[row.key]} (public, embedded)`)
+
   // Test signing (US4): decided BEFORE anything is built; a wrong certificate builds nothing.
   const signing = resolveTestSigning({
     argv,
@@ -131,6 +146,15 @@ async function main(argv) {
 
   const out = releasePaths(version)
   step('check-desktop-package', [node, path.join(repoRoot, 'source/scripts/check-desktop-package.mjs'), out.asar], { env })
+  console.log('
+▶ package:store — cloud client IDs in app.asar')
+  const embedded = verifyEmbedded(JSON.parse(readAsarFile(out.asar, 'package.json').toString('utf8')), cloud.ids)
+  if (embedded.length > 0) {
+    for (const p of embedded) console.error(`  ✖ ${p}`)
+    console.error('✖ package:store stopped at "cloud client IDs in app.asar"')
+    return 1
+  }
+  console.log('  PASS  package.json carries exactly the resolved public IDs')
   if (!existsSync(out.msix)) {
     console.error(`✖ package:store: electron-builder finished but ${out.msix} does not exist`)
     return 1

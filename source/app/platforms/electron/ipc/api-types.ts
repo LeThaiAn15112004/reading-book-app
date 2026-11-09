@@ -205,6 +205,18 @@ export interface SnapshotRegionDto {
 
 export type CloudProviderDto = 'google_drive' | 'dropbox' | 'onedrive'
 
+/**
+ * Spec 010 KL-1: why a Cloud Source is not offered. `coming_soon` = a packaged build (Google Drive, until a
+ * token-exchange service exists); `not_configured` = development without that provider's OAuth client.
+ */
+export type CloudProviderUnavailableReasonDto = 'coming_soon' | 'not_configured'
+
+/** Which Cloud Sources this build offers (`cloud:getProviderAvailability`). */
+export type CloudProviderAvailabilityDto = Record<
+  CloudProviderDto,
+  { available: boolean; reason?: CloudProviderUnavailableReasonDto }
+>
+
 export interface CloudCatalogEntryDto {
   externalId: string
   sourceProvider: CloudProviderDto
@@ -1230,6 +1242,8 @@ export interface DesktopApi {
     cancelDownload(externalId: string): Promise<OkResult>
     /** Subscribe to byte progress for the in-flight cloud download(s). Returns unsubscribe. */
     onDownloadProgress(handler: (progress: CloudDownloadProgressDto) => void): () => void
+    /** Which providers this build offers (Google Drive is "coming soon" in packaged builds, spec 010 KL-1). */
+    getProviderAvailability(): Promise<CloudProviderAvailabilityDto>
   }
   notifications: {
     getSupport(): Promise<NotificationSupportDto>
