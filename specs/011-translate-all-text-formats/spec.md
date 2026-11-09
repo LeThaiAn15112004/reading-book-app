@@ -25,6 +25,16 @@ default instead of the book's language.
 This feature makes both entry points behave the same in all four text formats. Audiobooks are not text formats and are
 not covered.
 
+## Clarifications
+
+### Session 2026-11-09
+
+- Q: While the Translate tool is on in a TXT book, should the user still be able to edit the text? → A: No — the text
+  is read-only while Translate mode is on (select and scroll still work); turning the tool off makes it editable again.
+- Q: If the user picks a book's source language by hand, should the app remember it the next time that book is
+  opened? → A: Yes — remembered per book and reused every time that book is opened, in every text format (EPUB
+  included).
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Translate mode works in TXT and Markdown (Priority: P1)
@@ -49,8 +59,11 @@ translation. Works without any PDF change.
    **Then** the panel shows the new phrase and the previous request is cancelled.
 4. **Given** Translate mode is on, **When** the user presses Escape or turns the tool off, **Then** the mode ends and the
    next selection behaves as an ordinary selection (selection menu, no automatic panel).
-5. **Given** Translate mode is on in a TXT book, **When** the user clicks to place the caret or types without making a
-   selection, **Then** no translation panel opens and editing works as usual.
+5. **Given** Translate mode is on in a TXT book, **When** the user clicks without making a selection or presses a key
+   that would type or delete, **Then** no translation panel opens and the text does not change (the text is read-only
+   while Translate mode is on).
+6. **Given** Translate mode was on in a TXT book, **When** the user turns it off, **Then** the text is editable again
+   immediately, with no reload.
 
 ---
 
@@ -81,8 +94,8 @@ opens with a translation.
 ### User Story 3 - Sensible source language in every format (Priority: P3)
 
 When translation starts from a PDF, TXT or Markdown book, the source language starts from the book's language (from its
-metadata when known), not from a fixed default. The user can still change the source language by hand, and that choice
-is kept for the rest of the book as it is in EPUB.
+metadata when known), not from a fixed default. The user can still change the source language by hand; that choice is
+remembered for that book and used again every time the book is opened, in every text format (EPUB included).
 
 **Why this priority**: The translation already runs; a wrong starting source language only costs one extra click to fix,
 but it makes non-EPUB formats feel second-class.
@@ -98,13 +111,18 @@ source language shown is the book's language.
    source language starts from the same default as an EPUB with no language, and the user can change it.
 3. **Given** the user has picked the source language by hand, **When** they translate another selection in the same
    book, **Then** their choice is kept.
+4. **Given** the user picked a source language by hand for a book and closed it, **When** they open that book again
+   (after a restart too) and translate a selection, **Then** the source language starts as their choice, even if the
+   book's metadata names another language.
+5. **Given** the user picked a source language for book X, **When** they open book Y, **Then** book Y starts from its
+   own remembered choice, or its metadata language, or the default — never from book X's choice.
 
 ---
 
 ### Edge Cases
 
-- A selection longer than the translation limit: handled the same way in every format as in EPUB today (same message,
-  same truncation or refusal).
+- A selection longer than the translation limit (20,000 characters today): refused with the same "Selection is too
+  long" message in every format, as in EPUB; nothing is truncated.
 - An empty or whitespace-only selection: no panel opens.
 - A selection that is only part of a Markdown code block, table cell or link text: the selected characters are
   translated as plain text; markup symbols that are not displayed are not included.
@@ -125,13 +143,17 @@ source language shown is the book's language.
   format.
 - **FR-004**: Translate mode MUST end the same way in every format: turning the tool off, pressing Escape, choosing
   another exclusive tool, or leaving / switching the book.
-- **FR-005**: Translate mode MUST never change the book content: in TXT it must not modify the text, move the caret in
-  a way that loses the selection, or create a saved revision; in PDF it must not create annotations or write to the file.
+- **FR-005**: Translate mode MUST never change the book content. In TXT the text MUST be read-only while Translate
+  mode is on (selecting and scrolling still work; typing, deleting, pasting and cutting do nothing; no revision is
+  saved) and editable again as soon as the mode ends. In PDF it must not create annotations or write to the file.
 - **FR-006**: A new selection while the panel is open MUST replace the source text and cancel the earlier request, in
   every format.
-- **FR-007**: The source language MUST start from the book's language when the app knows it, for every text format,
-  and fall back to the existing default otherwise; a source language chosen by hand MUST be kept for the rest of the
-  book, as in EPUB.
+- **FR-007**: The starting source language MUST be, in this order: the source language the user last chose by hand for
+  that book; else the book's language when the app knows it from metadata; else the existing default. This applies to
+  every text format (EPUB included).
+- **FR-007a**: A source language chosen by hand MUST be remembered per book and survive closing the book and
+  restarting the app. Choosing a target language does not change it. Removing the book from the library removes it.
+  It MUST NOT affect any other book.
 - **FR-008**: The translation panel, its language choices, model download, progress, errors, read-aloud of the result,
   panel position and size MUST be the same in every format (one shared panel, not one per format).
 - **FR-009**: The text sent for translation MUST be the text the user sees as selected, in reading order (PDF: text
@@ -145,7 +167,10 @@ source language shown is the book's language.
 ### Key Entities
 
 - **Translation selection**: the selected text plus an optional language hint; the same shape for every format.
-- **Book language**: the language from the book's metadata, when known; used as the starting source language.
+- **Book language**: the language from the book's metadata, when known; used as the starting source language when the
+  user has not chosen one for that book.
+- **Remembered source language**: the source language the user last chose by hand for one book; belongs to that book,
+  persists across sessions, takes precedence over the book language.
 
 ## Success Criteria *(mandatory)*
 
@@ -159,6 +184,8 @@ source language shown is the book's language.
   (no revision created).
 - **SC-004**: For a book whose language is known, the source language shown at the first translation matches it in
   every format.
+- **SC-006**: After choosing a source language by hand, closing the book and restarting the app, the first translation
+  in that book starts with the chosen language in 100% of attempts, in every text format.
 - **SC-005**: No regression in EPUB: every existing EPUB translation check still passes.
 
 ## Assumptions
