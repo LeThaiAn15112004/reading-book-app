@@ -14,7 +14,7 @@
     "source/app/platforms/electron/persistence/migrations/": "T029: the 30 migrations moved byte-identical to source/core/src/db/desktop/migrations (hashes in desktop-migrations.sha256.json)",
     "source/app/platforms/electron/persistence/migrate.ts": "T029: the ?raw imports read the migrations from their new folder (list and order unchanged)",
     "source/app/platforms/electron/persistence/sqlite-library-store.ts": "T032: SQL and row codecs come from core (libraryStatements / libraryCodec), run through the SyncSqlDriver; control flow and transactions unchanged",
-    "source/app/platforms/electron/persistence/sqlite-overlay-store.ts": "T033: SQL and note_json codecs come from core (overlayStatements / overlayCodec), run through the SyncSqlDriver; the manual BEGIN IMMEDIATE blocks are driver.transaction(…, immediate); behaviour unchanged",
+    "source/app/platforms/electron/persistence/sqlite-overlay-store.ts": "T033: SQL and note_json codecs come from core (overlayStatements / overlayCodec), run through the SyncSqlDriver; the manual BEGIN IMMEDIATE blocks are driver.transaction(…, immediate); behaviour unchanged | spec 011: getTranslationSource / setTranslationSource (reading_state_json.translationSourceLang, json_patch)",
     "source/app/platforms/electron/persistence/sqlite-txt-store.ts": "T034: SQL and row codec come from core (txtStatements / txtCodec), run through the SyncSqlDriver; commit keeps its own immediate transaction",
     "source/app/platforms/electron/persistence/sqlite-audio-store.ts": "T035: SQL and the Notes rules come from core (audioStatements / audioCodec), run through the SyncSqlDriver; behaviour unchanged",
     "source/app/platforms/electron/persistence/sqlite-transcript-store.ts": "T036: SQL, row codecs and limits come from core (transcriptStatements / transcriptCodec), run through the SyncSqlDriver; commitWindow keeps its single transaction",
@@ -42,7 +42,7 @@
     "source/app/platforms/electron/files/open-book-content.ts": "T049: import name @reading-book/* replaced by @core/* (import specifier only)",
     "source/app/platforms/electron/files/relink-book.ts": "T049: import name @reading-book/* replaced by @core/* (import specifier only)",
     "source/app/platforms/electron/files/sandbox.ts": "T049: import name @reading-book/* replaced by @core/* (import specifier only)",
-    "source/app/platforms/electron/ipc/api-types.ts": "T049: import name @reading-book/* replaced by @core/* (import specifier only) | spec 010 T032–T033: StartAtLoginDto.state (Store build only) + background.openStartupSettings | spec 010 KL-1: CloudProviderAvailabilityDto + cloud.getProviderAvailability",
+    "source/app/platforms/electron/ipc/api-types.ts": "T049: import name @reading-book/* replaced by @core/* (import specifier only) | spec 010 T032–T033: StartAtLoginDto.state (Store build only) + background.openStartupSettings | spec 010 KL-1: CloudProviderAvailabilityDto + cloud.getProviderAvailability | spec 011: translation.getSourceLanguage / setSourceLanguage + TranslationSource*Dto",
     "source/app/platforms/electron/ipc/app.ipc.ts": "T049: import name @reading-book/* replaced by @core/* (import specifier only)",
     "source/app/platforms/electron/ipc/audio.ipc.ts": "T049: import name @reading-book/* replaced by @core/* (import specifier only)",
     "source/app/platforms/electron/ipc/graphics.ipc.ts": "T049: import name @reading-book/* replaced by @core/* (import specifier only)",
@@ -104,7 +104,8 @@
     "source/app/platforms/electron/config/cloud-availability-core.d.mts": "spec 010 KL-1: new, types of cloud-availability-core.mjs",
     "source/app/platforms/electron/background/login-item.ts": "spec 010 T032: readStartAtLogin / changeStartAtLogin delegate to the startup task in the Store build (sync direct-build API unchanged)",
     "source/app/platforms/electron/ipc/background.ipc.ts": "spec 010 T032–T033: Start at Login handlers async (Store startup task); new background:openStartupSettings (Store build only, fixed ms-settings URI)",
-    "source/app/platforms/electron/ipc/channels.ts": "spec 010 T033: BackgroundChannels.openStartupSettings | spec 010 KL-1: CloudChannels.getProviderAvailability",
-    "source/app/platforms/electron/preload.ts": "spec 010 T033: background.openStartupSettings | spec 010 KL-1: cloud.getProviderAvailability"
+    "source/app/platforms/electron/ipc/channels.ts": "spec 010 T033: BackgroundChannels.openStartupSettings | spec 010 KL-1: CloudChannels.getProviderAvailability | spec 011: TranslationChannels.getSourceLanguage / setSourceLanguage",
+    "source/app/platforms/electron/preload.ts": "spec 010 T033: background.openStartupSettings | spec 010 KL-1: cloud.getProviderAvailability | spec 011: translation.getSourceLanguage / setSourceLanguage",
+    "source/app/platforms/electron/ipc/translation.ipc.ts": "spec 011: translation:getSourceLanguage / setSourceLanguage handlers (remembered translation source language per book)"
   }
 }

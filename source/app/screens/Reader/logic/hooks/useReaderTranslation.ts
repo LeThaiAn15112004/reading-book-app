@@ -29,9 +29,9 @@ export function useReaderTranslation({ bookId, setToast }: UseReaderTranslationO
   useEffect(() => translationApi.onProgress(handleProgress), [handleProgress])
 
   useEffect(() => {
-    resetForNewBook()
+    resetForNewBook(bookId)
     return () => {
-      resetForNewBook()
+      resetForNewBook(undefined)
       setMode(false)
     }
   }, [bookId, resetForNewBook, setMode])

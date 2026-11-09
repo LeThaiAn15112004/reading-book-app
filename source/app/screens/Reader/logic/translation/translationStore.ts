@@ -3,6 +3,7 @@ import {
   findTranslationLanguage,
   normalizeTranslationLanguage,
   resolveTranslationRoute,
+  resolveTranslationSource,
   type TtsEngine,
 } from '@core'
 import { translationApi, type TranslationErrorCode, type TranslationProgress } from '../../../../bridge'
@@ -132,8 +133,13 @@ type TranslationState = TranslationContext & {
   mode: boolean
   popover: TranslationPopoverState | null
   sourceLang: string
-  /** The user picked the source by hand — stop overwriting it from each selection's `lang`. */
+  /**
+   * The user picked the source by hand (now or in an earlier session — remembered per book, spec 011 FR-007a) — stop
+   * overwriting it from each selection's `lang`.
+   */
   sourceLocked: boolean
+  /** The open book: where a hand-picked source is remembered. */
+  bookId: string | null
   targetLang: string
   recentTargets: string[]
   status: TranslationStatus
@@ -167,8 +173,11 @@ type TranslationState = TranslationContext & {
   copyResult: () => void
   toggleSpeak: () => void
   handleProgress: (progress: TranslationProgress) => void
-  /** Per-book reset: closes the popover and forgets a hand-picked source language. */
-  resetForNewBook: () => void
+  /**
+   * Per-book reset: closes the popover, drops the previous book's source, then loads the source remembered for
+   * `bookId` (none → the selection's language / the default, as before).
+   */
+  resetForNewBook: (bookId: string | undefined) => void
   setPanelPosition: (position: PanelPosition | null) => void
   setPanelDragging: (dragging: boolean) => void
   setPanelSize: (size: PanelSize | null) => void
@@ -235,8 +244,11 @@ export const useTranslationStore = create<TranslationState>()((set, get) => {
   const open = (info: TranslationSelection) => {
     const text = info.text.trim()
     if (!text) return
-    const detected = normalizeTranslationLanguage(info.lang) ?? FALLBACK_SOURCE
-    const sourceLang = get().sourceLocked ? get().sourceLang : detected
+    const sourceLang = resolveTranslationSource({
+      remembered: get().sourceLocked ? get().sourceLang : null,
+      selectionLang: info.lang,
+      fallback: FALLBACK_SOURCE,
+    })
     set({
       popover: { sourceText: text },
       sourceLang,
@@ -245,12 +257,27 @@ export const useTranslationStore = create<TranslationState>()((set, get) => {
     void run()
   }
 
+  /** Remember a hand-picked source for the open book. Best-effort: a failure only means it is not remembered. */
+  const rememberSource = (code: string) => {
+    const { bookId } = get()
+    if (!bookId) return
+    translationApi
+      .setSourceLanguage(bookId, code)
+      .then((result) => {
+        if (!result.ok) console.warn(`[translation] source language not remembered (${result.code})`)
+      })
+      .catch(() => {
+        /* not available on this host (Mobile) or Main gone: keep the per-session behaviour */
+      })
+  }
+
   return {
     setToast: () => {},
     mode: false,
     popover: null,
     sourceLang: FALLBACK_SOURCE,
     sourceLocked: false,
+    bookId: null,
     targetLang: stored.targetLang,
     recentTargets: stored.recentTargets,
     status: 'idle',
@@ -283,6 +310,7 @@ export const useTranslationStore = create<TranslationState>()((set, get) => {
     setSourceLang: (code) => {
       if (!findTranslationLanguage(code) || code === get().sourceLang) return
       set({ sourceLang: code, sourceLocked: true })
+      rememberSource(code)
       void run()
     },
 
@@ -297,6 +325,8 @@ export const useTranslationStore = create<TranslationState>()((set, get) => {
     swapLanguages: () => {
       const { sourceLang, targetLang, result } = get()
       set({ sourceLang: targetLang, targetLang: sourceLang, sourceLocked: true })
+      // Swap is a hand choice of the source too (spec 011 FR-007a).
+      rememberSource(targetLang)
       // Swapping after a result translates the result back — the useful reading of "swap".
       const popover = get().popover
       if (popover && result) set({ popover: { ...popover, sourceText: result } })
@@ -365,9 +395,31 @@ export const useTranslationStore = create<TranslationState>()((set, get) => {
       set({ status: 'loading-model', progress: next })
     },
 
-    resetForNewBook: () => {
+    resetForNewBook: (bookId) => {
       get().close()
-      set({ sourceLocked: false })
+      set({ sourceLocked: false, sourceLang: FALLBACK_SOURCE, bookId: bookId ?? null })
+      if (!bookId) return
+      translationApi
+        .getSourceLanguage(bookId)
+        .then((result) => {
+          // Another book opened meanwhile, or the user already picked a source by hand: this answer is stale.
+          if (get().bookId !== bookId || get().sourceLocked) return
+          if (!result.ok) {
+            console.warn(`[translation] remembered source language not read (${result.code})`)
+            return
+          }
+          if (!result.lang || !findTranslationLanguage(result.lang)) return
+          const translatedWith = get().popover ? get().sourceLang : null
+          set({ sourceLang: result.lang, sourceLocked: true })
+          // A selection translated before this answer arrived used the fallback: translate it again.
+          if (translatedWith !== null && translatedWith !== result.lang) {
+            set({ targetLang: targetFor(result.lang, get().targetLang) })
+            void run()
+          }
+        })
+        .catch(() => {
+          /* not available on this host (Mobile) or Main gone: keep the per-session behaviour */
+        })
     },
 
     setPanelPosition: (position) => {

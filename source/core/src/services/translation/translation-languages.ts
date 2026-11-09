@@ -124,6 +124,21 @@ export function normalizeTranslationLanguage(tag: string | null | undefined): st
   return BY_CODE.has(primary) ? primary : null
 }
 
+/**
+ * The source language a translation starts from (spec 011 FR-007), the first that applies:
+ * 1. `remembered` — the source the user last chose by hand for this book — when it is a catalog code;
+ * 2. the selection's own language hint (EPUB `lang` attribute, PDF `/Lang`), normalized to a catalog code;
+ * 3. `fallback`.
+ */
+export function resolveTranslationSource(input: {
+  remembered: string | null | undefined
+  selectionLang: string | null | undefined
+  fallback: string
+}): string {
+  if (input.remembered && findTranslationLanguage(input.remembered)) return input.remembered
+  return normalizeTranslationLanguage(input.selectionLang) ?? input.fallback
+}
+
 /** Model + hints for `source → target`, or null when either language isn't in the catalog. */
 export function resolveTranslationRoute(source: string, target: string): TranslationRoute | null {
   const from = findTranslationLanguage(source)

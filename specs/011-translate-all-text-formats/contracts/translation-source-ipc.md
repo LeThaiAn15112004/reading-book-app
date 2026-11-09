@@ -10,7 +10,7 @@ Two new channels in the existing `TranslationChannels` group
 getSourceLanguage(bookId: string): Promise<TranslationSourceResultDto>
 
 type TranslationSourceResultDto =
-  | { ok: true; code: string | null }          // null = nothing remembered
+  | { ok: true; lang: string | null }          // null = nothing remembered
   | { ok: false; code: 'invalid_request' | 'not_found' }
 ```
 
@@ -21,11 +21,11 @@ type TranslationSourceResultDto =
 ## `translation:setSourceLanguage`
 
 ```ts
-setSourceLanguage(input: { bookId: string; code: string | null }): Promise<OkResultDto>
-// OkResultDto = { ok: true } | { ok: false; code: 'invalid_request' | 'not_found' }
+setSourceLanguage(input: { bookId: string; lang: string | null }): Promise<TranslationSourceSaveResultDto>
+// TranslationSourceSaveResultDto = { ok: true } | { ok: false; code: 'invalid_request' | 'not_found' }
 ```
 
-- `code` must be `null` (forget) or a catalog code (`findTranslationLanguage`); anything else → `invalid_request`,
+- `lang` must be `null` (forget) or a catalog code (`findTranslationLanguage`); anything else → `invalid_request`,
   nothing written.
 - One `json_patch` statement; no other key of `reading_state_json` changes; `books.updated_at` is NOT bumped
   (it is not a library edit).
@@ -37,8 +37,8 @@ Same guard and parameters; the new state additionally keeps the row's current `t
 
 ## Mobile
 
-The `translation` group already answers `NOT_AVAILABLE_ON_PLATFORM`; the two methods are added to
-`platforms/native/bridge/unavailable.ts` the same way so `create-api.ts` still type-checks against `Window['api']`.
+The `translation` group already answers `NOT_AVAILABLE_ON_PLATFORM` as a whole (`unavailableGroup<DesktopApi['translation']>`
+in `platforms/native/bridge/index.ts`), so the two new methods are covered with no Mobile change.
 
 ## Never
 

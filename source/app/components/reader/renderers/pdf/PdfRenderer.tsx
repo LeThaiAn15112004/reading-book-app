@@ -749,6 +749,26 @@ export function PdfRenderer({
   const initialPageRef = useRef(initialPage)
   const docRef = useRef(doc)
   docRef.current = doc
+  /** The document's catalog `/Lang` (pdf.js `info.Language`), '' when absent — the language hint of every selection (spec 011). */
+  const docLangRef = useRef('')
+  useEffect(() => {
+    docLangRef.current = ''
+    if (!doc) return
+    let cancelled = false
+    doc
+      .getMetadata()
+      .then((metadata) => {
+        const language = (metadata.info as { Language?: unknown } | null)?.Language
+        if (!cancelled && typeof language === 'string') docLangRef.current = language.trim()
+      })
+      .catch(() => {
+        /* no metadata: selections keep '' and translation starts from the remembered / default source */
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [doc])
+  const withDocLang = (selection: PdfSelectionInfo): PdfSelectionInfo => ({ ...selection, lang: docLangRef.current })
   const pageCountRef = useRef(0)
   pageCountRef.current = sizes.length
 
@@ -2486,7 +2506,7 @@ export function PdfRenderer({
     if (translateModeRef.current && !gesture.pan && rootRef.current && selectionChangedSince(gesture.selectionAtDown)) {
       const selection = readPdfSelection(rootRef.current)
       if (selection) {
-        onTranslateSelectionRef.current?.(selection)
+        onTranslateSelectionRef.current?.(withDocLang(selection))
         return
       }
     }
@@ -2543,7 +2563,7 @@ export function PdfRenderer({
     if (!root) return
     const selection = readPdfSelectionAt(root, event.clientX, event.clientY)
     if (selection) {
-      onSelectionContextMenuRef.current?.(selection, event.clientX, event.clientY)
+      onSelectionContextMenuRef.current?.(withDocLang(selection), event.clientX, event.clientY)
       return
     }
     const pin = attachmentsByPageRef.current.size > 0 ? attachmentAt(event.clientX, event.clientY) : null

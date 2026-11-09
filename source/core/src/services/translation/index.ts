@@ -13,6 +13,7 @@ export {
   findTranslationLanguage,
   normalizeTranslationLanguage,
   resolveTranslationRoute,
+  resolveTranslationSource,
   searchTranslationLanguages,
   type TranslationLanguage,
   type TranslationRoute,

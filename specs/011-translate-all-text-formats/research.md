@@ -47,6 +47,9 @@ All findings come from reading the current code (2026-11-09). No NEEDS CLARIFICA
   `overwriteSessionState` (`core/src/db/overlay/statements.ts`, used by `saveSessionState`, i.e. the reading-position
   autosave) REPLACES the whole JSON with the keys `readingStateOfSession` builds. A new key written by a merge would be
   erased by the next autosave.
+  *Correction (implementation)*: the renderer autosave (`overlay:saveSessionState`) actually goes through
+  `saveSessionPreferences`, a merge; the full overwrite is used by core services (`SessionService`,
+  `SaveReadingSessionState`) and Mobile's store. The carry-over below guards those paths.
 - **Decision**: Store it as a new key `translationSourceLang` (a catalog code, e.g. `vi`) in `reading_state_json`:
   - written by a dedicated `json_patch` (new statement `patchTranslationSource`), `null` removes it;
   - read by a dedicated statement;

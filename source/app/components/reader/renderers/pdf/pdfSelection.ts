@@ -28,7 +28,7 @@ export type PdfSelectionInfo = {
   pageEnd: number
   /** Page-relative rectangles of the selected glyph runs — the PDF anchor (never a CFI). */
   rects: PdfSelectionPageRect[]
-  /** No language metadata is read from the PDF; the translation flow falls back to detection. */
+  /** The document's `/Lang` — '' here; `PdfRenderer` fills it in from the document metadata (spec 011). */
   lang: string
 }
 

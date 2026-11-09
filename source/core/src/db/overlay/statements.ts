@@ -56,11 +56,15 @@ export const updateAudioProgress = (bookId: string, patchJson: string, now: stri
 export const patchSessionPreferences = (bookId: string, patchJson: string, now: string) =>
   s('UPDATE books SET reading_state_json = json_patch(reading_state_json, ?), updated_at = ? WHERE id = ?', patchJson, now, bookId)
 
-/** Full overwrite, dropped when older than the stored state's own `updatedAt` (ISO-8601 text compares chronologically). */
+/**
+ * Full overwrite, dropped when older than the stored state's own `updatedAt` (ISO-8601 text compares chronologically).
+ * The remembered translation source (`translationSourceLang`, spec 011) is not part of the session the autosave sends:
+ * it is carried over from the stored state (absent stays absent — a NULL member makes `json_patch` drop the key).
+ */
 export const overwriteSessionState = (bookId: string, stateJson: string, now: string, stateUpdatedAt: string) =>
   s(
     `UPDATE books
-     SET reading_state_json = ?,
+     SET reading_state_json = json_patch(?, json_object('translationSourceLang', json_extract(reading_state_json, '$.translationSourceLang'))),
          updated_at = ?
      WHERE id = ?
        AND COALESCE(json_extract(reading_state_json, '$.updatedAt'), '') <= ?`,
@@ -69,6 +73,17 @@ export const overwriteSessionState = (bookId: string, stateJson: string, now: st
     bookId,
     stateUpdatedAt,
   )
+
+/** Format + remembered translation source of one book (spec 011); `code` is NULL when nothing is remembered. */
+export const selectTranslationSource = (bookId: string) =>
+  s(`SELECT file_format, json_extract(reading_state_json, '$.translationSourceLang') AS code FROM books WHERE id = ?`, bookId)
+
+/**
+ * Remember / forget the translation source of one book: a `json_patch` merge (`{"translationSourceLang": null}`
+ * removes it), so no other key of the reading state changes. `books.updated_at` is left alone — not a library edit.
+ */
+export const patchTranslationSource = (bookId: string, patchJson: string) =>
+  s('UPDATE books SET reading_state_json = json_patch(reading_state_json, ?) WHERE id = ?', patchJson, bookId)
 
 // --- notes: reads --------------------------------------------------------------------------------------------------
 

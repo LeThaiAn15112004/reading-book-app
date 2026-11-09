@@ -221,6 +221,10 @@ export const TranslationChannels = {
   cancel: 'translation:cancel',
   /** Main → renderer: model download / load progress for a pending request. */
   progress: 'translation:progress',
+  /** Renderer → main: the source language remembered for one book (spec 011). */
+  getSourceLanguage: 'translation:getSourceLanguage',
+  /** Renderer → main: remember / forget the source language of one book (spec 011). */
+  setSourceLanguage: 'translation:setSourceLanguage',
 } as const
 
 export const WordCountChannels = {

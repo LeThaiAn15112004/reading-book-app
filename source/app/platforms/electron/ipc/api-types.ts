@@ -1286,10 +1286,21 @@ export interface DesktopApi {
     cancel(requestId: string): Promise<void>
     /** Subscribe to model download/load progress for this window's requests. Returns unsubscribe. */
     onProgress(handler: (progress: TranslationProgressDto) => void): () => void
+    /** The source language the user last chose by hand for this book (spec 011); `lang: null` = none. */
+    getSourceLanguage(bookId: string): Promise<TranslationSourceResultDto>
+    /** Remember (a catalog code) or forget (`null`) the source language of one book (spec 011). */
+    setSourceLanguage(input: { bookId: string; lang: string | null }): Promise<TranslationSourceSaveResultDto>
   }
   /** Audiobook transcription (spec 004). */
   transcription: TranscriptionApi
 }
+
+/** `invalid_request`: empty / malformed input, an audiobook, or a code that is not in the catalog. */
+export type TranslationSourceErrorCodeDto = 'invalid_request' | 'not_found'
+export type TranslationSourceResultDto =
+  | { ok: true; lang: string | null }
+  | { ok: false; code: TranslationSourceErrorCodeDto }
+export type TranslationSourceSaveResultDto = { ok: true } | { ok: false; code: TranslationSourceErrorCodeDto }
 
 export interface TranslateRequestDto {
   /** Caller-chosen id (UUID) — ties progress events and `cancel` to this request. */

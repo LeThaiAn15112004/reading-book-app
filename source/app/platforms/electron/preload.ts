@@ -316,6 +316,8 @@ const api: DesktopApi = {
         ipcRenderer.removeListener(TranslationChannels.progress, listener)
       }
     },
+    getSourceLanguage: (bookId) => ipcRenderer.invoke(TranslationChannels.getSourceLanguage, bookId),
+    setSourceLanguage: (input) => ipcRenderer.invoke(TranslationChannels.setSourceLanguage, input),
   },
   transcription: {
     getInfo: (bookId, appLanguage) => ipcRenderer.invoke(TranscriptionChannels.getInfo, bookId, appLanguage),

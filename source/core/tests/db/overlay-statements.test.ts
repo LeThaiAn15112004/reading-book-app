@@ -15,6 +15,8 @@ describe('overlay statements', () => {
       q.updateAudioProgress('b', '{}', now),
       q.patchSessionPreferences('b', '{}', now),
       q.overwriteSessionState('b', '{}', now, now),
+      q.selectTranslationSource('b'),
+      q.patchTranslationSource('b', '{}'),
       q.selectNoteCreatedAt('n', 'b'),
       q.selectNoteIdExists('n'),
       q.selectBookmarks('b'),
@@ -64,6 +66,44 @@ describe('overlay statements', () => {
     expect(row).toEqual({ created_at: 't0', updated_at: 't3' })
     expect(run(q.deleteHighlight('hl', 'b1'))).toBe(1)
     expect(run(q.deleteHighlight('bm', 'b1'))).toBe(0)
+  })
+})
+
+describe('remembered translation source (spec 011)', () => {
+  const setup = () => {
+    const db = new DatabaseSync(':memory:')
+    db.exec("CREATE TABLE books (id TEXT PRIMARY KEY, file_format TEXT NOT NULL, reading_state_json TEXT NOT NULL DEFAULT '{}', updated_at TEXT NOT NULL)")
+    db.prepare('INSERT INTO books VALUES (?, ?, ?, ?)').run('b1', 'txt', JSON.stringify({ percent: 10, updatedAt: '2026-01-01T00:00:00.000Z' }), 'u0')
+    const run = (st: Statement) => Number(db.prepare(st.sql).run(...(st.params as SqlValue[])).changes)
+    const state = () => JSON.parse((db.prepare('SELECT reading_state_json AS j FROM books WHERE id = ?').get('b1') as { j: string }).j)
+    const row = () => db.prepare('SELECT updated_at FROM books WHERE id = ?').get('b1') as { updated_at: string }
+    const read = () => db.prepare(q.selectTranslationSource('b1').sql).get('b1') as { file_format: string; code: string | null }
+    return { run, state, row, read }
+  }
+
+  it('patch writes and removes the key, keeps every other key and books.updated_at', () => {
+    const { run, state, row, read } = setup()
+    expect(read()).toEqual({ file_format: 'txt', code: null })
+    expect(run(q.patchTranslationSource('b1', JSON.stringify({ translationSourceLang: 'vi' })))).toBe(1)
+    expect(state()).toEqual({ percent: 10, updatedAt: '2026-01-01T00:00:00.000Z', translationSourceLang: 'vi' })
+    expect(read().code).toBe('vi')
+    expect(row().updated_at).toBe('u0')
+    expect(run(q.patchTranslationSource('b1', JSON.stringify({ translationSourceLang: null })))).toBe(1)
+    expect(state()).toEqual({ percent: 10, updatedAt: '2026-01-01T00:00:00.000Z' })
+    expect(run(q.patchTranslationSource('missing', JSON.stringify({ translationSourceLang: 'vi' })))).toBe(0)
+  })
+
+  it('the full session overwrite keeps a remembered source and does not invent one', () => {
+    const { run, state } = setup()
+    const later = '2026-02-01T00:00:00.000Z'
+    expect(run(q.overwriteSessionState('b1', JSON.stringify({ percent: 50, updatedAt: later }), 'u1', later))).toBe(1)
+    expect(state()).toEqual({ percent: 50, updatedAt: later })
+    run(q.patchTranslationSource('b1', JSON.stringify({ translationSourceLang: 'fr' })))
+    const latest = '2026-03-01T00:00:00.000Z'
+    expect(run(q.overwriteSessionState('b1', JSON.stringify({ percent: 70, updatedAt: latest }), 'u2', latest))).toBe(1)
+    expect(state()).toEqual({ percent: 70, updatedAt: latest, translationSourceLang: 'fr' })
+    // An older write is still dropped by the guard.
+    expect(run(q.overwriteSessionState('b1', JSON.stringify({ percent: 1, updatedAt: later }), 'u3', later))).toBe(0)
   })
 })
 

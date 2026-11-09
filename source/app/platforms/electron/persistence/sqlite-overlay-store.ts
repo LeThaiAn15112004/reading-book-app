@@ -23,6 +23,7 @@ import {
 } from '@core'
 import {
   audioProgressPatch,
+  findTranslationLanguage,
   isAudioFormat,
   parseAudioProgress,
   type AudioProgress,
@@ -139,6 +140,37 @@ export class SqliteOverlayStore implements OverlayStore {
     const now = new Date().toISOString()
     const result = this.sql.run(q.updateAudioProgress(id, JSON.stringify(audioProgressPatch(input, now)), now))
     return Number(result.changes) > 0
+  }
+
+  /**
+   * The source language the user last chose by hand for this book (spec 011 FR-007a), from
+   * `reading_state_json.translationSourceLang`. A stored value that is not (or no longer) a catalog code reads as
+   * `null`. Audiobooks have no text to translate: refused.
+   */
+  getTranslationSource(bookId: string): TranslationSourceResult {
+    const id = bookId.trim()
+    if (!id) return { ok: false, code: 'invalid_request' }
+    const row = this.sql.get<{ file_format: string; code: unknown }>(q.selectTranslationSource(id))
+    if (!row) return { ok: false, code: 'not_found' }
+    if (isAudioFormat(row.file_format)) return { ok: false, code: 'invalid_request' }
+    const lang = typeof row.code === 'string' && findTranslationLanguage(row.code) ? row.code : null
+    return { ok: true, lang }
+  }
+
+  /**
+   * Remember (`lang` = a catalog code) or forget (`null`) the translation source of one book: one `json_patch`,
+   * no other reading-state key and not `books.updated_at` change. Anything that is not a catalog code is refused
+   * and nothing is written. The book file is never touched.
+   */
+  setTranslationSource(bookId: string, lang: string | null): TranslationSourceSaveResult {
+    const id = bookId.trim()
+    if (!id) return { ok: false, code: 'invalid_request' }
+    if (lang !== null && !findTranslationLanguage(lang)) return { ok: false, code: 'invalid_request' }
+    const row = this.sql.get<{ file_format: string }>(q.selectTranslationSource(id))
+    if (!row) return { ok: false, code: 'not_found' }
+    if (isAudioFormat(row.file_format)) return { ok: false, code: 'invalid_request' }
+    this.sql.run(q.patchTranslationSource(id, JSON.stringify({ translationSourceLang: lang })))
+    return { ok: true }
   }
 
   /**
@@ -753,6 +785,10 @@ export type EmbeddedPdfSyncOutcome = {
 let overlayStore: SqliteOverlayStore | null = null
 
 /** Singleton OverlayStore backed by the open SQLite DB. */
+export type TranslationSourceErrorCode = 'invalid_request' | 'not_found'
+export type TranslationSourceResult = { ok: true; lang: string | null } | { ok: false; code: TranslationSourceErrorCode }
+export type TranslationSourceSaveResult = { ok: true } | { ok: false; code: TranslationSourceErrorCode }
+
 export function getOverlayStore(): SqliteOverlayStore {
   if (!overlayStore) {
     overlayStore = new SqliteOverlayStore()

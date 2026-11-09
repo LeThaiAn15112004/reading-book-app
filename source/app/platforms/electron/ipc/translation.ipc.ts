@@ -1,6 +1,12 @@
 import { ipcMain } from 'electron'
+import { getOverlayStore } from '../persistence/sqlite-overlay-store'
 import { cancelTranslation, cancelTranslationsFor, translate } from '../translation/translation-service'
-import type { TranslateRequestDto, TranslateResultDto } from './api-types'
+import type {
+  TranslateRequestDto,
+  TranslateResultDto,
+  TranslationSourceResultDto,
+  TranslationSourceSaveResultDto,
+} from './api-types'
 import { TranslationChannels } from './channels'
 
 const MAX_ID_LENGTH = 128
@@ -36,5 +42,21 @@ export function registerTranslationIpc(): void {
 
   ipcMain.handle(TranslationChannels.cancel, (_event, requestId: unknown) => {
     if (isShortString(requestId, MAX_ID_LENGTH)) cancelTranslation(requestId)
+  })
+
+  // Remembered source language per book (spec 011). The store re-validates the book and the code.
+  ipcMain.removeHandler(TranslationChannels.getSourceLanguage)
+  ipcMain.handle(TranslationChannels.getSourceLanguage, (_event, bookId: unknown): TranslationSourceResultDto => {
+    if (!isShortString(bookId, MAX_ID_LENGTH)) return { ok: false, code: 'invalid_request' }
+    return getOverlayStore().getTranslationSource(bookId)
+  })
+
+  ipcMain.removeHandler(TranslationChannels.setSourceLanguage)
+  ipcMain.handle(TranslationChannels.setSourceLanguage, (_event, raw: unknown): TranslationSourceSaveResultDto => {
+    if (!raw || typeof raw !== 'object') return { ok: false, code: 'invalid_request' }
+    const { bookId, lang } = raw as Record<string, unknown>
+    if (!isShortString(bookId, MAX_ID_LENGTH)) return { ok: false, code: 'invalid_request' }
+    if (lang !== null && !isShortString(lang, MAX_LANG_LENGTH)) return { ok: false, code: 'invalid_request' }
+    return getOverlayStore().setTranslationSource(bookId, lang)
   })
 }

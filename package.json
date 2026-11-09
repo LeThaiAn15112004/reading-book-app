@@ -68,6 +68,7 @@
     "e2e:typecheck": "cd source/app/platforms/electron && tsc --noEmit -p e2e/tsconfig.json",
     "spike:pdf:fixtures": "cd source/app/platforms/electron && node spikes/pdf-search/build-fixtures.mjs",
     "spike:pdf:search": "cd source/app/platforms/electron && node --experimental-strip-types --import ./spikes/pdf-search/register-alias.mjs spikes/pdf-search/run-pdf-search.mjs",
+    "spike:translation:source": "cd source/app/platforms/electron && node --experimental-transform-types --import ./spikes/pdf-annotations/register-alias.mjs spikes/translation/run-translation-source.mjs",
     "spike:pdf:annotations": "cd source/app/platforms/electron && node --experimental-transform-types --import ./spikes/pdf-annotations/register-alias.mjs spikes/pdf-annotations/run-pdf-annotations.mjs",
     "spike:pdf:embedded": "cd source/app/platforms/electron && node --experimental-transform-types --import ./spikes/pdf-annotations/register-alias.mjs spikes/pdf-annotations/run-pdf-embedded-annotations.mjs",
     "spike:pdf:live": "cd source/app/platforms/electron && node --experimental-transform-types --import ./spikes/pdf-annotations/register-alias.mjs spikes/pdf-annotations/run-pdf-embedded-live.mjs",
