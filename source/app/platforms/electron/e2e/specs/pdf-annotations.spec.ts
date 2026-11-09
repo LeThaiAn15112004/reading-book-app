@@ -236,6 +236,12 @@ test('EPUB highlights still work and never mix with PDF annotations', async ({ r
   const content = page.frameLocator('iframe').first()
   const heading = content.getByRole('heading', { name: 'Chapter One' })
   await expect(heading).toBeVisible()
+  // A freshly opened EPUB shows the synthetic cover first; its <img> lies over the iframe, so a right-click on the
+  // heading would land on the cover. Leave the cover before selecting text (as in epub-toc-regression).
+  const cover = page.getByRole('img', { name: 'Book cover' })
+  await expect(cover).toBeVisible()
+  await page.getByRole('button', { name: 'Next page' }).click()
+  await expect(cover).toBeHidden()
   await chooseTool(page, 'Select')
 
   // Select the heading text inside the epub.js iframe; epub.js reports the selection after it
