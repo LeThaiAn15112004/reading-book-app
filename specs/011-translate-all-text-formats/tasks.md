@@ -106,9 +106,9 @@ None. The three stories touch different renderers and layers; the only shared fi
 
 ## Phase 6: Polish & Cross-Cutting
 
-- [ ] T028 [P] Write `docs/implementation_plan/translation_all_formats.md` (short map: the renderer contract, TXT read-only + undo guard, PDF `/Lang`, `translationSourceLang` in `reading_state_json` and why `overwriteSessionState` carries it, the two channels, the spike) and add a pointer to it plus `spike:translation:source` to the spike list in `CLAUDE.md`
+- [X] T028 [P] Write `docs/implementation_plan/translation_all_formats.md` (short map: the renderer contract, TXT read-only + undo guard, PDF `/Lang`, `translationSourceLang` in `reading_state_json` and why `overwriteSessionState` carries it, the two channels, the spike) and add a pointer to it plus `spike:translation:source` to the spike list in `CLAUDE.md`
 - [ ] T029 Regression: walk [quickstart.md](quickstart.md) rows 12 (EPUB unchanged) and 14 (over 20,000 characters refused in every format); record results under Notes
-- [ ] T030 Run the whole gate `npm run check` from the repository root and fix anything this feature broke
+- [X] T030 Run the whole gate `npm run check` from the repository root and fix anything this feature broke
 
 ---
 
@@ -175,4 +175,5 @@ then  T017 → T018 → {T019, T020, T023} → T021 / T022 / T024 → T025 ; T02
 - Analysis fixes applied during implementation: I1 (success field is `lang`, not `code`), I2 (TXT selection not collapsed), A1 (Swap counts as a hand choice and is remembered), U1 (handlers use `getOverlayStore()`, no new dependency), U2 (a remembered source that arrives after a translation started re-runs it).
 - T022 deviation: the spike uses the repo's store-spike harness (`spikes/pdf-annotations/register-alias.mjs` + node:sqlite `db-stub.mjs` on the real migrations + the real IPC handlers through `electron-stub.mjs`, as `spike:txt:main` does) instead of re-launching under Electron's ABI; `json_patch` / `json_extract` behave the same. 13 checks pass. The SQL is also covered on node:sqlite in `source/core/tests/db/overlay-statements.test.ts`.
 - T022 finding: `overlay:saveSessionState` (the renderer autosave) goes through `saveSessionPreferences` (a `json_patch` merge), so on Desktop it never dropped the key; the full overwrite (`SqliteOverlayStore.saveSessionState` / `overwriteSessionState`) is used by core services (`SessionService`, `SaveReadingSessionState`) and Mobile's store. The carry-over in `overwriteSessionState` stays as the guard for those paths; the spike checks both.
+- T007 / T012 / T027 / T029: the automated parts pass (typecheck, lint, sdk:test, spike:translation:source, npm run check); the manual quickstart walk in `npm run dev` (rows 1–14) has NOT been done yet — open for the user.
 - Pre-existing failures from T001: none (typecheck, lint, sdk:test, check:desktop-baseline all green on 2026-11-09).
