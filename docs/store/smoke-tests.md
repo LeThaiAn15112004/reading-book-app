@@ -20,7 +20,7 @@
 | 8 | PDF attachment opens in the default viewer | Attachment tab of a PDF with an embedded file → double-click → confirm: the default app opens it (path mapped by `pathForOtherApps`, S4). | — |
 | 9 | "Show in folder" for a managed (URL-imported) book | Import a book from a URL, book menu → Show in folder: Explorer opens with the file selected (S4). | — |
 | 10 | An audiobook plays and seeks | Import an `.mp3` / `.m4b`, play, drag the timeline, pause, resume. | — |
-| 11 | Cloud sign-in returns to the app | Settings → Cloud Sources → link Google Drive / Dropbox / OneDrive: the browser hands back to the running app and the account shows as linked (`readmate-reader:` link, S2). | — |
+| 11 | Cloud sign-in returns to the app | Settings → Cloud Sources → link Google Drive / Dropbox / OneDrive: the browser hands back to the running app and the account shows as linked (`readmate-reader:` link, S2). | fail 2026-11-09 (client IDs empty in packaged builds — KL-1 in the implementation map) |
 | 12 | Tray / run in background | Settings → Background: tray on + Run in Background on, close the window: the tray icon stays; reopen from it; Quit from the tray quits. | — |
 | 13 | Reading-reminder toast | Notifications on, Settings → Notifications → send a test reminder: a Windows toast with the name **Readmate Reader** and its icon (package AUMID, S2). | — |
 | 14 | Start at Login on | Settings → Background → Start at Login on. Sign out and back in: the app starts hidden in the tray (`--hidden-at-startup` in its command line, S2). | — |

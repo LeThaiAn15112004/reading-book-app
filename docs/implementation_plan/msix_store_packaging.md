@@ -161,3 +161,50 @@ Package `anthaile.ReadMateReader_1.0.0.0_x64__dpq7cpm4v6h3j`, rebuilt with T026�
   delete it without the maintainer's consent.
 - Still to do (the maintainer, in the UI): cloud sign-in, reminder toast, Start at Login + `--hidden-at-startup`, and
   S4. Steps are in smoke-tests rows 8, 9, 11, 13, 14 and 15.
+
+### T038 — S2 cloud sign-in (smoke row 11, 2026-11-09) — FAIL: packaged builds have no OAuth client config
+
+- **What the maintainer saw** in the installed Store package, for all three providers:
+  - Google: "GoogleDriveAuthService: clientId is required. Set GOOGLE_CLIENT_ID env var or pass credentials."
+  - Dropbox: "Invalid client_id: ''".
+  - Microsoft: "AADSTS900144 … 'client_id'".
+- **Where the IDs come from.** `cloud.ipc.ts` builds every provider from
+  `config/google-oauth-config.ts` / `config/cloud-oauth-config.ts`. Those read the git-ignored source files
+  `client_secret_*.json` and `cloud-oauth-secrets.json` with `fs`, at
+  `path.resolve(APP_ROOT, '../../../core/src/config')`. When a file is not there, the auth services fall back to
+  environment variables: `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`, `DROPBOX_APP_KEY` / `DROPBOX_APP_SECRET`,
+  `AZURE_CLIENT_ID` (+ `AZURE_TENANT_ID`). Nothing is hard-coded and there is no backend.
+- **Why it fails.** `APP_ROOT` is `<resources>/app.asar` in any packaged build. The path then resolves to
+  `C:\Program Files\WindowsApps\<package>\core\src\config` (MSIX) or `%LOCALAPPDATA%\Programs\core\src\config`
+  (NSIS). Neither exists. `app.asar` (3,669 entries) contains no config file, by design: FR-033 / `check-no-secrets`
+  forbids secret files in bundles, and `check-store-package` does the same for the `.msix`. No environment variable is
+  set, so every ID is `''`.
+- **Scope: every packaged build, not only the Store one.** The NSIS installer uses the same `files` list and the same
+  `main.js`, so it should fail the same way. This comes from reading the code and config; an NSIS build was not run.
+  `npm run dev` works, because `APP_ROOT` is the source folder and the maintainer's local files have every value.
+  The maintainer's machine is not missing anything.
+- **How to test sign-in locally without changing code (expected, not yet verified):** set the five variables at
+  **User** scope from the existing local files (Dropbox's secret is optional with PKCE). Then sign out and back in, so
+  the Store app started from Start gets them. Remove them after the test, because every process of the user can read
+  them. The redirect URIs must already be registered:
+  - Google Desktop client: loopback `http://127.0.0.1:8730/oauth2callback`;
+  - Dropbox and Entra ID: `readmate-reader://oauth/callback`.
+  If Dropbox or OneDrive does not return to the app, suspect the half-registered
+  `HKCU\Software\Classes\readmate-reader` key first (see the S2 entry above).
+- **Decision pending (maintainer).** Nothing was changed. Embedding a secret file in the package was not done and must
+  not be done without a decision. See "Known limitations" below.
+
+## Known limitations
+
+- **KL-1 — Cloud sign-in does not work in any distributed build (Store `.msix`, NSIS installer), found 2026-11-09.**
+  OAuth client IDs are read only from git-ignored source files or environment variables (T038 S2 entry above).
+  A user who installs from the Store sees an error on every Cloud Sources sign-in. Spec 010 asks for the package to
+  behave like the direct build, and its smoke tests include cloud sign-in (spec FR-019, `smoke-tests.md` row 11). It
+  cannot pass until a way to ship client configuration is chosen. Options, none chosen:
+  (a) build-time injection of **public** client identifiers only (Dropbox app key with PKCE, Entra ID public client
+  ID), with Google handled separately, because its Desktop client sends `client_secret` and FR-033 forbids secret
+  values in a bundle;
+  (b) a token-exchange backend (conflicts with local-first);
+  (c) ship v1 with Cloud Sources hidden or disabled in packaged builds, and the listing does not claim cloud import.
+  Distributing Google Drive access publicly may also need Google's OAuth app verification for the Drive scope; check
+  before choosing (a) for Google.
