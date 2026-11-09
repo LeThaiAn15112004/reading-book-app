@@ -17,8 +17,9 @@ const { _doc, ...appxIdentity } = identity
 
 module.exports = {
   extends: './electron-builder.json5',
-  // Public OAuth client IDs (Dropbox app key, Entra ID client ID; never a secret) → app.asar/package.json, read by Main
-  // in config/cloud-oauth-config.ts (KL-1). Objects merge, so the base name / version / main are kept. Only values that
+  // OAuth client values (KL-1) → app.asar/package.json, read by Main in config/cloud-oauth-config.ts: Dropbox app key,
+  // Entra ID client ID (public clients, PKCE; never the Dropbox app secret) and Google's Desktop-app client ID + secret
+  // (public by Google's installed-app policy, decision 2026-11-09). Objects merge, so the base name / version / main are kept. Only values that
   // passed every check are here; package-store.mjs stops before building when one is missing or wrong.
   extraMetadata: { [EMBEDDED_KEY]: resolveCloudPublicIds().ids },
   // Windows Kits 10.0.26100 (signtool / makeappx / makepri), checksum-pinned by app-builder-lib. The default toolset

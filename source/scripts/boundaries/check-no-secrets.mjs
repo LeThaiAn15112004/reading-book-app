@@ -13,6 +13,21 @@ import { configDir, desktopDir, isMain, mobileDir, rel } from './lib/imports.mjs
 export const SECRET_FILE_PATTERNS = [/^client_secret_.*\.json$/i, /^cloud-oauth-secrets\.json$/i]
 const isSecretFileName = (name) => SECRET_FILE_PATTERNS.some((re) => re.test(name))
 
+/** Packaged outputs where the Google Desktop-app client secret may appear (inside app.asar only). */
+export const DEFAULT_PACKAGED_DIRS = [path.join(desktopDir, 'release')]
+
+/** The client_secret of a Google Desktop-app client file (`installed`), else null. */
+export function googleDesktopClientSecret(fileName, json) {
+  if (!/^client_secret_.*\.json$/i.test(fileName)) return null
+  const value = json?.installed?.client_secret
+  return typeof value === 'string' && value.trim() ? value.trim() : null
+}
+
+const isInside = (dir, file) => {
+  const r = path.relative(dir, file)
+  return r !== '' && !r.startsWith('..') && !path.isAbsolute(r)
+}
+
 export const DEFAULT_OUTPUTS = [
   path.join(desktopDir, 'dist'),
   path.join(desktopDir, 'dist-electron'),
@@ -47,7 +62,7 @@ function filesUnder(dir) {
   return out
 }
 
-export function checkNoSecrets({ secretsDir = configDir, outputs = DEFAULT_OUTPUTS } = {}) {
+export function checkNoSecrets({ secretsDir = configDir, outputs = DEFAULT_OUTPUTS, packagedDirs = DEFAULT_PACKAGED_DIRS } = {}) {
   const problems = []
   const notes = []
   const secretFiles = existsSync(secretsDir) ? readdirSync(secretsDir).filter(isSecretFileName).map((f) => path.join(secretsDir, f)) : []
@@ -56,7 +71,13 @@ export function checkNoSecrets({ secretsDir = configDir, outputs = DEFAULT_OUTPU
     const raw = readFileSync(file)
     needles.push({ source: path.basename(file), bytes: raw, kind: 'file contents' })
     try {
-      for (const value of secretValues(JSON.parse(raw.toString('utf8')))) needles.push({ source: path.basename(file), bytes: Buffer.from(value), kind: 'a secret value' })
+      const json = JSON.parse(raw.toString('utf8'))
+      const publicSecret = googleDesktopClientSecret(path.basename(file), json)
+      for (const value of secretValues(json)) {
+        const allowedIn = value === publicSecret ? (f) => path.basename(f) === 'app.asar' && packagedDirs.some((d) => isInside(d, f)) : null
+        needles.push({ source: path.basename(file), bytes: Buffer.from(value), kind: 'a secret value', allowedIn })
+      }
+      if (publicSecret) notes.push('the Google Desktop-app client secret is allowed in release/**/app.asar only (KL-1)')
     } catch {
       notes.push(`${path.basename(file)} is not JSON; only its raw contents are searched`)
     }
@@ -76,6 +97,7 @@ export function checkNoSecrets({ secretsDir = configDir, outputs = DEFAULT_OUTPU
       if (size === 0) continue
       const content = readFileSync(file)
       for (const needle of needles) {
+        if (needle.allowedIn?.(file)) continue
         if (needle.bytes.length && content.includes(needle.bytes)) problems.push(`${rel(file)}: contains ${needle.kind} of ${needle.source}`)
       }
     }

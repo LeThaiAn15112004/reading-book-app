@@ -43,9 +43,11 @@ function loadCloudOAuthSecrets(): CloudOAuthSecrets | null {
 let embeddedIds: EmbeddedCloudPublicIds | null = null
 
 /**
- * Spec 010 KL-1: the PUBLIC client IDs a packaged build carries in `app.asar/package.json` (`readmateCloudOAuth`,
- * written by electron-builder.store.cjs — Store build only; the NSIS build has none). Never a secret: Dropbox and
- * OneDrive use authorization code + PKCE as public clients. `{}` in development and when absent.
+ * Spec 010 KL-1: the OAuth client values a packaged build carries in `app.asar/package.json` (`readmateCloudOAuth`,
+ * written by electron-builder.store.cjs — Store build only; the NSIS build has none): the Dropbox app key and Entra ID
+ * client ID (public clients, PKCE) and Google's "Desktop app" client ID + client secret (public by Google's
+ * installed-app policy). Never the Dropbox app secret. `{}` in development and when absent. Main-only: none of these
+ * values is sent to the renderer.
  */
 function loadEmbeddedPublicIds(): EmbeddedCloudPublicIds {
   if (embeddedIds) return embeddedIds
@@ -78,16 +80,27 @@ export function loadOneDriveOAuthCredentials(): { clientId?: string } | null {
 }
 
 /**
- * Which Cloud Sources this build offers (KL-1): Google Drive never in a packaged build ("Coming soon"), and in
- * development only with both its client ID and secret (local file or GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET).
+ * Google Drive's Desktop-app client. Development: the local client_secret_*.json. Packaged: the embedded client ID +
+ * secret (KL-1, decision 2026-11-09), taken together. `null` → GoogleDriveAuthService falls back to GOOGLE_CLIENT_ID /
+ * GOOGLE_CLIENT_SECRET.
+ */
+export function loadGoogleDriveOAuthCredentials(): { clientId: string; clientSecret?: string } | null {
+  const file = loadGoogleOAuthCredentials()
+  if (file?.clientId) return { clientId: file.clientId, clientSecret: file.clientSecret }
+  const { googleClientId, googleClientSecret } = loadEmbeddedPublicIds()
+  return googleClientId && googleClientSecret ? { clientId: googleClientId, clientSecret: googleClientSecret } : null
+}
+
+/**
+ * Which Cloud Sources this build offers (KL-1): Google Drive when its client ID and secret are known (embedded in the
+ * Store package, the local file, or GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET), else "Not configured".
  */
 export function getCloudProviderAvailability(): CloudProviderAvailabilityDto {
-  const file = loadGoogleOAuthCredentials()
+  const google = loadGoogleDriveOAuthCredentials()
   return cloudProviderAvailability({
-    isPackaged: app.isPackaged,
     google: {
-      clientId: file?.clientId || process.env['GOOGLE_CLIENT_ID'],
-      clientSecret: file?.clientSecret || process.env['GOOGLE_CLIENT_SECRET'],
+      clientId: google?.clientId || process.env['GOOGLE_CLIENT_ID'],
+      clientSecret: google?.clientSecret || process.env['GOOGLE_CLIENT_SECRET'],
     },
   })
 }

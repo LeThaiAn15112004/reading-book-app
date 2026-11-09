@@ -5,8 +5,8 @@ import { cloudApi } from '../../bridge'
 
 /**
  * Spec 010 KL-1: which Cloud Sources this build offers, asked once from Main (`cloud:getProviderAvailability`).
- * Google Drive is "coming soon" in packaged builds (Store and installer) and needs its OAuth client in development;
- * Dropbox and OneDrive are offered. Until Main answers — or if it cannot (the Mobile host has no cloud group) —
+ * Google Drive needs its Desktop-app OAuth client (embedded in the Store package, local file in development) and is
+ * "Not configured" without it (e.g. the NSIS installer); Dropbox and OneDrive are offered. Until Main answers — or if it cannot (the Mobile host has no cloud group) —
  * Google Drive stays unavailable, so a sign-in that cannot work is never offered.
  */
 export type CloudProviderAvailability = Record<

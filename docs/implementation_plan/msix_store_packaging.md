@@ -193,45 +193,60 @@ Package `anthaile.ReadMateReader_1.0.0.0_x64__dpq7cpm4v6h3j`, rebuilt with T026�
   `HKCU\Software\Classes\readmate-reader` key first (see the S2 entry above).
 - **Decided 2026-11-09 (maintainer): (a) + (c), implemented the same day** — KL-1 under "Known limitations" below.
   No secret is embedded. Re-test of Dropbox / OneDrive on a package rebuilt after the change: pending (maintainer).
+- **Changed 2026-11-09 (maintainer): Google Drive works in Store 1.0.0** — (c) replaced by (d) in KL-1. The Google
+  "Desktop app" client ID **and** client secret are embedded like the Dropbox / Entra ID values. Re-test of all three
+  providers on a rebuilt package: pending (maintainer).
 
 ## Known limitations
 
-- **KL-1 — Cloud sign-in in distributed builds (found 2026-11-09). Decided 2026-11-09: (a) for Dropbox + OneDrive,
-  (c) for Google Drive.**
+- **KL-1 — Cloud sign-in in distributed builds (found 2026-11-09). Decided 2026-11-09: (a) for Dropbox + OneDrive;
+  Google Drive first (c), then the same day (d).**
   - **Problem.** OAuth client IDs were read only from git-ignored source files or environment variables (T038 S2 entry
     above). Every Cloud Sources sign-in therefore failed in every packaged build.
   - **(a) Dropbox + OneDrive, Store build: the public client IDs are embedded at build time.** Only the Dropbox app key
     and the Entra ID client ID are embedded. Both are public identifiers for authorization code + PKCE without a client
-    secret. The app secret is never read.
+    secret. The Dropbox app secret is never read.
     - `source/scripts/store/cloud-public-ids.cjs` takes each value from the build environment (`DROPBOX_APP_KEY` /
       `AZURE_CLIENT_ID`) or else from the local `cloud-oauth-secrets.json`. It checks the format (Dropbox key
-      `[a-z0-9]{8,32}`, Entra ID a GUID) and refuses a value equal to any known secret.
+      `[a-z0-9]{8,32}`, Entra ID a GUID) and refuses a value equal to any other known secret.
     - `electron-builder.store.cjs` writes the values to `extraMetadata.readmateCloudOAuth`, which lands in
       `app.asar/package.json`.
     - `npm run package:store` stops before building when a value is missing or wrong (`cloud_id_missing`,
-      `cloud_id_invalid`, `cloud_id_is_secret`, `cloud_secrets_unreadable`). After the build it reads `package.json`
-      back out of `app.asar` and fails unless the object has exactly those two keys and the resolved values.
-    - At run time, `config/cloud-oauth-config.ts` uses the local file in development and the embedded IDs in a packaged
-      build. The `*_SECRET` variables are still honoured if set.
-    - FR-033's `check-no-secrets` still searches the release output for every secret value.
-    - Tests: `cloud-public-ids.test.mjs`, 10 cases.
+      `cloud_id_invalid`, `cloud_id_is_secret`, `cloud_secrets_unreadable`, and for Google `google_client_not_desktop`,
+      `google_pair_mixed`). After the build it reads `package.json` back out of `app.asar` and fails unless the object
+      has exactly the four keys below and the resolved values.
+    - At run time, `config/cloud-oauth-config.ts` uses the local files in development and the embedded values in a
+      packaged build. The `*_SECRET` variables are still honoured if set.
     - **Console prerequisites (maintainer):** Dropbox App Console → "Allow public clients (Implicit Grant & PKCE)" is
       on, and `readmate-reader://oauth/callback` is a redirect URI. Entra ID → the redirect
       `readmate-reader://oauth/callback` is under "Mobile and desktop applications", and the supported account types
       include personal accounts (`common` endpoint).
-  - **(c) Google Drive: not offered in any packaged build.**
-    - `config/cloud-availability-core.mjs` makes Google Drive unavailable in a packaged build (Store and NSIS: same
-      `files`, same `main.js`, so the same failure), and in development when its client ID or secret is missing.
-      Tests: `cloud-availability.test.mjs`, 4 cases.
-    - The new channel `cloud:getProviderAvailability` brings this to the renderer (`cloudProviderAvailabilityStore`).
-    - The Cloud Sources dropdown shows "Google Drive · Coming soon" (or "Not configured" in development), disabled. Its
-      screen, and so its Connect button, cannot be opened (`useLibraryView` guard).
-    - `cloud:connect` in Main refuses it as well.
-    - The Store listing (`docs/store/listing/*`) does not mention cloud sources at all; keep Google Drive out of it for
-      v1.
-    - To bring Google Drive back, the idea is a small token-exchange function that holds the client secret and stores
-      no book data, keeping the local-first design. Google's OAuth app verification for the Drive scope is also needed
-      before public distribution.
-  - **NSIS installer: build left unchanged (as asked).** It gets the Google Drive rule at run time (`app.isPackaged`),
-    but no embedded IDs. **Dropbox / OneDrive sign-in in the NSIS build therefore still fails as before.** The same
-    `extraMetadata` line in `electron-builder.json5` would fix it once wanted.
+  - **(c) Google Drive not offered in packaged builds — superseded 2026-11-09 by (d).** It hid Google Drive as
+    "Coming soon" because its Desktop client needs a client secret.
+  - **(d) Google Drive, Store build: the Desktop-app client ID and client secret are embedded.** The maintainer's
+    reasoning: for an installed-app ("Desktop app") client, Google does not treat the client secret as confidential
+    (https://developers.google.com/identity/protocols/oauth2/native-app). A web-server client is different.
+    - `cloud-public-ids.cjs` adds `googleClientId` and `googleClientSecret`. They come from `GOOGLE_CLIENT_ID` +
+      `GOOGLE_CLIENT_SECRET`, which must be set together (else `google_pair_mixed`), or else from the first local
+      `client_secret_*.json` by name (the same file Main picks).
+    - Only a file with an `installed` object is accepted. A `web` client stops the build (`google_client_not_desktop`),
+      because its secret is confidential.
+    - The Google secret may not equal any other secret, for example the Dropbox app secret. A Google secret pasted into
+      another field also stops the build.
+    - At run time, `loadGoogleDriveOAuthCredentials()` in `cloud-oauth-config.ts` uses the local file, else the
+      embedded pair. The values stay in Main; the renderer gets only access tokens.
+    - `cloud-availability-core.mjs` offers Google Drive whenever both values are known. There is no "packaged" rule
+      any more. Without them (the NSIS installer, development without the file) it shows "Not configured", disabled,
+      and `cloud:connect` refuses it.
+    - **FR-033 exception:** `check-no-secrets` allows the secret of a Google `installed` client **only** in a file
+      named `app.asar` under `release/`. It is still forbidden in `dist/`, `dist-electron/` and the Mobile bundles.
+      The raw file contents, every other secret value and a `web` client's secret get no exception, and secret file
+      names are still forbidden everywhere. Tests are in `boundaries.test.mjs`.
+    - Tests: `cloud-public-ids.test.mjs` (15 cases), `cloud-availability.test.mjs` (4 cases).
+    - **Console prerequisites (maintainer):** this is a Desktop-app client, and sign-in uses the loopback
+      `http://127.0.0.1:8730/oauth2callback`, which Desktop clients allow without registration. While the OAuth consent
+      screen is in "Testing", only the listed test users can sign in, and their refresh tokens expire after 7 days.
+      Public distribution needs the app published, and Google verification for the Drive scope.
+  - **NSIS installer: build left unchanged (as asked).** It has no embedded values. **Google Drive shows "Not
+    configured" there, and Dropbox / OneDrive sign-in still fails as before.** The same `extraMetadata` line in
+    `electron-builder.json5` would fix it once wanted.

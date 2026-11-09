@@ -340,4 +340,27 @@ describe('FR-033: no secret file in a bundle', () => {
   test('a clean bundle passes', () => {
     assert.deepEqual(setup({ 'out/assets/main.js': 'const s = "nothing here"' }), [])
   })
+
+  // Spec 010 KL-1: a Google Desktop-app client secret is public and the Store build embeds it in app.asar only.
+  const gSecret = 'GOCSPX-TEST-ONLY-not-a-real-secret0'
+  const googleSetup = (client, outputFiles) => {
+    const root = tree({ 'config/client_secret_1-x.apps.googleusercontent.com.json': JSON.stringify(client), ...outputFiles })
+    return checkNoSecrets({ secretsDir: path.join(root, 'config'), outputs: [path.join(root, 'out'), path.join(root, 'release')], packagedDirs: [path.join(root, 'release')] }).problems
+  }
+  const installed = { installed: { client_id: '1-x.apps.googleusercontent.com', client_secret: gSecret } }
+
+  test('the Google Desktop-app client secret is allowed in release/**/app.asar', () => {
+    assert.deepEqual(googleSetup(installed, { 'release/1.0.0/win-unpacked/resources/app.asar': `{"g":"${gSecret}"}` }), [])
+  })
+
+  test('...but not in any other packaged file or in a bundle', () => {
+    const problems = googleSetup(installed, { 'release/1.0.0/notes.txt': gSecret, 'out/assets/main.js': gSecret })
+    assert.equal(problems.length, 2)
+    assert.ok(problems.every((p) => !p.includes(gSecret)))
+  })
+
+  test('a web client secret gets no exception, even in app.asar', () => {
+    const web = { web: { client_id: '1-x.apps.googleusercontent.com', client_secret: gSecret } }
+    assert.equal(googleSetup(web, { 'release/1.0.0/win-unpacked/resources/app.asar': gSecret }).length, 1)
+  })
 })

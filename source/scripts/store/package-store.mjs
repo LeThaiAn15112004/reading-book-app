@@ -101,7 +101,8 @@ async function main(argv) {
   const version = inputs.version
   const env = unsignedChildEnv(process.env)
 
-  // Public cloud client IDs (KL-1): Dropbox + OneDrive sign-in need them in the package. Never a secret.
+  // Cloud OAuth client values (KL-1): Google Drive, Dropbox and OneDrive sign-in need them in the package. Public by
+  // design; never the Dropbox app secret, never a Google web-client secret (cloud-public-ids.cjs).
   console.log('▶ package:store — cloud client IDs')
   const cloud = resolveCloudPublicIds({ env: process.env })
   if (cloud.errors.length > 0) {
@@ -146,15 +147,14 @@ async function main(argv) {
 
   const out = releasePaths(version)
   step('check-desktop-package', [node, path.join(repoRoot, 'source/scripts/check-desktop-package.mjs'), out.asar], { env })
-  console.log('
-▶ package:store — cloud client IDs in app.asar')
+  console.log('\n▶ package:store — cloud client IDs in app.asar')
   const embedded = verifyEmbedded(JSON.parse(readAsarFile(out.asar, 'package.json').toString('utf8')), cloud.ids)
   if (embedded.length > 0) {
     for (const p of embedded) console.error(`  ✖ ${p}`)
     console.error('✖ package:store stopped at "cloud client IDs in app.asar"')
     return 1
   }
-  console.log('  PASS  package.json carries exactly the resolved public IDs')
+  console.log('  PASS  package.json carries exactly the resolved public client values')
   if (!existsSync(out.msix)) {
     console.error(`✖ package:store: electron-builder finished but ${out.msix} does not exist`)
     return 1

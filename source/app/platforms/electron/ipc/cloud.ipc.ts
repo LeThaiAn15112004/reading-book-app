@@ -30,9 +30,9 @@ import {
 import {
   getCloudProviderAvailability,
   loadDropboxOAuthCredentials,
+  loadGoogleDriveOAuthCredentials,
   loadOneDriveOAuthCredentials,
 } from '../config/cloud-oauth-config'
-import { loadGoogleOAuthCredentials } from '../config/google-oauth-config'
 import { sanitizeFilename } from '../files/metadata-filename'
 import { openGoogleOAuthViaLoopback } from '../oauth/google-loopback-server'
 import { getLibraryStore } from '../persistence/sqlite-library-store'
@@ -96,7 +96,7 @@ interface CloudKit {
 }
 
 function buildGoogleDriveKit(): CloudKit {
-  const creds = loadGoogleOAuthCredentials()
+  const creds = loadGoogleDriveOAuthCredentials()
   const authService = new GoogleDriveAuthService({
     credentials: creds ? { clientId: creds.clientId, clientSecret: creds.clientSecret } : undefined,
     tokenStore: new SafeStorageTokenStore<GoogleDriveStoredTokens>('google_drive'),

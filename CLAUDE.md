@@ -375,7 +375,10 @@ concrete location representation.
 via `platforms/electron/security/token-vault.ts`, never exposed to the renderer; the renderer only receives short-lived access
 tokens, opaque `rb-cover://` cover URLs, and binary payloads (`OpenBookContentResult`) — never real filesystem paths.
 OAuth config files (`cloud-oauth-secrets.json`, `client_secret_*.json`) live in `source/core/src/config/` and must never
-reach a bundle (`check:boundaries` FR-033).
+reach a bundle (`check:boundaries` FR-033). The Store package (spec 010 KL-1) carries the public client values in
+`app.asar/package.json` `readmateCloudOAuth` (`source/scripts/store/cloud-public-ids.cjs`): the Dropbox app key, the Entra ID
+client ID and the Google "Desktop app" client ID + secret (public by Google's installed-app policy; FR-033 allows that
+one secret only in `release/**/app.asar`). The Dropbox app secret is never embedded.
 
 ### Path aliases
 

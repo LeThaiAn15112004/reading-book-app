@@ -368,6 +368,11 @@ S1, S2 and S4 pass, and every row of `docs/store/smoke-tests.md` passes.
     the Store build embeds the public Dropbox app key + Entra ID client ID (`cloud-public-ids.cjs`, checked before and
     after the build), and Google Drive is "Coming soon" in packaged builds (`cloud:getProviderAvailability`). Smoke row
     11 is now 11a (Dropbox / OneDrive, must pass) + 11b (Google Drive, N/A). Re-test on a rebuilt package: pending._
+  - _**KL-1 changed (2026-11-09, maintainer): Google Drive works in Store 1.0.0** — decision (d) replaces (c): the
+    Google "Desktop app" client ID + client secret are embedded too (`installed` client only; `web` refused). Main uses
+    them through `loadGoogleDriveOAuthCredentials()`. `check-no-secrets` allows that one secret only in
+    `release/**/app.asar`. Smoke row 11b is now a must-pass Google Drive sign-in. Re-test of 11a + 11b on a rebuilt
+    package: pending._
 - [ ] T039 [US2] Add `desktop-main-changes.json` entries for every `EL/` file changed in this phase (`main.ts`, `background/login-item.ts`, `background/store-startup-task.ts`, the background IPC file, `ipc/api-types.ts`, `ipc/channels.ts`, `preload.ts`, `files/external-path*.{ts,mjs}`, `store/*`, each file of T028). Run `npm run check:desktop-baseline`
 - [ ] T040 [US2] Run the full `docs/store/smoke-tests.md` on a clean machine or VM and fill in column `1.0.0`. Every row passes, or is fixed before moving on (SC-003)
 
