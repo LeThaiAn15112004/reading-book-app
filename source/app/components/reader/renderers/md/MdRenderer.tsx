@@ -111,6 +111,9 @@ export type MdRendererProps = {
   /** An armed markup tool: a drag marks instead of just selecting. */
   markupTool?: MarkupInteractionTool | null
   onMarkupSelection?: (selection: MdSelectionInfo, tool: MarkupInteractionTool) => void
+  /** Toolbar Translate mode (spec 011): every finished selection goes to `onTranslateSelection`. */
+  translateModeActive?: boolean
+  onTranslateSelection?: (selection: MdSelectionInfo) => void
   /** Insert Text tool: a click at an insertion point. */
   onInsertPoint?: (info: MdInsertionInfo) => void
   /** Right-click inside a text selection. */
@@ -239,6 +242,8 @@ export function MdRenderer({
   focusedAnnotationId,
   markupTool,
   onMarkupSelection,
+  translateModeActive = false,
+  onTranslateSelection,
   onInsertPoint,
   onSelectionContextMenu,
   onAnnotationClick,
@@ -265,8 +270,11 @@ export function MdRenderer({
   const overlayRef = useRef<HTMLDivElement | null>(null)
   const markupToolRef = useRef(markupTool ?? null)
   markupToolRef.current = markupTool ?? null
+  const translateModeRef = useRef(translateModeActive)
+  translateModeRef.current = translateModeActive
   const handlersRef = useRef({
     onMarkupSelection,
+    onTranslateSelection,
     onInsertPoint,
     onSelectionContextMenu,
     onAnnotationClick,
@@ -277,6 +285,7 @@ export function MdRenderer({
   })
   handlersRef.current = {
     onMarkupSelection,
+    onTranslateSelection,
     onInsertPoint,
     onSelectionContextMenu,
     onAnnotationClick,
@@ -642,6 +651,10 @@ export function MdRenderer({
       return
     }
     const selection = readMdSelection(article)
+    if (selection && translateModeRef.current) {
+      h.onTranslateSelection?.(selection)
+      return
+    }
     if (tool && selection) {
       h.onMarkupSelection?.(selection, tool)
       return

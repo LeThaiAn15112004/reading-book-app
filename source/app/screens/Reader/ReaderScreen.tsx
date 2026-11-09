@@ -1857,6 +1857,11 @@ export function ReaderScreen() {
                 setMdSelectionMenu(null)
                 mdHighlights.commitMarkupSelection(selection, tool)
               }}
+              translateModeActive={translation.mode}
+              onTranslateSelection={(selection) => {
+                setMdSelectionMenu(null)
+                translation.openForSelection({ text: selection.text, lang: '' })
+              }}
               onInsertPoint={(info) => {
                 setMdSelectionMenu(null)
                 mdHighlights.beginInsert(info)
@@ -1904,6 +1909,11 @@ export function ReaderScreen() {
               onMarkupSelection={(selection, tool) => {
                 txt.closeSelectionMenu()
                 txt.commitMarkupSelection(selection, tool)
+              }}
+              translateModeActive={translation.mode}
+              onTranslateSelection={(selection) => {
+                txt.closeSelectionMenu()
+                translation.openForSelection({ text: selection.text, lang: '' })
               }}
               onHighlightClick={(hit) => {
                 txt.closeSelectionMenu()

@@ -73,6 +73,12 @@ export type TxtRendererProps = {
   editable: boolean
   /** An armed Highlight / Underline / Strikethrough tool: a drag marks instead of editing. */
   markupTool: TxtMarkupTool | null
+  /**
+   * Toolbar Translate mode (spec 011): the text is read-only, undo / redo are ignored (nothing can change the
+   * text), and every finished selection goes to `onTranslateSelection` instead of waiting for the context menu.
+   */
+  translateModeActive?: boolean
+  onTranslateSelection?: (selection: TxtSelectionInfo) => void
   margin: MarginMode
   chromeHidden: boolean
   initialOffset: number
@@ -145,6 +151,7 @@ export function TxtRenderer(props: TxtRendererProps) {
     focusedHighlightId,
     editable,
     markupTool,
+    translateModeActive = false,
     margin,
     chromeHidden,
     initialOffset,
@@ -206,8 +213,8 @@ export function TxtRenderer(props: TxtRendererProps) {
   useLayoutEffect(() => {
     const input = inputRef.current
     if (!input) return
-    input.readOnly = !editable || markupTool !== null
-  }, [editable, markupTool])
+    input.readOnly = !editable || markupTool !== null || translateModeActive
+  }, [editable, markupTool, translateModeActive])
 
   // ---- geometry ---------------------------------------------------------------------------
   /** The backdrop to measure, only while it holds the same text as the box (null = trailing). */
@@ -328,12 +335,13 @@ export function TxtRenderer(props: TxtRendererProps) {
     const onBeforeInput = (event: InputEvent) => {
       if (event.inputType === 'historyUndo') {
         event.preventDefault()
-        propsRef.current.onUndo()
+        // Translate mode never changes the text (spec 011 FR-005); a markup tool still undoes its marks.
+        if (!propsRef.current.translateModeActive) propsRef.current.onUndo()
         return
       }
       if (event.inputType === 'historyRedo') {
         event.preventDefault()
-        propsRef.current.onRedo()
+        if (!propsRef.current.translateModeActive) propsRef.current.onRedo()
         return
       }
       hintRef.current = {
@@ -372,11 +380,13 @@ export function TxtRenderer(props: TxtRendererProps) {
       if (key === 'z') {
         event.preventDefault()
         event.stopPropagation()
+        if (propsRef.current.translateModeActive) return
         if (event.shiftKey) propsRef.current.onRedo()
         else propsRef.current.onUndo()
       } else if (key === 'y') {
         event.preventDefault()
         event.stopPropagation()
+        if (propsRef.current.translateModeActive) return
         propsRef.current.onRedo()
       } else if (key === 's') {
         event.preventDefault()
@@ -434,6 +444,11 @@ export function TxtRenderer(props: TxtRendererProps) {
     const { markupTool: tool } = propsRef.current
 
     const selection = readSelection()
+    // Translate mode: the selection stays visible so the reader sees what is being translated.
+    if (selection && propsRef.current.translateModeActive) {
+      propsRef.current.onTranslateSelection?.(selection)
+      return
+    }
     if (selection && tool) {
       propsRef.current.onMarkupSelection(selection, tool)
       input.setSelectionRange(selection.end, selection.end)

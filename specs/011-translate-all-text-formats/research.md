@@ -84,9 +84,11 @@ All findings come from reading the current code (2026-11-09). No NEEDS CLARIFICA
   tools use, which already blocks typing, paste, cut and IME. But its keydown handler calls `onUndo` / `onRedo` on
   Ctrl/Cmd+Z / Y and `beforeinput` `historyUndo` / `historyRedo` without checking `readOnly`, so undo could still change
   the text while a markup tool (and later Translate mode) is armed.
-- **Decision**: Add `translateMode` to the read-only condition, and make the undo / redo paths no-ops while the box is
-  read-only. Leaving the mode restores the old condition on the next layout effect (no reload).
-- **Rationale**: Reuses the existing read-only switch; closes the undo hole for markup tools at the same time.
+- **Decision**: Add `translateModeActive` to the read-only condition, and make the undo / redo paths no-ops while
+  Translate mode is on. Leaving the mode restores the old condition on the next layout effect (no reload).
+- **Correction (implementation)**: the undo guard is NOT applied to armed markup tools: the TXT history
+  (`core/src/txt/txt-document.ts`) also holds highlight steps, and Ctrl+Z with a markup tool armed must still undo a
+  mark. Translate mode creates nothing, so ignoring undo there loses nothing.
 
 ## R6. Markdown selection text
 

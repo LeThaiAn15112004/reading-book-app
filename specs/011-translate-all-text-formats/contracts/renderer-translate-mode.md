@@ -17,9 +17,7 @@ Rules common to all four:
 2. In Translate mode a finished selection does NOT open the selection context menu automatically; right-click still
    opens it (its Translate entry works as today).
 3. The callback never changes the document: no annotation, no edit, no write.
-4. The selection is left visible after the callback (the user sees what is being translated), except where the
-   renderer must collapse it to avoid an editing side effect (TXT keeps today's markup behaviour: caret moved to the
-   selection end).
+4. The selection is left visible after the callback (the user sees what is being translated), in every format.
 5. Translate mode and an armed markup / ink / shape / typewriter / attachment / insert tool never coexist
    (`ReaderScreen.selectTool` turns the mode off; turning the mode on sets the tool to `select`).
 

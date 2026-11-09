@@ -70,13 +70,13 @@ const SURFACE_CAPABILITIES: Record<ReaderSurface, readonly ReaderCapability[]> =
   // lives in the footer.
   pdf: ['interaction', 'pan', 'search', 'markupAnnotations', 'snapshot', 'wordCount', 'pageLayout', 'inkAnnotations', 'shapeAnnotations', 'typewriterAnnotations', 'fileAttachments', 'attachments'],
   // TXT: one continuous, editable text. No Hand / Select tools (the text box is live: click = caret,
-  // drag = selection); the Edit tool is the way back from a markup tool, no page layout (there are no pages), no search painting / read aloud /
-  // translate (out of scope). Markup is stored as offsets into the text
-  // (docs/implementation_plan/txt_reader.md).
+  // drag = selection); the Edit tool is the way back from a markup tool, no page layout (there are no pages), no search painting / read aloud.
+  // Translate (spec 011): selection menu + Translate mode; the text is read-only while the mode is on. Markup is stored as
+  // offsets into the text (docs/implementation_plan/txt_reader.md).
   txt: ['textEdit', 'search', 'translate', 'markupAnnotations', 'snapshot', 'wordCount', 'readingSettings'],
   // Markdown: read-only, one continuous scroll — no Hand (nothing to drag-pan; it scrolls natively), so it
-  // opens on Select. No annotations, search painting, read aloud or
-  // translate yet (docs/implementation_plan/markdown_reader.md); Aa applies font / size / spacing.
+  // opens on Select. No search painting or read aloud (docs/implementation_plan/markdown_reader.md); Translate works from the
+  // selection menu and Translate mode (spec 011); Aa applies font / size / spacing.
   md: ['interaction', 'search', 'translate', 'markupAnnotations', 'snapshot', 'wordCount', 'readingSettings'],
   placeholder: ['interaction', 'pan', 'snapshot', 'wordCount', 'readingSettings', 'pageLayout'],
 }
