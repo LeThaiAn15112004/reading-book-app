@@ -5,6 +5,7 @@
 import type { Book } from 'epubjs'
 import type { CumulativePageMetrics } from '../progress/reader-position'
 import type { EpubNavState, EpubTocItem } from './types'
+import { normalizeHrefForLocation } from '../href'
 
 export function spineLengthOf(book: Book): number {
   const spine = book.spine as { length?: number }
@@ -132,14 +133,6 @@ export function normalizeTocItems(items: unknown, level = 0): EpubTocItem[] {
       }
     })
     .filter((item) => item.href || item.children.length > 0)
-}
-
-function normalizeHrefForLocation(href: string): string {
-  return href
-    .split('#')[0]
-    .split('?')[0]
-    .replace(/^\.\//, '')
-    .replace(/\\/g, '/')
 }
 
 /** Human-readable TOC title for a spine href, including nested TOC entries. */

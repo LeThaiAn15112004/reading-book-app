@@ -14,6 +14,7 @@ export type SidebarHighlight = ReaderHighlightBase & {
   readOnly?: boolean
 }
 import type { EpubTocItem } from '../../../../components/reader/renderers/epub'
+import { normalizeHrefForLocation } from '../../../../components/reader/renderers/epub/href'
 import type { FakeChapter } from '../../logic'
 import { useNotesFilterStore, type NotesTypeFilter } from '../../logic/highlights/notesFilterStore'
 import { AttachmentsPanel } from './AttachmentsPanel'
@@ -79,10 +80,6 @@ type TocSidebarProps = {
   onChangeHighlightNote?: (id: string, note: string) => void
   onCopyHighlight?: (highlight: SidebarHighlight) => void
   onAskAiHighlight?: (highlight: SidebarHighlight) => void
-}
-
-function normalizeHref(href: string): string {
-  return href.split('#')[0] ?? href
 }
 
 /**
@@ -267,7 +264,7 @@ type TocActiveKey = { id: string | null } | { href?: string }
 function tocItemIsActive(item: EpubTocItem, active: TocActiveKey): boolean {
   if ('id' in active) return active.id !== null && item.id === active.id
   if (!active.href || !item.href) return false
-  return normalizeHref(item.href) === normalizeHref(active.href)
+  return normalizeHrefForLocation(item.href) === normalizeHrefForLocation(active.href)
 }
 
 function tocItemHasActiveDescendant(
