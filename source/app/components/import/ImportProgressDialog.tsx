@@ -1,3 +1,4 @@
+/* i18n-pending: import */
 export type ImportProgressDialogProps = {
   open: boolean
   /** e.g. "Importing…" / "Downloading…" */

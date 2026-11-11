@@ -1,3 +1,4 @@
+/* i18n-pending: reader.tools */
 import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent } from 'react'
 import {
   TRANSLATION_LANGUAGES,

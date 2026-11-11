@@ -1,3 +1,4 @@
+/* i18n-pending: settings */
 import { useEffect } from 'react'
 import { useNotificationsStore, type NotificationBlockedReason } from '../../logic/notificationsStore'
 import { SettingsCard } from '../layout/SettingsCard'

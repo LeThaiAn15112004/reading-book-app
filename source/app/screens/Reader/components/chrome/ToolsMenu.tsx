@@ -1,3 +1,4 @@
+/* i18n-pending: reader.chrome */
 import { useCallback, useRef, useState, type ReactNode, type Ref } from 'react'
 import { createPortal } from 'react-dom'
 import { FreehandSettingsPopover } from './FreehandSettingsPopover'

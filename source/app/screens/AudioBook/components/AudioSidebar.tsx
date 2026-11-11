@@ -1,3 +1,4 @@
+/* i18n-pending: audiobook.player */
 import { useEffect, useMemo, useRef, type CSSProperties, type PointerEvent as ReactPointerEvent } from 'react'
 import {
   chapterIndexAt,

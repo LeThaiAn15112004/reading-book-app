@@ -1,3 +1,4 @@
+/* i18n-pending: chrome */
 import { useLocation, useNavigate } from 'react-router-dom'
 import { flushRegisteredSession } from '../../screens/Reader/logic'
 import { useAppNav, type AppNavId } from './AppNavContext'

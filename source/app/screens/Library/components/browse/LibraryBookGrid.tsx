@@ -1,3 +1,4 @@
+/* i18n-pending: library */
 import type { LibraryBook } from '@core'
 import type { BookMenuPoint } from '../book'
 import { ShelfRailCard } from '../shelves/ShelfRailCard'

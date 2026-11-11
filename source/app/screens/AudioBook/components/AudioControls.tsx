@@ -1,3 +1,4 @@
+/* i18n-pending: audiobook.player */
 import { useEffect, useState } from 'react'
 import { PLAYBACK_RATES, formatPlaybackTime } from '@core'
 import { useNoteMenuStore } from '../logic/audioNoteMenuStore'

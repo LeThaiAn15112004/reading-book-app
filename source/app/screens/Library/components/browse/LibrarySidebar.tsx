@@ -1,3 +1,4 @@
+/* i18n-pending: library */
 import {
   LIBRARY_BROWSE_FILTERS,
   type LibraryBrowseFilter,

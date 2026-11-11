@@ -1,3 +1,4 @@
+/* i18n-pending: settings */
 import { useState } from 'react'
 import { useSearchHistoryStore } from '../../../../hooks/library/index.js'
 import { SettingsCard } from '../layout/SettingsCard'

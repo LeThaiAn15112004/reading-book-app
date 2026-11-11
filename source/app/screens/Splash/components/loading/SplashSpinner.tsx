@@ -1,3 +1,4 @@
+/* i18n-pending: chrome */
 /** Bottom-center loading indicator while Main/DB boot. */
 export function SplashSpinner() {
   return (

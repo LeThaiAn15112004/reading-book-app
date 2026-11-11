@@ -1,3 +1,4 @@
+/* i18n-pending: library */
 export type ViewMode = 'grid' | 'list'
 
 function GridIcon({ className }: { className?: string }) {

@@ -8,7 +8,7 @@
 | `platforms/electron/ipc/app.ipc.ts` (or the existing app handler file) | handler |
 | `platforms/electron/preload.ts` + `DesktopApi` in `api-types.ts` | `app.setUiLanguage(preference: UiLanguagePreferenceDto): Promise<SetUiLanguageResultDto>` |
 | `source/app/bridge/app.ts` | `setUiLanguage(pref)` wrapper, swallows `NOT_AVAILABLE_ON_PLATFORM` |
-| Mobile `platforms/native/bridge/unavailable.ts` | `app.setUiLanguage` → `NOT_AVAILABLE_ON_PLATFORM` |
+| Mobile `platforms/native/bridge/app.ts` | `setUiLanguage: notAvailable(…)` → `NOT_AVAILABLE_ON_PLATFORM` |
 
 ```ts
 type UiLanguagePreferenceDto = 'system' | 'vi' | 'en'

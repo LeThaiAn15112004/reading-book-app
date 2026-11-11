@@ -1,3 +1,4 @@
+/* i18n-pending: reader.pdf */
 /**
  * In-place editor of a Typewriter note (specs/005-typewriter-note, research D2): a `contenteditable` whose
  * content is ALWAYS rendered from the document model. Edits are intercepted in `beforeinput`, applied with the

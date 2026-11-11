@@ -1,3 +1,4 @@
+/* i18n-pending: reader.annotations */
 type SyncConflictBannerProps = {
   kind: 'both-changed' | 'removed-in-file'
   onKeepReadmate: () => void

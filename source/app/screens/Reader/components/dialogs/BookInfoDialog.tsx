@@ -1,3 +1,4 @@
+/* i18n-pending: reader.annotations */
 import { BookCover } from '../../../Library/components/book/BookCover'
 import {
   SIGNATURE_CHECKING,

@@ -41,6 +41,8 @@ const api: DesktopApi = {
     ipcRenderer.invoke(AppChannels.getGoogleOAuthConfig),
   setChromeTheme: (theme) =>
     ipcRenderer.invoke(AppChannels.setChromeTheme, theme),
+  setUiLanguage: (preference) =>
+    ipcRenderer.invoke(AppChannels.setUiLanguage, preference),
   getFullscreen: () => ipcRenderer.invoke(AppChannels.getFullscreen),
   setFullscreen: (value) =>
     ipcRenderer.invoke(AppChannels.setFullscreen, value),

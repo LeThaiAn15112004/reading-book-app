@@ -1,4 +1,4 @@
-import type { ReaderTheme } from '@core'
+import { resolveUiLanguage, type ReaderTheme } from '@core'
 import { customAccentTokens, normalizeHex } from './accentColor'
 
 /**
@@ -62,14 +62,18 @@ export const APP_LANGUAGES: readonly { id: AppLanguage; label: string }[] = [
   { id: 'en', label: 'English' },
 ]
 
-/** Concrete UI language for `system` (OS/browser locale), as a BCP 47 tag for `<html lang>`. */
+/**
+ * Concrete UI language for `system` (OS/browser locale), as a BCP 47 tag for `<html lang>`. Same rule as the
+ * interface translations and Main (core `resolveUiLanguage`, spec 012).
+ */
 export function resolveAppLanguage(language: AppLanguage): 'vi' | 'en' {
-  if (language !== 'system') return language
+  let locales: readonly string[] = []
   try {
-    return navigator.language.toLowerCase().startsWith('vi') ? 'vi' : 'en'
+    locales = navigator.languages?.length ? navigator.languages : [navigator.language]
   } catch {
-    return 'en'
+    locales = []
   }
+  return resolveUiLanguage(language, locales)
 }
 
 const SYSTEM_DARK_QUERY = '(prefers-color-scheme: dark)'
@@ -165,8 +169,8 @@ export function saveAppAppearance(appearance: AppAppearance): boolean {
 
 /**
  * Accent + density are plain `<html>` attributes consumed by styles/appearance.css; a custom accent
- * sets the same accent tokens inline on `<html>` instead. The language sets `<html lang>` (UI
- * strings themselves are not translated yet).
+ * sets the same accent tokens inline on `<html>` instead. The language sets `<html lang>`; the interface texts
+ * follow it through `source/app/i18n` (spec 012).
  */
 export function applyAppearanceAttributes({
   accent,

@@ -1,3 +1,4 @@
+/* i18n-pending: reader.chrome */
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import type { BookSearchMatch, BookSearchOrder } from '../../../../bridge'
 import { useBookSearchStore, useDraggableSearchPanel, useResizableSearchPanel } from '../../logic'

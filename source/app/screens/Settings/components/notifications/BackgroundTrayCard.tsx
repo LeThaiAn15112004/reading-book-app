@@ -1,3 +1,4 @@
+/* i18n-pending: settings */
 import { useEffect, type ReactNode } from 'react'
 import { canChangeStartAtLogin, useBackgroundStore } from '../../logic/backgroundStore'
 import { SettingsCard } from '../layout/SettingsCard'

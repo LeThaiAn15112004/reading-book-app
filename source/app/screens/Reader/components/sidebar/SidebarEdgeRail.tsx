@@ -1,3 +1,4 @@
+/* i18n-pending: reader.sidebar */
 import type { SidebarTab } from './TocSidebar'
 import {
   READER_FOOTER_HEIGHT_PX,

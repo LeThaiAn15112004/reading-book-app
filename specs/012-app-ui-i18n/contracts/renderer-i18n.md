@@ -6,8 +6,9 @@ Shared by Desktop and the Mobile WebView (no platform suffix needed).
 // uiLanguageStore.ts (zustand)
 type UiLanguageState = { language: UiLanguage }
 export const useUiLanguageStore: UseBoundStore<StoreApi<UiLanguageState>>
-export function initUiLanguage(pref: UiLanguagePreference): void   // called in main.tsx BEFORE React mounts
-export function setUiLanguagePreference(pref: UiLanguagePreference): void // called by appAppearanceStore.commit
+// Derived from useAppAppearanceStore.language (subscription) — no init / setter to call.
+export function getUiLanguage(): UiLanguage
+export function deviceLocales(): readonly string[]          // navigator.languages, else [navigator.language]
 
 // useT.ts
 export function useT(): Translator            // re-renders on language change
@@ -20,10 +21,11 @@ export function useFormat(): { date, dateTime, number, percent, bytes, duration 
 
 Behaviour
 
-1. `main.tsx` calls `initUiLanguage(appearance.language)` in the same synchronous block that applies the theme →
-   the first React frame is translated (FR-004).
-2. `setUiLanguage(pref)` → `resolveUiLanguage(pref, navigator.languages)` → store update → `<html lang>` → bridge
-   `app.setUiLanguage(pref)` (fire-and-forget; `NOT_AVAILABLE_ON_PLATFORM` ignored on Mobile). Also sent once at boot.
+1. The appearance store reads localStorage synchronously when its module loads; the i18n store derives from it at
+   creation → the first React frame is translated (FR-004).
+2. Preference change (Settings, Reset App Settings) → subscription → `resolveUiLanguage(pref, deviceLocales())` →
+   store update. `AppAppearanceBridge` sets `<html lang>` and calls bridge `appApi.setUiLanguage(pref)` once at start
+   and on every change (never rejects; `NOT_AVAILABLE_ON_PLATFORM` on Mobile is ignored).
 3. A language change re-renders subscribed components only; no route change, no remount of the Reader / player.
 4. State shown later than it is produced holds a `MessageRef`, rendered with `t(ref.key, ref.params)`.
 5. Native `<html lang>` stays set by `applyAppearanceAttributes` (unchanged role).

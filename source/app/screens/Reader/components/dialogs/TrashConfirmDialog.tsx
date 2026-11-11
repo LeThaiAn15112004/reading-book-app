@@ -1,3 +1,4 @@
+/* i18n-pending: reader.annotations */
 type TrashConfirmDialogProps = {
   open: boolean
   bookTitle: string

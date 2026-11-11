@@ -1,3 +1,4 @@
+/* i18n-pending: reader.annotations */
 const OVERLAY =
   'fixed inset-0 z-[250] flex items-center justify-center bg-lib-bg-deep/60 p-4 backdrop-blur-sm'
 const CARD =

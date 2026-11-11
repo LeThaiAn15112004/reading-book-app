@@ -1,3 +1,4 @@
+/* i18n-pending: library */
 import { useEffect, useId, useRef, useState, type FormEvent } from 'react'
 
 export type NewCollectionDialogProps = {

@@ -20,6 +20,10 @@ export function translate(lang: UiLanguage, key: MessageKey, params?: Params): s
 export function createTranslator(lang: UiLanguage): Translator
 export type Translator = (key: MessageKey, params?: Params) => string
 
+/** Core has no `console` (R1): the host plugs its logger in. Each (kind, key, param) is reported once. */
+export function setI18nWarningHandler(handler: ((w: I18nWarning) => void) | null): void
+export type I18nWarning = { kind: 'missing-key' | 'missing-param'; key: string; param?: string }
+
 // Plurals: a PluralMessage is chosen with Intl.PluralRules(localeTag(lang)).select(Number(params.count)).
 // `count` is REQUIRED for a plural key (type error otherwise).
 
@@ -41,7 +45,7 @@ export function pendingArea(reason: string): PendingArea
 Guarantees
 
 - `translate` never throws and never returns an unfilled placeholder: a missing param is a type error; if one is
-  still missing at runtime it is replaced by `''` and logged once.
+  still missing at runtime it is replaced by `''` and reported once through the warning handler.
 - Output is plain text. Escaping is the caller's renderer's job (React escapes by default).
 - Same inputs → same output in renderer and Main (same module).
 

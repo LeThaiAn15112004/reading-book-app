@@ -1,3 +1,4 @@
+/* i18n-pending: audiobook.player */
 import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent } from 'react'
 import { createPortal } from 'react-dom'
 import { MAX_NOTE_CHARS, formatPlaybackTime, trackNoteLabel } from '@core'

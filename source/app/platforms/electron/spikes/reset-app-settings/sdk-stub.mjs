@@ -19,3 +19,6 @@ export * from '../../../../../core/src/app-models/pdf-shape.ts'
 
 // The PDF Typewriter preferences store validates against these (import-free pure modules of the real SDK).
 export * from '../../../../../core/src/typewriter/index.ts'
+
+// App Language resolution (spec 012): the real, import-free i18n module of the core.
+export * from '../../../../../core/src/i18n/index.ts'

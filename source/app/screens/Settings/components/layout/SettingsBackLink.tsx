@@ -1,3 +1,4 @@
+/* i18n-pending: settings */
 import { Link } from 'react-router-dom'
 
 export function SettingsBackLink() {

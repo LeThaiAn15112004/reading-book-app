@@ -1,3 +1,4 @@
+/* i18n-pending: import */
 import { useEffect, useId, useRef, useState } from 'react'
 import { features } from '@core/config'
 import { useZipImportStore, zipJobShortLabel } from '../../hooks/library'

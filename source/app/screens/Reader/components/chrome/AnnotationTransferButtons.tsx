@@ -1,3 +1,4 @@
+/* i18n-pending: reader.chrome */
 type AnnotationTransferButtonsProps = {
   /** PDF only: save a new PDF with the annotations written in. Hidden when absent. */
   onExportPdf?: () => void

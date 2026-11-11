@@ -1,3 +1,4 @@
+/* i18n-pending: reader.sidebar */
 import { useRef, useState } from 'react'
 import type { ReaderHighlightBase } from '@core'
 import type { ViewportRectLike } from '../../../../components/reader/renderers/epub'

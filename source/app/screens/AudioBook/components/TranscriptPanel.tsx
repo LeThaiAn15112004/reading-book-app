@@ -1,3 +1,4 @@
+/* i18n-pending: audiobook.player */
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { TranscriptionScope } from '../../../bridge'
 import { useAudioPlayerStore } from '../logic/audioPlayerStore'

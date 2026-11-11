@@ -1,3 +1,4 @@
+/* i18n-pending: library */
 import { useRef, type KeyboardEvent } from 'react'
 import { formatRelativeLastRead, type LibraryBook } from '@core'
 import { BookCover, BookMenuButton, type BookMenuPoint } from '../book'

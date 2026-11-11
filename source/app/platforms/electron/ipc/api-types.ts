@@ -1006,6 +1006,13 @@ export interface AnnotationTransferProgressDto {
   total: number
 }
 
+/** Spec 012: App Language preference sent to Main (`app:setUiLanguage`). */
+export type UiLanguagePreferenceDto = 'system' | 'vi' | 'en'
+
+export type SetUiLanguageResultDto =
+  | { ok: true; effective: 'vi' | 'en' }
+  | { ok: false; code: 'INVALID_ARGUMENT' | 'WRITE_FAILED' }
+
 export interface DesktopApi {
   ping(): Promise<'pong'>
   getAppInfo(): Promise<AppInfo>
@@ -1013,6 +1020,8 @@ export interface DesktopApi {
   getGoogleOAuthConfig(): Promise<GoogleOAuthClientConfigDto | null>
   /** Update Windows/Linux caption button colors to match app theme. */
   setChromeTheme(theme: 'night' | 'sepia' | 'paper' | string): Promise<OkResult>
+  /** Spec 012: tell Main the App Language preference (it keeps a mirror in `{userData}/ui-language.json`). */
+  setUiLanguage(preference: UiLanguagePreferenceDto): Promise<SetUiLanguageResultDto>
   /** Whether the app window is currently fullscreen. */
   getFullscreen(): Promise<boolean>
   /** Enter or leave OS-level window fullscreen. */

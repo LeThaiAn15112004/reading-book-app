@@ -4,6 +4,7 @@ import reactHooks from 'eslint-plugin-react-hooks'
 import reactRefresh from 'eslint-plugin-react-refresh'
 import globals from 'globals'
 import tseslint from 'typescript-eslint'
+import { readmatePlugin } from './source/scripts/eslint-rules/no-ui-literals.mjs'
 
 function windowApiRestrictions() {
   const message = 'window.api is used only in source/app/platforms/api.electron.ts; import `api` from the platform adapter instead (spec 008 R9, spec 009 T043).'
@@ -72,6 +73,18 @@ export default tseslint.config(
         },
       ],
     },
+  },
+  {
+    // Spec 012: interface text comes from the i18n catalogue. A file not converted yet starts with
+    // `/* i18n-pending: <area> */` (the rule skips it; the release gate requires none left).
+    files: [
+      'source/app/screens/**/*.tsx',
+      'source/app/components/**/*.tsx',
+      'source/app/hooks/**/*.tsx',
+      'source/app/App.tsx',
+    ],
+    plugins: { readmate: readmatePlugin },
+    rules: { 'readmate/no-ui-literals': 'error' },
   },
   {
     files: ['source/app/platforms/api.electron.ts'],

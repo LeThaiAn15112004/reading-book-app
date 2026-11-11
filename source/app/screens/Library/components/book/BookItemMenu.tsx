@@ -1,3 +1,4 @@
+/* i18n-pending: library */
 import { useEffect, useRef, useState, type MouseEvent as ReactMouseEvent } from 'react'
 import { annotationTransferApi } from '../../../../bridge'
 import { isFeatureAvailable, isMobileHost } from '../../../../platforms/host'

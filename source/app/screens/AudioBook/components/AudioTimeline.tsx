@@ -1,3 +1,4 @@
+/* i18n-pending: audiobook.player */
 import { useMemo, useState, type KeyboardEvent } from 'react'
 import {
   formatPlaybackTime,

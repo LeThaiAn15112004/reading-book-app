@@ -1,3 +1,4 @@
+/* i18n-pending: chrome */
 function SplashBookIcon() {
   return (
     <div className="mb-6 h-20 w-20 animate-splash-pulse text-lib-accent drop-shadow-[0_0_15px_color-mix(in_srgb,var(--lib-accent)_35%,transparent)]">

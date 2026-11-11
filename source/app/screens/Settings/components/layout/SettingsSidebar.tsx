@@ -1,3 +1,4 @@
+/* i18n-pending: settings */
 import {
   visibleSettingsSections,
   useSettingsNavStore,

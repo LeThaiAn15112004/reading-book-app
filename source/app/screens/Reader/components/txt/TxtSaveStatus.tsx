@@ -1,3 +1,4 @@
+/* i18n-pending: reader.tools */
 import type { TxtSaveStatus as SaveStatus } from '../../logic/txtDocument/txtDocumentStore'
 
 type TxtSaveStatusProps = {

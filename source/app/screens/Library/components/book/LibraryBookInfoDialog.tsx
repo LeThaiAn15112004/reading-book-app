@@ -1,3 +1,4 @@
+/* i18n-pending: library */
 import { formatFileSizeMb } from '@core'
 import { BookCover } from './BookCover'
 

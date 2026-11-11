@@ -1,3 +1,4 @@
+/* i18n-pending: settings */
 import { useEffect, useId, useState } from 'react'
 
 /** One kind of history the dialog can clear. Add entries here as more history types exist. */

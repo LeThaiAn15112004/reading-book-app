@@ -1,3 +1,4 @@
+/* i18n-pending: settings */
 import { useEffect, useState } from 'react'
 import { ConfirmBookActionDialog } from '../../../Library/components/book/ConfirmBookActionDialog'
 import { useStorageStore } from '../../logic/storageStore'

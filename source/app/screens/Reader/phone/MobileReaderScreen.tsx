@@ -1,3 +1,4 @@
+/* i18n-pending: reader.phone */
 /**
  * The Mobile Reader (spec 008, T102 + T103, FR-012a / FR-012c; `contracts/phone-ui.md`, "Mobile Reader UI").
  *

@@ -1,3 +1,4 @@
+/* i18n-pending: reader.annotations */
 import { type ReactNode, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import type { ReaderHighlightBase } from '@core'

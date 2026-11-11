@@ -1,3 +1,4 @@
+/* i18n-pending: reader.pdf */
 /**
  * Selection chrome of one Typewriter note (specs/005-typewriter-note, US2): outline, 8 resize handles, a body that
  * moves the note, and a compact toolbar. Self-contained pointer handling (pointer capture on the pressed element),

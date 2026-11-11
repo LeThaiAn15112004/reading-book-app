@@ -1,3 +1,4 @@
+/* i18n-pending: settings */
 import { useEffect, useId, useRef, useState, type KeyboardEvent, type PointerEvent } from 'react'
 import {
   hexToHsv,

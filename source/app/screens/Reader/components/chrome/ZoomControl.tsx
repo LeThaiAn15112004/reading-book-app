@@ -1,3 +1,4 @@
+/* i18n-pending: reader.chrome */
 import { useEffect, useId, useRef, useState } from 'react'
 import {
   ZOOM_LAYOUT_PRESETS,

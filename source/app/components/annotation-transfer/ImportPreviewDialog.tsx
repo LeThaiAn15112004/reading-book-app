@@ -1,3 +1,4 @@
+/* i18n-pending: reader.annotations */
 import { useEffect, useId, useState } from 'react'
 import { useAnnotationTransferStore } from '../../screens/Reader/logic/annotationTransferStore'
 

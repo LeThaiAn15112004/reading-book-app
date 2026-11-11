@@ -6,6 +6,17 @@ export const appApi = {
   getAppInfo: () => api.getAppInfo(),
   getGoogleOAuthConfig: () => api.getGoogleOAuthConfig(),
   setChromeTheme: (theme: string) => api.setChromeTheme(theme),
+  /**
+   * Spec 012: App Language preference → Main. Never throws or rejects: Mobile has no Main (NOT_AVAILABLE_ON_PLATFORM)
+   * and the renderer's own translation does not depend on the answer.
+   */
+  setUiLanguage: async (preference: Parameters<typeof api.setUiLanguage>[0]) => {
+    try {
+      return await api.setUiLanguage(preference)
+    } catch {
+      return null
+    }
+  },
   getFullscreen: () => api.getFullscreen(),
   setFullscreen: (value: boolean) => api.setFullscreen(value),
   toggleFullscreen: () => api.toggleFullscreen(),

@@ -15,6 +15,7 @@ type AppMethods = Pick<
   | 'getAppInfo'
   | 'getGoogleOAuthConfig'
   | 'setChromeTheme'
+  | 'setUiLanguage'
   | 'getFullscreen'
   | 'setFullscreen'
   | 'toggleFullscreen'
@@ -55,6 +56,8 @@ export function createAppGroup(ctx: BridgeContext): AppMethods {
       refreshSystemBars()
       return { ok: true }
     },
+    // Spec 012: no tray / Main on the phone; the WebView translates itself from the same preference.
+    setUiLanguage: notAvailable('setUiLanguage'),
     getFullscreen: async () => false,
     setFullscreen: notAvailable('setFullscreen'),
     toggleFullscreen: notAvailable('toggleFullscreen'),

@@ -1,3 +1,4 @@
+/* i18n-pending: library */
 import { useEffect } from 'react'
 import type { LibraryBook } from '@core'
 import { BookMenuButton, LibraryBookInfoContent, type BookMenuPoint } from '../book'

@@ -1,3 +1,4 @@
+/* i18n-pending: reader.chrome */
 /** Loading / error surface while opening a book from the library. */
 export function ReaderOpenStatus({
   status,

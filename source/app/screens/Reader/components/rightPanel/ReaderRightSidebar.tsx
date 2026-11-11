@@ -1,3 +1,4 @@
+/* i18n-pending: reader.sidebar */
 import type { ReactNode } from 'react'
 import { readerChromeTopInset } from '../../../../components/reader/chrome'
 import { READER_FOOTER_HEIGHT_PX } from '../sidebar/sidebarTabs'

@@ -1,3 +1,4 @@
+/* i18n-pending: library */
 /** MVP format chips shown on SCR-01 (SDS / library mockup). */
 const MVP_FORMAT_CHIPS = ['EPUB', 'PDF', 'TXT', 'MD'] as const
 

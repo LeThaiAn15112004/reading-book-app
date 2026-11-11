@@ -1,3 +1,4 @@
+/* i18n-pending: reader.sidebar */
 /**
  * Format controls of a Typewriter note (specs/005-typewriter-note, US3): family, size (pt on a nominal 612 pt page),
  * colour (picker + HEX), B / I / U / S and alignment. Pure view: the host passes the effective values and applies the

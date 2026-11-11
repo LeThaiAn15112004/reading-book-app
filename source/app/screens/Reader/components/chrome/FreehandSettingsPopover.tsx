@@ -1,3 +1,4 @@
+/* i18n-pending: reader.chrome */
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type RefObject } from 'react'
 import { INK_PEN_PRESETS } from '@core'
 import { usePdfInkPrefsStore } from '../../logic/pdfInk/pdfInkPrefsStore'

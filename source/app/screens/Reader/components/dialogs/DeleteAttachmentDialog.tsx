@@ -1,3 +1,4 @@
+/* i18n-pending: reader.annotations */
 import type { PdfAttachmentPin } from '../../../../components/reader/renderers/pdf'
 
 const OVERLAY =

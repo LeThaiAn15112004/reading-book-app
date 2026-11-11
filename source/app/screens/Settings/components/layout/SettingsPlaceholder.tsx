@@ -1,3 +1,4 @@
+/* i18n-pending: settings */
 /** Content for Settings sections that exist in the sidebar but are not built yet. */
 export function SettingsPlaceholder() {
   return (

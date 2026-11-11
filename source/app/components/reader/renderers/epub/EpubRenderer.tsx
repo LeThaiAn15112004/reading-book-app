@@ -1,3 +1,4 @@
+/* i18n-pending: reader.text */
 import {
   useEffect,
   useRef,

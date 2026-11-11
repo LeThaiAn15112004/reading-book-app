@@ -1,3 +1,4 @@
+/* i18n-pending: reader.chrome */
 import { useEffect, useState } from 'react'
 import { parseHexInput } from '../../logic/pdfInk/pdfInkPrefsStore'
 

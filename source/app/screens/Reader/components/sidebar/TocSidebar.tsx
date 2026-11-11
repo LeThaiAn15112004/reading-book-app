@@ -1,3 +1,4 @@
+/* i18n-pending: reader.sidebar */
 import { Component, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { formatAttachmentSize, isShapeStyleKind, type ReaderBookmark, type ReaderHighlightBase } from '@core'
 

@@ -1,3 +1,4 @@
+/* i18n-pending: library */
 import type { CollectionSummary } from '@core'
 
 const STACK_GRADS = [

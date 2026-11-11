@@ -1,3 +1,4 @@
+/* i18n-pending: audiobook.transcription */
 import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { AUTO_LANGUAGE, WHISPER_LANGUAGES } from '@core'
 import type { TranscriptionScope } from '../../../bridge'

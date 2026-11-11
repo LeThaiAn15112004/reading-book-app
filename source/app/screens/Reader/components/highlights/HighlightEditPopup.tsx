@@ -1,3 +1,4 @@
+/* i18n-pending: reader.annotations */
 import { type ReactNode, useLayoutEffect, useRef, useState } from 'react'
 import { HIGHLIGHT_TAG_PRESETS, type ReaderHighlightBase } from '@core'
 import type { ViewportRectLike } from '../../../../components/reader/renderers/epub'

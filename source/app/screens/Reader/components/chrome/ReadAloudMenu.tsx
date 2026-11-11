@@ -1,3 +1,4 @@
+/* i18n-pending: reader.chrome */
 import { useLayoutEffect, useRef, useState, type RefObject } from 'react'
 import { createPortal } from 'react-dom'
 import { READ_ALOUD_RATES, useDismissOnOutsideOrEscape, type ReadAloudStatus } from '../../logic'

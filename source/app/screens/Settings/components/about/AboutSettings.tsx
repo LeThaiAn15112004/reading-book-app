@@ -1,3 +1,4 @@
+/* i18n-pending: settings */
 import { SettingsCard } from '../layout/SettingsCard'
 
 /** Official product name shown on the About page. */

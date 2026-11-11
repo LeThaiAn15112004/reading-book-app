@@ -1,3 +1,4 @@
+/* i18n-pending: library */
 import { useEffect, useState, type FormEvent } from 'react'
 import type { LibraryBook } from '@core'
 

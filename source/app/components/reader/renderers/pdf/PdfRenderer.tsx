@@ -1,3 +1,4 @@
+/* i18n-pending: reader.pdf */
 /**
  * PDF surface — continuous vertical scrolling (see docs/implementation_plan/pdf_continuous_scroll.md).
  *

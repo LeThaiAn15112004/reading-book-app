@@ -1,3 +1,4 @@
+/* i18n-pending: reader.chrome */
 import type { PointerEvent as ReactPointerEvent } from 'react'
 import type { SnapshotRect } from '../../logic'
 

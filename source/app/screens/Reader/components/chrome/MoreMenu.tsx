@@ -1,3 +1,4 @@
+/* i18n-pending: reader.chrome */
 type MoreMenuProps = {
   open: boolean
   onShare: () => void

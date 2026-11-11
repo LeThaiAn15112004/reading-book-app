@@ -1,3 +1,4 @@
+/* i18n-pending: reader.phone */
 import { useState } from 'react'
 import type { ReaderBookmark, ReaderHighlightBase } from '@core'
 import { MobileSheet, MobileSheetRow } from './MobileSheet'

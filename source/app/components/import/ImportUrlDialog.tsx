@@ -1,3 +1,4 @@
+/* i18n-pending: import */
 import { useEffect, useId, useRef, useState, type FormEvent } from 'react'
 
 const FORMAT_TAGS = ['EPUB', 'PDF', 'TXT', 'MD'] as const

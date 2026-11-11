@@ -1,3 +1,4 @@
+/* i18n-pending: reader.tools */
 import { useCallback, useLayoutEffect, useRef } from 'react'
 import { findTranslationLanguage } from '@core'
 import { useDismissOnOutsideOrEscape, type DismissReason } from '../../logic/highlights/useDismissOnOutsideOrEscape'

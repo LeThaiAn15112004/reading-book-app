@@ -1,3 +1,4 @@
+/* i18n-pending: reader.sidebar */
 type TocEdgeButtonProps = {
   onOpen: () => void
 }

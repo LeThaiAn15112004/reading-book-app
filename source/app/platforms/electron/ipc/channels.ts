@@ -6,6 +6,8 @@ export const AppChannels = {
   getGoogleOAuthConfig: 'app:getGoogleOAuthConfig',
   /** Sync native titleBarOverlay caption buttons to Night/Sepia/Paper. */
   setChromeTheme: 'app:setChromeTheme',
+  /** Spec 012: the App Language preference, mirrored by Main for the tray, dialogs, reminders and its messages. */
+  setUiLanguage: 'app:setUiLanguage',
   /** Whether the BrowserWindow is currently fullscreen. */
   getFullscreen: 'app:getFullscreen',
   /** Enter or leave OS-level fullscreen. */

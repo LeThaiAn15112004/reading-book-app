@@ -1,3 +1,4 @@
+/* i18n-pending: reader.sidebar */
 import { useEffect } from 'react'
 import { useAttachmentsStore } from '../../logic/attachments/attachmentsStore'
 import { AttachmentBlockedDialog, AttachmentOpenDialog } from '../dialogs/AttachmentDialogs'

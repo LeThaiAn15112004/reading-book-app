@@ -1,3 +1,4 @@
+/* i18n-pending: reader.chrome */
 import type { Ref } from 'react'
 import type { ReaderCapability } from '../../../../components/reader/capabilities'
 import { AnnotationTransferButtons } from './AnnotationTransferButtons'

@@ -1,3 +1,4 @@
+/* i18n-pending: import */
 import { useEffect, useId } from 'react'
 
 export type ImportConflictDialogProps = {

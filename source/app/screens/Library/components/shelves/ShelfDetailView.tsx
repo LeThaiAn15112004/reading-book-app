@@ -1,3 +1,4 @@
+/* i18n-pending: library */
 import {
   ShelfDetailItem,
   type ShelfDetailItemData,

@@ -1,3 +1,4 @@
+/* i18n-pending: reader.annotations */
 import { useState } from 'react'
 import { HexAlphaColorPicker, HexColorInput } from 'react-colorful'
 import {

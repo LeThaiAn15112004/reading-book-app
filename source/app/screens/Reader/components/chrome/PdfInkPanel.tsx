@@ -1,3 +1,4 @@
+/* i18n-pending: reader.chrome */
 import type { InkPenStyle } from '@core'
 import type { PdfInkMark } from '../../logic/pdfInk/pdfInkStore'
 import { InkStyleControls } from './InkStyleControls'

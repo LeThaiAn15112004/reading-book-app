@@ -1,3 +1,4 @@
+/* i18n-pending: library */
 type BootErrorBannerProps = {
   message: string
   onRetry: () => void

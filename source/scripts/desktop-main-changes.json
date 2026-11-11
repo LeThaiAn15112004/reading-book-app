@@ -42,15 +42,15 @@
     "source/app/platforms/electron/files/open-book-content.ts": "T049: import name @reading-book/* replaced by @core/* (import specifier only)",
     "source/app/platforms/electron/files/relink-book.ts": "T049: import name @reading-book/* replaced by @core/* (import specifier only)",
     "source/app/platforms/electron/files/sandbox.ts": "T049: import name @reading-book/* replaced by @core/* (import specifier only)",
-    "source/app/platforms/electron/ipc/api-types.ts": "T049: import name @reading-book/* replaced by @core/* (import specifier only) | spec 010 T032–T033: StartAtLoginDto.state (Store build only) + background.openStartupSettings | spec 010 KL-1: CloudProviderAvailabilityDto + cloud.getProviderAvailability | spec 011: translation.getSourceLanguage / setSourceLanguage + TranslationSource*Dto",
-    "source/app/platforms/electron/ipc/app.ipc.ts": "T049: import name @reading-book/* replaced by @core/* (import specifier only)",
+    "source/app/platforms/electron/ipc/api-types.ts": "T049: import name @reading-book/* replaced by @core/* (import specifier only) | spec 010 T032–T033: StartAtLoginDto.state (Store build only) + background.openStartupSettings | spec 010 KL-1: CloudProviderAvailabilityDto + cloud.getProviderAvailability | spec 011: translation.getSourceLanguage / setSourceLanguage + TranslationSource*Dto | spec 012: UiLanguagePreferenceDto, SetUiLanguageResultDto, DesktopApi.setUiLanguage",
+    "source/app/platforms/electron/ipc/app.ipc.ts": "T049: import name @reading-book/* replaced by @core/* (import specifier only) | spec 012: app:setUiLanguage handler (validation in i18n/main-i18n.ts)",
     "source/app/platforms/electron/ipc/audio.ipc.ts": "T049: import name @reading-book/* replaced by @core/* (import specifier only)",
     "source/app/platforms/electron/ipc/graphics.ipc.ts": "T049: import name @reading-book/* replaced by @core/* (import specifier only)",
     "source/app/platforms/electron/ipc/import.ipc.ts": "T049: import name @reading-book/* replaced by @core/* (import specifier only)",
     "source/app/platforms/electron/ipc/library.ipc.ts": "T049: import name @reading-book/* replaced by @core/* (import specifier only) | spec 010 T028: Show in folder and Copy file path go through pathForOtherApps",
     "source/app/platforms/electron/ipc/transcription.ipc.ts": "T049: import name @reading-book/* replaced by @core/* (import specifier only)",
     "source/app/platforms/electron/ipc/zip-import.ipc.ts": "T049: import name @reading-book/* replaced by @core/* (import specifier only)",
-    "source/app/platforms/electron/main.ts": "T049: import name @reading-book/* replaced by @core/* (import specifier only) | spec 010 T027: first import store/store-userdata-first (Store build: own userData before anything reads it); Store build skips setAsDefaultProtocolClient (the MSIX declares the scheme) and setAppUserModelId (the package gives the AUMID)",
+    "source/app/platforms/electron/main.ts": "T049: import name @reading-book/* replaced by @core/* (import specifier only) | spec 010 T027: first import store/store-userdata-first (Store build: own userData before anything reads it); Store build skips setAsDefaultProtocolClient (the MSIX declares the scheme) and setAppUserModelId (the package gives the AUMID) | spec 012: loadMainUiLanguage() at ready, before the menu, tray, windows and reminder worker",
     "source/app/platforms/electron/md/md-asset-files.ts": "T049: import name @reading-book/* replaced by @core/* (import specifier only)",
     "source/app/platforms/electron/oauth/google-loopback-server.ts": "T049: import name @reading-book/* replaced by @core/* (import specifier only)",
     "source/app/platforms/electron/pdf-sync/pdf-annotation-export.ts": "T049: import name @reading-book/* replaced by @core/* (import specifier only)",
@@ -104,8 +104,11 @@
     "source/app/platforms/electron/config/cloud-availability-core.d.mts": "spec 010 KL-1: new, types of cloud-availability-core.mjs",
     "source/app/platforms/electron/background/login-item.ts": "spec 010 T032: readStartAtLogin / changeStartAtLogin delegate to the startup task in the Store build (sync direct-build API unchanged)",
     "source/app/platforms/electron/ipc/background.ipc.ts": "spec 010 T032–T033: Start at Login handlers async (Store startup task); new background:openStartupSettings (Store build only, fixed ms-settings URI)",
-    "source/app/platforms/electron/ipc/channels.ts": "spec 010 T033: BackgroundChannels.openStartupSettings | spec 010 KL-1: CloudChannels.getProviderAvailability | spec 011: TranslationChannels.getSourceLanguage / setSourceLanguage",
-    "source/app/platforms/electron/preload.ts": "spec 010 T033: background.openStartupSettings | spec 010 KL-1: cloud.getProviderAvailability | spec 011: translation.getSourceLanguage / setSourceLanguage",
-    "source/app/platforms/electron/ipc/translation.ipc.ts": "spec 011: translation:getSourceLanguage / setSourceLanguage handlers (remembered translation source language per book)"
+    "source/app/platforms/electron/ipc/channels.ts": "spec 010 T033: BackgroundChannels.openStartupSettings | spec 010 KL-1: CloudChannels.getProviderAvailability | spec 011: TranslationChannels.getSourceLanguage / setSourceLanguage | spec 012: AppChannels.setUiLanguage",
+    "source/app/platforms/electron/preload.ts": "spec 010 T033: background.openStartupSettings | spec 010 KL-1: cloud.getProviderAvailability | spec 011: translation.getSourceLanguage / setSourceLanguage | spec 012: setUiLanguage",
+    "source/app/platforms/electron/ipc/translation.ipc.ts": "spec 011: translation:getSourceLanguage / setSourceLanguage handlers (remembered translation source language per book)",
+    "source/app/platforms/electron/i18n/": "spec 012: new — Main interface language (ui-language.json mirror, tMain, change listeners)",
+    "source/app/platforms/electron/spikes/i18n/": "spec 012: new — spike:i18n:main (stubbed electron, real core i18n)",
+    "source/app/platforms/electron/spikes/reset-app-settings/sdk-stub.mjs": "spec 012: re-exports the real core i18n module (appAppearance.ts resolves the language with it)"
   }
 }

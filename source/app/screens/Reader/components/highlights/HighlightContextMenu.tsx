@@ -1,3 +1,4 @@
+/* i18n-pending: reader.annotations */
 import { useLayoutEffect, useRef, useState } from 'react'
 import type { ViewportRectLike } from '../../../../components/reader/renderers/epub'
 import { highlightPopoverPosition, useDismissOnOutsideOrEscape } from '../../logic'

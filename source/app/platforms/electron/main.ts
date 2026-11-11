@@ -27,6 +27,7 @@ import { disposePdfAnnotationSync } from './ipc/overlay.ipc'
 import { disposeTranslationWorker } from './translation/translation-service'
 import { ensureBooksSandbox } from './files/sandbox'
 import { registerAllIpcHandlers } from './ipc'
+import { loadMainUiLanguage } from './i18n/main-i18n'
 import { disposeTranscription, recoverInterruptedTranscripts } from './transcription/transcription-runtime'
 import { installFullscreenShortcuts } from './ipc/app.ipc'
 import { AppChannels, NotificationChannels } from './ipc/channels'
@@ -449,6 +450,8 @@ app.whenReady().then(async () => {
   if (process.platform === 'win32' && !isStoreBuild()) {
     app.setAppUserModelId(app.isPackaged ? APP_USER_MODEL_ID : process.execPath)
   }
+  // Spec 012: interface language mirror first — the tray, dialogs and reminders built below read it.
+  loadMainUiLanguage()
   installApplicationMenu()
   ensureBooksSandbox()
   openDatabase()

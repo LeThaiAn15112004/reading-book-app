@@ -1,3 +1,4 @@
+/* i18n-pending: reader.chrome */
 import { useRef } from 'react'
 import { useDraggableWordCountPanel, useResizableWordCountPanel } from '../../logic'
 import type { WordCountStats, WordCountStatus } from '../../logic'

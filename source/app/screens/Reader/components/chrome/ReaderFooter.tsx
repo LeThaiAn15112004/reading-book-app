@@ -1,3 +1,4 @@
+/* i18n-pending: reader.chrome */
 import { useEffect, useRef, useState } from 'react'
 import { useShortcutAction } from '../../../../shortcuts'
 import type { ZoomLayoutPreset } from '../../logic'

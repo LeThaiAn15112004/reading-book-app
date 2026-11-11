@@ -1,3 +1,4 @@
+/* i18n-pending: settings */
 import { useEffect, useState } from 'react'
 import { useNotificationsStore, type TestReminderState } from '../../logic/notificationsStore'
 import { SettingsCard } from '../layout/SettingsCard'

@@ -1,3 +1,4 @@
+/* i18n-pending: library */
 import { ImportMenu } from '../../../../components/import'
 import { isFeatureAvailable } from '../../../../platforms/host'
 import { useAnnotationTransferStore } from '../../../Reader/logic/annotationTransferStore'

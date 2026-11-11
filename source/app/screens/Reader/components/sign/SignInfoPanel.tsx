@@ -1,3 +1,4 @@
+/* i18n-pending: reader.tools */
 import { useBookSignature } from '../../logic/hooks/useBookSignature'
 import {
   SIGNATURE_CHECKING,

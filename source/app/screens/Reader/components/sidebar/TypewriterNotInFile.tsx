@@ -1,3 +1,4 @@
+/* i18n-pending: reader.sidebar */
 import { typewriterNotInFileMessage, useTypewriterFileStatusStore } from '../../logic/pdfTypewriter/typewriterFileStatusStore'
 
 /** "Not in the file" + the reason and what to do, for a Typewriter note that could not be written into the PDF (renders nothing otherwise). */

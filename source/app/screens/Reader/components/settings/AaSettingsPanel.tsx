@@ -1,3 +1,4 @@
+/* i18n-pending: reader.sidebar */
 import type { PageLayout } from '@core'
 import { useShortcutLabel } from '../../../../shortcuts/useShortcutLabel'
 import type {

@@ -1,3 +1,4 @@
+/* i18n-pending: reader.annotations */
 import { useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { formatAttachmentSize } from '@core'

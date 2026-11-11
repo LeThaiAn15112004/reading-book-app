@@ -1,3 +1,4 @@
+/* i18n-pending: library */
 import { ImportMenu } from '../../../../components/import'
 
 type LibraryEmptyStateProps = {

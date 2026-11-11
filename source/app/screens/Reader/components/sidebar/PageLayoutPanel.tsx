@@ -1,3 +1,4 @@
+/* i18n-pending: reader.sidebar */
 import { useEffect, useRef, useState } from 'react'
 
 /** Rasterizes a 1-based page into a canvas `cssWidth` CSS px wide (PDF: `PdfRendererApi.renderThumbnail`). */

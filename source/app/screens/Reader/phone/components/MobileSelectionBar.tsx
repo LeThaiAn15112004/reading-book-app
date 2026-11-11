@@ -1,3 +1,4 @@
+/* i18n-pending: reader.phone */
 import type { PointerEvent as ReactPointerEvent } from 'react'
 
 export type SelectionMarkKind = 'highlight' | 'underline' | 'strikethrough' | 'textbox'

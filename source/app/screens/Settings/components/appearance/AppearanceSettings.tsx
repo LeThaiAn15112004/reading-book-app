@@ -1,3 +1,4 @@
+/* i18n-pending: settings */
 import { useState } from 'react'
 import { READER_THEME_PRESETS } from '../../../../components/chrome'
 import {

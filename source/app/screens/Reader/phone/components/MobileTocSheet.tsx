@@ -1,3 +1,4 @@
+/* i18n-pending: reader.phone */
 import type { EpubTocItem } from '../../../../components/reader/renderers/epub'
 import { normalizeHrefForLocation } from '../../../../components/reader/renderers/epub/href'
 import { MobileSheet, MobileSheetRow } from './MobileSheet'

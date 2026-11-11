@@ -1,3 +1,4 @@
+/* i18n-pending: reader.annotations */
 type SignedPdfWriteDialogProps = {
   open: boolean
   /** "Export" (a new file) or "Write" (the book's own file, two-way sync). */

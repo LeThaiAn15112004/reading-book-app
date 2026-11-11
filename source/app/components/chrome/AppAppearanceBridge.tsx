@@ -7,6 +7,7 @@ import {
 } from '../../theme/appAppearance'
 import { useAppAppearanceStore } from '../../theme/appAppearanceStore'
 import { useGlobalReadingPrefs } from './GlobalReadingPrefsContext'
+import { appApi } from '../../bridge/app'
 
 /**
  * Applies the global app appearance: resolves the theme mode (incl. System → OS light/dark) into
@@ -40,6 +41,12 @@ export function AppAppearanceBridge() {
   useEffect(() => {
     applyAppearanceAttributes({ accent, customAccent, density, language })
   }, [accent, customAccent, density, language])
+
+  // Spec 012: Main (tray, dialogs, reminders, its messages) follows the same preference — sent once at start (Main's
+  // mirror self-heals) and on every change, Reset App Settings included. Fire-and-forget; Mobile answers "not available".
+  useEffect(() => {
+    void appApi.setUiLanguage(language)
+  }, [language])
 
   return null
 }

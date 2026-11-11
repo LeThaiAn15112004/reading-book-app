@@ -1,3 +1,4 @@
+/* i18n-pending: settings */
 import { useEffect, useState } from 'react'
 import type { UpdateChannel } from '../../../../bridge'
 import { ConfirmBookActionDialog } from '../../../Library/components/book/ConfirmBookActionDialog'

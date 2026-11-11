@@ -10,6 +10,7 @@ import { AppChannels } from './channels'
 import { applyChromeThemeToWindow } from '../theme/titlebar-overlay'
 import { loadGoogleOAuthClientConfig } from '../config/google-oauth-config'
 import { isTranscriptionPlatformSupported } from '../transcription/ffmpeg-artifacts'
+import { handleSetUiLanguage } from '../i18n/main-i18n'
 
 function windowFromEvent(event: Electron.IpcMainInvokeEvent): BrowserWindow | null {
   return BrowserWindow.fromWebContents(event.sender)
@@ -67,6 +68,10 @@ export function registerAppIpc(): void {
       return { ok: true }
     },
   )
+
+  // Spec 012: App Language preference from the renderer (untrusted input; nothing changes on a bad value).
+  ipcMain.removeHandler(AppChannels.setUiLanguage)
+  ipcMain.handle(AppChannels.setUiLanguage, (_event, preference: unknown) => handleSetUiLanguage(preference))
 
   ipcMain.removeHandler(AppChannels.getFullscreen)
   ipcMain.handle(AppChannels.getFullscreen, (event): boolean => {

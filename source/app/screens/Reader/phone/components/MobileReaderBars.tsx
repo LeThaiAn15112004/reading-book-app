@@ -1,3 +1,4 @@
+/* i18n-pending: reader.phone */
 import { useEffect, useState } from 'react'
 
 const iconButton =

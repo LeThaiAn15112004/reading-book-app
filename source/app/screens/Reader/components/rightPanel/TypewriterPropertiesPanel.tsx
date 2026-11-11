@@ -1,3 +1,4 @@
+/* i18n-pending: reader.sidebar */
 import { applyAlign, emptyTypewriterDoc, type TypewriterAlign, type TypewriterTextStyle } from '@core'
 import type { PdfTypewriterMark } from '../../../../components/reader/renderers/pdf/PdfTypewriterLayer'
 import { usePdfTypewriterPrefsStore } from '../../logic/pdfTypewriter/pdfTypewriterPrefsStore'

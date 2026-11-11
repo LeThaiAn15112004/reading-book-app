@@ -1,3 +1,4 @@
+/* i18n-pending: reader.phone */
 import { useState } from 'react'
 import { HIGHLIGHT_COLOR_PRESETS, type HighlightStyleKind, type ReaderHighlightBase } from '@core'
 import { MobileSheet } from './MobileSheet'

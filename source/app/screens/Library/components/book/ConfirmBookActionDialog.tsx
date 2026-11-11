@@ -1,3 +1,4 @@
+/* i18n-pending: library */
 import { useEffect } from 'react'
 
 export type ConfirmBookActionDialogProps = {

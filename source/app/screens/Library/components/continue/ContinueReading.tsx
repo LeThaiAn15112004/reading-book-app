@@ -1,3 +1,4 @@
+/* i18n-pending: library */
 import { formatRelativeLastRead, type LibraryBook } from '@core'
 import { BookCover, BookMenuButton, type BookMenuPoint } from '../book'
 import { withLongPress } from '../../../../platforms/longPress'

@@ -1,3 +1,4 @@
+/* i18n-pending: library */
 import { useId, useRef, useState, type KeyboardEvent } from 'react'
 import { useShortcutAction } from '../../../../shortcuts'
 
