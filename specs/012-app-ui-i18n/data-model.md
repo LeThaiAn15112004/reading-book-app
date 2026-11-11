@@ -62,8 +62,9 @@ Rules (enforced by types + `tests/i18n/*`):
 
 ## PendingViAreas — new
 
-`PENDING_VI_AREAS: readonly AreaId[]` with a one-line reason per entry. Invariant: every English area is in exactly
-one of `vi` or `PENDING_VI_AREAS`. Release condition: empty (release-gate test).
+Each `catalogue/vi/<area>.ts` exports either the complete area or `pendingArea(reason: string)` (non-empty reason).
+`PENDING_VI_AREAS: readonly { area: AreaId; reason: string }[]` is derived from the markers. Invariant: every English
+area has exactly one Vietnamese file. Release condition: no marker left (release-gate test).
 
 ## MessageRef — new (renderer state)
 

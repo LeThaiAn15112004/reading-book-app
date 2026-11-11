@@ -34,7 +34,8 @@ export function formatDuration(lang: UiLanguage, seconds: number, style: 'clock'
 // Catalogue registry (for tests and tools)
 export const EN_CATALOGUE: Catalogue
 export const VI_CATALOGUE: Partial<Catalogue>   // areas present are complete by type
-export const PENDING_VI_AREAS: readonly AreaId[]
+export const PENDING_VI_AREAS: readonly { area: AreaId; reason: string }[]   // derived from pendingArea() markers
+export function pendingArea(reason: string): PendingArea
 ```
 
 Guarantees

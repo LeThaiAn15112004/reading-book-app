@@ -90,7 +90,7 @@ source/core/src/i18n/
 ├── translate.ts          # translate, createTranslator, placeholders, plurals, fallback
 ├── format.ts             # date/number/percent/bytes/duration (cached Intl)
 ├── types.ts              # Message, PluralMessage, MessageKey (leaf paths), AreaShape
-├── pending.ts            # PENDING_VI_AREAS
+├── pending.ts            # pendingArea() marker + derived PENDING_VI_AREAS
 └── catalogue/
     ├── en/<area>.ts  + en/index.ts
     └── vi/<area>.ts  + vi/index.ts
@@ -125,8 +125,8 @@ core share one source; React and Electron glue stay in their layers.
 ## Delivery order (each step keeps `npm run check` green)
 
 1. Foundation: core i18n + tests, renderer store / `useT` / `TransText`, boot init, `app:setUiLanguage` + Main i18n
-   + mirror + spike, ESLint rule (enabled for no folder yet), inventory script. All areas start in
-   `PENDING_VI_AREAS`.
+   + mirror + spike, ESLint rule (enabled for no folder yet), inventory script. All areas start as
+   `pendingArea()` markers in `catalogue/vi/`.
 2. Areas, each = English catalogue + call sites + Vietnamese catalogue + lint enabled + removed from pending:
    `common`/`chrome` → `library`/`import` → `settings` → `reader` (shared chrome, sidebars, annotations, translation,
    search, then epub / pdf / txt / md specifics) → `audiobook` (player, notes, transcription, zip import) → `main`

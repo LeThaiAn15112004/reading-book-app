@@ -30,7 +30,8 @@ Behaviour
 
 Lint (`readmate/no-ui-literals`, research R3): JSX text and the attributes `title`, `aria-label`, `placeholder`,
 `alt`, `label`, `description`, `message`, `confirmLabel`, `cancelLabel` must not be string literals containing a
-letter in folders whose area is no longer pending. Escape: `{/* i18n-ignore: reason */}` / `// i18n-ignore: reason`.
+letter, in every file under `screens/`, `components/`, `hooks/` and `App.tsx` except files whose first line is
+`/* i18n-pending: <area> */` (removed when the area is converted; none may remain at release). Escape: `{/* i18n-ignore: reason */}` / `// i18n-ignore: reason`.
 
 Not translated (FR-009): user data, book content, file names, language names in their own language
 (`APP_LANGUAGES` labels "Tiếng Việt" / "English" — but "System Default" IS translated), keyboard key names.

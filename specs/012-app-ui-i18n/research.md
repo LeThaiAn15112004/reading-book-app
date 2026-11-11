@@ -44,9 +44,10 @@ All decisions below were taken from the codebase as it stands on `011-translate-
 - **Decision**: English catalogue = one `as const` TS object per **area** (`common`, `chrome`, `library`, `import`,
   `reader.*`, `audiobook.*`, `settings.*`, `main.*` …). Vietnamese area files are written
   `export const vi = { … } satisfies AreaShape<typeof en>` — so a Vietnamese area that exists must have exactly the
-  English keys (missing or extra key = compile error). An area not yet translated is absent from the Vietnamese index
-  and **must** be listed in `PENDING_VI_AREAS` (one array, with a comment per entry). A core test enforces:
-  every English area is either in `vi` or in `PENDING_VI_AREAS` (not both); placeholders `{x}` are identical per key;
+  English keys (missing or extra key = compile error). An area not yet translated has a Vietnamese file that exports
+  `pendingArea('<reason>')` instead (the written pending marker); `PENDING_VI_AREAS` is **derived** from those files,
+  so converting one area touches only that area's files. A core test enforces: every English area has a Vietnamese
+  file that is either complete or a pending marker with a non-empty reason; placeholders `{x}` are identical per key;
   plural messages give every form the language needs; no message is empty. A **release-gate test**
   (`tests/i18n/i18n-release-gate.test.ts`, like `audiobook-transcription-gate.test.ts`) asserts
   `PENDING_VI_AREAS.length === 0`; it is added by the last task of the feature (release = that test green). Until
@@ -60,9 +61,10 @@ All decisions below were taken from the codebase as it stands on `011-translate-
 
 - **Decision**: a local ESLint rule `readmate/no-ui-literals` (in `source/scripts/eslint-rules/`, wired in
   `eslint.config.mjs`): reports JSX text containing a letter, and string literals in JSX attributes `title`,
-  `aria-label`, `placeholder`, `alt`, `label`, `description`, `message`, `confirmLabel`, `cancelLabel`. Enabled per
-  folder as each area is converted (list in the config = complement of `PENDING_VI_AREAS`); at release it covers all
-  of `source/app/screens`, `components`, `hooks`. Escape hatch: `// i18n-ignore: <reason>` for real non-texts
+  `aria-label`, `placeholder`, `alt`, `label`, `description`, `message`, `confirmLabel`, `cancelLabel`. On for all of
+  `source/app/screens`, `components`, `hooks`, `App.tsx` from the start; a file not yet converted carries a first-line
+  comment `/* i18n-pending: <area> */` and the rule skips it. The foundation step adds the header to every file that
+  has literals; converting an area removes the headers of its files; the release gate also asserts no header is left. Escape hatch: `// i18n-ignore: <reason>` for real non-texts
   (keyboard key names, format names, `·` separators). Main strings are covered by the inventory (R9) and review, not
   by the rule (they are plain `.ts` values).
 - **Rationale**: the catalogue test only proves the catalogue is complete; it cannot see a string never moved into it.
