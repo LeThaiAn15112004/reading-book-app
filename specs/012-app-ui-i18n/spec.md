@@ -26,6 +26,19 @@ This feature makes the existing App Language setting actually translate the inte
 ones already offered: Vietnamese and English. Book content is never translated by it (that is the Reader's
 Translate tool, spec 011).
 
+## Clarifications
+
+### Session 2026-11-11
+
+- Q: Must the first release translate the whole app at once, or may it ship screen by screen with English on the
+  rest? → A: Built screen by screen, but released only when 100 % of interface texts (main window, tray, dialogs,
+  notifications) have Vietnamese; the completeness check fails — not warns — on any missing text.
+- Q: Should app terms (Library, Highlight, Note, Bookmark…) be fully Vietnamese or keep some English? → A: Fully
+  Vietnamese, following one fixed glossary; brand and format names (Readmate, EPUB, PDF, MP3…) unchanged; neutral,
+  concise tone without addressing the user as "bạn".
+- Q: Should the readable Markdown export's fixed headings follow the app language or always be English? → A: Follow
+  the app language active at export time (e.g. "Chương 3", "Trang 12"); no language picker in the export dialog.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Use the whole app in Vietnamese (Priority: P1)
@@ -173,15 +186,24 @@ date order, decimal separator and unit words follow the language.
   (e.g. "file missing", "file not writable") MUST be the same regardless of language — only its wording changes.
 - **FR-012**: Fixed headings the app writes into files it generates for the user to read (e.g. the readable Markdown
   copy of annotations) MUST use the language active at export time; the restorable annotations file MUST stay
-  language-independent so a file exported in one language imports in the other.
+  language-independent so a file exported in one language imports in the other. The export dialog offers no separate
+  language choice; a file exported in English and one exported in Vietnamese differ only in those fixed headings and
+  labels (e.g. "Chapter 3" / "Chương 3", "Page 12" / "Trang 12"), never in the user's quotes or comments.
 - **FR-013**: The layout MUST remain usable in both languages at the minimum supported window width and on the phone
   layout: no clipped, overlapping or hidden controls.
 - **FR-014**: The Mobile app MUST follow the same setting and show the same translations as Desktop for the shared
   interface.
 - **FR-015**: The project MUST have an automated check that fails when an English interface text has no Vietnamese
   counterpart, or when a Vietnamese entry no longer matches any English one, so new features cannot ship untranslated
-  silently.
-- **FR-016**: The Reader's Translate tool (source / target languages) and the speech / transcription languages MUST
+  silently. The check is part of the project's standard quality gate and is a hard failure (not a warning); the
+  feature is released only when it passes for every surface in FR-001 and FR-006. Work may be merged screen by screen
+  before that: the check accepts only an explicit, written list of areas still pending (covered meanwhile by the
+  English fallback, FR-007), and the release requires that list to be empty.
+- **FR-016**: Vietnamese texts MUST be fully Vietnamese and use ONE glossary of app terms (e.g. Library → Thư viện,
+  Highlight → Tô sáng, Note → Ghi chú, Bookmark → Dấu trang, Collection → Bộ sưu tập), the same term on every screen;
+  brand, product and file-format names (Readmate, EPUB, PDF, TXT, Markdown, MP3…) stay unchanged. The tone is neutral
+  and concise: the user is not addressed as "bạn" in every sentence.
+- **FR-017**: The Reader's Translate tool (source / target languages) and the speech / transcription languages MUST
   remain independent of the App Language setting.
 
 ### Key Entities
@@ -192,6 +214,7 @@ date order, decimal separator and unit words follow the language.
   preference and, for System Default, the device language.
 - **Interface text catalogue**: for each language, the set of interface texts keyed by a stable identifier, including
   values to insert and plural forms. English is the complete reference; Vietnamese must cover it.
+- **Glossary**: the fixed English → Vietnamese mapping of app terms (FR-016) that every Vietnamese text follows.
 
 ## Success Criteria *(mandatory)*
 
