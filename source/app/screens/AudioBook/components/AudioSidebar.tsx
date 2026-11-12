@@ -1,4 +1,3 @@
-/* i18n-pending: audiobook.player */
 import { useEffect, useMemo, useRef, type CSSProperties, type PointerEvent as ReactPointerEvent } from 'react'
 import {
   chapterIndexAt,
@@ -16,6 +15,7 @@ import { selectNoteGroupOpen, useNoteGroupsStore } from '../logic/audioNoteGroup
 import { useNoteMenuStore } from '../logic/audioNoteMenuStore'
 import { selectCanAddNote, useAudioPlayerStore } from '../logic/audioPlayerStore'
 import { TranscriptPanel } from './TranscriptPanel'
+import { useT } from '../../../i18n'
 
 const EMPTY = 'm-0 px-2 py-4 text-sm leading-relaxed text-lib-muted'
 
@@ -32,6 +32,7 @@ function CurrentChapterBar({ start, end }: { start: number; end: number }) {
 
 /** Contents: the chapters the file declares. */
 function ChaptersTab() {
+  const t = useT()
   const chapters = useAudioPlayerStore((s) => s.chapters)
   const status = useAudioPlayerStore((s) => s.chapterStatus)
   const reason = useAudioPlayerStore((s) => s.chapterReason)
@@ -44,25 +45,23 @@ function ChaptersTab() {
     currentRef.current?.scrollIntoView?.({ block: 'nearest' })
   }, [currentIndex])
 
-  if (status === 'pending-duration') return <p className={EMPTY}>Reading chapters…</p>
+  if (status === 'pending-duration') return <p className={EMPTY}>{t('audiobook.player.sidebar.readingChapters')}</p>
   if (status === 'invalid') {
     return (
       <p className={EMPTY}>
-        The chapter list in this file could not be trusted{reason ? ` (${reason})` : ''}, so it was ignored. Playback and
-        Book progress work normally.
+        {reason ? t('audiobook.player.sidebar.untrustedReason', { reason }) : t('audiobook.player.sidebar.untrusted')}
       </p>
     )
   }
   if (status !== 'ok') {
     return (
       <p className={EMPTY}>
-        This audiobook has no chapter information. Playback, Book progress and bookmarks work normally; chapters are only
-        shown when the file declares them.
+        {t('audiobook.player.sidebar.noChapters')}
       </p>
     )
   }
   return (
-    <ol className="m-0 list-none p-0" aria-label="Chapters">
+    <ol className="m-0 list-none p-0" aria-label={t('audiobook.player.sidebar.chapters')}>
       {chapters.map((c, i) => {
         const current = i === currentIndex
         return (
@@ -99,6 +98,7 @@ function ChaptersTab() {
  * Clicking another track plays it from its start (the play state is kept); the current track ignores clicks.
  */
 function TracksTab() {
+  const t = useT()
   const tracks = useAudioPlayerStore((s) => s.tracks)
   const trackIndex = useAudioPlayerStore((s) => s.trackIndex)
   const trackErrors = useAudioPlayerStore((s) => s.trackErrors)
@@ -113,19 +113,19 @@ function TracksTab() {
 
   return (
     <>
-      <p className="m-0 px-2 pb-2 text-xs text-lib-muted">{tracks.length} tracks</p>
-      <ol className="m-0 list-none p-0" aria-label="Tracks">
-        {tracks.map((t, i) => {
+      <p className="m-0 px-2 pb-2 text-xs text-lib-muted">{t('audiobook.player.sidebar.trackCount', { count: tracks.length })}</p>
+      <ol className="m-0 list-none p-0" aria-label={t('audiobook.player.sidebar.tracks')}>
+        {tracks.map((track, i) => {
           const current = i === trackIndex
-          const failed = trackErrors.has(t.id)
-          const duration = current ? (currentDuration ?? t.durationSeconds) : t.durationSeconds
+          const failed = trackErrors.has(track.id)
+          const duration = current ? (currentDuration ?? track.durationSeconds) : track.durationSeconds
           return (
-            <li key={t.id} style={{ contentVisibility: 'auto', containIntrinsicSize: 'auto 40px' } as CSSProperties}>
+            <li key={track.id} style={{ contentVisibility: 'auto', containIntrinsicSize: 'auto 40px' } as CSSProperties}>
               <button
                 ref={current ? currentRef : undefined}
                 type="button"
                 aria-current={current ? 'true' : undefined}
-                title={t.title}
+                title={track.title}
                 className={`flex w-full cursor-pointer items-start gap-3 rounded-lg border-none bg-transparent px-2.5 py-2 text-left hover:bg-lib-surface-hover ${
                   current ? '!bg-lib-accent-soft' : ''
                 }`}
@@ -135,11 +135,11 @@ function TracksTab() {
                   {trackNumberLabel(i)}
                 </span>
                 <span className="min-w-0 flex-1">
-                  <span className={`block truncate text-sm ${current ? 'font-semibold text-lib-text-strong' : 'text-lib-text'}`}>{t.title}</span>
+                  <span className={`block truncate text-sm ${current ? 'font-semibold text-lib-text-strong' : 'text-lib-text'}`}>{track.title}</span>
                   {current && !failed && duration ? <CurrentChapterBar start={0} end={duration} /> : null}
                 </span>
                 {failed ? (
-                  <span className="shrink-0 pt-0.5 text-xs text-amber-300">⚠ Can't play</span>
+                  <span className="shrink-0 pt-0.5 text-xs text-amber-300">{t('audiobook.player.sidebar.cantPlay')}</span>
                 ) : (
                   <span className="shrink-0 pt-0.5 text-xs tabular-nums text-lib-muted">{trackDurationLabel(duration)}</span>
                 )}
@@ -165,6 +165,7 @@ function useIsHere(at: number, trackId: string | undefined): boolean {
  * "NN · track title" (multi-track), created date, ⋮. `at` is a position in the file, or inside the Note's track.
  */
 function NoteCard({ note: n, at, chapterTitle }: { note: AudioBookmark; at: number; chapterTitle: string | undefined }) {
+  const t = useT()
   const goToNote = useAudioPlayerStore((s) => s.goToNote)
   const openFor = useNoteMenuStore((s) => s.openFor)
   const isHere = useIsHere(at, n.trackId)
@@ -180,7 +181,7 @@ function NoteCard({ note: n, at, chapterTitle }: { note: AudioBookmark; at: numb
       <button
         type="button"
         className="min-w-0 flex-1 cursor-pointer border-none bg-transparent p-0 text-left outline-none focus-visible:outline-none"
-        aria-label={`Seek to note at ${time}`}
+        aria-label={t('audiobook.player.sidebar.seekToNote', { time })}
         onClick={() => goToNote(n.id)}
       >
         <span className="flex min-w-0 items-center gap-1.5">
@@ -190,12 +191,12 @@ function NoteCard({ note: n, at, chapterTitle }: { note: AudioBookmark; at: numb
           {chapterTitle ? <span className="truncate text-[11px] font-medium text-lib-muted">{chapterTitle}</span> : null}
           {isHere ? (
             <span className="ml-auto inline-flex shrink-0 items-center rounded-full bg-lib-accent/15 px-1.5 py-0.5 text-[10px] font-bold tracking-wide text-lib-accent uppercase">
-              Here
+              {t('audiobook.player.sidebar.here')}
             </span>
           ) : null}
         </span>
         <span className={`mt-1.5 line-clamp-4 block text-sm leading-snug break-words ${n.note ? 'text-lib-text' : 'text-lib-muted italic'}`}>
-          {n.note ?? 'No text'}
+          {n.note ?? t('audiobook.player.sidebar.noText')}
         </span>
         {created && !Number.isNaN(created.getTime()) ? (
           <span className="mt-1 block text-[11px] text-lib-faint">{created.toLocaleString()}</span>
@@ -204,9 +205,9 @@ function NoteCard({ note: n, at, chapterTitle }: { note: AudioBookmark; at: numb
       <button
         type="button"
         className="inline-flex size-7 shrink-0 cursor-pointer items-center justify-center rounded-full border-none bg-transparent text-base leading-none text-lib-muted hover:bg-lib-surface-hover hover:text-lib-text-strong"
-        aria-label={`Note actions for ${time}`}
+        aria-label={t('audiobook.player.sidebar.noteActionsFor', { time })}
         aria-haspopup="menu"
-        title="Note actions"
+        title={t('audiobook.player.sidebar.noteActions')}
         onClick={(e) => openFor(n.id, e.currentTarget)}
       >
         ⋮
@@ -221,10 +222,10 @@ function NoteCard({ note: n, at, chapterTitle }: { note: AudioBookmark; at: numb
  * `NoteCard`s (jump, ⋮ menu, "Here"); the header already names the track, so a card carries no track caption.
  */
 function TrackNoteGroupRow({ group, playing }: { group: TrackNoteGroup; playing: boolean }) {
+  const t = useT()
   const open = useNoteGroupsStore(selectNoteGroupOpen(group.trackId))
   const toggle = useNoteGroupsStore((s) => s.toggle)
   const listId = `audio-note-group-${group.trackId}`
-  const noteWord = group.count === 1 ? 'note' : 'notes'
   return (
     <li data-note-group={group.trackId} className="flex flex-col gap-2">
       <button
@@ -232,7 +233,7 @@ function TrackNoteGroupRow({ group, playing }: { group: TrackNoteGroup; playing:
         aria-expanded={open}
         aria-controls={listId}
         aria-current={playing ? 'true' : undefined}
-        aria-label={`Track ${group.index + 1}, ${group.track.title}, ${group.count} ${noteWord}`}
+        aria-label={t('audiobook.player.sidebar.groupAria', { track: group.index + 1, title: group.track.title, count: group.count })}
         title={group.track.title}
         className={`flex w-full cursor-pointer items-center gap-2 rounded-lg border px-2.5 py-2 text-left hover:bg-lib-surface-hover ${
           playing ? 'border-lib-accent bg-lib-accent-soft' : 'border-lib-border-soft bg-lib-surface'
@@ -246,7 +247,7 @@ function TrackNoteGroupRow({ group, playing }: { group: TrackNoteGroup; playing:
         <span className={`min-w-0 flex-1 truncate text-sm ${playing ? 'font-semibold text-lib-text-strong' : 'text-lib-text'}`}>{group.track.title}</span>
         {playing ? (
           <span className="inline-flex shrink-0 items-center rounded-full bg-lib-accent/15 px-1.5 py-0.5 text-[10px] font-bold tracking-wide text-lib-accent uppercase">
-            Playing
+            {t('audiobook.player.sidebar.playing')}
           </span>
         ) : null}
         <span className="inline-flex shrink-0 items-center rounded-full bg-lib-accent/15 px-2 py-0.5 text-[11px] font-bold tabular-nums text-lib-accent">
@@ -254,7 +255,7 @@ function TrackNoteGroupRow({ group, playing }: { group: TrackNoteGroup; playing:
         </span>
       </button>
       {open ? (
-        <ul id={listId} className="m-0 flex list-none flex-col gap-2 p-0 pl-3" aria-label={`Notes in ${group.track.title}`}>
+        <ul id={listId} className="m-0 flex list-none flex-col gap-2 p-0 pl-3" aria-label={t('audiobook.player.sidebar.notesIn', { title: group.track.title })}>
           {group.notes.map((n) => (
             <NoteCard key={n.id} note={n} at={n.positionSeconds} chapterTitle={undefined} />
           ))}
@@ -266,6 +267,7 @@ function TrackNoteGroupRow({ group, playing }: { group: TrackNoteGroup; playing:
 
 /** Notes: marked positions of this audiobook, each with optional text. The same list is drawn as markers on the timeline. */
 function NotesTab() {
+  const t = useT()
   const notes = useAudioPlayerStore((s) => s.notes)
   const chapters = useAudioPlayerStore((s) => s.chapters)
   const status = useAudioPlayerStore((s) => s.chapterStatus)
@@ -294,31 +296,31 @@ function NotesTab() {
       <button
         type="button"
         disabled={!canAddNote}
-        title={canAddNote ? undefined : 'A Note can be added once the track is playing normally'}
+        title={canAddNote ? undefined : t('audiobook.player.controls.noteNotReady')}
         className="h-9 w-full cursor-pointer rounded-lg border border-lib-accent-ring bg-lib-accent-soft text-sm font-semibold text-lib-accent hover:bg-lib-surface-hover disabled:cursor-not-allowed disabled:opacity-40"
         onClick={(e) => {
           const id = addNote()
           if (id) openFor(id, e.currentTarget, 'edit')
         }}
       >
-        + Note at current position
+        {t('audiobook.player.sidebar.addNote')}
       </button>
       {multiTrack && notesUnavailable ? (
-        <p className={EMPTY}>Your Notes could not be loaded, so they are not shown and cannot be changed right now. Reopen the audiobook to try again.</p>
+        <p className={EMPTY}>{t('audiobook.player.sidebar.notesUnavailable')}</p>
       ) : notes.length === 0 ? (
         <p className={EMPTY}>
           {multiTrack
-            ? 'No notes yet. Add one to mark this exact spot in the current track, with or without text. Notes from every track appear here.'
-            : 'No notes yet. Add one to mark this exact spot, with or without text.'}
+            ? t('audiobook.player.sidebar.emptyMulti')
+            : t('audiobook.player.sidebar.empty')}
         </p>
       ) : multiTrack ? (
-        <ul className="m-0 flex list-none flex-col gap-2 p-0" aria-label="Tracks with notes">
+        <ul className="m-0 flex list-none flex-col gap-2 p-0" aria-label={t('audiobook.player.sidebar.tracksWithNotes')}>
           {groups.map((g) => (
             <TrackNoteGroupRow key={g.trackId} group={g} playing={g.trackId === currentTrackId} />
           ))}
         </ul>
       ) : (
-        <ul className="m-0 flex list-none flex-col gap-2 p-0" aria-label="Notes">
+        <ul className="m-0 flex list-none flex-col gap-2 p-0" aria-label={t('audiobook.player.sidebar.notes')}>
           {notes.map((n) => {
             const at = resolveBookmarkTarget(n, known, duration)
             const chapter = known[chapterIndexAt(known, at)]
@@ -331,11 +333,12 @@ function NotesTab() {
 }
 
 function PanelBody({ tab, bookId }: { tab: SidebarTab; bookId: string }) {
+  const t = useT()
   const multiTrack = useAudioPlayerStore((s) => s.tracks.length > 0)
   if (tab === 'chapters') return multiTrack ? <TracksTab /> : <ChaptersTab />
   if (tab === 'highlights') return <NotesTab />
   if (tab === 'transcript') return <TranscriptPanel bookId={bookId} />
-  return <p className={EMPTY}>Attachments are not available for audiobooks.</p>
+  return <p className={EMPTY}>{t('audiobook.player.sidebar.noAttachments')}</p>
 }
 
 /**
@@ -360,20 +363,21 @@ export function AudioSidebarPanel({
   onClose: () => void
   onResizePointerDown: (event: ReactPointerEvent<HTMLDivElement>) => void
 }) {
+  const t = useT()
   if (!open) return null
   return (
     <aside
       data-audio-sidebar
-      aria-label={SIDEBAR_TAB_LABEL[tab] /* TODO spec012 T037: t() */}
+      aria-label={t(SIDEBAR_TAB_LABEL[tab])}
       className="absolute inset-y-0 z-[160] flex flex-col border-y border-r border-lib-border border-l-0 bg-lib-surface-strong shadow-lg"
       style={{ left: SIDEBAR_RAIL_WIDTH_PX, width: panelWidth }}
     >
       <div className="flex items-center justify-between gap-2 border-b border-lib-border-soft px-3 py-2.5">
-        <h2 className="m-0 min-w-0 flex-1 truncate text-[15px] font-semibold text-lib-text-strong">{SIDEBAR_TAB_LABEL[tab]}</h2>
+        <h2 className="m-0 min-w-0 flex-1 truncate text-[15px] font-semibold text-lib-text-strong">{t(SIDEBAR_TAB_LABEL[tab])}</h2>
         <button
           className="inline-flex size-8 cursor-pointer items-center justify-center rounded-md border-none bg-transparent text-base text-lib-muted hover:bg-lib-surface-hover hover:text-lib-text-strong"
           type="button"
-          aria-label="Close"
+          aria-label={t('audiobook.player.sidebar.close')}
           onClick={onClose}
         >
           ✕
@@ -385,7 +389,7 @@ export function AudioSidebarPanel({
       <div
         role="separator"
         aria-orientation="vertical"
-        aria-label="Resize sidebar"
+        aria-label={t('audiobook.player.sidebar.resize')}
         className="absolute top-0 -right-1 bottom-0 z-[165] w-2 cursor-col-resize touch-none"
         onPointerDown={onResizePointerDown}
       >

@@ -87,7 +87,7 @@ export function AudioControls() {
           <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden><rect x="2" y="2" width="2" height="12" fill="currentColor" /><path d="M14 2 L5 8 L14 14 Z" fill="currentColor" /></svg>
         </button>
         <button type="button" className={`${ROUND} size-14`} aria-label={t('audiobook.player.controls.back15')} title={t('audiobook.player.controls.back15')} onClick={() => skipBy(-15)}>
-          −15s
+          {t('audiobook.player.controls.back15Short')}
         </button>
         <button
           type="button"
@@ -103,7 +103,7 @@ export function AudioControls() {
           )}
         </button>
         <button type="button" className={`${ROUND} size-14`} aria-label={t('audiobook.player.controls.forward30')} title={t('audiobook.player.controls.forward30')} onClick={() => skipBy(30)}>
-          +30s
+          {t('audiobook.player.controls.forward30Short')}
         </button>
         <button type="button" className={`${ROUND} size-11 border-transparent bg-transparent`} aria-label={nextLabel} title={noChapters ?? nextLabel} disabled={(!hasChapters && !multiTrack) || onLastTrack} onClick={nextChapter}>
           <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden><rect x="12" y="2" width="2" height="12" fill="currentColor" /><path d="M2 2 L11 8 L2 14 Z" fill="currentColor" /></svg>

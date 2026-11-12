@@ -131,7 +131,7 @@ export function AudioTimeline() {
     // Duration unknown (still loading, or the stream does not report one): nothing to seek on.
     return (
       <div className="flex w-full flex-col gap-2">
-        <input type="range" aria-label="Seek" disabled className="w-full" min={0} max={1} value={0} readOnly />
+        <input type="range" aria-label={t('audiobook.player.timeline.seekPlain')} disabled className="w-full" min={0} max={1} value={0} readOnly />
         <div className="flex justify-between text-xs tabular-nums text-lib-muted">
           <span>--:--</span>
           <span>{t('audiobook.player.timeline.durationUnavailable')}</span>

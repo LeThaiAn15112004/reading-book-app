@@ -1,10 +1,10 @@
-/* i18n-pending: audiobook.player */
 import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent } from 'react'
 import { createPortal } from 'react-dom'
 import { MAX_NOTE_CHARS, formatPlaybackTime, trackNoteLabel } from '@core'
 import { useDismissOnOutsideOrEscape } from '../../Reader/logic'
 import { useNoteMenuStore } from '../logic/audioNoteMenuStore'
 import { useAudioPlayerStore } from '../logic/audioPlayerStore'
+import { useT } from '../../../i18n'
 
 const WIDTH = 264
 const MARGIN = 8
@@ -33,6 +33,7 @@ export function AudioNoteMenu() {
 }
 
 function Popover() {
+  const t = useT()
   const open = useNoteMenuStore((s) => s.open)!
   const { setMode, close } = useNoteMenuStore.getState()
   const note = useAudioPlayerStore((s) => s.notes.find((n) => n.id === open.noteId))!
@@ -97,10 +98,10 @@ function Popover() {
       onKeyDown={onMenuKeyDown}
     >
       {open.mode === 'menu' ? (
-        <div role="menu" aria-label={`Note at ${time}`}>
-          <div className="px-3 pt-1.5 pb-1 text-[11px] font-bold tracking-wide text-lib-faint uppercase">Note · {where}</div>
+        <div role="menu" aria-label={t('audiobook.player.noteMenu.aria', { time })}>
+          <div className="px-3 pt-1.5 pb-1 text-[11px] font-bold tracking-wide text-lib-faint uppercase">{t('audiobook.player.noteMenu.heading', { where })}</div>
           <button type="button" role="menuitem" className={itemClass} onClick={() => setMode('edit')}>
-            {note.note ? 'Edit note' : 'Add note'}
+            {note.note ? t('audiobook.player.noteMenu.edit') : t('audiobook.player.noteMenu.add')}
           </button>
           <button
             type="button"
@@ -111,16 +112,16 @@ function Popover() {
               close()
             }}
           >
-            Seek to position
+            {t('audiobook.player.noteMenu.seek')}
           </button>
           <button type="button" role="menuitem" className={`${itemClass} !text-rose-300`} onClick={() => setMode('confirm-delete')}>
-            Delete note
+            {t('audiobook.player.noteMenu.delete')}
           </button>
         </div>
       ) : open.mode === 'edit' ? (
         <form
           role="dialog"
-          aria-label={note.note ? 'Edit note' : 'Add note'}
+          aria-label={note.note ? t('audiobook.player.noteMenu.edit') : t('audiobook.player.noteMenu.add')}
           className="flex flex-col gap-2 p-1.5"
           onSubmit={(e) => {
             e.preventDefault()
@@ -128,7 +129,7 @@ function Popover() {
           }}
         >
           <label className="text-[11px] font-bold tracking-wide text-lib-faint uppercase" htmlFor="audio-note-text">
-            Note · {where}
+            {t('audiobook.player.noteMenu.heading', { where })}
           </label>
           <textarea
             id="audio-note-text"
@@ -136,7 +137,7 @@ function Popover() {
             value={draft}
             maxLength={MAX_NOTE_CHARS}
             rows={4}
-            placeholder="Optional — add some text"
+            placeholder={t('audiobook.player.noteMenu.placeholder')}
             className="w-full resize-y rounded-lg border border-lib-border bg-lib-input p-2 text-sm text-lib-text outline-none focus:border-lib-accent-ring"
             onChange={(e) => setDraft(e.target.value)}
             onKeyDown={(e) => {
@@ -148,16 +149,16 @@ function Popover() {
           />
           <div className="flex justify-end gap-2">
             <button type="button" className={buttonClass} onClick={close}>
-              Cancel
+              {t('common.actions.cancel')}
             </button>
             <button type="submit" className={`${buttonClass} border-lib-accent-ring bg-lib-accent-soft text-lib-accent`}>
-              Save
+              {t('common.actions.save')}
             </button>
           </div>
         </form>
       ) : (
-        <div role="alertdialog" aria-label="Delete note" className="flex flex-col gap-2 p-1.5">
-          <p className="m-0 px-1 text-sm text-lib-text">Delete the note at {time}?</p>
+        <div role="alertdialog" aria-label={t('audiobook.player.noteMenu.delete')} className="flex flex-col gap-2 p-1.5">
+          <p className="m-0 px-1 text-sm text-lib-text">{t('audiobook.player.noteMenu.confirmDelete', { time })}</p>
           <div className="flex justify-end gap-2">
             <button
               type="button"
@@ -167,10 +168,10 @@ function Popover() {
                 close()
               }}
             >
-              Delete
+              {t('common.actions.delete')}
             </button>
             <button type="button" data-focus-first className={buttonClass} onClick={close}>
-              Cancel
+              {t('common.actions.cancel')}
             </button>
           </div>
         </div>
