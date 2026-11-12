@@ -1,10 +1,10 @@
-/* i18n-pending: reader.chrome */
 import { useEffect, useRef, useState } from 'react'
 import { useShortcutAction } from '../../../../shortcuts'
 import type { ZoomLayoutPreset } from '../../logic'
 import type { PageLayout, ReadingViewMode } from '@core'
 import { ZoomControl } from './ZoomControl'
 import { FullscreenButton } from './FullscreenButton'
+import { useT } from '../../../../i18n'
 
 const modeGroupClass =
   'inline-flex items-center gap-0.5 rounded-lg bg-lib-hint/70 p-0.5'
@@ -16,10 +16,9 @@ const modeButtonActiveClass =
 const layoutOptions: Array<{
   id: PageLayout
   count: 1 | 2
-  label: string
 }> = [
-  { id: 'single', count: 1, label: '1 page' },
-  { id: 'dual', count: 2, label: '2 pages' },
+  { id: 'single', count: 1 },
+  { id: 'dual', count: 2 },
 ]
 
 function BookmarkIcon({ filled }: { filled: boolean }) {
@@ -181,6 +180,7 @@ export function ReaderFooter({
   onToggleBookmark,
   searchIndexing = false,
 }: ReaderFooterProps) {
+  const t = useT()
   const [pageInput, setPageInput] = useState(String(pageCurrent))
   const pageInputRef = useRef<HTMLInputElement>(null)
 
@@ -247,7 +247,7 @@ export function ReaderFooter({
       <div
         className={`absolute inset-x-0 top-0 h-1 ${onSeekProgress ? 'cursor-pointer' : ''}`}
         role={onSeekProgress ? 'slider' : undefined}
-        aria-label={onSeekProgress ? 'Reading progress' : undefined}
+        aria-label={onSeekProgress ? t('reader.chrome.footer.readingProgress') : undefined}
         aria-valuemin={onSeekProgress ? 0 : undefined}
         aria-valuemax={onSeekProgress ? 100 : undefined}
         aria-valuenow={onSeekProgress ? Math.round(progress * 100) : undefined}
@@ -271,7 +271,7 @@ export function ReaderFooter({
         <button
           type="button"
           className="rounded px-2 py-1 text-sm hover:bg-lib-chip disabled:cursor-not-allowed disabled:opacity-40"
-          aria-label="First page"
+          aria-label={t('reader.chrome.footer.firstPage')}
           disabled={isScrollMode || atStart}
           onClick={() => onGoToPage(1)}
         >
@@ -280,7 +280,7 @@ export function ReaderFooter({
         <button
           type="button"
           className="rounded px-2 py-1 text-sm hover:bg-lib-chip disabled:cursor-not-allowed disabled:opacity-40"
-          aria-label="Previous page"
+          aria-label={t('reader.chrome.footer.previousPage')}
           disabled={atStart}
           onClick={onPreviousPage}
         >
@@ -291,7 +291,7 @@ export function ReaderFooter({
           // measurement is skipped in scroll mode — show book progress instead.
           <span
             className="inline-flex items-center gap-1 tabular-nums text-lib-muted"
-            aria-label="Reading progress"
+            aria-label={t('reader.chrome.footer.readingProgress')}
           >
             {Math.round(progress * 100)}%
           </span>
@@ -306,7 +306,7 @@ export function ReaderFooter({
               inputMode="numeric"
               pattern="[0-9]*"
               ref={pageInputRef}
-              aria-label="Current page"
+              aria-label={t('reader.chrome.footer.currentPage')}
               className="rounded border border-transparent bg-transparent px-1 py-0.5 text-right font-semibold outline-none hover:border-lib-border-soft focus:border-lib-accent focus:bg-lib-chip"
               style={{
                 width: `${inputWidthCh}ch`,
@@ -330,17 +330,17 @@ export function ReaderFooter({
             />
             <span aria-hidden="true">/</span>
             {pageCountReady && pageTotal > 0 ? (
-              <span aria-label="Total pages">{pageTotal}</span>
+              <span aria-label={t('reader.chrome.footer.totalPages')}>{pageTotal}</span>
             ) : (
               <span
                 className="inline-flex items-center gap-1.5 text-lib-muted"
-                aria-label="Calculating page count"
+                aria-label={t('reader.chrome.footer.calculatingAria')}
               >
                 <span
                   className="size-3 shrink-0 animate-spin rounded-full border-2 border-current/20 border-t-current"
                   aria-hidden
                 />
-                <span>Calculating…</span>
+                <span>{t('reader.chrome.footer.calculating')}</span>
               </span>
             )}
           </span>
@@ -348,7 +348,7 @@ export function ReaderFooter({
         <button
           type="button"
           className="rounded px-2 py-1 text-sm hover:bg-lib-chip disabled:cursor-not-allowed disabled:opacity-40"
-          aria-label="Next page"
+          aria-label={t('reader.chrome.footer.nextPage')}
           disabled={atEnd}
           onClick={onNextPage}
         >
@@ -357,7 +357,7 @@ export function ReaderFooter({
         <button
           type="button"
           className="rounded px-2 py-1 text-sm hover:bg-lib-chip disabled:cursor-not-allowed disabled:opacity-40"
-          aria-label="Last page"
+          aria-label={t('reader.chrome.footer.lastPage')}
           disabled={isScrollMode || !pageCountReady || atEnd}
           onClick={() => onGoToPage(pageTotal)}
         >
@@ -373,9 +373,9 @@ export function ReaderFooter({
                 ? 'bg-lib-accent-soft text-lib-accent hover:bg-lib-accent-soft hover:text-lib-accent'
                 : ''
             }`}
-            title={bookmarkActive ? 'Remove bookmark' : 'Bookmark this place'}
+            title={bookmarkActive ? t('reader.chrome.footer.removeBookmark') : t('reader.chrome.footer.addBookmark')}
             aria-label={
-              bookmarkActive ? 'Remove bookmark' : 'Bookmark this place'
+              bookmarkActive ? t('reader.chrome.footer.removeBookmark') : t('reader.chrome.footer.addBookmark')
             }
             aria-pressed={bookmarkActive}
             onClick={onToggleBookmark}
@@ -385,12 +385,12 @@ export function ReaderFooter({
         ) : null}
 
         {onPagesPerViewChange ? (
-          <span className={modeGroupClass} aria-label="Page count">
+          <span className={modeGroupClass} aria-label={t('reader.chrome.footer.pageCount')}>
             {(
               [
-                [1, 'Single page'],
-                [2, 'Double page'],
-                [3, 'Triple page'],
+                [1, t('reader.chrome.footer.singlePage')],
+                [2, t('reader.chrome.footer.doublePage')],
+                [3, t('reader.chrome.footer.triplePage')],
               ] as const
             ).map(([count, label]) => (
               <button
@@ -409,7 +409,7 @@ export function ReaderFooter({
         ) : null}
 
         {onLayoutChange ? (
-          <span className={modeGroupClass} aria-label="Page count">
+          <span className={modeGroupClass} aria-label={t('reader.chrome.footer.pageCount')}>
             {layoutOptions.map((option) => (
               <button
                 key={option.id}
@@ -417,8 +417,8 @@ export function ReaderFooter({
                 className={`${modeButtonClass} ${
                   layout === option.id ? modeButtonActiveClass : ''
                 }`}
-                title={option.label}
-                aria-label={option.label}
+                title={t('reader.chrome.footer.pagesCount', { count: option.count })}
+                aria-label={t('reader.chrome.footer.pagesCount', { count: option.count })}
                 aria-pressed={layout === option.id}
                 onClick={() => onLayoutChange(option.id)}
               >
@@ -429,12 +429,12 @@ export function ReaderFooter({
         ) : null}
 
         {onViewModeChange ? (
-          <span className={modeGroupClass} aria-label="View mode">
+          <span className={modeGroupClass} aria-label={t('reader.chrome.footer.viewMode')}>
             <button
               type="button"
               className={`${modeButtonClass} ${!viewModeIsScroll ? modeButtonActiveClass : ''}`}
-              title="Lật trang"
-              aria-label="Lật trang"
+              title={t('reader.chrome.footer.paginated')}
+              aria-label={t('reader.chrome.footer.paginated')}
               aria-pressed={!viewModeIsScroll}
               onClick={() => onViewModeChange('paginated')}
             >
@@ -443,8 +443,8 @@ export function ReaderFooter({
             <button
               type="button"
               className={`${modeButtonClass} ${viewModeIsScroll ? modeButtonActiveClass : ''}`}
-              title="Cuộn dọc"
-              aria-label="Cuộn dọc"
+              title={t('reader.chrome.footer.scrolled')}
+              aria-label={t('reader.chrome.footer.scrolled')}
               aria-pressed={viewModeIsScroll}
               onClick={() => onViewModeChange('scroll')}
             >
@@ -480,8 +480,8 @@ export function ReaderFooter({
           <button
             type="button"
             className="inline-flex size-7 cursor-pointer items-center justify-center rounded text-lib-text-strong hover:bg-lib-chip"
-            title="Fit page"
-            aria-label="Fit page"
+            title={t('reader.chrome.footer.fitPage')}
+            aria-label={t('reader.chrome.footer.fitPage')}
             onClick={onFitPage}
           >
             <FitPageIcon />

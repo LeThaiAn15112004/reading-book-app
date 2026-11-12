@@ -1,4 +1,3 @@
-/* i18n-pending: reader.chrome */
 import { useEffect, useId, useRef, useState } from 'react'
 import {
   ZOOM_LAYOUT_PRESETS,
@@ -9,6 +8,8 @@ import {
   parseZoomPercentInput,
   type ZoomLayoutPreset,
 } from '../../logic'
+import { useT } from '../../../../i18n'
+import type { MessageKey, ZoomLayoutPreset as ZoomPresetId } from '@core'
 
 type ZoomControlProps = {
   zoom: number
@@ -17,12 +18,20 @@ type ZoomControlProps = {
   onLayoutPreset: (preset: ZoomLayoutPreset) => void
 }
 
+const ZOOM_PRESET_LABELS: Record<ZoomPresetId, MessageKey> = {
+  'actual-size': 'reader.chrome.zoom.actualSize',
+  'fit-page': 'reader.chrome.zoom.fitPage',
+  'fit-width': 'reader.chrome.zoom.fitWidth',
+  'fit-visible': 'reader.chrome.zoom.fitVisible',
+}
+
 export function ZoomControl({
   zoom,
   onZoomChange,
   onZoomStep,
   onLayoutPreset,
 }: ZoomControlProps) {
+  const t = useT()
   const menuId = useId()
   const rootRef = useRef<HTMLDivElement>(null)
   const [input, setInput] = useState(formatZoomPercent(zoom))
@@ -71,7 +80,7 @@ export function ZoomControl({
       <button
         type="button"
         className="rounded px-2 py-1 text-sm hover:bg-lib-chip disabled:cursor-not-allowed disabled:opacity-40"
-        aria-label="Zoom out"
+        aria-label={t('reader.chrome.zoom.zoomOut')}
         disabled={atMin}
         onClick={() => onZoomStep(-1)}
       >
@@ -82,7 +91,7 @@ export function ZoomControl({
         <input
           type="text"
           inputMode="decimal"
-          aria-label="Zoom percentage"
+          aria-label={t('reader.chrome.zoom.percentage')}
           className="w-[4.5rem] bg-transparent px-1.5 py-1 text-right outline-none focus:bg-lib-chip"
           value={input}
           onChange={(event) => setInput(event.target.value)}
@@ -105,7 +114,7 @@ export function ZoomControl({
         <button
           type="button"
           className="border-l border-lib-border-soft px-1.5 text-[10px] text-lib-muted hover:bg-lib-chip hover:text-lib-text-strong"
-          aria-label="Zoom presets"
+          aria-label={t('reader.chrome.zoom.presets')}
           aria-haspopup="menu"
           aria-expanded={menuOpen}
           aria-controls={menuId}
@@ -118,7 +127,7 @@ export function ZoomControl({
       <button
         type="button"
         className="rounded px-2 py-1 text-sm hover:bg-lib-chip disabled:cursor-not-allowed disabled:opacity-40"
-        aria-label="Zoom in"
+        aria-label={t('reader.chrome.zoom.zoomIn')}
         disabled={atMax}
         onClick={() => onZoomStep(1)}
       >
@@ -142,7 +151,7 @@ export function ZoomControl({
                 setMenuOpen(false)
               }}
             >
-              {item.label}
+              {t(ZOOM_PRESET_LABELS[item.id])}
             </button>
           ))}
           <div className="my-1 border-t border-lib-border-soft" role="separator" />

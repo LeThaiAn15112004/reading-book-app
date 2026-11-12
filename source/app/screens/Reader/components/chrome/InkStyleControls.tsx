@@ -1,8 +1,9 @@
-/* i18n-pending: reader.chrome */
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { INK_PEN_PRESETS, INK_PEN_STYLES, type InkPenStyle } from '@core'
 import { pickerEventAction, setInkColorPickerOpen } from './inkColorPickerState'
 import { inkWidthToPoints, parseHexInput } from '../../logic/pdfInk/pdfInkPrefsStore'
+import { useT } from '../../../../i18n'
+import { INK_STYLE_LABELS } from './inkStyleLabels'
 
 const STYLE_ICONS: Record<InkPenStyle, ReactNode> = {
   pen: <path d="m16.9 3.6 3.5 3.5a1.4 1.4 0 0 1 0 2L8.6 20.9 3 21l.1-5.6L14.9 3.6a1.4 1.4 0 0 1 2 0ZM13.5 5l5.5 5.5" />,
@@ -15,6 +16,7 @@ const sectionLabel = 'text-[11px] font-semibold uppercase tracking-wide text-lib
 
 /** The colour row — the system picker plus a `#RRGGBB` field. Shared by the Freehand and Shape settings. */
 export function InkColorControl({ colorHex, onColor, live = false }: { colorHex: string; onColor: (colorHex: string) => void; live?: boolean }) {
+  const t = useT()
   const hex = colorHex.toUpperCase()
   const [hexDraft, setHexDraft] = useState(hex)
   useEffect(() => setHexDraft(hex), [hex])
@@ -62,17 +64,17 @@ export function InkColorControl({ colorHex, onColor, live = false }: { colorHex:
 
   return (
     <div className="flex flex-col gap-1.5">
-      <span className={sectionLabel}>Color</span>
+      <span className={sectionLabel}>{t('reader.chrome.ink.color')}</span>
       <div className="flex items-center gap-2">
         <label
-          title="Pick a color"
+          title={t('reader.chrome.ink.pickColor')}
           className="relative h-7 w-7 shrink-0 cursor-pointer overflow-hidden rounded-full border border-lib-border"
           style={{ backgroundColor: pickerLive ?? hex }}
         >
           <input
             ref={pickerRef}
             type="color"
-            aria-label="Pick a color"
+            aria-label={t('reader.chrome.ink.pickColor')}
             // Controlled by the LIVE pick too: re-rendering with the saved colour while the picker is open
             // would put the old value back before its `change` event reads it (the colour never changed).
             value={(pickerLive ?? hex).toLowerCase()}
@@ -82,7 +84,7 @@ export function InkColorControl({ colorHex, onColor, live = false }: { colorHex:
         </label>
         <input
           type="text"
-          aria-label="Hex color"
+          aria-label={t('reader.chrome.ink.hexColor')}
           aria-invalid={!hexValid}
           spellCheck={false}
           maxLength={7}
@@ -101,7 +103,7 @@ export function InkColorControl({ colorHex, onColor, live = false }: { colorHex:
         />
         {!hexValid ? (
           <span role="alert" className="text-[11px] text-red-500">
-            Use #RRGGBB
+            {t('reader.chrome.ink.hexHint')}
           </span>
         ) : null}
       </div>
@@ -175,6 +177,7 @@ type InkStyleControlsProps = {
  * (edit of that one stroke); the caller decides what each change applies to.
  */
 export function InkStyleControls({ idPrefix, style, colorHex, width, opacity, onStyle, onColor, onWidth, onOpacity, liveColor = false }: InkStyleControlsProps) {
+  const t = useT()
   const preset = INK_PEN_PRESETS[style]
   const [widthLive, setWidthLive] = useState<number | null>(null)
   const [opacityLive, setOpacityLive] = useState<number | null>(null)
@@ -182,8 +185,8 @@ export function InkStyleControls({ idPrefix, style, colorHex, width, opacity, on
   return (
     <div className="flex flex-col gap-3">
       <div className="flex flex-col gap-1.5">
-        <span className={sectionLabel}>Drawing style</span>
-        <div className="grid grid-cols-4 gap-1" role="group" aria-label="Drawing style">
+        <span className={sectionLabel}>{t('reader.chrome.ink.drawingStyle')}</span>
+        <div className="grid grid-cols-4 gap-1" role="group" aria-label={t('reader.chrome.ink.drawingStyle')}>
           {INK_PEN_STYLES.map((s) => (
             <button
               key={s}
@@ -196,7 +199,7 @@ export function InkStyleControls({ idPrefix, style, colorHex, width, opacity, on
               <svg className="size-[18px] shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
                 {STYLE_ICONS[s]}
               </svg>
-              {INK_PEN_PRESETS[s].label}
+              {t(INK_STYLE_LABELS[s])}
             </button>
           ))}
         </div>
@@ -207,9 +210,9 @@ export function InkStyleControls({ idPrefix, style, colorHex, width, opacity, on
       <div className="flex flex-col gap-1.5">
         <div className="flex items-baseline justify-between">
           <label htmlFor={`${idPrefix}-thickness`} className={sectionLabel}>
-            Thickness
+            {t('reader.chrome.ink.thickness')}
           </label>
-          <span className="text-[12px] font-semibold text-lib-text-strong">{inkWidthToPoints(widthLive ?? width).toFixed(1)} pt</span>
+          <span className="text-[12px] font-semibold text-lib-text-strong">{t('reader.chrome.ink.points', { value: inkWidthToPoints(widthLive ?? width).toFixed(1) })}</span>
         </div>
         <CommitSlider
           id={`${idPrefix}-thickness`}
@@ -226,7 +229,7 @@ export function InkStyleControls({ idPrefix, style, colorHex, width, opacity, on
         <div className="flex flex-col gap-1.5">
           <div className="flex items-baseline justify-between">
             <label htmlFor={`${idPrefix}-opacity`} className={sectionLabel}>
-              Opacity
+              {t('reader.chrome.ink.opacity')}
             </label>
             <span className="text-[12px] font-semibold text-lib-text-strong">{Math.round((opacityLive ?? opacity) * 100)}%</span>
           </div>
@@ -241,7 +244,7 @@ export function InkStyleControls({ idPrefix, style, colorHex, width, opacity, on
           />
         </div>
       ) : (
-        <span className="text-[11px] text-lib-muted">The Pen is always fully opaque.</span>
+        <span className="text-[11px] text-lib-muted">{t('reader.chrome.ink.penOpaque')}</span>
       )}
     </div>
   )

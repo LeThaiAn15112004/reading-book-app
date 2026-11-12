@@ -1,3 +1,4 @@
+import { useT } from '../../../../i18n'
 type ChromeRevealButtonProps = {
   expanded: boolean
   onToggle: () => void
@@ -8,14 +9,15 @@ export function ChromeRevealButton({
   expanded,
   onToggle,
 }: ChromeRevealButtonProps) {
+  const t = useT()
   return (
     <button
       type="button"
       className={`absolute left-1/2 z-[60] flex h-7 w-10 -translate-x-1/2 cursor-pointer items-center justify-center rounded-b-lg border border-t-0 border-lib-border bg-lib-surface-strong text-lib-muted shadow-md backdrop-blur-md transition-[top,color,border-color] hover:border-lib-accent-ring hover:text-lib-accent ${
         expanded ? 'top-14 sm:top-16' : 'top-0'
       }`}
-      title={expanded ? 'Hide tools' : 'Show tools'}
-      aria-label={expanded ? 'Hide tools bar' : 'Show tools bar'}
+      title={expanded ? t('reader.chrome.topbar.hideTools') : t('reader.chrome.topbar.showTools')}
+      aria-label={expanded ? t('reader.chrome.topbar.hideToolsBar') : t('reader.chrome.topbar.showToolsBar')}
       aria-expanded={expanded}
       onClick={(e) => {
         e.stopPropagation()

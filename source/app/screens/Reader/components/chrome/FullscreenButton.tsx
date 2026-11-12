@@ -1,4 +1,5 @@
 import { useShortcutLabel } from '../../../../shortcuts/useShortcutLabel'
+import { useT } from '../../../../i18n'
 
 type FullscreenButtonProps = {
   fullscreen: boolean
@@ -51,13 +52,14 @@ export function FullscreenButton({
   fullscreen,
   onToggle,
 }: FullscreenButtonProps) {
+  const t = useT()
   const shortcut = useShortcutLabel('view.toggleFullscreen')
   return (
     <button
       type="button"
       className="inline-flex items-center justify-center rounded px-2 py-1 text-lib-text-strong hover:bg-lib-chip"
-      title={fullscreen ? 'Exit full screen (Esc)' : `Full screen (${shortcut})`}
-      aria-label={fullscreen ? 'Exit full screen' : 'Enter full screen'}
+      title={fullscreen ? t('reader.chrome.topbar.exitFullScreenEsc') : t('reader.chrome.topbar.fullScreenShortcut', { shortcut })}
+      aria-label={fullscreen ? t('reader.chrome.topbar.exitFullScreen') : t('reader.chrome.topbar.enterFullScreen')}
       aria-pressed={fullscreen}
       onClick={onToggle}
     >

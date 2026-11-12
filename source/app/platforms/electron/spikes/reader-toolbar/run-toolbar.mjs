@@ -298,10 +298,10 @@ check('Eraser mode dropdown: an arrow beside the Eraser only picks the mode; the
   assert.doesNotMatch(arrow, /onTool|handleTool/)
   assert.match(arrow, /aria-haspopup="menu"/)
   assert.match(arrow, /aria-expanded=\{showMenu\}/)
-  assert.match(arrow, /aria-label=\{`Eraser mode:/)
+  assert.match(arrow, /aria-label=\{t\('reader\.chrome\.strip\.eraserMode'/)
   // both modes are offered, the current one is checked, choosing one calls onMode
-  assert.match(toolsMenu, /label: 'Stroke Eraser'/)
-  assert.match(toolsMenu, /label: 'Partial Eraser'/)
+  assert.match(toolsMenu, /label: 'reader\.chrome\.strip\.strokeEraser'/)
+  assert.match(toolsMenu, /label: 'reader\.chrome\.strip\.partialEraser'/)
   assert.match(arrow, /active: m\.id === mode/)
   assert.match(arrow, /onSelect: \(\) => onMode\(m\.id\)/)
   // the shared popup closes first, on an outside click and on Escape, and supports arrow keys

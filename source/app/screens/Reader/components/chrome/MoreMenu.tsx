@@ -1,4 +1,4 @@
-/* i18n-pending: reader.chrome */
+import { useT } from '../../../../i18n'
 type MoreMenuProps = {
   open: boolean
   onShare: () => void
@@ -17,6 +17,7 @@ export function MoreMenu({
   onBookInfo,
   onTrash,
 }: MoreMenuProps) {
+  const t = useT()
   if (!open) return null
 
   return (
@@ -26,7 +27,7 @@ export function MoreMenu({
       onClick={(e) => e.stopPropagation()}
     >
       <button className={itemClass} type="button" role="menuitem" onClick={onShare}>
-        Share document
+        {t('reader.chrome.moreMenu.share')}
       </button>
       <button
         className={itemClass}
@@ -34,7 +35,7 @@ export function MoreMenu({
         role="menuitem"
         onClick={onFavorites}
       >
-        Add to Favorites
+        {t('reader.chrome.moreMenu.favorites')}
       </button>
       <button
         className={itemClass}
@@ -42,7 +43,7 @@ export function MoreMenu({
         role="menuitem"
         onClick={onBookInfo}
       >
-        Book info
+        {t('reader.chrome.moreMenu.bookInfo')}
       </button>
       <div className="mx-1.5 my-1 h-px bg-lib-border-soft" />
       <button
@@ -51,7 +52,7 @@ export function MoreMenu({
         role="menuitem"
         onClick={onTrash}
       >
-        Move to trash
+        {t('reader.chrome.moreMenu.trash')}
       </button>
     </div>
   )

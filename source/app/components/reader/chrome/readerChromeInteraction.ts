@@ -16,15 +16,15 @@ export const READER_CHROME_TRANSITION_MS = 300
 export const READER_CHROME_RESIZE_SETTLE_MS = READER_CHROME_TRANSITION_MS + 250
 
 const READER_SIDEBAR_FOCUS_ROOT =
-  '[data-reader-sidebar-panel], [data-reader-right-sidebar-panel], [aria-label="Sidebar navigation"]'
+  // Data attributes, never aria-label / title: those are translated (spec 012).
+  '[data-reader-sidebar-panel], [data-reader-right-sidebar-panel], [data-reader-sidebar-nav]'
 
 const STUCK_HOVER_SELECTORS = [
   '.app-menubar button:not([data-hover-menu-trigger])',
-  '[aria-label="Sidebar navigation"] button',
+  '[data-reader-sidebar-nav] button',
   '[data-reader-sidebar-panel] button',
   '[data-reader-right-sidebar-panel] button',
-  'button[aria-label="Open sidebar"]',
-  'button[aria-label="Close sidebar"]',
+  'button[data-reader-sidebar-toggle]',
 ] as const
 
 /** Drop sidebar panel / rail focus so accent rings do not stick after navigation. */

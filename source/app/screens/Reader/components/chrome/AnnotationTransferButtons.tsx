@@ -1,4 +1,4 @@
-/* i18n-pending: reader.chrome */
+import { useT } from '../../../../i18n'
 type AnnotationTransferButtonsProps = {
   /** PDF only: save a new PDF with the annotations written in. Hidden when absent. */
   onExportPdf?: () => void
@@ -31,32 +31,33 @@ function PageIcon({ children }: { children: React.ReactNode }) {
  * Icon-only like the markup tools; the tooltip names the action. Hidden for books that cannot carry annotations.
  */
 export function AnnotationTransferButtons({ onExportPdf, onExportAnnotations, onExportReadable, onImportAnnotations }: AnnotationTransferButtonsProps) {
+  const t = useT()
   if (!onExportPdf && !onExportAnnotations && !onExportReadable && !onImportAnnotations) return null
   return (
-    <div className="flex shrink-0 items-center gap-0.5 border-l border-lib-border pl-1.5 sm:pl-2" role="group" aria-label="Export and import annotations">
+    <div className="flex shrink-0 items-center gap-0.5 border-l border-lib-border pl-1.5 sm:pl-2" role="group" aria-label={t('reader.chrome.transfer.group')}>
       {onExportPdf ? (
-        <button type="button" className={buttonClass} title="Export PDF with annotations…" aria-label="Export PDF with annotations" onClick={onExportPdf}>
+        <button type="button" className={buttonClass} title={t('reader.chrome.transfer.exportPdfTitle')} aria-label={t('reader.chrome.transfer.exportPdf')} onClick={onExportPdf}>
           <PageIcon>
             <path strokeLinecap="round" strokeLinejoin="round" d="M12 17.25v-6m0 0-2.25 2.25M12 11.25l2.25 2.25" />
           </PageIcon>
         </button>
       ) : null}
       {onExportAnnotations ? (
-        <button type="button" className={buttonClass} title="Export annotations (backup)…" aria-label="Export annotations (backup)" onClick={onExportAnnotations}>
+        <button type="button" className={buttonClass} title={t('reader.chrome.transfer.exportBackupTitle')} aria-label={t('reader.chrome.transfer.exportBackup')} onClick={onExportAnnotations}>
           <svg {...icon} aria-hidden>
             <path strokeLinecap="round" strokeLinejoin="round" d="M12 3v12m0 0-3.75-3.75M12 15l3.75-3.75M4.5 16.5v1.75A1.75 1.75 0 0 0 6.25 20h11.5a1.75 1.75 0 0 0 1.75-1.75V16.5" />
           </svg>
         </button>
       ) : null}
       {onExportReadable ? (
-        <button type="button" className={buttonClass} title="Export readable copy…" aria-label="Export readable copy" onClick={onExportReadable}>
+        <button type="button" className={buttonClass} title={t('reader.chrome.transfer.exportReadableTitle')} aria-label={t('reader.chrome.transfer.exportReadable')} onClick={onExportReadable}>
           <PageIcon>
             <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6M9 15h6M9 18h3.5" />
           </PageIcon>
         </button>
       ) : null}
       {onImportAnnotations ? (
-        <button type="button" className={buttonClass} title="Import annotations…" aria-label="Import annotations" onClick={onImportAnnotations}>
+        <button type="button" className={buttonClass} title={t('reader.chrome.transfer.importTitle')} aria-label={t('reader.chrome.transfer.import')} onClick={onImportAnnotations}>
           <svg {...icon} aria-hidden>
             <path strokeLinecap="round" strokeLinejoin="round" d="M12 15V3m0 0L8.25 6.75M12 3l3.75 3.75M4.5 16.5v1.75A1.75 1.75 0 0 0 6.25 20h11.5a1.75 1.75 0 0 0 1.75-1.75V16.5" />
           </svg>

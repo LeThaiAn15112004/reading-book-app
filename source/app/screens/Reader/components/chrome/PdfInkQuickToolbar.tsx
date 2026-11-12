@@ -1,6 +1,6 @@
-/* i18n-pending: reader.chrome */
 import { useEffect, useState } from 'react'
 import { parseHexInput } from '../../logic/pdfInk/pdfInkPrefsStore'
+import { useT } from '../../../../i18n'
 
 type PdfInkQuickToolbarProps = {
   /** Hidden (with its editor) for an object whose colour can't be changed safely. */
@@ -16,6 +16,7 @@ type PdfInkQuickToolbarProps = {
  * stays the place for thickness etc.
  */
 export function PdfInkQuickToolbar({ colorHex, onColor, onDelete }: PdfInkQuickToolbarProps) {
+  const t = useT()
   const hex = (colorHex ?? '#000000').toUpperCase()
   const [draft, setDraft] = useState(hex)
   useEffect(() => setDraft(hex), [hex])
@@ -28,7 +29,7 @@ export function PdfInkQuickToolbar({ colorHex, onColor, onDelete }: PdfInkQuickT
   return (
     <div
       role="toolbar"
-      aria-label="Object tools"
+      aria-label={t('reader.chrome.ink.objectTools')}
       className="flex items-center gap-1.5 rounded-lg border border-lib-border bg-lib-surface-strong p-1.5 shadow-lg"
     >
       {colorHex !== undefined && onColor ? (
@@ -36,7 +37,7 @@ export function PdfInkQuickToolbar({ colorHex, onColor, onDelete }: PdfInkQuickT
           <span aria-hidden className="size-5 shrink-0 rounded-full border border-lib-border" style={{ backgroundColor: valid ? (parseHexInput(draft) ?? hex) : hex }} />
           <input
             type="text"
-            aria-label="Hex color"
+            aria-label={t('reader.chrome.ink.hexColor')}
             aria-invalid={!valid}
             spellCheck={false}
             maxLength={7}
@@ -57,8 +58,8 @@ export function PdfInkQuickToolbar({ colorHex, onColor, onDelete }: PdfInkQuickT
       {onDelete ? (
         <button
           type="button"
-          aria-label="Delete"
-          title="Delete"
+          aria-label={t('common.actions.delete')}
+          title={t('common.actions.delete')}
           onClick={onDelete}
           className="flex size-7 cursor-pointer items-center justify-center rounded-md text-lib-text-strong hover:bg-lib-accent-soft"
         >

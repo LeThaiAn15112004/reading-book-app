@@ -1,7 +1,7 @@
-/* i18n-pending: reader.chrome */
 import { useRef } from 'react'
 import { useDraggableWordCountPanel, useResizableWordCountPanel } from '../../logic'
 import type { WordCountStats, WordCountStatus } from '../../logic'
+import { useT } from '../../../../i18n'
 
 type WordCountPanelProps = {
   open: boolean
@@ -95,6 +95,7 @@ export function WordCountPanel({
   pageTotal,
   onClose,
 }: WordCountPanelProps) {
+  const t = useT()
   const panelRef = useRef<HTMLDivElement>(null)
   const drag = useDraggableWordCountPanel(panelRef, open)
   const resize = useResizableWordCountPanel(panelRef)
@@ -127,13 +128,13 @@ export function WordCountPanel({
             className="flex-1 truncate text-[12px] font-semibold text-lib-text-strong"
             id="word-count-panel-title"
           >
-            Word Count
+            {t('reader.chrome.wordCount.title')}
           </span>
           <button
             type="button"
             className={iconButton}
-            title="Close"
-            aria-label="Close"
+            title={t('common.actions.close')}
+            aria-label={t('common.actions.close')}
             data-no-drag
             onClick={onClose}
           >
@@ -155,26 +156,26 @@ export function WordCountPanel({
           {status === 'loading' || status === 'indexing' ? (
             <div className="flex items-center gap-2 py-4 text-[13px] text-lib-muted">
               <Spinner />
-              {status === 'indexing' ? 'Đang chuẩn bị sách để đếm từ…' : 'Đang tính số từ…'}
+              {status === 'indexing' ? t('reader.chrome.wordCount.preparing') : t('reader.chrome.wordCount.counting')}
             </div>
           ) : status === 'unsupported' ? (
             <p className="m-0 py-2 text-[13px] leading-snug text-lib-muted">
-              Định dạng này chưa hỗ trợ đếm từ.
+              {t('reader.chrome.wordCount.unsupported')}
             </p>
           ) : status === 'error' ? (
             <p className="m-0 py-2 text-[13px] leading-snug text-lib-muted">
-              {errorMessage ?? 'Không thể đếm số từ.'}
+              {errorMessage ?? t('reader.chrome.wordCount.failed')}
             </p>
           ) : (
             <div className="flex flex-col">
-              <div className="mb-1 text-[12px] font-semibold text-lib-muted">Statistics:</div>
-              <StatRow label="Pages" value={pageTotal} />
-              <StatRow label="Words" value={stats.words} />
-              <StatRow label="Characters (no spaces)" value={stats.charactersNoSpaces} />
-              <StatRow label="Characters (with spaces)" value={stats.charactersWithSpaces} />
-              <StatRow label="Lines" value={stats.lines} />
-              <StatRow label="Non-Asian words" value={stats.nonAsianWords} />
-              <StatRow label="Asian characters, Korean" value={stats.asianCharacters} />
+              <div className="mb-1 text-[12px] font-semibold text-lib-muted">{t('reader.chrome.wordCount.statistics')}</div>
+              <StatRow label={t('reader.chrome.wordCount.pages')} value={pageTotal} />
+              <StatRow label={t('reader.chrome.wordCount.words')} value={stats.words} />
+              <StatRow label={t('reader.chrome.wordCount.charactersNoSpaces')} value={stats.charactersNoSpaces} />
+              <StatRow label={t('reader.chrome.wordCount.charactersWithSpaces')} value={stats.charactersWithSpaces} />
+              <StatRow label={t('reader.chrome.wordCount.lines')} value={stats.lines} />
+              <StatRow label={t('reader.chrome.wordCount.nonAsianWords')} value={stats.nonAsianWords} />
+              <StatRow label={t('reader.chrome.wordCount.asianCharacters')} value={stats.asianCharacters} />
             </div>
           )}
         </div>
@@ -220,7 +221,7 @@ export function WordCountPanel({
       />
       <div
         onPointerDown={(e) => resize.onResizePointerDown('se', e)}
-        title="Drag to resize"
+        title={t('reader.chrome.wordCount.dragToResize')}
         className="absolute -right-1 -bottom-1 flex size-4 touch-none cursor-nwse-resize items-end justify-end p-0.5"
       >
         <ResizeHandleIcon />

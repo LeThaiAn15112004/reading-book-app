@@ -1,9 +1,9 @@
-/* i18n-pending: reader.chrome */
 import type { Ref } from 'react'
 import type { ReaderCapability } from '../../../../components/reader/capabilities'
 import { AnnotationTransferButtons } from './AnnotationTransferButtons'
 import { MoreMenu } from './MoreMenu'
 import { ToolsStrip, type EraserMode, type ToolId, type ToolStates } from './ToolsMenu'
+import { useT } from '../../../../i18n'
 
 type ReaderTopbarProps = {
   chromeHidden: boolean
@@ -56,6 +56,7 @@ export function ReaderTopbar({
   onEraserMode,
   audioButtonRef,
 }: ReaderTopbarProps) {
+  const t = useT()
   return (
     <header
       id="reader-tools-chrome"
@@ -89,8 +90,8 @@ export function ReaderTopbar({
         <button
           className={`${chromeBtn}${moreOpen ? ' border-lib-accent bg-lib-accent-soft text-lib-text-strong' : ''}`}
           type="button"
-          title="More"
-          aria-label="More options"
+          title={t('reader.chrome.topbar.more')}
+          aria-label={t('reader.chrome.topbar.moreOptions')}
           aria-haspopup="true"
           aria-expanded={moreOpen}
           onClick={(e) => {

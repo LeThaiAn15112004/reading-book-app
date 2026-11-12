@@ -1,7 +1,8 @@
-/* i18n-pending: reader.chrome */
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import type { BookSearchMatch, BookSearchOrder } from '../../../../bridge'
 import { useBookSearchStore, useDraggableSearchPanel, useResizableSearchPanel } from '../../logic'
+import type { MessageKey } from '@core'
+import { getFormat, useT } from '../../../../i18n'
 
 type ReaderSearchPanelProps = {
   open: boolean
@@ -109,9 +110,9 @@ function OptionToggle({
   )
 }
 
-const SORT_OPTIONS: ReadonlyArray<{ value: BookSearchOrder; label: string }> = [
-  { value: 'position', label: 'In book order' },
-  { value: 'relevance', label: 'By relevance' },
+const SORT_OPTIONS: ReadonlyArray<{ value: BookSearchOrder; label: MessageKey }> = [
+  { value: 'position', label: 'reader.chrome.search.inBookOrder' },
+  { value: 'relevance', label: 'reader.chrome.search.byRelevance' },
 ]
 
 /**
@@ -126,6 +127,7 @@ function SortDropdown({
   order: BookSearchOrder
   onChange: (order: BookSearchOrder) => void
 }) {
+  const t = useT()
   const rootRef = useRef<HTMLDivElement>(null)
   const [open, setOpen] = useState(false)
 
@@ -153,7 +155,7 @@ function SortDropdown({
         type="button"
         aria-haspopup="listbox"
         aria-expanded={open}
-        title="Sort results"
+        title={t('reader.chrome.search.sortResults')}
         onClick={() => setOpen((v) => !v)}
         className={`flex h-6 cursor-pointer items-center gap-1 rounded-md border px-1.5 text-[12px] font-medium transition-colors ${
           open
@@ -161,7 +163,7 @@ function SortDropdown({
             : 'border-lib-border-soft bg-transparent text-lib-muted hover:text-lib-text-strong'
         }`}
       >
-        {current.label}
+        {t(current.label)}
         <svg
           xmlns="http://www.w3.org/2000/svg"
           fill="none"
@@ -178,7 +180,7 @@ function SortDropdown({
       {open ? (
         <div
           role="listbox"
-          aria-label="Sort results"
+          aria-label={t('reader.chrome.search.sortResults')}
           className="absolute top-[calc(100%+4px)] right-0 z-[130] w-36 overflow-hidden rounded-lg border border-lib-border bg-lib-surface-strong py-1 shadow-xl"
         >
           {SORT_OPTIONS.map((option) => (
@@ -207,11 +209,12 @@ function SortDropdown({
 }
 
 function formatCount(value: number): string {
-  return value.toLocaleString()
+  return getFormat().number(value)
 }
 
 /** One-line summary under the options: loading / count / "occurrence k of n" (Foxit-style). */
 function StatusLine() {
+  const t = useT()
   const status = useBookSearchStore((s) => s.status)
   const busy = useBookSearchStore((s) => s.busy)
   const query = useBookSearchStore((s) => s.query)
@@ -225,38 +228,37 @@ function StatusLine() {
     content = (
       <>
         <Spinner />
-        Searching entire book…
+        {t('reader.chrome.search.searching')}
       </>
     )
   } else if (status === 'indexing') {
     content = (
       <>
         <Spinner />
-        Preparing this book for search…
+        {t('reader.chrome.search.preparing')}
       </>
     )
   } else if (status === 'unsupported') {
-    content = 'Search isn’t available for this format yet.'
+    content = t('reader.chrome.search.unsupported')
   } else if (status === 'noText') {
-    content = 'Text search isn’t available — this document has no selectable text (it may be a scanned PDF).'
+    content = t('reader.chrome.search.noText')
   } else if (status === 'error') {
-    content = errorMessage ?? 'Search failed.'
+    content = errorMessage ?? t('reader.chrome.search.failed')
   } else if (status === 'ready' && totalMatches === 0) {
-    content = `No matches for “${query}”.`
+    content = t('reader.chrome.search.noMatches', { query })
   } else if (status === 'ready' && active) {
     content = (
       <span className="min-w-0 truncate">
         <strong className="font-semibold text-lib-text-strong">
-          Occurrence {formatCount(active.occurrence)} of {formatCount(totalMatches)}
+          {t('reader.chrome.search.occurrence', { current: formatCount(active.occurrence), total: formatCount(totalMatches) })}
         </strong>
         <span className="text-lib-muted">
-          {' '}
-          · word {formatCount(active.wordIndex)} of {formatCount(totalWords)}
+          {t('reader.chrome.search.wordOf', { current: formatCount(active.wordIndex), total: formatCount(totalWords) })}
         </span>
       </span>
     )
   } else if (status === 'ready') {
-    content = `${formatCount(totalMatches)} ${totalMatches === 1 ? 'match' : 'matches'}`
+    content = t('reader.chrome.search.matchCount', { count: totalMatches })
   }
 
   if (content === null) return null
@@ -282,6 +284,7 @@ function ResultItem({
   active: boolean
   onSelect: () => void
 }) {
+  const t = useT()
   return (
     <li>
       <button
@@ -296,7 +299,7 @@ function ResultItem({
         <span className="flex items-baseline justify-between gap-2 text-[11px] text-lib-muted">
           <span className="min-w-0 truncate">{label}</span>
           <span className="shrink-0 tabular-nums">
-            #{formatCount(match.occurrence)} · word {formatCount(match.wordIndex)}
+            {t('reader.chrome.search.resultMeta', { occurrence: formatCount(match.occurrence), word: formatCount(match.wordIndex) })}
           </span>
         </span>
         <span className="mt-0.5 line-clamp-2 text-[13px] leading-snug text-lib-text">
@@ -323,6 +326,7 @@ export function ReaderSearchPanel({
   onSubmit,
   onClose,
 }: ReaderSearchPanelProps) {
+  const t = useT()
   const inputRef = useRef<HTMLInputElement>(null)
   const listRef = useRef<HTMLUListElement>(null)
   const panelRef = useRef<HTMLDivElement>(null)
@@ -389,13 +393,13 @@ export function ReaderSearchPanel({
       >
         <GripIcon />
         <span className="flex-1 truncate text-[12px] font-semibold text-lib-text-strong">
-          Search in book
+          {t('reader.chrome.search.title')}
         </span>
         <button
           type="button"
           className={iconButton}
-          title="Close search"
-          aria-label="Close search"
+          title={t('reader.chrome.search.close')}
+          aria-label={t('reader.chrome.search.close')}
           data-no-drag
           onClick={onClose}
         >
@@ -450,9 +454,9 @@ export function ReaderSearchPanel({
                 onClose()
               }
             }}
-            placeholder="Search in book…"
-            aria-label="Search in book"
-            title="Enter: search / next · Shift+Enter: previous"
+            placeholder={t('reader.chrome.search.placeholder')}
+            aria-label={t('reader.chrome.search.title')}
+            title={t('reader.chrome.search.inputTitle')}
             autoComplete="off"
             spellCheck={false}
             className="min-w-0 flex-1 border-none bg-transparent text-sm text-lib-text outline-none placeholder:text-lib-muted"
@@ -466,8 +470,8 @@ export function ReaderSearchPanel({
         <button
           type="button"
           className={iconButton}
-          title="Previous match (Shift+Enter)"
-          aria-label="Previous match"
+          title={t('reader.chrome.search.previousTitle')}
+          aria-label={t('reader.chrome.search.previous')}
           disabled={!canStep}
           onClick={previous}
         >
@@ -476,8 +480,8 @@ export function ReaderSearchPanel({
         <button
           type="button"
           className={iconButton}
-          title="Next match (Enter)"
-          aria-label="Next match"
+          title={t('reader.chrome.search.nextTitle')}
+          aria-label={t('reader.chrome.search.next')}
           disabled={!canStep}
           onClick={() => void next()}
         >
@@ -487,24 +491,26 @@ export function ReaderSearchPanel({
 
       <div className="flex items-center gap-1 px-2 pb-2">
         <OptionToggle
-          title="Match case"
+          title={t('reader.chrome.search.matchCase')}
           pressed={options.matchCase}
           onToggle={() => setOptions({ matchCase: !options.matchCase })}
         >
+          {/* i18n-ignore: glyph icon of the match-case toggle */}
           Aa
         </OptionToggle>
         <OptionToggle
-          title="Whole words only"
+          title={t('reader.chrome.search.wholeWords')}
           pressed={options.wholeWords}
           onToggle={() => setOptions({ wholeWords: !options.wholeWords })}
         >
-          <span className="underline decoration-1 underline-offset-2">ab</span>
+          <span className="underline decoration-1 underline-offset-2">{/* i18n-ignore: glyph icon of the whole-words toggle */}ab</span>
         </OptionToggle>
         <OptionToggle
-          title="Match diacritics (ă ≠ a)"
+          title={t('reader.chrome.search.matchDiacritics')}
           pressed={options.matchDiacritics}
           onToggle={() => setOptions({ matchDiacritics: !options.matchDiacritics })}
         >
+          {/* i18n-ignore: glyph icon of the diacritics toggle */}
           ă
         </OptionToggle>
         <SortDropdown order={order} onChange={setOrder} />
@@ -517,7 +523,7 @@ export function ReaderSearchPanel({
           ref={listRef}
           className="min-h-0 flex-1 overflow-y-auto border-t border-lib-border-soft py-1"
           style={resize.style ? undefined : { maxHeight: 'min(50vh, 420px)' }}
-          aria-label="Search results"
+          aria-label={t('reader.chrome.search.results')}
         >
           {matches.map((match, index) => (
             <ResultItem
@@ -537,7 +543,7 @@ export function ReaderSearchPanel({
                 className="inline-flex w-full cursor-pointer items-center justify-center gap-2 rounded-md py-1.5 text-[12px] font-semibold text-lib-muted hover:bg-lib-surface-hover hover:text-lib-text-strong disabled:cursor-default"
               >
                 {loadingMore ? <Spinner /> : null}
-                Show more ({formatCount(totalMatches - matches.length)} left)
+                {t('reader.chrome.search.showMore', { count: formatCount(totalMatches - matches.length) })}
               </button>
             </li>
           ) : null}
@@ -585,7 +591,7 @@ export function ReaderSearchPanel({
       />
       <div
         onPointerDown={(e) => resize.onResizePointerDown('se', e)}
-        title="Drag to resize"
+        title={t('reader.chrome.wordCount.dragToResize')}
         className="absolute -right-1 -bottom-1 flex size-4 touch-none items-end justify-end p-0.5 cursor-nwse-resize"
       >
         <ResizeHandleIcon />

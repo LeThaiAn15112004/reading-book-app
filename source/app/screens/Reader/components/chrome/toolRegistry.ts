@@ -1,3 +1,4 @@
+import type { MessageKey } from '@core'
 import type { ReaderCapability } from '../../../../components/reader/capabilities'
 import type { ShortcutId } from '../../../../shortcuts/shortcutDefinitions'
 
@@ -34,10 +35,10 @@ export type ToolIconId = ToolId | 'view' | 'tools'
 
 export type ToolDef = {
   id: ToolId
-  label: string
+  labelKey: MessageKey
   group: ToolGroupId
   /** Tooltip text when the label alone isn't self-explanatory. */
-  description?: string
+  descriptionKey?: MessageKey
   /** Shown only when the reader surface has all of these (see `reader/capabilities.ts`). */
   requires: readonly ReaderCapability[]
   /** Its key is shown in the tooltip and in dropdowns, following the user's customization. */
@@ -48,7 +49,7 @@ export type ToolDef = {
 
 export type ToolGroupDef = {
   id: ToolGroupId
-  label: string
+  labelKey: MessageKey
   icon: ToolIconId
   /** `never`: always inline (frequent tools). `always`: always one dropdown. `auto`: inline until
    *  the strip runs out of room. */
@@ -59,12 +60,12 @@ export type ToolGroupDef = {
 
 /** Toolbar order. Empty groups (nothing supported by the surface) are not rendered. */
 export const TOOL_GROUPS: readonly ToolGroupDef[] = [
-  { id: 'navigate', label: 'Navigate', icon: 'hand', collapse: 'never' },
-  { id: 'annotation', label: 'Annotation', icon: 'highlight', collapse: 'never', iconOnly: true },
-  { id: 'freehand', label: 'Freehand', icon: 'pen', collapse: 'never' },
-  { id: 'tools', label: 'Tools', icon: 'tools', collapse: 'never' },
-  { id: 'view', label: 'View', icon: 'view', collapse: 'auto' },
-  { id: 'settings', label: 'Settings', icon: 'settings', collapse: 'never' },
+  { id: 'navigate', labelKey: 'reader.chrome.groups.navigate', icon: 'hand', collapse: 'never' },
+  { id: 'annotation', labelKey: 'reader.chrome.groups.annotation', icon: 'highlight', collapse: 'never', iconOnly: true },
+  { id: 'freehand', labelKey: 'reader.chrome.groups.freehand', icon: 'pen', collapse: 'never' },
+  { id: 'tools', labelKey: 'reader.chrome.groups.tools', icon: 'tools', collapse: 'never' },
+  { id: 'view', labelKey: 'reader.chrome.groups.view', icon: 'view', collapse: 'auto' },
+  { id: 'settings', labelKey: 'reader.chrome.groups.settings', icon: 'settings', collapse: 'never' },
 ]
 
 /** A group with more tools than this is always a dropdown. */
@@ -75,26 +76,26 @@ export const FOLD_ORDER: readonly ToolGroupId[] = ['view', 'annotation']
 
 /** Order within a group is toolbar / menu order. */
 export const TOOL_REGISTRY: readonly ToolDef[] = [
-  { id: 'hand', label: 'Hand', group: 'navigate', description: 'Hand — pan and turn pages', requires: ['interaction', 'pan'] },
-  { id: 'edit', label: 'Edit', group: 'navigate', description: 'Edit text — type in the document', requires: ['textEdit'] },
-  { id: 'select', label: 'Select', group: 'navigate', description: 'Select text', requires: ['interaction'] },
-  { id: 'search', label: 'Search', group: 'navigate', description: 'Search in book', requires: ['search'], shortcutId: 'general.searchBook' },
-  { id: 'speech', label: 'Audio', group: 'navigate', description: 'Read aloud', requires: ['readAloud'], popup: 'menu' },
-  { id: 'translate', label: 'Translate', group: 'navigate', description: 'Translate selected text', requires: ['translate'] },
-  { id: 'highlight', label: 'Highlight', group: 'annotation', description: 'Highlight — drag over text', requires: ['markupAnnotations'] },
-  { id: 'underline', label: 'Underline', group: 'annotation', description: 'Underline — drag over text', requires: ['markupAnnotations'] },
-  { id: 'squiggly', label: 'Squiggly', group: 'annotation', description: 'Squiggly underline — drag over text', requires: ['markupAnnotations'] },
-  { id: 'strikethrough', label: 'Strikethrough', group: 'annotation', description: 'Strikethrough — drag over text', requires: ['markupAnnotations'] },
-  { id: 'replace', label: 'Replace Text', group: 'annotation', description: 'Replace text — strike out the selection; the note holds the new text', requires: ['markupAnnotations'] },
-  { id: 'insert', label: 'Insert Text', group: 'annotation', description: 'Insert text — mark a place; the note holds the text to add', requires: ['markupAnnotations'] },
-  { id: 'pen', label: 'Freehand', group: 'freehand', description: 'Freehand — draw on the page', requires: ['inkAnnotations'] },
-  { id: 'shape', label: 'Shapes', group: 'freehand', description: 'Shapes — drag to draw a rectangle, ellipse, line or arrow (see the arrow for the kind and look)', requires: ['shapeAnnotations'] },
-  { id: 'eraser', label: 'Eraser', group: 'freehand', description: 'Eraser — remove freehand strokes (whole or in part, see the arrow)', requires: ['inkAnnotations'] },
-  { id: 'typewriter', label: 'Typewriter', group: 'freehand', description: 'Typewriter — click or drag on the page, then type', requires: ['typewriterAnnotations'] },
-  { id: 'fileAttachment', label: 'File Attachment', group: 'freehand', description: 'File Attachment — click a spot on the page, then choose a file to embed in the PDF', requires: ['fileAttachments'] },
-  { id: 'snapshot', label: 'Snapshot', group: 'tools', description: 'Snapshot — copy an area as an image', requires: ['snapshot'] },
-  { id: 'wordCount', label: 'Word Count', group: 'tools', description: 'Word count and reading time', requires: ['wordCount'] },
-  { id: 'settings', label: 'Settings', group: 'settings', description: 'Reading settings', requires: ['readingSettings'], popup: 'dialog' },
+  { id: 'hand', labelKey: 'reader.chrome.tools.hand', group: 'navigate', descriptionKey: 'reader.chrome.toolDescriptions.hand', requires: ['interaction', 'pan'] },
+  { id: 'edit', labelKey: 'reader.chrome.tools.edit', group: 'navigate', descriptionKey: 'reader.chrome.toolDescriptions.edit', requires: ['textEdit'] },
+  { id: 'select', labelKey: 'reader.chrome.tools.select', group: 'navigate', descriptionKey: 'reader.chrome.toolDescriptions.select', requires: ['interaction'] },
+  { id: 'search', labelKey: 'reader.chrome.tools.search', group: 'navigate', descriptionKey: 'reader.chrome.toolDescriptions.search', requires: ['search'], shortcutId: 'general.searchBook' },
+  { id: 'speech', labelKey: 'reader.chrome.tools.speech', group: 'navigate', descriptionKey: 'reader.chrome.toolDescriptions.speech', requires: ['readAloud'], popup: 'menu' },
+  { id: 'translate', labelKey: 'reader.chrome.tools.translate', group: 'navigate', descriptionKey: 'reader.chrome.toolDescriptions.translate', requires: ['translate'] },
+  { id: 'highlight', labelKey: 'reader.chrome.tools.highlight', group: 'annotation', descriptionKey: 'reader.chrome.toolDescriptions.highlight', requires: ['markupAnnotations'] },
+  { id: 'underline', labelKey: 'reader.chrome.tools.underline', group: 'annotation', descriptionKey: 'reader.chrome.toolDescriptions.underline', requires: ['markupAnnotations'] },
+  { id: 'squiggly', labelKey: 'reader.chrome.tools.squiggly', group: 'annotation', descriptionKey: 'reader.chrome.toolDescriptions.squiggly', requires: ['markupAnnotations'] },
+  { id: 'strikethrough', labelKey: 'reader.chrome.tools.strikethrough', group: 'annotation', descriptionKey: 'reader.chrome.toolDescriptions.strikethrough', requires: ['markupAnnotations'] },
+  { id: 'replace', labelKey: 'reader.chrome.tools.replace', group: 'annotation', descriptionKey: 'reader.chrome.toolDescriptions.replace', requires: ['markupAnnotations'] },
+  { id: 'insert', labelKey: 'reader.chrome.tools.insert', group: 'annotation', descriptionKey: 'reader.chrome.toolDescriptions.insert', requires: ['markupAnnotations'] },
+  { id: 'pen', labelKey: 'reader.chrome.tools.pen', group: 'freehand', descriptionKey: 'reader.chrome.toolDescriptions.pen', requires: ['inkAnnotations'] },
+  { id: 'shape', labelKey: 'reader.chrome.tools.shape', group: 'freehand', descriptionKey: 'reader.chrome.toolDescriptions.shape', requires: ['shapeAnnotations'] },
+  { id: 'eraser', labelKey: 'reader.chrome.tools.eraser', group: 'freehand', descriptionKey: 'reader.chrome.toolDescriptions.eraser', requires: ['inkAnnotations'] },
+  { id: 'typewriter', labelKey: 'reader.chrome.tools.typewriter', group: 'freehand', descriptionKey: 'reader.chrome.toolDescriptions.typewriter', requires: ['typewriterAnnotations'] },
+  { id: 'fileAttachment', labelKey: 'reader.chrome.tools.fileAttachment', group: 'freehand', descriptionKey: 'reader.chrome.toolDescriptions.fileAttachment', requires: ['fileAttachments'] },
+  { id: 'snapshot', labelKey: 'reader.chrome.tools.snapshot', group: 'tools', descriptionKey: 'reader.chrome.toolDescriptions.snapshot', requires: ['snapshot'] },
+  { id: 'wordCount', labelKey: 'reader.chrome.tools.wordCount', group: 'tools', descriptionKey: 'reader.chrome.toolDescriptions.wordCount', requires: ['wordCount'] },
+  { id: 'settings', labelKey: 'reader.chrome.tools.settings', group: 'settings', descriptionKey: 'reader.chrome.toolDescriptions.settings', requires: ['readingSettings'], popup: 'dialog' },
 ]
 
 export function toolsForGroup(

@@ -1,4 +1,3 @@
-/* i18n-pending: reader.sidebar */
 import type { SidebarTab } from './TocSidebar'
 import {
   READER_FOOTER_HEIGHT_PX,
@@ -65,6 +64,7 @@ export function SidebarEdgeRail({
           top: chromeTopInset,
           bottom: bottomInsetPx,
         }}
+        data-reader-sidebar-nav=""
         aria-label="Sidebar navigation"
       >
         {tabs.map((tab) => {
@@ -110,6 +110,7 @@ export function SidebarEdgeRail({
           bottom: bottomInsetPx,
         }}
         type="button"
+        data-reader-sidebar-toggle=""
         title={open ? undefined : 'Open sidebar'}
         aria-label={open ? 'Close sidebar' : 'Open sidebar'}
         aria-expanded={open}

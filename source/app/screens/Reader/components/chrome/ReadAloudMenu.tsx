@@ -1,7 +1,7 @@
-/* i18n-pending: reader.chrome */
 import { useLayoutEffect, useRef, useState, type RefObject } from 'react'
 import { createPortal } from 'react-dom'
 import { READ_ALOUD_RATES, useDismissOnOutsideOrEscape, type ReadAloudStatus } from '../../logic'
+import { useT } from '../../../../i18n'
 
 type ReadAloudMenuProps = {
   open: boolean
@@ -80,6 +80,7 @@ function ReadAloudMenuPanel({
   onRateChange,
   onVolumeChange,
 }: Omit<ReadAloudMenuProps, 'open'>) {
+  const t = useT()
   const menuRef = useRef<HTMLDivElement>(null)
   const [position, setPosition] = useState<{ top: number; left: number } | null>(null)
 
@@ -113,20 +114,20 @@ function ReadAloudMenuPanel({
       className="fixed z-[400] rounded-xl border border-lib-border bg-lib-surface-strong p-1.5 shadow-xl backdrop-blur-md"
       style={{ top: position.top, left: position.left, width: MENU_WIDTH }}
       role="menu"
-      aria-label="Read aloud"
+      aria-label={t('reader.chrome.readAloud.title')}
       onClick={(e) => e.stopPropagation()}
     >
-      <div className={sectionTitle}>Read aloud</div>
+      <div className={sectionTitle}>{t('reader.chrome.readAloud.title')}</div>
       <button className={itemClass} type="button" role="menuitem" disabled={!available} onClick={onReadViewport}>
         <Icon d={ICON_VIEW} />
-        Read current view
+        {t('reader.chrome.readAloud.readView')}
       </button>
       <button className={itemClass} type="button" role="menuitem" disabled={!available} onClick={onReadFromPosition}>
         <Icon d={ICON_FROM_HERE} />
-        Read from current position
+        {t('reader.chrome.readAloud.readFromPosition')}
       </button>
       {!available && (
-        <p className="px-3 pb-1 text-xs text-lib-faint">Read aloud is available for EPUB books.</p>
+        <p className="px-3 pb-1 text-xs text-lib-faint">{t('reader.chrome.readAloud.epubOnly')}</p>
       )}
 
       <div className="mx-1.5 my-1 h-px bg-lib-border-soft" />
@@ -136,21 +137,21 @@ function ReadAloudMenuPanel({
           className={controlClass}
           type="button"
           disabled={!available}
-          aria-label={playing ? 'Pause' : 'Play'}
+          aria-label={playing ? t('reader.chrome.readAloud.pause') : t('reader.chrome.readAloud.play')}
           onClick={onTogglePlayPause}
         >
           <Icon d={playing ? ICON_PAUSE : ICON_PLAY} filled />
-          {playing ? 'Pause' : 'Play'}
+          {playing ? t('reader.chrome.readAloud.pause') : t('reader.chrome.readAloud.play')}
         </button>
-        <button className={controlClass} type="button" disabled={idle} aria-label="Stop" onClick={onStop}>
+        <button className={controlClass} type="button" disabled={idle} aria-label={t('reader.chrome.readAloud.stop')} onClick={onStop}>
           <Icon d={ICON_STOP} filled />
-          Stop
+          {t('reader.chrome.readAloud.stop')}
         </button>
       </div>
 
       <div className="mx-1.5 my-1 h-px bg-lib-border-soft" />
 
-      <div className={sectionTitle}>Volume</div>
+      <div className={sectionTitle}>{t('reader.chrome.readAloud.volume')}</div>
       <div className="flex items-center gap-3 px-3 pb-2">
         <input
           type="range"
@@ -158,7 +159,7 @@ function ReadAloudMenuPanel({
           max={100}
           step={5}
           value={Math.round(volume * 100)}
-          aria-label="Volume"
+          aria-label={t('reader.chrome.readAloud.volume')}
           className="flex-1 accent-lib-accent"
           onChange={(e) => onVolumeChange(Number(e.target.value) / 100)}
         />
@@ -167,8 +168,8 @@ function ReadAloudMenuPanel({
         </span>
       </div>
 
-      <div className={sectionTitle}>Speed</div>
-      <div className="mx-1.5 mb-1 flex gap-1 rounded-lg bg-lib-hint p-1" role="group" aria-label="Speed">
+      <div className={sectionTitle}>{t('reader.chrome.readAloud.speed')}</div>
+      <div className="mx-1.5 mb-1 flex gap-1 rounded-lg bg-lib-hint p-1" role="group" aria-label={t('reader.chrome.readAloud.speed')}>
         {READ_ALOUD_RATES.map((option) => {
           const active = option === rate
           return (

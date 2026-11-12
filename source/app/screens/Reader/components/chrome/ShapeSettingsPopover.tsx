@@ -1,11 +1,12 @@
-/* i18n-pending: reader.chrome */
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode, type RefObject } from 'react'
-import { PDF_SHAPE_KINDS, PDF_SHAPE_LABELS, PDF_SHAPE_MAX_STROKE, PDF_SHAPE_MIN_STROKE, type PdfShapeKind } from '@core'
+import { PDF_SHAPE_KINDS, PDF_SHAPE_MAX_STROKE, PDF_SHAPE_MIN_STROKE, type PdfShapeKind } from '@core'
 import { inkWidthToPoints } from '../../logic/pdfInk/pdfInkPrefsStore'
 import { usePdfShapePrefsStore } from '../../logic/pdfShapes/pdfShapePrefsStore'
 import { useDismissOnOutsideOrEscape } from '../../logic/highlights/useDismissOnOutsideOrEscape'
 import { CommitSlider, InkColorControl } from './InkStyleControls'
 import { isInkColorPickerOpen } from './inkColorPickerState'
+import { useT } from '../../../../i18n'
+import type { MessageKey } from '@core'
 
 const KIND_ICONS: Record<PdfShapeKind, ReactNode> = {
   rectangle: <rect x="4" y="6" width="16" height="12" rx="1" />,
@@ -35,7 +36,15 @@ const sectionLabel = 'text-[11px] font-semibold uppercase tracking-wide text-lib
  * A saved shape keeps what it was drawn with (change one through its toolbar or the Notes list). Portalled and
  * fixed-positioned like the Freehand settings; opening it does not arm the tool or draw.
  */
+const SHAPE_KIND_LABELS: Record<PdfShapeKind, MessageKey> = {
+  rectangle: 'reader.chrome.shape.kinds.rectangle',
+  ellipse: 'reader.chrome.shape.kinds.ellipse',
+  line: 'reader.chrome.shape.kinds.line',
+  arrow: 'reader.chrome.shape.kinds.arrow',
+}
+
 export function ShapeSettingsPopover({ anchorRef, onClose }: ShapeSettingsPopoverProps) {
+  const t = useT()
   const popRef = useRef<HTMLDivElement | null>(null)
   const [pos, setPos] = useState<{ left: number; top: number } | null>(null)
   const kind = usePdfShapePrefsStore((s) => s.kind)
@@ -75,7 +84,7 @@ export function ShapeSettingsPopover({ anchorRef, onClose }: ShapeSettingsPopove
     <div
       ref={popRef}
       role="dialog"
-      aria-label="Shape settings"
+      aria-label={t('reader.chrome.shape.settings')}
       data-pdf-shape-panel=""
       className="fixed z-[120] w-[270px] rounded-xl border border-lib-border bg-lib-surface-strong p-3 shadow-xl backdrop-blur-md"
       style={{ left: pos?.left ?? 0, top: pos?.top ?? 0, visibility: pos ? 'visible' : 'hidden' }}
@@ -85,8 +94,8 @@ export function ShapeSettingsPopover({ anchorRef, onClose }: ShapeSettingsPopove
     >
       <div className="flex flex-col gap-3">
         <div className="flex flex-col gap-1.5">
-          <span className={sectionLabel}>Shape</span>
-          <div className="grid grid-cols-4 gap-1" role="group" aria-label="Shape type">
+          <span className={sectionLabel}>{t('reader.chrome.shape.shape')}</span>
+          <div className="grid grid-cols-4 gap-1" role="group" aria-label={t('reader.chrome.shape.shapeType')}>
             {PDF_SHAPE_KINDS.map((k) => (
               <button
                 key={k}
@@ -97,7 +106,7 @@ export function ShapeSettingsPopover({ anchorRef, onClose }: ShapeSettingsPopove
                 className="flex cursor-pointer flex-col items-center gap-0.5 rounded-lg border border-transparent px-1 py-1.5 text-[11px] font-semibold text-lib-muted hover:border-lib-accent-ring hover:bg-lib-accent-soft hover:text-lib-text-strong aria-pressed:border-lib-accent aria-pressed:bg-lib-accent-soft aria-pressed:text-lib-accent"
               >
                 <ShapeKindIcon kind={k} />
-                {PDF_SHAPE_LABELS[k]}
+                {t(SHAPE_KIND_LABELS[k])}
               </button>
             ))}
           </div>
@@ -108,9 +117,9 @@ export function ShapeSettingsPopover({ anchorRef, onClose }: ShapeSettingsPopove
         <div className="flex flex-col gap-1.5">
           <div className="flex items-baseline justify-between">
             <label htmlFor="shape-thickness" className={sectionLabel}>
-              Thickness
+              {t('reader.chrome.ink.thickness')}
             </label>
-            <span className="text-[12px] font-semibold text-lib-text-strong">{inkWidthToPoints(widthLive ?? width).toFixed(1)} pt</span>
+            <span className="text-[12px] font-semibold text-lib-text-strong">{t('reader.chrome.ink.points', { value: inkWidthToPoints(widthLive ?? width).toFixed(1) })}</span>
           </div>
           <CommitSlider id="shape-thickness" min={PDF_SHAPE_MIN_STROKE} max={PDF_SHAPE_MAX_STROKE} step={0.0005} value={width} onCommit={setWidth} onDraft={setWidthLive} />
         </div>
@@ -118,7 +127,7 @@ export function ShapeSettingsPopover({ anchorRef, onClose }: ShapeSettingsPopove
         <div className="flex flex-col gap-1.5">
           <div className="flex items-baseline justify-between">
             <label htmlFor="shape-opacity" className={sectionLabel}>
-              Opacity
+              {t('reader.chrome.ink.opacity')}
             </label>
             <span className="text-[12px] font-semibold text-lib-text-strong">{Math.round((opacityLive ?? opacity) * 100)}%</span>
           </div>

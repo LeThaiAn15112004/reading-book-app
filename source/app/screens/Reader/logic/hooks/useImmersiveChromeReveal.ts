@@ -90,7 +90,7 @@ export function useImmersiveChromeReveal({
       if (
         target instanceof Element &&
         target.closest(
-          '[data-immersive-chrome], #reader-tools-chrome, [aria-label="Sidebar navigation"]',
+          '[data-immersive-chrome], #reader-tools-chrome, [data-reader-sidebar-nav]',
         )
       ) {
         keepVisible()

@@ -1,7 +1,7 @@
-/* i18n-pending: reader.chrome */
 import type { InkPenStyle } from '@core'
 import type { PdfInkMark } from '../../logic/pdfInk/pdfInkStore'
 import { InkStyleControls } from './InkStyleControls'
+import { useT } from '../../../../i18n'
 
 type PdfInkPanelProps = {
   /** The selected stroke as saved. */
@@ -17,10 +17,11 @@ type PdfInkPanelProps = {
  * change here, and changing them never reaches a saved stroke.
  */
 export function PdfInkPanel({ stroke, onChange, onDeleteSelected }: PdfInkPanelProps) {
+  const t = useT()
   return (
     <div
       role="dialog"
-      aria-label="Selected stroke"
+      aria-label={t('reader.chrome.ink.selectedStroke')}
       data-pdf-ink-panel="selected"
       data-ink-style={stroke.penStyle}
       className="fixed bottom-14 right-4 z-[120] flex w-[270px] flex-col gap-3 rounded-xl border border-lib-border bg-lib-surface-strong p-3 shadow-xl backdrop-blur-md"
@@ -28,13 +29,13 @@ export function PdfInkPanel({ stroke, onChange, onDeleteSelected }: PdfInkPanelP
       onKeyDown={(e) => e.stopPropagation()}
     >
       <div className="flex items-center justify-between">
-        <span className="text-[12px] font-semibold text-lib-text-strong">Selected stroke</span>
+        <span className="text-[12px] font-semibold text-lib-text-strong">{t('reader.chrome.ink.selectedStroke')}</span>
         <button
           type="button"
           onClick={onDeleteSelected}
           className="cursor-pointer rounded-md px-2 py-1 text-[13px] font-semibold text-lib-text-strong hover:bg-lib-accent-soft"
         >
-          Delete stroke
+          {t('reader.chrome.ink.deleteStroke')}
         </button>
       </div>
       <InkStyleControls

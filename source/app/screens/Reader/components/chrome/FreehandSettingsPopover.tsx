@@ -1,10 +1,10 @@
-/* i18n-pending: reader.chrome */
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type RefObject } from 'react'
-import { INK_PEN_PRESETS } from '@core'
 import { usePdfInkPrefsStore } from '../../logic/pdfInk/pdfInkPrefsStore'
 import { useDismissOnOutsideOrEscape } from '../../logic/highlights/useDismissOnOutsideOrEscape'
 import { InkStyleControls } from './InkStyleControls'
+import { INK_STYLE_LABELS } from './inkStyleLabels'
 import { isInkColorPickerOpen } from './inkColorPickerState'
+import { useT } from '../../../../i18n'
 
 type FreehandSettingsPopoverProps = {
   anchorRef: RefObject<HTMLElement | null>
@@ -17,6 +17,7 @@ type FreehandSettingsPopoverProps = {
  * panel). Portalled and fixed-positioned like `ToolGroupMenu`; opening it does not arm the tool or draw.
  */
 export function FreehandSettingsPopover({ anchorRef, onClose }: FreehandSettingsPopoverProps) {
+  const t = useT()
   const popRef = useRef<HTMLDivElement | null>(null)
   const [pos, setPos] = useState<{ left: number; top: number } | null>(null)
   const tool = usePdfInkPrefsStore((s) => s.tool)
@@ -52,7 +53,7 @@ export function FreehandSettingsPopover({ anchorRef, onClose }: FreehandSettings
     <div
       ref={popRef}
       role="dialog"
-      aria-label="Freehand settings"
+      aria-label={t('reader.chrome.strip.freehandSettings')}
       data-pdf-ink-panel=""
       data-ink-style={tool}
       className="fixed z-[120] w-[270px] rounded-xl border border-lib-border bg-lib-surface-strong p-3 shadow-xl backdrop-blur-md"
@@ -73,7 +74,7 @@ export function FreehandSettingsPopover({ anchorRef, onClose }: FreehandSettings
         onWidth={(w) => setStyleWidth(tool, w)}
         onOpacity={(o) => setStyleOpacity(tool, o)}
       />
-      <span className="sr-only">{INK_PEN_PRESETS[tool].label} selected</span>
+      <span className="sr-only">{t('reader.chrome.ink.styleSelected', { style: t(INK_STYLE_LABELS[tool]) })}</span>
     </div>
   )
 }

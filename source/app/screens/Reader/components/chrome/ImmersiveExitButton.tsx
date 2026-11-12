@@ -1,4 +1,4 @@
-/* i18n-pending: reader.chrome */
+import { useT } from '../../../../i18n'
 type ImmersiveExitButtonProps = {
   onExit: () => void
 }
@@ -8,13 +8,14 @@ type ImmersiveExitButtonProps = {
  * Esc / F11 also exit; this is a discoverable affordance only.
  */
 export function ImmersiveExitButton({ onExit }: ImmersiveExitButtonProps) {
+  const t = useT()
   return (
     <button
       type="button"
       data-immersive-chrome=""
       className="fixed top-1/2 right-0 z-[220] flex h-16 w-7 -translate-y-1/2 cursor-pointer items-center justify-center rounded-l-md border border-r-0 border-lib-border-soft bg-lib-surface-strong/85 text-lib-muted shadow-md backdrop-blur-md transition-colors hover:w-8 hover:border-lib-accent-ring hover:bg-lib-accent-soft hover:text-lib-accent"
-      title="Exit full screen (Esc)"
-      aria-label="Exit full screen"
+      title={t('reader.chrome.topbar.exitFullScreenEsc')}
+      aria-label={t('reader.chrome.topbar.exitFullScreen')}
       onClick={(e) => {
         e.stopPropagation()
         onExit()

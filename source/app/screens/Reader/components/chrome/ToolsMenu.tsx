@@ -1,4 +1,3 @@
-/* i18n-pending: reader.chrome */
 import { useCallback, useRef, useState, type ReactNode, type Ref } from 'react'
 import { createPortal } from 'react-dom'
 import { FreehandSettingsPopover } from './FreehandSettingsPopover'
@@ -19,6 +18,8 @@ import type {
   ToolId,
 } from './toolRegistry'
 import { useToolbarOverflow } from './useToolbarOverflow'
+import type { MessageKey } from '@core'
+import { useT } from '../../../../i18n'
 
 export type { AnnotationTool, CompanionTool, EraserMode, ModeTool, ToolId }
 
@@ -299,6 +300,7 @@ function ShapeToolIcon() {
 
 /** Dropdown arrow beside Freehand / Shapes: opens its settings; never arms the tool. */
 function FreehandSettingsButton({ hidden, shapes = false }: { hidden: boolean; shapes?: boolean }) {
+  const t = useT()
   const [open, setOpen] = useState(false)
   const btnRef = useRef<HTMLButtonElement | null>(null)
   const close = useCallback((refocus: boolean) => {
@@ -312,8 +314,8 @@ function FreehandSettingsButton({ hidden, shapes = false }: { hidden: boolean; s
         ref={btnRef}
         type="button"
         className="-ml-0.5 inline-flex h-[52px] w-5 shrink-0 cursor-pointer items-center justify-center rounded-lg border border-transparent text-lib-muted transition-colors hover:border-lib-accent-ring hover:bg-lib-accent-soft hover:text-lib-text-strong sm:h-[56px]"
-        title={shapes ? 'Shape settings' : 'Freehand settings'}
-        aria-label={shapes ? 'Shape settings' : 'Freehand settings'}
+        title={shapes ? t('reader.chrome.strip.shapeSettings') : t('reader.chrome.strip.freehandSettings')}
+        aria-label={shapes ? t('reader.chrome.strip.shapeSettings') : t('reader.chrome.strip.freehandSettings')}
         aria-haspopup="dialog"
         aria-expanded={showPopover}
         onClick={() => setOpen((v) => !v)}
@@ -327,9 +329,9 @@ function FreehandSettingsButton({ hidden, shapes = false }: { hidden: boolean; s
   )
 }
 
-const ERASER_MODES: readonly { id: EraserMode; label: string; hint: string }[] = [
-  { id: 'stroke', label: 'Stroke Eraser', hint: 'Removes the whole stroke it touches' },
-  { id: 'partial', label: 'Partial Eraser', hint: 'Removes only the part it passes over' },
+const ERASER_MODES: readonly { id: EraserMode; label: MessageKey; hint: MessageKey }[] = [
+  { id: 'stroke', label: 'reader.chrome.strip.strokeEraser', hint: 'reader.chrome.strip.strokeEraserHint' },
+  { id: 'partial', label: 'reader.chrome.strip.partialEraser', hint: 'reader.chrome.strip.partialEraserHint' },
 ]
 
 function EraserModeIcon({ mode }: { mode: EraserMode }) {
@@ -349,6 +351,7 @@ function EraserModeIcon({ mode }: { mode: EraserMode }) {
 
 /** Dropdown arrow beside Eraser: picks the mode (Stroke / Partial); never arms or disarms the tool. */
 function EraserModeButton({ hidden, mode, onMode }: { hidden: boolean; mode: EraserMode; onMode: (mode: EraserMode) => void }) {
+  const t = useT()
   const [open, setOpen] = useState(false)
   const btnRef = useRef<HTMLButtonElement | null>(null)
   const close = useCallback((refocus: boolean) => {
@@ -363,8 +366,8 @@ function EraserModeButton({ hidden, mode, onMode }: { hidden: boolean; mode: Era
         ref={btnRef}
         type="button"
         className="-ml-0.5 inline-flex h-[52px] w-5 shrink-0 cursor-pointer items-center justify-center rounded-lg border border-transparent text-lib-muted transition-colors hover:border-lib-accent-ring hover:bg-lib-accent-soft hover:text-lib-text-strong sm:h-[56px]"
-        title={`Eraser mode: ${current.label}`}
-        aria-label={`Eraser mode: ${current.label}`}
+        title={t('reader.chrome.strip.eraserMode', { mode: t(current.label) })}
+        aria-label={t('reader.chrome.strip.eraserMode', { mode: t(current.label) })}
         aria-haspopup="menu"
         aria-expanded={showMenu}
         data-eraser-mode={mode}
@@ -381,7 +384,7 @@ function EraserModeButton({ hidden, mode, onMode }: { hidden: boolean; mode: Era
               onClose={close}
               items={ERASER_MODES.map((m) => ({
                 id: m.id,
-                label: m.label,
+                label: t(m.label),
                 icon: <EraserModeIcon mode={m.id} />,
                 active: m.id === mode,
                 onSelect: () => onMode(m.id),
@@ -396,13 +399,14 @@ function EraserModeButton({ hidden, mode, onMode }: { hidden: boolean; mode: Era
 
 /** Tooltip: description (or label) plus the tool's current shortcut, e.g. `Search in book (Ctrl+F)`. */
 function useToolTitle(): (tool: ToolDef) => string {
+  const t = useT()
   const overrides = useShortcutsStore((s) => s.overrides)
   const keys = effectiveShortcutKeys(overrides)
   return (tool) => {
-    const text = tool.description ?? tool.label
+    const text = t(tool.descriptionKey ?? tool.labelKey)
     if (!tool.shortcutId) return text
     const shortcut = keys[tool.shortcutId].map((key) => formatShortcutKey(key)).join('+')
-    return shortcut ? `${text} (${shortcut})` : text
+    return shortcut ? t('reader.chrome.strip.withShortcut', { text, shortcut }) : text
   }
 }
 
@@ -412,6 +416,7 @@ function useToolTitle(): (tool: ToolDef) => string {
  * See docs/implementation_plan/reader_toolbar.md.
  */
 export function ToolsStrip({ capabilities, toolStates, onTool, onToolContextMenu, toolRefs, hidden = false, eraserMode = 'stroke', onEraserMode }: ToolsStripProps) {
+  const t = useT()
   const stripRef = useRef<HTMLDivElement | null>(null)
   const foldLevel = useToolbarOverflow(stripRef, foldableGroups(capabilities).length)
   const layout = resolveToolbarLayout(capabilities, foldLevel)
@@ -430,7 +435,7 @@ export function ToolsStrip({ capabilities, toolStates, onTool, onToolContextMenu
           type="button"
           disabled={disabled}
           title={disabled && state?.reason ? state.reason : toolTitle(tool)}
-          aria-label={tool.label}
+          aria-label={t(tool.labelKey)}
           aria-pressed={active}
           onClick={() => onTool(tool.id)}
           onContextMenu={tool.id === 'typewriter' && onToolContextMenu ? (e) => { e.preventDefault(); onToolContextMenu(tool.id) } : undefined}
@@ -447,7 +452,7 @@ export function ToolsStrip({ capabilities, toolStates, onTool, onToolContextMenu
         type="button"
         disabled={disabled}
         title={disabled && state?.reason ? state.reason : toolTitle(tool)}
-        aria-label={tool.label}
+        aria-label={t(tool.labelKey)}
         aria-pressed={tool.popup ? undefined : active}
         aria-haspopup={tool.popup}
         aria-expanded={tool.popup ? (state?.expanded ?? false) : undefined}
@@ -455,7 +460,7 @@ export function ToolsStrip({ capabilities, toolStates, onTool, onToolContextMenu
         onContextMenu={tool.id === 'typewriter' && onToolContextMenu ? (e) => { e.preventDefault(); onToolContextMenu(tool.id) } : undefined}
       >
         <ToolIcon tool={tool.id} />
-        <span className={stripLabel}>{tool.label}</span>
+        <span className={stripLabel}>{t(tool.labelKey)}</span>
       </button>
     )
   }
@@ -464,16 +469,16 @@ export function ToolsStrip({ capabilities, toolStates, onTool, onToolContextMenu
     const armed = tools.find((tool) => toolStates[tool.id]?.active)
     return (
       <ToolGroupMenu
-        label={armed ? armed.label : group.label}
+        label={armed ? t(armed.labelKey) : t(group.labelKey)}
         icon={<ToolIcon tool={armed ? armed.id : group.icon} />}
-        title={armed ? `${group.label}: ${armed.label}` : group.label}
+        title={armed ? t('reader.chrome.strip.groupTitle', { group: t(group.labelKey), tool: t(armed.labelKey) }) : t(group.labelKey)}
         active={armed !== undefined}
         hidden={hidden}
         buttonClassName={menuTriggerClass(armed !== undefined)}
         labelClassName={stripLabel}
         items={tools.map((tool) => ({
           id: tool.id,
-          label: tool.label,
+          label: t(tool.labelKey),
           icon: <ToolIcon tool={tool.id} />,
           active: toolStates[tool.id]?.disabled ? false : toolStates[tool.id]?.active,
           shortcutId: tool.shortcutId,
@@ -490,13 +495,13 @@ export function ToolsStrip({ capabilities, toolStates, onTool, onToolContextMenu
       ref={stripRef}
       className="relative flex min-w-0 flex-1 items-center gap-1 overflow-x-auto overscroll-x-contain sm:gap-1.5"
       role="toolbar"
-      aria-label="Reading tools"
+      aria-label={t('reader.chrome.strip.aria')}
       onClick={(e) => e.stopPropagation()}
     >
       {layout.map((resolved, index) => (
         <div key={resolved.group.id} className="contents">
           {index > 0 ? <ToolSeparator /> : null}
-          <ToolGroup aria-label={resolved.group.label} twoRows={resolved.mode === 'inline' && resolved.group.iconOnly}>
+          <ToolGroup aria-label={t(resolved.group.labelKey)} twoRows={resolved.mode === 'inline' && resolved.group.iconOnly}>
             {resolved.mode === 'menu'
               ? renderMenu(resolved)
               : resolved.tools.map((tool) =>
