@@ -1,4 +1,4 @@
-/* i18n-pending: settings */
+import { useT } from '../../../../i18n'
 import { useEffect, useId, useRef, useState, type KeyboardEvent, type PointerEvent } from 'react'
 import {
   hexToHsv,
@@ -49,6 +49,7 @@ export type AccentColorPickerProps = {
  * Nothing is applied until Apply; Esc / Cancel / clicking outside discards the draft.
  */
 export function AccentColorPicker({ value, onApply, onCancel }: AccentColorPickerProps) {
+  const t = useT()
   const [hsv, setHsv] = useState<Hsv>(() => hexToHsv(value))
   const [hexText, setHexText] = useState(value)
   const panelRef = useRef<HTMLDivElement>(null)
@@ -134,14 +135,17 @@ export function AccentColorPicker({ value, onApply, onCancel }: AccentColorPicke
     <div
       ref={panelRef}
       role="dialog"
-      aria-label="Custom accent color"
+      aria-label={t('settings.appearance.picker.aria')}
       className="absolute top-full right-0 z-20 mt-2 w-64 rounded-xl border border-lib-border bg-lib-surface-strong p-3 shadow-xl"
     >
       <div
         role="slider"
         tabIndex={0}
-        aria-label="Saturation and brightness"
-        aria-valuetext={`Saturation ${Math.round(hsv.s * 100)}%, brightness ${Math.round(hsv.v * 100)}%`}
+        aria-label={t('settings.appearance.picker.saturationBrightness')}
+        aria-valuetext={t('settings.appearance.picker.valueText', {
+          saturation: Math.round(hsv.s * 100),
+          brightness: Math.round(hsv.v * 100),
+        })}
         aria-valuenow={Math.round(hsv.s * 100)}
         className={`relative h-36 w-full cursor-crosshair touch-none rounded-lg ${focusRing}`}
         style={{
@@ -160,7 +164,7 @@ export function AccentColorPicker({ value, onApply, onCancel }: AccentColorPicke
       <div
         role="slider"
         tabIndex={0}
-        aria-label="Hue"
+        aria-label={t('settings.appearance.picker.hue')}
         aria-valuemin={0}
         aria-valuemax={360}
         aria-valuenow={Math.round(hsv.h)}
@@ -186,7 +190,7 @@ export function AccentColorPicker({ value, onApply, onCancel }: AccentColorPicke
           aria-hidden
         />
         <label htmlFor={hexId} className="sr-only">
-          Hex color
+          {t('settings.appearance.picker.hex')}
         </label>
         <input
           id={hexId}
@@ -212,7 +216,7 @@ export function AccentColorPicker({ value, onApply, onCancel }: AccentColorPicke
       </div>
       {parsedHex ? null : (
         <p id={errorId} className="m-0 mt-1.5 text-[11px] text-red-400">
-          Enter a hex color like #3B82F6 or #38F.
+          {t('settings.appearance.picker.hexError')}
         </p>
       )}
 
@@ -222,7 +226,7 @@ export function AccentColorPicker({ value, onApply, onCancel }: AccentColorPicke
           className={`h-8 cursor-pointer rounded-lg border border-lib-border bg-transparent px-3 text-[12px] font-semibold text-lib-muted hover:text-lib-text-strong ${focusRing}`}
           onClick={onCancel}
         >
-          Cancel
+          {t('common.actions.cancel')}
         </button>
         <button
           type="button"
@@ -231,7 +235,7 @@ export function AccentColorPicker({ value, onApply, onCancel }: AccentColorPicke
           style={{ background: color, color: onAccentColor(color) }}
           onClick={apply}
         >
-          Apply
+          {t('settings.appearance.picker.apply')}
         </button>
       </div>
     </div>

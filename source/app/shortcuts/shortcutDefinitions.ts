@@ -7,6 +7,8 @@
  * the handler a screen registers with `useShortcutAction` (see `shortcutActions.ts`).
  */
 
+import type { MessageKey } from '@core'
+
 export type ShortcutGroupId = 'general' | 'navigation' | 'search' | 'view'
 
 /**
@@ -46,7 +48,8 @@ export type ShortcutKeys = readonly string[]
 export type ShortcutDefinition = {
   id: ShortcutId
   group: ShortcutGroupId
-  label: string
+  /** Catalogue key of the action's name (spec 012), translated in Settings. */
+  labelKey: MessageKey
   contexts: readonly ShortcutContext[]
   defaultKeys: ShortcutKeys
   /**
@@ -69,39 +72,39 @@ export type ShortcutDefinition = {
   ignoreInTextFields?: boolean
 }
 
-export const SHORTCUT_GROUPS: readonly { id: ShortcutGroupId; label: string }[] = [
-  { id: 'general', label: 'General' },
-  { id: 'navigation', label: 'Navigation' },
-  { id: 'search', label: 'Search' },
-  { id: 'view', label: 'View' },
+export const SHORTCUT_GROUPS: readonly { id: ShortcutGroupId; labelKey: MessageKey }[] = [
+  { id: 'general', labelKey: 'settings.keyboard.groups.general' },
+  { id: 'navigation', labelKey: 'settings.keyboard.groups.navigation' },
+  { id: 'search', labelKey: 'settings.keyboard.groups.search' },
+  { id: 'view', labelKey: 'settings.keyboard.groups.view' },
 ]
 
 export const SHORTCUTS: readonly ShortcutDefinition[] = [
   {
     id: 'general.openBook',
     group: 'general',
-    label: 'Open Book',
+    labelKey: 'settings.keyboard.items.openBook',
     contexts: ['library', 'reader', 'settings'],
     defaultKeys: ['Mod', 'O'],
   },
   {
     id: 'general.openSettings',
     group: 'general',
-    label: 'Open Settings',
+    labelKey: 'settings.keyboard.items.openSettings',
     contexts: ['library', 'reader'],
     defaultKeys: ['Mod', ','],
   },
   {
     id: 'general.backToLibrary',
     group: 'general',
-    label: 'Back to Library',
+    labelKey: 'settings.keyboard.items.backToLibrary',
     contexts: ['reader', 'settings'],
     defaultKeys: ['Alt', 'ArrowLeft'],
   },
   {
     id: 'navigation.nextPage',
     group: 'navigation',
-    label: 'Next Page',
+    labelKey: 'settings.keyboard.items.nextPage',
     contexts: ['reader'],
     defaultKeys: ['ArrowRight'],
     aliases: [['PageDown']],
@@ -111,7 +114,7 @@ export const SHORTCUTS: readonly ShortcutDefinition[] = [
   {
     id: 'navigation.previousPage',
     group: 'navigation',
-    label: 'Previous Page',
+    labelKey: 'settings.keyboard.items.previousPage',
     contexts: ['reader'],
     defaultKeys: ['ArrowLeft'],
     aliases: [['PageUp']],
@@ -121,7 +124,7 @@ export const SHORTCUTS: readonly ShortcutDefinition[] = [
   {
     id: 'navigation.firstPage',
     group: 'navigation',
-    label: 'Start of Book',
+    labelKey: 'settings.keyboard.items.firstPage',
     contexts: ['reader'],
     defaultKeys: ['Home'],
     allowBare: true,
@@ -129,7 +132,7 @@ export const SHORTCUTS: readonly ShortcutDefinition[] = [
   {
     id: 'navigation.lastPage',
     group: 'navigation',
-    label: 'End of Book',
+    labelKey: 'settings.keyboard.items.lastPage',
     contexts: ['reader'],
     defaultKeys: ['End'],
     allowBare: true,
@@ -137,21 +140,21 @@ export const SHORTCUTS: readonly ShortcutDefinition[] = [
   {
     id: 'navigation.goToPage',
     group: 'navigation',
-    label: 'Go to Page',
+    labelKey: 'settings.keyboard.items.goToPage',
     contexts: ['reader'],
     defaultKeys: ['Mod', 'G'],
   },
   {
     id: 'navigation.addBookmark',
     group: 'navigation',
-    label: 'Add Bookmark',
+    labelKey: 'settings.keyboard.items.addBookmark',
     contexts: ['reader'],
     defaultKeys: ['Mod', 'D'],
   },
   {
     id: 'navigation.toggleToc',
     group: 'navigation',
-    label: 'Table of Contents',
+    labelKey: 'settings.keyboard.items.toggleToc',
     contexts: ['reader'],
     defaultKeys: ['T'],
     allowBare: true,
@@ -159,21 +162,21 @@ export const SHORTCUTS: readonly ShortcutDefinition[] = [
   {
     id: 'general.searchLibrary',
     group: 'search',
-    label: 'Search Library',
+    labelKey: 'settings.keyboard.items.searchLibrary',
     contexts: ['library'],
     defaultKeys: ['Mod', 'F'],
   },
   {
     id: 'general.searchBook',
     group: 'search',
-    label: 'Search in Book',
+    labelKey: 'settings.keyboard.items.searchBook',
     contexts: ['reader'],
     defaultKeys: ['Mod', 'F'],
   },
   {
     id: 'search.nextResult',
     group: 'search',
-    label: 'Next Result',
+    labelKey: 'settings.keyboard.items.nextResult',
     contexts: ['reader'],
     defaultKeys: ['Enter'],
     locked: true,
@@ -181,7 +184,7 @@ export const SHORTCUTS: readonly ShortcutDefinition[] = [
   {
     id: 'search.previousResult',
     group: 'search',
-    label: 'Previous Result',
+    labelKey: 'settings.keyboard.items.previousResult',
     contexts: ['reader'],
     defaultKeys: ['Shift', 'Enter'],
     locked: true,
@@ -189,7 +192,7 @@ export const SHORTCUTS: readonly ShortcutDefinition[] = [
   {
     id: 'search.close',
     group: 'search',
-    label: 'Close Search / Cancel',
+    labelKey: 'settings.keyboard.items.closeSearch',
     contexts: ['reader'],
     defaultKeys: ['Escape'],
     locked: true,
@@ -198,7 +201,7 @@ export const SHORTCUTS: readonly ShortcutDefinition[] = [
   {
     id: 'view.zoomIn',
     group: 'view',
-    label: 'Zoom In',
+    labelKey: 'settings.keyboard.items.zoomIn',
     contexts: ['reader'],
     defaultKeys: ['Mod', '='],
     // Ctrl/⌘ + "+" (Shift held on layouts where + shares the = key) has always zoomed in too.
@@ -208,7 +211,7 @@ export const SHORTCUTS: readonly ShortcutDefinition[] = [
   {
     id: 'view.zoomOut',
     group: 'view',
-    label: 'Zoom Out',
+    labelKey: 'settings.keyboard.items.zoomOut',
     contexts: ['reader'],
     defaultKeys: ['Mod', '-'],
     aliases: [['Mod', 'Shift', '-']],
@@ -217,7 +220,7 @@ export const SHORTCUTS: readonly ShortcutDefinition[] = [
   {
     id: 'view.resetZoom',
     group: 'view',
-    label: 'Reset Zoom',
+    labelKey: 'settings.keyboard.items.resetZoom',
     contexts: ['reader'],
     defaultKeys: ['Mod', '0'],
     ignoreInTextFields: true,
@@ -225,7 +228,7 @@ export const SHORTCUTS: readonly ShortcutDefinition[] = [
   {
     id: 'view.toggleFullscreen',
     group: 'view',
-    label: 'Toggle Fullscreen',
+    labelKey: 'settings.keyboard.items.toggleFullscreen',
     // Window-level, so it works on every screen (it used to be handled by the Main process).
     contexts: ['library', 'reader', 'settings'],
     defaultKeys: ['F11'],

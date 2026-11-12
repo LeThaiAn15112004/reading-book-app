@@ -1,27 +1,28 @@
-/* i18n-pending: settings */
+import type { MessageKey } from '@core'
+import { useT } from '../../../../i18n'
 import { useEffect, type ReactNode } from 'react'
 import { canChangeStartAtLogin, useBackgroundStore } from '../../logic/backgroundStore'
 import { SettingsCard } from '../layout/SettingsCard'
 import { SettingsSwitch } from '../layout/SettingsSwitch'
 
 const isMac = typeof navigator !== 'undefined' && /Mac/i.test(navigator.platform)
-const TRAY_NAME = isMac ? 'menu bar' : 'system tray'
-
-const CARD_TITLE = 'Background / System Tray'
+const TRAY_NAME_KEY: MessageKey = isMac
+  ? 'settings.notifications.background.trayNameMac'
+  : 'settings.notifications.background.trayNameWin'
 
 /**
  * Spec 010: why the Store build's Start at Login switch can't be changed here, or null when it can. The startup task
  * is Windows' to decide in these states; the app never overrides it (FR-007).
  */
-function startAtLoginLockedReason(state: string | undefined): string | null {
+function startAtLoginLockedReason(state: string | undefined): MessageKey | null {
   switch (state) {
     case 'disabledByUser':
-      return 'Turned off in Windows Settings → Startup. Turn it back on there.'
+      return 'settings.notifications.background.lockedByUser'
     case 'disabledByPolicy':
     case 'enabledByPolicy':
-      return 'Set by your organisation.'
+      return 'settings.notifications.background.lockedByPolicy'
     case 'managedByWindows':
-      return 'Managed by Windows. Change it in Windows Settings → Startup.'
+      return 'settings.notifications.background.lockedByWindows'
     default:
       return null
   }
@@ -62,6 +63,9 @@ function Row({
  * change is saved by Main before it shows here.
  */
 export function BackgroundTrayCard() {
+  const t = useT()
+  const tray = t(TRAY_NAME_KEY)
+  const CARD_TITLE = t('settings.notifications.background.title')
   const prefs = useBackgroundStore((s) => s.prefs)
   const loadFailed = useBackgroundStore((s) => s.loadFailed)
   const saving = useBackgroundStore((s) => s.saving)
@@ -99,17 +103,17 @@ export function BackgroundTrayCard() {
         <p role={loadFailed ? 'alert' : 'status'} className="m-0 text-[13px] text-lib-muted">
           {loadFailed ? (
             <>
-              Couldn’t load these settings.{' '}
+              {t('settings.loadFailed')}{' '}
               <button
                 type="button"
                 className="cursor-pointer border-none bg-transparent p-0 font-semibold text-lib-accent underline"
                 onClick={() => void load()}
               >
-                Try again
+                {t('settings.tryAgain')}
               </button>
             </>
           ) : (
-            'Loading…'
+            t('settings.loading')
           )}
         </p>
       </SettingsCard>
@@ -124,18 +128,18 @@ export function BackgroundTrayCard() {
             role="alert"
             className="m-0 rounded-lg border border-red-400/40 bg-red-500/10 px-3 py-2 text-[13px] text-red-400"
           >
-            Couldn’t save this change. The previous setting is still in use.
+            {t('settings.saveFailed')}
           </p>
         ) : null}
 
         <Row
           labelId="background-run-label"
           descId="background-run-desc"
-          label="Run in Background"
+          label={t('settings.notifications.background.run')}
           description={
             prefs.showTray
-              ? `Closing the window hides it instead of quitting, so Readmate keeps running. Reopen it from the ${TRAY_NAME} icon.`
-              : `Needs the ${TRAY_NAME} icon below — it’s how you reopen or quit Readmate while it runs in the background.`
+              ? t('settings.notifications.background.runOn', { tray })
+              : t('settings.notifications.background.runOff', { tray })
           }
           control={
             <SettingsSwitch
@@ -151,10 +155,12 @@ export function BackgroundTrayCard() {
         <Row
           labelId="background-tray-label"
           descId="background-tray-desc"
-          label="System Tray"
-          description={`Show a Readmate icon in the ${TRAY_NAME}. ${
-            isMac ? 'Click' : 'Click to open Readmate; right-click'
-          } for Open Readmate and Quit Readmate.`}
+          label={t('settings.notifications.background.tray')}
+          description={
+            isMac
+              ? t('settings.notifications.background.trayDescriptionMac', { tray })
+              : t('settings.notifications.background.trayDescription', { tray })
+          }
           control={
             <SettingsSwitch
               checked={prefs.showTray}
@@ -169,17 +175,17 @@ export function BackgroundTrayCard() {
         <Row
           labelId="background-login-label"
           descId="background-login-desc"
-          label="Start at Login"
+          label={t('settings.notifications.background.login')}
           description={
             !startAtLogin?.supported
-              ? 'Not available on this system.'
+              ? t('settings.notifications.background.loginUnavailable')
               : loginLockedReason
-                ? loginLockedReason
+                ? t(loginLockedReason)
                 : startAtLoginFailed
-                ? 'Your system didn’t accept this change. Check your startup apps settings.'
-                : prefs.showTray
-                  ? `Tự động chạy ứng dụng ngầm khi bật máy tính để các tính năng nhắc nhở hoạt động chính xác. Starts hidden in the ${TRAY_NAME}.`
-                  : `Tự động chạy ứng dụng ngầm khi bật máy tính để các tính năng nhắc nhở hoạt động chính xác. Without the ${TRAY_NAME} icon the window opens at login instead of staying hidden.`
+                  ? t('settings.notifications.background.loginFailed')
+                  : prefs.showTray
+                    ? t('settings.notifications.background.loginOnTray', { tray })
+                    : t('settings.notifications.background.loginNoTray', { tray })
           }
           control={
             <div className="flex shrink-0 flex-col items-end gap-2">
@@ -196,7 +202,7 @@ export function BackgroundTrayCard() {
                   className="cursor-pointer border-none bg-transparent p-0 text-[12px] font-semibold text-lib-accent underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-lib-accent"
                   onClick={() => void openStartupSettings()}
                 >
-                  Open Startup settings
+                  {t('settings.notifications.background.openStartup')}
                 </button>
               ) : null}
             </div>
@@ -206,8 +212,8 @@ export function BackgroundTrayCard() {
         <Row
           labelId="background-quit-label"
           descId="background-quit-desc"
-          label="Quit from Tray"
-          description={`Quit Readmate in the ${TRAY_NAME} menu closes the app completely, even while it runs in the background. Your reading position is saved first. You can also quit right here.`}
+          label={t('settings.notifications.background.quit')}
+          description={t('settings.notifications.background.quitDescription', { tray })}
           control={
             <button
               type="button"
@@ -217,7 +223,7 @@ export function BackgroundTrayCard() {
               aria-busy={quitting}
               onClick={() => void quit()}
             >
-              {quitting ? 'Quitting…' : 'Quit Readmate'}
+              {quitting ? t('settings.notifications.background.quitting') : t('settings.notifications.background.quitButton')}
             </button>
           }
         />

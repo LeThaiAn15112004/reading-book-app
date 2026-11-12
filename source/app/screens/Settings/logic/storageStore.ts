@@ -1,12 +1,13 @@
 import { create } from 'zustand'
 import { storageApi, type StorageUsage } from '../../../bridge'
+import type { UiText } from '../../../i18n'
 
-type StorageNotice = { tone: 'success' | 'error'; text: string }
+type StorageNotice = { tone: 'success' | 'error'; text: UiText }
 
 type StorageState = {
   usage: StorageUsage | null
   loading: boolean
-  loadError: string | null
+  loadError: UiText | null
   clearing: boolean
   /** Model id whose Remove is in flight. */
   removingModelId: string | null
@@ -35,7 +36,7 @@ export const useStorageStore = create<StorageState>()((set, get) => ({
     try {
       set({ usage: await storageApi.getUsage(), loading: false })
     } catch {
-      set({ loading: false, loadError: 'Could not read storage usage.' })
+      set({ loading: false, loadError: { key: 'settings.storage.notices.loadFailed' } })
     }
   },
 
@@ -47,11 +48,11 @@ export const useStorageStore = create<StorageState>()((set, get) => ({
       set({
         clearing: false,
         notice: result.ok
-          ? { tone: 'success', text: 'Cache cleared.' }
-          : { tone: 'error', text: result.errorMessage ?? 'Could not clear the cache.' },
+          ? { tone: 'success', text: { key: 'settings.storage.notices.cacheCleared' } }
+          : { tone: 'error', text: result.errorMessage ?? { key: 'settings.storage.notices.cacheClearFailed' } },
       })
     } catch {
-      set({ clearing: false, notice: { tone: 'error', text: 'Could not clear the cache.' } })
+      set({ clearing: false, notice: { tone: 'error', text: { key: 'settings.storage.notices.cacheClearFailed' } } })
     }
     await get().load()
   },
@@ -64,11 +65,11 @@ export const useStorageStore = create<StorageState>()((set, get) => ({
       set({
         removingModelId: null,
         notice: result.ok
-          ? { tone: 'success', text: `Removed ${modelId}.` }
-          : { tone: 'error', text: result.errorMessage ?? 'Could not remove the model.' },
+          ? { tone: 'success', text: { key: 'settings.storage.notices.removed', params: { id: modelId } } }
+          : { tone: 'error', text: result.errorMessage ?? { key: 'settings.storage.notices.removeFailed' } },
       })
     } catch {
-      set({ removingModelId: null, notice: { tone: 'error', text: 'Could not remove the model.' } })
+      set({ removingModelId: null, notice: { tone: 'error', text: { key: 'settings.storage.notices.removeFailed' } } })
     }
     await get().load()
   },
@@ -81,11 +82,11 @@ export const useStorageStore = create<StorageState>()((set, get) => ({
       set({
         removingModelId: null,
         notice: result.ok
-          ? { tone: 'success', text: `Removed ${modelId}.` }
-          : { tone: 'error', text: result.errorMessage ?? 'Could not remove the model.' },
+          ? { tone: 'success', text: { key: 'settings.storage.notices.removed', params: { id: modelId } } }
+          : { tone: 'error', text: result.errorMessage ?? { key: 'settings.storage.notices.removeFailed' } },
       })
     } catch {
-      set({ removingModelId: null, notice: { tone: 'error', text: 'Could not remove the model.' } })
+      set({ removingModelId: null, notice: { tone: 'error', text: { key: 'settings.storage.notices.removeFailed' } } })
     }
     await get().load()
   },
@@ -93,9 +94,9 @@ export const useStorageStore = create<StorageState>()((set, get) => ({
   openBooksFolder: async () => {
     try {
       const result = await storageApi.openBooksFolder()
-      if (!result.ok) set({ notice: { tone: 'error', text: 'Could not open the folder.' } })
+      if (!result.ok) set({ notice: { tone: 'error', text: { key: 'settings.storage.notices.openFolderFailed' } } })
     } catch {
-      set({ notice: { tone: 'error', text: 'Could not open the folder.' } })
+      set({ notice: { tone: 'error', text: { key: 'settings.storage.notices.openFolderFailed' } } })
     }
   },
 }))

@@ -358,7 +358,7 @@ const matchingIds = (event, context, overrides = {}) => {
 }
 
 await check('View group lists the four actions with their default shortcuts', () => {
-  assert.ok(defs.SHORTCUT_GROUPS.some((g) => g.id === 'view' && g.label === 'View'))
+  assert.ok(defs.SHORTCUT_GROUPS.some((g) => g.id === 'view' && g.labelKey === 'settings.keyboard.groups.view'))
   const view = defs.SHORTCUTS.filter((s) => s.group === 'view')
   assert.deepEqual(view.map((s) => s.id), VIEW)
   const d = effectiveShortcutKeys({})

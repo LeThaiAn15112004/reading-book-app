@@ -1,3 +1,4 @@
+import type { MessageRef } from '@core'
 import { create } from 'zustand'
 import { SHORTCUTS, getShortcut, type ShortcutId, type ShortcutKeys } from './shortcutDefinitions'
 import { findShortcutConflict, type ShortcutKeyMap } from './shortcutConflicts'
@@ -53,7 +54,7 @@ function saveOverrides(overrides: ShortcutOverrides): boolean {
 
 export type AssignResult =
   | { ok: true }
-  | { ok: false; reason: 'invalid'; message: string }
+  | { ok: false; reason: 'invalid'; message: MessageRef }
   | { ok: false; reason: 'conflict'; conflictWith: ShortcutId }
 
 type ShortcutsState = {
@@ -79,7 +80,7 @@ export const useShortcutsStore = create<ShortcutsState>()((set, get) => ({
   tryAssign: (id, keys) => {
     const definition = getShortcut(id)
     if (definition.locked) {
-      return { ok: false, reason: 'invalid', message: 'This shortcut is fixed and can’t be changed.' }
+      return { ok: false, reason: 'invalid', message: { key: 'settings.keyboard.errors.fixed' } }
     }
     const normalized = normalizeShortcutKeys(keys)
     const message = validateShortcutKeys(normalized, undefined, { allowBare: definition.allowBare })

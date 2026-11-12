@@ -1,4 +1,5 @@
-/* i18n-pending: settings */
+import type { MessageRef } from '@core'
+import { getT, translateRef, useT } from '../../../../i18n'
 import { useEffect, useState } from 'react'
 import {
   SHORTCUTS,
@@ -14,7 +15,7 @@ import {
 import { SettingsCard } from '../layout/SettingsCard'
 
 /** Rejected attempt shown while the row keeps listening: the keys pressed and why they were refused. */
-type Attempt = { keys: ShortcutKeys; message: string }
+type Attempt = { keys: ShortcutKeys; message: MessageRef }
 
 function KeyCaps({ keys }: { keys: ShortcutKeys }) {
   return (
@@ -42,6 +43,8 @@ const CHIP_STATIC =
   'inline-flex h-8 min-w-12 items-center justify-center rounded-lg border border-lib-border-soft bg-transparent px-2.5 text-[13px] text-lib-muted'
 
 function ShortcutRow({ shortcut }: { shortcut: ShortcutDefinition }) {
+  const t = useT()
+  const name = t(shortcut.labelKey)
   const overrides = useShortcutsStore((s) => s.overrides)
   const recording = useShortcutsStore((s) => s.recordingId === shortcut.id)
   const setRecording = useShortcutsStore((s) => s.setRecording)
@@ -78,8 +81,11 @@ function ShortcutRow({ shortcut }: { shortcut: ShortcutDefinition }) {
           keys: pressed,
           message:
             result.conflictWith === shortcut.id
-              ? 'Already an alternate key of this action.'
-              : `Already assigned to ${getShortcut(result.conflictWith).label}.`,
+              ? { key: 'settings.keyboard.alreadyAlternate' }
+              : {
+                  key: 'settings.keyboard.alreadyAssigned',
+                  params: { name: getT()(getShortcut(result.conflictWith).labelKey) },
+                },
         })
       } else {
         setAttempt({ keys: pressed, message: result.message })
@@ -102,23 +108,23 @@ function ShortcutRow({ shortcut }: { shortcut: ShortcutDefinition }) {
   return (
     <li className="px-3 py-1.5">
       <div className="flex min-h-[calc(var(--ui-density-row)-12px)] items-center justify-between gap-3 text-[13px]">
-        <span className="min-w-0 truncate font-medium text-lib-text-strong">{shortcut.label}</span>
+        <span className="min-w-0 truncate font-medium text-lib-text-strong">{name}</span>
         <span className="flex shrink-0 items-center gap-2">
           {changed && !recording ? (
             <button
               type="button"
               onClick={() => resetOne(shortcut.id)}
-              aria-label={`Reset ${shortcut.label} to default`}
+              aria-label={t('settings.keyboard.resetAria', { name })}
               className="cursor-pointer rounded-md border-none bg-transparent px-1.5 py-1 text-[12px] font-medium text-lib-muted transition-colors hover:text-lib-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-lib-accent"
             >
-              Reset
+              {t('settings.keyboard.reset')}
             </button>
           ) : null}
           {shortcut.locked ? (
             <span
               className={`${CHIP_STATIC} min-w-24`}
-              title="Fixed — this shortcut can’t be changed"
-              aria-label={`${shortcut.label}: fixed shortcut`}
+              title={t('settings.keyboard.fixedTitle')}
+              aria-label={t('settings.keyboard.fixedAria', { name })}
             >
               <KeyCaps keys={shortcut.defaultKeys} />
             </span>
@@ -131,13 +137,13 @@ function ShortcutRow({ shortcut }: { shortcut: ShortcutDefinition }) {
               }}
               aria-label={
                 recording
-                  ? `Recording a new shortcut for ${shortcut.label}. Press Escape to cancel.`
-                  : `${shortcut.label}: change shortcut`
+                  ? t('settings.keyboard.recordingAria', { name })
+                  : t('settings.keyboard.changeAria', { name })
               }
               className={`${CHIP_BASE} ${chipClass}`}
             >
               {recording && !attempt ? (
-                <span className="font-medium">Press a shortcut…</span>
+                <span className="font-medium">{t('settings.keyboard.pressShortcut')}</span>
               ) : (
                 <KeyCaps keys={attempt ? attempt.keys : keys} />
               )}
@@ -146,21 +152,21 @@ function ShortcutRow({ shortcut }: { shortcut: ShortcutDefinition }) {
           {shortcut.aliases?.map((alias, i) => (
             <span key={i} className="flex items-center gap-2">
               <span className="text-[11px] text-lib-muted" aria-hidden>
-                or
+                {t('settings.keyboard.or')}
               </span>
-              <span className={CHIP_STATIC} title="Alternate key (fixed)">
+              <span className={CHIP_STATIC} title={t('settings.keyboard.alternateTitle')}>
                 <KeyCaps keys={alias} />
               </span>
             </span>
           ))}
           {shortcut.locked ? (
-            <span className="text-[11px] text-lib-muted">Fixed</span>
+            <span className="text-[11px] text-lib-muted">{t('settings.keyboard.fixed')}</span>
           ) : null}
         </span>
       </div>
       {attempt ? (
         <p role="alert" className="m-0 mt-1 text-right text-[12px] text-red-400">
-          ⚠ {attempt.message}
+          ⚠ {translateRef(t, attempt.message)}
         </p>
       ) : null}
     </li>
@@ -172,27 +178,28 @@ function ShortcutRow({ shortcut }: { shortcut: ShortcutDefinition }) {
  * already used by another action active on the same screen is refused (see `shortcutConflicts`).
  */
 export function KeyboardShortcutsSettings() {
+  const t = useT()
   const hasOverrides = useShortcutsStore((s) => Object.keys(s.overrides).length > 0)
   const reset = useShortcutsStore((s) => s.reset)
 
   return (
     <div className="flex flex-col gap-[var(--ui-density-gap)]">
       <div className="flex items-center justify-between gap-3">
-        <p className="m-0 text-[13px] text-lib-muted">Click a shortcut, then press the new keys.</p>
+        <p className="m-0 text-[13px] text-lib-muted">{t('settings.keyboard.intro')}</p>
         <button
           type="button"
           disabled={!hasOverrides}
           onClick={() => reset()}
           className="inline-flex h-9 shrink-0 cursor-pointer items-center rounded-lg border border-lib-border bg-transparent px-4 text-[13px] font-semibold text-lib-text-strong transition-colors hover:border-lib-accent hover:text-lib-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-lib-accent disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:border-lib-border disabled:hover:text-lib-text-strong"
         >
-          Reset to Defaults
+          {t('settings.keyboard.resetAll')}
         </button>
       </div>
       {SHORTCUT_GROUPS.map((group) => (
-        <SettingsCard key={group.id} title={group.label}>
+        <SettingsCard key={group.id} title={t(group.labelKey)}>
           <ul
             className="m-0 list-none divide-y divide-lib-border-soft overflow-hidden rounded-lg border border-lib-border-soft p-0"
-            aria-label={`${group.label} shortcuts`}
+            aria-label={t('settings.keyboard.groupAria', { group: t(group.labelKey) })}
           >
             {SHORTCUTS.filter((s) => s.group === group.id).map((shortcut) => (
               <ShortcutRow key={shortcut.id} shortcut={shortcut} />

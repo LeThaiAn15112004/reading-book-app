@@ -1,3 +1,4 @@
+import type { MessageRef } from '@core'
 import { isMacPlatform, type ShortcutKeys } from './shortcutDefinitions'
 
 const MODIFIER_ORDER = ['Mod', 'Alt', 'Shift']
@@ -136,23 +137,20 @@ export function validateShortcutKeys(
   keys: ShortcutKeys,
   mac: boolean = isMacPlatform,
   options: ValidateShortcutOptions = {},
-): string | null {
+): MessageRef | null {
   const normalized = normalizeShortcutKeys(keys)
   const main = normalized[normalized.length - 1]
-  if (!main || MODIFIER_ORDER.includes(main)) return 'Press a key together with the modifier.'
+  if (!main || MODIFIER_ORDER.includes(main)) return { key: 'settings.keyboard.errors.modifierOnly' }
   const isFunctionKey = /^F\d+$/.test(main)
+  const modifiers = { mod: mac ? '⌘' : 'Ctrl', alt: mac ? '⌥' : 'Alt' }
   if (!hasModifier(normalized) && !isFunctionKey) {
-    if (!options.allowBare) {
-      return `Add ${mac ? '⌘' : 'Ctrl'} or ${mac ? '⌥' : 'Alt'} — a plain key would break typing.`
-    }
-    if (!isBareCapableKey(main)) {
-      return `Add ${mac ? '⌘' : 'Ctrl'} or ${mac ? '⌥' : 'Alt'} — this key can't be used on its own.`
-    }
+    if (!options.allowBare) return { key: 'settings.keyboard.errors.plainKey', params: modifiers }
+    if (!isBareCapableKey(main)) return { key: 'settings.keyboard.errors.notAlone', params: modifiers }
   }
   if (normalized.length === 2 && normalized[0] === 'Shift' && !isFunctionKey) {
-    return 'Shift alone is used for typing — add another modifier.'
+    return { key: 'settings.keyboard.errors.shiftOnly' }
   }
-  if (RESERVED.has(shortcutKeysId(normalized))) return 'This shortcut is reserved by the system.'
+  if (RESERVED.has(shortcutKeysId(normalized))) return { key: 'settings.keyboard.errors.reserved' }
   return null
 }
 

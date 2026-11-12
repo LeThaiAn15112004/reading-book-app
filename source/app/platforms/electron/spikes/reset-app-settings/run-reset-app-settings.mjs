@@ -312,7 +312,7 @@ await check('storage write failure: groups reported, in-memory state still reset
   failWrites = true
   try {
     const { failed } = await resetAppSettings()
-    assert.deepEqual(failed.map((r) => r.label), ['Appearance', 'Library', 'PDF page layout', 'PDF pen', 'PDF shapes', 'PDF Typewriter'], 'Main-owned prefs are unaffected by localStorage')
+    assert.deepEqual(failed.map((r) => r.id), ['appearance', 'library', 'pdf-view', 'pdf-ink', 'pdf-shape', 'pdf-typewriter'], 'Main-owned prefs are unaffected by localStorage')
   } finally {
     failWrites = false
   }
@@ -336,7 +336,7 @@ await check('Main could not save the background defaults: that group is reported
 
 await check('a throwing group is reported and does not stop the others', async () => {
   customize()
-  const boom = { id: 'boom', label: 'Boom', reset: () => { throw new Error('boom') } }
+  const boom = { id: 'boom', labelKey: 'settings.advanced.groups.appearance', reset: () => { throw new Error('boom') } }
   const { failed } = await resetAppSettings([boom, ...APP_SETTINGS_RESETTERS])
   assert.deepEqual(failed.map((r) => r.id), ['boom'])
   assert.deepEqual(appearance(), DEFAULT_APP_APPEARANCE)

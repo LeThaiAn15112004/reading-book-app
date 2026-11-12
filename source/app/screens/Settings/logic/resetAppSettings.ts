@@ -1,3 +1,4 @@
+import type { MessageKey } from '@core'
 import { isFeatureAvailable, type AppFeature } from '../../../platforms/host'
 import { useShortcutsStore } from '../../../shortcuts/shortcutsStore'
 import { useAppAppearanceStore } from '../../../theme/appAppearanceStore'
@@ -17,7 +18,7 @@ import { useNotificationsStore } from './notificationsStore'
  */
 export type AppSettingsResetter = {
   id: string
-  label: string
+  labelKey: MessageKey
   reset: () => boolean | Promise<boolean>
   /** The group exists only where this feature does (spec 008: the Mobile host has no Main-owned preferences). */
   feature?: AppFeature
@@ -32,27 +33,31 @@ export type AppSettingsResetter = {
  * `AppAppearanceBridge`.
  */
 export const APP_SETTINGS_RESETTERS: readonly AppSettingsResetter[] = [
-  { id: 'appearance', label: 'Appearance', reset: () => useAppAppearanceStore.getState().reset() },
-  { id: 'library', label: 'Library', reset: () => useLibraryBrowseStore.getState().reset() },
-  { id: 'pdf-view', label: 'PDF page layout', reset: () => usePdfViewStore.getState().reset() },
-  { id: 'pdf-ink', label: 'PDF pen', reset: () => usePdfInkPrefsStore.getState().reset() },
-  { id: 'pdf-shape', label: 'PDF shapes', reset: () => usePdfShapePrefsStore.getState().reset() },
-  { id: 'pdf-typewriter', label: 'PDF Typewriter', reset: () => usePdfTypewriterPrefsStore.getState().reset() },
+  { id: 'appearance', labelKey: 'settings.advanced.groups.appearance', reset: () => useAppAppearanceStore.getState().reset() },
+  { id: 'library', labelKey: 'settings.advanced.groups.library', reset: () => useLibraryBrowseStore.getState().reset() },
+  { id: 'pdf-view', labelKey: 'settings.advanced.groups.pdfView', reset: () => usePdfViewStore.getState().reset() },
+  { id: 'pdf-ink', labelKey: 'settings.advanced.groups.pdfInk', reset: () => usePdfInkPrefsStore.getState().reset() },
+  { id: 'pdf-shape', labelKey: 'settings.advanced.groups.pdfShape', reset: () => usePdfShapePrefsStore.getState().reset() },
+  {
+    id: 'pdf-typewriter',
+    labelKey: 'settings.advanced.groups.pdfTypewriter',
+    reset: () => usePdfTypewriterPrefsStore.getState().reset(),
+  },
   {
     id: 'notifications',
-    label: 'Notifications',
+    labelKey: 'settings.advanced.groups.notifications',
     reset: () => useNotificationsStore.getState().reset(),
     feature: 'notificationSettings',
   },
   {
     id: 'background',
-    label: 'Background & System Tray',
+    labelKey: 'settings.advanced.groups.background',
     reset: () => useBackgroundStore.getState().reset(),
     feature: 'notificationSettings',
   },
   {
     id: 'keyboard-shortcuts',
-    label: 'Keyboard Shortcuts',
+    labelKey: 'settings.advanced.groups.keyboard',
     reset: () => useShortcutsStore.getState().reset(),
     feature: 'keyboardShortcuts',
   },

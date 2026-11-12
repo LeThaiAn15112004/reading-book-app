@@ -1,4 +1,4 @@
-/* i18n-pending: settings */
+import { useT } from '../../../../i18n'
 import { useEffect, useId, useState } from 'react'
 
 /** One kind of history the dialog can clear. Add entries here as more history types exist. */
@@ -23,6 +23,7 @@ export type ClearDataDialogProps = {
  * translation models.
  */
 export function ClearDataDialog({ options, onCancel, onClear }: ClearDataDialogProps) {
+  const t = useT()
   const titleId = useId()
   const descId = useId()
   const [selected, setSelected] = useState<ReadonlySet<string>>(new Set())
@@ -61,9 +62,9 @@ export function ClearDataDialog({ options, onCancel, onClear }: ClearDataDialogP
         onClick={(e) => e.stopPropagation()}
       >
         <h2 id={titleId} className="m-0 text-base font-semibold text-lib-text-strong">
-          Clear Data
+          {t('settings.privacy.clearData')}
         </h2>
-        <p className="m-0 mt-1 text-[13px] text-lib-muted">Choose what you want to remove.</p>
+        <p className="m-0 mt-1 text-[13px] text-lib-muted">{t('settings.privacy.dialog.choose')}</p>
 
         <ul className="m-0 mt-4 flex list-none flex-col gap-2 p-0">
           {options.map((option) => (
@@ -92,8 +93,7 @@ export function ClearDataDialog({ options, onCancel, onClear }: ClearDataDialogP
         </ul>
 
         <p id={descId} className="m-0 mt-4 text-[12px] leading-relaxed text-lib-muted">
-          This will not delete your books, annotations, collections, reading progress, search index
-          or translation models.
+          {t('settings.privacy.dialog.note')}
         </p>
 
         <div className="mt-5 flex justify-end gap-2">
@@ -102,7 +102,7 @@ export function ClearDataDialog({ options, onCancel, onClear }: ClearDataDialogP
             className="h-10 cursor-pointer rounded-lg border border-lib-border bg-transparent px-4 text-[13px] font-semibold text-lib-muted hover:text-lib-text-strong"
             onClick={onCancel}
           >
-            Cancel
+            {t('common.actions.cancel')}
           </button>
           <button
             type="button"
@@ -110,7 +110,7 @@ export function ClearDataDialog({ options, onCancel, onClear }: ClearDataDialogP
             disabled={selected.size === 0}
             onClick={() => onClear([...selected])}
           >
-            Clear Selected
+            {t('settings.privacy.dialog.clearSelected')}
           </button>
         </div>
       </div>

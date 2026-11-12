@@ -1,5 +1,6 @@
-/* i18n-pending: settings */
 import { useState } from 'react'
+import type { MessageKey } from '@core'
+import { useT } from '../../../../i18n'
 import { READER_THEME_PRESETS } from '../../../../components/chrome'
 import {
   ACCENT_COLORS,
@@ -13,17 +14,17 @@ import { useAppAppearanceStore } from '../../../../theme/appAppearanceStore'
 import { SettingsCard } from '../layout/SettingsCard'
 import { AccentColorPicker } from './AccentColorPicker'
 
-const THEME_LABELS: Record<AppThemeMode, { label: string; hint: string }> = {
-  light: { label: 'Light', hint: 'Bright surfaces' },
-  dark: { label: 'Dark', hint: 'Default' },
-  sepia: { label: 'Sepia', hint: 'Warm, low glare' },
-  system: { label: 'System', hint: 'Follow the OS' },
+const THEME_LABELS: Record<AppThemeMode, { label: MessageKey; hint: MessageKey }> = {
+  light: { label: 'settings.appearance.theme.light', hint: 'settings.appearance.theme.lightHint' },
+  dark: { label: 'settings.appearance.theme.dark', hint: 'settings.appearance.theme.darkHint' },
+  sepia: { label: 'settings.appearance.theme.sepia', hint: 'settings.appearance.theme.sepiaHint' },
+  system: { label: 'settings.appearance.theme.system', hint: 'settings.appearance.theme.systemHint' },
 }
 
-const DENSITY_LABELS: Record<UiDensity, { label: string; hint: string }> = {
-  comfortable: { label: 'Comfortable', hint: 'More spacing' },
-  balanced: { label: 'Balanced', hint: 'Default' },
-  compact: { label: 'Compact', hint: 'More content on screen' },
+const DENSITY_LABELS: Record<UiDensity, { label: MessageKey; hint: MessageKey }> = {
+  comfortable: { label: 'settings.appearance.density.comfortable', hint: 'settings.appearance.density.comfortableHint' },
+  balanced: { label: 'settings.appearance.density.balanced', hint: 'settings.appearance.density.balancedHint' },
+  compact: { label: 'settings.appearance.density.compact', hint: 'settings.appearance.density.compactHint' },
 }
 
 const focusRing =
@@ -86,6 +87,7 @@ function PreviewLines({ color }: { color: string }) {
  * App-wide only — per-book reading settings stay in the Reader.
  */
 export function AppearanceSettings() {
+  const t = useT()
   const themeMode = useAppAppearanceStore((s) => s.themeMode)
   const accent = useAppAppearanceStore((s) => s.accent)
   const density = useAppAppearanceStore((s) => s.density)
@@ -102,13 +104,13 @@ export function AppearanceSettings() {
   return (
     <div className="@container flex flex-col gap-[var(--ui-density-gap)]">
       <SettingsCard
-        title="App Theme"
-        description="Colors the whole app, including the reading page. System follows your OS light/dark setting."
+        title={t('settings.appearance.theme.title')}
+        description={t('settings.appearance.theme.description')}
       >
         <div
           className="grid grid-cols-2 gap-3 @xl:grid-cols-4"
           role="radiogroup"
-          aria-label="App theme"
+          aria-label={t('settings.appearance.theme.aria')}
         >
           {APP_THEME_MODES.map((mode) => {
             const selected = themeMode === mode
@@ -129,10 +131,10 @@ export function AppearanceSettings() {
                 <span className="flex items-center justify-between gap-2 px-0.5">
                   <span className="min-w-0">
                     <span className="block truncate text-[13px] font-semibold text-lib-text-strong">
-                      {THEME_LABELS[mode].label}
+                      {t(THEME_LABELS[mode].label)}
                     </span>
                     <span className="block truncate text-[11px] text-lib-faint">
-                      {THEME_LABELS[mode].hint}
+                      {t(THEME_LABELS[mode].hint)}
                     </span>
                   </span>
                   <span
@@ -153,20 +155,21 @@ export function AppearanceSettings() {
       </SettingsCard>
 
       <SettingsCard
-        title="Accent Color"
-        description="Used for buttons, selections and highlights across the app."
+        title={t('settings.appearance.accent.title')}
+        description={t('settings.appearance.accent.description')}
       >
-        <div className="flex flex-wrap gap-3" role="radiogroup" aria-label="Accent color">
+        <div className="flex flex-wrap gap-3" role="radiogroup" aria-label={t('settings.appearance.accent.aria')}>
           {ACCENT_COLORS.map((color) => {
             const selected = accent === color.id
+            const label = t(color.labelKey)
             return (
               <button
                 key={color.id}
                 type="button"
                 role="radio"
                 aria-checked={selected}
-                aria-label={color.label}
-                title={color.label}
+                aria-label={label}
+                title={label}
                 className={`flex w-16 cursor-pointer flex-col items-center gap-1.5 rounded-lg border-none bg-transparent p-1 ${focusRing}`}
                 onClick={() => setAccent(color.id)}
               >
@@ -184,7 +187,7 @@ export function AppearanceSettings() {
                     selected ? 'text-lib-text-strong' : 'text-lib-muted'
                   }`}
                 >
-                  {color.label}
+                  {label}
                 </span>
               </button>
             )
@@ -196,8 +199,8 @@ export function AppearanceSettings() {
               aria-checked={customSelected}
               aria-haspopup="dialog"
               aria-expanded={customPickerOpen}
-              aria-label={`Custom color ${customAccent.toUpperCase()}`}
-              title={`Custom (${customAccent.toUpperCase()})`}
+              aria-label={t('settings.appearance.accent.customAria', { hex: customAccent.toUpperCase() })}
+              title={t('settings.appearance.accent.customTitle', { hex: customAccent.toUpperCase() })}
               className={`flex w-16 cursor-pointer flex-col items-center gap-1.5 rounded-lg border-none bg-transparent p-1 ${focusRing}`}
               onClick={() => setCustomPickerOpen((open) => !open)}
             >
@@ -226,7 +229,7 @@ export function AppearanceSettings() {
                   customSelected ? 'text-lib-text-strong' : 'text-lib-muted'
                 }`}
               >
-                Custom
+                {t('settings.appearance.accent.custom')}
               </span>
             </button>
             {customPickerOpen ? (
@@ -244,13 +247,13 @@ export function AppearanceSettings() {
       </SettingsCard>
 
       <SettingsCard
-        title="UI Density"
-        description="Spacing of app chrome. Applied to Settings now; other screens adopt it later."
+        title={t('settings.appearance.density.title')}
+        description={t('settings.appearance.density.description')}
       >
         <div
           className="grid grid-cols-1 gap-2 @lg:grid-cols-3"
           role="radiogroup"
-          aria-label="UI density"
+          aria-label={t('settings.appearance.density.aria')}
         >
           {UI_DENSITIES.map((id) => {
             const selected = density === id
@@ -274,10 +277,10 @@ export function AppearanceSettings() {
                       selected ? 'text-lib-accent' : 'text-lib-text-strong'
                     }`}
                   >
-                    {DENSITY_LABELS[id].label}
+                    {t(DENSITY_LABELS[id].label)}
                   </span>
                   <span className="block text-[11px] text-lib-faint">
-                    {DENSITY_LABELS[id].hint}
+                    {t(DENSITY_LABELS[id].hint)}
                   </span>
                 </span>
               </button>
@@ -287,12 +290,12 @@ export function AppearanceSettings() {
       </SettingsCard>
 
       <SettingsCard
-        title="Language"
-        description="Language of the app interface (menus, Settings, Library, dialogs). Book content is not changed; translation languages are chosen in the Reader's Translate panel."
+        title={t('settings.appearance.language.title')}
+        description={t('settings.appearance.language.description')}
       >
         <div className="flex flex-col gap-2">
           <span id="app-language-label" className="text-[12px] font-semibold text-lib-text-strong">
-            App Language
+            {t('settings.appearance.language.label')}
           </span>
           <div
             className="grid grid-cols-1 gap-2 @lg:grid-cols-3"
@@ -320,7 +323,7 @@ export function AppearanceSettings() {
                       selected ? 'text-lib-accent' : 'text-lib-text-strong'
                     }`}
                   >
-                    {option.label}
+                    {'labelKey' in option ? t(option.labelKey) : option.nativeLabel}
                   </span>
                   <span
                     className={`inline-flex size-[18px] shrink-0 items-center justify-center rounded-full border ${

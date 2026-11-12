@@ -1,13 +1,14 @@
-/* i18n-pending: settings */
+import type { MessageKey } from '@core'
+import { useT } from '../../../../i18n'
 import { useEffect, useState } from 'react'
 import { useNotificationsStore, type TestReminderState } from '../../logic/notificationsStore'
 import { SettingsCard } from '../layout/SettingsCard'
 import { SettingsSwitch } from '../layout/SettingsSwitch'
 
-const TEST_STATUS: Partial<Record<TestReminderState, { text: string; error: boolean }>> = {
-  sent: { text: 'Test reminder sent — check your system notifications.', error: false },
-  blocked: { text: 'Notifications are off or not available, so nothing was shown.', error: true },
-  failed: { text: 'Couldn’t show the test reminder.', error: true },
+const TEST_STATUS: Partial<Record<TestReminderState, { text: MessageKey; error: boolean }>> = {
+  sent: { text: 'settings.notifications.reminders.testSent', error: false },
+  blocked: { text: 'settings.notifications.reminders.testBlocked', error: true },
+  failed: { text: 'settings.notifications.reminders.testFailed', error: true },
 }
 
 /**
@@ -16,6 +17,7 @@ const TEST_STATUS: Partial<Record<TestReminderState, { text: string; error: bool
  * haven't read yet, and only while Readmate is running (see Start at Login).
  */
 export function ReadingRemindersCard() {
+  const t = useT()
   const prefs = useNotificationsStore((s) => s.prefs)
   const saving = useNotificationsStore((s) => s.saving)
   const test = useNotificationsStore((s) => s.test)
@@ -39,17 +41,17 @@ export function ReadingRemindersCard() {
   }
 
   return (
-    <SettingsCard title="Reading Reminders">
+    <SettingsCard title={t('settings.notifications.reminders.title')}>
       <div className="flex flex-col gap-4">
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0">
             <p id="reminder-enable-label" className="m-0 text-[13px] text-lib-text-strong">
-              Enable Reminder
+              {t('settings.notifications.reminders.enable')}
             </p>
             <p id="reminder-enable-desc" className="m-0 mt-1 text-[12px] text-lib-faint">
               {notificationsOn
-                ? 'A nudge at your chosen time — only on days you haven’t read yet. Clicking it opens the book you’re reading.'
-                : 'Turn on Enable Notifications above to get reading reminders.'}
+                ? t('settings.notifications.reminders.enableOn')
+                : t('settings.notifications.reminders.enableOff')}
             </p>
           </div>
           <SettingsSwitch
@@ -64,11 +66,10 @@ export function ReadingRemindersCard() {
         <div className="flex items-center justify-between gap-4 border-t border-lib-border-soft pt-4">
           <div className="min-w-0">
             <label htmlFor="reminder-time" className="m-0 block text-[13px] text-lib-text-strong">
-              Reminder Time
+              {t('settings.notifications.reminders.time')}
             </label>
             <p id="reminder-time-desc" className="m-0 mt-1 text-[12px] text-lib-faint">
-              Your computer’s local time. If Readmate wasn’t running at that minute, it can still remind
-              you within the next hour.
+              {t('settings.notifications.reminders.timeDescription')}
             </p>
           </div>
           <input
@@ -85,7 +86,8 @@ export function ReadingRemindersCard() {
 
         <div className="flex flex-wrap items-center justify-between gap-3 border-t border-lib-border-soft pt-4">
           <p className="m-0 text-[13px] text-lib-muted">
-            Frequency / Limit: <span className="font-semibold text-lib-text-strong">Maximum: 1 per day</span>
+            {t('settings.notifications.reminders.frequency')}{' '}
+            <span className="font-semibold text-lib-text-strong">{t('settings.notifications.reminders.frequencyValue')}</span>
           </p>
           <button
             type="button"
@@ -94,7 +96,7 @@ export function ReadingRemindersCard() {
             aria-busy={test === 'sending'}
             onClick={() => void sendTestReminder()}
           >
-            {test === 'sending' ? 'Sending…' : 'Send test reminder'}
+            {test === 'sending' ? t('settings.notifications.reminders.sending') : t('settings.notifications.reminders.sendTest')}
           </button>
         </div>
 
@@ -103,7 +105,7 @@ export function ReadingRemindersCard() {
             role="status"
             className={`m-0 text-[12px] ${testStatus.error ? 'text-red-400' : 'text-lib-muted'}`}
           >
-            {testStatus.text}
+            {t(testStatus.text)}
           </p>
         ) : null}
       </div>

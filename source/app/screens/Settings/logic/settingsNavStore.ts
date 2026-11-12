@@ -1,3 +1,4 @@
+import type { MessageKey } from '@core'
 import { create } from 'zustand'
 import { isFeatureAvailable, type AppFeature } from '../../../platforms/host'
 
@@ -14,18 +15,18 @@ export type SettingsSectionId =
   | 'advanced'
   | 'about'
 
-export const SETTINGS_SECTIONS: readonly { id: SettingsSectionId; label: string; feature?: AppFeature }[] = [
-  { id: 'appearance', label: 'Appearance' },
-  { id: 'storage', label: 'Storage', feature: 'storageSettings' },
-  { id: 'notifications', label: 'Notifications', feature: 'notificationSettings' },
-  { id: 'keyboard', label: 'Keyboard Shortcuts', feature: 'keyboardShortcuts' },
-  { id: 'privacy', label: 'Privacy' },
-  { id: 'advanced', label: 'Advanced' },
-  { id: 'about', label: 'About' },
+export const SETTINGS_SECTIONS: readonly { id: SettingsSectionId; labelKey: MessageKey; feature?: AppFeature }[] = [
+  { id: 'appearance', labelKey: 'settings.sections.appearance' },
+  { id: 'storage', labelKey: 'settings.sections.storage', feature: 'storageSettings' },
+  { id: 'notifications', labelKey: 'settings.sections.notifications', feature: 'notificationSettings' },
+  { id: 'keyboard', labelKey: 'settings.sections.keyboard', feature: 'keyboardShortcuts' },
+  { id: 'privacy', labelKey: 'settings.sections.privacy' },
+  { id: 'advanced', labelKey: 'settings.sections.advanced' },
+  { id: 'about', labelKey: 'settings.sections.about' },
 ]
 
 /** The sections shown on this platform: every one in Electron; hidden, never disabled, on the Mobile host (spec 008). */
-export function visibleSettingsSections(): readonly { id: SettingsSectionId; label: string }[] {
+export function visibleSettingsSections(): readonly { id: SettingsSectionId; labelKey: MessageKey }[] {
   return SETTINGS_SECTIONS.filter((s) => s.feature === undefined || isFeatureAvailable(s.feature))
 }
 

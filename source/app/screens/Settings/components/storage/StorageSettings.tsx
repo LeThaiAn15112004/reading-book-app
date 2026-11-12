@@ -1,32 +1,21 @@
-/* i18n-pending: settings */
+import { uiText, useFormat, useT } from '../../../../i18n'
 import { useEffect, useState } from 'react'
 import { ConfirmBookActionDialog } from '../../../Library/components/book/ConfirmBookActionDialog'
 import { useStorageStore } from '../../logic/storageStore'
 import { SettingsCard } from '../layout/SettingsCard'
 
-function formatBytes(bytes: number | null | undefined): string {
-  if (bytes == null) return '—'
-  if (bytes < 1024) return `${bytes} B`
-  const units = ['KB', 'MB', 'GB', 'TB']
-  let value = bytes / 1024
-  let unit = 0
-  while (value >= 1024 && unit < units.length - 1) {
-    value /= 1024
-    unit += 1
-  }
-  return `${value >= 100 ? value.toFixed(0) : value.toFixed(1)} ${units[unit]}`
-}
+
 
 const secondaryButton =
   'inline-flex h-9 shrink-0 cursor-pointer items-center rounded-lg border border-lib-border bg-transparent px-4 text-[13px] font-semibold text-lib-text-strong transition-colors hover:border-lib-accent hover:bg-lib-accent-soft focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-lib-accent disabled:cursor-not-allowed disabled:opacity-60'
 
 /** Usage segments in display order; colors are theme tokens / neutral swatches. */
 const SEGMENTS = [
-  { key: 'books', label: 'Books', color: 'var(--lib-accent)' },
-  { key: 'cache', label: 'Cache', color: '#38bdf8' },
-  { key: 'models', label: 'Translation Models', color: '#a78bfa' },
-  { key: 'speech', label: 'Speech Models', color: '#34d399' },
-  { key: 'other', label: 'Other', color: 'var(--lib-faint)' },
+  { key: 'books', labelKey: 'settings.storage.segments.books', color: 'var(--lib-accent)' },
+  { key: 'cache', labelKey: 'settings.storage.segments.cache', color: '#38bdf8' },
+  { key: 'models', labelKey: 'settings.storage.segments.models', color: '#a78bfa' },
+  { key: 'speech', labelKey: 'settings.storage.segments.speech', color: '#34d399' },
+  { key: 'other', labelKey: 'settings.storage.segments.other', color: 'var(--lib-faint)' },
 ] as const
 
 /**
@@ -34,6 +23,9 @@ const SEGMENTS = [
  * translation models and a usage breakdown. Not a place to manage books (that is the Library).
  */
 export function StorageSettings() {
+  const t = useT()
+  const format = useFormat()
+  const formatBytes = (bytes: number | null | undefined): string => (bytes == null ? '—' : format.bytes(bytes))
   const usage = useStorageStore((s) => s.usage)
   const loading = useStorageStore((s) => s.loading)
   const loadError = useStorageStore((s) => s.loadError)
@@ -73,47 +65,49 @@ export function StorageSettings() {
               : 'border-red-400/40 bg-red-500/10 text-red-400'
           }`}
         >
-          {notice.text}
+          {uiText(t, notice.text)}
         </p>
       ) : null}
       {loadError ? (
         <p role="alert" className="m-0 text-[13px] text-red-400">
-          {loadError}
+          {uiText(t, loadError)}
         </p>
       ) : null}
 
       <SettingsCard
-        title="Book Storage"
-        description="Books downloaded from a URL or a cloud source are kept here. Books you add from your own folders stay where they are and are not copied."
+        title={t('settings.storage.books.title')}
+        description={t('settings.storage.books.description')}
       >
-        <p className="m-0 text-[12px] font-semibold text-lib-muted">Book Storage Location</p>
+        <p className="m-0 text-[12px] font-semibold text-lib-muted">{t('settings.storage.books.location')}</p>
         <div className="mt-1.5 flex flex-wrap items-center gap-3">
           <code
             className="min-w-0 flex-1 truncate rounded-md border border-lib-border-soft bg-lib-input px-2.5 py-2 font-mono text-[12px] text-lib-text-strong select-text"
             title={usage?.booksFolderPath}
           >
-            {usage?.booksFolderPath ?? (loading ? 'Loading…' : '—')}
+            {usage?.booksFolderPath ?? (loading ? t('settings.loading') : '—')}
           </code>
           <button type="button" className={secondaryButton} onClick={() => void openBooksFolder()}>
-            Open Folder
+            {t('settings.storage.books.openFolder')}
           </button>
         </div>
       </SettingsCard>
 
       <SettingsCard
-        title="Cache"
-        description="Temporary data the app can rebuild: the in-book search index and the browser cache. Clearing it never deletes books, annotations, reading progress, collections, metadata or translation models."
+        title={t('settings.storage.cache.title')}
+        description={t('settings.storage.cache.description')}
       >
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <p className="m-0 text-[13px] text-lib-muted">Used</p>
+            <p className="m-0 text-[13px] text-lib-muted">{t('settings.storage.cache.used')}</p>
             <p className="m-0 mt-0.5 text-[15px] font-semibold text-lib-text-strong tabular-nums">
-              {usage ? formatBytes(usage.cacheBytes) : loading ? 'Loading…' : '—'}
+              {usage ? formatBytes(usage.cacheBytes) : loading ? t('settings.loading') : '—'}
             </p>
             {usage ? (
               <p className="m-0 mt-1 text-[11px] text-lib-faint tabular-nums">
-                Search index {formatBytes(usage.searchIndexBytes)} · Browser cache{' '}
-                {formatBytes(usage.browserCacheBytes)}
+                {t('settings.storage.cache.breakdown', {
+                  index: formatBytes(usage.searchIndexBytes),
+                  browser: formatBytes(usage.browserCacheBytes),
+                })}
               </p>
             ) : null}
           </div>
@@ -123,18 +117,17 @@ export function StorageSettings() {
             disabled={clearing || !usage}
             onClick={() => setConfirmClear(true)}
           >
-            {clearing ? 'Clearing…' : 'Clear Cache'}
+            {clearing ? t('settings.storage.cache.clearing') : t('settings.storage.cache.clear')}
           </button>
         </div>
         <p className="m-0 mt-3 text-[12px] text-lib-faint">
-          After clearing, search and word count rebuild a book&apos;s index the next time you open
-          it.
+          {t('settings.storage.cache.after')}
         </p>
       </SettingsCard>
 
       <SettingsCard
-        title="Translation Models"
-        description="Offline translation models downloaded by the Translate tool. They are not cache: remove one to free space; it downloads again the next time you translate that language pair."
+        title={t('settings.storage.models.title')}
+        description={t('settings.storage.models.description')}
       >
         {usage && usage.translationModels.length > 0 ? (
           <ul className="m-0 list-none divide-y divide-lib-border-soft overflow-hidden rounded-lg border border-lib-border-soft p-0">
@@ -153,11 +146,11 @@ export function StorageSettings() {
                   <button
                     type="button"
                     className="inline-flex h-7 cursor-pointer items-center rounded-md border border-lib-border bg-transparent px-2.5 text-[12px] font-semibold text-lib-muted transition-colors hover:border-red-400 hover:text-red-400 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-lib-accent disabled:cursor-not-allowed disabled:opacity-60"
-                    aria-label={`Remove ${model.id}`}
+                    aria-label={t('settings.storage.models.removeAria', { id: model.id })}
                     disabled={removingModelId !== null}
                     onClick={() => setConfirmRemoveModel(model.id)}
                   >
-                    {removingModelId === model.id ? 'Removing…' : 'Remove'}
+                    {removingModelId === model.id ? t('settings.storage.models.removing') : t('common.actions.remove')}
                   </button>
                 </span>
               </li>
@@ -165,14 +158,14 @@ export function StorageSettings() {
           </ul>
         ) : (
           <p className="m-0 text-[13px] text-lib-faint">
-            {usage ? 'No translation models downloaded.' : loading ? 'Loading…' : '—'}
+            {usage ? t('settings.storage.models.none') : loading ? t('settings.loading') : '—'}
           </p>
         )}
       </SettingsCard>
 
       <SettingsCard
-        title="Speech Models"
-        description="Models downloaded for audiobook transcription. Transcripts you already made are kept; remove a model to free space and it downloads again the next time you choose it. A model cannot be removed while a transcription is running."
+        title={t('settings.storage.speech.title')}
+        description={t('settings.storage.speech.description')}
       >
         {usage && usage.speechModels.length > 0 ? (
           <ul className="m-0 list-none divide-y divide-lib-border-soft overflow-hidden rounded-lg border border-lib-border-soft p-0">
@@ -192,11 +185,11 @@ export function StorageSettings() {
                   <button
                     type="button"
                     className="inline-flex h-7 cursor-pointer items-center rounded-md border border-lib-border bg-transparent px-2.5 text-[12px] font-semibold text-lib-muted transition-colors hover:border-red-400 hover:text-red-400 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-lib-accent disabled:cursor-not-allowed disabled:opacity-60"
-                    aria-label={`Remove ${model.id}`}
+                    aria-label={t('settings.storage.models.removeAria', { id: model.id })}
                     disabled={removingModelId !== null}
                     onClick={() => setConfirmRemoveSpeech(model.id)}
                   >
-                    {removingModelId === model.id ? 'Removing…' : 'Remove'}
+                    {removingModelId === model.id ? t('settings.storage.models.removing') : t('common.actions.remove')}
                   </button>
                 </span>
               </li>
@@ -204,16 +197,16 @@ export function StorageSettings() {
           </ul>
         ) : (
           <p className="m-0 text-[13px] text-lib-faint">
-            {usage ? 'No speech models downloaded.' : loading ? 'Loading…' : '—'}
+            {usage ? t('settings.storage.speech.none') : loading ? t('settings.loading') : '—'}
           </p>
         )}
       </SettingsCard>
 
-      <SettingsCard title="Storage Usage" description="Space used by Readmate Reader's own data.">
+      <SettingsCard title={t('settings.storage.usage.title')} description={t('settings.storage.usage.description')}>
         <div
           className="flex h-2.5 w-full overflow-hidden rounded-full bg-lib-chip"
           role="img"
-          aria-label={`Total ${formatBytes(total)}`}
+          aria-label={t('settings.storage.usage.totalAria', { size: formatBytes(total) })}
         >
           {total > 0
             ? SEGMENTS.map((segment) => {
@@ -222,7 +215,10 @@ export function StorageSettings() {
                   <span
                     key={segment.key}
                     style={{ width: `${share}%`, background: segment.color }}
-                    title={`${segment.label} ${formatBytes(sizes[segment.key])}`}
+                    title={t('settings.storage.segmentTitle', {
+                      label: t(segment.labelKey),
+                      size: formatBytes(sizes[segment.key]),
+                    })}
                   />
                 ) : null
               })
@@ -237,7 +233,7 @@ export function StorageSettings() {
                   style={{ background: segment.color }}
                   aria-hidden
                 />
-                {segment.label}
+                {t(segment.labelKey)}
               </dt>
               <dd className="m-0 text-lib-text-strong tabular-nums">
                 {usage ? formatBytes(sizes[segment.key]) : '—'}
@@ -245,22 +241,22 @@ export function StorageSettings() {
             </div>
           ))}
           <div className="mt-1 flex items-center justify-between gap-3 border-t border-lib-border-soft pt-2">
-            <dt className="font-semibold text-lib-text-strong">Total</dt>
+            <dt className="font-semibold text-lib-text-strong">{t('settings.storage.usage.total')}</dt>
             <dd className="m-0 font-semibold text-lib-text-strong tabular-nums">
               {usage ? formatBytes(total) : '—'}
             </dd>
           </div>
         </dl>
         <p className="m-0 mt-3 text-[12px] text-lib-faint">
-          Other includes the library database (books, notes, progress), covers and app settings.
+          {t('settings.storage.usage.otherNote')}
         </p>
       </SettingsCard>
 
       {confirmClear ? (
         <ConfirmBookActionDialog
-          title="Clear Cache?"
-          message="This will remove temporary cached data (search index and browser cache). Your books and reading progress will not be deleted."
-          confirmLabel="Clear Cache"
+          title={t('settings.storage.confirm.clearTitle')}
+          message={t('settings.storage.confirm.clearBody')}
+          confirmLabel={t('settings.storage.cache.clear')}
           onCancel={() => setConfirmClear(false)}
           onConfirm={() => {
             setConfirmClear(false)
@@ -271,9 +267,9 @@ export function StorageSettings() {
 
       {confirmRemoveSpeech ? (
         <ConfirmBookActionDialog
-          title="Remove speech model?"
-          message={`${confirmRemoveSpeech} will be deleted from this device. Your transcripts are kept; the model downloads again the next time you transcribe with it.`}
-          confirmLabel="Remove"
+          title={t('settings.storage.confirm.removeSpeechTitle')}
+          message={t('settings.storage.confirm.removeSpeechBody', { id: confirmRemoveSpeech })}
+          confirmLabel={t('common.actions.remove')}
           destructive
           onCancel={() => setConfirmRemoveSpeech(null)}
           onConfirm={() => {
@@ -286,9 +282,9 @@ export function StorageSettings() {
 
       {confirmRemoveModel ? (
         <ConfirmBookActionDialog
-          title="Remove translation model?"
-          message={`${confirmRemoveModel} will be deleted from this device. It downloads again the next time you translate this language pair.`}
-          confirmLabel="Remove"
+          title={t('settings.storage.confirm.removeModelTitle')}
+          message={t('settings.storage.confirm.removeModelBody', { id: confirmRemoveModel })}
+          confirmLabel={t('common.actions.remove')}
           destructive
           onCancel={() => setConfirmRemoveModel(null)}
           onConfirm={() => {

@@ -1,4 +1,4 @@
-/* i18n-pending: settings */
+import { useT } from '../../../../i18n'
 import {
   visibleSettingsSections,
   useSettingsNavStore,
@@ -33,13 +33,14 @@ function ChevronIcon({ collapsed }: { collapsed: boolean }) {
  * edge, like the Reader's left sidebar. Width animates; the content panel takes the rest.
  */
 export function SettingsSidebar() {
+  const t = useT()
   const activeSection = useSettingsNavStore((s) => s.activeSection)
   // Mobile host (spec 008, T069): the icon rail leaves the phone's width to the content; there is no toggle there.
   const phone = isMobileHost()
   const collapsed = useSettingsNavStore((s) => s.collapsed) || phone
   const setActiveSection = useSettingsNavStore((s) => s.setActiveSection)
   const toggleCollapsed = useSettingsNavStore((s) => s.toggleCollapsed)
-  const toggleLabel = collapsed ? 'Expand settings sidebar' : 'Collapse settings sidebar'
+  const toggleLabel = collapsed ? t('settings.sidebar.expand') : t('settings.sidebar.collapse')
 
   return (
     <div className="relative z-[5] flex shrink-0">
@@ -47,7 +48,7 @@ export function SettingsSidebar() {
         className={`flex shrink-0 flex-col overflow-hidden border-r border-lib-border-soft bg-lib-topbar transition-[width] duration-200 ease-out ${
           collapsed ? 'w-[60px]' : 'w-[232px]'
         }`}
-        aria-label="Settings sections"
+        aria-label={t('settings.sidebar.aria')}
       >
         <div
           className={`flex h-16 shrink-0 items-center border-b border-lib-border-soft ${
@@ -61,7 +62,7 @@ export function SettingsSidebar() {
                 : 'm-0 truncate text-lg font-semibold tracking-tight text-lib-text-strong'
             }
           >
-            Settings
+            {t('settings.title')}
           </h1>
         </div>
 
@@ -69,6 +70,7 @@ export function SettingsSidebar() {
           <ul className="m-0 flex list-none flex-col gap-0.5 p-0">
             {visibleSettingsSections().map((section) => {
               const active = section.id === activeSection
+              const label = t(section.labelKey)
               return (
                 <li key={section.id}>
                   <button
@@ -80,8 +82,8 @@ export function SettingsSidebar() {
                         ? 'bg-lib-accent-soft text-lib-accent'
                         : 'bg-transparent text-lib-muted hover:bg-lib-surface-hover hover:text-lib-text-strong'
                     }`}
-                    title={collapsed ? section.label : undefined}
-                    aria-label={section.label}
+                    title={collapsed ? label : undefined}
+                    aria-label={label}
                     aria-current={active ? 'page' : undefined}
                     onClick={() => setActiveSection(section.id)}
                   >
@@ -92,7 +94,7 @@ export function SettingsSidebar() {
                       />
                     ) : null}
                     <SettingsSectionIcon section={section.id} />
-                    {collapsed ? null : <span className="min-w-0 truncate">{section.label}</span>}
+                    {collapsed ? null : <span className="min-w-0 truncate">{label}</span>}
                   </button>
                 </li>
               )

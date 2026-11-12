@@ -1,4 +1,5 @@
-/* i18n-pending: settings */
+import type { MessageKey, MessageRef, Translator } from '@core'
+import { getT, translateRef, useT } from '../../../../i18n'
 import { useEffect, useState } from 'react'
 import type { UpdateChannel } from '../../../../bridge'
 import { ConfirmBookActionDialog } from '../../../Library/components/book/ConfirmBookActionDialog'
@@ -7,32 +8,31 @@ import { useUpdatesStore, type UpdateCheckState } from '../../logic/updatesStore
 import { SettingsCard } from '../layout/SettingsCard'
 import { isFeatureAvailable } from '../../../../platforms/host'
 
-const RESET_APP_SETTINGS_COPY =
-  'Your books, reading progress, annotations, and other personal data will not be affected.'
+type ResetNotice = { tone: 'success' | 'error'; text: MessageRef }
 
-type ResetNotice = { tone: 'success' | 'error'; text: string }
-
-const CHANNEL_NOTE: Record<UpdateChannel, string> = {
-  'mac-app-store':
-    'This copy was installed from the Mac App Store, which delivers updates. Readmate Reader cannot query the App Store for pending updates from inside the app.',
-  'microsoft-store':
-    'This copy was installed from the Microsoft Store, which delivers updates. Checking the Store from inside the app is not supported yet.',
-  direct: 'This build has no update service configured, so it cannot check for newer versions.',
+const CHANNEL_NOTE: Record<UpdateChannel, MessageKey> = {
+  'mac-app-store': 'settings.advanced.channel.macAppStore',
+  'microsoft-store': 'settings.advanced.channel.microsoftStore',
+  direct: 'settings.advanced.channel.direct',
 }
 
 type StatusView = { tone: 'neutral' | 'success' | 'accent' | 'error'; title: string; body: string }
 
-function statusFor(check: UpdateCheckState): StatusView | null {
+function statusFor(t: Translator, check: UpdateCheckState): StatusView | null {
   switch (check.kind) {
     case 'idle':
       return null
     case 'checking':
-      return { tone: 'neutral', title: 'Checking…', body: 'Checking for updates…' }
+      return {
+        tone: 'neutral',
+        title: t('settings.advanced.status.checking'),
+        body: t('settings.advanced.status.checkingBody'),
+      }
     case 'error':
       return {
         tone: 'error',
-        title: 'Couldn’t check for updates.',
-        body: 'Please try again later.',
+        title: t('settings.advanced.status.failed'),
+        body: t('settings.advanced.status.failedBody'),
       }
     case 'done': {
       const { result } = check
@@ -40,28 +40,28 @@ function statusFor(check: UpdateCheckState): StatusView | null {
         case 'up-to-date':
           return {
             tone: 'success',
-            title: 'You’re up to date.',
-            body: 'You’re running the latest version.',
+            title: t('settings.advanced.status.upToDate'),
+            body: t('settings.advanced.status.upToDateBody'),
           }
         case 'update-available':
           return {
             tone: 'accent',
-            title: 'Update available',
+            title: t('settings.advanced.status.available'),
             body: result.latestVersion
-              ? `Version ${result.latestVersion} is available.`
-              : 'A new version is available.',
+              ? t('settings.advanced.status.availableVersion', { version: result.latestVersion })
+              : t('settings.advanced.status.availableBody'),
           }
         case 'failed':
           return {
             tone: 'error',
-            title: 'Couldn’t check for updates.',
-            body: 'Please try again later.',
+            title: t('settings.advanced.status.failed'),
+            body: t('settings.advanced.status.failedBody'),
           }
         case 'unavailable':
           return {
             tone: 'neutral',
-            title: 'Update check not available yet',
-            body: CHANNEL_NOTE[result.channel],
+            title: t('settings.advanced.status.unavailable'),
+            body: t(CHANNEL_NOTE[result.channel]),
           }
       }
     }
@@ -77,12 +77,14 @@ const TONE_CLASS: Record<StatusView['tone'], string> = {
 
 /** SCR-06 Settings → Advanced: Updates (current version + check) and Reset App Settings. */
 export function AdvancedSettings() {
+  const t = useT()
   const version = useUpdatesStore((s) => s.version)
   const check = useUpdatesStore((s) => s.check)
   const loadVersion = useUpdatesStore((s) => s.loadVersion)
   const checkForUpdates = useUpdatesStore((s) => s.checkForUpdates)
   const checking = check.kind === 'checking'
-  const status = statusFor(check)
+  const status = statusFor(t, check)
+  const resetCopy = t('settings.advanced.resetCopy')
   const [resetDialogOpen, setResetDialogOpen] = useState(false)
   const [resetNotice, setResetNotice] = useState<ResetNotice | null>(null)
   const [resetting, setResetting] = useState(false)
@@ -94,12 +96,13 @@ export function AdvancedSettings() {
     setResetting(false)
     setResetNotice(
       failed.length === 0
-        ? { tone: 'success', text: 'Settings have been reset to their defaults.' }
+        ? { tone: 'success', text: { key: 'settings.advanced.reset.success' } }
         : {
             tone: 'error',
-            text: `Some settings couldn’t be saved and may revert after restarting: ${failed
-              .map((group) => group.label)
-              .join(', ')}.`,
+            text: {
+              key: 'settings.advanced.reset.partial',
+              params: { groups: failed.map((group) => getT()(group.labelKey)).join(', ') },
+            },
           },
     )
   }
@@ -112,12 +115,12 @@ export function AdvancedSettings() {
     <div className="flex flex-col gap-[var(--ui-density-gap)]">
       {/* No update channel on the Mobile host (spec 008): the app store updates it. */}
       {isFeatureAvailable('updates') ? (
-        <SettingsCard title="Updates">
+        <SettingsCard title={t('settings.advanced.updates')}>
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="min-w-0">
-              <p className="m-0 text-[13px] text-lib-muted">Current Version</p>
+              <p className="m-0 text-[13px] text-lib-muted">{t('settings.advanced.currentVersion')}</p>
               <p className="m-0 mt-0.5 text-[15px] font-semibold text-lib-text-strong tabular-nums select-text">
-                {version === null ? 'Loading…' : version === undefined ? 'Unknown' : version}
+                {version === null ? t('settings.loading') : version === undefined ? t('settings.advanced.unknown') : version}
               </p>
             </div>
             <button
@@ -133,7 +136,7 @@ export function AdvancedSettings() {
                   aria-hidden
                 />
               ) : null}
-              {checking ? 'Checking…' : 'Check for Updates'}
+              {checking ? t('settings.advanced.status.checking') : t('settings.advanced.checkForUpdates')}
             </button>
           </div>
 
@@ -151,8 +154,8 @@ export function AdvancedSettings() {
       ) : null}
 
       <SettingsCard
-        title="Reset App Settings"
-        description={`Restore your application preferences to their default values. ${RESET_APP_SETTINGS_COPY}`}
+        title={t('settings.advanced.reset.title')}
+        description={t('settings.advanced.reset.description', { copy: resetCopy })}
       >
         <button
           type="button"
@@ -170,7 +173,7 @@ export function AdvancedSettings() {
               aria-hidden
             />
           ) : null}
-          {resetting ? 'Resetting…' : 'Reset App Settings'}
+          {resetting ? t('settings.advanced.reset.resetting') : t('settings.advanced.reset.button')}
         </button>
 
         {resetNotice ? (
@@ -181,16 +184,16 @@ export function AdvancedSettings() {
               TONE_CLASS[resetNotice.tone]
             }`}
           >
-            {resetNotice.text}
+            {translateRef(t, resetNotice.text)}
           </p>
         ) : null}
       </SettingsCard>
 
       {resetDialogOpen ? (
         <ConfirmBookActionDialog
-          title="Reset App Settings?"
-          message={`This will restore your application preferences to their default values. ${RESET_APP_SETTINGS_COPY}`}
-          confirmLabel="Reset Settings"
+          title={t('settings.advanced.reset.confirmTitle')}
+          message={t('settings.advanced.reset.confirmBody', { copy: resetCopy })}
+          confirmLabel={t('settings.advanced.reset.confirm')}
           destructive
           onCancel={() => setResetDialogOpen(false)}
           onConfirm={confirmReset}

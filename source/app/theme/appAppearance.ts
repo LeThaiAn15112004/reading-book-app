@@ -1,4 +1,4 @@
-import { resolveUiLanguage, type ReaderTheme } from '@core'
+import { resolveUiLanguage, type MessageKey, type ReaderTheme } from '@core'
 import { customAccentTokens, normalizeHex } from './accentColor'
 
 /**
@@ -44,22 +44,29 @@ export const DEFAULT_APP_APPEARANCE: AppAppearance = {
 
 export const APP_THEME_MODES: readonly AppThemeMode[] = ['light', 'dark', 'sepia', 'system']
 
-export const ACCENT_COLORS: readonly { id: AccentColorId; label: string; swatch: string }[] = [
-  { id: 'blue', label: 'Blue', swatch: '#3b82f6' },
-  { id: 'purple', label: 'Purple', swatch: '#8b5cf6' },
-  { id: 'green', label: 'Green', swatch: '#22c55e' },
-  { id: 'cyan', label: 'Cyan', swatch: '#06b6d4' },
-  { id: 'orange', label: 'Orange', swatch: '#f59e0b' },
-  { id: 'red', label: 'Red', swatch: '#ef4444' },
-  { id: 'slate', label: 'Slate', swatch: '#94a3b8' },
+export const ACCENT_COLORS: readonly { id: AccentColorId; labelKey: MessageKey; swatch: string }[] = [
+  { id: 'blue', labelKey: 'settings.appearance.accent.blue', swatch: '#3b82f6' },
+  { id: 'purple', labelKey: 'settings.appearance.accent.purple', swatch: '#8b5cf6' },
+  { id: 'green', labelKey: 'settings.appearance.accent.green', swatch: '#22c55e' },
+  { id: 'cyan', labelKey: 'settings.appearance.accent.cyan', swatch: '#06b6d4' },
+  { id: 'orange', labelKey: 'settings.appearance.accent.orange', swatch: '#f59e0b' },
+  { id: 'red', labelKey: 'settings.appearance.accent.red', swatch: '#ef4444' },
+  { id: 'slate', labelKey: 'settings.appearance.accent.slate', swatch: '#94a3b8' },
 ]
 
 export const UI_DENSITIES: readonly UiDensity[] = ['comfortable', 'balanced', 'compact']
 
-export const APP_LANGUAGES: readonly { id: AppLanguage; label: string }[] = [
-  { id: 'system', label: 'System Default' },
-  { id: 'vi', label: 'Tiếng Việt' },
-  { id: 'en', label: 'English' },
+/**
+ * "System Default" is translated (`labelKey`); a language's own name is always written in that language (FR-009), so
+ * "Tiếng Việt" and "English" are `nativeLabel`s, never translated.
+ */
+export const APP_LANGUAGES: readonly (
+  | { id: 'system'; labelKey: MessageKey }
+  | { id: Exclude<AppLanguage, 'system'>; nativeLabel: string }
+)[] = [
+  { id: 'system', labelKey: 'settings.appearance.language.system' },
+  { id: 'vi', nativeLabel: 'Tiếng Việt' },
+  { id: 'en', nativeLabel: 'English' },
 ]
 
 /**

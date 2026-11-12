@@ -1,3 +1,5 @@
+import type { MessageKey } from '@core'
+import { useT } from '../../i18n'
 import {
   AboutSettings,
   AdvancedSettings,
@@ -15,18 +17,19 @@ import {
   type SettingsSectionId,
 } from './logic/settingsNavStore'
 
-const SECTION_DESCRIPTIONS: Partial<Record<SettingsSectionId, string>> = {
-  appearance: 'Theme, accent color, density and language for the whole app.',
-  keyboard: 'Keyboard shortcuts for common actions.',
-  notifications: 'System notifications, running in the background and the tray icon.',
-  storage: 'Where Readmate Reader keeps its data and how much space it uses.',
-  privacy: 'History Readmate Reader saves about your use — not your books.',
-  advanced: 'Updates and app preferences for Readmate Reader.',
-  about: 'Information about Readmate Reader.',
+const SECTION_DESCRIPTIONS: Partial<Record<SettingsSectionId, MessageKey>> = {
+  appearance: 'settings.sectionDescriptions.appearance',
+  keyboard: 'settings.sectionDescriptions.keyboard',
+  notifications: 'settings.sectionDescriptions.notifications',
+  storage: 'settings.sectionDescriptions.storage',
+  privacy: 'settings.sectionDescriptions.privacy',
+  advanced: 'settings.sectionDescriptions.advanced',
+  about: 'settings.sectionDescriptions.about',
 }
 
 /** SCR-06 — App Settings: section sidebar (collapsible) + content panel. */
 export function SettingsScreen() {
+  const t = useT()
   const activeSection = useSettingsNavStore((s) => s.activeSection)
   const sections = visibleSettingsSections()
   const section = sections.find((s) => s.id === activeSection) ?? sections[0]!
@@ -42,10 +45,10 @@ export function SettingsScreen() {
               id="settings-section-title"
               className="m-0 truncate text-lg font-semibold tracking-tight text-lib-text-strong"
             >
-              {section.label}
+              {t(section.labelKey)}
             </h2>
             {description ? (
-              <p className="m-0 mt-0.5 truncate text-xs text-lib-faint">{description}</p>
+              <p className="m-0 mt-0.5 truncate text-xs text-lib-faint">{t(description)}</p>
             ) : null}
           </div>
         </header>
