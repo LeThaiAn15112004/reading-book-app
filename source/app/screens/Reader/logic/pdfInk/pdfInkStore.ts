@@ -20,6 +20,7 @@ import {
 } from '@core'
 import { overlayApi } from '../../../../bridge'
 import { activeInkLook, usePdfInkPrefsStore } from './pdfInkPrefsStore'
+import { getT } from '../../../../i18n'
 
 /** One stroke as the PDF surface paints it and the store persists it. */
 export type PdfInkMark = {
@@ -160,13 +161,13 @@ export const usePdfInkStore = create<PdfInkStoreState>()((set, get) => {
       set((s) => ({
         strokes: s.strokes.some((m) => m.id === mark.id) ? s.strokes.map((m) => (m.id === mark.id ? mark : m)) : [...s.strokes, mark],
       }))
-      persist(mark, 'Could not restore the stroke.')
+      persist(mark, getT()('reader.pdf.toast.restoreStrokeFailed'))
     },
     remove: (mark: PdfInkMark) => {
       dropRow(mark.id)
       const { bookId, onToast } = get()
       if (!bookId) return
-      void overlayApi.deleteInk({ bookId, id: mark.id }).catch(() => onToast('Could not undo.'))
+      void overlayApi.deleteInk({ bookId, id: mark.id }).catch(() => onToast(getT()('reader.pdf.toast.undoFailed')))
     },
   }
 
@@ -194,7 +195,7 @@ export const usePdfInkStore = create<PdfInkStoreState>()((set, get) => {
         if (get().bookId !== bookId) return
         set({ strokes: rows.map(dtoToInkMark).filter((m): m is PdfInkMark => m != null) })
       } catch {
-        if (get().bookId === bookId) onToast('Could not load pen strokes.')
+        if (get().bookId === bookId) onToast(getT()('reader.pdf.toast.loadStrokesFailed'))
       }
     },
 
@@ -208,7 +209,7 @@ export const usePdfInkStore = create<PdfInkStoreState>()((set, get) => {
       const pen = activeInkLook(usePdfInkPrefsStore.getState())
       const ink = parsePdfInk({ pageIndex, paths: [path], penStyle: pen.penStyle, width: pen.width })
       if (!ink) {
-        onToast('Could not save the stroke.')
+        onToast(getT()('reader.pdf.toast.saveStrokeFailed'))
         return null
       }
       const now = new Date().toISOString()
@@ -230,11 +231,11 @@ export const usePdfInkStore = create<PdfInkStoreState>()((set, get) => {
         .then((saved) => {
           if (saved) return
           dropRow(mark.id)
-          onToast('Could not save the stroke.')
+          onToast(getT()('reader.pdf.toast.saveStrokeFailed'))
         })
         .catch(() => {
           dropRow(mark.id)
-          onToast('Could not save the stroke.')
+          onToast(getT()('reader.pdf.toast.saveStrokeFailed'))
         })
       return mark
     },
@@ -252,7 +253,7 @@ export const usePdfInkStore = create<PdfInkStoreState>()((set, get) => {
       dropRow(id)
       const restore = () => {
         set((s) => ({ strokes: [...s.strokes, current] }))
-        onToast('Could not delete the stroke.')
+        onToast(getT()('reader.pdf.toast.deleteStrokeFailed'))
       }
       void overlayApi
         .deleteInk({ bookId, id })
@@ -279,7 +280,7 @@ export const usePdfInkStore = create<PdfInkStoreState>()((set, get) => {
       const next: PdfInkMark = { ...current, penStyle, width, opacity, colorHex: hex, updatedAt: new Date().toISOString() }
       record({ kind: 'replace', before: current, after: next })
       set((s) => ({ strokes: s.strokes.map((m) => (m.id === id ? next : m)) }))
-      persist(next, 'Could not save the stroke.')
+      persist(next, getT()('reader.pdf.toast.saveStrokeFailed'))
     },
 
     moveStroke: (id, dx, dy) => {
@@ -290,7 +291,7 @@ export const usePdfInkStore = create<PdfInkStoreState>()((set, get) => {
       const next: PdfInkMark = { ...current, paths: moved.paths, updatedAt: new Date().toISOString() }
       record({ kind: 'replace', before: current, after: next })
       set((s) => ({ strokes: s.strokes.map((m) => (m.id === id ? next : m)) }))
-      persist(next, 'Could not save the moved stroke.')
+      persist(next, getT()('reader.pdf.toast.saveMovedStrokeFailed'))
     },
 
     resizeStroke: (id, paths) => {
@@ -301,7 +302,7 @@ export const usePdfInkStore = create<PdfInkStoreState>()((set, get) => {
       const next: PdfInkMark = { ...current, paths: ink.paths, updatedAt: new Date().toISOString() }
       record({ kind: 'replace', before: current, after: next })
       set((s) => ({ strokes: s.strokes.map((m) => (m.id === id ? next : m)) }))
-      persist(next, 'Could not save the resized stroke.')
+      persist(next, getT()('reader.pdf.toast.saveResizedStrokeFailed'))
     },
 
     deleteSelected: () => {
@@ -353,7 +354,7 @@ export const usePdfInkStore = create<PdfInkStoreState>()((set, get) => {
       let failed = false
       const fail = (undo: () => void) => {
         undo()
-        if (!failed) onToast('Could not save the erased strokes.')
+        if (!failed) onToast(getT()('reader.pdf.toast.saveErasedFailed'))
         failed = true
       }
       for (const mark of toSave) {
@@ -396,7 +397,7 @@ export const usePdfInkStore = create<PdfInkStoreState>()((set, get) => {
         const restore = () => {
           failed++
           set((s) => (s.strokes.some((m) => m.id === mark.id) ? s : { strokes: [...s.strokes, mark] }))
-          if (failed === 1) onToast('Could not erase every stroke.')
+          if (failed === 1) onToast(getT()('reader.pdf.toast.eraseAllFailed'))
         }
         void overlayApi
           .deleteInk({ bookId, id: mark.id })

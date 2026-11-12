@@ -114,7 +114,8 @@ import { useReaderPdfGraphics } from './logic/hooks/useReaderPdfGraphics'
 import { usePdfShapePrefsStore } from './logic/pdfShapes/pdfShapePrefsStore'
 import { usePdfTypewriterPrefsStore } from './logic/pdfTypewriter/pdfTypewriterPrefsStore'
 import { useTypewriterEditorStore } from './logic/pdfTypewriter/typewriterEditorStore'
-import { usePageAttachmentsStore } from './logic/attachments/pageAttachmentsStore'
+import { usePageAttachmentsStore, writeBlockedMessage } from './logic/attachments/pageAttachmentsStore'
+import { useUiLanguage } from '../../i18n'
 import { TypewriterPropertiesPanel } from './components/rightPanel/TypewriterPropertiesPanel'
 import { useTypewriterPanelStore } from './logic/pdfTypewriter/typewriterPanelStore'
 import { PdfTypewriterEditor } from '../../components/reader/renderers/pdf/PdfTypewriterEditor'
@@ -549,6 +550,7 @@ export function ReaderScreen() {
   const selectedAttachmentId = usePageAttachmentsStore((s) => s.selectedId)
   const movingAttachment = usePageAttachmentsStore((s) => s.moving)
   const attachmentWriteBlocked = usePageAttachmentsStore((s) => s.writeBlocked)
+  const uiLanguage = useUiLanguage()
   const pdfAttachmentPins = useMemo(
     () => [
       ...pdfHighlights.highlights.flatMap((h): PdfAttachmentPin[] => {
@@ -861,7 +863,7 @@ export function ReaderScreen() {
     typewriter: { active: activeTool === 'typewriter' },
     // Disabled with the reason when the open PDF is known to be unwritable (FR-012); a signed PDF stays usable (it asks).
     fileAttachment: attachmentWriteBlocked
-      ? { active: false, disabled: true, reason: attachmentWriteBlocked }
+      ? { active: false, disabled: true, reason: writeBlockedMessage(attachmentWriteBlocked, uiLanguage) }
       : { active: activeTool === 'fileAttachment' },
     eraser: { active: activeTool === 'eraser' },
     snapshot: { active: snapshot.active },

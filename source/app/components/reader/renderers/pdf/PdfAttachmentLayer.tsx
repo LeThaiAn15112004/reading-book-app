@@ -1,5 +1,6 @@
 import { memo } from 'react'
 import type { PdfAttachmentPin } from './attachmentPins'
+import { useT } from '../../../../i18n'
 
 type Props = {
   pins: readonly PdfAttachmentPin[]
@@ -10,6 +11,7 @@ type Props = {
 
 /** The page's attachment icons. Pointer input is handled by the renderer's surface (hit-tested with `attachmentPinAt`). */
 export const PdfPageAttachments = memo(function PdfPageAttachments({ pins, selectedId = null, drag = null }: Props) {
+  const t = useT()
   return (
     <div className="pointer-events-none absolute inset-0" style={{ zIndex: 4 }} data-pdf-attachments="">
       {pins.map((pin) => {
@@ -19,7 +21,7 @@ export const PdfPageAttachments = memo(function PdfPageAttachments({ pins, selec
           <div
             key={pin.id}
             role="img"
-            aria-label={`Attached file: ${pin.name}`}
+            aria-label={t('reader.pdf.renderer.attachedFile', { name: pin.name })}
             title={pin.name}
             data-attachment-id={pin.id}
             data-attachment-pending={pin.pending ? '' : undefined}

@@ -1,4 +1,3 @@
-/* i18n-pending: reader.pdf */
 /**
  * In-place editor of a Typewriter note (specs/005-typewriter-note, research D2): a `contenteditable` whose
  * content is ALWAYS rendered from the document model. Edits are intercepted in `beforeinput`, applied with the
@@ -10,6 +9,7 @@ import { useLayoutEffect, useMemo, useRef, type ClipboardEvent, type Composition
 import { editText, type PdfTypewriterDoc, type TypewriterLayout, type TypewriterTextStyle } from '@core'
 import { TypewriterLines } from './PdfTypewriterLayer'
 import { layoutNote, noteHeightFraction, type TypewriterNormBox } from './typewriterBox'
+import { useT } from '../../../../i18n'
 
 export type TypewriterFlag = 'bold' | 'italic' | 'underline' | 'strike'
 
@@ -151,6 +151,7 @@ function nextBoundary(text: string, offset: number): number {
 const FLAG_KEYS: Partial<Record<string, TypewriterFlag>> = { KeyB: 'bold', KeyI: 'italic', KeyU: 'underline' }
 
 export function PdfTypewriterEditor({ box, heightRatio, value, truncated, onChange, onSelect, onUndo, onRedo, onToggleFlag, onCommit, onRebuild }: Props) {
+  const t = useT()
   const rootRef = useRef<HTMLDivElement>(null)
   const composingRef = useRef<{ start: number; end: number } | null>(null)
   const valueRef = useRef(value)
@@ -357,7 +358,7 @@ export function PdfTypewriterEditor({ box, heightRatio, value, truncated, onChan
         spellCheck={false}
         role="textbox"
         aria-multiline="true"
-        aria-label="Typewriter text"
+        aria-label={t('reader.pdf.typewriter.textAria')}
         style={{ position: 'absolute', inset: 0, outline: 'none', caretColor: value.doc.base.color, cursor: 'text', userSelect: 'text' }}
         onCompositionStart={onCompositionStart}
         onCompositionEnd={onCompositionEnd}
@@ -368,7 +369,7 @@ export function PdfTypewriterEditor({ box, heightRatio, value, truncated, onChan
       </div>
       {truncated ? (
         <div role="status" style={{ position: 'absolute', left: 0, top: '100%', fontSize: 11, background: '#333', color: '#fff', padding: '2px 6px', borderRadius: 4, whiteSpace: 'nowrap' }}>
-          Text limit reached (10 000 characters)
+          {t('reader.pdf.typewriter.limit')}
         </div>
       ) : null}
     </div>

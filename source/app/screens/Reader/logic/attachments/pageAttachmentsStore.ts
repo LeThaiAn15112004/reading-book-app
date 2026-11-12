@@ -3,7 +3,7 @@ import {
   classifyAttachment,
   describeAttachFailure,
   describeAttachmentBlock,
-  formatAttachmentSize,
+  type UiLanguage,
   highlightReplace,
   pdfHighlightDtoToReaderHighlight,
   type HighlightAction,
@@ -14,6 +14,7 @@ import { attachmentsApi } from '../../../../bridge/attachments'
 import { overlayApi } from '../../../../bridge/overlay'
 import type { PdfAttachmentPin } from '../../../../components/reader/renderers/pdf'
 import { registerAttachmentHistory, usePdfHighlightsStore } from '../pdfHighlights/pdfHighlightsStore'
+import { getFormat, getT, getUiLanguage } from '../../../../i18n'
 
 type SyncEvent = Parameters<Parameters<typeof overlayApi.onPdfEmbeddedAnnotationsChanged>[0]>[0]
 export type ForeignPageAttachment = NonNullable<SyncEvent['pageAttachments']>[number]
@@ -98,7 +99,7 @@ export function attachmentIdOfPin(pin: PdfAttachmentPin): string {
  */
 export function openBlockedByName(pin: PdfAttachmentPin): string | null {
   const verdict = classifyAttachment(pin.name, new Uint8Array(0))
-  return verdict.open ? null : describeAttachmentBlock(verdict.reason)
+  return verdict.open ? null : describeAttachmentBlock(verdict.reason, getUiLanguage())
 }
 
 const toast = (message: string) => usePdfHighlightsStore.getState().onToast(message)
@@ -122,9 +123,14 @@ const IDLE = {
 /** Write refusals that last until the file itself changes (not `signed`, `locked`, `changed`). */
 const LASTING_BLOCKS = new Set(['read_only', 'managed_copy', 'encrypted', 'unsupported_pdf'])
 
-/** The disabled tool's reason for a lasting block, or null. */
+/** The lasting block's reason code (kept, not its text: the text follows the interface language), or null. */
 function lastingBlock(reason: string | undefined): string | null {
-  return reason && LASTING_BLOCKS.has(reason) ? describeAttachFailure({ code: 'blocked', reason }) : null
+  return reason && LASTING_BLOCKS.has(reason) ? reason : null
+}
+
+/** The disabled File Attachment tool's reason for a `writeBlocked` code, in `lang` (spec 012). */
+export function writeBlockedMessage(reason: string, lang: UiLanguage = getUiLanguage()): string {
+  return describeAttachFailure({ code: 'blocked', reason }, 'attach', lang) ?? ''
 }
 
 type Failure = { ok: false; code: string; reason?: string; signerName?: string }
@@ -149,12 +155,12 @@ async function writeMove(
 ): Promise<{ row: PdfReaderHighlight } | { failed: string | null }> {
   const result = await attachmentsApi.change({ bookId, rowId: row.id, op: 'move', rect: box }).catch(() => null)
   if (!result) {
-    toast('The attachment could not be moved. Nothing was changed.')
+    toast(getT()('reader.pdf.attachments.moveFailed'))
     return { failed: null }
   }
   if (!result.ok) {
     if (isSignedRefusal(result)) onSigned(result.code === 'blocked' ? result.signerName : undefined)
-    else toast(describeAttachFailure(result, 'move') ?? 'The attachment could not be moved. Nothing was changed.')
+    else toast(describeAttachFailure(result, 'move', getUiLanguage()) ?? getT()('reader.pdf.attachments.moveFailed'))
     return { failed: result.code }
   }
   const saved = result.highlight ? pdfHighlightDtoToReaderHighlight(result.highlight) : null
@@ -206,14 +212,14 @@ export const usePageAttachmentsStore = create<PageAttachmentsState>((set, get) =
     // Known to be unwritable: say why, never open the picker (Main would refuse before it anyway).
     const blocked = get().writeBlocked
     if (blocked) {
-      toast(blocked)
+      toast(writeBlockedMessage(blocked))
       return
     }
     set({ creating: true })
     try {
       const result = await attachmentsApi.create({ bookId, pageIndex, point }).catch(() => null)
       if (!result) {
-        toast('The file could not be attached. Nothing was changed.')
+        toast(getT()('reader.pdf.attachments.attachFailed'))
         return
       }
       if (!result.ok) {
@@ -223,7 +229,7 @@ export const usePageAttachmentsStore = create<PageAttachmentsState>((set, get) =
           set({ signed: { bookId, signerName: result.code === 'blocked' ? result.signerName : undefined, retry: () => void get().create(bookId, pageIndex, point) } })
           return
         }
-        const message = describeAttachFailure(result)
+        const message = describeAttachFailure(result, 'attach', getUiLanguage())
         if (message) toast(message)
         return
       }
@@ -234,7 +240,11 @@ export const usePageAttachmentsStore = create<PageAttachmentsState>((set, get) =
       usePdfHighlightsStore.setState((s) => ({ highlights: [...s.highlights.filter((h) => h.id !== row.id), row] }))
       set({ selectedId: row.id })
       const info = row.attachment
-      toast(info ? `Attached ${info.name} (${formatAttachmentSize(info.sizeBytes)}).` : 'File attached.')
+      toast(
+        info
+          ? getT()('reader.pdf.attachments.attached', { name: info.name, size: getFormat().bytes(info.sizeBytes) })
+          : getT()('reader.pdf.attachments.attachedPlain'),
+      )
     } finally {
       set({ creating: false })
     }
@@ -271,12 +281,12 @@ export const usePageAttachmentsStore = create<PageAttachmentsState>((set, get) =
     if (get().bookId !== bookId) return set({ busy: false })
     if (result?.ok) {
       set({ busy: false })
-      toast(`Opened “${result.fileName}”.`)
+      toast(getT()('reader.pdf.attachments.opened', { name: result.fileName }))
     } else if (result?.errorCode === 'blocked') {
       set({ busy: false, blocked: { pin: confirming, message: result.errorMessage } })
     } else {
       set({ busy: false })
-      toast(result ? result.errorMessage : 'The attachment could not be opened.')
+      toast(result ? result.errorMessage : getT()('reader.pdf.attachments.openFailed'))
     }
   },
 
@@ -288,13 +298,13 @@ export const usePageAttachmentsStore = create<PageAttachmentsState>((set, get) =
     if (get().bookId !== bookId) return set({ busy: false })
     if (result?.ok) {
       set({ busy: false, blocked: null, details: null })
-      toast(`Saved as “${result.fileName}”.`)
+      toast(getT()('reader.pdf.attachments.savedAs', { name: result.fileName }))
     } else if (result?.errorCode === 'canceled') {
       // The dialog that started it stays: the user can try again or close it.
       set({ busy: false })
     } else {
       set({ busy: false, blocked: null })
-      toast(result ? result.errorMessage : 'The attachment could not be saved.')
+      toast(result ? result.errorMessage : getT()('reader.pdf.attachments.saveFailed'))
     }
   },
 
@@ -327,7 +337,7 @@ export const usePageAttachmentsStore = create<PageAttachmentsState>((set, get) =
   confirmDelete: async () => {
     const pin = get().deleting
     set({ deleting: null })
-    if (pin && (await get().remove(pin.id))) toast(`Removed “${pin.name}” from the PDF.`)
+    if (pin && (await get().remove(pin.id))) toast(getT()('reader.pdf.attachments.removed', { name: pin.name }))
   },
 
   confirmSigned: async () => {
@@ -336,7 +346,7 @@ export const usePageAttachmentsStore = create<PageAttachmentsState>((set, get) =
     if (!pending || pending.bookId !== get().bookId) return
     const result = await overlayApi.confirmSignedPdfWrite(pending.bookId).catch(() => null)
     if (!result?.ok) {
-      toast('Could not write into the signed PDF. Nothing was changed.')
+      toast(getT()('reader.pdf.attachments.signedWriteFailed'))
       return
     }
     pending.retry()
@@ -345,7 +355,7 @@ export const usePageAttachmentsStore = create<PageAttachmentsState>((set, get) =
   declineSigned: () => {
     if (!get().signed) return
     set({ signed: null })
-    toast('The signed PDF was not changed.')
+    toast(getT()('reader.pdf.attachments.signedUnchanged'))
   },
 
   remove: async (rowId) => {
@@ -362,12 +372,12 @@ export const usePageAttachmentsStore = create<PageAttachmentsState>((set, get) =
             signed: {
               bookId,
               signerName: result.code === 'blocked' ? result.signerName : undefined,
-              retry: () => void get().remove(rowId).then((ok) => ok && name && toast(`Removed “${name}” from the PDF.`)),
+              retry: () => void get().remove(rowId).then((ok) => ok && name && toast(getT()('reader.pdf.attachments.removed', { name }))),
             },
           })
           return false
         }
-        toast((result && describeAttachFailure(result, 'delete')) ?? 'The attachment could not be deleted. Nothing was changed.')
+        toast((result && describeAttachFailure(result, 'delete', getUiLanguage())) ?? getT()('reader.pdf.attachments.deleteFailed'))
         return false
       }
       // Its move steps can never be applied again: dropped, so Undo reaches the steps behind them.

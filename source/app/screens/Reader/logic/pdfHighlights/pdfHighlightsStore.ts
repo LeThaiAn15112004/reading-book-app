@@ -39,6 +39,7 @@ import {
 import { overlayApi } from '../../../../bridge'
 import { usePdfSignedWriteStore } from '../pdfExport/pdfSignedWriteStore'
 import type { PdfInsertionPoint, PdfRendererApi, PdfSelectionInfo } from '../../../../components/reader/renderers/pdf'
+import { getT } from '../../../../i18n'
 
 /** Derived from the bridge: the renderer never imports from electron/. */
 type PdfEmbeddedAnnotationsChangedDto = Parameters<Parameters<typeof overlayApi.onPdfEmbeddedAnnotationsChanged>[0]>[0]
@@ -224,7 +225,7 @@ export const usePdfHighlightsStore = create<PdfHighlightsStoreState>()((set, get
           .filter((h): h is PdfReaderHighlight => h != null),
       })
     } catch {
-      if (get().bookId === bookId) onToast('Could not load highlights.')
+      if (get().bookId === bookId) onToast(getT()('reader.pdf.toast.loadHighlightsFailed'))
     }
   },
 
@@ -239,19 +240,19 @@ export const usePdfHighlightsStore = create<PdfHighlightsStoreState>()((set, get
     const { onToast } = get()
     switch (event.writeStatus) {
       case 'locked':
-        onToast('The PDF is in use by another app — Readmate will retry writing your annotations.')
+        onToast(getT()('reader.pdf.sync.locked'))
         break
       case 'failed':
-        onToast('Could not write your annotations into the PDF file. They are kept in Readmate.')
+        onToast(getT()('reader.pdf.sync.failed'))
         break
       case 'read_only':
-        onToast('The PDF file or its folder is read-only, so your annotations are kept in Readmate but not written into it.')
+        onToast(getT()('reader.pdf.sync.readOnly'))
         break
       case 'encrypted':
-        onToast('This PDF is encrypted — your annotations are kept in Readmate but can’t be written into it.')
+        onToast(getT()('reader.pdf.sync.encrypted'))
         break
       case 'unsupported_pdf':
-        onToast('This PDF’s structure doesn’t allow writing annotations — they are kept in Readmate.')
+        onToast(getT()('reader.pdf.sync.unsupported'))
         break
       case 'signed':
         usePdfSignedWriteStore.getState().request(event.bookId, event.signerName)
@@ -263,9 +264,7 @@ export const usePdfHighlightsStore = create<PdfHighlightsStoreState>()((set, get
     if (event.conflicts.length > 0) {
       set((s) => ({ conflicts: { ...s.conflicts, ...Object.fromEntries(event.conflicts.map((c) => [c.noteId, c])) } }))
       onToast(
-        event.conflicts.length === 1
-          ? 'An annotation was changed in Readmate and in another app — open it to choose a version.'
-          : `${event.conflicts.length} annotations were changed in Readmate and in another app — open them to choose.`,
+        getT()('reader.pdf.sync.conflict', { count: event.conflicts.length }),
       )
     }
     if (byId.size === 0 && deleted.size === 0 && event.hiddenObjectIds.length === 0) return
@@ -301,7 +300,7 @@ export const usePdfHighlightsStore = create<PdfHighlightsStoreState>()((set, get
       const result = await overlayApi.resolvePdfAnnotationConflict(bookId, id, choice)
       if (get().bookId !== bookId) return
       if (!result.ok) {
-        onToast('Could not resolve the conflict.')
+        onToast(getT()('reader.pdf.toast.resolveFailed'))
         return
       }
       const updated = result.updated ? pdfHighlightDtoToReaderHighlight(result.updated) : null
@@ -315,7 +314,7 @@ export const usePdfHighlightsStore = create<PdfHighlightsStoreState>()((set, get
         }
       })
     } catch {
-      onToast('Could not resolve the conflict.')
+      onToast(getT()('reader.pdf.toast.resolveFailed'))
     }
   },
 
@@ -324,7 +323,7 @@ export const usePdfHighlightsStore = create<PdfHighlightsStoreState>()((set, get
     if (!bookId) return null
     const annotation = pdfAnnotationFromRects(selection.rects)
     if (!annotation) {
-      onToast('Could not mark this selection.')
+      onToast(getT()('reader.pdf.toast.markFailed'))
       return null
     }
     const now = new Date().toISOString()
@@ -356,11 +355,11 @@ export const usePdfHighlightsStore = create<PdfHighlightsStoreState>()((set, get
       .then((saved) => {
         if (saved) return
         removeHighlightRow(set, highlight.id)
-        onToast('Could not save highlight.')
+        onToast(getT()('reader.pdf.toast.saveHighlightFailed'))
       })
       .catch(() => {
         removeHighlightRow(set, highlight.id)
-        onToast('Could not save highlight.')
+        onToast(getT()('reader.pdf.toast.saveHighlightFailed'))
       })
     return highlight
   },
@@ -384,7 +383,7 @@ export const usePdfHighlightsStore = create<PdfHighlightsStoreState>()((set, get
   beginInsert: (point) => {
     const rect = pdfCaretRect(point.page, point.x, point.lineBottom, point.lineHeight, point.aspect)
     if (!rect) {
-      get().onToast('Could not place the insertion point.')
+      get().onToast(getT()('reader.pdf.toast.placeInsertFailed'))
       return
     }
     const { x, bottom } = point.client
@@ -403,7 +402,7 @@ export const usePdfHighlightsStore = create<PdfHighlightsStoreState>()((set, get
     if (!bookId || !note) return
     const annotation = pdfAnnotationFromRects([pendingInsert.rect], { caret: true })
     if (!annotation?.caret) {
-      onToast('Could not mark this insertion point.')
+      onToast(getT()('reader.pdf.toast.markInsertFailed'))
       return
     }
     const now = new Date().toISOString()
@@ -428,11 +427,11 @@ export const usePdfHighlightsStore = create<PdfHighlightsStoreState>()((set, get
       .then((saved) => {
         if (saved) return
         removeHighlightRow(set, highlight.id)
-        onToast('Could not save highlight.')
+        onToast(getT()('reader.pdf.toast.saveHighlightFailed'))
       })
       .catch(() => {
         removeHighlightRow(set, highlight.id)
-        onToast('Could not save highlight.')
+        onToast(getT()('reader.pdf.toast.saveHighlightFailed'))
       })
   },
 
@@ -479,11 +478,11 @@ export const usePdfHighlightsStore = create<PdfHighlightsStoreState>()((set, get
       .then((saved) => {
         if (saved) return
         removeHighlightRow(set, highlight.id)
-        onToast('Could not save the shape.')
+        onToast(getT()('reader.pdf.toast.saveShapeFailed'))
       })
       .catch(() => {
         removeHighlightRow(set, highlight.id)
-        onToast('Could not save the shape.')
+        onToast(getT()('reader.pdf.toast.saveShapeFailed'))
       })
     return highlight
   },
@@ -493,7 +492,7 @@ export const usePdfHighlightsStore = create<PdfHighlightsStoreState>()((set, get
     if (!bookId) return null
     const clean = parseTypewriterDoc(doc, text)
     if (!clean || !isValidTypewriterText(text) || !isValidTypewriterBox(box)) {
-      onToast('The text does not fit on the page — enlarge the box or reduce the size.')
+      onToast(getT()('reader.pdf.toast.doesNotFit'))
       return null
     }
     const rects = [{ page: pageIndex + 1, x: box.x, y: box.y, width: box.width, height: box.height }]
@@ -518,7 +517,7 @@ export const usePdfHighlightsStore = create<PdfHighlightsStoreState>()((set, get
     set((s) => ({ highlights: [...s.highlights, highlight] }))
     const fail = () => {
       removeHighlightRow(set, highlight.id)
-      onToast('Could not save the text box.')
+      onToast(getT()('reader.pdf.toast.saveTextBoxFailed'))
     }
     void overlayApi
       .saveHighlight(toSaveInput(bookId, highlight))
@@ -534,7 +533,7 @@ export const usePdfHighlightsStore = create<PdfHighlightsStoreState>()((set, get
     if (!current || current.styleKind !== 'typewriter') return false
     const clean = parseTypewriterDoc(doc, text)
     if (!clean || !isValidTypewriterText(text) || !isValidTypewriterBox(box)) {
-      get().onToast('The text does not fit on the page — enlarge the box or reduce the size.')
+      get().onToast(getT()('reader.pdf.toast.doesNotFit'))
       return false
     }
     const annotation = pdfAnnotationFromRects([{ page: current.page, x: box.x, y: box.y, width: box.width, height: box.height }])
@@ -560,7 +559,7 @@ export const usePdfHighlightsStore = create<PdfHighlightsStoreState>()((set, get
     if (doc === current.typewriter) return true
     const box = fit(doc, text, { x: rect.x, y: rect.y, width: rect.width, height: rect.height })
     if (!box) {
-      get().onToast('The text does not fit on the page — enlarge the box or reduce the size.')
+      get().onToast(getT()('reader.pdf.toast.doesNotFit'))
       return false
     }
     const clean = parseTypewriterDoc(doc, text)
@@ -625,7 +624,7 @@ export const usePdfHighlightsStore = create<PdfHighlightsStoreState>()((set, get
     removeHighlightRow(set, id)
     const restore = () => {
       set((s) => ({ highlights: [...s.highlights, current] }))
-      onToast('Could not delete highlight.')
+      onToast(getT()('reader.pdf.toast.deleteHighlightFailed'))
     }
     void overlayApi
       .deleteHighlight({ bookId, id })
@@ -738,9 +737,9 @@ function persistHighlight(get: Get, h: PdfReaderHighlight): void {
   void overlayApi
     .saveHighlight(toSaveInput(bookId, h))
     .then((saved) => {
-      if (!saved) onToast('Could not update highlight.')
+      if (!saved) onToast(getT()('reader.pdf.toast.updateHighlightFailed'))
     })
-    .catch(() => onToast('Could not update highlight.'))
+    .catch(() => onToast(getT()('reader.pdf.toast.updateHighlightFailed')))
 }
 
 /** Undo / redo: re-apply a snapshot (insert or overwrite) or remove — and persist either way, so
@@ -756,7 +755,7 @@ function historyHandlers(get: Get, set: Set) {
       removeHighlightRow(set, id)
       const { bookId, onToast } = get()
       if (!bookId) return
-      void overlayApi.deleteHighlight({ bookId, id }).catch(() => onToast('Could not undo.'))
+      void overlayApi.deleteHighlight({ bookId, id }).catch(() => onToast(getT()('reader.pdf.toast.undoFailed')))
     },
   }
 }

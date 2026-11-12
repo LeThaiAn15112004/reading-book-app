@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { attachmentsApi, type AttachmentItem as AttachmentDto } from '../../../../bridge'
+import type { UiText } from '../../../../i18n'
 
 /**
  * State of the PDF Attachment panel and of the double-click → confirm → open workflow
@@ -18,13 +19,13 @@ type AttachmentsState = {
   status: ListStatus
   items: AttachmentDto[]
   truncated: boolean
-  loadError: string | null
+  loadError: UiText | null
   selectedId: string | null
   confirming: AttachmentDto | null
   blocked: { attachment: AttachmentDto; message: string } | null
   busy: boolean
   /** Result of the last open / save: an error to show in the panel, or a short confirmation. */
-  notice: { kind: 'error' | 'info'; message: string } | null
+  notice: { kind: 'error' | 'info'; message: UiText } | null
   load: (bookId: string) => Promise<void>
   select: (id: string | null) => void
   requestOpen: (attachment: AttachmentDto) => void
@@ -65,7 +66,7 @@ export const useAttachmentsStore = create<AttachmentsState>((set, get) => ({
       set({
         status: 'error',
         items: [],
-        loadError: result ? result.errorMessage : 'The attachments could not be loaded.',
+        loadError: result ? result.errorMessage : { key: 'reader.pdf.attachments.loadFailed' },
       })
     }
   },
@@ -92,13 +93,13 @@ export const useAttachmentsStore = create<AttachmentsState>((set, get) => ({
       return
     }
     if (result?.ok) {
-      set({ busy: false, notice: { kind: 'info', message: `Opened “${result.fileName}”.` } })
+      set({ busy: false, notice: { kind: 'info', message: { key: 'reader.pdf.attachments.opened', params: { name: result.fileName } } } })
     } else if (result?.errorCode === 'blocked') {
       set({ busy: false, blocked: { attachment: confirming, message: result.errorMessage } })
     } else {
       set({
         busy: false,
-        notice: { kind: 'error', message: result ? result.errorMessage : 'The attachment could not be opened.' },
+        notice: { kind: 'error', message: result ? result.errorMessage : { key: 'reader.pdf.attachments.openFailed' } },
       })
     }
   },
@@ -115,7 +116,7 @@ export const useAttachmentsStore = create<AttachmentsState>((set, get) => ({
       return
     }
     if (result?.ok) {
-      set({ busy: false, blocked: null, notice: { kind: 'info', message: `Saved as “${result.fileName}”.` } })
+      set({ busy: false, blocked: null, notice: { kind: 'info', message: { key: 'reader.pdf.attachments.savedAs', params: { name: result.fileName } } } })
     } else if (result?.errorCode === 'canceled') {
       // The dialog stays: the user can try again or close it.
       set({ busy: false })
@@ -123,7 +124,7 @@ export const useAttachmentsStore = create<AttachmentsState>((set, get) => ({
       set({
         busy: false,
         blocked: null,
-        notice: { kind: 'error', message: result ? result.errorMessage : 'The attachment could not be saved.' },
+        notice: { kind: 'error', message: result ? result.errorMessage : { key: 'reader.pdf.attachments.saveFailed' } },
       })
     }
   },

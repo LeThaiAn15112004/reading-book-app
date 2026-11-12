@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { getT } from '../../../../i18n'
 /** Mirrors `TypewriterFileStatusDto` (electron/ipc/api-types.ts). */
 export type TypewriterFileStatusDto = {
   id: string
@@ -31,14 +32,16 @@ export const useTypewriterFileStatusStore = create<State>()((set) => ({
 /** The user-facing reason a note is "not in the file" (contracts §3); null when it is in the file or unreported. The note itself is never altered. */
 export function typewriterNotInFileMessage(status: TypewriterFileStatusDto | undefined): string | null {
   if (!status || status.code === 'in_file') return null
+  // Called while rendering, so the text follows the current interface language (spec 012).
+  const t = getT()
   switch (status.code) {
     case 'unsupported_characters':
-      return `Remove or replace: ${(status.characters ?? []).join(' ')} — or choose another font. Your text is kept.`
+      return t('reader.pdf.typewriter.notInFile.unsupportedCharacters', { characters: (status.characters ?? []).join(' ') })
     case 'font_unavailable':
-      return 'Restart the app; your text is kept.'
+      return t('reader.pdf.typewriter.notInFile.fontUnavailable')
     case 'does_not_fit':
-      return 'Enlarge the box or reduce the size.'
+      return t('reader.pdf.typewriter.notInFile.doesNotFit')
     case 'file_not_writable':
-      return 'The PDF cannot be written right now (read-only, encrypted, in use, signed or changed on disk). Your note is kept in Readmate.'
+      return t('reader.pdf.typewriter.notInFile.fileNotWritable')
   }
 }

@@ -1,6 +1,8 @@
 import { create } from 'zustand'
 import { pdfGraphicAllows, type PdfGraphicObject, type PdfGraphicOp } from '@core'
 import { graphicsApi } from '../../../../bridge'
+import type { MessageKey } from '@core'
+import { getT } from '../../../../i18n'
 
 type GraphicsContext = {
   bookId: string | undefined
@@ -25,18 +27,18 @@ type PdfGraphicsStoreState = GraphicsContext & {
   deleteSelected: () => void
 }
 
-const FAILURE_MESSAGE: Record<string, string> = {
-  not_found: 'That object is no longer in the PDF.',
-  not_allowed: 'That change is not available for this object.',
-  managed_copy: 'This is an app-owned copy of the PDF, so it is not edited.',
-  read_only: 'The PDF file is read-only, so it was not changed.',
-  encrypted: 'The PDF is encrypted, so it was not changed.',
-  unsupported_pdf: 'This PDF’s structure can’t be edited safely, so it was not changed.',
-  signed: 'The PDF is digitally signed — editing it would invalidate the signature, so it was not changed.',
-  locked: 'The PDF is open in another program, so it was not changed.',
-  changed: 'The PDF changed on disk meanwhile — nothing was written. Try again.',
-  verify_failed: 'The edit could not be verified, so the PDF was left as it was.',
-  failed: 'Could not change the PDF.',
+const FAILURE_MESSAGE: Record<string, MessageKey> = {
+  not_found: 'reader.pdf.graphics.notFound',
+  not_allowed: 'reader.pdf.graphics.notAllowed',
+  managed_copy: 'reader.pdf.graphics.managedCopy',
+  read_only: 'reader.pdf.graphics.readOnly',
+  encrypted: 'reader.pdf.graphics.encrypted',
+  unsupported_pdf: 'reader.pdf.graphics.unsupportedPdf',
+  signed: 'reader.pdf.graphics.signed',
+  locked: 'reader.pdf.graphics.locked',
+  changed: 'reader.pdf.graphics.changed',
+  verify_failed: 'reader.pdf.graphics.verifyFailed',
+  failed: 'reader.pdf.graphics.failed',
 }
 
 /**
@@ -79,7 +81,7 @@ export const usePdfGraphicsStore = create<PdfGraphicsStoreState>()((set, get) =>
     const object = get().objects.find((o) => o.objectId === objectId)
     if (!bookId || !object || busy) return false
     if (!pdfGraphicAllows(object.caps, op)) {
-      onToast(FAILURE_MESSAGE.not_allowed!)
+      onToast(getT()(FAILURE_MESSAGE.not_allowed!))
       return false
     }
     set({ busy: true })
@@ -87,14 +89,14 @@ export const usePdfGraphicsStore = create<PdfGraphicsStoreState>()((set, get) =>
       const result = await graphicsApi.apply({ bookId, objectId, op })
       if (get().bookId !== bookId) return false
       if (!result.ok) {
-        onToast(FAILURE_MESSAGE[result.errorCode] ?? FAILURE_MESSAGE.failed!)
+        onToast(getT()(FAILURE_MESSAGE[result.errorCode] ?? FAILURE_MESSAGE.failed!))
         return false
       }
       set((s) => ({ objects: result.objects, selectedId: op.kind === 'delete' && s.selectedId === objectId ? null : s.selectedId }))
       get().onFileChanged()
       return true
     } catch {
-      onToast(FAILURE_MESSAGE.failed!)
+      onToast(getT()(FAILURE_MESSAGE.failed!))
       return false
     } finally {
       set({ busy: false })

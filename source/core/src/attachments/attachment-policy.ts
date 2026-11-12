@@ -1,3 +1,5 @@
+import { translate } from '../i18n/translate.js'
+import type { UiLanguage } from '../i18n/types.js'
 /**
  * Embedded-file ("attachment") policy shared by Main and the renderer: the descriptor the Attachment
  * panel shows, id shape, name sanitising and the decision whether Readmate may hand an extracted file
@@ -168,14 +170,15 @@ export function classifyAttachment(name: string, head: Uint8Array): AttachmentVe
   return { open: true }
 }
 
-export function describeAttachmentBlock(reason: AttachmentBlockReason): string {
+export function describeAttachmentBlock(reason: AttachmentBlockReason, lang: UiLanguage = 'en'): string {
+  // Catalogue texts (area reader.pdf, spec 012) in the interface language `lang`.
   switch (reason) {
     case 'prohibited_type':
-      return 'This type of file can run code or scripts, so Readmate will not open it directly.'
+      return translate(lang, 'reader.pdf.attachmentBlock.prohibitedType')
     case 'no_extension':
-      return 'This file has no file extension, so Readmate cannot tell what opening it would do.'
+      return translate(lang, 'reader.pdf.attachmentBlock.noExtension')
     case 'executable_content':
-      return 'The contents of this file look like a program or script, whatever it is named.'
+      return translate(lang, 'reader.pdf.attachmentBlock.executableContent')
   }
 }
 

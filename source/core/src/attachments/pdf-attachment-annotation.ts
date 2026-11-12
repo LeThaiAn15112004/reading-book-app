@@ -4,6 +4,9 @@
  * the PDF. See specs/007-pdf-file-attachment/ (data-model.md §1, contracts/pdf-file-attachment.md).
  */
 import { ATTACHMENT_MAX_BYTES, sanitizeAttachmentFileName } from './attachment-policy.js'
+import { formatBytes } from '../i18n/format.js'
+import { translate, type AnyMessageKey } from '../i18n/translate.js'
+import type { Params, UiLanguage } from '../i18n/types.js'
 
 /** What the app keeps about a file embedded in the PDF (`pdfAnnotation.attachment`). The content is only in the PDF. */
 export type PdfAttachmentInfo = {
@@ -78,25 +81,28 @@ export type AttachFailure =
   | { code: 'write_failed'; errno?: string }
   | { code: 'verify_failed' | 'unsupported_pdf' | 'encrypted' | 'not_found' | 'not_editable' | 'invalid_request' | 'busy' }
 
-const BLOCK_REASON_TEXT: Record<string, string> = {
-  managed_copy: 'this PDF is a copy Readmate keeps itself (downloaded from a link or a cloud service), not your own file',
-  read_only: 'the PDF file or its folder is read-only',
-  encrypted: 'the PDF is encrypted',
-  unsupported_pdf: 'the PDF’s structure does not allow adding to it safely',
-  signed: 'the PDF is digitally signed',
-  changed: 'another program changed the PDF meanwhile — try again',
-}
-
 /** What the refused operation was: the wording of a refusal follows it. */
 export type AttachAction = 'attach' | 'move' | 'delete'
 
-const ACTION_TEXT: Record<AttachAction, string> = { attach: 'add a file to this PDF', move: 'move this attachment', delete: 'delete this attachment' }
-const NOTHING_DONE: Record<AttachAction, string> = { attach: 'Nothing was attached.', move: 'Nothing was moved.', delete: 'Nothing was deleted.' }
-
 /** A size limit as people read it: whole megabytes without a decimal ("100 MB"), anything else like a file size. */
-function formatLimit(bytes: number): string {
-  return bytes % (1024 * 1024) === 0 ? `${bytes / (1024 * 1024)} MB` : formatAttachmentSize(bytes)
+function formatLimit(lang: UiLanguage, bytes: number): string {
+  return bytes % (1024 * 1024) === 0 ? `${bytes / (1024 * 1024)} MB` : sizeIn(lang, bytes)
 }
+
+/** English keeps the historical one-decimal form ("100.0 MB"); other languages use their own separators. */
+function sizeIn(lang: UiLanguage, bytes: number): string {
+  return lang === 'en' ? formatAttachmentSize(bytes) : formatBytes(lang, bytes)
+}
+
+type BlockReason = 'managed_copy' | 'read_only' | 'encrypted' | 'unsupported_pdf' | 'signed' | 'changed'
+const BLOCK_REASONS: ReadonlySet<string> = new Set<BlockReason>([
+  'managed_copy',
+  'read_only',
+  'encrypted',
+  'unsupported_pdf',
+  'signed',
+  'changed',
+])
 
 /**
  * What to tell the user about a refused or failed attach / move / delete (FR-011, FR-012, US4). Sizes have one
@@ -104,43 +110,65 @@ function formatLimit(bytes: number): string {
  * limit of PDF, Foxit or Acrobat. The refused file's name leads the message when it is known. Null for a cancelled
  * picker (nothing to say).
  */
-export function describeAttachFailure(failure: AttachFailure, action: AttachAction = 'attach'): string | null {
-  const named = (text: string, fileName?: string) => (fileName ? `“${fileName}” ${text}` : `This file ${text}`)
-  const nothing = NOTHING_DONE[action]
+export function describeAttachFailure(
+  failure: AttachFailure,
+  action: AttachAction = 'attach',
+  lang: UiLanguage = 'en',
+): string | null {
+  // The texts live in the i18n catalogue (area reader.pdf, spec 012); `lang` is the interface language.
+  const t = (key: AnyMessageKey, params?: Params) => translate(lang, key, params)
+  const named = (rest: string, fileName?: string) =>
+    fileName ? t('reader.pdf.attachFailure.named', { name: fileName, rest }) : t('reader.pdf.attachFailure.unnamed', { rest })
+  const nothing = t(`reader.pdf.attachFailure.nothing.${action}`)
+  const actionText = t(`reader.pdf.attachFailure.action.${action}`)
   switch (failure.code) {
     case 'cancelled':
       return null
-    case 'blocked':
-      return `Readmate can’t ${ACTION_TEXT[action]}: ${BLOCK_REASON_TEXT[failure.reason] ?? 'the file cannot be written'}. ${nothing}`
+    case 'blocked': {
+      const reason = BLOCK_REASONS.has(failure.reason)
+        ? t(`reader.pdf.attachFailure.blockReason.${failure.reason as BlockReason}`)
+        : t('reader.pdf.attachFailure.blockReason.other')
+      return t('reader.pdf.attachFailure.blocked', { action: actionText, reason, nothing })
+    }
     case 'empty':
-      return named(`is empty (0 bytes), so there is nothing to attach. ${nothing}`, failure.fileName)
+      return named(t('reader.pdf.attachFailure.empty', { nothing }), failure.fileName)
     case 'read_failed':
-      return named(`could not be read (it may be locked, moved or not permitted). ${nothing}`, failure.fileName)
+      return named(t('reader.pdf.attachFailure.readFailed', { nothing }), failure.fileName)
     case 'source_changed':
-      return named(`changed while it was being read. ${nothing} Try again once it is no longer changing.`, failure.fileName)
+      return named(t('reader.pdf.attachFailure.sourceChanged', { nothing }), failure.fileName)
     case 'too_large':
-      return named(`is ${formatAttachmentSize(failure.sizeBytes)} — the limit is ${formatLimit(failure.limitBytes)}. ${nothing}`, failure.fileName)
+      return named(
+        t('reader.pdf.attachFailure.tooLarge', { size: sizeIn(lang, failure.sizeBytes), limit: formatLimit(lang, failure.limitBytes), nothing }),
+        failure.fileName,
+      )
     case 'too_large_for_pdf':
       return named(
-        `is ${formatAttachmentSize(failure.sizeBytes)} and this PDF is ${formatAttachmentSize(failure.pdfSizeBytes)} — together they are over ${formatLimit(failure.limitBytes)}, the most Readmate writes into one PDF at a time. ${nothing}`,
+        t('reader.pdf.attachFailure.tooLargeForPdf', {
+          size: sizeIn(lang, failure.sizeBytes),
+          pdfSize: sizeIn(lang, failure.pdfSizeBytes),
+          limit: formatLimit(lang, failure.limitBytes),
+          nothing,
+        }),
         failure.fileName,
       )
     case 'write_failed':
       return failure.errno === 'ENOSPC' || failure.errno === 'EDQUOT'
-        ? `There is not enough disk space to write the PDF. The PDF was not changed.`
-        : `The PDF could not be written${failure.errno && failure.errno !== 'DB' ? ` (${failure.errno})` : ''}. The PDF was not changed.`
+        ? t('reader.pdf.attachFailure.noSpace')
+        : failure.errno && failure.errno !== 'DB'
+          ? t('reader.pdf.attachFailure.writeFailedErrno', { errno: failure.errno })
+          : t('reader.pdf.attachFailure.writeFailed')
     case 'verify_failed':
-      return 'The written PDF did not check out, so it was not kept. The PDF was not changed.'
+      return t('reader.pdf.attachFailure.verifyFailed')
     case 'unsupported_pdf':
-      return `This PDF’s structure does not allow changing it safely. ${nothing}`
+      return t('reader.pdf.attachFailure.unsupportedPdf', { nothing })
     case 'encrypted':
-      return `This PDF is encrypted, so Readmate can’t ${ACTION_TEXT[action]}.`
+      return t('reader.pdf.attachFailure.encrypted', { action: actionText })
     case 'not_found':
-      return action === 'attach' ? 'The PDF could not be found.' : 'This attachment is no longer in the PDF.'
+      return action === 'attach' ? t('reader.pdf.attachFailure.pdfNotFound') : t('reader.pdf.attachFailure.attachmentNotFound')
     case 'not_editable':
-      return 'This attachment was made in another app; Readmate can open or save it, but not move or delete it.'
+      return t('reader.pdf.attachFailure.notEditable')
     case 'invalid_request':
     case 'busy':
-      return `That did not work. ${nothing}`
+      return t('reader.pdf.attachFailure.didNotWork', { nothing })
   }
 }

@@ -1,4 +1,3 @@
-/* i18n-pending: reader.pdf */
 /**
  * PDF surface — continuous vertical scrolling (see docs/implementation_plan/pdf_continuous_scroll.md).
  *
@@ -100,6 +99,7 @@ import { PAD_PX, PAGE_GAP_PX, PDF_TO_CSS, type PdfPageCssSize } from './pdfLayou
 import { isTypingTarget } from '../../../../shortcuts/iframeKeydown'
 // `?url` makes Vite emit the worker as a local asset in dist/ — never loaded from a CDN.
 import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
+import { getT, useT } from '../../../../i18n'
 import 'pdfjs-dist/web/pdf_viewer.css'
 
 GlobalWorkerOptions.workerSrc = pdfWorkerUrl
@@ -404,7 +404,7 @@ async function resolveOutline(doc: PDFDocumentProxy): Promise<PdfOutlineItem[]> 
     return Promise.all(
       nodes.map(async (node) => ({
         id: `pdf-outline-${nextId++}`,
-        label: node.title?.trim() || 'Untitled',
+        label: node.title?.trim() || getT()('common.untitled'),
         page: await pageOf(node.dest),
         level,
         children: node.items?.length ? await map(node.items as OutlineNode[], level + 1) : [],
@@ -483,6 +483,7 @@ export function PdfRenderer({
   eraserMode = 'stroke',
   onInkPartialErase,
 }: PdfRendererProps) {
+  const t = useT()
   const [doc, setDoc] = useState<PDFDocumentProxy | null>(null)
   const [sizes, setSizes] = useState<PageSize[]>([])
   const [status, setStatus] = useState<Status>({ kind: 'loading' })
@@ -1276,7 +1277,7 @@ export function PdfRenderer({
         setSizes(measured)
       } catch (err) {
         if (cancelled || isCancelled(err)) return
-        setStatus({ kind: 'error', message: err instanceof Error ? err.message : 'Could not open this PDF.' })
+        setStatus({ kind: 'error', message: err instanceof Error ? err.message : getT()('reader.pdf.renderer.openFailed') })
       }
     })()
 
@@ -2816,7 +2817,7 @@ export function PdfRenderer({
         if (!gestureRef.current) dwellRef.current?.update(false)
       }}
     >
-      {status.kind === 'loading' ? <p className="mt-6 text-sm">Loading PDF…</p> : null}
+      {status.kind === 'loading' ? <p className="mt-6 text-sm">{t('reader.pdf.renderer.loading')}</p> : null}
       {paged ? (
         <div className="grid" style={{ perspective: '2400px' }}>
           {pageRows}

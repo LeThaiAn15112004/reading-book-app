@@ -1,7 +1,7 @@
 import { useEffect } from 'react'
 import { useAttachmentsStore } from '../../logic/attachments/attachmentsStore'
 import { AttachmentBlockedDialog, AttachmentOpenDialog } from '../dialogs/AttachmentDialogs'
-import { useFormat, useT } from '../../../../i18n'
+import { uiText, useFormat, useT } from '../../../../i18n'
 
 const EMPTY = 'm-0 px-2 py-6 text-center text-[13px] leading-relaxed text-lib-faint'
 
@@ -39,7 +39,7 @@ export function AttachmentsPanel({ bookId }: { bookId: string }) {
           }`}
           role={notice.kind === 'error' ? 'alert' : 'status'}
         >
-          <span>{notice.message}</span>
+          <span>{uiText(t, notice.message)}</span>
           <button
             className="cursor-pointer border-0 bg-transparent p-0 text-xs text-lib-faint"
             type="button"
@@ -52,7 +52,7 @@ export function AttachmentsPanel({ bookId }: { bookId: string }) {
       ) : null}
 
       {status === 'loading' && items.length === 0 ? <p className={EMPTY}>{t('reader.sidebar.attachments.looking')}</p> : null}
-      {status === 'error' ? <p className={EMPTY}>{loadError}</p> : null}
+      {status === 'error' ? <p className={EMPTY}>{loadError ? uiText(t, loadError) : null}</p> : null}
       {status === 'ready' && items.length === 0 ? (
         <p className={EMPTY}>{t('reader.sidebar.attachments.none')}</p>
       ) : null}

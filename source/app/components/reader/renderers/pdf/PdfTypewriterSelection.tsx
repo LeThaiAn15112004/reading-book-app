@@ -1,4 +1,3 @@
-/* i18n-pending: reader.pdf */
 /**
  * Selection chrome of one Typewriter note (specs/005-typewriter-note, US2): outline, 8 resize handles, a body that
  * moves the note, and a compact toolbar. Self-contained pointer handling (pointer capture on the pressed element),
@@ -9,6 +8,7 @@ import { useRef, useState, type PointerEvent as ReactPointerEvent, type RefObjec
 import { TYPEWRITER_HANDLES, moveTypewriterBox, resizeTypewriterBox, type TypewriterHandle } from '@core'
 import type { PdfTypewriterMark } from './PdfTypewriterLayer'
 import { layoutNote, noteHeightFraction, type TypewriterNormBox } from './typewriterBox'
+import { useT } from '../../../../i18n'
 
 const DRAG_THRESHOLD_PX = 4
 
@@ -48,6 +48,7 @@ export function PdfTypewriterSelection({
   /** Select mode: a second click on the selected note (no drag) starts editing. */
   editOnClick: boolean
 }) {
+  const t = useT()
   const dragRef = useRef<Drag | null>(null)
   const [box, setBox] = useState<TypewriterNormBox | null>(null)
   const shown = box ?? mark.box
@@ -132,19 +133,19 @@ export function PdfTypewriterSelection({
       ))}
       <div
         role="toolbar"
-        aria-label="Typewriter note"
+        aria-label={t('reader.pdf.typewriter.toolbar')}
         data-tw-toolbar=""
         style={{ position: 'absolute', left: 0, bottom: 'calc(100% + 6px)', display: 'flex', gap: 4, padding: 3, background: '#1f2937', borderRadius: 6, pointerEvents: 'auto', whiteSpace: 'nowrap' }}
         onPointerDown={(e) => e.stopPropagation()}
       >
         <button type="button" onClick={onEdit} style={{ color: '#fff', fontSize: 12, padding: '2px 8px', background: 'transparent', border: 'none', cursor: 'pointer' }}>
-          Edit
+          {t('reader.pdf.typewriter.edit')}
         </button>
         <button type="button" onClick={onProperties} style={{ color: '#fff', fontSize: 12, padding: '2px 8px', background: 'transparent', border: 'none', cursor: 'pointer' }}>
-          Properties
+          {t('reader.pdf.typewriter.properties')}
         </button>
-        <button type="button" onClick={onDelete} aria-label="Delete note" style={{ color: '#fecaca', fontSize: 12, padding: '2px 8px', background: 'transparent', border: 'none', cursor: 'pointer' }}>
-          Delete
+        <button type="button" onClick={onDelete} aria-label={t('reader.pdf.typewriter.deleteNote')} style={{ color: '#fecaca', fontSize: 12, padding: '2px 8px', background: 'transparent', border: 'none', cursor: 'pointer' }}>
+          {t('common.actions.delete')}
         </button>
       </div>
     </div>
