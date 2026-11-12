@@ -1,5 +1,5 @@
-/* i18n-pending: library */
 import { ImportMenu } from '../../../../components/import'
+import { useT } from '../../../../i18n'
 import { isFeatureAvailable } from '../../../../platforms/host'
 import { useAnnotationTransferStore } from '../../../Reader/logic/annotationTransferStore'
 import { LibrarySearchBox } from './LibrarySearchBox'
@@ -25,6 +25,7 @@ export function LibraryTopBar({
   onFromDevice,
   onFromUrl,
 }: LibraryTopBarProps) {
+  const t = useT()
   return (
     <header className="app-titlebar relative z-[35] flex h-16 shrink-0 items-center gap-2 border-b border-lib-border-soft bg-lib-topbar px-4 backdrop-blur-sm sm:gap-3 sm:pl-7">
       <LibrarySearchBox
@@ -46,10 +47,10 @@ export function LibraryTopBar({
         <button
           type="button"
           className="hidden h-[38px] shrink-0 cursor-pointer items-center rounded-lg border border-lib-border bg-transparent px-3 text-[13px] font-medium text-lib-muted transition-colors hover:border-lib-accent hover:text-lib-text-strong md:inline-flex"
-          title="Import a .readmate-notes.json file; the app finds the book it belongs to"
+          title={t('library.topBar.importAnnotationsTitle')}
           onClick={() => void useAnnotationTransferStore.getState().startImport()}
         >
-          Import annotations file…
+          {t('library.topBar.importAnnotations')}
         </button>
       ) : null}
     </header>

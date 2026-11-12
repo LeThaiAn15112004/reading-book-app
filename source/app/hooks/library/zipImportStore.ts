@@ -6,10 +6,12 @@ import {
   selectAllTracks,
   setCover,
   toggleTrack,
+  type Translator,
   type ZipImportPreview,
   type ZipImportSelection,
 } from '@core'
 import { audioApi, zipImportApi } from '../../bridge'
+import type { UiText } from '../../i18n'
 import { useLibraryImportStore } from './libraryImportStore.js'
 
 /** Chapters written so far while an import runs (from Main). */
@@ -18,7 +20,8 @@ export type ZipImportProgress = { stage: 'extracting' | 'saving'; done: number; 
 /** The preview dialog's phases. The import itself is NOT a phase: it runs as a background `job` after the dialog closed. */
 export type ZipImportPhase = 'closed' | 'inspecting' | 'preview' | 'error'
 
-export type ZipImportError = { code: string; message: string }
+/** `message`: Main's text (already in the app language) or a renderer-side message translated when shown (spec 012). */
+export type ZipImportError = { code: string; message: UiText }
 
 /** One imported audio file, as the result panel lists it. */
 export type ZipImportedTrack = { title: string; durationSeconds: number | null }
@@ -88,19 +91,22 @@ type ZipImportState = {
 const EMPTY_SELECTION: ZipImportSelection = { trackIds: [], coverId: null }
 
 /** Short progress text for the Audiobook ZIP entry: `12/68`, or `Saving…` once every track is in place. */
-export function zipJobShortLabel(job: Pick<ZipImportJob, 'total' | 'progress' | 'cancelling'>): string {
-  if (job.cancelling) return 'Cancelling…'
-  if (job.progress?.stage === 'saving') return 'Saving…'
+export function zipJobShortLabel(t: Translator, job: Pick<ZipImportJob, 'total' | 'progress' | 'cancelling'>): string {
+  if (job.cancelling) return t('import.job.cancelling')
+  if (job.progress?.stage === 'saving') return t('import.job.saving')
   return `${Math.min(job.progress?.done ?? 0, job.total)}/${job.total}`
 }
 
 /** Longer progress text for the panel: which track is being worked on. */
-export function zipJobDetail(job: Pick<ZipImportJob, 'total' | 'progress' | 'cancelling'>): string {
-  if (job.cancelling) return 'Cancelling…'
+export function zipJobDetail(t: Translator, job: Pick<ZipImportJob, 'total' | 'progress' | 'cancelling'>): string {
+  if (job.cancelling) return t('import.job.cancelling')
   const p = job.progress
-  if (!p) return 'Starting…'
-  if (p.stage === 'saving') return 'Saving to your library…'
-  return `Track ${Math.min(p.done + 1, job.total)} of ${job.total}${p.name ? ` — ${p.name}` : ''}`
+  if (!p) return t('import.job.starting')
+  if (p.stage === 'saving') return t('import.job.savingToLibrary')
+  const current = Math.min(p.done + 1, job.total)
+  return p.name
+    ? t('import.job.trackOfNamed', { current, total: job.total, name: p.name })
+    : t('import.job.trackOf', { current, total: job.total })
 }
 
 const stem = (name: string): string => name.replace(/\.[^./\\]+$/, '')
@@ -114,7 +120,7 @@ async function inspect(open: () => Promise<Awaited<ReturnType<typeof zipImportAp
   // One ZIP at a time: while an import runs the entry is a spinner, and a second inspection cannot start.
   if (get().job?.status === 'running') {
     // e.g. a ZIP chosen in "Add file" while another import runs: say so and show the running import.
-    useLibraryImportStore.getState().showToast('An audiobook import is already running. Wait for it to finish.', 'info')
+    useLibraryImportStore.getState().showToast({ key: 'library.toast.zipAlreadyRunning' }, 'info')
     set({ panelOpen: true })
     return
   }
@@ -144,7 +150,7 @@ async function inspect(open: () => Promise<Awaited<ReturnType<typeof zipImportAp
     })
     if (result.preview.defaultCoverId) void get().loadCover(result.preview.defaultCoverId)
   } catch {
-    set({ phase: 'error', preview: null, error: { code: 'unreadable', message: 'Could not open the ZIP file.' } })
+    set({ phase: 'error', preview: null, error: { code: 'unreadable', message: { key: 'import.job.cannotOpenZip' } } })
   } finally {
     off()
   }
@@ -258,7 +264,7 @@ export const useZipImportStore = create<ZipImportState>()((set, get) => ({
         // The user stopped it: nothing was added. The preview session is still in Main; drop it.
         set({ job: null, panelOpen: false })
         void zipImportApi.discard(preview.sessionId).catch(() => {})
-        useLibraryImportStore.getState().showToast('Audiobook import cancelled.', 'info')
+        useLibraryImportStore.getState().showToast({ key: 'library.toast.zipCancelled' }, 'info')
         return
       }
       if (result.errorCode === 'duplicate' && result.bookId) {
@@ -274,7 +280,7 @@ export const useZipImportStore = create<ZipImportState>()((set, get) => ({
         result.errorCode !== 'session_expired' && result.errorCode !== 'archive_changed',
       )
     } catch {
-      fail({ code: 'import_failed', message: 'Could not import the audiobook. Nothing was added to your library.' }, true)
+      fail({ code: 'import_failed', message: { key: 'library.toast.zipImportFailed' } }, true)
     } finally {
       off()
     }

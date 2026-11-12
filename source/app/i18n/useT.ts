@@ -64,3 +64,13 @@ export function useFormat(): BoundFormat {
 export function getFormat(): BoundFormat {
   return bindFormat(getUiLanguage())
 }
+
+/**
+ * Text kept in state until it is shown: a final string (already in the right language, e.g. a message Main produced
+ * with `tMain`) or a {@link MessageRef} translated when rendered, so a language change re-translates it (spec 012).
+ */
+export type UiText = string | MessageRef
+
+export function uiText(t: Translator, value: UiText): string {
+  return typeof value === 'string' ? value : translateRef(t, value)
+}

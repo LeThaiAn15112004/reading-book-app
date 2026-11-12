@@ -64,12 +64,13 @@ export function OpenReadingProvider({
           t.bookId === bookId ? { ...t, title } : t,
         )
       }
-      return [...prev, { bookId, title: title?.trim() || 'Untitled' }]
+      // '' = no title; the tab shows `common.untitled` in the current language (spec 012).
+      return [...prev, { bookId, title: title?.trim() || '' }]
     })
   }, [])
 
   const updateBookTitle = useCallback((bookId: string, title: string) => {
-    const next = title.trim() || 'Untitled'
+    const next = title.trim()
     setTabs((prev) => {
       const existing = prev.find((t) => t.bookId === bookId)
       if (!existing || existing.title === next) return prev

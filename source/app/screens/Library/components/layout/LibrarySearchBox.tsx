@@ -1,5 +1,5 @@
-/* i18n-pending: library */
 import { useId, useRef, useState, type KeyboardEvent } from 'react'
+import { useT } from '../../../../i18n'
 import { useShortcutAction } from '../../../../shortcuts'
 
 export type LibrarySearchBoxProps = {
@@ -39,6 +39,7 @@ export function LibrarySearchBox({
   onCommit,
   onRemoveRecent,
 }: LibrarySearchBoxProps) {
+  const t = useT()
   const listId = useId()
   const inputRef = useRef<HTMLInputElement>(null)
   useShortcutAction('general.searchLibrary', () => {
@@ -91,8 +92,8 @@ export function LibrarySearchBox({
         aria-autocomplete="list"
         aria-activedescendant={activeId}
         className="h-[38px] w-full rounded-lg border border-lib-border bg-lib-input py-0 pr-3.5 pl-9 text-sm text-lib-text-strong outline-none transition-[border-color,box-shadow] placeholder:text-lib-faint focus:border-lib-accent focus:shadow-[0_0_0_3px_var(--color-lib-accent-soft)]"
-        placeholder="Search imported files…"
-        aria-label="Search local library"
+        placeholder={t('library.search.placeholder')}
+        aria-label={t('library.search.aria')}
         value={value}
         onChange={(e) => {
           onChange(e.target.value)
@@ -119,9 +120,9 @@ export function LibrarySearchBox({
           onMouseDown={(e) => e.preventDefault()}
         >
           <p className="m-0 px-3 pt-1.5 pb-1 text-[11px] font-semibold tracking-wide text-lib-faint uppercase">
-            Recent searches
+            {t('library.search.recent')}
           </p>
-          <ul id={listId} role="listbox" aria-label="Recent searches" className="m-0 list-none p-0">
+          <ul id={listId} role="listbox" aria-label={t('library.search.recent')} className="m-0 list-none p-0">
             {recentSearches.map((query, index) => (
               <li
                 key={query}
@@ -142,8 +143,8 @@ export function LibrarySearchBox({
                   type="button"
                   tabIndex={-1}
                   className="hover-reveal inline-flex size-6 shrink-0 cursor-pointer items-center justify-center rounded border-none bg-transparent text-[12px] text-lib-faint opacity-0 transition-opacity group-hover:opacity-100 hover:text-lib-text-strong"
-                  aria-label={`Remove “${query}” from recent searches`}
-                  title="Remove"
+                  aria-label={t('library.search.removeRecent', { query })}
+                  title={t('library.search.remove')}
                   onClick={(e) => {
                     e.stopPropagation()
                     onRemoveRecent(query)

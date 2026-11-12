@@ -1,6 +1,6 @@
-/* i18n-pending: library */
 import { useEffect, useRef, useState, type MouseEvent as ReactMouseEvent } from 'react'
 import { annotationTransferApi } from '../../../../bridge'
+import { useT } from '../../../../i18n'
 import { isFeatureAvailable, isMobileHost } from '../../../../platforms/host'
 import { supportsAnnotationTransfer } from '../../../Reader/logic/annotationTransferStore'
 import type {
@@ -59,12 +59,13 @@ export function BookMenuButton({
   onOpen,
   className = '',
 }: BookMenuButtonProps) {
+  const t = useT()
   return (
     <button
       type="button"
       className={`inline-flex size-9 cursor-pointer items-center justify-center rounded-lg border-none bg-transparent text-lib-faint transition-[opacity,color,background-color] hover:bg-white/5 hover:text-lib-text-strong focus-visible:bg-white/5 focus-visible:text-lib-text-strong focus-visible:outline-none ${className}`}
-      aria-label={`More actions for ${title}`}
-      title="More actions"
+      aria-label={t('library.menu.moreActionsFor', { title })}
+      title={t('library.menu.moreActions')}
       onClick={(event) => {
         event.preventDefault()
         event.stopPropagation()
@@ -108,6 +109,7 @@ export function BookItemMenu({
   onImportAnnotations,
   onExportReadable,
 }: BookItemMenuProps) {
+  const t = useT()
   const menuRef = useRef<HTMLDivElement>(null)
   const [collectionsOpen, setCollectionsOpen] = useState(false)
   const canExportAnnotations = supportsAnnotationTransfer(book.format) && isFeatureAvailable('annotationTransfer')
@@ -158,7 +160,7 @@ export function BookItemMenu({
     <div
       ref={menuRef}
       role="menu"
-      aria-label={`Actions for ${book.title}`}
+      aria-label={t('library.menu.actionsFor', { title: book.title })}
       className={
         phone
           ? 'phone-sheet fixed inset-x-0 bottom-0 z-[300] max-h-[80vh] overflow-y-auto rounded-t-2xl border border-lib-border bg-lib-surface-strong p-2 shadow-[0_-12px_40px_rgba(0,0,0,0.45)]'
@@ -168,7 +170,7 @@ export function BookItemMenu({
       onContextMenu={blockContextMenu}
     >
       <button className={itemClass} role="menuitem" onClick={() => run(() => onResume(book.id))}>
-        Resume reading
+        {t('library.menu.resume')}
       </button>
       <div className="relative" onMouseLeave={phone ? undefined : () => setCollectionsOpen(false)}>
         <button
@@ -179,7 +181,7 @@ export function BookItemMenu({
           onMouseEnter={phone ? undefined : () => setCollectionsOpen(true)}
           onClick={() => setCollectionsOpen((open) => !open)}
         >
-          <span>Add to collection</span>
+          <span>{t('library.menu.addToCollection')}</span>
           <span aria-hidden>›</span>
         </button>
         {collectionsOpen ? (
@@ -196,7 +198,7 @@ export function BookItemMenu({
           >
             <div
               role="menu"
-              aria-label="Collections"
+              aria-label={t('library.menu.collections')}
               className={phone ? 'w-full' : 'w-56 rounded-xl border border-lib-border bg-lib-surface-strong p-1.5 shadow-[0_18px_48px_rgba(0,0,0,0.45)]'}
             >
               {collections.map((collection) => {
@@ -212,20 +214,20 @@ export function BookItemMenu({
                     }
                   >
                     <span className="truncate">{collection.name}</span>
-                    {included ? <span aria-label="Already added">✓</span> : null}
+                    {included ? <span aria-label={t('library.menu.alreadyAdded')}>✓</span> : null}
                   </button>
                 )
               })}
               {collections.length > 0 ? <MenuSeparator /> : null}
               <button className={itemClass} role="menuitem" onClick={() => run(onNewCollection)}>
-                New collection…
+                {t('library.menu.newCollection')}
               </button>
             </div>
           </div>
         ) : null}
       </div>
       <button className={itemClass} role="menuitem" onClick={() => run(() => onToggleFavorite(book))}>
-        {book.isFavorite ? 'Remove from favorites' : 'Add to favorites'}
+        {book.isFavorite ? t('library.menu.removeFavorite') : t('library.menu.addFavorite')}
       </button>
       <button
         className={itemClass}
@@ -233,14 +235,14 @@ export function BookItemMenu({
         disabled={book.status === 'completed'}
         onClick={() => run(() => onMarkCompleted(book.id))}
       >
-        Mark as completed
+        {t('library.menu.markCompleted')}
       </button>
       <MenuSeparator />
       <button className={itemClass} role="menuitem" onClick={() => run(() => onDetails(book.id))}>
-        Book details
+        {t('library.menu.details')}
       </button>
       <button className={itemClass} role="menuitem" onClick={() => run(() => onEditMetadata(book.id))}>
-        Edit metadata
+        {t('library.menu.editMetadata')}
       </button>
       {activeCollectionId ? (
         <button
@@ -250,7 +252,7 @@ export function BookItemMenu({
             run(() => onRemoveFromCollection(activeCollectionId, book.id))
           }
         >
-          Remove from this collection
+          {t('library.menu.removeFromCollection')}
         </button>
       ) : null}
       {canExportAnnotations ? (
@@ -258,10 +260,10 @@ export function BookItemMenu({
           className={itemClass}
           role="menuitem"
           disabled={annotationCount === 0}
-          title={annotationCount === 0 ? 'This book has no annotations to export yet.' : undefined}
+          title={annotationCount === 0 ? t('library.menu.noAnnotations') : undefined}
           onClick={() => run(() => onExportAnnotations(book.id))}
         >
-          Export annotations (backup)…
+          {t('library.menu.exportAnnotations')}
         </button>
       ) : null}
       {canExportAnnotations ? (
@@ -269,25 +271,25 @@ export function BookItemMenu({
           className={itemClass}
           role="menuitem"
           disabled={annotationCount === 0}
-          title={annotationCount === 0 ? 'This book has no annotations to export yet.' : undefined}
+          title={annotationCount === 0 ? t('library.menu.noAnnotations') : undefined}
           onClick={() => run(() => onExportReadable(book.id))}
         >
-          Export readable copy…
+          {t('library.menu.exportReadable')}
         </button>
       ) : null}
       {canExportAnnotations ? (
         <button className={itemClass} role="menuitem" onClick={() => run(() => onImportAnnotations(book.id))}>
-          Import annotations…
+          {t('library.menu.importAnnotations')}
         </button>
       ) : null}
       {isFeatureAvailable('fileSystemActions') ? (
         <>
           <MenuSeparator />
           <button className={itemClass} role="menuitem" onClick={() => run(() => onOpenFileLocation(book.id))}>
-            Open file location
+            {t('library.menu.openFileLocation')}
           </button>
           <button className={itemClass} role="menuitem" onClick={() => run(() => onCopyFilePath(book.id))}>
-            Copy file path
+            {t('library.menu.copyFilePath')}
           </button>
         </>
       ) : null}
@@ -300,11 +302,11 @@ export function BookItemMenu({
           role="menuitem"
           onClick={() => run(() => onRemoveAudiobook(book.id))}
         >
-          Remove audiobook…
+          {t('library.menu.removeAudiobook')}
         </button>
       ) : (
         <button className={itemClass} role="menuitem" onClick={() => run(() => onRemove(book.id))}>
-          Remove from library
+          {t('library.menu.removeFromLibrary')}
         </button>
       )}
       {/* Only app-owned copies can be deleted; a referenced book's file is the user's own. */}
@@ -314,7 +316,7 @@ export function BookItemMenu({
           role="menuitem"
           onClick={() => run(() => onDeleteFile(book.id))}
         >
-          Delete file…
+          {t('library.menu.deleteFile')}
         </button>
       ) : null}
     </div>

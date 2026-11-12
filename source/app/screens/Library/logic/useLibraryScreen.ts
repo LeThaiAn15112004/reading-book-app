@@ -8,7 +8,7 @@ import {
   useLibraryView,
   useZipImportStore,
 } from '../../../hooks/library/index.js'
-import { type LibraryBook } from '@core'
+import { type LibraryBook, type MessageRef } from '@core'
 import { importApi, libraryApi } from '../../../bridge'
 import { useAppNav, useOpenReading, type AppStubNavId } from '../../../components/chrome'
 import type { BootLocationState } from '../../boot'
@@ -135,7 +135,7 @@ export function useLibraryScreen() {
     goCollections,
     openCollection,
   } = useLibraryView({
-    onComingSoon: () => showToast('Coming soon.', 'info'),
+    onComingSoon: () => showToast({ key: 'library.toast.comingSoon' }, 'info'),
     onFilterNav: (filter) =>
       useLibraryBrowseStore.getState().setFilter(filter === 'to-read' ? 'not-started' : filter),
   })
@@ -197,7 +197,7 @@ export function useLibraryScreen() {
   } = useCollections({
     client: libraryApi,
     onCreated: (created) =>
-      showToast(`Created “${created.name}”.`, 'success'),
+      showToast({ key: 'library.toast.collectionCreated', params: { name: created.name } }, 'success'),
   })
 
   const bookList = books ?? []
@@ -213,19 +213,19 @@ export function useLibraryScreen() {
 
   async function runBookMutation(
     action: () => Promise<{ ok: boolean }>,
-    successMessage: string,
+    successMessage: MessageRef,
   ) {
     try {
       const result = await action()
       if (!result.ok) {
-        showToast('The book action could not be completed.', 'error')
+        showToast({ key: 'library.toast.actionFailed' }, 'error')
         return false
       }
       await refreshLibrary()
       showToast(successMessage, 'success')
       return true
     } catch {
-      showToast('The book action could not be completed.', 'error')
+      showToast({ key: 'library.toast.actionFailed' }, 'error')
       return false
     }
   }
@@ -233,28 +233,28 @@ export function useLibraryScreen() {
   async function handleToggleFavorite(book: LibraryBook) {
     await runBookMutation(
       () => libraryApi.setFavorite(book.id, !book.isFavorite),
-      book.isFavorite ? 'Removed from favorites.' : 'Added to favorites.',
+      { key: book.isFavorite ? 'library.toast.favoriteRemoved' : 'library.toast.favoriteAdded' },
     )
   }
 
   async function handleMarkCompleted(bookId: string) {
     await runBookMutation(
       () => libraryApi.markAsCompleted(bookId),
-      'Marked as completed.',
+      { key: 'library.toast.markedCompleted' },
     )
   }
 
   async function handleSaveMetadata(values: BookMetadataValues) {
     await runBookMutation(
       () => libraryApi.updateMetadata(values),
-      'Book metadata updated.',
+      { key: 'library.toast.metadataUpdated' },
     )
   }
 
   async function handleOpenFileLocation(bookId: string) {
     await runBookMutation(
       () => libraryApi.showInFolder(bookId),
-      'Opened file location.',
+      { key: 'library.toast.fileLocationOpened' },
     )
   }
 
@@ -262,11 +262,11 @@ export function useLibraryScreen() {
     try {
       const result = await libraryApi.copyFilePath(bookId)
       showToast(
-        result.ok ? 'File path copied.' : 'Could not copy the file path.',
+        { key: result.ok ? 'library.toast.pathCopied' : 'library.toast.pathCopyFailed' },
         result.ok ? 'success' : 'error',
       )
     } catch {
-      showToast('Could not copy the file path.', 'error')
+      showToast({ key: 'library.toast.pathCopyFailed' }, 'error')
     }
   }
 
@@ -277,13 +277,13 @@ export function useLibraryScreen() {
       showToast(
         added
           ? collection
-            ? `Added to “${collection.name}”.`
-            : 'Added to collection.'
-          : 'Could not add the book to that collection.',
+            ? { key: 'library.toast.addedToNamed', params: { name: collection.name } }
+            : { key: 'library.toast.addedToCollection' }
+          : { key: 'library.toast.addToCollectionFailed' },
         added ? 'success' : 'error',
       )
     } catch {
-      showToast('Could not add the book to that collection.', 'error')
+      showToast({ key: 'library.toast.addToCollectionFailed' }, 'error')
     }
   }
 
@@ -313,7 +313,7 @@ export function useLibraryScreen() {
       if (editingCollectionId) {
         const updated = await updateCollection(editingCollectionId, input)
         showToast(
-          updated ? 'Collection updated.' : 'Could not update the collection.',
+          { key: updated ? 'library.toast.collectionUpdated' : 'library.toast.collectionUpdateFailed' },
           updated ? 'success' : 'error',
         )
         return updated
@@ -326,14 +326,14 @@ export function useLibraryScreen() {
         )
         if (!added) {
           showToast(
-            `Created “${created.name}”, but the book could not be added.`,
+            { key: 'library.toast.createdButNotAdded', params: { name: created.name } },
             'error',
           )
         }
       }
       return true
     } catch {
-      showToast('Could not save the collection.', 'error')
+      showToast({ key: 'library.toast.collectionSaveFailed' }, 'error')
       return false
     }
   }
@@ -343,7 +343,7 @@ export function useLibraryScreen() {
     try {
       const deleted = await deleteCollection(pendingCollectionDeleteId)
       showToast(
-        deleted ? 'Collection deleted.' : 'Could not delete the collection.',
+        { key: deleted ? 'library.toast.collectionDeleted' : 'library.toast.collectionDeleteFailed' },
         deleted ? 'success' : 'error',
       )
       if (deleted) {
@@ -356,7 +356,7 @@ export function useLibraryScreen() {
         setPendingCollectionDeleteId(null)
       }
     } catch {
-      showToast('Could not delete the collection.', 'error')
+      showToast({ key: 'library.toast.collectionDeleteFailed' }, 'error')
     }
   }
 
@@ -367,11 +367,11 @@ export function useLibraryScreen() {
     try {
       const removed = await removeBookFromCollection(collectionId, bookId)
       showToast(
-        removed ? 'Removed from collection.' : 'Could not remove the book.',
+        { key: removed ? 'library.toast.removedFromCollection' : 'library.toast.removeFromCollectionFailed' },
         removed ? 'success' : 'error',
       )
     } catch {
-      showToast('Could not remove the book.', 'error')
+      showToast({ key: 'library.toast.removeFromCollectionFailed' }, 'error')
     }
   }
 
@@ -385,11 +385,14 @@ export function useLibraryScreen() {
           : action.kind === 'remove-audiobook'
             ? libraryApi.removeAudiobook(action.bookId)
             : libraryApi.deleteBookFile(action.bookId),
-      action.kind === 'remove'
-        ? 'Removed from library.'
-        : action.kind === 'remove-audiobook'
-          ? 'Audiobook removed.'
-          : 'Book file deleted.',
+      {
+        key:
+          action.kind === 'remove'
+            ? 'library.toast.removedFromLibrary'
+            : action.kind === 'remove-audiobook'
+              ? 'library.toast.audiobookRemoved'
+              : 'library.toast.fileDeleted',
+      },
     )
     if (removed) {
       await refreshCollections()

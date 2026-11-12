@@ -8,6 +8,7 @@ import {
   type ImportToastAction,
 } from './libraryImportStore.js'
 import { useZipImportStore } from './zipImportStore.js'
+import type { UiText } from '../../i18n'
 
 /** Step / byte progress pushed by the platform while an import runs. */
 export type LibraryImportProgress = {
@@ -91,7 +92,7 @@ export function useLibraryImport({
 
   const openBookAction = useCallback(
     (bookId: string): ImportToastAction => ({
-      label: 'Open',
+      label: { key: 'library.toast.open' },
       run: () => onOpenBook(bookId),
     }),
     [onOpenBook],
@@ -107,7 +108,7 @@ export function useLibraryImport({
         } catch {
           // The book is saved; a failed list refresh must not turn success into an error.
         }
-        store.showToast('Book added to your library.', 'success', openBookAction(result.bookId))
+        store.showToast({ key: 'library.toast.bookAdded' }, 'success', openBookAction(result.bookId))
         return true
       }
       if (result.errorCode === 'duplicate' && result.bookId) {
@@ -137,7 +138,7 @@ export function useLibraryImport({
         useLibraryImportStore.getState().showToast(result.errorMessage, 'error')
       }
     } catch {
-      useLibraryImportStore.getState().showToast('Could not import file.', 'error')
+      useLibraryImportStore.getState().showToast({ key: 'library.toast.importFailed' }, 'error')
     } finally {
       const after = useLibraryImportStore.getState()
       after.setBusy(false)
@@ -166,22 +167,22 @@ export function useLibraryImport({
           if (await handleCommonResult(result)) return
           const after = useLibraryImportStore.getState()
           const code = result.errorCode
-          const message = result.errorMessage ?? 'Could not download from URL.'
+          const message: UiText = result.errorMessage ?? { key: 'library.toast.downloadFailedUrl' }
           if (code === 'cancelled') {
-            after.showToast('Download cancelled.', 'info')
+            after.showToast({ key: 'library.toast.downloadCancelled' }, 'info')
           } else if (code && URL_RETRYABLE_ERRORS.has(code)) {
             after.openUrlDialog(target, { message, retryable: true })
           } else if (code && URL_INPUT_ERRORS.has(code)) {
             after.openUrlDialog(target, { message, retryable: false })
           } else if (code === 'save_failed') {
-            after.showToast(message, 'error', { label: 'Retry', run: () => void run(target) })
+            after.showToast(message, 'error', { label: { key: 'library.toast.retry' }, run: () => void run(target) })
           } else {
             after.showToast(message, 'error')
           }
         } catch {
           useLibraryImportStore
             .getState()
-            .openUrlDialog(target, { message: 'Could not start URL import.', retryable: true })
+            .openUrlDialog(target, { message: { key: 'library.toast.urlImportStartFailed' }, retryable: true })
         } finally {
           const after = useLibraryImportStore.getState()
           after.setBusy(false)

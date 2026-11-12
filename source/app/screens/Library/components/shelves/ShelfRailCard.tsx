@@ -1,5 +1,5 @@
-/* i18n-pending: library */
-import { formatLastReadLine, type LibraryBook } from '@core'
+import type { LibraryBook } from '@core'
+import { useT } from '../../../../i18n'
 import { BookCover, BookMenuButton, type BookMenuPoint } from '../book'
 import { withLongPress } from '../../../../platforms/longPress'
 
@@ -53,13 +53,14 @@ export function ShelfRailCard({
   onBookMenu,
   className = 'w-[132px] shrink-0',
 }: ShelfRailCardProps) {
+  const t = useT()
   const progress =
     book.status === 'reading' && book.progressPercent != null
       ? Math.round(book.progressPercent)
       : undefined
   const lastReadLine =
     progress === undefined && book.status === 'reading' && book.lastReadLocation
-      ? formatLastReadLine(book.lastReadLocation)
+      ? t('library.progress.lastAt', { location: book.lastReadLocation.trim() })
       : undefined
 
   return (
@@ -75,7 +76,7 @@ export function ShelfRailCard({
         type="button"
         className="flex cursor-pointer flex-col gap-2 border-none bg-transparent p-0 text-left font-[inherit] text-inherit focus-visible:outline-none"
         onClick={() => onOpen(book.id)}
-        aria-label={`Open ${book.title}`}
+        aria-label={t('library.card.openAria', { title: book.title })}
       >
         <BookCover
           bookId={book.id}
@@ -91,14 +92,15 @@ export function ShelfRailCard({
           <p className="m-0 truncate text-[11px] text-lib-faint">{book.author}</p>
           {lastReadLine && book.lastReadLocation ? (
             <p className="m-0 truncate text-[11px] text-lib-muted" aria-label={lastReadLine}>
-              Last at · <strong className="font-semibold text-lib-text-strong">{book.lastReadLocation}</strong>
+              {t('library.progress.lastAtPrefix')}
+              <strong className="font-semibold text-lib-text-strong">{book.lastReadLocation}</strong>
             </p>
           ) : null}
           {progress !== undefined ? (
             <div
               className="mt-1.5 flex items-center gap-1.5"
               role="progressbar"
-              aria-label={`${progress}% read`}
+              aria-label={t('library.continue.percentRead', { percent: progress })}
               aria-valuemin={0}
               aria-valuemax={100}
               aria-valuenow={progress}
@@ -115,7 +117,7 @@ export function ShelfRailCard({
         <span className="inline-flex items-center gap-1 rounded bg-lib-chip px-1.5 py-0.5 text-[9px] font-bold tracking-wide text-lib-muted uppercase">
           {book.format}
           {book.sourceProvider ? (
-            <span title={`Synced from ${PROVIDER_LABEL[book.sourceProvider]}`}>
+            <span title={t('library.card.syncedFrom', { provider: PROVIDER_LABEL[book.sourceProvider] })}>
               <CloudBadgeIcon className="size-2.5" />
             </span>
           ) : null}

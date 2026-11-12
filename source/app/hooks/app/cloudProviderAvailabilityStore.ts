@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 import { create } from 'zustand'
-import type { ExternalLibraryProvider } from '@core'
+import type { ExternalLibraryProvider, Translator } from '@core'
 import { cloudApi } from '../../bridge'
 
 /**
@@ -42,9 +42,12 @@ export const useCloudProviderAvailabilityStore = create<CloudProviderAvailabilit
 }))
 
 /** Short UI label for an unavailable provider, or null when it is offered. */
-export function cloudProviderUnavailableLabel(entry: CloudProviderAvailability[ExternalLibraryProvider]): string | null {
+export function cloudProviderUnavailableLabel(
+  t: Translator,
+  entry: CloudProviderAvailability[ExternalLibraryProvider],
+): string | null {
   if (entry.available) return null
-  return entry.reason === 'not_configured' ? 'Not configured' : 'Coming soon'
+  return entry.reason === 'not_configured' ? t('appHooks.cloud.notConfigured') : t('appHooks.cloud.comingSoon')
 }
 
 /** The availability map; asks Main the first time any component uses it. */

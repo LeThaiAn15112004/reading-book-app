@@ -1,4 +1,4 @@
-/* i18n-pending: library */
+import { useT } from '../../../../i18n'
 import { useEffect, useId, useRef, useState, type FormEvent } from 'react'
 
 export type NewCollectionDialogProps = {
@@ -18,6 +18,7 @@ export function NewCollectionDialog({
   onClose,
   onSubmit,
 }: NewCollectionDialogProps) {
+  const t = useT()
   const titleId = useId()
   const nameRef = useRef<HTMLInputElement>(null)
   const [name, setName] = useState('')
@@ -29,8 +30,8 @@ export function NewCollectionDialog({
     setName(collection?.name ?? '')
     setDescription(collection?.description ?? '')
     setSubmitting(false)
-    const t = window.setTimeout(() => nameRef.current?.focus(), 0)
-    return () => window.clearTimeout(t)
+    const timer = window.setTimeout(() => nameRef.current?.focus(), 0)
+    return () => window.clearTimeout(timer)
   }, [open, collection])
 
   useEffect(() => {
@@ -81,17 +82,17 @@ export function NewCollectionDialog({
           id={titleId}
           className="m-0 mb-1 text-lg font-semibold text-lib-text-strong"
         >
-          {collection ? 'Edit collection' : 'New collection'}
+          {collection ? t('library.collections.dialog.editTitle') : t('library.collections.dialog.newTitle')}
         </h2>
         <p className="m-0 mb-4 text-[13px] text-lib-muted">
           {collection
-            ? 'Update the name or description for this collection.'
-            : 'Create a set to organize books by topic or purpose.'}
+            ? t('library.collections.dialog.editBody')
+            : t('library.collections.dialog.newBody')}
         </p>
 
         <form className="flex flex-col gap-3" onSubmit={handleSubmit}>
           <label className="flex flex-col gap-1.5 text-[13px] text-lib-muted">
-            Name
+            {t('library.collections.dialog.name')}
             <input
               ref={nameRef}
               type="text"
@@ -100,18 +101,19 @@ export function NewCollectionDialog({
               value={name}
               onChange={(e) => setName(e.target.value)}
               className="h-10 rounded-lg border border-lib-border bg-lib-input px-3 text-sm text-lib-text-strong outline-none focus:border-lib-accent focus:shadow-[0_0_0_3px_var(--color-lib-accent-soft)]"
-              placeholder="e.g. Weekend fiction"
+              placeholder={t('library.collections.dialog.namePlaceholder')}
             />
           </label>
           <label className="flex flex-col gap-1.5 text-[13px] text-lib-muted">
-            Description <span className="text-lib-faint">(optional)</span>
+            {t('library.collections.dialog.description')}{' '}
+            <span className="text-lib-faint">{t('library.collections.dialog.optional')}</span>
             <input
               type="text"
               maxLength={160}
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               className="h-10 rounded-lg border border-lib-border bg-lib-input px-3 text-sm text-lib-text-strong outline-none focus:border-lib-accent focus:shadow-[0_0_0_3px_var(--color-lib-accent-soft)]"
-              placeholder="Short note about this set"
+              placeholder={t('library.collections.dialog.descriptionPlaceholder')}
             />
           </label>
 
@@ -121,14 +123,18 @@ export function NewCollectionDialog({
               className="inline-flex h-[38px] cursor-pointer items-center rounded-lg border border-lib-border bg-transparent px-4 text-[13px] font-medium text-lib-muted transition-colors hover:text-lib-text-strong"
               onClick={onClose}
             >
-              Cancel
+              {t('common.actions.cancel')}
             </button>
             <button
               type="submit"
               className="inline-flex h-[38px] cursor-pointer items-center rounded-lg border-none bg-lib-accent px-4 text-[13px] font-semibold text-lib-bg-deep transition-colors hover:bg-lib-accent-hover disabled:cursor-not-allowed disabled:opacity-50"
               disabled={!name.trim() || submitting}
             >
-              {submitting ? 'Saving…' : collection ? 'Save' : 'Create'}
+              {submitting
+                ? t('library.collections.dialog.saving')
+                : collection
+                  ? t('common.actions.save')
+                  : t('library.collections.dialog.create')}
             </button>
           </div>
         </form>

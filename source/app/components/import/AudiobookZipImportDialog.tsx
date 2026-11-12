@@ -1,4 +1,3 @@
-/* i18n-pending: import */
 import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import {
   buildZipTree,
@@ -7,10 +6,12 @@ import {
   formatPlaybackTime,
   importModeForSelection,
   singleFileImportNotes,
+  type MessageKey,
   type ZipImportPreview,
   type ZipPreviewEntry,
 } from '@core'
 import { useZipImportStore } from '../../hooks/library'
+import { uiText, useFormat, useT } from '../../i18n'
 
 const ROW_HEIGHT = 32
 const OVERSCAN = 8
@@ -28,12 +29,6 @@ function iconFor(entry: ZipPreviewEntry): string {
   return '·'
 }
 
-function formatSize(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`
-  if (bytes < 1024 ** 2) return `${(bytes / 1024).toFixed(0)} KB`
-  if (bytes < 1024 ** 3) return `${(bytes / 1024 ** 2).toFixed(1)} MB`
-  return `${(bytes / 1024 ** 3).toFixed(2)} GB`
-}
 
 function Shell({ title, labelId, children }: { title: string; labelId: string; children: React.ReactNode }) {
   return (
@@ -57,6 +52,7 @@ function Shell({ title, labelId, children }: { title: string; labelId: string; c
 
 /** Audiobook ZIP import preview: archive tree, chapters in playback order, cover choice. */
 export function AudiobookZipImportDialog() {
+  const t = useT()
   const phase = useZipImportStore((s) => s.phase)
   const preview = useZipImportStore((s) => s.preview)
   const error = useZipImportStore((s) => s.error)
@@ -82,18 +78,18 @@ export function AudiobookZipImportDialog() {
 
   if (phase === 'error' || !preview) {
     return (
-      <Shell title="Audiobook ZIP import failed" labelId={labelId}>
+      <Shell title={t('import.zip.failedTitle')} labelId={labelId}>
         <div className="flex flex-col gap-4 px-6 py-6">
-          <p className="m-0 text-base font-semibold text-lib-text-strong">This ZIP could not be imported</p>
+          <p className="m-0 text-base font-semibold text-lib-text-strong">{t('import.zip.failedHeading')}</p>
           <p className="m-0 text-[13px] text-red-400" role="alert">
-            {error?.message ?? 'Something went wrong.'}
+            {error ? uiText(t, error.message) : t('import.zip.somethingWrong')}
           </p>
           <div className="flex justify-end gap-2.5">
             <button type="button" className={GHOST_BTN} onClick={() => void useZipImportStore.getState().cancel()}>
-              Close
+              {t('common.actions.close')}
             </button>
             <button type="button" className={PRIMARY_BTN} onClick={() => void useZipImportStore.getState().start()}>
-              Choose another ZIP
+              {t('import.zip.chooseAnother')}
             </button>
           </div>
         </div>
@@ -102,13 +98,21 @@ export function AudiobookZipImportDialog() {
   }
 
   return (
-    <Shell title={`Import audiobook from ${preview.archiveName}`} labelId={labelId}>
+    <Shell title={t('import.zip.dialogTitle', { archive: preview.archiveName })} labelId={labelId}>
       <PreviewBody preview={preview} />
     </Shell>
   )
 }
 
+const WARNING_KEYS = {
+  no_numbering: 'import.zip.warnings.no_numbering',
+  partial_numbering: 'import.zip.warnings.partial_numbering',
+  duplicate_numbers: 'import.zip.warnings.duplicate_numbers',
+  multiple_covers: 'import.zip.warnings.multiple_covers',
+} as const
+
 function PreviewBody({ preview }: { preview: ZipImportPreview }) {
+  const t = useT()
   const selection = useZipImportStore((s) => s.selection)
   const collapsed = useZipImportStore((s) => s.collapsed)
   const coverUrls = useZipImportStore((s) => s.coverUrls)
@@ -130,46 +134,46 @@ function PreviewBody({ preview }: { preview: ZipImportPreview }) {
             {preview.archiveName}
           </h3>
           <p className="m-0 mt-1 text-[13px] text-lib-muted" role="status">
-            Archive inspected · {preview.trackOrder.length} audio track{preview.trackOrder.length === 1 ? '' : 's'} detected
-            {unsupportedCount > 0 ? ` · ${unsupportedCount} unsupported` : ''}
+            {t('import.zip.inspected', { count: preview.trackOrder.length })}
+            {unsupportedCount > 0 ? t('import.zip.unsupportedCount', { count: unsupportedCount }) : ''}
           </p>
         </div>
         <button type="button" className={GHOST_BTN} onClick={() => void store().cancel()}>
-          Cancel
+          {t('common.actions.cancel')}
         </button>
       </header>
 
       {noAudio ? (
         <div className="px-6 py-4 text-[13px] text-amber-300" role="alert">
           {unsupportedCount > 0
-            ? 'None of the audio files in this archive can be imported. See the warnings in the file list.'
-            : 'No audio files were found in this archive.'}
+            ? t('import.zip.noneImportable')
+            : t('import.zip.noAudio')}
         </div>
       ) : null}
 
       <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 overflow-y-auto p-5 md:grid-cols-2 md:overflow-hidden">
-        <section className="flex min-h-[240px] min-w-0 flex-col md:min-h-0" aria-label="Archive contents">
+        <section className="flex min-h-[240px] min-w-0 flex-col md:min-h-0" aria-label={t('import.zip.archiveContents')}>
           <div className="mb-2 flex items-center justify-between gap-2">
-            <h4 className="m-0 text-[11px] font-semibold tracking-[0.1em] text-lib-faint uppercase">Archive</h4>
+            <h4 className="m-0 text-[11px] font-semibold tracking-[0.1em] text-lib-faint uppercase">{t('import.zip.archive')}</h4>
             <div className="flex gap-1.5">
               <button type="button" className={GHOST_BTN + ' !h-7 !px-2.5 !text-xs'} disabled={noAudio} onClick={() => store().selectAll()}>
-                Select all
+                {t('import.zip.selectAll')}
               </button>
               <button type="button" className={GHOST_BTN + ' !h-7 !px-2.5 !text-xs'} disabled={noAudio} onClick={() => store().deselectAll()}>
-                Deselect all
+                {t('import.zip.deselectAll')}
               </button>
             </div>
           </div>
           <VirtualTree rows={rows} selected={selected} />
         </section>
 
-        <section className="flex min-w-0 flex-col gap-4 md:min-h-0 md:overflow-y-auto" aria-label="Import settings">
+        <section className="flex min-w-0 flex-col gap-4 md:min-h-0 md:overflow-y-auto" aria-label={t('import.zip.importSettings')}>
           <div>
             <h4 className="m-0 mb-2 text-[11px] font-semibold tracking-[0.1em] text-lib-faint uppercase">
-              Chapters in playback order ({selection.trackIds.length})
+              {t('import.zip.chaptersInOrder', { count: selection.trackIds.length })}
             </h4>
             {selection.trackIds.length === 0 ? (
-              <p className="m-0 text-[13px] text-lib-muted">No tracks selected.</p>
+              <p className="m-0 text-[13px] text-lib-muted">{t('import.zip.noTracksSelected')}</p>
             ) : (
               <ol className="m-0 flex max-h-[260px] list-none flex-col gap-0.5 overflow-y-auto p-0">
                 {selection.trackIds.map((id, i) => {
@@ -189,14 +193,14 @@ function PreviewBody({ preview }: { preview: ZipImportPreview }) {
             )}
             {notes.title ? (
               <p className="m-0 mt-2 text-xs text-amber-300" role="note">
-                {notes.title}
+                {t(notes.title)}
               </p>
             ) : null}
             {preview.warnings
               .filter((w) => w.code !== 'no_cover')
               .map((w) => (
                 <p key={w.code} className="m-0 mt-2 text-xs text-amber-300" role="note">
-                  {w.message}
+                  {w.code in WARNING_KEYS ? t(WARNING_KEYS[w.code as keyof typeof WARNING_KEYS]) : w.message}
                 </p>
               ))}
           </div>
@@ -207,11 +211,11 @@ function PreviewBody({ preview }: { preview: ZipImportPreview }) {
 
       <footer className="flex flex-wrap items-center justify-between gap-3 border-t border-lib-border-soft px-6 py-3.5">
         <p className="m-0 min-w-0 flex-1 text-[13px] text-lib-muted" role="status">
-          {selection.trackIds.length} of {preview.trackOrder.length} tracks selected · the import runs in the background
+          {t('import.zip.selectedOfTotal', { selected: selection.trackIds.length, total: preview.trackOrder.length })}
         </p>
         <div className="flex shrink-0 gap-2.5">
           <button type="button" className={GHOST_BTN} onClick={() => void store().cancel()}>
-            Cancel
+            {t('common.actions.cancel')}
           </button>
           <button
             type="button"
@@ -219,7 +223,9 @@ function PreviewBody({ preview }: { preview: ZipImportPreview }) {
             disabled={!canConfirmSelection(selection)}
             onClick={() => void store().confirm()}
           >
-            {mode === 'single-file' ? 'Import audiobook' : `Import ${selection.trackIds.length} chapters`}
+            {mode === 'single-file'
+              ? t('import.zip.importAudiobook')
+              : t('import.zip.importChapters', { count: selection.trackIds.length })}
           </button>
         </div>
       </footer>
@@ -234,6 +240,8 @@ function VirtualTree({
   rows: ReturnType<typeof flattenZipTree>
   selected: ReadonlySet<string>
 }) {
+  const t = useT()
+  const format = useFormat()
   const ref = useRef<HTMLDivElement>(null)
   const [scrollTop, setScrollTop] = useState(0)
   const [height, setHeight] = useState(320)
@@ -256,7 +264,7 @@ function VirtualTree({
     <div
       ref={ref}
       role="tree"
-      aria-label="Archive contents"
+      aria-label={t('import.zip.archiveContents')}
       className="min-h-0 flex-1 overflow-auto rounded-lg border border-lib-border-soft bg-[rgba(15,23,42,0.35)]"
       style={{ maxHeight: 420 }}
       onScroll={(e) => setScrollTop(e.currentTarget.scrollTop)}
@@ -276,7 +284,7 @@ function VirtualTree({
               aria-expanded={node.isFolder ? expanded : undefined}
               className={`absolute right-0 left-0 flex items-center gap-2 pr-3 text-[13px] ${dim ? 'text-lib-faint' : 'text-lib-text'}`}
               style={{ top, height: ROW_HEIGHT, paddingLeft: 8 + depth * 16 }}
-              title={entry?.reason ? `${node.path} — ${entry.reason}` : node.path}
+              title={entry?.reason ? t('import.zip.entryWithReason', { path: node.path, reason: entry.reason }) : node.path}
             >
               {node.isFolder ? (
                 <button
@@ -296,7 +304,7 @@ function VirtualTree({
                     <input
                       type="checkbox"
                       className="size-3.5 shrink-0 accent-[var(--color-lib-accent)]"
-                      aria-label={`Include ${entry.name}`}
+                      aria-label={t('import.zip.include', { name: entry.name })}
                       checked={selected.has(entry.id)}
                       disabled={!eligible}
                       onChange={() => store().toggleTrack(entry.id)}
@@ -309,12 +317,12 @@ function VirtualTree({
                   </span>
                   <span className="truncate">{entry.name}</span>
                   {entry.status === 'unsupported' ? (
-                    <span className="shrink-0 text-xs text-amber-300">{entry.reason ?? 'Unsupported'}</span>
+                    <span className="shrink-0 text-xs text-amber-300">{entry.reason ?? t('import.zip.unsupported')}</span>
                   ) : entry.reason ? (
                     <span className="shrink-0 text-xs text-lib-faint">{entry.reason}</span>
                   ) : null}
                   <span className="ml-auto shrink-0 pl-3 text-xs text-lib-faint tabular-nums">
-                    {entry.durationSeconds ? formatPlaybackTime(entry.durationSeconds) : formatSize(entry.size)}
+                    {entry.durationSeconds ? formatPlaybackTime(entry.durationSeconds) : format.bytes(entry.size)}
                   </span>
                 </>
               ) : null}
@@ -322,7 +330,7 @@ function VirtualTree({
           )
         })}
       </div>
-      {rows.length === 0 ? <p className="m-0 p-3 text-[13px] text-lib-muted">The archive has no files.</p> : null}
+      {rows.length === 0 ? <p className="m-0 p-3 text-[13px] text-lib-muted">{t('import.zip.emptyArchive')}</p> : null}
     </div>
   )
 }
@@ -337,25 +345,32 @@ function CoverPicker({
   coverId: string | null
   coverUrls: Readonly<Record<string, string | null>>
   /** One-track import: the cover chosen here is not applied — said before the user confirms. */
-  inactiveNote: string | null
+  inactiveNote: MessageKey | null
 }) {
+  const t = useT()
   const store = useZipImportStore.getState
   const byId = new Map(preview.entries.map((e) => [e.id, e]))
   const current = coverId ? byId.get(coverId) : undefined
   const url = coverId ? coverUrls[coverId] : null
   return (
     <div>
-      <h4 className="m-0 mb-2 text-[11px] font-semibold tracking-[0.1em] text-lib-faint uppercase">Cover</h4>
+      <h4 className="m-0 mb-2 text-[11px] font-semibold tracking-[0.1em] text-lib-faint uppercase">{t('import.zip.cover')}</h4>
       {preview.coverCandidates.length === 0 ? (
-        <p className="m-0 text-[13px] text-lib-muted">No cover image found. The default cover will be used.</p>
+        <p className="m-0 text-[13px] text-lib-muted">{t('import.zip.noCoverFound')}</p>
       ) : (
         <div className={`flex items-start gap-3 ${inactiveNote ? 'opacity-60' : ''}`}>
           <div className="flex h-[112px] w-[84px] shrink-0 items-center justify-center overflow-hidden rounded-md border border-lib-border-soft bg-[rgba(15,23,42,0.45)] text-xs text-lib-faint">
-            {url ? <img src={url} alt="Selected cover" className="h-full w-full object-cover" /> : current ? 'No preview' : 'No cover'}
+            {url ? (
+              <img src={url} alt={t('import.zip.selectedCover')} className="h-full w-full object-cover" />
+            ) : current ? (
+              t('import.zip.noPreview')
+            ) : (
+              t('import.zip.noCover')
+            )}
           </div>
           <div className="flex min-w-0 flex-1 flex-col gap-1.5">
             <label className="text-xs text-lib-muted" htmlFor="zip-cover-select">
-              Cover image
+              {t('import.zip.coverImage')}
             </label>
             <select
               id="zip-cover-select"
@@ -363,7 +378,7 @@ function CoverPicker({
               value={coverId ?? ''}
               onChange={(e) => store().chooseCover(e.target.value || null)}
             >
-              <option value="">No cover</option>
+              <option value="">{t('import.zip.noCover')}</option>
               {preview.coverCandidates.map((id) => (
                 <option key={id} value={id}>
                   {byId.get(id)?.path ?? id}
@@ -375,7 +390,7 @@ function CoverPicker({
       )}
       {inactiveNote ? (
         <p className="m-0 mt-2 text-xs text-amber-300" role="note">
-          {inactiveNote}
+          {t(inactiveNote)}
         </p>
       ) : null}
     </div>

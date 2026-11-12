@@ -1,6 +1,6 @@
-/* i18n-pending: library */
 import { useEffect, useState, type FormEvent } from 'react'
 import type { LibraryBook } from '@core'
+import { useT } from '../../../../i18n'
 
 export type BookMetadataValues = {
   id: string
@@ -25,6 +25,7 @@ export function EditBookMetadataDialog({
   onClose,
   onSave,
 }: EditBookMetadataDialogProps) {
+  const t = useT()
   const [title, setTitle] = useState('')
   const [author, setAuthor] = useState('')
   const [genres, setGenres] = useState('')
@@ -82,26 +83,26 @@ export function EditBookMetadataDialog({
         onClick={(event) => event.stopPropagation()}
       >
         <h2 id="edit-book-metadata-title" className="m-0 text-base font-semibold text-lib-text-strong">
-          Edit metadata
+          {t('library.edit.title')}
         </h2>
         <label className="flex flex-col gap-1.5 text-xs font-semibold text-lib-muted">
-          Title
+          {t('library.edit.bookTitle')}
           <input className={inputClass} value={title} onChange={(event) => setTitle(event.target.value)} autoFocus />
         </label>
         <label className="flex flex-col gap-1.5 text-xs font-semibold text-lib-muted">
-          Author
+          {t('library.edit.author')}
           <input className={inputClass} value={author} onChange={(event) => setAuthor(event.target.value)} />
         </label>
         <label className="flex flex-col gap-1.5 text-xs font-semibold text-lib-muted">
-          Genres <span className="font-normal text-lib-faint">(comma separated)</span>
+          {t('library.edit.genres')} <span className="font-normal text-lib-faint">{t('library.edit.genresHint')}</span>
           <input className={inputClass} value={genres} onChange={(event) => setGenres(event.target.value)} />
         </label>
         <label className="flex flex-col gap-1.5 text-xs font-semibold text-lib-muted">
-          Pages
+          {t('library.edit.pages')}
           <input className={inputClass} inputMode="numeric" value={pageCount} onChange={(event) => setPageCount(event.target.value)} />
         </label>
         <label className="flex flex-col gap-1.5 text-xs font-semibold text-lib-muted">
-          Description
+          {t('library.edit.description')}
           <textarea
             className="min-h-24 w-full resize-y rounded-lg border border-lib-border bg-lib-input px-3 py-2.5 text-[13px] text-lib-text-strong outline-none focus:border-lib-accent"
             value={description}
@@ -110,10 +111,10 @@ export function EditBookMetadataDialog({
         </label>
         <div className="flex justify-end gap-2">
           <button type="button" className="h-10 cursor-pointer rounded-lg border border-lib-border bg-transparent px-4 text-[13px] font-semibold text-lib-muted" onClick={onClose}>
-            Cancel
+            {t('common.actions.cancel')}
           </button>
           <button type="submit" disabled={!title.trim() || saving} className="h-10 cursor-pointer rounded-lg border border-lib-accent bg-lib-accent px-4 text-[13px] font-semibold text-lib-on-accent disabled:cursor-default disabled:opacity-50">
-            {saving ? 'Saving…' : 'Save'}
+            {saving ? t('library.edit.saving') : t('common.actions.save')}
           </button>
         </div>
       </form>

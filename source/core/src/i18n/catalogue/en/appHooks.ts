@@ -1,2 +1,7 @@
-/** English texts of area `appHooks` (spec 012). Filled when the area is converted. */
-export const en = {} as const
+/** English texts of area `appHooks` (spec 012): app-wide hooks and stores in `source/app/hooks/app`. */
+export const en = {
+  cloud: {
+    notConfigured: 'Not configured',
+    comingSoon: 'Coming soon',
+  },
+} as const

@@ -1,3 +1,4 @@
+import type { MessageKey } from '../i18n/translate.js'
 import { audioFormatFromExtension, audioPlaybackStatus } from './audio-formats.js'
 
 /**
@@ -279,14 +280,12 @@ export function importModeForSelection(selection: ZipImportSelection): ZipImport
 }
 
 /** What the preview must tell the user BEFORE confirming a one-track import (the cover chosen here is not applied). */
-export function singleFileImportNotes(selection: ZipImportSelection): { cover: string | null; title: string | null } {
+export function singleFileImportNotes(selection: ZipImportSelection): { cover: MessageKey | null; title: MessageKey | null } {
   if (importModeForSelection(selection) !== 'single-file') return { cover: null, title: null }
+  // Message keys (spec 012): the UI translates them in its current language.
   return {
-    cover:
-      selection.coverId !== null
-        ? "With one track this is imported as a single audio file. The cover selected here won't be used; the track's own cover (or a generated one) is used instead."
-        : null,
-    title: "The title comes from the track's own tags or file name, not from the ZIP name.",
+    cover: selection.coverId !== null ? 'import.zip.notes.singleFileCover' : null,
+    title: 'import.zip.notes.singleFileTitle',
   }
 }
 

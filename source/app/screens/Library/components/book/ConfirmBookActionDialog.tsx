@@ -1,5 +1,5 @@
-/* i18n-pending: library */
 import { useEffect } from 'react'
+import { useT } from '../../../../i18n'
 
 export type ConfirmBookActionDialogProps = {
   title: string
@@ -18,6 +18,7 @@ export function ConfirmBookActionDialog({
   onCancel,
   onConfirm,
 }: ConfirmBookActionDialogProps) {
+  const t = useT()
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
       if (e.key === 'Escape') {
@@ -50,7 +51,7 @@ export function ConfirmBookActionDialog({
         </p>
         <div className="flex justify-end gap-2">
           <button type="button" className="h-10 cursor-pointer rounded-lg border border-lib-border bg-transparent px-4 text-[13px] font-semibold text-lib-muted" onClick={onCancel}>
-            Cancel
+            {t('common.actions.cancel')}
           </button>
           <button
             type="button"

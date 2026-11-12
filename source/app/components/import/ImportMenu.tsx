@@ -1,6 +1,6 @@
-/* i18n-pending: import */
 import { useEffect, useId, useRef, useState } from 'react'
 import { features } from '@core/config'
+import { useT } from '../../i18n'
 import { useZipImportStore, zipJobShortLabel } from '../../hooks/library'
 import { isFeatureAvailable } from '../../platforms/host'
 import { SpinnerIcon } from './SpinnerIcon'
@@ -121,18 +121,24 @@ function ChevronIcon({ className }: { className?: string }) {
  * hides the progress panel (a second ZIP cannot be started meanwhile); otherwise a click starts a new import.
  */
 function useZipEntry() {
+  const t = useT()
   const job = useZipImportStore((s) => s.job)
   const inspecting = useZipImportStore((s) => s.phase === 'inspecting')
   const running = job?.status === 'running'
   const busy = running || inspecting
   // Reading the archive and importing it are both "working": a spinner, and a click opens / hides the small progress card.
-  const label = running && job ? zipJobShortLabel(job) : inspecting ? 'ZIP…' : ''
+  const label = running && job ? zipJobShortLabel(t, job) : inspecting ? t('import.menu.zip.readingShort') : ''
   const onClick = () => {
     const state = useZipImportStore.getState()
     if (busy) state.setPanelOpen(!state.panelOpen)
     else void state.start()
   }
-  return { running: busy, inspecting, label, onClick }
+  const text = inspecting
+    ? t('import.menu.zip.reading')
+    : busy
+      ? t('import.menu.zip.importing', { progress: label })
+      : t('import.menu.zip.label')
+  return { running: busy, inspecting, label, text, onClick }
 }
 
 export function ImportMenu({
@@ -140,6 +146,7 @@ export function ImportMenu({
   onFromUrl,
   size = 'md',
 }: ImportMenuProps) {
+  const t = useT()
   const zip = useZipEntry()
   const isLg = size === 'lg'
   const iconClass = isLg ? 'size-5' : 'size-4'
@@ -155,15 +162,15 @@ export function ImportMenu({
   // Mobile host (spec 008, T068): no URL or audiobook import in the first release, so "Add file" is the only entry.
   if (!isFeatureAvailable('urlImport') && !isFeatureAvailable('audiobooks')) {
     return (
-      <button type="button" className={primaryClass} aria-label="Add file from this device" onClick={onFromDevice}>
+      <button type="button" className={primaryClass} aria-label={t('import.menu.addFileAria')} onClick={onFromDevice}>
         <PlusIcon className={iconClass} />
-        <span>Add file</span>
+        <span>{t('import.menu.addFile')}</span>
       </button>
     )
   }
 
   return (
-    <div className="inline-flex shrink-0" aria-label="Import documents">
+    <div className="inline-flex shrink-0" aria-label={t('import.menu.importDocuments')}>
       {/* Narrow viewport — Import dropdown */}
       <div className="sm:hidden">
         <ImportDropdown
@@ -177,37 +184,49 @@ export function ImportMenu({
       <div
         className={`hidden sm:inline-flex items-center ${isLg ? 'flex-wrap justify-center gap-3' : 'gap-2'}`}
         role="group"
-        aria-label="Import documents"
+        aria-label={t('import.menu.importDocuments')}
       >
         <button
           type="button"
           className={primaryClass}
-          aria-label="Add file from this device"
+          aria-label={t('import.menu.addFileAria')}
           onClick={onFromDevice}
         >
           <PlusIcon className={iconClass} />
-          <span>Add file</span>
+          <span>{t('import.menu.addFile')}</span>
         </button>
         <button
           type="button"
           className={secondaryClass}
-          aria-label="Import document from URL"
+          aria-label={t('import.menu.importUrlAria')}
           onClick={onFromUrl}
         >
           <LinkIcon className={iconClass} />
-          <span>Import URL</span>
+          <span>{t('import.menu.importUrl')}</span>
         </button>
         {features.audiobookZipImportEnabled ? (
           <button
             type="button"
             className={secondaryClass}
-            aria-label={zip.inspecting ? 'Reading the audiobook ZIP' : zip.running ? `Audiobook import in progress, ${zip.label}` : 'Import audiobook from a ZIP archive'}
+            aria-label={
+              zip.inspecting
+                ? t('import.menu.zip.readingAria')
+                : zip.running
+                  ? t('import.menu.zip.runningAria', { progress: zip.label })
+                  : t('import.menu.zip.idleAria')
+            }
             aria-busy={zip.running}
-            title={zip.inspecting ? 'Reading the ZIP — click for details' : zip.running ? 'Importing audiobook — click for details' : undefined}
+            title={
+              zip.inspecting
+                ? t('import.menu.zip.readingTitle')
+                : zip.running
+                  ? t('import.menu.zip.runningTitle')
+                  : undefined
+            }
             onClick={zip.onClick}
           >
             {zip.running ? <SpinnerIcon className={`${iconClass} text-lib-accent`} /> : <ZipIcon className={iconClass} />}
-            <span>{zip.inspecting ? 'Reading ZIP…' : zip.running ? `Importing ${zip.label}` : 'Audiobook ZIP'}</span>
+            <span>{zip.text}</span>
           </button>
         ) : null}
       </div>
@@ -224,6 +243,7 @@ function ImportDropdown({
   onFromUrl: () => void
   size: 'md' | 'lg'
 }) {
+  const t = useT()
   const zip = useZipEntry()
   const menuId = useId()
   const rootRef = useRef<HTMLDivElement>(null)
@@ -278,14 +298,14 @@ function ImportDropdown({
       <button
         type="button"
         className={triggerClass}
-        aria-label="Import"
+        aria-label={t('import.menu.import')}
         aria-haspopup="menu"
         aria-expanded={open}
         aria-controls={menuId}
         onClick={() => setOpen((v) => !v)}
       >
         {zip.running ? <SpinnerIcon className={isLg ? 'size-5' : 'size-4'} /> : <PlusIcon className={isLg ? 'size-5' : 'size-4'} />}
-        <span>Import</span>
+        <span>{t('import.menu.import')}</span>
         <ChevronIcon className={isLg ? 'size-4' : 'size-3.5'} />
       </button>
 
@@ -293,7 +313,7 @@ function ImportDropdown({
         <div
           id={menuId}
           role="menu"
-          aria-label="Import options"
+          aria-label={t('import.menu.importOptions')}
           className="absolute top-[calc(100%+6px)] right-0 z-[100] flex w-[210px] flex-col gap-1 rounded-lg border border-lib-border bg-lib-surface-strong p-1.5 shadow-[0_12px_32px_rgba(0,0,0,0.35)] backdrop-blur-md"
         >
           <button
@@ -303,7 +323,7 @@ function ImportDropdown({
             onClick={() => choose(onFromDevice)}
           >
             <DeviceIcon className="size-4" />
-            <span>Add file</span>
+            <span>{t('import.menu.addFile')}</span>
           </button>
           <button
             type="button"
@@ -312,7 +332,7 @@ function ImportDropdown({
             onClick={() => choose(onFromUrl)}
           >
             <LinkIcon className="size-4" />
-            <span>Import URL</span>
+            <span>{t('import.menu.importUrl')}</span>
           </button>
           {features.audiobookZipImportEnabled ? (
             <button
@@ -323,7 +343,7 @@ function ImportDropdown({
               onClick={() => choose(zip.onClick)}
             >
               {zip.running ? <SpinnerIcon className="size-4 !text-lib-accent" /> : <ZipIcon className="size-4" />}
-              <span>{zip.inspecting ? 'Reading ZIP…' : zip.running ? `Importing ${zip.label}` : 'Audiobook ZIP'}</span>
+              <span>{zip.text}</span>
             </button>
           ) : null}
         </div>

@@ -1,4 +1,5 @@
-import { formatFileSizeMb } from '@core'
+import type { MessageRef, Translator } from '@core'
+import { translateRef, useFormat, useT, type BoundFormat } from '../../../../i18n'
 import { BookCover, BookMenuButton, type BookMenuPoint } from '../book'
 import { withLongPress } from '../../../../platforms/longPress'
 
@@ -17,7 +18,7 @@ export type ShelfDetailItemData = {
   genres?: string[]
   pageCount?: number
   /** Progress chip or last-read line (G4 fills real location). */
-  progressLabel?: string
+  progressLabel?: MessageRef
   progressKind?: 'chip' | 'last'
   progressDone?: boolean
   isFavorite?: boolean
@@ -73,18 +74,15 @@ function ChevronIcon({ className }: { className?: string }) {
   )
 }
 
-function buildMetaLine(item: ShelfDetailItemData): string | undefined {
+function buildMetaLine(t: Translator, format: BoundFormat, item: ShelfDetailItemData): string | undefined {
   const parts: string[] = []
   const genreLabel =
     item.genre?.trim() ||
     (item.genres && item.genres.length > 0 ? item.genres.join(', ') : undefined)
   if (genreLabel) parts.push(genreLabel)
-  const size = formatFileSizeMb(item.fileSizeBytes)
-  if (size) parts.push(size)
+  if (item.fileSizeBytes != null && item.fileSizeBytes >= 0) parts.push(format.bytes(item.fileSizeBytes))
   if (item.pageCount != null && item.pageCount > 0) {
-    parts.push(
-      `${item.pageCount} ${item.pageCount === 1 ? 'page' : 'pages'}`,
-    )
+    parts.push(t('library.pageCount', { count: item.pageCount }))
   }
   return parts.length > 0 ? parts.join(' · ') : undefined
 }
@@ -101,10 +99,13 @@ export function ShelfDetailItem({
   onOpen,
   onBookMenu,
 }: ShelfDetailItemProps) {
+  const t = useT()
+  const format = useFormat()
   const formatBadge = item.format?.trim().toUpperCase()
   const progressKind =
     item.progressKind ?? (item.progressLabel ? 'chip' : undefined)
-  const metaLine = buildMetaLine(item)
+  const progressText = item.progressLabel ? translateRef(t, item.progressLabel) : undefined
+  const metaLine = buildMetaLine(t, format, item)
   const description = item.description?.trim()
 
   return (
@@ -138,7 +139,7 @@ export function ShelfDetailItem({
               {item.sourceProvider ? (
                 <span
                   className="inline-flex shrink-0"
-                  title={`Synced from ${PROVIDER_LABEL[item.sourceProvider]}`}
+                  title={t('library.card.syncedFrom', { provider: PROVIDER_LABEL[item.sourceProvider] })}
                 >
                   <CloudBadgeIcon className="size-3 text-lib-faint" />
                 </span>
@@ -164,12 +165,12 @@ export function ShelfDetailItem({
                 {description}
               </p>
             ) : null}
-            {item.progressLabel && progressKind === 'last' ? (
+            {progressText && progressKind === 'last' ? (
               <p className="m-0 text-[11px] text-lib-muted">
-                {item.progressLabel}
+                {progressText}
               </p>
             ) : null}
-            {item.progressLabel && progressKind === 'chip' ? (
+            {progressText && progressKind === 'chip' ? (
               <div className="mt-0.5">
                 <span
                   className={
@@ -178,7 +179,7 @@ export function ShelfDetailItem({
                       : 'inline-flex rounded-md bg-lib-chip px-1.5 py-0.5 text-[10px] font-medium text-lib-muted'
                   }
                 >
-                  {item.progressLabel}
+                  {progressText}
                 </span>
               </div>
             ) : null}
@@ -195,7 +196,7 @@ export function ShelfDetailItem({
           <button
             type="button"
             className="inline-flex size-9 cursor-pointer items-center justify-center rounded-lg border-none bg-transparent text-lib-faint transition-colors hover:text-lib-text-strong focus-visible:text-lib-text-strong focus-visible:outline-none"
-            aria-label={`Open ${item.title}`}
+            aria-label={t('library.card.openAria', { title: item.title })}
             onClick={() => onOpen(item.id)}
           >
             <ChevronIcon className="size-5" />

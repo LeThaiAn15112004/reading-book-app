@@ -1,4 +1,5 @@
-/* i18n-pending: library */
+import { useT } from '../../../../i18n'
+
 export type ViewMode = 'grid' | 'list'
 
 function GridIcon({ className }: { className?: string }) {
@@ -48,17 +49,18 @@ export type ViewModeToggleProps = {
 
 /** Grid/List switch shown on section + collection full-page views. */
 export function ViewModeToggle({ viewMode, onChange }: ViewModeToggleProps) {
+  const t = useT()
   return (
     <div
       className="flex shrink-0 items-center gap-0.5 rounded-lg bg-lib-chip/50 p-0.5"
       role="group"
-      aria-label="Change view mode"
+      aria-label={t('library.layout.changeViewMode')}
     >
       <button
         type="button"
         aria-pressed={viewMode === 'grid'}
-        aria-label="Grid view"
-        title="Grid view"
+        aria-label={t('library.layout.grid')}
+        title={t('library.layout.grid')}
         onClick={() => onChange('grid')}
         className={`inline-flex size-8 cursor-pointer items-center justify-center rounded-md border-none transition-colors ${
           viewMode === 'grid'
@@ -71,8 +73,8 @@ export function ViewModeToggle({ viewMode, onChange }: ViewModeToggleProps) {
       <button
         type="button"
         aria-pressed={viewMode === 'list'}
-        aria-label="List view"
-        title="List view"
+        aria-label={t('library.layout.list')}
+        title={t('library.layout.list')}
         onClick={() => onChange('list')}
         className={`inline-flex size-8 cursor-pointer items-center justify-center rounded-md border-none transition-colors ${
           viewMode === 'list'

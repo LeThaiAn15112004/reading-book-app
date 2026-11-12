@@ -1,4 +1,4 @@
-import { filterByNav, type LibraryBook } from '@core'
+import { filterByNav, type LibraryBook, type MessageKey } from '@core'
 
 /** Library sidebar destinations (status filters + favorites). Collections live in the top nav. */
 export type LibraryBrowseFilter = 'all' | 'reading' | 'not-started' | 'completed' | 'favorites'
@@ -8,28 +8,29 @@ export type LibrarySortId = 'recently-added' | 'recently-read' | 'title' | 'auth
 /** Grid = covers (reading); Table = dense rows + detail panel (managing many documents). */
 export type LibraryLayout = 'grid' | 'table'
 
-export const LIBRARY_BROWSE_FILTERS: readonly { id: LibraryBrowseFilter; label: string }[] = [
-  { id: 'all', label: 'All books' },
-  { id: 'reading', label: 'Reading' },
-  { id: 'not-started', label: 'Not started' },
-  { id: 'completed', label: 'Completed' },
-  { id: 'favorites', label: 'Favorites' },
+/** Labels are catalogue keys, translated where they are shown (spec 012). */
+export const LIBRARY_BROWSE_FILTERS: readonly { id: LibraryBrowseFilter; labelKey: MessageKey }[] = [
+  { id: 'all', labelKey: 'library.filters.all' },
+  { id: 'reading', labelKey: 'library.filters.reading' },
+  { id: 'not-started', labelKey: 'library.filters.notStarted' },
+  { id: 'completed', labelKey: 'library.filters.completed' },
+  { id: 'favorites', labelKey: 'library.filters.favorites' },
 ]
 
-export const LIBRARY_SORTS: readonly { id: LibrarySortId; label: string }[] = [
-  { id: 'recently-added', label: 'Recently added' },
-  { id: 'recently-read', label: 'Recently read' },
-  { id: 'title', label: 'Title' },
-  { id: 'author', label: 'Author' },
+export const LIBRARY_SORTS: readonly { id: LibrarySortId; labelKey: MessageKey }[] = [
+  { id: 'recently-added', labelKey: 'library.sorts.recentlyAdded' },
+  { id: 'recently-read', labelKey: 'library.sorts.recentlyRead' },
+  { id: 'title', labelKey: 'library.sorts.title' },
+  { id: 'author', labelKey: 'library.sorts.author' },
 ]
 
 /** Empty-state copy per filter. */
-export const LIBRARY_FILTER_EMPTY: Record<LibraryBrowseFilter, string> = {
-  all: 'No books yet.',
-  reading: 'No books in progress. Open a book to start reading.',
-  'not-started': 'Every book has been opened at least once.',
-  completed: 'No completed books yet. Mark a book completed from its menu.',
-  favorites: 'No favorites yet. Add one from a book’s menu.',
+export const LIBRARY_FILTER_EMPTY: Record<LibraryBrowseFilter, MessageKey> = {
+  all: 'library.filterEmpty.all',
+  reading: 'library.filterEmpty.reading',
+  'not-started': 'library.filterEmpty.notStarted',
+  completed: 'library.filterEmpty.completed',
+  favorites: 'library.filterEmpty.favorites',
 }
 
 /** Books matching one sidebar filter — reuses the SDK nav filters. */

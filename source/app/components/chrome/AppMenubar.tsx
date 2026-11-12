@@ -1,4 +1,3 @@
-/* i18n-pending: chrome */
 import {
   useEffect,
   useRef,
@@ -9,7 +8,8 @@ import {
 } from 'react'
 import { createPortal } from 'react-dom'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import type { ExternalLibraryProvider } from '@core'
+import type { ExternalLibraryProvider, MessageKey } from '@core'
+import { useT } from '../../i18n'
 import {
   cloudProviderUnavailableLabel,
   useCloudProviderAvailability,
@@ -24,13 +24,13 @@ import { useOpenReading } from './OpenReadingContext'
 import { useReaderChromeMenu } from './ReaderChromeMenuContext'
 
 type NavItem =
-  | { id: 'library' | 'settings' | 'reading'; label: string; to?: string }
-  | { id: AppStubNavId; label: string }
+  | { id: 'library' | 'settings' | 'reading'; labelKey: MessageKey; to?: string }
+  | { id: AppStubNavId; labelKey: MessageKey }
 
 const PRIMARY_ITEMS: readonly NavItem[] = [
-  { id: 'library', label: 'Library', to: '/library' },
-  { id: 'collections', label: 'Collections' },
-  { id: 'cloud-sources', label: 'Cloud Sources' },
+  { id: 'library', labelKey: 'chrome.nav.library', to: '/library' },
+  { id: 'collections', labelKey: 'chrome.nav.collections' },
+  { id: 'cloud-sources', labelKey: 'chrome.nav.cloudSources' },
 ]
 
 type CloudProviderNavId = 'cloud-google-drive' | 'cloud-dropbox' | 'cloud-onedrive'
@@ -73,6 +73,7 @@ function CloudSourcesMenuItem({
   active: boolean
   onSelectProvider: (id: CloudProviderNavId) => void
 }) {
+  const t = useT()
   const [open, setOpen] = useState(false)
   const [menuPos, setMenuPos] = useState<{ left: number; top: number } | null>(null)
   // Spec 010 KL-1: a provider this build does not offer is listed but cannot be opened (no Connect button anywhere).
@@ -178,14 +179,14 @@ function CloudSourcesMenuItem({
         }}
         onClick={openMenu}
       >
-        Cloud Sources
+        {t('chrome.nav.cloudSources')}
       </button>
       {open && menuPos
         ? createPortal(
             <div
               ref={menuRef}
               role="menu"
-              aria-label="Cloud Sources providers"
+              aria-label={t('chrome.nav.cloudProviders')}
               data-app-menubar-popover
               className="app-menubar-popover app-no-drag fixed z-[1000] w-52 rounded-xl border border-lib-border bg-lib-surface-strong p-1.5 shadow-[0_18px_48px_rgba(0,0,0,0.45)]"
               style={{ left: menuPos.left, top: menuPos.top }}
@@ -210,7 +211,7 @@ function CloudSourcesMenuItem({
                 aria-hidden
               />
               {CLOUD_PROVIDER_ITEMS.map((item) => {
-                const unavailable = cloudProviderUnavailableLabel(availability[item.provider])
+                const unavailable = cloudProviderUnavailableLabel(t, availability[item.provider])
                 return (
                   <button
                     key={item.id}
@@ -218,7 +219,11 @@ function CloudSourcesMenuItem({
                     role="menuitem"
                     disabled={unavailable !== null}
                     aria-disabled={unavailable !== null}
-                    title={unavailable ? `${item.label} — ${unavailable}` : undefined}
+                    title={
+                      unavailable
+                        ? t('chrome.nav.providerUnavailable', { provider: item.label, reason: unavailable })
+                        : undefined
+                    }
                     className="flex h-8 w-full cursor-pointer items-center justify-between gap-2 rounded-md border-none bg-transparent px-2.5 text-left text-[13px] text-lib-text-strong transition-colors hover:bg-white/5 focus-visible:bg-white/5 focus-visible:outline-none disabled:cursor-default disabled:text-lib-muted disabled:hover:bg-transparent"
                     onClick={() => {
                       if (unavailable) return
@@ -251,6 +256,7 @@ function NavDivider() {
 }
 
 function ReadingTabs() {
+  const t = useT()
   const { tabs, activeBookId, focusBook, closeBook, reorderTabs } =
     useOpenReading()
   const [dragFrom, setDragFrom] = useState<number | null>(null)
@@ -267,14 +273,15 @@ function ReadingTabs() {
     <div
       className="flex min-h-9 shrink-0 items-center gap-1 overflow-x-auto border-b border-lib-border-soft bg-lib-topbar px-3 py-1"
       role="tablist"
-      aria-label="Open books"
+      aria-label={t('chrome.tabs.openBooks')}
       onDragLeave={(e) => {
         if (!e.currentTarget.contains(e.relatedTarget as Node | null)) {
           setDragOver(null)
         }
       }}
     >
-      {tabs.map((tab, index) => {
+      {tabs.map((openTab, index) => {
+        const tab = { ...openTab, title: openTab.title || t('common.untitled') }
         const active = tab.bookId === activeBookId
         const isDragging = dragFrom === index
         const isDropTarget = dragOver === index && dragFrom !== index
@@ -318,7 +325,7 @@ function ReadingTabs() {
             <button
               type="button"
               className="min-w-0 flex-1 cursor-inherit truncate border-none bg-transparent p-0 text-left text-inherit"
-              title={`${tab.title} — drag to reorder`}
+              title={t('chrome.tabs.dragToReorder', { title: tab.title })}
               onClick={() => focusBook(tab.bookId)}
             >
               {tab.title}
@@ -327,8 +334,8 @@ function ReadingTabs() {
               type="button"
               draggable={false}
               className="inline-flex size-5 shrink-0 cursor-pointer items-center justify-center rounded border-none bg-transparent text-[11px] text-lib-faint opacity-70 transition-opacity hover:bg-lib-accent-soft hover:text-lib-text-strong hover:opacity-100 group-hover:opacity-100"
-              title={`Close “${tab.title}”`}
-              aria-label={`Close ${tab.title}`}
+              title={t('chrome.tabs.closeTitle', { title: tab.title })}
+              aria-label={t('chrome.tabs.closeAria', { title: tab.title })}
               onClick={(e) => {
                 e.stopPropagation()
                 void flushRegisteredSession().finally(() => {
@@ -351,6 +358,7 @@ function ReadingTabs() {
  * Hidden on Splash only — visible on Library, Settings, and Reader for fast screen switching.
  */
 export function AppMenubar() {
+  const t = useT()
   const location = useLocation()
   const navigate = useNavigate()
   const { libraryNav } = useAppNav()
@@ -410,12 +418,12 @@ export function AppMenubar() {
           aria-current={active ? 'page' : undefined}
           title={
             tabs.length === 0
-              ? 'Open a book from Library to start reading'
-              : `${tabs.length} open book(s)`
+              ? t('chrome.nav.noOpenBooks')
+              : t('chrome.nav.openBookCount', { count: tabs.length })
           }
           onClick={() => goReading()}
         >
-          {item.label}
+          {t(item.labelKey)}
           {tabs.length > 0 ? (
             <span className="ml-1.5 inline-flex min-w-[1.1rem] items-center justify-center rounded-full bg-lib-accent-soft px-1 text-[10px] font-bold text-lib-accent">
               {tabs.length}
@@ -438,7 +446,7 @@ export function AppMenubar() {
               leaveReaderThen(() => libraryNav.onLibraryNav())
             }}
           >
-            {item.label}
+            {t(item.labelKey)}
           </Link>
         )
       }
@@ -454,7 +462,7 @@ export function AppMenubar() {
             leaveReaderThen(() => navigate(item.to!))
           }}
         >
-          {item.label}
+          {t(item.labelKey)}
         </Link>
       )
     }
@@ -466,7 +474,7 @@ export function AppMenubar() {
         className={className}
         onClick={() => handleStub(item.id as AppStubNavId)}
       >
-        {item.label}
+        {t(item.labelKey)}
       </button>
     )
   }
@@ -476,21 +484,21 @@ export function AppMenubar() {
     <div className="app-menubar-stack">
       <nav
         className="app-menubar flex items-center gap-0.5 overflow-x-auto border-b border-lib-border-soft bg-lib-bg-deep/95 px-3 backdrop-blur-md"
-        aria-label="Main navigation"
+        aria-label={t('chrome.nav.mainNavigation')}
       >
         {PRIMARY_ITEMS.map(renderItem)}
         <Link
           to="/settings"
           className={itemClass(activeId === 'settings')}
-          aria-label="Settings"
-          title="Settings"
+          aria-label={t('chrome.nav.settings')}
+          title={t('chrome.nav.settings')}
           onClick={(e: MouseEvent<HTMLAnchorElement>) => {
             if (!onReading) return
             e.preventDefault()
             leaveReaderThen(() => navigate('/settings'))
           }}
         >
-          Settings
+          {t('chrome.nav.settings')}
         </Link>
         {onReading ? (
           <>
@@ -502,7 +510,7 @@ export function AppMenubar() {
               aria-controls="reader-tools-chrome"
               onClick={() => readerChrome?.toggleTools()}
             >
-              Tools
+              {t('chrome.nav.tools')}
             </button>
           </>
         ) : null}

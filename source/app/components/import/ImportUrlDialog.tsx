@@ -1,5 +1,5 @@
-/* i18n-pending: import */
 import { useEffect, useId, useRef, useState, type FormEvent } from 'react'
+import { uiText, useT, type UiText } from '../../i18n'
 
 const FORMAT_TAGS = ['EPUB', 'PDF', 'TXT', 'MD'] as const
 
@@ -11,7 +11,7 @@ export type ImportUrlDialogProps = {
   /** Pre-filled URL (kept after a failed download). */
   initialUrl?: string
   /** Error from the last download attempt; `retryable` turns the submit button into Retry. */
-  submitError?: { message: string; retryable: boolean } | null
+  submitError?: { message: UiText; retryable: boolean } | null
 }
 
 function LinkIcon({ className }: { className?: string }) {
@@ -42,18 +42,19 @@ export function ImportUrlDialog({
   initialUrl = '',
   submitError = null,
 }: ImportUrlDialogProps) {
+  const t = useT()
   const titleId = useId()
   const errorId = useId()
   const inputRef = useRef<HTMLInputElement>(null)
   const [url, setUrl] = useState('')
-  const [error, setError] = useState<string | null>(null)
+  const [error, setError] = useState<UiText | null>(null)
 
   useEffect(() => {
     if (!open) return
     setUrl(initialUrl)
     setError(submitError?.message ?? null)
-    const t = window.setTimeout(() => inputRef.current?.focus(), 0)
-    return () => window.clearTimeout(t)
+    const timer = window.setTimeout(() => inputRef.current?.focus(), 0)
+    return () => window.clearTimeout(timer)
   }, [open, initialUrl, submitError])
 
   useEffect(() => {
@@ -79,7 +80,7 @@ export function ImportUrlDialog({
     const trimmed = url.trim()
     if (!trimmed) return
     if (!trimmed.toLowerCase().startsWith('https://')) {
-      setError('Only secure HTTPS links are allowed.')
+      setError({ key: 'import.url.httpsOnly' })
       return
     }
     setError(null)
@@ -105,11 +106,11 @@ export function ImportUrlDialog({
             id={titleId}
             className="m-0 text-lg font-semibold text-lib-text-strong"
           >
-            Import from URL
+            {t('import.url.title')}
           </h2>
           <button
             type="button"
-            aria-label="Close"
+            aria-label={t('common.actions.close')}
             className="inline-flex size-8 cursor-pointer items-center justify-center rounded-full border-none bg-transparent text-lib-faint transition-colors hover:bg-white/5 hover:text-lib-text-strong"
             onClick={onClose}
           >
@@ -123,7 +124,7 @@ export function ImportUrlDialog({
               htmlFor="import-url-input"
               className="text-[11px] font-semibold tracking-[0.1em] text-lib-faint uppercase"
             >
-              Direct File Link (HTTPS)
+              {t('import.url.linkLabel')}
             </label>
             <div className="relative flex items-center">
               <LinkIcon className="pointer-events-none absolute left-3 size-4 text-lib-faint" />
@@ -140,6 +141,7 @@ export function ImportUrlDialog({
                   if (error) setError(null)
                 }}
                 className="h-[42px] w-full rounded-lg border border-lib-border bg-[rgba(15,23,42,0.45)] py-0 pr-3.5 pl-[38px] text-sm text-lib-text-strong outline-none transition-[border-color,box-shadow] placeholder:text-lib-faint focus:border-lib-accent focus:shadow-[0_0_0_3px_var(--color-lib-accent-soft)]"
+                // i18n-ignore: example URL, not interface text
                 placeholder="https://example.com/book.epub"
               />
             </div>
@@ -149,7 +151,7 @@ export function ImportUrlDialog({
                 className="m-0 text-[13px] text-red-400"
                 role="alert"
               >
-                {error}
+                {uiText(t, error)}
               </p>
             ) : null}
             <div className="mt-1 flex flex-wrap gap-1.5">
@@ -170,14 +172,14 @@ export function ImportUrlDialog({
               className="inline-flex h-[38px] cursor-pointer items-center rounded-lg border border-lib-border bg-transparent px-4 text-[13px] font-medium text-lib-muted transition-colors hover:text-lib-text-strong"
               onClick={onClose}
             >
-              Cancel
+              {t('common.actions.cancel')}
             </button>
             <button
               type="submit"
               className="inline-flex h-[38px] cursor-pointer items-center rounded-lg border-none bg-lib-accent px-4 text-[13px] font-semibold text-lib-bg-deep transition-colors hover:bg-lib-accent-hover disabled:cursor-not-allowed disabled:opacity-50"
               disabled={!url.trim()}
             >
-              {isRetry ? 'Retry' : 'Download'}
+              {isRetry ? t('common.actions.retry') : t('import.url.download')}
             </button>
           </div>
         </form>

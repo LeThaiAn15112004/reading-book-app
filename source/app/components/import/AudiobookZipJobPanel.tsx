@@ -1,6 +1,6 @@
-/* i18n-pending: import */
 import { useId } from 'react'
 import { trackDurationLabel } from '@core'
+import { uiText, useT } from '../../i18n'
 import { useZipImportStore, zipJobDetail, type ZipImportJob } from '../../hooks/library'
 import { SpinnerIcon } from './SpinnerIcon'
 
@@ -26,6 +26,7 @@ function Progress({ job }: { job: ZipImportJob }) {
  * itself and offers "Review & retry". It lives in a store, so it is still there after reading another book and coming back.
  */
 export function AudiobookZipJobPanel({ onOpenBook }: { onOpenBook: (bookId: string) => void }) {
+  const t = useT()
   const job = useZipImportStore((s) => s.job)
   const open = useZipImportStore((s) => s.panelOpen)
   const inspecting = useZipImportStore((s) => s.phase === 'inspecting')
@@ -45,12 +46,12 @@ export function AudiobookZipJobPanel({ onOpenBook }: { onOpenBook: (bookId: stri
         <div className="flex items-center justify-between gap-3">
           <h2 id={labelId} className="m-0 flex items-center gap-2 text-[15px] font-semibold text-lib-text-strong">
             <SpinnerIcon className="size-4 text-lib-accent" />
-            Reading archive…
+            {t('import.job.readingArchive')}
           </h2>
           <button
             type="button"
-            aria-label="Hide"
-            title="Hide (it keeps reading)"
+            aria-label={t('import.job.hide')}
+            title={t('import.job.hideReading')}
             className="inline-flex size-7 shrink-0 cursor-pointer items-center justify-center rounded-full border-none bg-transparent text-lib-faint hover:bg-white/5 hover:text-lib-text-strong"
             onClick={() => store().setPanelOpen(false)}
           >
@@ -63,10 +64,10 @@ export function AudiobookZipJobPanel({ onOpenBook }: { onOpenBook: (bookId: stri
         <div className="h-1.5 w-full overflow-hidden rounded-full bg-white/10">
           <div className="h-full w-1/3 animate-pulse rounded-full bg-lib-accent" />
         </div>
-        <p className="m-0 text-xs text-lib-faint">The list of audio files opens here when it is ready. You can keep using Readmate.</p>
+        <p className="m-0 text-xs text-lib-faint">{t('import.job.readingHint')}</p>
         <div className="flex justify-end">
           <button type="button" className={GHOST_BTN} onClick={() => void store().cancel()}>
-            Cancel
+            {t('common.actions.cancel')}
           </button>
         </div>
       </section>
@@ -87,7 +88,11 @@ export function AudiobookZipJobPanel({ onOpenBook }: { onOpenBook: (bookId: stri
         <div className="min-w-0">
           <h2 id={labelId} className="m-0 flex items-center gap-2 text-[15px] font-semibold text-lib-text-strong">
             {job.status === 'running' ? <SpinnerIcon className="size-4 text-lib-accent" /> : null}
-            {job.status === 'running' ? 'Importing audiobook' : job.status === 'done' ? 'Audiobook added' : 'Import failed'}
+            {job.status === 'running'
+              ? t('import.job.importing')
+              : job.status === 'done'
+                ? t('import.job.added')
+                : t('import.job.failed')}
           </h2>
           <p className="m-0 mt-0.5 truncate text-xs text-lib-muted" title={job.archiveName}>
             {job.archiveName}
@@ -95,8 +100,8 @@ export function AudiobookZipJobPanel({ onOpenBook }: { onOpenBook: (bookId: stri
         </div>
         <button
           type="button"
-          aria-label={job.status === 'running' ? 'Hide' : 'Close'}
-          title={job.status === 'running' ? 'Hide (the import keeps running)' : 'Close'}
+          aria-label={job.status === 'running' ? t('import.job.hide') : t('common.actions.close')}
+          title={job.status === 'running' ? t('import.job.hideRunning') : t('common.actions.close')}
           className="inline-flex size-7 shrink-0 cursor-pointer items-center justify-center rounded-full border-none bg-transparent text-lib-faint hover:bg-white/5 hover:text-lib-text-strong"
           onClick={close}
         >
@@ -107,11 +112,11 @@ export function AudiobookZipJobPanel({ onOpenBook }: { onOpenBook: (bookId: stri
       {job.status === 'running' ? (
         <div className="flex flex-col gap-3 px-4 py-4">
           <Progress job={job} />
-          <p className="m-0 truncate text-[13px] text-lib-muted">{zipJobDetail(job)}</p>
-          <p className="m-0 text-xs text-lib-faint">You can keep using Readmate — this continues in the background.</p>
+          <p className="m-0 truncate text-[13px] text-lib-muted">{zipJobDetail(t, job)}</p>
+          <p className="m-0 text-xs text-lib-faint">{t('import.job.backgroundHint')}</p>
           <div className="flex justify-end">
             <button type="button" className={GHOST_BTN} disabled={job.cancelling} onClick={() => void store().cancelJob()}>
-              {job.cancelling ? 'Cancelling…' : 'Cancel import'}
+              {job.cancelling ? t('import.job.cancelling') : t('import.job.cancelImport')}
             </button>
           </div>
         </div>
@@ -121,21 +126,23 @@ export function AudiobookZipJobPanel({ onOpenBook }: { onOpenBook: (bookId: stri
         <>
           <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
             <p className="m-0 mb-2 text-xs font-semibold tracking-[0.08em] text-lib-faint uppercase">
-              {job.tracks?.length === 1 ? 'Imported audio file' : `${job.tracks?.length ?? 0} audio files imported`}
+              {job.tracks?.length === 1
+                ? t('import.job.importedOne')
+                : t('import.job.importedMany', { count: job.tracks?.length ?? 0 })}
             </p>
             <ol className="m-0 flex list-none flex-col gap-0.5 p-0">
-              {(job.tracks ?? []).map((t, i) => (
-                <li key={i} className="flex items-baseline gap-2 text-[13px] text-lib-text" title={t.title}>
+              {(job.tracks ?? []).map((track, i) => (
+                <li key={i} className="flex items-baseline gap-2 text-[13px] text-lib-text" title={track.title}>
                   <span className="w-6 shrink-0 text-right text-xs text-lib-faint tabular-nums">{i + 1}.</span>
-                  <span className="min-w-0 flex-1 truncate">{t.title}</span>
-                  <span className="shrink-0 text-xs text-lib-muted tabular-nums">{trackDurationLabel(t.durationSeconds)}</span>
+                  <span className="min-w-0 flex-1 truncate">{track.title}</span>
+                  <span className="shrink-0 text-xs text-lib-muted tabular-nums">{trackDurationLabel(track.durationSeconds)}</span>
                 </li>
               ))}
             </ol>
           </div>
           <footer className="flex justify-end gap-2 border-t border-lib-border-soft px-4 py-3">
             <button type="button" className={GHOST_BTN} onClick={() => store().dismissJob()}>
-              Close
+              {t('common.actions.close')}
             </button>
             <button
               type="button"
@@ -145,7 +152,7 @@ export function AudiobookZipJobPanel({ onOpenBook }: { onOpenBook: (bookId: stri
                 store().dismissJob()
               }}
             >
-              Open audiobook
+              {t('import.job.openAudiobook')}
             </button>
           </footer>
         </>
@@ -154,15 +161,15 @@ export function AudiobookZipJobPanel({ onOpenBook }: { onOpenBook: (bookId: stri
       {job.status === 'failed' ? (
         <div className="flex flex-col gap-3 px-4 py-4">
           <p className="m-0 text-[13px] text-red-400" role="alert">
-            {job.error?.message ?? 'Something went wrong. Nothing was added to your library.'}
+            {job.error ? uiText(t, job.error.message) : t('import.job.failedFallback')}
           </p>
           <div className="flex justify-end gap-2">
             <button type="button" className={GHOST_BTN} onClick={() => store().dismissJob()}>
-              Dismiss
+              {t('import.job.dismiss')}
             </button>
             {job.retry ? (
               <button type="button" className={PRIMARY_BTN} onClick={() => store().reviewAndRetry()}>
-                Review &amp; retry
+                {t('import.job.reviewRetry')}
               </button>
             ) : null}
           </div>

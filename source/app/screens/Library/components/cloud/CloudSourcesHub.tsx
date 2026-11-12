@@ -1,12 +1,13 @@
-/* i18n-pending: library */
 import { useState } from 'react'
+import type { Translator } from '@core'
+import { TransText, useFormat, useT } from '../../../../i18n'
 import {
   getProviderDisplayName,
   type ExternalCatalogEntry,
   type ExternalLibraryInfo,
   type ExternalLibraryProvider,
 } from '@core'
-import { formatFileSizeMb, type LibraryBook } from '@core'
+import type { LibraryBook } from '@core'
 
 const FORMAT_LABELS: Record<string, string> = {
   epub: 'EPUB',
@@ -15,7 +16,7 @@ const FORMAT_LABELS: Record<string, string> = {
   azw3: 'AZW3',
   fb2: 'FB2',
   cbz: 'CBZ',
-  txt: 'Plain text',
+  txt: 'TXT',
   md: 'Markdown',
   docx: 'DOCX',
   doc: 'DOC',
@@ -123,19 +124,19 @@ function CheckIcon({ className }: { className?: string }) {
   )
 }
 
-function statusLabel(status: ExternalLibraryInfo['status']): string {
+function statusLabel(t: Translator, status: ExternalLibraryInfo['status']): string {
   switch (status) {
     case 'linked':
-      return 'Connected'
+      return t('library.cloud.status.linked')
     case 'syncing':
-      return 'Syncing…'
+      return t('library.cloud.status.syncing')
     case 'error':
-      return 'Connection error'
+      return t('library.cloud.status.error')
     case 'disabled':
-      return 'Disabled'
+      return t('library.cloud.status.disabled')
     case 'unlinked':
     default:
-      return 'Not connected'
+      return t('library.cloud.status.unlinked')
   }
 }
 
@@ -187,6 +188,8 @@ export function CloudSourcesHub({
   books,
   onOpenBook,
 }: CloudSourcesHubProps) {
+  const t = useT()
+  const format = useFormat()
   const [searchQuery, setSearchQuery] = useState('')
   const [formatFilter, setFormatFilter] = useState('all')
   const downloadedByExternalId = new Map<string, string>(
@@ -212,7 +215,7 @@ export function CloudSourcesHub({
     <div
       className="flex min-h-0 flex-1 flex-col overflow-hidden"
       role="region"
-      aria-label={`${providerName} Cloud Source`}
+      aria-label={t('library.cloud.region', { provider: providerName })}
     >
       <header className="app-titlebar flex h-16 shrink-0 items-center justify-between gap-4 border-b border-lib-border-soft bg-lib-topbar pl-7 pr-7 backdrop-blur-sm">
         <div className="min-w-0">
@@ -220,7 +223,7 @@ export function CloudSourcesHub({
             {providerName}
           </h1>
           <p className="m-0 mt-0.5 text-[13px] text-lib-muted">
-            Connect, point at a folder, and download books only when you open them
+            {t('library.cloud.subtitle')}
           </p>
         </div>
       </header>
@@ -239,7 +242,7 @@ export function CloudSourcesHub({
                 <span
                   className={`mt-1 inline-flex rounded-md px-1.5 py-0.5 text-[10px] font-bold tracking-wide uppercase ${statusPillClass(info.status)}`}
                 >
-                  {statusLabel(info.status)}
+                  {statusLabel(t, info.status)}
                 </span>
                 {info.lastError ? (
                   <p className="m-0 mt-1 text-[11px] text-red-400">{info.lastError}</p>
@@ -256,7 +259,11 @@ export function CloudSourcesHub({
               disabled={isConnecting}
               onClick={() => (isLinked ? onDisconnect() : onConnect())}
             >
-              {isConnecting ? 'Connecting…' : isLinked ? 'Disconnect' : 'Connect'}
+              {isConnecting
+                ? t('library.cloud.connecting')
+                : isLinked
+                  ? t('library.cloud.disconnect')
+                  : t('library.cloud.connect')}
             </button>
           </div>
 
@@ -264,13 +271,13 @@ export function CloudSourcesHub({
             <div className="mt-4 border-t border-lib-border-soft pt-4">
               <div className="flex flex-wrap items-center gap-2">
                 <label className="flex min-w-0 flex-1 items-center gap-2 text-[12px] text-lib-muted">
-                  <span className="shrink-0">Folder</span>
+                  <span className="shrink-0">{t('library.cloud.folder')}</span>
                   <input
                     type="text"
                     value={folderPath}
                     onChange={(e) => onFolderPathChange(e.target.value)}
                     placeholder={
-                      provider === 'google_drive' ? 'Leave empty for your whole Drive' : '/Ebooks'
+                      provider === 'google_drive' ? t('library.cloud.folderPlaceholderDrive') : '/Ebooks'
                     }
                     className="h-8 min-w-0 flex-1 rounded-md border border-lib-border bg-lib-bg-deep px-2.5 text-[12px] text-lib-text-strong outline-none focus:border-lib-accent-ring"
                   />
@@ -281,14 +288,15 @@ export function CloudSourcesHub({
                   disabled={isSyncing}
                   onClick={() => onSync()}
                 >
-                  {isSyncing ? 'Syncing…' : 'Sync now'}
+                  {isSyncing ? t('library.cloud.status.syncing') : t('library.cloud.syncNow')}
                 </button>
               </div>
               {provider === 'google_drive' ? (
                 <p className="m-0 mt-1.5 text-[11px] text-lib-faint">
-                  Google Drive needs a folder <strong>ID</strong> (the string after{' '}
-                  <code>/folders/</code> in the folder&apos;s Drive URL), not a path — leave empty to
-                  search your entire Drive.
+                  <TransText
+                    k="library.cloud.driveFolderHint"
+                    slots={{ b: (text) => <strong>{text}</strong>, code: (text) => <code>{text}</code> }}
+                  />
                 </p>
               ) : null}
             </div>
@@ -297,26 +305,26 @@ export function CloudSourcesHub({
           {isLinked ? (
             <div className="mt-4 flex flex-wrap gap-2">
               <label className="min-w-[180px] flex-1">
-                <span className="sr-only">Search {providerName} files</span>
+                <span className="sr-only">{t('library.cloud.searchFiles', { provider: providerName })}</span>
                 <input
                   type="search"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search files by title"
+                  placeholder={t('library.cloud.searchPlaceholder')}
                   className="h-9 w-full rounded-md border border-lib-border bg-lib-bg-deep px-3 text-[12px] text-lib-text-strong outline-none placeholder:text-lib-faint focus:border-lib-accent-ring"
                 />
               </label>
               <label className="flex min-w-[150px] items-center">
-                <span className="sr-only">Filter {providerName} files by format</span>
+                <span className="sr-only">{t('library.cloud.filterFormat', { provider: providerName })}</span>
                 <select
                   value={formatFilter}
                   onChange={(e) => setFormatFilter(e.target.value)}
                   className="h-9 w-full rounded-md border border-lib-border bg-lib-bg-deep px-2.5 text-[12px] text-lib-text-strong outline-none focus:border-lib-accent-ring"
                 >
-                  <option value="all">All formats</option>
+                  <option value="all">{t('library.cloud.allFormats')}</option>
                   {providerFormats.map((value) => (
                     <option key={value} value={value}>
-                      {FORMAT_LABELS[value] ?? value.toUpperCase()}
+                      {value === 'txt' ? t('library.cloud.plainText') : (FORMAT_LABELS[value] ?? value.toUpperCase())}
                     </option>
                   ))}
                 </select>
@@ -330,7 +338,8 @@ export function CloudSourcesHub({
               {visibleEntries.map((entry) => {
                 const key = `${entry.sourceProvider}:${entry.externalId}`
                 const downloadedBookId = downloadedByExternalId.get(key)
-                const size = formatFileSizeMb(entry.fileSizeBytes)
+                const size =
+                  entry.fileSizeBytes != null && entry.fileSizeBytes >= 0 ? format.bytes(entry.fileSizeBytes) : undefined
                 const isDownloading = downloadingId === entry.externalId
                 const progressTotal = downloadProgress?.totalBytes
                 const progressPercent =
@@ -339,7 +348,7 @@ export function CloudSourcesHub({
                     : null
                 const receivedLabel =
                   isDownloading && downloadProgress
-                    ? formatFileSizeMb(downloadProgress.receivedBytes)
+                    ? format.bytes(downloadProgress.receivedBytes)
                     : undefined
                 return (
                   <li
@@ -361,7 +370,7 @@ export function CloudSourcesHub({
                         onClick={() => onOpenBook(downloadedBookId)}
                       >
                         <CheckIcon className="size-3.5" />
-                        Read
+                        {t('library.cloud.read')}
                       </button>
                     ) : (
                       <div className="flex shrink-0 items-center gap-1.5">
@@ -374,12 +383,14 @@ export function CloudSourcesHub({
                           {isDownloading ? (
                             <>
                               <DownloadRing percent={progressPercent} />
-                              {receivedLabel ? `Downloading... (${receivedLabel})` : 'Downloading...'}
+                              {receivedLabel
+                                ? t('library.cloud.downloadingBytes', { received: receivedLabel })
+                                : t('library.cloud.downloading')}
                             </>
                           ) : (
                             <>
                               <CloudIcon className="size-3.5" />
-                              Download
+                              {t('library.cloud.download')}
                             </>
                           )}
                         </button>
@@ -387,10 +398,10 @@ export function CloudSourcesHub({
                           <button
                             type="button"
                             className="inline-flex h-7 shrink-0 cursor-pointer items-center rounded-md border-none bg-transparent px-2 text-[11px] font-semibold text-lib-faint transition-colors hover:bg-white/5 hover:text-lib-text-strong"
-                            aria-label={`Cancel downloading ${entry.title}`}
+                            aria-label={t('library.cloud.cancelDownloadAria', { title: entry.title })}
                             onClick={() => onCancelDownload(entry)}
                           >
-                            Cancel
+                            {t('common.actions.cancel')}
                           </button>
                         ) : null}
                       </div>
@@ -405,8 +416,8 @@ export function CloudSourcesHub({
           {isLinked && visibleEntries.length === 0 ? (
             <p className="m-0 mt-3 text-[12px] text-lib-faint">
               {entries.length === 0
-                ? 'No files synced yet — press “Sync now” to fetch this folder’s metadata.'
-                : 'No files match the current search and format filters.'}
+                ? t('library.cloud.noFilesSynced')
+                : t('library.cloud.noFilesMatch')}
             </p>
           ) : null}
         </div>

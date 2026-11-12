@@ -1,14 +1,15 @@
+import type { MessageRef } from '../i18n/translate.js'
 import type { LibraryBook } from './library-book.js'
 
-/** Progress chip / last-read line for shelf & filter list rows (SCR-01a). */
+/** Progress chip / last-read line for shelf & filter list rows (SCR-01a). The label is translated by the UI (spec 012). */
 export type ShelfProgressView = {
   progressKind?: 'chip' | 'last'
-  progressLabel?: string
+  progressLabel?: MessageRef
   progressDone?: boolean
 }
 
-export function formatLastReadLine(location: string): string {
-  return `Last at · ${location.trim()}`
+export function formatLastReadLine(location: string): MessageRef {
+  return { key: 'library.progress.lastAt', params: { location: location.trim() } }
 }
 
 /**
@@ -20,7 +21,7 @@ export function shelfProgressForBook(book: LibraryBook): ShelfProgressView {
   if (useChip) {
     return {
       progressKind: 'chip',
-      progressLabel: book.status === 'completed' ? 'Completed' : 'Not started',
+      progressLabel: { key: book.status === 'completed' ? 'library.progress.completed' : 'library.progress.notStarted' },
       progressDone: book.status === 'completed',
     }
   }

@@ -23,6 +23,7 @@ export const en = {
     megabytes: '{value} MB',
     gigabytes: '{value} GB',
   },
+  untitled: 'Untitled',
   appLanguage: {
     system: 'System Default',
   },

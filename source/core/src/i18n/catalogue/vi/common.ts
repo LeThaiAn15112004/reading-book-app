@@ -26,6 +26,7 @@ export const vi = {
     megabytes: '{value} MB',
     gigabytes: '{value} GB',
   },
+  untitled: 'Không có tiêu đề',
   appLanguage: {
     system: 'Theo hệ thống',
   },

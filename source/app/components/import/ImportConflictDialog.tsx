@@ -1,5 +1,5 @@
-/* i18n-pending: import */
 import { useEffect, useId } from 'react'
+import { useT } from '../../i18n'
 
 export type ImportConflictDialogProps = {
   open: boolean
@@ -19,6 +19,7 @@ export function ImportConflictDialog({
   onDiscard,
   onOpenExisting,
 }: ImportConflictDialogProps) {
+  const t = useT()
   const titleId = useId()
   const bodyId = useId()
 
@@ -36,9 +37,7 @@ export function ImportConflictDialog({
 
   if (!open) return null
 
-  const body =
-    message?.trim() ||
-    'This book is already in your local library. Open the existing copy?'
+  const body = message?.trim() || t('import.conflict.body')
 
   return (
     <div
@@ -60,7 +59,7 @@ export function ImportConflictDialog({
             id={titleId}
             className="m-0 text-lg font-semibold text-lib-accent"
           >
-            File already exists
+            {t('import.conflict.title')}
           </h2>
         </div>
 
@@ -77,14 +76,14 @@ export function ImportConflictDialog({
               className="inline-flex h-[38px] cursor-pointer items-center rounded-lg border border-lib-border bg-transparent px-4 text-[13px] font-medium text-lib-muted transition-colors hover:text-lib-text-strong"
               onClick={onDiscard}
             >
-              Discard
+              {t('import.conflict.discard')}
             </button>
             <button
               type="button"
               className="inline-flex h-[38px] cursor-pointer items-center rounded-lg border-none bg-lib-accent px-4 text-[13px] font-semibold text-lib-bg-deep transition-colors hover:bg-lib-accent-hover"
               onClick={onOpenExisting}
             >
-              Open existing
+              {t('import.conflict.openExisting')}
             </button>
           </div>
         </div>

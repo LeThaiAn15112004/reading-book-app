@@ -1,5 +1,6 @@
 import type { LibraryBook } from '@core'
 import { useSearchHistoryStore } from '../../hooks/library/index.js'
+import { useT } from '../../i18n'
 import {
   BootErrorBanner,
   ContinueReading,
@@ -52,6 +53,7 @@ export function LibraryHub({
   const bookList = books ?? []
   const { filter, sort, layout, searchActive, counts, visibleBooks, continueBooks, selectedBook } =
     useLibraryBrowse(bookList, searchQuery)
+  const t = useT()
   const setFilter = useLibraryBrowseStore((s) => s.setFilter)
   const setSort = useLibraryBrowseStore((s) => s.setSort)
   const setLayout = useLibraryBrowseStore((s) => s.setLayout)
@@ -62,7 +64,7 @@ export function LibraryHub({
   const removeRecentSearch = useSearchHistoryStore((s) => s.remove)
 
   const isEmpty = books !== null && books.length === 0
-  const filterLabel = LIBRARY_BROWSE_FILTERS.find((f) => f.id === filter)?.label ?? 'All books'
+  const filterLabel = t(LIBRARY_BROWSE_FILTERS.find((f) => f.id === filter)?.labelKey ?? 'library.filters.all')
 
   return (
     <div className="flex min-h-0 min-w-0 flex-1">
@@ -103,7 +105,7 @@ export function LibraryHub({
 
                   {visibleBooks.length === 0 ? (
                     <p className="mt-10 text-center text-sm text-lib-faint" role="status">
-                      {searchActive ? 'No matching books found.' : LIBRARY_FILTER_EMPTY[filter]}
+                      {searchActive ? t('library.filterEmpty.noMatch') : t(LIBRARY_FILTER_EMPTY[filter])}
                     </p>
                   ) : layout === 'table' ? (
                     <LibraryBookTable

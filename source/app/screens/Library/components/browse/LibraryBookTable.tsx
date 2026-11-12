@@ -1,6 +1,6 @@
-/* i18n-pending: library */
 import { useRef, type KeyboardEvent } from 'react'
 import { formatRelativeLastRead, type LibraryBook } from '@core'
+import { useFormat, useT, useUiLanguage, type BoundFormat } from '../../../../i18n'
 import { BookCover, BookMenuButton, type BookMenuPoint } from '../book'
 import { withLongPress } from '../../../../platforms/longPress'
 
@@ -12,29 +12,28 @@ export type LibraryBookTableProps = {
   onBookMenu: (bookId: string, point: BookMenuPoint) => void
 }
 
-const dateFormat = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' })
-
-function formatAdded(iso?: string): string {
+function formatAdded(format: BoundFormat, iso?: string): string {
   if (!iso) return '—'
   const time = Date.parse(iso)
-  return Number.isNaN(time) ? '—' : dateFormat.format(time)
+  return Number.isNaN(time) ? '—' : format.date(time, 'medium')
 }
 
 function ProgressCell({ book }: { book: LibraryBook }) {
+  const t = useT()
   if (book.status === 'completed') {
     return (
       <span className="inline-flex rounded-md bg-lib-accent-soft px-1.5 py-0.5 text-[11px] font-semibold text-lib-accent">
-        Completed
+        {t('library.progress.completed')}
       </span>
     )
   }
   if (book.status === 'reading') {
     if (book.progressPercent == null) {
-      return <span className="text-[12px] text-lib-muted">In progress</span>
+      return <span className="text-[12px] text-lib-muted">{t('library.progress.inProgress')}</span>
     }
     const value = Math.round(book.progressPercent)
     return (
-      <span className="flex items-center gap-2" aria-label={`${value}% read`}>
+      <span className="flex items-center gap-2" aria-label={t('library.continue.percentRead', { percent: value })}>
         <span className="h-1 w-16 overflow-hidden rounded-full bg-lib-chip">
           <span className="block h-full rounded-full bg-lib-accent" style={{ width: `${value}%` }} />
         </span>
@@ -42,7 +41,7 @@ function ProgressCell({ book }: { book: LibraryBook }) {
       </span>
     )
   }
-  return <span className="text-[12px] text-lib-faint">Not started</span>
+  return <span className="text-[12px] text-lib-faint">{t('library.progress.notStarted')}</span>
 }
 
 const th =
@@ -61,6 +60,9 @@ export function LibraryBookTable({
   onOpen,
   onBookMenu,
 }: LibraryBookTableProps) {
+  const t = useT()
+  const format = useFormat()
+  const language = useUiLanguage()
   const rowRefs = useRef(new Map<string, HTMLTableRowElement>())
 
   function moveSelection(fromIndex: number, delta: number) {
@@ -89,20 +91,20 @@ export function LibraryBookTable({
 
   return (
     <div className="@container rounded-xl border border-lib-border-soft">
-      <table className="w-full border-collapse text-[13px]" role="grid" aria-label="Books">
+      <table className="w-full border-collapse text-[13px]" role="grid" aria-label={t('library.books')}>
         <thead>
           <tr>
             <th className={`${th} w-[52px]`}>
-              <span className="sr-only">Cover</span>
+              <span className="sr-only">{t('library.table.cover')}</span>
             </th>
-            <th className={th}>Title</th>
-            <th className={`${th} hidden w-[22%] @lg:table-cell`}>Author</th>
-            <th className={`${th} w-[72px]`}>Format</th>
-            <th className={`${th} hidden w-[132px] @md:table-cell`}>Progress</th>
-            <th className={`${th} hidden w-[120px] @2xl:table-cell`}>Last read</th>
-            <th className={`${th} hidden w-[120px] @3xl:table-cell`}>Added</th>
+            <th className={th}>{t('library.table.title')}</th>
+            <th className={`${th} hidden w-[22%] @lg:table-cell`}>{t('library.table.author')}</th>
+            <th className={`${th} w-[72px]`}>{t('library.table.format')}</th>
+            <th className={`${th} hidden w-[132px] @md:table-cell`}>{t('library.table.progress')}</th>
+            <th className={`${th} hidden w-[120px] @2xl:table-cell`}>{t('library.table.lastRead')}</th>
+            <th className={`${th} hidden w-[120px] @3xl:table-cell`}>{t('library.table.added')}</th>
             <th className={`${th} w-[44px]`}>
-              <span className="sr-only">Actions</span>
+              <span className="sr-only">{t('library.table.actions')}</span>
             </th>
           </tr>
         </thead>
@@ -146,7 +148,7 @@ export function LibraryBookTable({
                       {book.title}
                     </span>
                     {book.isFavorite ? (
-                      <span className="shrink-0 text-[11px] text-lib-accent" aria-label="Favorite">
+                      <span className="shrink-0 text-[11px] text-lib-accent" aria-label={t('library.card.favorite')}>
                         ★
                       </span>
                     ) : null}
@@ -165,10 +167,10 @@ export function LibraryBookTable({
                   <ProgressCell book={book} />
                 </td>
                 <td className={`${td} hidden text-[12px] text-lib-muted @2xl:table-cell`}>
-                  {formatRelativeLastRead(book.lastReadAt) ?? '—'}
+                  {formatRelativeLastRead(book.lastReadAt, language) ?? '—'}
                 </td>
                 <td className={`${td} hidden text-[12px] text-lib-muted @3xl:table-cell`}>
-                  {formatAdded(book.addedAt)}
+                  {formatAdded(format, book.addedAt)}
                 </td>
                 <td className={`${td} px-1`}>
                   <BookMenuButton

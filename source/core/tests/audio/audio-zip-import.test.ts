@@ -227,8 +227,8 @@ describe('import mode (single-file vs multi-chapter) and the one-track notices',
   })
   it('one track with a cover selected warns that the cover is not used, and that the title is the track’s', () => {
     const n = singleFileImportNotes(sel(1, 'e5'))
-    expect(n.cover).toMatch(/cover selected here won't be used/)
-    expect(n.title).toMatch(/not from the ZIP name/)
+    expect(n.cover).toBe('import.zip.notes.singleFileCover')
+    expect(n.title).toBe('import.zip.notes.singleFileTitle')
   })
   it('one track without a cover: only the title notice', () => {
     const n = singleFileImportNotes(sel(1, null))

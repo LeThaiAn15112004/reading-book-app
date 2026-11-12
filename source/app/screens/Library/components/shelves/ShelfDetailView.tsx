@@ -1,4 +1,4 @@
-/* i18n-pending: library */
+import { useT } from '../../../../i18n'
 import {
   ShelfDetailItem,
   type ShelfDetailItemData,
@@ -49,27 +49,27 @@ export function ShelfDetailView({
   onOpenItem,
   onBookMenu,
   countLabel,
-  emptyMessage = 'No files in this section.',
-  backAriaLabel = 'Back to library',
+  emptyMessage,
+  backAriaLabel,
   viewMode = 'list',
   onViewModeChange,
 }: ShelfDetailViewProps) {
-  const fileLabel =
-    countLabel ?? (items.length === 1 ? '1 file' : `${items.length} files`)
+  const t = useT()
+  const fileLabel = countLabel ?? t('library.fileCount', { count: items.length })
 
   return (
     <div
       className="flex min-h-0 flex-1 flex-col overflow-hidden"
       id="shelfDetailView"
       role="region"
-      aria-label={`${title} shelf`}
+      aria-label={t('library.shelf.region', { title })}
     >
       <header className="app-titlebar flex h-16 shrink-0 items-center gap-3 border-b border-lib-border-soft bg-lib-topbar pl-5 pr-5 backdrop-blur-sm">
         <button
           type="button"
           className="inline-flex size-11 shrink-0 cursor-pointer items-center justify-center rounded-lg border-none bg-transparent text-lib-muted transition-[color,background-color] hover:bg-white/5 hover:text-lib-accent focus-visible:bg-white/5 focus-visible:text-lib-accent focus-visible:outline-none"
-          aria-label={backAriaLabel}
-          title="Back"
+          aria-label={backAriaLabel ?? t('library.shelf.backToLibrary')}
+          title={t('library.shelf.back')}
           onClick={onBack}
         >
           <BackIcon className="size-6" />
@@ -119,7 +119,7 @@ export function ShelfDetailView({
           )
         ) : (
           <p className="m-0 text-center text-[13px] text-lib-faint">
-            {emptyMessage}
+            {emptyMessage ?? t('library.shelf.emptySection')}
           </p>
         )}
       </div>

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useLinkedLibraries } from '../../../hooks/app/index.js'
-import type { ExternalCatalogEntry, ExternalLibraryProvider } from '@core'
+import { getProviderDisplayName, type ExternalCatalogEntry, type ExternalLibraryProvider } from '@core'
+import type { UiText } from '../../../i18n'
 import { cloudApi } from '../../../bridge'
 
 /** Byte progress for the entry currently being downloaded (keyed by externalId). */
@@ -19,10 +20,10 @@ const DEFAULT_FOLDER_PATH: Record<ExternalLibraryProvider, string> = {
 export type CloudToastVariant = 'success' | 'error' | 'info'
 
 /** Optional one-click follow-up on a toast (Open / Retry / Connect). */
-export type CloudToastAction = { label: string; run: () => void }
+export type CloudToastAction = { label: UiText; run: () => void }
 
 export type UseCloudSourcesOptions = {
-  showToast: (message: string, variant: CloudToastVariant, action?: CloudToastAction) => void
+  showToast: (message: UiText, variant: CloudToastVariant, action?: CloudToastAction) => void
   /** Called after a successful download so the Library grid refreshes. */
   onDownloaded: () => void
   /** The entry is already in the library (same provider file or same SHA-256): raise the conflict dialog. */
@@ -74,7 +75,10 @@ export function useCloudSources(options: UseCloudSourcesOptions) {
         const result = await cloudApi.connect(provider)
         if (!result.ok) {
           options.showToast(
-            result.errorMessage ?? `Could not connect to ${provider}.`,
+            result.errorMessage ?? {
+              key: 'library.toast.cloudConnectFailed',
+              params: { provider: getProviderDisplayName(provider) },
+            },
             'error',
           )
           return
@@ -84,10 +88,10 @@ export function useCloudSources(options: UseCloudSourcesOptions) {
           apiKey: token ?? undefined,
           folderPath: folderPaths[provider],
         })
-        options.showToast('Connected.', 'success')
+        options.showToast({ key: 'library.toast.cloudConnected' }, 'success')
       } catch (err) {
         options.showToast(
-          err instanceof Error ? err.message : 'Could not connect.',
+          err instanceof Error ? err.message : { key: 'library.toast.cloudConnectFailedShort' },
           'error',
         )
       } finally {
@@ -120,7 +124,7 @@ export function useCloudSources(options: UseCloudSourcesOptions) {
       } catch (err) {
         console.error(`[Cloud Sources] Sync now failed for ${provider}:`, err)
         options.showToast(
-          err instanceof Error ? err.message : 'Sync failed.',
+          err instanceof Error ? err.message : { key: 'library.toast.cloudSyncFailed' },
           'error',
         )
       } finally {
@@ -135,25 +139,28 @@ export function useCloudSources(options: UseCloudSourcesOptions) {
       setDownloadingId(entry.externalId)
       try {
         const result = await cloudApi.downloadAndImport(provider, entry)
-        const message = result.errorMessage ?? `Could not download "${entry.title}".`
+        const message: UiText = result.errorMessage ?? {
+          key: 'library.toast.cloudDownloadFailed',
+          params: { title: entry.title },
+        }
         const retry: CloudToastAction = {
-          label: 'Retry',
+          label: { key: 'library.toast.retry' },
           run: () => void download(provider, entry),
         }
         if (result.ok && result.bookId) {
           const bookId = result.bookId
-          options.showToast(`Downloaded "${entry.title}".`, 'success', {
-            label: 'Open',
+          options.showToast({ key: 'library.toast.cloudDownloaded', params: { title: entry.title } }, 'success', {
+            label: { key: 'library.toast.open' },
             run: () => options.onOpenBook(bookId),
           })
           options.onDownloaded()
         } else if (result.errorCode === 'duplicate' && result.bookId) {
           options.onDuplicate(result.bookId, result.errorMessage)
         } else if (result.errorCode === 'cancelled') {
-          options.showToast('Download cancelled.', 'info')
+          options.showToast({ key: 'library.toast.downloadCancelled' }, 'info')
         } else if (result.errorCode === 'not_connected') {
           options.showToast(message, 'error', {
-            label: 'Connect',
+            label: { key: 'library.toast.connect' },
             run: () => void connect(provider),
           })
         } else if (
@@ -166,8 +173,8 @@ export function useCloudSources(options: UseCloudSourcesOptions) {
           options.showToast(message, 'error')
         }
       } catch {
-        options.showToast(`Could not download "${entry.title}".`, 'error', {
-          label: 'Retry',
+        options.showToast({ key: 'library.toast.cloudDownloadFailed', params: { title: entry.title } }, 'error', {
+          label: { key: 'library.toast.retry' },
           run: () => void download(provider, entry),
         })
       } finally {

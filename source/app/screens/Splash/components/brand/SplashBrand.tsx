@@ -1,4 +1,3 @@
-/* i18n-pending: chrome */
 function SplashBookIcon() {
   return (
     <div className="mb-6 h-20 w-20 animate-splash-pulse text-lib-accent drop-shadow-[0_0_15px_color-mix(in_srgb,var(--lib-accent)_35%,transparent)]">
@@ -27,9 +26,11 @@ export function SplashBrand() {
     <div className="flex flex-col items-center text-center">
       <SplashBookIcon />
       <h1 className="animate-splash-fade-in-up translate-y-2.5 text-2xl font-light uppercase tracking-[0.3em] text-lib-text-strong opacity-0 delay-500">
+        {/* i18n-ignore: brand name (app name Readmate Reader) */}
         Readmate
       </h1>
       <p className="animate-splash-fade-in-up mt-2 translate-y-2.5 text-[11px] font-light uppercase tracking-[0.45em] text-lib-faint opacity-0 delay-[800ms]">
+        {/* i18n-ignore: brand name (app name Readmate Reader) */}
         Reader
       </p>
     </div>

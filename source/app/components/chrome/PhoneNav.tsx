@@ -1,5 +1,5 @@
-/* i18n-pending: chrome */
 import { useLocation, useNavigate } from 'react-router-dom'
+import { useT } from '../../i18n'
 import { flushRegisteredSession } from '../../screens/Reader/logic'
 import { useAppNav, type AppNavId } from './AppNavContext'
 import { useOpenReading } from './OpenReadingContext'
@@ -10,6 +10,7 @@ import { useOpenReading } from './OpenReadingContext'
  * flushed before leaving the Reader); Cloud Sources is not in the first release. Targets are at least 44 px.
  */
 export function PhoneNav() {
+  const t = useT()
   const location = useLocation()
   const navigate = useNavigate()
   const { libraryNav } = useAppNav()
@@ -31,20 +32,20 @@ export function PhoneNav() {
   }
 
   const items: { id: AppNavId; label: string; onSelect: () => void; badge?: number; disabled?: boolean }[] = [
-    { id: 'library', label: 'Library', onSelect: () => leaveReaderThen(() => (libraryNav ? libraryNav.onLibraryNav() : navigate('/library'))) },
+    { id: 'library', label: t('chrome.nav.library'), onSelect: () => leaveReaderThen(() => (libraryNav ? libraryNav.onLibraryNav() : navigate('/library'))) },
     {
       id: 'collections',
-      label: 'Collections',
+      label: t('chrome.nav.collections'),
       onSelect: () => leaveReaderThen(() => (libraryNav ? libraryNav.onStubNav('collections') : navigate('/library', { state: { openNav: 'collections' } }))),
     },
-    { id: 'reading', label: 'Reading', onSelect: () => goReading(), badge: tabs.length, disabled: tabs.length === 0 },
-    { id: 'settings', label: 'Settings', onSelect: () => leaveReaderThen(() => navigate('/settings')) },
+    { id: 'reading', label: t('chrome.nav.reading'), onSelect: () => goReading(), badge: tabs.length, disabled: tabs.length === 0 },
+    { id: 'settings', label: t('chrome.nav.settings'), onSelect: () => leaveReaderThen(() => navigate('/settings')) },
   ]
 
   return (
     <nav
       className="phone-nav flex items-stretch justify-around border-b border-lib-border-soft bg-lib-bg-deep/95 px-1 backdrop-blur-md"
-      aria-label="Main navigation"
+      aria-label={t('chrome.nav.mainNavigation')}
     >
       {items.map((item) => {
         const active = item.id === activeId

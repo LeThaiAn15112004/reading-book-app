@@ -1,5 +1,5 @@
-/* i18n-pending: library */
 import { formatRelativeLastRead, type LibraryBook } from '@core'
+import { useT, useUiLanguage } from '../../../../i18n'
 import { BookCover, BookMenuButton, type BookMenuPoint } from '../book'
 import { withLongPress } from '../../../../platforms/longPress'
 
@@ -15,18 +15,20 @@ export type ContinueReadingProps = {
  * a rail: at most a few cards that wrap; the full library is listed below.
  */
 export function ContinueReading({ books, onResume, onBookMenu }: ContinueReadingProps) {
+  const t = useT()
+  const language = useUiLanguage()
   return (
     <section className="mb-8" aria-labelledby="continue-title">
       <h2
         id="continue-title"
         className="m-0 mb-3 text-[11px] font-bold tracking-[0.14em] text-lib-faint uppercase"
       >
-        Continue reading
+        {t('library.continue.title')}
       </h2>
       <ul className="m-0 grid list-none grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-3 p-0">
         {books.map((book) => {
           const progress = book.progressPercent != null ? Math.round(book.progressPercent) : undefined
-          const relative = formatRelativeLastRead(book.lastReadAt)
+          const relative = formatRelativeLastRead(book.lastReadAt, language)
           return (
             <li
               key={book.id}
@@ -39,7 +41,7 @@ export function ContinueReading({ books, onResume, onBookMenu }: ContinueReading
               <button
                 type="button"
                 className="shrink-0 cursor-pointer border-none bg-transparent p-0"
-                aria-label={`Resume ${book.title}`}
+                aria-label={t('library.continue.resumeAria', { title: book.title })}
                 onClick={() => onResume(book.id)}
               >
                 <BookCover
@@ -60,7 +62,7 @@ export function ContinueReading({ books, onResume, onBookMenu }: ContinueReading
                   {[book.lastReadLocation, relative].filter(Boolean).join(' · ')}
                 </p>
                 {progress !== undefined ? (
-                  <span className="mt-1 flex items-center gap-2" aria-label={`${progress}% read`}>
+                  <span className="mt-1 flex items-center gap-2" aria-label={t('library.continue.percentRead', { percent: progress })}>
                     <span className="h-1 flex-1 overflow-hidden rounded-full bg-lib-chip">
                       <span className="block h-full rounded-full bg-lib-accent" style={{ width: `${progress}%` }} />
                     </span>
@@ -74,7 +76,7 @@ export function ContinueReading({ books, onResume, onBookMenu }: ContinueReading
                   className="inline-flex h-8 cursor-pointer items-center rounded-lg border-none bg-lib-accent px-3 text-[12px] font-semibold text-lib-bg-deep transition-colors hover:bg-lib-accent-hover"
                   onClick={() => onResume(book.id)}
                 >
-                  Resume
+                  {t('library.continue.resume')}
                 </button>
                 <BookMenuButton
                   title={book.title}

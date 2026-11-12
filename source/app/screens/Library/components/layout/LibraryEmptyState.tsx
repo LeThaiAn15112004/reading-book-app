@@ -1,5 +1,5 @@
-/* i18n-pending: library */
 import { ImportMenu } from '../../../../components/import'
+import { useT } from '../../../../i18n'
 
 type LibraryEmptyStateProps = {
   onFromDevice: () => void
@@ -11,17 +11,17 @@ export function LibraryEmptyState({
   onFromDevice,
   onFromUrl,
 }: LibraryEmptyStateProps) {
+  const t = useT()
   return (
     <section
       className="flex flex-col items-center justify-center px-6 py-16 text-center"
-      aria-label="Empty library"
+      aria-label={t('library.empty.aria')}
     >
       <h2 className="mb-2 text-xl font-semibold tracking-tight text-lib-text-strong">
-        No files in your library yet
+        {t('library.empty.title')}
       </h2>
       <p className="mb-8 max-w-md text-sm leading-relaxed text-lib-muted">
-        Import EPUB, PDF, TXT, or Markdown from your device or a direct file URL.
-        Files stay on this machine — no bookstore.
+        {t('library.empty.body')}
       </p>
       <ImportMenu
         size="lg"

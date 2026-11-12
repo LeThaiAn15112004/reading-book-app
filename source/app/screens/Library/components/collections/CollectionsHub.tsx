@@ -1,4 +1,4 @@
-/* i18n-pending: library */
+import { useT } from '../../../../i18n'
 import type { CollectionSummary } from '@core'
 
 const STACK_GRADS = [
@@ -52,19 +52,20 @@ export function CollectionsHub({
   onEditCollection,
   onDeleteCollection,
 }: CollectionsHubProps) {
+  const t = useT()
   return (
     <div
       className="flex min-h-0 flex-1 flex-col overflow-hidden"
       role="region"
-      aria-label="Collections"
+      aria-label={t('library.collections.title')}
     >
       <header className="app-titlebar flex h-16 shrink-0 items-center justify-between gap-4 border-b border-lib-border-soft bg-lib-topbar pl-7 pr-7 backdrop-blur-sm">
         <div className="min-w-0">
           <h1 className="m-0 truncate text-[22px] leading-tight font-semibold tracking-tight text-lib-text-strong">
-            Collections
+            {t('library.collections.title')}
           </h1>
           <p className="m-0 mt-0.5 text-[13px] text-lib-muted">
-            Group books into sets you curate yourself
+            {t('library.collections.subtitle')}
           </p>
         </div>
         <button
@@ -73,7 +74,7 @@ export function CollectionsHub({
           onClick={onNewCollection}
         >
           <PlusIcon className="size-4" />
-          <span>New collection</span>
+          <span>{t('library.collections.new')}</span>
         </button>
       </header>
 
@@ -81,11 +82,10 @@ export function CollectionsHub({
         {collections.length === 0 ? (
           <div className="mx-auto flex max-w-md flex-col items-center py-16 text-center">
             <p className="m-0 mb-2 text-base font-semibold text-lib-text-strong">
-              No collections yet
+              {t('library.collections.emptyTitle')}
             </p>
             <p className="m-0 mb-6 text-sm leading-relaxed text-lib-muted">
-              Create a set to group books by topic or purpose — beyond shelves and
-              favorites.
+              {t('library.collections.emptyBody')}
             </p>
             <button
               type="button"
@@ -93,7 +93,7 @@ export function CollectionsHub({
               onClick={onNewCollection}
             >
               <PlusIcon className="size-4" />
-              <span>New collection</span>
+              <span>{t('library.collections.new')}</span>
             </button>
           </div>
         ) : (
@@ -103,10 +103,7 @@ export function CollectionsHub({
           >
             {collections.map((c) => {
               const [g1, g2, g3] = stackFor(c.id)
-              const count =
-                c.bookIds.length === 1
-                  ? '1 book'
-                  : `${c.bookIds.length} books`
+              const count = t('library.bookCount', { count: c.bookIds.length })
               return (
                 <div
                   key={c.id}
@@ -145,17 +142,17 @@ export function CollectionsHub({
                       type="button"
                       className="h-7 cursor-pointer rounded-md border-none bg-transparent px-2 text-xs text-lib-muted hover:bg-white/10 hover:text-lib-text-strong"
                       onClick={() => onEditCollection(c.id)}
-                      aria-label={`Edit ${c.name}`}
+                      aria-label={t('library.collections.editAria', { name: c.name })}
                     >
-                      Edit
+                      {t('library.collections.edit')}
                     </button>
                     <button
                       type="button"
                       className="h-7 cursor-pointer rounded-md border-none bg-transparent px-2 text-xs text-red-400 hover:bg-red-500/10 hover:text-red-300"
                       onClick={() => onDeleteCollection(c.id)}
-                      aria-label={`Delete ${c.name}`}
+                      aria-label={t('library.collections.deleteAria', { name: c.name })}
                     >
-                      Delete
+                      {t('common.actions.delete')}
                     </button>
                   </div>
                 </div>

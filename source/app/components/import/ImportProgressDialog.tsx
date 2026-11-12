@@ -1,4 +1,5 @@
-/* i18n-pending: import */
+import { useFormat, useT } from '../../i18n'
+
 export type ImportProgressDialogProps = {
   open: boolean
   /** e.g. "Importing…" / "Downloading…" */
@@ -12,9 +13,6 @@ export type ImportProgressDialogProps = {
   onCancel?: () => void
 }
 
-function formatMb(bytes: number): string {
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
-}
 
 /**
  * UX-IMP progress — Importing / Downloading overlay (T2.10). Shown only after a file was picked
@@ -28,6 +26,8 @@ export function ImportProgressDialog({
   totalBytes,
   onCancel,
 }: ImportProgressDialogProps) {
+  const t = useT()
+  const format = useFormat()
   if (!open) return null
 
   const percent =
@@ -37,8 +37,8 @@ export function ImportProgressDialog({
   const bytesLabel =
     receivedBytes != null && receivedBytes > 0
       ? totalBytes && totalBytes > 0
-        ? `${formatMb(receivedBytes)} / ${formatMb(totalBytes)}`
-        : formatMb(receivedBytes)
+        ? t('import.progress.bytesOfTotal', { received: format.bytes(receivedBytes), total: format.bytes(totalBytes) })
+        : format.bytes(receivedBytes)
       : null
 
   return (
@@ -96,7 +96,7 @@ export function ImportProgressDialog({
               className="inline-flex h-[34px] cursor-pointer items-center rounded-lg border border-lib-border bg-transparent px-4 text-[13px] font-medium text-lib-muted transition-colors hover:text-lib-text-strong"
               onClick={onCancel}
             >
-              Cancel
+              {t('common.actions.cancel')}
             </button>
           </div>
         ) : null}

@@ -24,6 +24,7 @@ import { useAnnotationTransferStore } from '../Reader/logic/annotationTransferSt
 import { useLibraryImportStore } from '../../hooks/library'
 import { annotationExportMessage } from '../../utils/annotationTransferMessages'
 import { useShortcutAction } from '../../shortcuts'
+import { uiText, useT } from '../../i18n'
 import { LibraryHub } from './LibraryHub'
 import { useLibraryScreen } from './logic'
 
@@ -32,6 +33,7 @@ import { useLibraryScreen } from './logic'
  * navigation's Collections / Cloud Sources replace it with their own views.
  */
 export function LibraryScreen() {
+  const t = useT()
   const {
     navigate,
     bootError,
@@ -133,13 +135,9 @@ export function LibraryScreen() {
             onBack={goCollections}
             onOpenItem={openReader}
             onBookMenu={handleOpenBookMenu}
-            countLabel={
-              collectionItems.length === 1
-                ? '1 book'
-                : `${collectionItems.length} books`
-            }
-            emptyMessage="No books in this collection yet."
-            backAriaLabel="Back to collections"
+            countLabel={t('library.bookCount', { count: collectionItems.length })}
+            emptyMessage={t('library.shelf.emptyCollection')}
+            backAriaLabel={t('library.shelf.backToCollections')}
             viewMode={collectionViewMode}
             onViewModeChange={setCollectionViewMode}
           />
@@ -161,9 +159,9 @@ export function LibraryScreen() {
 
       <ImportToast
         open={toast !== null}
-        message={toast?.message ?? ''}
+        message={toast ? uiText(t, toast.message) : ''}
         variant={toast?.variant ?? 'info'}
-        action={toast?.action}
+        action={toast?.action ? { label: uiText(t, toast.action.label), run: toast.action.run } : undefined}
         onClose={clearToast}
       />
 
@@ -187,7 +185,7 @@ export function LibraryScreen() {
 
       <ImportProgressDialog
         open={progress !== null}
-        status={progress?.stage === 'downloading' ? 'Downloading…' : 'Importing…'}
+        status={progress?.stage === 'downloading' ? t('library.progressDialog.downloading') : t('library.progressDialog.importing')}
         filename={progress?.filename}
         receivedBytes={progress?.receivedBytes}
         totalBytes={progress?.totalBytes}
@@ -277,24 +275,31 @@ export function LibraryScreen() {
         <ConfirmBookActionDialog
           title={
             pendingRemoval.kind === 'remove'
-              ? 'Remove from library?'
+              ? t('library.confirm.removeTitle')
               : pendingRemoval.kind === 'remove-audiobook'
-                ? 'Remove audiobook?'
-                : 'Delete file permanently?'
+                ? t('library.confirm.removeAudiobookTitle')
+                : t('library.confirm.deleteFileTitle')
           }
           message={
             pendingRemoval.kind === 'remove-audiobook'
-              ? `“${pendingRemovalBook.title}” and its ${pendingRemovalBook.chapterCount ?? 'imported'} chapter files will be permanently deleted from Readmate. Your original ZIP is not touched. This cannot be undone.`
+              ? pendingRemovalBook.chapterCount
+                ? t('library.confirm.removeAudiobookBody', {
+                    title: pendingRemovalBook.title,
+                    chapters: pendingRemovalBook.chapterCount,
+                  })
+                : t('library.confirm.removeAudiobookBodyUnknown', { title: pendingRemovalBook.title })
               : pendingRemoval.kind === 'remove'
-              ? `“${pendingRemovalBook.title}” will disappear from the library. ${
-                  pendingRemovalBook.fileStorage === 'referenced'
-                    ? 'Your original file will not be touched.'
-                    : 'Its imported file will be kept.'
-                }`
-              : `“${pendingRemovalBook.title}” and its imported file will be permanently deleted. This cannot be undone.`
+                ? pendingRemovalBook.fileStorage === 'referenced'
+                  ? t('library.confirm.removeReferencedBody', { title: pendingRemovalBook.title })
+                  : t('library.confirm.removeManagedBody', { title: pendingRemovalBook.title })
+                : t('library.confirm.deleteFileBody', { title: pendingRemovalBook.title })
           }
           confirmLabel={
-            pendingRemoval.kind === 'remove' ? 'Remove' : pendingRemoval.kind === 'remove-audiobook' ? 'Remove audiobook' : 'Delete file'
+            pendingRemoval.kind === 'remove'
+              ? t('library.confirm.remove')
+              : pendingRemoval.kind === 'remove-audiobook'
+                ? t('library.confirm.removeAudiobook')
+                : t('library.confirm.deleteFile')
           }
           destructive={pendingRemoval.kind !== 'remove'}
           onCancel={() => setPendingRemoval(null)}
@@ -304,9 +309,9 @@ export function LibraryScreen() {
 
       {pendingCollectionDelete ? (
         <ConfirmBookActionDialog
-          title="Delete collection?"
-          message={`“${pendingCollectionDelete.name}” will be deleted. Books in it will remain in your library.`}
-          confirmLabel="Delete collection"
+          title={t('library.confirm.deleteCollectionTitle')}
+          message={t('library.confirm.deleteCollectionBody', { name: pendingCollectionDelete.name })}
+          confirmLabel={t('library.confirm.deleteCollection')}
           destructive
           onCancel={() => setPendingCollectionDeleteId(null)}
           onConfirm={confirmCollectionDelete}

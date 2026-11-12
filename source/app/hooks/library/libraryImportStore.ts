@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import type { ImportToastVariant } from '@core'
+import type { UiText } from '../../i18n'
 
 export type ImportSource = 'file' | 'url'
 
@@ -14,12 +15,13 @@ export type ImportProgressState = {
 
 /** Optional one-click follow-up on a toast (Open, Retry, Connect…). */
 export type ImportToastAction = {
-  label: string
+  label: UiText
   run: () => void
 }
 
+/** Texts are {@link UiText}: Main's messages as strings, the renderer's own as keys translated when shown (spec 012). */
 export type ImportToastState = {
-  message: string
+  message: UiText
   variant: ImportToastVariant
   action?: ImportToastAction
 }
@@ -31,7 +33,7 @@ export type ImportConflictState = {
 
 /** Inline error shown inside the URL dialog after a failed download. */
 export type ImportUrlError = {
-  message: string
+  message: UiText
   /** Transient failure (network / timeout / HTTP): the submit button becomes "Retry". */
   retryable: boolean
 }
@@ -53,7 +55,7 @@ type LibraryImportState = {
   setBusy: (busy: boolean) => void
   setProgress: (progress: ImportProgressState | null) => void
   showToast: (
-    message: string,
+    message: UiText,
     variant?: ImportToastVariant,
     action?: ImportToastAction,
   ) => void

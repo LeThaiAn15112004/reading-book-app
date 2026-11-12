@@ -1,5 +1,5 @@
-/* i18n-pending: library */
-import { formatFileSizeMb } from '@core'
+import type { MessageKey, Translator } from '@core'
+import { useFormat, useT, type BoundFormat } from '../../../../i18n'
 import { BookCover } from './BookCover'
 
 export type LibraryBookInfoFields = {
@@ -19,26 +19,27 @@ export type LibraryBookInfoFields = {
 }
 
 /** Rows shown for a book (dialog + Library table detail panel share them). */
-function bookInfoRows(book: LibraryBookInfoFields): Array<[string, string]> {
-  const sizeLabel = formatFileSizeMb(book.fileSizeBytes) ?? '—'
+function bookInfoRows(t: Translator, format: BoundFormat, book: LibraryBookInfoFields): Array<[MessageKey, string]> {
+  const sizeLabel =
+    book.fileSizeBytes != null && book.fileSizeBytes >= 0 ? format.bytes(book.fileSizeBytes) : '—'
   const pagesLabel =
-    book.pageCount != null && book.pageCount > 0
-      ? `${book.pageCount} ${book.pageCount === 1 ? 'page' : 'pages'}`
-      : '—'
+    book.pageCount != null && book.pageCount > 0 ? t('library.pageCount', { count: book.pageCount }) : '—'
   const isMulti = (book.chapterCount ?? 0) > 0
-  const formatLabel = isMulti ? 'Audiobook' : book.format?.trim().toUpperCase() || '—'
+  const formatLabel = isMulti ? t('library.info.audiobook') : book.format?.trim().toUpperCase() || '—'
   const genreLabel =
     book.genre?.trim() ||
     (book.genres && book.genres.length > 0 ? book.genres.join(', ') : undefined) ||
     '—'
   return [
-    ['Title', book.title],
-    ['Author', book.author?.trim() || '—'],
-    ['Format', formatLabel],
-    ['Genre', genreLabel],
-    ['Size', sizeLabel],
-    ['Pages', pagesLabel],
-    isMulti ? ['Chapters', String(book.chapterCount)] : ['File', book.fileName?.trim() || '—'],
+    ['library.info.title', book.title],
+    ['library.info.author', book.author?.trim() || '—'],
+    ['library.info.format', formatLabel],
+    ['library.info.genre', genreLabel],
+    ['library.info.size', sizeLabel],
+    ['library.info.pages', pagesLabel],
+    isMulti
+      ? ['library.info.chapters', String(book.chapterCount)]
+      : ['library.info.file', book.fileName?.trim() || '—'],
   ]
 }
 
@@ -50,9 +51,11 @@ export type LibraryBookInfoContentProps = {
 
 /** Cover + metadata + description — body of the Book info dialog and the table detail panel. */
 export function LibraryBookInfoContent({ book, variant = 'dialog' }: LibraryBookInfoContentProps) {
+  const t = useT()
+  const format = useFormat()
   const formatLabel = book.format?.trim().toUpperCase()
   const isPanel = variant === 'panel'
-  const rows = bookInfoRows(book).filter(([k]) => !(isPanel && k === 'Title'))
+  const rows = bookInfoRows(t, format, book).filter(([k]) => !(isPanel && k === 'library.info.title'))
 
   return (
     <>
@@ -72,7 +75,7 @@ export function LibraryBookInfoContent({ book, variant = 'dialog' }: LibraryBook
         <dl className="m-0 flex min-w-0 flex-1 flex-col gap-2.5">
           {rows.map(([k, v]) => (
             <div key={k} className="grid grid-cols-[72px_1fr] gap-2 text-[13px]">
-              <dt className="m-0 font-semibold text-lib-faint">{k}</dt>
+              <dt className="m-0 font-semibold text-lib-faint">{t(k)}</dt>
               <dd className="m-0 break-words text-lib-text-strong select-text">{v}</dd>
             </div>
           ))}
@@ -80,7 +83,7 @@ export function LibraryBookInfoContent({ book, variant = 'dialog' }: LibraryBook
       </div>
 
       <div className="text-[13px]">
-        <div className="mb-1 font-semibold text-lib-faint">Description</div>
+        <div className="mb-1 font-semibold text-lib-faint">{t('library.info.description')}</div>
         <p className="m-0 whitespace-pre-wrap break-words text-lib-text-strong select-text">
           {book.description?.trim() || '—'}
         </p>
@@ -101,6 +104,7 @@ export function LibraryBookInfoDialog({
   book,
   onClose,
 }: LibraryBookInfoDialogProps) {
+  const t = useT()
   if (!open || !book) return null
 
   return (
@@ -118,7 +122,7 @@ export function LibraryBookInfoDialog({
           className="text-base font-semibold text-lib-text-strong"
           id="library-book-info-title"
         >
-          Book info
+          {t('library.info.dialogTitle')}
         </div>
 
         <LibraryBookInfoContent book={book} />
@@ -129,7 +133,7 @@ export function LibraryBookInfoDialog({
             type="button"
             onClick={onClose}
           >
-            Close
+            {t('common.actions.close')}
           </button>
         </div>
       </div>

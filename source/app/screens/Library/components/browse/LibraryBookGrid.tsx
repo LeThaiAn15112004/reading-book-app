@@ -1,5 +1,5 @@
-/* i18n-pending: library */
 import type { LibraryBook } from '@core'
+import { useT } from '../../../../i18n'
 import type { BookMenuPoint } from '../book'
 import { ShelfRailCard } from '../shelves/ShelfRailCard'
 
@@ -14,11 +14,12 @@ export type LibraryBookGridProps = {
  * (no horizontal rail, vertical scroll only).
  */
 export function LibraryBookGrid({ books, onOpen, onBookMenu }: LibraryBookGridProps) {
+  const t = useT()
   return (
     <div
       className="grid grid-cols-[repeat(auto-fill,minmax(136px,1fr))] gap-x-5 gap-y-6"
       role="list"
-      aria-label="Books"
+      aria-label={t('library.books')}
     >
       {books.map((book) => (
         <ShelfRailCard

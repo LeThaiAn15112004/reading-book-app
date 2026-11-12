@@ -1,4 +1,5 @@
-/* i18n-pending: library */
+import type { MessageKey } from '@core'
+import { useT } from '../../../../i18n'
 import {
   LIBRARY_SORTS,
   type LibraryLayout,
@@ -30,9 +31,9 @@ function TableIcon() {
   )
 }
 
-const LAYOUTS: readonly { id: LibraryLayout; label: string; icon: () => React.JSX.Element }[] = [
-  { id: 'grid', label: 'Grid view', icon: GridIcon },
-  { id: 'table', label: 'Table view', icon: TableIcon },
+const LAYOUTS: readonly { id: LibraryLayout; labelKey: MessageKey; icon: () => React.JSX.Element }[] = [
+  { id: 'grid', labelKey: 'library.layout.grid', icon: GridIcon },
+  { id: 'table', labelKey: 'library.layout.table', icon: TableIcon },
 ]
 
 /** Heading of the browse area: current filter + count, Sort and Grid ⇄ Table (both remembered). */
@@ -44,6 +45,7 @@ export function LibraryBrowseToolbar({
   layout,
   onLayoutChange,
 }: LibraryBrowseToolbarProps) {
+  const t = useT()
   return (
     <div className="mb-4 flex flex-wrap items-center gap-3">
       <div className="flex min-w-0 flex-1 items-baseline gap-2">
@@ -51,12 +53,12 @@ export function LibraryBrowseToolbar({
           {title}
         </h2>
         <span className="text-[13px] text-lib-faint tabular-nums">
-          {count === 1 ? '1 book' : `${count} books`}
+          {t('library.bookCount', { count })}
         </span>
       </div>
 
       <label className="flex items-center gap-2 text-[12px] text-lib-muted">
-        <span>Sort</span>
+        <span>{t('library.sorts.label')}</span>
         <select
           className="h-8 cursor-pointer rounded-lg border border-lib-border bg-lib-input px-2.5 text-[13px] text-lib-text-strong outline-none focus:border-lib-accent"
           value={sort}
@@ -64,7 +66,7 @@ export function LibraryBrowseToolbar({
         >
           {LIBRARY_SORTS.map((option) => (
             <option key={option.id} value={option.id}>
-              {option.label}
+              {t(option.labelKey)}
             </option>
           ))}
         </select>
@@ -73,10 +75,11 @@ export function LibraryBrowseToolbar({
       <div
         className="inline-flex overflow-hidden rounded-lg border border-lib-border"
         role="group"
-        aria-label="Layout"
+        aria-label={t('library.layout.aria')}
       >
-        {LAYOUTS.map(({ id, label, icon: Icon }) => {
+        {LAYOUTS.map(({ id, labelKey, icon: Icon }) => {
           const selected = layout === id
+          const label = t(labelKey)
           return (
             <button
               key={id}

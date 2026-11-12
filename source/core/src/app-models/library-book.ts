@@ -1,3 +1,7 @@
+import { localeTag } from '../i18n/language.js'
+import { translate } from '../i18n/translate.js'
+import type { UiLanguage } from '../i18n/types.js'
+
 /** Reading status used by shelves + nav filters (SCR-01). */
 export type LibraryReadingStatus = 'reading' | 'completed' | 'not-started'
 
@@ -216,18 +220,26 @@ export function filterByShelf(
   return books.filter((b) => b.status === shelfId)
 }
 
-export function formatRelativeLastRead(iso?: string): string | undefined {
+const relativeFormats = new Map<UiLanguage, Intl.RelativeTimeFormat>()
+
+/** "5 minutes ago" / "5 phút trước" in the interface language (spec 012: `Intl.RelativeTimeFormat`). */
+export function formatRelativeLastRead(iso?: string, lang: UiLanguage = 'en'): string | undefined {
   if (!iso) return undefined
   const then = Date.parse(iso)
   if (Number.isNaN(then)) return undefined
   const diffMs = Date.now() - then
-  if (diffMs < 60_000) return 'just now'
+  if (diffMs < 60_000) return translate(lang, 'library.relative.justNow')
+  let rtf = relativeFormats.get(lang)
+  if (!rtf) {
+    rtf = new Intl.RelativeTimeFormat(localeTag(lang), { numeric: 'always' })
+    relativeFormats.set(lang, rtf)
+  }
   const mins = Math.floor(diffMs / 60_000)
-  if (mins < 60) return `${mins} minute${mins === 1 ? '' : 's'} ago`
+  if (mins < 60) return rtf.format(-mins, 'minute')
   const hours = Math.floor(mins / 60)
-  if (hours < 48) return `${hours} hour${hours === 1 ? '' : 's'} ago`
+  if (hours < 48) return rtf.format(-hours, 'hour')
   const days = Math.floor(hours / 24)
-  return `${days} day${days === 1 ? '' : 's'} ago`
+  return rtf.format(-days, 'day')
 }
 
 /** Human-readable file size for Library cards (G1-N7). */

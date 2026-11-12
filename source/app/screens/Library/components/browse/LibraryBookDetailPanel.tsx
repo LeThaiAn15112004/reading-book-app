@@ -1,6 +1,6 @@
-/* i18n-pending: library */
 import { useEffect } from 'react'
 import type { LibraryBook } from '@core'
+import { useT } from '../../../../i18n'
 import { BookMenuButton, LibraryBookInfoContent, type BookMenuPoint } from '../book'
 
 export type LibraryBookDetailPanelProps = {
@@ -22,6 +22,7 @@ export function LibraryBookDetailPanel({
   onToggleFavorite,
   onBookMenu,
 }: LibraryBookDetailPanelProps) {
+  const t = useT()
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
       if (e.key === 'Escape' && !e.defaultPrevented) onClose()
@@ -38,7 +39,7 @@ export function LibraryBookDetailPanel({
   return (
     <aside
       className="flex w-[320px] shrink-0 flex-col border-l border-lib-border-soft bg-lib-surface-strong max-[1100px]:w-[280px]"
-      aria-label={`Details for ${book.title}`}
+      aria-label={t('library.detail.aria', { title: book.title })}
     >
       <div className="flex shrink-0 items-center justify-between gap-2 border-b border-lib-border-soft px-4 py-2.5">
         <h2 className="m-0 min-w-0 truncate text-sm font-semibold text-lib-text-strong" title={book.title}>
@@ -47,8 +48,8 @@ export function LibraryBookDetailPanel({
         <button
           type="button"
           className="inline-flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-md border-none bg-transparent text-lib-muted transition-colors hover:bg-lib-surface-hover hover:text-lib-text-strong"
-          title="Close details"
-          aria-label="Close details"
+          title={t('library.detail.close')}
+          aria-label={t('library.detail.close')}
           onClick={onClose}
         >
           ✕
@@ -62,15 +63,15 @@ export function LibraryBookDetailPanel({
             className="inline-flex h-9 flex-1 cursor-pointer items-center justify-center rounded-lg border-none bg-lib-accent px-4 text-[13px] font-semibold text-lib-bg-deep transition-colors hover:bg-lib-accent-hover"
             onClick={() => onOpen(book.id)}
           >
-            {book.status === 'reading' ? 'Resume' : 'Read'}
+            {book.status === 'reading' ? t('library.continue.resume') : t('library.continue.read')}
           </button>
           <button
             type="button"
             className={`inline-flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-lg border border-lib-border bg-transparent text-[15px] transition-colors hover:border-lib-accent ${
               book.isFavorite ? 'text-lib-accent' : 'text-lib-muted'
             }`}
-            title={book.isFavorite ? 'Remove from favorites' : 'Add to favorites'}
-            aria-label={book.isFavorite ? 'Remove from favorites' : 'Add to favorites'}
+            title={book.isFavorite ? t('library.detail.removeFavorite') : t('library.detail.addFavorite')}
+            aria-label={book.isFavorite ? t('library.detail.removeFavorite') : t('library.detail.addFavorite')}
             aria-pressed={book.isFavorite}
             onClick={() => onToggleFavorite(book)}
           >

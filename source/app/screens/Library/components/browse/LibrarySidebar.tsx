@@ -1,4 +1,4 @@
-/* i18n-pending: library */
+import { useT } from '../../../../i18n'
 import {
   LIBRARY_BROWSE_FILTERS,
   type LibraryBrowseFilter,
@@ -23,18 +23,20 @@ export type LibrarySidebarProps = {
  * Narrow windows (< 900px) show icons only (label via tooltip + aria-label).
  */
 export function LibrarySidebar({ active, counts, onSelect }: LibrarySidebarProps) {
+  const t = useT()
   return (
     <aside
       className="flex w-[208px] shrink-0 flex-col border-r border-lib-border-soft bg-lib-topbar max-[900px]:w-[60px]"
-      aria-label="Library filters"
+      aria-label={t('library.sidebar.aria')}
     >
       <nav className="app-scroll min-h-0 flex-1 overflow-y-auto p-2 pt-3">
         <p className="m-0 mb-1.5 px-3 text-[11px] font-bold tracking-wide text-lib-faint uppercase max-[900px]:hidden">
-          Library
+          {t('library.sidebar.heading')}
         </p>
         <ul className="m-0 flex list-none flex-col gap-0.5 p-0">
           {LIBRARY_BROWSE_FILTERS.map((item) => {
             const selected = item.id === active
+            const label = t(item.labelKey)
             return (
               <li key={item.id}>
                 <button
@@ -44,8 +46,8 @@ export function LibrarySidebar({ active, counts, onSelect }: LibrarySidebarProps
                       ? 'bg-lib-accent-soft text-lib-accent'
                       : 'bg-transparent text-lib-muted hover:bg-lib-surface-hover hover:text-lib-text-strong'
                   }`}
-                  title={item.label}
-                  aria-label={`${item.label}, ${counts[item.id] === 1 ? '1 book' : `${counts[item.id]} books`}`}
+                  title={label}
+                  aria-label={t('library.sidebar.filterCount', { label, count: counts[item.id] })}
                   aria-current={selected ? 'page' : undefined}
                   onClick={() => onSelect(item.id)}
                 >
@@ -60,7 +62,7 @@ export function LibrarySidebar({ active, counts, onSelect }: LibrarySidebarProps
                   >
                     <path strokeLinecap="round" strokeLinejoin="round" d={ICON_PATHS[item.id]} />
                   </svg>
-                  <span className="min-w-0 flex-1 truncate max-[900px]:hidden">{item.label}</span>
+                  <span className="min-w-0 flex-1 truncate max-[900px]:hidden">{label}</span>
                   <span
                     className={`text-[11px] tabular-nums max-[900px]:hidden ${
                       selected ? 'text-lib-accent' : 'text-lib-faint'
