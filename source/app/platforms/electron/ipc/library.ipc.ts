@@ -153,6 +153,19 @@ export function registerLibraryIpc(): void {
     },
   )
 
+  ipcMain.removeHandler(LibraryChannels.restartBook)
+  ipcMain.handle(
+    LibraryChannels.restartBook,
+    async (_event, id: unknown): Promise<OkResult> => {
+      if (typeof id !== 'string' || !id.trim()) return { ok: false }
+      const store = getLibraryStore()
+      const book = await store.findById(id.trim())
+      if (!book) return { ok: false }
+      store.restartBook(book.id)
+      return { ok: true }
+    },
+  )
+
   ipcMain.removeHandler(LibraryChannels.setGeneratedCover)
   ipcMain.handle(
     LibraryChannels.setGeneratedCover,

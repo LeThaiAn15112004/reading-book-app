@@ -5,13 +5,11 @@ import type { LibraryHubProps } from '../LibraryHub'
 import { LIBRARY_FILTER_EMPTY, useLibraryBrowse, useLibraryBrowseStore } from '../logic'
 import { MobileLibraryEmptyState } from './MobileLibraryEmptyState'
 import { MobileLibraryHeader } from './MobileLibraryHeader'
+import { PhoneContinueCarousel } from './PhoneContinueCarousel'
 
 export type MobileLibraryHubProps = LibraryHubProps & {
-  /**
-   * "Read again" on a finished book (spec 013 US1): restart it at the beginning, then open it. Optional until the
-   * carousel and the sheet use it (tasks T019–T021, T028).
-   */
-  onReadAgain?: (bookId: string) => void
+  /** "Read again" on a finished book (spec 013 US1): restart it at the beginning, then open it. */
+  onReadAgain: (bookId: string) => void
 }
 
 /**
@@ -31,11 +29,12 @@ export default function MobileLibraryHub({
   bootError,
   onRetryBoot,
   onOpenBook,
+  onReadAgain,
   onBookMenu,
 }: MobileLibraryHubProps) {
   const t = useT()
   const bookList = books ?? []
-  const { filter, searchActive, visibleBooks } = useLibraryBrowse(bookList, searchQuery)
+  const { filter, searchActive, visibleBooks, phoneContinueBooks } = useLibraryBrowse(bookList, searchQuery)
   const setFilter = useLibraryBrowseStore((s) => s.setFilter)
 
   // First launch (no book at all): only the header and the empty state — no chips, carousel or toolbar (US2).
@@ -81,7 +80,20 @@ export default function MobileLibraryHub({
       {/* The one vertical scroll container: carousel (US1), toolbar + Grid / List (US3). */}
       <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain pb-4">
         {bootError ? <BootErrorBanner message={bootError} onRetry={onRetryBoot} /> : null}
-        {isEmpty ? <MobileLibraryEmptyState onFromDevice={onFromDevice} /> : collection}
+        {isEmpty ? (
+          <MobileLibraryEmptyState onFromDevice={onFromDevice} />
+        ) : (
+          <>
+            {/* Only on All without a search (phoneContinueBooks is [] otherwise): a shortcut, not a filter result. */}
+            <PhoneContinueCarousel
+              books={phoneContinueBooks}
+              onResume={onOpenBook}
+              onReadAgain={onReadAgain}
+              onBookMenu={onBookMenu}
+            />
+            {collection}
+          </>
+        )}
       </div>
 
       {/* Banner slot (US5) goes here, outside the scroll container. */}

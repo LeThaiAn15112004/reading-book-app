@@ -76,6 +76,14 @@ export function createLibraryGroup(ctx: BridgeContext): Library {
         return { ok: true }
       }),
 
+    restartBook: (id) =>
+      writes.run(async () => {
+        const bookId = idOf(id)
+        if (!bookId || !(await library.findById(bookId))) return { ok: false }
+        await library.restartBook(bookId)
+        return { ok: true }
+      }),
+
     markAsCompleted: (id) =>
       writes.run(async () => {
         const bookId = idOf(id)

@@ -40,7 +40,7 @@ export function useLibraryScreen() {
   const navigate = useNavigate()
   const location = useLocation()
   const { registerLibraryNav } = useAppNav()
-  const { openBook } = useOpenReading()
+  const { openBook, closeBook } = useOpenReading()
   const locState = location.state as LibraryLocationState | null
   const bootError = locState?.bootError
   const [searchQuery, setSearchQuery] = useState('')
@@ -235,6 +235,27 @@ export function useLibraryScreen() {
       () => libraryApi.setFavorite(book.id, !book.isFavorite),
       { key: book.isFavorite ? 'library.toast.favoriteRemoved' : 'library.toast.favoriteAdded' },
     )
+  }
+
+  /**
+   * "Read again" (spec 013 US1): close the book's Reading tab if one is open (the Reader re-reads the restarted
+   * state instead of an old position), restart it (status reading, no position, 0 %), then open it at the
+   * beginning. On failure the Reader is not opened.
+   */
+  async function handleReadAgain(bookId: string) {
+    closeBook(bookId)
+    try {
+      const result = await libraryApi.restartBook(bookId)
+      if (!result.ok) {
+        showToast({ key: 'library.toast.actionFailed' }, 'error')
+        return
+      }
+    } catch {
+      showToast({ key: 'library.toast.actionFailed' }, 'error')
+      return
+    }
+    await refreshLibrary()
+    openReader(bookId)
   }
 
   async function handleMarkCompleted(bookId: string) {
@@ -444,6 +465,7 @@ export function useLibraryScreen() {
     confirmPendingRemoval,
     handleToggleFavorite,
     handleMarkCompleted,
+    handleReadAgain,
     handleSaveMetadata,
     handleOpenFileLocation,
     handleCopyFilePath,

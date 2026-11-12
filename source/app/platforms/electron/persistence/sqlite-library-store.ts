@@ -151,6 +151,16 @@ export class SqliteLibraryStore implements LibraryStore {
     this.patchReadingState(bookId, patch)
   }
 
+  /**
+   * "Read again" (spec 013): status `reading`, the `Started` label and 0 % in ONE transaction (core
+   * `restartReading`); typography overrides, the translation source and notes are kept.
+   */
+  restartBook(bookId: string, now = new Date().toISOString()): void {
+    this.sql.transaction(() => {
+      for (const statement of q.restartReading(bookId, now)) this.sql.run(statement)
+    })
+  }
+
   setReadingStatus(
     bookId: string,
     status: 'reading' | 'completed' | 'not-started',

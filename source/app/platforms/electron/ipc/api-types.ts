@@ -1053,6 +1053,8 @@ export interface DesktopApi {
     /** After user opens Reader — book appears on Reading shelf. */
     markAsReading(id: string): Promise<OkResult>
     markAsCompleted(id: string): Promise<OkResult>
+    /** "Read again" (spec 013): status reading, the `Started` label and 0 %; notes and other reading-state keys kept. */
+    restartBook(id: string): Promise<OkResult>
     setFavorite(id: string, value: boolean): Promise<OkResult>
     /** Store a PNG rendered by the renderer as the cover; refused when the book already has one. */
     setGeneratedCover(id: string, png: ArrayBuffer): Promise<OkResult>

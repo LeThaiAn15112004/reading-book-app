@@ -4,6 +4,7 @@
  * run these through their driver. No driver, no I/O.
  */
 import type { ReadingStateJson } from '../../persistence/books-json.js'
+import { STARTED_LOCATION_LABEL } from '../../persistence/session-location.js'
 import type { SqlValue, Statement } from '../driver.js'
 import type { ReadingStatus } from './codec.js'
 
@@ -62,6 +63,16 @@ export const updateGenres = (bookId: string, genresJson: string) =>
 /** Merge `patch` into `reading_state_json` in one atomic statement (`json_patch`, RFC 7396). */
 export const patchReadingState = (bookId: string, patch: ReadingStateJson) =>
   s('UPDATE books SET reading_state_json = json_patch(reading_state_json, ?) WHERE id = ?', JSON.stringify(patch), bookId)
+
+/**
+ * "Read again" (spec 013, contracts/library-restart-book.md): back to `reading`, no resumable location (the `Started`
+ * label, so the Reader opens at the beginning) and 0 %. A merge patch: typography overrides, the translation source
+ * and audio progress are kept. The stores run both in ONE transaction.
+ */
+export const restartReading = (bookId: string, now: string): Statement[] => [
+  updateReadingStatus(bookId, 'reading', now),
+  patchReadingState(bookId, { lastReadLocation: STARTED_LOCATION_LABEL, percent: 0, updatedAt: now }),
+]
 
 /** `sha256` is kept in step with the file; no-op when unchanged (`sha256 <> ?`). `updated_at` is left alone. */
 export const updateFileFingerprint = (bookId: string, sha256: string, patchJson: string) =>

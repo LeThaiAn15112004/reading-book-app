@@ -7,6 +7,7 @@ export const libraryApi = {
   openBookContent: (id: string) => api.library.openBookContent(id),
   markAsReading: (id: string) => api.library.markAsReading(id),
   markAsCompleted: (id: string) => api.library.markAsCompleted(id),
+  restartBook: (id: string) => api.library.restartBook(id),
   setGeneratedCover: (id: string, png: ArrayBuffer) =>
     api.library.setGeneratedCover(id, png),
   setFavorite: (id: string, value: boolean) =>

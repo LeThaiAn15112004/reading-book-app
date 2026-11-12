@@ -80,4 +80,17 @@ describe('library statements', () => {
     const metadata = JSON.parse(libraryCodec.bookToRowValues(book)[11] as string) as Record<string, unknown>
     expect(Object.keys(metadata).some((k) => k.startsWith('signat') || k === 'signerName' || k === 'signedAt')).toBe(false)
   })
+
+  it('restartReading ("Read again", spec 013) = status reading + json_patch of location, percent and updatedAt', () => {
+    const now = '2026-11-12T10:00:00.000Z'
+    const statements = q.restartReading('b1', now)
+    expect(statements).toEqual([
+      q.updateReadingStatus('b1', 'reading', now),
+      q.patchReadingState('b1', { lastReadLocation: 'Started', percent: 0, updatedAt: now }),
+    ])
+    // A merge patch: only these three keys are written, every other reading_state key is kept.
+    expect(JSON.parse(statements[1]!.params[0] as string)).toEqual({ lastReadLocation: 'Started', percent: 0, updatedAt: now })
+    expect(statements[1]!.sql).toContain('json_patch(reading_state_json, ?)')
+    for (const statement of statements) expect(statement.params.length, statement.sql).toBe(placeholders(statement.sql))
+  })
 })

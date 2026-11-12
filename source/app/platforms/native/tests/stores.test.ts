@@ -113,6 +113,38 @@ describe('MobileLibraryStore rules', () => {
   })
 })
 
+describe('MobileLibraryStore.restartBook ("Read again", spec 013)', () => {
+  const stateOf = async () =>
+    (await driver.query<{ reading_status: string; reading_state_json: string }>(
+      'SELECT reading_status, reading_state_json FROM books WHERE id = ?',
+      [ID],
+    ))[0]!
+
+  it('sets status reading, the Started label and 0 %, keeping every other reading-state key and the notes', async () => {
+    const store = new MobileLibraryStore(driver)
+    await store.save(book())
+    const location = JSON.stringify({ kind: 'cfi', cfi: 'epubcfi(/6/8!/4/2/1:0)', chapterIndex: 3 })
+    await driver.run("UPDATE books SET reading_status = 'completed', reading_state_json = ? WHERE id = ?", [
+      JSON.stringify({ lastReadLocation: location, percent: 100, fontSize: 18, translationSourceLang: 'fr', updatedAt: '2026-01-02T00:00:00.000Z' }),
+      ID,
+    ])
+    await new MobileOverlayStore(driver).saveBookmark({ bookId: ID, locator: { kind: 'cfi', cfi: 'epubcfi(/6/2!/4/2/1:0)', chapterIndex: 0 } })
+
+    await store.restartBook(ID, '2026-11-12T10:00:00.000Z')
+
+    const row = await stateOf()
+    expect(row.reading_status).toBe('reading')
+    expect(JSON.parse(row.reading_state_json)).toEqual({
+      lastReadLocation: 'Started',
+      percent: 0,
+      fontSize: 18,
+      translationSourceLang: 'fr',
+      updatedAt: '2026-11-12T10:00:00.000Z',
+    })
+    expect((await driver.query<{ n: number }>('SELECT count(*) AS n FROM notes WHERE book_id = ?', [ID]))[0]!.n).toBe(1)
+  })
+})
+
 describe('MobileOverlayStore validation (Main re-validation, SDK functions)', () => {
   const overlay = () => new MobileOverlayStore(driver)
   const save = async (over: Record<string, unknown>) => {

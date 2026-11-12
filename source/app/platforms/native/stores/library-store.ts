@@ -155,6 +155,11 @@ export class MobileLibraryStore implements LibraryStore {
     await this.db.transaction([q.updateReadingStatus(bookId, 'reading', now), q.patchReadingState(bookId, patch)])
   }
 
+  /** "Read again" (spec 013): status `reading`, the `Started` label and 0 %, other reading-state keys kept — ONE transaction. */
+  async restartBook(bookId: string, now = new Date().toISOString()): Promise<void> {
+    await this.db.transaction(q.restartReading(bookId, now))
+  }
+
   async setReadingStatus(bookId: string, status: 'reading' | 'completed' | 'not-started', now = new Date().toISOString()): Promise<void> {
     await this.run(q.updateReadingStatus(bookId, status, now))
   }

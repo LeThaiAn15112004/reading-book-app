@@ -36,11 +36,11 @@ import { useLibraryScreen } from './logic'
 const MobileLibraryHub = lazy(() => import('./phone/MobileLibraryHub'))
 
 /** Desktop hub, or the phone hub on the Mobile host — same props (FR-029: one Library, two presentations). */
-function LibraryHome(props: LibraryHubProps) {
+function LibraryHome({ onReadAgain, ...props }: LibraryHubProps & { onReadAgain: (bookId: string) => void }) {
   if (!isMobileHost()) return <LibraryHub {...props} />
   return (
     <Suspense fallback={<div className="flex-1" aria-busy="true" />}>
-      <MobileLibraryHub {...props} />
+      <MobileLibraryHub {...props} onReadAgain={onReadAgain} />
     </Suspense>
   )
 }
@@ -73,6 +73,7 @@ export function LibraryScreen() {
     confirmPendingRemoval,
     handleToggleFavorite,
     handleMarkCompleted,
+    handleReadAgain,
     handleSaveMetadata,
     handleOpenFileLocation,
     handleCopyFilePath,
@@ -168,6 +169,7 @@ export function LibraryScreen() {
             bootError={bootError}
             onRetryBoot={() => navigate('/', { replace: true })}
             onOpenBook={openReader}
+            onReadAgain={(bookId) => void handleReadAgain(bookId)}
             onBookMenu={handleOpenBookMenu}
             onToggleFavorite={handleToggleFavorite}
           />

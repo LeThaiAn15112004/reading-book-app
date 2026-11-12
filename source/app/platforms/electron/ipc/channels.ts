@@ -34,6 +34,8 @@ export const LibraryChannels = {
   /** Mark book as in-progress → Library Reading shelf. */
   markAsReading: 'library:markAsReading',
   markAsCompleted: 'library:markAsCompleted',
+  /** "Read again" (spec 013): status reading, no resumable location, 0 %. */
+  restartBook: 'library:restartBook',
   setFavorite: 'library:setFavorite',
   /** Renderer-rendered first page (PDF / DOCX / TXT / MD) stored as the book's cover when it has none. */
   setGeneratedCover: 'library:setGeneratedCover',

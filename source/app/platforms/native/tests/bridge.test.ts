@@ -126,6 +126,30 @@ describe('serialized writes', () => {
   })
 })
 
+describe('library.restartBook ("Read again", spec 013)', () => {
+  it('restarts an existing book: status reading, no resumable location, 0 %', async () => {
+    host = await createFakeHost()
+    const bookId = await importText('Story.txt', 'Once upon a time.')
+    expect(await host.api.library.markAsCompleted(bookId)).toEqual({ ok: true })
+    expect(await host.api.library.restartBook(bookId)).toEqual({ ok: true })
+    const [book] = await host.api.library.listBooks()
+    expect(book).toMatchObject({ id: bookId, readingStatus: 'reading' })
+    // The `Started` label (no Location JSON): the Reader opens at the beginning; same label as markAsReading.
+    expect(book?.lastReadLocation).toBe('Started')
+    expect(book?.progressPercent ?? 0).toBe(0)
+  })
+
+  it('refuses an unknown or empty id and writes nothing', async () => {
+    host = await createFakeHost()
+    const bookId = await importText('Story.txt', 'Once upon a time.')
+    expect(await host.api.library.markAsCompleted(bookId)).toEqual({ ok: true })
+    expect(await host.api.library.restartBook(testUuid())).toEqual({ ok: false })
+    expect(await host.api.library.restartBook('')).toEqual({ ok: false })
+    const [book] = await host.api.library.listBooks()
+    expect(book).toMatchObject({ id: bookId, readingStatus: 'completed' })
+  })
+})
+
 describe('openBookContent', () => {
   it('assembles a book from 1 MiB chunks in Expo Go and returns the same ArrayBuffer result as Desktop', async () => {
     host = await createFakeHost()
