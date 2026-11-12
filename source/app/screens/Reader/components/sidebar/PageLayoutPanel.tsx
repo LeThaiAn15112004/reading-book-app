@@ -1,5 +1,5 @@
-/* i18n-pending: reader.sidebar */
 import { useEffect, useRef, useState } from 'react'
+import { useT } from '../../../../i18n'
 
 /** Rasterizes a 1-based page into a canvas `cssWidth` CSS px wide (PDF: `PdfRendererApi.renderThumbnail`). */
 export type PageThumbnailRenderer = (
@@ -118,11 +118,12 @@ function PageCard({
   onSelect: () => void
   renderThumbnail?: PageThumbnailRenderer
 }) {
+  const t = useT()
   return (
     <button
       type="button"
       className="group flex w-full min-w-0 cursor-pointer flex-col gap-1 border-none bg-transparent p-0 text-left"
-      aria-label={`Go to ${label}`}
+      aria-label={t('reader.sidebar.layout.goTo', { label })}
       aria-current={active ? 'page' : undefined}
       onClick={onSelect}
     >
@@ -163,10 +164,11 @@ export function PageLayoutPanel({
   onGoToPage,
   renderThumbnail,
 }: PageLayoutPanelProps) {
+  const t = useT()
   if (pageTotal <= 0) {
     return (
       <p className="m-0 px-2 py-6 text-center text-[13px] leading-relaxed text-lib-faint">
-        Sections are not available yet.
+        {t('reader.sidebar.layout.unavailable')}
       </p>
     )
   }
@@ -182,7 +184,7 @@ export function PageLayoutPanel({
           <PageCard
             key={page}
             page={page}
-            label={sectionLabels?.[index] ?? `Section ${page}`}
+            label={sectionLabels?.[index] ?? t('reader.sidebar.layout.sectionN', { n: page })}
             active={page === pageCurrent}
             onSelect={() => onGoToPage(page)}
             renderThumbnail={renderThumbnail}

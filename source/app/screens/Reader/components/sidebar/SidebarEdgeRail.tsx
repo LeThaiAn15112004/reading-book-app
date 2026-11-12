@@ -6,6 +6,7 @@ import {
   type SidebarTabDef,
 } from './sidebarTabs'
 import { readerChromeTopInset } from '../../../../components/reader/chrome'
+import { useT } from '../../../../i18n'
 
 type SidebarEdgeRailProps = {
   open: boolean
@@ -38,6 +39,7 @@ export function SidebarEdgeRail({
   onOpenTab,
   onToggle,
 }: SidebarEdgeRailProps) {
+  const t = useT()
   const handleLeft = open
     ? SIDEBAR_RAIL_WIDTH_PX + panelWidth
     : SIDEBAR_RAIL_WIDTH_PX
@@ -65,7 +67,7 @@ export function SidebarEdgeRail({
           bottom: bottomInsetPx,
         }}
         data-reader-sidebar-nav=""
-        aria-label="Sidebar navigation"
+        aria-label={t('reader.sidebar.rail.navigation')}
       >
         {tabs.map((tab) => {
           const isActive = activeTab === tab.id
@@ -86,8 +88,8 @@ export function SidebarEdgeRail({
                       : 'rounded-md text-lib-muted opacity-65 hover:bg-lib-bg-deep/45 hover:text-lib-text-strong hover:opacity-100'
               }`}
               type="button"
-              title={open ? undefined : tab.label}
-              aria-label={tab.label}
+              title={open ? undefined : t(tab.labelKey)}
+              aria-label={t(tab.labelKey)}
               aria-current={isActive ? 'page' : undefined}
               aria-pressed={isActive}
               onClick={(e) => {
@@ -111,8 +113,8 @@ export function SidebarEdgeRail({
         }}
         type="button"
         data-reader-sidebar-toggle=""
-        title={open ? undefined : 'Open sidebar'}
-        aria-label={open ? 'Close sidebar' : 'Open sidebar'}
+        title={open ? undefined : t('reader.sidebar.rail.open')}
+        aria-label={open ? t('reader.sidebar.rail.close') : t('reader.sidebar.rail.open')}
         aria-expanded={open}
         onClick={(e) => {
           e.stopPropagation()

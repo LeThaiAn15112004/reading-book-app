@@ -1,6 +1,5 @@
-/* i18n-pending: reader.sidebar */
 import { Component, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { formatAttachmentSize, isShapeStyleKind, type ReaderBookmark, type ReaderHighlightBase } from '@core'
+import { isShapeStyleKind, type ReaderBookmark, type ReaderHighlightBase } from '@core'
 
 /**
  * A highlight / note card in the sidebar — EPUB (`ReaderHighlight`) and PDF (`PdfReaderHighlight`)
@@ -28,6 +27,8 @@ import {
   SIDEBAR_TAB_LABEL,
 } from './sidebarTabs'
 import { readerChromeTopInset } from '../../../../components/reader/chrome'
+import type { MessageKey, Translator } from '@core'
+import { getFormat, getT, useT } from '../../../../i18n'
 
 export type SidebarTab = 'chapters' | 'bookmarks' | 'highlights' | 'layout' | 'attachments' | 'transcript'
 
@@ -94,7 +95,7 @@ function bookmarkProgressLabel(
 ): string | undefined {
   if (!Number.isFinite(sectionCount) || sectionCount <= 0) return undefined
   const percent = Math.min(100, Math.max(0, (chapterIndex / sectionCount) * 100))
-  return `${percent.toFixed(2)}%`
+  return `${getFormat().number(percent, 2)}%`
 }
 
 type HighlightChapterGroup = { chapterIndex: number; label: string; items: SidebarHighlight[] }
@@ -116,41 +117,30 @@ function groupHighlightsByChapter(
     .sort(([a], [b]) => a - b)
     .map(([chapterIndex, items]) => ({
       chapterIndex,
-      label: sectionLabels?.[chapterIndex]?.trim() || `Chapter ${chapterIndex + 1}`,
+      label: sectionLabels?.[chapterIndex]?.trim() || getT()('reader.sidebar.toc.chapterN', { n: chapterIndex + 1 }),
       items: [...items].sort((a, b) => a.createdAt.localeCompare(b.createdAt)),
     }))
 }
 
 /** Human label for a note's type — distinct from `styleKind` so it can carry copy that differs
  *  from the raw discriminator (e.g. "Note" for `textbox`). */
-function highlightTypeLabel(styleKind: SidebarHighlight['styleKind']): string {
+function highlightTypeLabel(t: Translator, styleKind: SidebarHighlight['styleKind']): string {
   switch (styleKind) {
     case 'underline':
-      return 'Underline'
     case 'strikethrough':
-      return 'Strikethrough'
     case 'squiggly':
-      return 'Squiggly'
     case 'replace':
-      return 'Replace'
     case 'insert':
-      return 'Insert'
     case 'textbox':
-      return 'Note'
     case 'rectangle':
-      return 'Rectangle'
     case 'ellipse':
-      return 'Ellipse'
     case 'line':
-      return 'Line'
     case 'arrow':
-      return 'Arrow'
     case 'typewriter':
-      return 'Typewriter'
     case 'attachment':
-      return 'Attachment'
+      return t(`reader.sidebar.notes.types.${styleKind}`)
     default:
-      return 'Highlight'
+      return t('reader.sidebar.notes.types.highlight')
   }
 }
 
@@ -162,7 +152,7 @@ function safeDateLabel(iso: string | undefined): string {
   try {
     const date = new Date(iso)
     if (Number.isNaN(date.getTime())) return ''
-    return date.toLocaleString()
+    return getFormat().dateTime(date)
   } catch {
     return ''
   }
@@ -171,20 +161,20 @@ function safeDateLabel(iso: string | undefined): string {
 /** Type-filter dropdown options for the Notes panel's third row — scoped to the three annotation
  *  kinds the reader fully supports (`highlight`, `underline`, `strikethrough`); `textbox` notes
  *  still show up under "All types", they just aren't independently filterable yet. */
-const NOTE_TYPE_OPTIONS: { value: NotesTypeFilter; label: string }[] = [
-  { value: 'all', label: 'All types' },
-  { value: 'highlight', label: 'Highlight' },
-  { value: 'underline', label: 'Underline' },
-  { value: 'squiggly', label: 'Squiggly' },
-  { value: 'strikethrough', label: 'Strikethrough' },
-  { value: 'replace', label: 'Replace' },
-  { value: 'insert', label: 'Insert' },
-  { value: 'rectangle', label: 'Rectangle' },
-  { value: 'ellipse', label: 'Ellipse' },
-  { value: 'line', label: 'Line' },
-  { value: 'arrow', label: 'Arrow' },
-  { value: 'typewriter', label: 'Typewriter' },
-  { value: 'attachment', label: 'Attachment' },
+const NOTE_TYPE_OPTIONS: { value: NotesTypeFilter; label: MessageKey }[] = [
+  { value: 'all', label: 'reader.sidebar.notes.types.all' },
+  { value: 'highlight', label: 'reader.sidebar.notes.types.highlight' },
+  { value: 'underline', label: 'reader.sidebar.notes.types.underline' },
+  { value: 'squiggly', label: 'reader.sidebar.notes.types.squiggly' },
+  { value: 'strikethrough', label: 'reader.sidebar.notes.types.strikethrough' },
+  { value: 'replace', label: 'reader.sidebar.notes.types.replace' },
+  { value: 'insert', label: 'reader.sidebar.notes.types.insert' },
+  { value: 'rectangle', label: 'reader.sidebar.notes.types.rectangle' },
+  { value: 'ellipse', label: 'reader.sidebar.notes.types.ellipse' },
+  { value: 'line', label: 'reader.sidebar.notes.types.line' },
+  { value: 'arrow', label: 'reader.sidebar.notes.types.arrow' },
+  { value: 'typewriter', label: 'reader.sidebar.notes.types.typewriter' },
+  { value: 'attachment', label: 'reader.sidebar.notes.types.attachment' },
 ]
 
 /** Case-insensitive substring match over a highlight's excerpt, note and tags. */
@@ -244,13 +234,13 @@ class NotesErrorBoundary extends Component<NotesErrorBoundaryProps, NotesErrorBo
     if (this.state.hasError) {
       return (
         <div className="flex flex-col items-center gap-2 px-4 py-6 text-center text-[13px] text-lib-faint">
-          <span>Something went wrong showing your notes.</span>
+          <span>{getT()('reader.sidebar.notes.renderError')}</span>
           <button
             className="cursor-pointer rounded-md border border-lib-border bg-transparent px-3 py-1.5 text-xs font-medium text-lib-text hover:bg-lib-surface-hover"
             type="button"
             onClick={() => this.setState({ hasError: false })}
           >
-            Try again
+            {getT()('reader.sidebar.notes.tryAgain')}
           </button>
         </div>
       )
@@ -378,6 +368,7 @@ function HighlightListItem({
   onCopy,
   onAskAi,
 }: HighlightListItemProps) {
+  const t = useT()
   const progressLabel = bookmarkProgressLabel(h.chapterIndex, pageTotal)
   const dateLabel = safeDateLabel(h.createdAt)
   return (
@@ -418,7 +409,7 @@ function HighlightListItem({
         <span className="min-w-0 flex-1">
           <span className="flex flex-wrap items-center gap-1.5">
             <span className="inline-flex items-center rounded-full bg-lib-hint/70 px-1.5 py-0.5 text-[10px] font-semibold text-lib-muted">
-              {highlightTypeLabel(h.styleKind)}
+              {highlightTypeLabel(t, h.styleKind)}
             </span>
             {progressLabel ? (
               <span className="text-[10px] font-semibold text-lib-faint">{progressLabel}</span>
@@ -433,12 +424,12 @@ function HighlightListItem({
             <span className="mt-1 block truncate text-[13px] leading-snug text-lib-text" title={h.attachment.name}>
               {h.attachment.name}{' '}
               <span className="text-lib-faint">
-                · {h.attachment.sizeBytes === null ? 'size unknown' : formatAttachmentSize(h.attachment.sizeBytes)}
-                {h.readOnly ? ' · added by another app' : ''}
+                · {h.attachment.sizeBytes === null ? t('reader.sidebar.notes.sizeUnknown') : getFormat().bytes(h.attachment.sizeBytes)}
+                {h.readOnly ? t('reader.sidebar.notes.addedByOtherApp') : ''}
               </span>
             </span>
           ) : isShapeStyleKind(h.styleKind) || h.styleKind === 'typewriter' || h.styleKind === 'attachment' ? null : (
-            <span className="mt-1 block text-[13px] text-lib-faint italic">(no excerpt)</span>
+            <span className="mt-1 block text-[13px] text-lib-faint italic">{t('reader.sidebar.notes.noExcerpt')}</span>
           )}
           {h.note ? (
             <span className="line-clamp-2 mt-1 text-xs leading-snug text-lib-muted">{h.note}</span>
@@ -463,15 +454,15 @@ function HighlightListItem({
         <button
           type="button"
           className="shrink-0 cursor-pointer rounded-md border-none bg-transparent px-1.5 py-0.5 text-xs leading-none text-lib-faint hover:bg-lib-surface-hover hover:text-lib-text-strong"
-          aria-label={`Delete attachment ${h.attachment?.name ?? ''}`.trim()}
-          title="Delete attachment…"
+          aria-label={t('reader.sidebar.notes.deleteAttachmentAria', { name: h.attachment?.name ?? '' }).trim()}
+          title={t('reader.sidebar.notes.deleteAttachmentTitle')}
           onClick={(e) => {
             e.preventDefault()
             e.stopPropagation()
             onDelete?.(h.id)
           }}
         >
-          Delete…
+          {t('reader.sidebar.notes.deleteEllipsis')}
         </button>
       ) : (
         <NoteItemMenu
@@ -525,6 +516,7 @@ export function TocSidebar({
   onCopyHighlight,
   onAskAiHighlight,
 }: TocSidebarProps) {
+  const t = useT()
   const hasRealToc = !!tocItems && tocItems.length > 0
   const tocActive: TocActiveKey =
     activeTocItemId !== undefined ? { id: activeTocItemId } : { href: activeTocHref }
@@ -643,13 +635,13 @@ export function TocSidebar({
     >
       <div className="flex items-center justify-between gap-2 border-b border-lib-border-soft px-3 py-2.5">
         <h2 className="m-0 min-w-0 flex-1 truncate text-[15px] font-semibold text-lib-text-strong">
-          {SIDEBAR_TAB_LABEL[tab]}
+          {t(SIDEBAR_TAB_LABEL[tab])}
         </h2>
         <div className="flex shrink-0 items-center gap-1">
           <button
             className="inline-flex size-8 cursor-pointer items-center justify-center rounded-md border-none bg-transparent text-base text-lib-muted hover:bg-lib-surface-hover hover:text-lib-text-strong"
             type="button"
-            aria-label="Close"
+            aria-label={t('common.actions.close')}
             onClick={onClose}
           >
             ✕
@@ -667,7 +659,7 @@ export function TocSidebar({
               />
             ) : chapters.length === 0 ? (
               <p className="m-0 px-3 py-3 text-sm text-lib-muted">
-                This book has no table of contents.
+                {t('reader.sidebar.toc.empty')}
               </p>
             ) : (
               <ul className="m-0 flex list-none flex-col gap-1.5 p-0">
@@ -699,24 +691,24 @@ export function TocSidebar({
                   onClick={onToggleBookmark}
                 >
                   {currentPlaceBookmarked
-                    ? 'Remove bookmark here'
-                    : 'Bookmark this place'}
+                    ? t('reader.sidebar.bookmarks.removeHere')
+                    : t('reader.sidebar.bookmarks.addHere')}
                 </button>
               ) : null}
               {bookmarks.length === 0 ? (
                 <p className="m-0 px-4 py-6 text-center text-[13px] text-lib-faint">
-                  No bookmarks yet
+                  {t('reader.sidebar.bookmarks.empty')}
                 </p>
               ) : (
                 <>
                   <label className="relative block">
-                    <span className="sr-only">Search bookmarks</span>
+                    <span className="sr-only">{t('reader.sidebar.bookmarks.search')}</span>
                     <input
                       className="h-9 w-full rounded-lg border border-lib-border bg-lib-input py-0 pr-3 pl-8 text-[13px] text-lib-text-strong outline-none placeholder:text-lib-faint focus:border-lib-accent"
                       type="search"
                       value={bookmarkQuery}
                       onChange={(e) => setBookmarkQuery(e.target.value)}
-                      placeholder="Search bookmarks…"
+                      placeholder={t('reader.sidebar.bookmarks.searchPlaceholder')}
                     />
                     <span
                       className="pointer-events-none absolute top-1/2 left-2.5 -translate-y-1/2 text-xs text-lib-faint"
@@ -727,7 +719,7 @@ export function TocSidebar({
                   </label>
                   {filteredBookmarks.length === 0 ? (
                     <p className="m-0 px-2 py-4 text-center text-[13px] text-lib-faint">
-                      No matches
+                      {t('reader.sidebar.bookmarks.noMatches')}
                     </p>
                   ) : (
                     filteredBookmarks.map((b) => {
@@ -769,7 +761,7 @@ export function TocSidebar({
                               ) : null}
                               {isHere ? (
                                 <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-lib-accent/15 px-1.5 py-0.5 text-[10px] font-bold tracking-wide text-lib-accent uppercase">
-                                  Here
+                                  {t('reader.sidebar.bookmarks.here')}
                                 </span>
                               ) : null}
                             </span>
@@ -780,14 +772,14 @@ export function TocSidebar({
                             ) : null}
                             {b.createdAt ? (
                               <span className="mt-0.5 block text-[11px] text-lib-faint">
-                                {new Date(b.createdAt).toLocaleString()}
+                                {safeDateLabel(b.createdAt)}
                               </span>
                             ) : null}
                           </button>
                           <button
                             className="cursor-pointer border-none bg-transparent px-1 text-xs text-lib-faint hover:text-red-400"
                             type="button"
-                            aria-label="Delete bookmark"
+                            aria-label={t('reader.sidebar.bookmarks.delete')}
                             onClick={() => onDeleteBookmark?.(b.id)}
                           >
                             ✕
@@ -804,20 +796,20 @@ export function TocSidebar({
           {tab === 'highlights' ? (
             highlights.length === 0 ? (
               <p className="m-0 px-4 py-6 text-center text-[13px] text-lib-faint">
-                No notes yet
+                {t('reader.sidebar.notes.empty')}
               </p>
             ) : (
               <div className="flex flex-col gap-2.5">
                 {/* Row 2 — search + filter toggle */}
                 <div className="flex items-center gap-1.5">
                   <label className="relative block flex-1">
-                    <span className="sr-only">Search notes</span>
+                    <span className="sr-only">{t('reader.sidebar.notes.search')}</span>
                     <input
                       className="h-9 w-full rounded-lg border border-lib-border bg-lib-input py-0 pr-3 pl-8 text-[13px] text-lib-text-strong outline-none placeholder:text-lib-faint focus:border-lib-accent"
                       type="search"
                       value={notesSearchTerm}
                       onChange={(e) => setNotesSearchTerm(e.target.value)}
-                      placeholder="Search notes…"
+                      placeholder={t('reader.sidebar.notes.searchPlaceholder')}
                     />
                     <span
                       className="pointer-events-none absolute top-1/2 left-2.5 -translate-y-1/2 text-xs text-lib-faint"
@@ -834,8 +826,8 @@ export function TocSidebar({
                     }`}
                     type="button"
                     aria-pressed={notesFiltersOpen}
-                    aria-label="Toggle filters"
-                    title="Filter & sort"
+                    aria-label={t('reader.sidebar.notes.toggleFilters')}
+                    title={t('reader.sidebar.notes.filterSort')}
                     onClick={toggleNotesFiltersOpen}
                   >
                     <svg width="15" height="15" viewBox="0 0 15 15" fill="none" aria-hidden>
@@ -853,7 +845,7 @@ export function TocSidebar({
                 {notesFiltersOpen ? (
                   <div className="flex flex-wrap items-center gap-2">
                     <label className="relative block flex-1">
-                      <span className="sr-only">Filter by type</span>
+                      <span className="sr-only">{t('reader.sidebar.notes.filterType')}</span>
                       <select
                         className="h-8 w-full cursor-pointer rounded-lg border border-lib-border bg-lib-input px-2 text-xs font-medium text-lib-text-strong outline-none focus:border-lib-accent"
                         value={notesActiveType}
@@ -861,20 +853,20 @@ export function TocSidebar({
                       >
                         {NOTE_TYPE_OPTIONS.map((opt) => (
                           <option key={opt.value} value={opt.value}>
-                            {opt.label}
+                            {t(opt.label)}
                           </option>
                         ))}
                       </select>
                     </label>
                     {availableTags.length > 0 ? (
                       <label className="relative block min-w-full flex-1">
-                        <span className="sr-only">Filter by tag</span>
+                        <span className="sr-only">{t('reader.sidebar.notes.filterTag')}</span>
                         <select
                           className="h-8 w-full cursor-pointer rounded-lg border border-lib-border bg-lib-input px-2 text-xs font-medium text-lib-text-strong outline-none focus:border-lib-accent"
                           value={effectiveNotesTag}
                           onChange={(e) => setNotesActiveTag(e.target.value)}
                         >
-                          <option value="">All tags</option>
+                          <option value="">{t('reader.sidebar.notes.allTags')}</option>
                           {availableTags.map((tag) => (
                             <option key={tag} value={tag}>
                               #{tag}
@@ -884,14 +876,14 @@ export function TocSidebar({
                       </label>
                     ) : null}
                     <label className="relative block flex-1">
-                      <span className="sr-only">Sort notes</span>
+                      <span className="sr-only">{t('reader.sidebar.notes.sort')}</span>
                       <select
                         className="h-8 w-full cursor-pointer rounded-lg border border-lib-border bg-lib-input px-2 text-xs font-medium text-lib-text-strong outline-none focus:border-lib-accent"
                         value={notesSortBy}
                         onChange={(e) => setNotesSortBy(e.target.value === 'chronological' ? 'chronological' : 'readingOrder')}
                       >
-                        <option value="readingOrder">Reading Order</option>
-                        <option value="chronological">Chronological</option>
+                        <option value="readingOrder">{t('reader.sidebar.notes.readingOrder')}</option>
+                        <option value="chronological">{t('reader.sidebar.notes.chronological')}</option>
                       </select>
                     </label>
                   </div>
@@ -905,7 +897,7 @@ export function TocSidebar({
 
                 <NotesErrorBoundary>
                   {filteredHighlights.length === 0 ? (
-                    <p className="m-0 px-2 py-4 text-center text-[13px] text-lib-faint">No matches</p>
+                    <p className="m-0 px-2 py-4 text-center text-[13px] text-lib-faint">{t('reader.sidebar.bookmarks.noMatches')}</p>
                   ) : notesSortBy === 'chronological' ? (
                     <div className="flex flex-col gap-2">
                       {chronologicalHighlights.map((h) => (
@@ -957,10 +949,10 @@ export function TocSidebar({
                               </span>
                               <span className="flex items-center gap-1.5 text-xs text-lib-muted">
                                 <span aria-hidden>📖</span>
-                                {sectionNoun} {group.chapterIndex + 1} of {pageTotal}
+                                {t(sectionNoun === 'Page' ? 'reader.sidebar.notes.sectionOfPage' : 'reader.sidebar.notes.sectionOfChapter', { n: group.chapterIndex + 1, total: pageTotal })}
                               </span>
                               <span className="text-xs text-lib-muted">
-                                {highlightsOnlyCount} Highlights / {notesCount} Notes
+                                {t('reader.sidebar.notes.groupCounts', { highlights: highlightsOnlyCount, notes: notesCount })}
                               </span>
                             </button>
 
@@ -1009,7 +1001,7 @@ export function TocSidebar({
         <div
           role="separator"
           aria-orientation="vertical"
-          aria-label="Resize sidebar"
+          aria-label={t('reader.sidebar.rail.resize')}
           className="absolute top-0 -right-1 z-[165] w-2 cursor-col-resize touch-none"
           style={{ bottom: 0 }}
           onPointerDown={onResizePointerDown}

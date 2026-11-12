@@ -1,4 +1,3 @@
-/* i18n-pending: reader.sidebar */
 import type { PageLayout } from '@core'
 import { useShortcutLabel } from '../../../../shortcuts/useShortcutLabel'
 import type {
@@ -7,6 +6,7 @@ import type {
   ReadingViewMode,
   TextAlign,
 } from '@core'
+import { useT } from '../../../../i18n'
 
 export type MarginMode = 'narrow' | 'normal' | 'wide' | 'off'
 
@@ -45,6 +45,7 @@ export function AaSettingsPanel({
   prefs,
   onChange,
 }: AaSettingsPanelProps) {
+  const t = useT()
   const zoomIn = useShortcutLabel('view.zoomIn')
   const zoomOut = useShortcutLabel('view.zoomOut')
   const resetZoom = useShortcutLabel('view.resetZoom')
@@ -53,13 +54,13 @@ export function AaSettingsPanel({
   return (
     <div>
       <div className="mb-5">
-        <div className={sectionTitle}>Font family</div>
+        <div className={sectionTitle}>{t('reader.sidebar.aa.fontFamily')}</div>
         <div className={toggleGroup}>
           {(
             [
-              ['serif', 'Serif'],
-              ['sans', 'Sans'],
-              ['mono', 'Mono'],
+              ['serif', t('reader.sidebar.aa.serif')],
+              ['sans', t('reader.sidebar.aa.sans')],
+              ['mono', t('reader.sidebar.aa.mono')],
             ] as const
           ).map(([id, label]) => (
             <button
@@ -75,7 +76,7 @@ export function AaSettingsPanel({
       </div>
 
       <div className="mb-5">
-        <div className={sectionTitle}>Font size / zoom</div>
+        <div className={sectionTitle}>{t('reader.sidebar.aa.fontSize')}</div>
         <div className="flex items-center gap-2">
           <button
             className="h-10 flex-1 cursor-pointer rounded-lg border border-lib-border bg-lib-bg-mid/50 text-sm font-bold text-lib-text-strong"
@@ -84,10 +85,11 @@ export function AaSettingsPanel({
               onChange({ fontSize: Math.max(12, prefs.fontSize - 2) })
             }
           >
+            {/* i18n-ignore: glyph of the smaller-text button */}
             A−
           </button>
           <div className="w-14 text-center text-sm font-bold text-lib-text-strong">
-            {prefs.fontSize}px
+            {t('reader.sidebar.aa.sizePx', { size: prefs.fontSize })}
           </div>
           <button
             className="h-10 flex-1 cursor-pointer rounded-lg border border-lib-border bg-lib-bg-mid/50 text-sm font-bold text-lib-text-strong"
@@ -96,22 +98,23 @@ export function AaSettingsPanel({
               onChange({ fontSize: Math.min(32, prefs.fontSize + 2) })
             }
           >
+            {/* i18n-ignore: glyph of the larger-text button */}
             A+
           </button>
         </div>
         <p className="mt-2 mb-0 text-[11px] leading-snug text-lib-faint">
-          Also on the footer (− / +) or {zoomOut} / {zoomIn} / {resetZoom}.
+          {t('reader.sidebar.aa.zoomHint', { zoomOut, zoomIn, resetZoom })}
         </p>
       </div>
 
       <div className="mb-5">
-        <div className={sectionTitle}>Font weight</div>
+        <div className={sectionTitle}>{t('reader.sidebar.aa.fontWeight')}</div>
         <div className={toggleGroup}>
           {(
             [
-              [300, 'Light'],
-              [400, 'Regular'],
-              [600, 'Bold'],
+              [300, t('reader.sidebar.aa.light')],
+              [400, t('reader.sidebar.aa.regular')],
+              [600, t('reader.sidebar.aa.bold')],
             ] as const
           ).map(([value, label]) => (
             <button
@@ -127,50 +130,50 @@ export function AaSettingsPanel({
       </div>
 
       <div className="mb-5">
-        <div className={sectionTitle}>Chế độ xem</div>
+        <div className={sectionTitle}>{t('reader.sidebar.aa.viewMode')}</div>
         <div className={toggleGroup}>
           <button
             className={`${toggleItem} ${prefs.viewMode !== 'scroll' ? toggleActive : toggleIdle}`}
             type="button"
             onClick={() => onChange({ viewMode: 'paginated' })}
           >
-            Lật trang
+            {t('reader.sidebar.aa.paginated')}
           </button>
           <button
             className={`${toggleItem} ${prefs.viewMode === 'scroll' ? toggleActive : toggleIdle}`}
             type="button"
             onClick={() => onChange({ viewMode: 'scroll' })}
           >
-            Cuộn dọc
+            {t('reader.sidebar.aa.scrolled')}
           </button>
         </div>
       </div>
 
       <div className="mb-5">
-        <div className={sectionTitle}>Margins</div>
+        <div className={sectionTitle}>{t('reader.sidebar.aa.margins')}</div>
         <div className={`${toggleGroup} mb-2.5`}>
           <button
             className={`${toggleItem} ${prefs.marginEnabled ? toggleActive : toggleIdle}`}
             type="button"
             onClick={() => onChange({ marginEnabled: true })}
           >
-            On
+            {t('reader.sidebar.aa.on')}
           </button>
           <button
             className={`${toggleItem} ${!prefs.marginEnabled ? toggleActive : toggleIdle}`}
             type="button"
             onClick={() => onChange({ marginEnabled: false })}
           >
-            Off
+            {t('reader.sidebar.aa.off')}
           </button>
         </div>
         {prefs.marginEnabled ? (
           <div className={toggleGroup}>
             {(
               [
-                ['narrow', 'Narrow'],
-                ['normal', 'Normal'],
-                ['wide', 'Wide'],
+                ['narrow', t('reader.sidebar.aa.narrow')],
+                ['normal', t('reader.sidebar.aa.normal')],
+                ['wide', t('reader.sidebar.aa.wide')],
               ] as const
             ).map(([id, label]) => (
               <button
@@ -187,7 +190,7 @@ export function AaSettingsPanel({
       </div>
 
       <div className="mb-5">
-        <div className={sectionTitle}>Line height</div>
+        <div className={sectionTitle}>{t('reader.sidebar.aa.lineHeight')}</div>
         <div className="flex items-center gap-3">
           <input
             type="range"
@@ -207,13 +210,13 @@ export function AaSettingsPanel({
       </div>
 
       <div className="mb-5">
-        <div className={sectionTitle}>Text align</div>
+        <div className={sectionTitle}>{t('reader.sidebar.aa.textAlign')}</div>
         <div className={toggleGroup}>
           {(
             [
-              ['left', 'Left'],
-              ['justify', 'Justify'],
-              ['center', 'Center'],
+              ['left', t('reader.sidebar.aa.left')],
+              ['justify', t('reader.sidebar.aa.justify')],
+              ['center', t('reader.sidebar.aa.center')],
             ] as const
           ).map(([id, label]) => (
             <button

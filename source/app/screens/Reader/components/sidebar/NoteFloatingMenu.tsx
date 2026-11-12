@@ -1,10 +1,10 @@
-/* i18n-pending: reader.sidebar */
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import type { ReaderHighlightBase } from '@core'
 import type { ViewportRectLike } from '../../../../components/reader/renderers/epub'
 import { highlightPopoverPosition, useDismissOnOutsideOrEscape } from '../../logic'
 import { HighlightColorPicker } from '../highlights/HighlightColorPicker'
+import { useT } from '../../../../i18n'
 
 type NoteFloatingMenuProps = {
   open: boolean
@@ -42,6 +42,7 @@ export function NoteFloatingMenu({
   onDelete,
   onDismiss,
 }: NoteFloatingMenuProps) {
+  const t = useT()
   const containerRef = useRef<HTMLDivElement | null>(null)
   const [editingNote, setEditingNote] = useState(false)
   const [noteDraft, setNoteDraft] = useState(highlight.note ?? '')
@@ -88,7 +89,7 @@ export function NoteFloatingMenu({
     <div
       ref={containerRef}
       role="menu"
-      aria-label="Note options"
+      aria-label={t('reader.sidebar.noteMenu.options')}
       className="fixed z-[400] flex w-[220px] flex-col gap-2 rounded-xl border border-lib-border bg-lib-surface-strong p-2 shadow-xl"
       style={{ top: position.top, left: position.left }}
       onContextMenu={(e) => {
@@ -110,7 +111,7 @@ export function NoteFloatingMenu({
             autoFocus
             value={noteDraft}
             onChange={(e) => setNoteDraft(e.target.value)}
-            placeholder="Add a note…"
+            placeholder={t('reader.sidebar.noteMenu.placeholder')}
             rows={3}
             className="w-full resize-none rounded-md border border-lib-border bg-lib-bg-mid/50 p-1.5 text-[12px] text-lib-text"
           />
@@ -125,7 +126,7 @@ export function NoteFloatingMenu({
               setEditingNote(false)
             }}
           >
-            Save note
+            {t('reader.sidebar.noteMenu.save')}
           </button>
         </div>
       ) : (
@@ -140,7 +141,7 @@ export function NoteFloatingMenu({
           }}
         >
           <span aria-hidden>📝</span>
-          {highlight.note ? 'Edit note' : 'Add note'}
+          {highlight.note ? t('reader.sidebar.noteMenu.edit') : t('reader.sidebar.noteMenu.add')}
         </button>
       )}
 
@@ -156,7 +157,7 @@ export function NoteFloatingMenu({
         }}
       >
         <span aria-hidden>📋</span>
-        Copy text
+        {t('reader.sidebar.noteMenu.copy')}
       </button>
 
       <button
@@ -171,7 +172,7 @@ export function NoteFloatingMenu({
         }}
       >
         <span aria-hidden>✨</span>
-        Ask AI
+        {t('reader.sidebar.noteMenu.askAi')}
       </button>
 
       <div className="border-t border-lib-border-soft pt-1.5">
@@ -187,7 +188,7 @@ export function NoteFloatingMenu({
           }}
         >
           <span aria-hidden>🗑</span>
-          Delete
+          {t('common.actions.delete')}
         </button>
       </div>
     </div>,

@@ -1,4 +1,3 @@
-/* i18n-pending: reader.sidebar */
 /**
  * Format controls of a Typewriter note (specs/005-typewriter-note, US3): family, size (pt on a nominal 612 pt page),
  * colour (picker + HEX), B / I / U / S and alignment. Pure view: the host passes the effective values and applies the
@@ -18,6 +17,8 @@ import {
   type TypewriterFamilyId,
   type TypewriterTextStyle,
 } from '@core'
+import { useT } from '../../../../i18n'
+import type { MessageKey } from '@core'
 
 const PAGE_PT = 612
 const keepFocus = (e: MouseEvent) => e.preventDefault()
@@ -36,13 +37,18 @@ type Props = {
   onAlign: (align: TypewriterAlign) => void
 }
 
-const FLAGS: { key: FlagKey; label: string; title: string; css: string }[] = [
-  { key: 'bold', label: 'B', title: 'Bold (Ctrl+B)', css: 'font-bold' },
-  { key: 'italic', label: 'I', title: 'Italic (Ctrl+I)', css: 'italic' },
-  { key: 'underline', label: 'U', title: 'Underline (Ctrl+U)', css: 'underline' },
-  { key: 'strike', label: 'S', title: 'Strikethrough (Ctrl+Shift+X)', css: 'line-through' },
+const FLAGS: { key: FlagKey; label: string; title: MessageKey; css: string }[] = [
+  { key: 'bold', label: 'B', title: 'reader.sidebar.typewriter.bold', css: 'font-bold' },
+  { key: 'italic', label: 'I', title: 'reader.sidebar.typewriter.italic', css: 'italic' },
+  { key: 'underline', label: 'U', title: 'reader.sidebar.typewriter.underline', css: 'underline' },
+  { key: 'strike', label: 'S', title: 'reader.sidebar.typewriter.strike', css: 'line-through' },
 ]
-const ALIGN_LABEL: Record<TypewriterAlign, string> = { left: 'Left', center: 'Center', right: 'Right', justify: 'Justify' }
+const ALIGN_LABEL: Record<TypewriterAlign, MessageKey> = {
+  left: 'reader.sidebar.typewriter.alignLeft',
+  center: 'reader.sidebar.typewriter.alignCenter',
+  right: 'reader.sidebar.typewriter.alignRight',
+  justify: 'reader.sidebar.typewriter.alignJustify',
+}
 const ALIGN_GLYPH: Record<TypewriterAlign, string> = { left: '⇤', center: '↔', right: '⇥', justify: '☰' }
 
 const ptOf = (size: number) => String(Math.round(size * PAGE_PT * 10) / 10)
@@ -52,6 +58,7 @@ function btn(active: boolean, mixed: boolean): string {
 }
 
 export function TypewriterFormatControls({ values, onStyle, onAlign }: Props) {
+  const t = useT()
   const { style, mixed, align } = values
   const [hex, setHex] = useState(style.color)
   const [hexInvalid, setHexInvalid] = useState(false)
@@ -85,14 +92,14 @@ export function TypewriterFormatControls({ values, onStyle, onAlign }: Props) {
   }
 
   return (
-    <div data-tw-format="" className="flex flex-wrap items-center gap-2 text-xs" role="group" aria-label="Typewriter format">
+    <div data-tw-format="" className="flex flex-wrap items-center gap-2 text-xs" role="group" aria-label={t('reader.sidebar.typewriter.format')}>
       <select
-        aria-label="Font family"
+        aria-label={t('reader.sidebar.typewriter.fontFamily')}
         className="h-7 rounded border border-gray-300 bg-transparent px-1"
         value={mixed.has('family') ? '' : style.family}
         onChange={(e) => onStyle({ family: e.target.value as TypewriterFamilyId })}
       >
-        {mixed.has('family') ? <option value="">Mixed</option> : null}
+        {mixed.has('family') ? <option value="">{t('reader.sidebar.typewriter.mixed')}</option> : null}
         {typewriterFamilies.map((f) => (
           <option key={f.id} value={f.id}>
             {f.label}
@@ -100,11 +107,11 @@ export function TypewriterFormatControls({ values, onStyle, onAlign }: Props) {
         ))}
       </select>
       <input
-        aria-label="Font size (pt)"
+        aria-label={t('reader.sidebar.typewriter.fontSize')}
         className="h-7 w-14 rounded border border-gray-300 bg-transparent px-1 text-right"
         inputMode="decimal"
         value={mixed.has('size') ? '' : size}
-        placeholder={mixed.has('size') ? 'Mixed' : undefined}
+        placeholder={mixed.has('size') ? t('reader.sidebar.typewriter.mixed') : undefined}
         onChange={(e) => setSize(e.target.value)}
         onBlur={commitSize}
         onKeyDown={(e) => {
@@ -115,8 +122,8 @@ export function TypewriterFormatControls({ values, onStyle, onAlign }: Props) {
       <span className="relative">
         <button
           type="button"
-          aria-label="Text colour"
-          title="Text colour"
+          aria-label={t('reader.sidebar.typewriter.textColour')}
+          title={t('reader.sidebar.typewriter.textColour')}
           className={btn(false, mixed.has('color'))}
           onMouseDown={keepFocus}
           onClick={() => setPickerOpen((o) => !o)}
@@ -130,11 +137,11 @@ export function TypewriterFormatControls({ values, onStyle, onAlign }: Props) {
         ) : null}
       </span>
       <input
-        aria-label="Colour HEX"
+        aria-label={t('reader.sidebar.typewriter.colourHex')}
         aria-invalid={hexInvalid}
         className={`h-7 w-20 rounded border bg-transparent px-1 font-mono ${hexInvalid ? 'border-red-500' : 'border-gray-300'}`}
         value={mixed.has('color') && hex === style.color ? '' : hex}
-        placeholder={mixed.has('color') ? 'Mixed' : '#RRGGBB'}
+        placeholder={mixed.has('color') ? t('reader.sidebar.typewriter.mixed') : '#RRGGBB'}
         spellCheck={false}
         onChange={(e) => {
           setHex(e.target.value)
@@ -152,8 +159,8 @@ export function TypewriterFormatControls({ values, onStyle, onAlign }: Props) {
           <button
             key={f.key}
             type="button"
-            title={disabled ? 'This font family has no italic face' : f.title}
-            aria-label={f.title}
+            title={disabled ? t('reader.sidebar.typewriter.noItalic') : t(f.title)}
+            aria-label={t(f.title)}
             aria-pressed={mixed.has(f.key) ? 'mixed' : style[f.key]}
             disabled={disabled}
             className={`${btn(style[f.key] && !mixed.has(f.key), mixed.has(f.key))} ${f.css}`}
@@ -168,8 +175,8 @@ export function TypewriterFormatControls({ values, onStyle, onAlign }: Props) {
         <button
           key={a}
           type="button"
-          title={ALIGN_LABEL[a]}
-          aria-label={`Align ${ALIGN_LABEL[a].toLowerCase()}`}
+          title={t(ALIGN_LABEL[a])}
+          aria-label={t(ALIGN_LABEL[a])}
           aria-pressed={align === a}
           className={btn(align === a, align === 'mixed')}
           onMouseDown={keepFocus}

@@ -1,8 +1,8 @@
-/* i18n-pending: reader.sidebar */
 import { useRef, useState } from 'react'
 import type { ReaderHighlightBase } from '@core'
 import type { ViewportRectLike } from '../../../../components/reader/renderers/epub'
 import { NoteFloatingMenu } from './NoteFloatingMenu'
+import { useT } from '../../../../i18n'
 
 type NoteItemMenuProps = {
   highlight: ReaderHighlightBase
@@ -26,6 +26,7 @@ export function NoteItemMenu({
   onAskAi,
   onDelete,
 }: NoteItemMenuProps) {
+  const t = useT()
   const buttonRef = useRef<HTMLButtonElement | null>(null)
   const [open, setOpen] = useState(false)
   const [anchorRect, setAnchorRect] = useState<ViewportRectLike | null>(null)
@@ -55,7 +56,7 @@ export function NoteItemMenu({
         ref={buttonRef}
         type="button"
         className="shrink-0 cursor-pointer rounded-md border-none bg-transparent px-1.5 py-0.5 text-sm leading-none text-lib-faint hover:bg-lib-surface-hover hover:text-lib-text-strong"
-        aria-label="Note options"
+        aria-label={t('reader.sidebar.noteMenu.options')}
         aria-haspopup="menu"
         aria-expanded={open}
         onClick={(e) => {

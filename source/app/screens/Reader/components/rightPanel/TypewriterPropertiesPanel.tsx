@@ -1,4 +1,3 @@
-/* i18n-pending: reader.sidebar */
 import { applyAlign, emptyTypewriterDoc, type TypewriterAlign, type TypewriterTextStyle } from '@core'
 import type { PdfTypewriterMark } from '../../../../components/reader/renderers/pdf/PdfTypewriterLayer'
 import { usePdfTypewriterPrefsStore } from '../../logic/pdfTypewriter/pdfTypewriterPrefsStore'
@@ -7,6 +6,7 @@ import { typewriterFormatValues } from '../../logic/pdfTypewriter/typewriterForm
 import { useTypewriterPanelStore } from '../../logic/pdfTypewriter/typewriterPanelStore'
 import { TypewriterNotInFile } from '../sidebar/TypewriterNotInFile'
 import { TypewriterFormatControls } from './TypewriterFormatControls'
+import { TransText, useT } from '../../../../i18n'
 
 type Props = {
   marks: readonly PdfTypewriterMark[]
@@ -25,6 +25,7 @@ const excerpt = (text: string) => {
  * box), or the defaults of the next box. Values are always read from that target, never kept here.
  */
 export function TypewriterPropertiesPanel({ marks, onFormatNote, onEditNote }: Props) {
+  const t = useT()
   const target = useTypewriterPanelStore((s) => s.target)
   const session = useTypewriterEditorStore((s) => s.session)
   const formatStyle = useTypewriterEditorStore((s) => s.formatStyle)
@@ -37,14 +38,18 @@ export function TypewriterPropertiesPanel({ marks, onFormatNote, onEditNote }: P
     return (
       <div data-tw-panel="session" className="flex flex-col gap-3">
         <p className="m-0 text-xs text-lib-muted">
-          {range ? 'Format applies to the selected text.' : session.text.length === 0 ? 'Format applies to the whole box.' : 'No text selected: format applies to what you type next.'}
+          {range
+            ? t('reader.sidebar.typewriter.selectedText')
+            : session.text.length === 0
+              ? t('reader.sidebar.typewriter.wholeBox')
+              : t('reader.sidebar.typewriter.nextTyped')}
         </p>
         <TypewriterFormatControls
           values={typewriterFormatValues(session.doc, session.text, session.selection, session.pending)}
           onStyle={formatStyle}
           onAlign={formatAlign}
         />
-        <p className="m-0 text-[11px] text-lib-muted">Shortcuts: Ctrl+B bold, Ctrl+I italic, Ctrl+U underline, Ctrl+Shift+X strikethrough. Press Escape in the text to finish editing.</p>
+        <p className="m-0 text-[11px] text-lib-muted">{t('reader.sidebar.typewriter.shortcuts')}</p>
       </div>
     )
   }
@@ -53,7 +58,11 @@ export function TypewriterPropertiesPanel({ marks, onFormatNote, onEditNote }: P
     return (
       <div data-tw-panel="note" className="flex flex-col gap-3">
         <p className="m-0 text-xs text-lib-muted">
-          Selected note: <span className="font-semibold text-lib-text-strong">“{excerpt(mark.text)}”</span>. Format applies to the whole box.
+          <TransText
+            k="reader.sidebar.typewriter.selectedNote"
+            params={{ excerpt: excerpt(mark.text) }}
+            slots={{ b: (text) => <span className="font-semibold text-lib-text-strong">{text}</span> }}
+          />
         </p>
         <TypewriterFormatControls
           key={mark.id}
@@ -67,9 +76,9 @@ export function TypewriterPropertiesPanel({ marks, onFormatNote, onEditNote }: P
           className="h-8 cursor-pointer self-start rounded-md border border-lib-border bg-transparent px-3 text-xs font-semibold text-lib-text-strong hover:bg-lib-surface-hover"
           onClick={() => onEditNote(mark.id)}
         >
-          Edit text
+          {t('reader.sidebar.typewriter.editText')}
         </button>
-        <p className="m-0 text-[11px] text-lib-muted">To format only some words, choose Edit text and select them.</p>
+        <p className="m-0 text-[11px] text-lib-muted">{t('reader.sidebar.typewriter.someWords')}</p>
       </div>
     )
   }
@@ -77,7 +86,10 @@ export function TypewriterPropertiesPanel({ marks, onFormatNote, onEditNote }: P
   return (
     <div data-tw-panel="defaults" className="flex flex-col gap-3">
       <p className="m-0 text-xs text-lib-muted">
-        Default look of <span className="font-semibold text-lib-text-strong">new</span> text boxes. Notes already on the page are not changed.
+        <TransText
+          k="reader.sidebar.typewriter.defaults"
+          slots={{ b: (text) => <span className="font-semibold text-lib-text-strong">{text}</span> }}
+        />
       </p>
       <TypewriterFormatControls
         key="defaults"

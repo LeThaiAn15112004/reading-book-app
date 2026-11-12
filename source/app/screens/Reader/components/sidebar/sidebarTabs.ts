@@ -1,21 +1,23 @@
 import type { ReaderCapability } from '../../../../components/reader/capabilities'
 import type { SidebarTab } from './TocSidebar'
+import type { MessageKey } from '@core'
 
 export type SidebarTabDef = {
   id: SidebarTab
-  label: string
+  /** Catalogue key (spec 012), translated where shown. */
+  labelKey: MessageKey
   icon: string
   /** Shown / openable only when the open book's surface has this capability. */
   requires?: ReaderCapability
 }
 
 export const SIDEBAR_TABS: SidebarTabDef[] = [
-  { id: 'chapters', label: 'Contents', icon: '📑' },
-  { id: 'bookmarks', label: 'Bookmark', icon: '🔖' },
-  { id: 'highlights', label: 'Notes', icon: '🖍️' },
-  { id: 'layout', label: 'Page layout', icon: '📄', requires: 'pageLayout' },
-  { id: 'attachments', label: 'Attachment', icon: '📎', requires: 'attachments' },
-  { id: 'transcript', label: 'Transcript', icon: '📝', requires: 'transcript' },
+  { id: 'chapters', labelKey: 'reader.sidebar.tabs.chapters', icon: '📑' },
+  { id: 'bookmarks', labelKey: 'reader.sidebar.tabs.bookmarks', icon: '🔖' },
+  { id: 'highlights', labelKey: 'reader.sidebar.tabs.highlights', icon: '🖍️' },
+  { id: 'layout', labelKey: 'reader.sidebar.tabs.layout', icon: '📄', requires: 'pageLayout' },
+  { id: 'attachments', labelKey: 'reader.sidebar.tabs.attachments', icon: '📎', requires: 'attachments' },
+  { id: 'transcript', labelKey: 'reader.sidebar.tabs.transcript', icon: '📝', requires: 'transcript' },
 ]
 
 /** True when `tab` can be shown for a surface with `capabilities`. */
@@ -43,13 +45,14 @@ export function resolveSidebarTab(
   return isSidebarTabAvailable(tab, capabilities) ? tab : 'chapters'
 }
 
-export const SIDEBAR_TAB_LABEL: Record<SidebarTab, string> = {
-  chapters: 'Contents',
-  bookmarks: 'Bookmark',
-  highlights: 'Notes',
-  layout: 'Page layout',
-  attachments: 'Attachment',
-  transcript: 'Transcript',
+/** Catalogue keys of the panel titles (spec 012): render with `t(SIDEBAR_TAB_LABEL[tab])`. */
+export const SIDEBAR_TAB_LABEL: Record<SidebarTab, MessageKey> = {
+  chapters: 'reader.sidebar.tabs.chapters',
+  bookmarks: 'reader.sidebar.tabs.bookmarks',
+  highlights: 'reader.sidebar.tabs.highlights',
+  layout: 'reader.sidebar.tabs.layout',
+  attachments: 'reader.sidebar.tabs.attachments',
+  transcript: 'reader.sidebar.tabs.transcript',
 }
 
 /** Icon rail only — panel sits flush on the right edge. */

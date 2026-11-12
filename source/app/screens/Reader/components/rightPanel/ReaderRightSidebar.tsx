@@ -1,8 +1,8 @@
-/* i18n-pending: reader.sidebar */
 import type { ReactNode } from 'react'
 import { readerChromeTopInset } from '../../../../components/reader/chrome'
 import { READER_FOOTER_HEIGHT_PX } from '../sidebar/sidebarTabs'
 import { RIGHT_SIDEBAR_WIDTH_PX } from './rightSidebarLayout'
+import { useT } from '../../../../i18n'
 
 type ReaderRightSidebarProps = {
   open: boolean
@@ -32,6 +32,7 @@ export function ReaderRightSidebar({
   headerActions,
   children,
 }: ReaderRightSidebarProps) {
+  const t = useT()
   return (
     <aside
       data-reader-right-panel
@@ -57,8 +58,8 @@ export function ReaderRightSidebar({
           <button
             className="inline-flex size-8 cursor-pointer items-center justify-center rounded-md border-none bg-transparent text-lib-muted transition-colors hover:bg-lib-surface-hover hover:text-lib-text-strong"
             type="button"
-            title="Close"
-            aria-label={`Close ${title}`}
+            title={t('common.actions.close')}
+            aria-label={t('reader.sidebar.rightPanel.closeAria', { title })}
             onClick={onClose}
           >
             ✕

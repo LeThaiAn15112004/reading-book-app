@@ -1,22 +1,17 @@
-/* i18n-pending: reader.sidebar */
 import { useEffect } from 'react'
 import { useAttachmentsStore } from '../../logic/attachments/attachmentsStore'
 import { AttachmentBlockedDialog, AttachmentOpenDialog } from '../dialogs/AttachmentDialogs'
+import { useFormat, useT } from '../../../../i18n'
 
 const EMPTY = 'm-0 px-2 py-6 text-center text-[13px] leading-relaxed text-lib-faint'
-
-function formatSize(bytes: number | null): string | null {
-  if (bytes === null) return null
-  if (bytes < 1024) return `${bytes} B`
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
-}
 
 /**
  * Sidebar → Attachment for a PDF: the files embedded in it. Listed lazily (this panel only mounts
  * when its tab is open); a double-click starts the confirm → open workflow in `attachmentsStore`.
  */
 export function AttachmentsPanel({ bookId }: { bookId: string }) {
+  const t = useT()
+  const format = useFormat()
   const status = useAttachmentsStore((s) => s.status)
   const items = useAttachmentsStore((s) => s.items)
   const truncated = useAttachmentsStore((s) => s.truncated)
@@ -48,7 +43,7 @@ export function AttachmentsPanel({ bookId }: { bookId: string }) {
           <button
             className="cursor-pointer border-0 bg-transparent p-0 text-xs text-lib-faint"
             type="button"
-            aria-label="Dismiss"
+            aria-label={t('reader.sidebar.attachments.dismiss')}
             onClick={clearNotice}
           >
             ✕
@@ -56,17 +51,17 @@ export function AttachmentsPanel({ bookId }: { bookId: string }) {
         </div>
       ) : null}
 
-      {status === 'loading' && items.length === 0 ? <p className={EMPTY}>Looking for attachments…</p> : null}
+      {status === 'loading' && items.length === 0 ? <p className={EMPTY}>{t('reader.sidebar.attachments.looking')}</p> : null}
       {status === 'error' ? <p className={EMPTY}>{loadError}</p> : null}
       {status === 'ready' && items.length === 0 ? (
-        <p className={EMPTY}>No attachments in this PDF.</p>
+        <p className={EMPTY}>{t('reader.sidebar.attachments.none')}</p>
       ) : null}
 
       {items.length > 0 ? (
-        <ul className="m-0 flex list-none flex-col gap-1.5 p-0" aria-label="Attachments">
+        <ul className="m-0 flex list-none flex-col gap-1.5 p-0" aria-label={t('reader.sidebar.attachments.list')}>
           {items.map((item) => {
-            const size = formatSize(item.size)
-            const meta = [item.page ? `Page ${item.page}` : 'Document', size].filter(Boolean).join(' · ')
+            const size = item.size === null ? null : format.bytes(item.size)
+            const meta = [item.page ? t('reader.sidebar.attachments.page', { page: item.page }) : t('reader.sidebar.attachments.document'), size].filter(Boolean).join(' · ')
             return (
               <li key={item.id}>
                 <button
@@ -76,7 +71,7 @@ export function AttachmentsPanel({ bookId }: { bookId: string }) {
                       : 'border-lib-border bg-lib-bg-mid/50'
                   }`}
                   type="button"
-                  title="Double-click to open"
+                  title={t('reader.sidebar.attachments.doubleClick')}
                   onClick={() => select(item.id)}
                   onDoubleClick={() => requestOpen(item)}
                   onKeyDown={(e) => {
@@ -98,7 +93,7 @@ export function AttachmentsPanel({ bookId }: { bookId: string }) {
         </ul>
       ) : null}
       {truncated ? (
-        <p className={EMPTY}>Only the first {items.length} attachments are shown.</p>
+        <p className={EMPTY}>{t('reader.sidebar.attachments.truncated', { count: items.length })}</p>
       ) : null}
 
       <AttachmentOpenDialog
