@@ -13,6 +13,7 @@ import {
   type BookSearchResult,
 } from '../../../../bridge'
 import { clampPanelSize, type PanelPosition, type PanelSize } from '../floatingPanel/panelGeometry'
+import { getT, type UiText } from '../../../../i18n'
 
 /** Matches per IPC page; the total count is always exact regardless. */
 const PAGE_SIZE = 200
@@ -140,7 +141,7 @@ type BookSearchState = BookSearchContext & {
   loadingMore: boolean
   /** Index into `matches` of the current hit; -1 before the first jump. */
   activeIndex: number
-  errorMessage: string | null
+  errorMessage: UiText | null
   /** Section labels by real spine index, snapshotted per result set (TOC walk is not free). */
   chapterLabels: string[]
   /** Where the user dragged the floating panel to — null = default CSS-anchored corner. Not a
@@ -190,7 +191,7 @@ function clearBusyTimer(): void {
 }
 
 function errorMessageOf(err: unknown): string {
-  return err instanceof Error && err.message ? err.message : 'Search failed.'
+  return err instanceof Error && err.message ? err.message : getT()('reader.tools.search.failed')
 }
 
 const emptyResults: Pick<
@@ -400,7 +401,7 @@ export const useBookSearchStore = create<BookSearchState>()((set, get) => {
       if (state === 'done') {
         void get().search(get().query)
       } else if (state === 'error') {
-        set({ status: 'error', busy: false, errorMessage: 'This book could not be prepared for search.' })
+        set({ status: 'error', busy: false, errorMessage: { key: 'reader.tools.search.prepareFailed' } })
       }
     },
 

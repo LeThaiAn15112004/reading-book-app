@@ -31,10 +31,10 @@ export function BookInfoDialog({
   if (!open) return null
 
   const signatureText = signature
-    ? SIGNATURE_LABELS[signature.status].label
+    ? t(SIGNATURE_LABELS[signature.status].label)
     : loading
-      ? SIGNATURE_CHECKING
-      : SIGNATURE_UNAVAILABLE
+      ? t(SIGNATURE_CHECKING)
+      : t(SIGNATURE_UNAVAILABLE)
 
   const formatBadge = formatLabel.trim().toUpperCase()
 

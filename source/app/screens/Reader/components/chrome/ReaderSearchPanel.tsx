@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react'
 import type { BookSearchMatch, BookSearchOrder } from '../../../../bridge'
 import { useBookSearchStore, useDraggableSearchPanel, useResizableSearchPanel } from '../../logic'
 import type { MessageKey } from '@core'
-import { getFormat, useT } from '../../../../i18n'
+import { getFormat, uiText, useT } from '../../../../i18n'
 
 type ReaderSearchPanelProps = {
   open: boolean
@@ -243,7 +243,7 @@ function StatusLine() {
   } else if (status === 'noText') {
     content = t('reader.chrome.search.noText')
   } else if (status === 'error') {
-    content = errorMessage ?? t('reader.chrome.search.failed')
+    content = errorMessage ? uiText(t, errorMessage) : t('reader.chrome.search.failed')
   } else if (status === 'ready' && totalMatches === 0) {
     content = t('reader.chrome.search.noMatches', { query })
   } else if (status === 'ready' && active) {

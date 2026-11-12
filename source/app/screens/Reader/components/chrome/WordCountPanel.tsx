@@ -1,13 +1,13 @@
 import { useRef } from 'react'
 import { useDraggableWordCountPanel, useResizableWordCountPanel } from '../../logic'
 import type { WordCountStats, WordCountStatus } from '../../logic'
-import { useT } from '../../../../i18n'
+import { uiText, useT, type UiText } from '../../../../i18n'
 
 type WordCountPanelProps = {
   open: boolean
   status: WordCountStatus
   stats: WordCountStats
-  errorMessage: string | null
+  errorMessage: UiText | null
   /** Current live page total from the reader's own pagination (reflow-dependent, so it comes
    *  from `ReaderScreen`'s nav state, not the static `book_chunks` index the other rows use). */
   pageTotal: number
@@ -164,7 +164,7 @@ export function WordCountPanel({
             </p>
           ) : status === 'error' ? (
             <p className="m-0 py-2 text-[13px] leading-snug text-lib-muted">
-              {errorMessage ?? t('reader.chrome.wordCount.failed')}
+              {errorMessage ? uiText(t, errorMessage) : t('reader.chrome.wordCount.failed')}
             </p>
           ) : (
             <div className="flex flex-col">

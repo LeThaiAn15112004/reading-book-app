@@ -1,4 +1,87 @@
-import { pendingArea } from '../../pending.js'
+import type { AreaShape } from '../../types.js'
+import type { en } from '../en/reader-tools.js'
 
-/** Area `reader.tools`: not translated yet — falls back to English (spec 012). */
-export const vi = pendingArea('not translated yet')
+/** Area `reader.tools` in Vietnamese (glossary: specs/012-app-ui-i18n/contracts/glossary.md). */
+export const vi = {
+  translate: {
+    title: 'Dịch',
+    offline: 'Ngoại tuyến',
+    aria: 'Bản dịch',
+    close: 'Đóng bản dịch',
+    from: 'Dịch từ',
+    to: 'Dịch sang',
+    swap: 'Đổi chiều ngôn ngữ',
+    translatingTo: 'Đang dịch sang {language}…',
+    tryAgain: 'Thử lại',
+    copy: 'Sao chép',
+    stop: 'Dừng',
+    listen: 'Nghe',
+    dragToResize: 'Kéo để đổi kích thước',
+    downloadingModel: 'Đang tải mô hình dịch…',
+    loadingModel: 'Đang nạp mô hình dịch…',
+    modelDownload: 'Tải mô hình',
+    oneTimeDownload: 'Chỉ tải một lần — sau đó dịch ngoại tuyến.',
+    oneTimeDownloadSize: 'Chỉ tải một lần ({loaded} / {total}) — sau đó dịch ngoại tuyến.',
+    fromCache: 'Đang chuẩn bị mô hình từ bộ nhớ đệm trên máy.',
+    multilingual: ' Cặp ngôn ngữ này dùng mô hình đa ngôn ngữ lớn hơn.',
+    searchLanguages: 'Tìm ngôn ngữ…',
+    searchAria: '{label} — tìm kiếm',
+    recent: 'Gần đây',
+    allLanguages: 'Mọi ngôn ngữ',
+    noMatch: 'Không có ngôn ngữ nào khớp “{query}”',
+    errors: {
+      network: 'Không tải được mô hình dịch. Kiểm tra kết nối internet — sau lần tải đầu tiên, việc dịch hoạt động ngoại tuyến.',
+      modelLoad: 'Không nạp được mô hình dịch. Thử lại hoặc chọn ngôn ngữ khác.',
+      unsupported: 'Chưa hỗ trợ cặp ngôn ngữ này.',
+      sameLanguage: 'Ngôn ngữ nguồn và ngôn ngữ đích giống nhau — chọn ngôn ngữ khác.',
+      worker: 'Bộ máy dịch dừng đột ngột. Thử lại.',
+      generic: 'Dịch không thành công. Thử lại.',
+    },
+    toast: {
+      copied: 'Đã sao chép bản dịch.',
+      copyFailed: 'Không sao chép được.',
+      speechUnavailable: 'Hệ thống này không hỗ trợ đọc to.',
+      speechFailed: 'Không đọc to được bản dịch.',
+    },
+  },
+  signature: {
+    title: 'Chữ ký số',
+    unavailableFile: 'Không đọc được trạng thái chữ ký vì tệp sách không khả dụng.',
+    checking: 'Đang kiểm tra chữ ký số của tài liệu…',
+    signedAt: 'Ký lúc {date}',
+    checkedAt: 'Kiểm tra lúc {date}',
+    checkingShort: 'Đang kiểm tra…',
+    unavailable: 'Không khả dụng',
+    valid: 'Đã ký · hợp lệ',
+    validDetail: 'Tài liệu có chữ ký số và còn nguyên vẹn. Chứng thư của người ký không được đối chiếu với danh sách tin cậy.',
+    unsigned: 'Chưa ký',
+    unsignedDetail: 'Không tìm thấy chữ ký số trong tài liệu này.',
+    invalid: 'Chữ ký không hợp lệ',
+    invalidDetail: 'Tài liệu có chữ ký số nhưng không xác minh được — có thể tài liệu đã bị sửa sau khi ký.',
+    unsupported: 'Không xác minh được',
+    unsupportedDetail: 'Không thể xác minh chữ ký cho loại tệp này nên không biết tài liệu có được ký hay không.',
+  },
+  txtSave: {
+    saved: 'Đã lưu',
+    dirty: 'Có thay đổi chưa lưu',
+    saving: 'Đang lưu…',
+    failed: 'Không lưu được',
+    failedWithReason: 'Không lưu được — {reason}',
+  },
+  search: {
+    failed: 'Tìm kiếm không thành công.',
+    prepareFailed: 'Không chuẩn bị được sách để tìm kiếm.',
+  },
+  wordCount: {
+    prepareFailed: 'Không chuẩn bị được sách để đếm từ.',
+  },
+  readAloud: {
+    noVoice: 'Chưa cài giọng đọc {lang} — dùng giọng mặc định.',
+    endOfBook: 'Đã đọc đến cuối sách.',
+    stopped: 'Đọc to đã dừng ({error}).',
+    epubOnly: 'Đọc to chỉ dùng được với sách EPUB.',
+    noSynthesis: 'Hệ thống này không có bộ tổng hợp giọng nói.',
+    nothingHere: 'Không có gì để đọc ở đây.',
+    nothingOnPage: 'Trang này không có gì để đọc.',
+  },
+} as const satisfies AreaShape<typeof en>

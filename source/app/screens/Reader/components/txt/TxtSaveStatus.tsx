@@ -1,5 +1,6 @@
-/* i18n-pending: reader.tools */
 import type { TxtSaveStatus as SaveStatus } from '../../logic/txtDocument/txtDocumentStore'
+import type { MessageKey } from '@core'
+import { useT } from '../../../../i18n'
 
 type TxtSaveStatusProps = {
   status: SaveStatus
@@ -9,10 +10,10 @@ type TxtSaveStatusProps = {
   onRetry: () => void
 }
 
-const LABEL: Record<Exclude<SaveStatus, 'error'>, string> = {
-  saved: 'Saved',
-  dirty: 'Unsaved changes',
-  saving: 'Saving…',
+const LABEL: Record<Exclude<SaveStatus, 'error'>, MessageKey> = {
+  saved: 'reader.tools.txtSave.saved',
+  dirty: 'reader.tools.txtSave.dirty',
+  saving: 'reader.tools.txtSave.saving',
 }
 
 /**
@@ -21,6 +22,7 @@ const LABEL: Record<Exclude<SaveStatus, 'error'>, string> = {
  * "saved". Errors keep the text in memory and offer a retry.
  */
 export function TxtSaveStatus({ status, error, editable, onRetry }: TxtSaveStatusProps) {
+  const t = useT()
   if (!editable) return null
   const isError = status === 'error'
   return (
@@ -37,7 +39,11 @@ export function TxtSaveStatus({ status, error, editable, onRetry }: TxtSaveStatu
         }`}
       />
       <span className="truncate" title={isError ? (error ?? undefined) : undefined}>
-        {isError ? `Couldn’t save${error ? ` — ${error}` : ''}` : LABEL[status]}
+        {isError
+          ? error
+            ? t('reader.tools.txtSave.failedWithReason', { reason: error })
+            : t('reader.tools.txtSave.failed')
+          : t(LABEL[status])}
       </span>
       {isError ? (
         <button
@@ -45,7 +51,7 @@ export function TxtSaveStatus({ status, error, editable, onRetry }: TxtSaveStatu
           className="shrink-0 rounded border-none bg-lib-accent-soft px-2 py-0.5 text-[11px] font-bold text-lib-text-strong hover:bg-lib-accent-ring"
           onClick={onRetry}
         >
-          Retry
+          {t('common.actions.retry')}
         </button>
       ) : null}
     </div>

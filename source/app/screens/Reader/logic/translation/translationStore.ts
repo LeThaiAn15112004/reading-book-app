@@ -10,6 +10,7 @@ import { translationApi, type TranslationErrorCode, type TranslationProgress } f
 import { createWebSpeechEngine } from '../../../../components/reader/tts/webSpeechEngine'
 import { useReadAloudStore } from '../readAloud/readAloudStore'
 import { clampPanelSize, type PanelPosition, type PanelSize } from '../floatingPanel/panelGeometry'
+import { getT } from '../../../../i18n'
 
 export type TranslationStatus = 'idle' | 'loading-model' | 'translating' | 'done' | 'error'
 
@@ -341,8 +342,8 @@ export const useTranslationStore = create<TranslationState>()((set, get) => {
       const { result, setToast } = get()
       if (!result) return
       navigator.clipboard.writeText(result).then(
-        () => setToast('Translation copied.'),
-        () => setToast('Could not copy.'),
+        () => setToast(getT()('reader.tools.translate.toast.copied')),
+        () => setToast(getT()('reader.tools.translate.toast.copyFailed')),
       )
     },
 
@@ -355,7 +356,7 @@ export const useTranslationStore = create<TranslationState>()((set, get) => {
       if (!result) return
       const engine = tts()
       if (!engine.isSupported()) {
-        setToast('Read aloud is not available on this system.')
+        setToast(getT()('reader.tools.translate.toast.speechUnavailable'))
         return
       }
       // One voice at a time: the book's read-aloud and this share the OS speech engine.
@@ -368,7 +369,7 @@ export const useTranslationStore = create<TranslationState>()((set, get) => {
           onEnd: () => set({ speaking: false }),
           onError: () => {
             set({ speaking: false })
-            setToast('Could not read the translation aloud.')
+            setToast(getT()('reader.tools.translate.toast.speechFailed'))
           },
         },
       )

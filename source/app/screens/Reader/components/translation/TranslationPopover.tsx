@@ -1,4 +1,3 @@
-/* i18n-pending: reader.tools */
 import { useCallback, useLayoutEffect, useRef } from 'react'
 import { findTranslationLanguage } from '@core'
 import { useDismissOnOutsideOrEscape, type DismissReason } from '../../logic/highlights/useDismissOnOutsideOrEscape'
@@ -11,6 +10,7 @@ import {
 } from '../../logic/translation/translationStore'
 import type { TranslationErrorCode } from '../../../../bridge'
 import { LanguageCombobox } from './LanguageCombobox'
+import { getFormat, getT, useT } from '../../../../i18n'
 
 const iconBtn =
   'inline-flex size-7 shrink-0 cursor-pointer items-center justify-center rounded-md border-none bg-transparent text-lib-muted transition-colors hover:bg-lib-bg-mid/60 hover:text-lib-text-strong focus-visible:bg-lib-bg-mid/60 focus-visible:outline-none disabled:cursor-default disabled:opacity-40'
@@ -19,26 +19,27 @@ const actionBtn =
   'inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-lg border border-lib-border bg-lib-bg-mid/40 px-3 text-[12px] font-semibold text-lib-text transition-colors hover:border-lib-accent-ring hover:bg-lib-accent-soft hover:text-lib-text-strong focus-visible:border-lib-accent focus-visible:outline-none'
 
 function errorText(code: TranslationErrorCode, message: string): string {
+  const t = getT()
   switch (code) {
     case 'NETWORK_UNAVAILABLE':
-      return 'Couldn’t download the translation model. Check your internet connection — after the first download, translation works offline.'
+      return t('reader.tools.translate.errors.network')
     case 'MODEL_LOAD_FAILED':
-      return 'The translation model failed to load. Try again, or pick another language.'
+      return t('reader.tools.translate.errors.modelLoad')
     case 'UNSUPPORTED_LANGUAGE':
-      return 'This language pair isn’t supported yet.'
+      return t('reader.tools.translate.errors.unsupported')
     case 'SAME_LANGUAGE':
-      return 'Source and target are the same language — pick a different one.'
+      return t('reader.tools.translate.errors.sameLanguage')
     case 'INVALID_ARGUMENT':
       return message
     case 'WORKER_FAILED':
-      return 'The translation engine stopped unexpectedly. Try again.'
+      return t('reader.tools.translate.errors.worker')
     default:
-      return 'Translation failed. Try again.'
+      return t('reader.tools.translate.errors.generic')
   }
 }
 
 function formatMb(bytes: number | null): string | null {
-  return bytes === null ? null : `${Math.round(bytes / 1_000_000)} MB`
+  return bytes === null ? null : getFormat().bytes(bytes)
 }
 
 function Spinner() {
@@ -89,6 +90,7 @@ function ResizeHandleIcon() {
 }
 
 function ModelProgress({ progress, multilingual }: { progress: TranslationLoadProgressState | null; multilingual: boolean }) {
+  const t = useT()
   const percent = progress?.percent ?? null
   const loaded = formatMb(progress?.loadedBytes ?? null)
   const total = formatMb(progress?.totalBytes ?? null)
@@ -97,13 +99,13 @@ function ModelProgress({ progress, multilingual }: { progress: TranslationLoadPr
     <div className="flex flex-col gap-2">
       <div className="flex items-center gap-2 text-[12px] font-semibold text-lib-text">
         <Spinner />
-        <span>{downloading ? 'Downloading translation model…' : 'Loading translation model…'}</span>
+        <span>{downloading ? t('reader.tools.translate.downloadingModel') : t('reader.tools.translate.loadingModel')}</span>
         {percent !== null ? <span className="ml-auto tabular-nums text-lib-muted">{Math.floor(percent)}%</span> : null}
       </div>
       <div
         className="h-1.5 overflow-hidden rounded-full bg-lib-bg-mid"
         role="progressbar"
-        aria-label="Model download"
+        aria-label={t('reader.tools.translate.modelDownload')}
         aria-valuemin={0}
         aria-valuemax={100}
         aria-valuenow={percent !== null ? Math.floor(percent) : undefined}
@@ -115,9 +117,11 @@ function ModelProgress({ progress, multilingual }: { progress: TranslationLoadPr
       </div>
       <p className="text-[11px] leading-snug text-lib-muted">
         {downloading
-          ? `One-time download${loaded && total ? ` (${loaded} of ${total})` : ''} — works offline afterwards.`
-          : 'Preparing the model from the local cache.'}
-        {downloading && multilingual ? ' This language pair uses a larger multilingual model.' : ''}
+          ? loaded && total
+            ? t('reader.tools.translate.oneTimeDownloadSize', { loaded, total })
+            : t('reader.tools.translate.oneTimeDownload')
+          : t('reader.tools.translate.fromCache')}
+        {downloading && multilingual ? t('reader.tools.translate.multilingual') : ''}
       </p>
     </div>
   )
@@ -134,6 +138,7 @@ function ModelProgress({ progress, multilingual }: { progress: TranslationLoadPr
  * `useResizableTranslationPanel`).
  */
 export function TranslationPopover() {
+  const t = useT()
   const popover = useTranslationStore((s) => s.popover)
   const sourceLang = useTranslationStore((s) => s.sourceLang)
   const targetLang = useTranslationStore((s) => s.targetLang)
@@ -209,7 +214,7 @@ export function TranslationPopover() {
       className="absolute top-4 left-4 z-[420] flex w-[min(380px,calc(100vw-24px))] flex-col rounded-2xl border border-lib-border bg-lib-surface-strong shadow-2xl"
       style={{ ...drag.style, ...resize.style, maxWidth: 'calc(100vw - 24px)' }}
       role="dialog"
-      aria-label="Translation"
+      aria-label={t('reader.tools.translate.aria')}
       onClick={(e) => e.stopPropagation()}
       onContextMenu={(event) => {
         event.preventDefault()
@@ -227,9 +232,9 @@ export function TranslationPopover() {
           <svg className="size-4 shrink-0 text-lib-accent" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor" aria-hidden>
             <path strokeLinecap="round" strokeLinejoin="round" d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Zm0 0c2.5-2.7 3.75-5.7 3.75-9S14.5 5.7 12 3m0 18c-2.5-2.7-3.75-5.7-3.75-9S9.5 5.7 12 3M3.75 9.75h16.5M3.75 14.25h16.5" />
           </svg>
-          <span className="text-[13px] font-bold text-lib-text-strong">Translate</span>
-          <span className="ml-auto text-[10px] font-semibold tracking-wide text-lib-faint uppercase">Offline</span>
-          <button type="button" className={iconBtn} aria-label="Close translation" data-no-drag onClick={close}>
+          <span className="text-[13px] font-bold text-lib-text-strong">{t('reader.tools.translate.title')}</span>
+          <span className="ml-auto text-[10px] font-semibold tracking-wide text-lib-faint uppercase">{t('reader.tools.translate.offline')}</span>
+          <button type="button" className={iconBtn} aria-label={t('reader.tools.translate.close')} data-no-drag onClick={close}>
             <svg className="size-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden>
               <path d="M6.28 5.22a.75.75 0 0 0-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 1 0 1.06 1.06L10 11.06l3.72 3.72a.75.75 0 1 0 1.06-1.06L11.06 10l3.72-3.72a.75.75 0 0 0-1.06-1.06L10 8.94 6.28 5.22Z" />
             </svg>
@@ -237,14 +242,14 @@ export function TranslationPopover() {
         </div>
 
         <div className="flex items-center gap-1.5 px-3.5 pb-2.5">
-          <LanguageCombobox label="Translate from" value={sourceLang} onChange={setSourceLang} onOpenChange={onListOpenChange} />
-          <button type="button" className={iconBtn} aria-label="Swap languages" title="Swap languages" onClick={swapLanguages}>
+          <LanguageCombobox label={t('reader.tools.translate.from')} value={sourceLang} onChange={setSourceLang} onOpenChange={onListOpenChange} />
+          <button type="button" className={iconBtn} aria-label={t('reader.tools.translate.swap')} title={t('reader.tools.translate.swap')} onClick={swapLanguages}>
             <svg className="size-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor" aria-hidden>
               <path strokeLinecap="round" strokeLinejoin="round" d="M7.5 21 3 16.5m0 0L7.5 12M3 16.5h13.5m0-13.5L21 7.5m0 0L16.5 12M21 7.5H7.5" />
             </svg>
           </button>
           <LanguageCombobox
-            label="Translate to"
+            label={t('reader.tools.translate.to')}
             value={targetLang}
             onChange={setTargetLang}
             recentCodes={recentTargets}
@@ -275,7 +280,7 @@ export function TranslationPopover() {
             {status === 'translating' ? (
               <div className="flex items-center gap-2 py-1 text-[12px] font-semibold text-lib-muted">
                 <Spinner />
-                <span>Translating to {targetName}…</span>
+                <span>{t('reader.tools.translate.translatingTo', { language: targetName })}</span>
               </div>
             ) : null}
 
@@ -296,7 +301,7 @@ export function TranslationPopover() {
                 </p>
                 {error.code !== 'SAME_LANGUAGE' && error.code !== 'UNSUPPORTED_LANGUAGE' ? (
                   <button type="button" className={actionBtn} onClick={retry}>
-                    Try again
+                    {t('reader.tools.translate.tryAgain')}
                   </button>
                 ) : null}
               </div>
@@ -310,7 +315,7 @@ export function TranslationPopover() {
               <svg className="size-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor" aria-hidden>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 17.25v3.375c0 .621-.504 1.125-1.125 1.125h-9.75a1.125 1.125 0 0 1-1.125-1.125V7.875c0-.621.504-1.125 1.125-1.125H6.75a9.06 9.06 0 0 1 1.5.124m7.5 10.376h3.375c.621 0 1.125-.504 1.125-1.125V11.25c0-4.46-3.243-8.161-7.5-8.876a9.06 9.06 0 0 0-1.5-.124H9.375c-.621 0-1.125.504-1.125 1.125v3.5m7.5 10.375H9.375a1.125 1.125 0 0 1-1.125-1.125v-9.25m12 6.625v-1.875a3.375 3.375 0 0 0-3.375-3.375h-1.5a1.125 1.125 0 0 1-1.125-1.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H9.75" />
               </svg>
-              Copy
+              {t('reader.tools.translate.copy')}
             </button>
             <button type="button" className={actionBtn} aria-pressed={speaking} onClick={toggleSpeak}>
               {speaking ? (
@@ -323,7 +328,7 @@ export function TranslationPopover() {
                   <path strokeLinecap="round" strokeLinejoin="round" d="M16 9c1 .9 1 5.1 0 6M18.3 6.7c2.2 2.2 2.2 8.4 0 10.6" />
                 </svg>
               )}
-              {speaking ? 'Stop' : 'Listen'}
+              {speaking ? t('reader.tools.translate.stop') : t('reader.tools.translate.listen')}
             </button>
           </div>
         ) : null}
@@ -369,7 +374,7 @@ export function TranslationPopover() {
       />
       <div
         onPointerDown={(e) => resize.onResizePointerDown('se', e)}
-        title="Drag to resize"
+        title={t('reader.tools.translate.dragToResize')}
         className="absolute -right-1 -bottom-1 flex size-4 touch-none cursor-nwse-resize items-end justify-end p-0.5"
       >
         <ResizeHandleIcon />

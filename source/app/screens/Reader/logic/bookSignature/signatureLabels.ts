@@ -1,42 +1,40 @@
 import type { BookSignatureDto } from './bookSignatureStore'
+import type { MessageKey } from '@core'
 
 type SignatureStatusDto = BookSignatureDto['status']
 
 export type SignatureTone = 'ok' | 'warn' | 'neutral'
 
 export interface SignatureLabel {
-  /** Short value for a details row / pill. */
-  label: string
-  /** One sentence for the signature panel. */
-  detail: string
+  /** Short value for a details row / pill (catalogue key, spec 012). */
+  label: MessageKey
+  /** One sentence for the signature panel (catalogue key). */
+  detail: MessageKey
   tone: SignatureTone
 }
 
 export const SIGNATURE_LABELS: Record<SignatureStatusDto, SignatureLabel> = {
   valid: {
-    label: 'Signed · valid',
-    detail:
-      'This document carries a digital signature and it is intact. The signer’s certificate is not checked against a trust list.',
+    label: 'reader.tools.signature.valid',
+    detail: 'reader.tools.signature.validDetail',
     tone: 'ok',
   },
   unsigned: {
-    label: 'Not signed',
-    detail: 'No digital signature was found in this document.',
+    label: 'reader.tools.signature.unsigned',
+    detail: 'reader.tools.signature.unsignedDetail',
     tone: 'neutral',
   },
   invalid: {
-    label: 'Signature invalid',
-    detail:
-      'This document has a digital signature that does not verify — it may have been changed after it was signed.',
+    label: 'reader.tools.signature.invalid',
+    detail: 'reader.tools.signature.invalidDetail',
     tone: 'warn',
   },
   unsupported: {
-    label: 'Can’t verify',
-    detail:
-      'Signatures can’t be verified for this file type, so it is unknown whether it is signed.',
+    label: 'reader.tools.signature.unsupported',
+    detail: 'reader.tools.signature.unsupportedDetail',
     tone: 'neutral',
   },
 }
 
-export const SIGNATURE_CHECKING = 'Checking…'
-export const SIGNATURE_UNAVAILABLE = 'Unavailable'
+export const SIGNATURE_CHECKING: MessageKey = 'reader.tools.signature.checkingShort'
+export const SIGNATURE_UNAVAILABLE: MessageKey = 'reader.tools.signature.unavailable'

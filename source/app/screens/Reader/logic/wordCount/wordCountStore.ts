@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { wordCountApi } from '../../../../bridge'
 import { clampPanelSize, type PanelPosition, type PanelSize } from '../floatingPanel/panelGeometry'
+import type { UiText } from '../../../../i18n'
 
 const PANEL_POSITION_STORAGE_KEY = 'reading-book.wordCountPanelPosition'
 const PANEL_SIZE_STORAGE_KEY = 'reading-book.wordCountPanelSize'
@@ -84,7 +85,7 @@ type WordCountState = {
   bookId: string | undefined
   status: WordCountStatus
   stats: WordCountStats
-  errorMessage: string | null
+  errorMessage: UiText | null
   /** Where the user last dragged the panel to — null = default CSS-anchored corner. Not a
    *  per-book value (a layout preference), so `resetForNewBook` leaves it. */
   panelPosition: PanelPosition | null
@@ -166,7 +167,7 @@ export const useWordCountStore = create<WordCountState>()((set, get) => ({
     if (state === 'done') {
       void get().load()
     } else if (state === 'error') {
-      set({ status: 'error', errorMessage: 'This book could not be prepared for word count.' })
+      set({ status: 'error', errorMessage: { key: 'reader.tools.wordCount.prepareFailed' } })
     }
   },
 

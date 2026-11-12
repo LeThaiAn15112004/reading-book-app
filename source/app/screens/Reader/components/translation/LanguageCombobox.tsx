@@ -1,4 +1,3 @@
-/* i18n-pending: reader.tools */
 import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent } from 'react'
 import {
   TRANSLATION_LANGUAGES,
@@ -6,6 +5,7 @@ import {
   searchTranslationLanguages,
   type TranslationLanguage,
 } from '@core'
+import { useT } from '../../../../i18n'
 
 type LanguageComboboxProps = {
   /** Accessible name, e.g. "Translate from". */
@@ -37,6 +37,7 @@ export function LanguageCombobox({
   onOpenChange,
   align = 'left',
 }: LanguageComboboxProps) {
+  const t = useT()
   const id = useId()
   const listboxId = `${id}-listbox`
   const [open, setOpen] = useState(false)
@@ -184,8 +185,8 @@ export function LanguageCombobox({
               type="text"
               role="combobox"
               className="h-8 w-full rounded-md border border-lib-border bg-lib-bg-mid/40 px-2.5 text-[12px] text-lib-text-strong placeholder:text-lib-faint focus:border-lib-accent focus:outline-none"
-              placeholder="Search languages…"
-              aria-label={`${label} — search`}
+              placeholder={t('reader.tools.translate.searchLanguages')}
+              aria-label={t('reader.tools.translate.searchAria', { label })}
               aria-autocomplete="list"
               aria-expanded
               aria-controls={listboxId}
@@ -209,7 +210,7 @@ export function LanguageCombobox({
           >
             {rows.length === 0 ? (
               <li className="px-2.5 py-2 text-[12px] text-lib-muted" role="presentation">
-                No language matches “{query}”
+                {t('reader.tools.translate.noMatch', { query })}
               </li>
             ) : null}
             {rows.map((row, index) => {
@@ -220,7 +221,7 @@ export function LanguageCombobox({
                 <li key={row.key} role="presentation">
                   {showHeader && !query.trim() ? (
                     <div className="px-2.5 pt-1.5 pb-1 text-[10px] font-bold tracking-wider text-lib-faint uppercase">
-                      {row.group === 'recent' ? 'Recent' : 'All languages'}
+                      {row.group === 'recent' ? t('reader.tools.translate.recent') : t('reader.tools.translate.allLanguages')}
                     </div>
                   ) : null}
                   <div

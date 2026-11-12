@@ -2,6 +2,7 @@ import type { MutableRefObject } from 'react'
 import { create } from 'zustand'
 import type { EpubRendererApi, ReadAloudSection } from '../../../../components/reader/renderers/epub'
 import { createWebSpeechEngine } from '../../../../components/reader/tts/webSpeechEngine'
+import { getT } from '../../../../i18n'
 
 export type ReadAloudStatus = 'idle' | 'loading' | 'playing' | 'paused'
 export const READ_ALOUD_RATES = [0.75, 1, 1.25, 1.5, 2] as const
@@ -117,7 +118,7 @@ export const useReadAloudStore = create<ReadAloudState>()((set, get) => {
     const match = await engine.resolveVoice(lang)
     if (!match.exact && !warnedLangs.has(lang)) {
       warnedLangs.add(lang)
-      toast(`No ${lang} voice installed — using the default voice.`)
+      toast(getT()('reader.tools.readAloud.noVoice', { lang }))
     }
   }
 
@@ -149,7 +150,7 @@ export const useReadAloudStore = create<ReadAloudState>()((set, get) => {
       const section = renderer.getReadAloudSegments('section')
       if (!section || section.spineIndex === spine) {
         finish()
-        toast('Reached the end of the book.')
+        toast(getT()('reader.tools.readAloud.endOfBook'))
         return
       }
       if (section.startIndex < section.endIndex) {
@@ -189,7 +190,7 @@ export const useReadAloudStore = create<ReadAloudState>()((set, get) => {
         onError: (error) => {
           if (token !== session) return
           finish()
-          toast(`Read aloud stopped (${error}).`)
+          toast(getT()('reader.tools.readAloud.stopped', { error: String(error) }))
         },
       },
     )
@@ -199,11 +200,11 @@ export const useReadAloudStore = create<ReadAloudState>()((set, get) => {
     const renderer = api()
     set({ menuOpen: false })
     if (!renderer || !get().isEpubSurface) {
-      toast('Read aloud is available for EPUB books.')
+      toast(getT()('reader.tools.readAloud.epubOnly'))
       return
     }
     if (!readAloudSupported) {
-      toast('Speech synthesis is not available on this system.')
+      toast(getT()('reader.tools.readAloud.noSynthesis'))
       return
     }
     finish()
@@ -212,13 +213,13 @@ export const useReadAloudStore = create<ReadAloudState>()((set, get) => {
     const section = renderer.getReadAloudSegments(kind)
     if (!section) {
       finish()
-      toast('Nothing to read here.')
+      toast(getT()('reader.tools.readAloud.nothingHere'))
       return
     }
     if (section.startIndex >= section.endIndex) {
       if (kind === 'viewport') {
         finish()
-        toast('Nothing to read on this page.')
+        toast(getT()('reader.tools.readAloud.nothingOnPage'))
         return
       }
       set({ status: 'playing' })

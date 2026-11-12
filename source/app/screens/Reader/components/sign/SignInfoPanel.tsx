@@ -1,4 +1,3 @@
-/* i18n-pending: reader.tools */
 import { useBookSignature } from '../../logic/hooks/useBookSignature'
 import {
   SIGNATURE_CHECKING,
@@ -6,6 +5,7 @@ import {
   SIGNATURE_UNAVAILABLE,
   type SignatureTone,
 } from '../../logic/bookSignature/signatureLabels'
+import { getFormat, useT } from '../../../../i18n'
 
 type SignInfoPanelProps = {
   open: boolean
@@ -21,15 +21,16 @@ const TONE_CLASS: Record<SignatureTone, string> = {
 
 /** Read-only "is this book signed?" panel. The app verifies signatures; it never creates them. */
 export function SignInfoPanel({ open, bookId, onClose }: SignInfoPanelProps) {
+  const t = useT()
   const { signature, loading, failed } = useBookSignature(bookId, open)
   if (!open) return null
 
   const label = signature ? SIGNATURE_LABELS[signature.status] : undefined
   const summary = label
-    ? label.detail
+    ? t(label.detail)
     : failed
-      ? 'The signature status could not be read because the book file is unavailable.'
-      : 'Checking this document for a digital signature…'
+      ? t('reader.tools.signature.unavailableFile')
+      : t('reader.tools.signature.checking')
 
   return (
     <div
@@ -46,26 +47,26 @@ export function SignInfoPanel({ open, bookId, onClose }: SignInfoPanelProps) {
           className="text-base font-semibold text-lib-text-strong"
           id="sign-panel-title"
         >
-          Digital signature
+          {t('reader.tools.signature.title')}
         </div>
         <p className="m-0 text-[13px] leading-snug text-lib-muted">{summary}</p>
         <div className="flex flex-wrap items-center gap-2 rounded-lg border border-lib-border-soft bg-lib-surface px-3 py-2.5 text-[13px] text-lib-text">
           <span
             className={`rounded-full px-2 py-0.5 text-[11px] font-bold uppercase ${TONE_CLASS[label?.tone ?? 'neutral']}`}
           >
-            {label?.label ?? (loading ? SIGNATURE_CHECKING : SIGNATURE_UNAVAILABLE)}
+            {t(label?.label ?? (loading ? SIGNATURE_CHECKING : SIGNATURE_UNAVAILABLE))}
           </span>
           {signature?.signerName ? (
             <strong className="text-lib-text-strong">{signature.signerName}</strong>
           ) : null}
           {signature?.signedAt ? (
             <span className="w-full text-[11px] text-lib-faint">
-              Signed {new Date(signature.signedAt).toLocaleString()}
+              {t('reader.tools.signature.signedAt', { date: getFormat().dateTime(new Date(signature.signedAt)) })}
             </span>
           ) : null}
           {signature?.checkedAt ? (
             <span className="w-full text-[11px] text-lib-faint">
-              Checked {new Date(signature.checkedAt).toLocaleString()}
+              {t('reader.tools.signature.checkedAt', { date: getFormat().dateTime(new Date(signature.checkedAt)) })}
             </span>
           ) : null}
         </div>
@@ -75,7 +76,7 @@ export function SignInfoPanel({ open, bookId, onClose }: SignInfoPanelProps) {
             type="button"
             onClick={onClose}
           >
-            Close
+            {t('common.actions.close')}
           </button>
         </div>
       </div>
