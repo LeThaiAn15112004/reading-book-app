@@ -1,10 +1,13 @@
 /**
  * The readable copy of a book's annotations (specs/006-annotation-import-export, FR-014 / FR-023): a Markdown document of
  * quotes and comments in reading order, for people and other tools. It is not importable. Pure; layout in
- * contracts/readable-markdown.md.
+ * contracts/readable-markdown.md. Its words follow the interface language (`lang`, spec 012 FR-012); English by default.
  */
 import { HIGHLIGHT_COLOR_PRESETS } from '../app-models/highlight-colors.js'
 import { formatAttachmentSize } from '../attachments/pdf-attachment-annotation.js'
+import { formatBytes } from '../i18n/format.js'
+import { translate, type AnyMessageKey, type MessageKey } from '../i18n/translate.js'
+import type { Params, UiLanguage } from '../i18n/types.js'
 import type { ReadableAttachment } from './export-build.js'
 import type { AnnotationFile, TransferAnnotation, TransferAnnotationType } from './file-format.js'
 
@@ -24,21 +27,33 @@ export interface ReadableMarkdownOptions {
    * `📎 name (size), page n` after that page's annotations (specs/007-pdf-file-attachment research R14).
    */
   attachments?: readonly ReadableAttachment[]
+  /** Language of the document's own words (headings, labels, counts); `en` when omitted. */
+  lang?: UiLanguage
 }
 
-const KIND_LABEL: Record<TransferAnnotationType, string> = {
-  highlight: 'Highlight',
-  underline: 'Underline',
-  squiggly: 'Squiggly underline',
-  strikethrough: 'Strikethrough',
-  replace: 'Replace text',
-  insert: 'Insert text',
-  textbox: 'Text box',
-  rectangle: 'Rectangle',
-  ellipse: 'Ellipse',
-  line: 'Line',
-  arrow: 'Arrow',
-  typewriter: 'Typewriter note',
+type T = (key: AnyMessageKey, params?: Params) => string
+
+const KIND_LABEL: Record<TransferAnnotationType, MessageKey> = {
+  highlight: 'exports.kinds.highlight',
+  underline: 'exports.kinds.underline',
+  squiggly: 'exports.kinds.squiggly',
+  strikethrough: 'exports.kinds.strikethrough',
+  replace: 'exports.kinds.replace',
+  insert: 'exports.kinds.insert',
+  textbox: 'exports.kinds.textbox',
+  rectangle: 'exports.kinds.rectangle',
+  ellipse: 'exports.kinds.ellipse',
+  line: 'exports.kinds.line',
+  arrow: 'exports.kinds.arrow',
+  typewriter: 'exports.kinds.typewriter',
+}
+
+const COLOUR_KEYS: Readonly<Record<string, MessageKey>> = {
+  yellow: 'reader.annotations.colors.yellow',
+  blue: 'reader.annotations.colors.blue',
+  green: 'reader.annotations.colors.green',
+  pink: 'reader.annotations.colors.pink',
+  purple: 'reader.annotations.colors.purple',
 }
 
 const SHAPES: readonly TransferAnnotationType[] = ['rectangle', 'ellipse', 'line', 'arrow']
@@ -59,28 +74,42 @@ function formatDate(iso: string, utcOffsetMinutes?: number): string {
 }
 
 /** A preset's name when the colour is one of the picker's presets; the hex otherwise (alpha dropped for the lookup). */
-function colourName(colorHex: string): string {
+function colourName(t: T, colorHex: string): string {
   const hex6 = colorHex.slice(0, 7).toUpperCase()
-  return HIGHLIGHT_COLOR_PRESETS.find((p) => p.hex.toUpperCase() === hex6)?.label ?? colorHex
+  const preset = HIGHLIGHT_COLOR_PRESETS.find((p) => p.hex.toUpperCase() === hex6)
+  if (!preset) return colorHex
+  const key = COLOUR_KEYS[preset.id]
+  return key ? t(key) : preset.label
 }
 
-function defaultHeading(file: AnnotationFile, a: TransferAnnotation): string {
+function chapterIndexOf(a: TransferAnnotation): number | undefined {
+  const index = (a.locator as { chapterIndex?: number }).chapterIndex
+  return typeof index === 'number' ? index : undefined
+}
+
+function defaultHeading(t: T, file: AnnotationFile, a: TransferAnnotation): string {
   const loc = a.locator
-  if (file.book.format === 'pdf' && loc.kind === 'page-rect') return `Page ${loc.page}`
-  if (file.book.format === 'epub') return typeof (loc as { chapterIndex?: number }).chapterIndex === 'number' ? `Chapter ${(loc as { chapterIndex: number }).chapterIndex + 1}` : 'Annotations'
+  if (file.book.format === 'pdf' && loc.kind === 'page-rect') return t('exports.headings.page', { n: loc.page })
+  if (file.book.format === 'epub') {
+    const chapter = chapterIndexOf(a)
+    return chapter !== undefined ? t('exports.headings.chapter', { n: chapter + 1 }) : t('exports.headings.annotations')
+  }
   if (file.book.format === 'md') {
     const md = a.mdAnnotation as { startSegment?: number } | undefined
-    return typeof md?.startSegment === 'number' ? `Section ${md.startSegment + 1}` : 'Annotations'
+    return typeof md?.startSegment === 'number' ? t('exports.headings.section', { n: md.startSegment + 1 }) : t('exports.headings.annotations')
   }
-  if (loc.kind === 'text-offset') return `Section ${Math.floor(loc.offset / TXT_SECTION_CHARS) + 1}`
-  return 'Annotations'
+  if (loc.kind === 'text-offset') return t('exports.headings.section', { n: Math.floor(loc.offset / TXT_SECTION_CHARS) + 1 })
+  return t('exports.headings.annotations')
 }
 
 /** Where the annotation is, for a shape or a mark with no text: "on page 3", "in chapter 7", ... */
-function placeText(file: AnnotationFile, a: TransferAnnotation): string {
+function placeText(t: T, file: AnnotationFile, a: TransferAnnotation): string {
   const loc = a.locator
-  if (loc.kind === 'page-rect') return ` on page ${loc.page}`
-  if (file.book.format === 'epub') return typeof (loc as { chapterIndex?: number }).chapterIndex === 'number' ? ` in chapter ${(loc as { chapterIndex: number }).chapterIndex + 1}` : ''
+  if (loc.kind === 'page-rect') return t('exports.place.onPage', { n: loc.page })
+  if (file.book.format === 'epub') {
+    const chapter = chapterIndexOf(a)
+    return chapter !== undefined ? t('exports.place.inChapter', { n: chapter + 1 }) : ''
+  }
   return ''
 }
 
@@ -93,30 +122,32 @@ function blockQuote(text: string, wrap: (line: string) => string = (l) => l): st
     .join('\n')
 }
 
-function renderAnnotation(file: AnnotationFile, a: TransferAnnotation, utcOffsetMinutes?: number): string {
+function renderAnnotation(t: T, file: AnnotationFile, a: TransferAnnotation, utcOffsetMinutes?: number): string {
   const lines: string[] = []
   const quote = a.selectionText?.highlight
+  const kind = t(KIND_LABEL[a.type])
   if (a.type === 'typewriter') {
     // The note IS the document: it is the quote, and there is no separate comment.
-    lines.push(a.note ? blockQuote(a.note) : `> [${KIND_LABEL.typewriter}${placeText(file, a)}]`)
+    lines.push(a.note ? blockQuote(a.note) : `> [${kind}${placeText(t, file, a)}]`)
   } else if (SHAPES.includes(a.type)) {
-    lines.push(`> [${KIND_LABEL[a.type]}${placeText(file, a)}]`)
+    lines.push(`> [${kind}${placeText(t, file, a)}]`)
   } else if (quote) {
     lines.push(blockQuote(quote, a.type === 'strikethrough' ? (l) => `~~${l}~~` : undefined))
   } else {
-    lines.push(`> [${KIND_LABEL[a.type]}${placeText(file, a)}]`)
+    lines.push(`> [${kind}${placeText(t, file, a)}]`)
   }
   lines.push('')
-  lines.push(`**${KIND_LABEL[a.type]}** · ${colourName(a.colorHex)} · ${formatDateTime(a.createdAt, utcOffsetMinutes)}`)
+  lines.push(`**${kind}** · ${colourName(t, a.colorHex)} · ${formatDateTime(a.createdAt, utcOffsetMinutes)}`)
   if (a.type !== 'typewriter' && a.note && a.note.trim() !== '') {
     // Hard line breaks keep a multi-line comment together as one paragraph.
-    lines.push(`Note: ${a.note.replace(/\r\n?/g, '\n').split('\n').join('  \n')}`)
+    lines.push(t('exports.note', { text: a.note.replace(/\r\n?/g, '\n').split('\n').join('  \n') }))
   }
   return lines.join('\n')
 }
 
-function renderAttachment(a: ReadableAttachment): string {
-  return `📎 ${a.name} (${formatAttachmentSize(a.sizeBytes)}), page ${a.page}`
+function renderAttachment(t: T, lang: UiLanguage, a: ReadableAttachment): string {
+  const size = lang === 'en' ? formatAttachmentSize(a.sizeBytes) : formatBytes(lang, a.sizeBytes)
+  return t('exports.attachment', { name: a.name, size, page: a.page })
 }
 
 /** The page an annotation is on (PDF), for placing attachments between pages; Infinity elsewhere. */
@@ -125,6 +156,8 @@ function pageOf(a: TransferAnnotation): number {
 }
 
 export function renderReadableMarkdown(file: AnnotationFile, options: ReadableMarkdownOptions = {}): string {
+  const lang = options.lang ?? 'en'
+  const t: T = (key, params) => translate(lang, key, params)
   const { book } = file
   const attachments = options.attachments ?? []
   const out: string[] = []
@@ -132,8 +165,9 @@ export function renderReadableMarkdown(file: AnnotationFile, options: ReadableMa
   const n = file.annotations.length
   const m = attachments.length
   out.push(
-    `Exported ${formatDate(file.exportedAt, options.utcOffsetMinutes)} · ${n} annotation${n === 1 ? '' : 's'}` +
-      (m > 0 ? ` · ${m} file attachment${m === 1 ? '' : 's'}` : ''),
+    t('exports.exported', { date: formatDate(file.exportedAt, options.utcOffsetMinutes) }) +
+      t('exports.annotationCount', { count: n }) +
+      (m > 0 ? t('exports.attachmentCount', { count: m }) : ''),
   )
 
   let heading: string | null = null
@@ -147,14 +181,14 @@ export function renderReadableMarkdown(file: AnnotationFile, options: ReadableMa
   const attachmentsBefore = (page: number) => {
     while (next < m && attachments[next]!.page < page) {
       const a = attachments[next++]!
-      section(`Page ${a.page}`)
-      out.push('', renderAttachment(a))
+      section(t('exports.headings.page', { n: a.page }))
+      out.push('', renderAttachment(t, lang, a))
     }
   }
   for (const a of file.annotations) {
     attachmentsBefore(pageOf(a))
-    section(options.headingOf?.(a) ?? defaultHeading(file, a))
-    out.push('', renderAnnotation(file, a, options.utcOffsetMinutes))
+    section(options.headingOf?.(a) ?? defaultHeading(t, file, a))
+    out.push('', renderAnnotation(t, file, a, options.utcOffsetMinutes))
   }
   attachmentsBefore(Number.POSITIVE_INFINITY)
   return `${out.join('\n')}\n`

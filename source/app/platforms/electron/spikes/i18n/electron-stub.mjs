@@ -18,3 +18,8 @@ export const app = {
   },
   getLocale: () => stub.locale,
 }
+
+/** For `background/background-mode.ts` (tray texts, spec 012 US3): records nothing, builds the template as is. */
+export const Menu = { buildFromTemplate: (template) => ({ items: template }) }
+export const nativeImage = { createFromPath: () => ({ isEmpty: () => true, setTemplateImage() {} }) }
+export class Tray {}

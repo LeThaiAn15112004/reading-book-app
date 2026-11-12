@@ -344,4 +344,15 @@ await check('a throwing group is reported and does not stop the others', async (
   assertOutOfScopeUntouched()
 })
 
+await check('a fresh install (nothing stored) starts with App Language = System Default (spec 012 US2)', async () => {
+  const saved = new Map(storage)
+  storage.clear()
+  try {
+    assert.equal(loadAppAppearance().language, 'system')
+    assert.equal(DEFAULT_APP_APPEARANCE.language, 'system')
+  } finally {
+    for (const [k, v] of saved) storage.set(k, v)
+  }
+})
+
 console.log(`\n${passed} checks passed.`)

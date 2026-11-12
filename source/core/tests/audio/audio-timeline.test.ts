@@ -90,6 +90,11 @@ describe('normalizeChapters', () => {
     expect(r.chapters.map((c) => c.id)).toEqual(['x', 'x#2'])
     expect(r.chapters.map((c) => c.title)).toEqual(['Intro', 'Chapter 2'])
   })
+  it('the position label of an untitled chapter follows the interface language (spec 012)', () => {
+    const raw = [{ title: 'Mở đầu', startSeconds: 0 }, { title: '', startSeconds: 50 }]
+    expect(normalizeChapters(raw, 100, 'vi').chapters.map((c) => c.title)).toEqual(['Mở đầu', 'Chương 2'])
+    expect(normalizeChapters(raw, 100, 'en').chapters.map((c) => c.title)).toEqual(['Mở đầu', 'Chapter 2'])
+  })
 })
 
 describe('chapterIndexAt', () => {

@@ -15,6 +15,7 @@ import type { AttachmentActionResult, ChangePdfAttachmentResultDto, CreatePdfAtt
 import { pathForOtherApps } from '../files/external-path'
 import { AttachmentChannels } from './channels'
 import { pdfFileOperations, runInScanWorker, toHighlightDto } from './overlay.ipc'
+import { tMain } from '../i18n/main-translate'
 
 /** Main-owned folder for attachments handed to the OS: `{userData}/attachment-tmp/{uuid}/{name}`. */
 function attachmentTempRoot(): string {
@@ -57,7 +58,7 @@ function attachmentService(senderWindow: () => BrowserWindow | undefined): Attac
     chooseSaveTarget: async (suggestedName) => {
       const parent = senderWindow()
       const options: Electron.SaveDialogOptions = {
-        title: 'Save attachment',
+        title: tMain('main.shell.dialogs.saveAttachment'),
         defaultPath: path.join(app.getPath('downloads'), suggestedName),
         properties: ['showOverwriteConfirmation', 'createDirectory'],
       }
@@ -84,7 +85,7 @@ function attachmentOperationDeps(sender: Electron.WebContents): AttachmentOperat
     checkWritable: pdfFileOperations.checkWritable,
     chooseFile: async () => {
       const parent = BrowserWindow.fromWebContents(sender) ?? undefined
-      const options: Electron.OpenDialogOptions = { title: 'Attach a file to this page', properties: ['openFile'] }
+      const options: Electron.OpenDialogOptions = { title: tMain('main.shell.dialogs.attachFile'), properties: ['openFile'] }
       const picked = parent ? await dialog.showOpenDialog(parent, options) : await dialog.showOpenDialog(options)
       return picked.canceled || !picked.filePaths[0] ? null : picked.filePaths[0]
     },

@@ -16,6 +16,7 @@ import type {
   TranscriptionStartResult,
 } from './api-types'
 import { TranscriptionChannels } from './channels'
+import { tMain } from '../i18n/main-translate'
 
 /**
  * Handlers for transcription:* (spec 004, contracts/ipc-transcription.md). Input is validated by the service (Main owns the
@@ -67,9 +68,9 @@ export function registerTranscriptionIpc(): void {
           suggestedName: async (id) => transcriptExportFileName((await getLibraryStore().findById(id))?.title),
           pickFile: async (suggestedName) => {
             const dialogOptions: Electron.SaveDialogOptions = {
-              title: 'Export transcript',
+              title: tMain('main.shell.dialogs.exportTranscript'),
               defaultPath: path.join(app.getPath('documents'), suggestedName),
-              filters: [{ name: 'Text', extensions: ['txt'] }],
+              filters: [{ name: tMain('main.shell.dialogs.textFilter'), extensions: ['txt'] }],
               properties: ['showOverwriteConfirmation', 'createDirectory'],
             }
             const picked = parent ? await dialog.showSaveDialog(parent, dialogOptions) : await dialog.showSaveDialog(dialogOptions)

@@ -6,6 +6,7 @@
  *   3. handler       -> app:setUiLanguage validation, nothing changes on bad input, WRITE_FAILED still applies
  *   4. listeners     -> fire once per EFFECTIVE change (not per call), a throwing listener does not break others
  *   5. tMain         -> follows the language without a restart
+ *   6. Main shell    -> tray menu, reminder notification and every Main-owned dialog in vi and en, no restart
  *
  * Run: npm run spike:i18n:main
  */
@@ -70,6 +71,13 @@ await check('system follows the first device locale; fallback to app.getLocale()
   stub.preferredLanguages = []
   stub.locale = 'de'
   assert.equal(i18n.handleSetUiLanguage('system').effective, 'en')
+})
+
+await check('neither locale API answers → system resolves to English', () => {
+  stub.preferredLanguages = null
+  stub.locale = ''
+  assert.equal(i18n.handleSetUiLanguage('system').effective, 'en')
+  stub.locale = 'en-US'
 })
 
 await check('an explicit choice wins over the device', () => {
@@ -142,6 +150,55 @@ await check('tMain follows the language without a restart', () => {
   i18n.handleSetUiLanguage('vi')
   assert.equal(i18n.tMain('common.actions.delete'), 'Xóa')
   assert.equal(i18n.tMain('common.duration.minutes', { count: 2 }), '2 phút')
+})
+
+// 6. Main shell texts (spec 012 US3) -----------------------------------------
+
+const background = await import('../../background/background-mode.ts')
+const reminders = await import('../../reminders/reminder-schedule.ts')
+
+await check('tray menu labels: vi, then en after a change, no restart', () => {
+  i18n.handleSetUiLanguage('vi')
+  const vi = background.trayMenuTemplate().filter((item) => item.label).map((item) => item.label)
+  assert.equal(vi.length, 2)
+  assert.deepEqual(vi, [i18n.tMain('main.shell.tray.open', { app: 'Readmate' }), i18n.tMain('main.shell.tray.quit', { app: 'Readmate' })])
+  i18n.handleSetUiLanguage('en')
+  const en = background.trayMenuTemplate().filter((item) => item.label).map((item) => item.label)
+  assert.deepEqual(en, ['Open Readmate', 'Quit Readmate'])
+  assert.notDeepEqual(vi, en)
+})
+
+await check('reminder notification text in both languages', () => {
+  i18n.handleSetUiLanguage('en')
+  const en = reminders.reminderMessage('Nhà Giả Kim')
+  const enPick = reminders.reminderMessage(null)
+  i18n.handleSetUiLanguage('vi')
+  const vi = reminders.reminderMessage('Nhà Giả Kim')
+  const viPick = reminders.reminderMessage(null)
+  for (const m of [en, vi]) assert.ok(m.body.includes('Nhà Giả Kim'))
+  assert.notEqual(en.title, vi.title)
+  assert.notEqual(en.body, vi.body)
+  assert.notEqual(enPick.body, viPick.body)
+})
+
+await check('every Main-owned dialog title / filter name comes from the catalogue, in both languages', () => {
+  const files = ['annotation-transfer', 'attachments', 'import', 'library', 'overlay', 'transcription', 'zip-import']
+  for (const name of files) {
+    const source = fs.readFileSync(new URL(`../../ipc/${name}.ipc.ts`, import.meta.url), 'utf8')
+    const keys = [...source.matchAll(/tMain\('(main\.shell\.dialogs\.[A-Za-z]+)'/g)].map((m) => m[1])
+    assert.ok(keys.length > 0, `${name}.ipc.ts has no catalogue dialog text`)
+    assert.doesNotMatch(source, /(title|name|buttonLabel): '[A-Z][a-z]/, `${name}.ipc.ts still has an English dialog literal`)
+    let translated = 0 // format names ("Markdown (*.md)") may read the same; titles may not
+    for (const key of keys) {
+      i18n.handleSetUiLanguage('en')
+      const en = i18n.tMain(key, { title: 'X' })
+      i18n.handleSetUiLanguage('vi')
+      const vi = i18n.tMain(key, { title: 'X' })
+      assert.ok(en && en !== key && vi && vi !== key, key)
+      if (en !== vi) translated += 1
+    }
+    assert.ok(translated > 0, `${name}.ipc.ts: no dialog text differs between en and vi`)
+  }
 })
 
 fs.rmSync(userData, { recursive: true, force: true })

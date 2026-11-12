@@ -32,7 +32,7 @@ import {
 } from '@core'
 import { audioApi, libraryApi, overlayApi } from '../../../bridge'
 import { registerSessionFlushHandler } from '../../Reader/logic/session/sessionFlushRegistry'
-import type { UiText } from '../../../i18n'
+import { getUiLanguage, type UiText } from '../../../i18n'
 
 /**
  * The audiobook player. One module-level `<audio>` element at a time (so two books can never play
@@ -338,7 +338,7 @@ export const useAudioPlayerStore = create<AudioPlayerState>()((set, get) => {
   const revalidateChapters = () => {
     const el = audio
     if (!el) return
-    const result = normalizeChapters(rawChapters, el.duration)
+    const result = normalizeChapters(rawChapters, el.duration, getUiLanguage())
     set({ chapters: result.chapters, chapterStatus: result.status, chapterReason: result.reason ?? null })
   }
 
