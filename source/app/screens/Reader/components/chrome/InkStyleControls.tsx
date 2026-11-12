@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { INK_PEN_PRESETS, INK_PEN_STYLES, type InkPenStyle } from '@core'
 import { pickerEventAction, setInkColorPickerOpen } from './inkColorPickerState'
 import { inkWidthToPoints, parseHexInput } from '../../logic/pdfInk/pdfInkPrefsStore'
-import { useT } from '../../../../i18n'
+import { getFormat, useT } from '../../../../i18n'
 import { INK_STYLE_LABELS } from './inkStyleLabels'
 
 const STYLE_ICONS: Record<InkPenStyle, ReactNode> = {
@@ -212,7 +212,7 @@ export function InkStyleControls({ idPrefix, style, colorHex, width, opacity, on
           <label htmlFor={`${idPrefix}-thickness`} className={sectionLabel}>
             {t('reader.chrome.ink.thickness')}
           </label>
-          <span className="text-[12px] font-semibold text-lib-text-strong">{t('reader.chrome.ink.points', { value: inkWidthToPoints(widthLive ?? width).toFixed(1) })}</span>
+          <span className="text-[12px] font-semibold text-lib-text-strong">{t('reader.chrome.ink.points', { value: getFormat().number(inkWidthToPoints(widthLive ?? width), 1) })}</span>
         </div>
         <CommitSlider
           id={`${idPrefix}-thickness`}

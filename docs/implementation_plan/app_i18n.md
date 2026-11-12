@@ -13,6 +13,7 @@ Spec, plan, contracts: `specs/012-app-ui-i18n/`. Glossary (authoritative Vietnam
 | Areas translated (Phase 3) | every renderer area + `main.messages` |
 | System language (Phase 4) | renderer and Main resolve `system` by the same rule; no locale API → English |
 | Main shell + export (Phase 5) | tray, reminder notifications, Main-owned dialogs (`main.shell`), readable `.md` export (`exports`) |
+| Formats + plurals (Phase 6) | no `toLocale*` left in `source/app`; decimals, sizes, dates through `useFormat()` / `getFormat()`; plural shape tested |
 | Release gate (`tests/i18n/i18n-release-gate.test.ts`) | not yet (T059) — **not releasable** until it exists and passes |
 
 ## Modules
@@ -106,6 +107,12 @@ first line of each converted file, `npm run typecheck && npm run lint && npm run
 - Audiobook chapters with no title get "Chapter N" / "Chương N" in the language active when the chapter list is
   validated (`normalizeChapters(raw, duration, lang)`); the list's `reason` (why it was not trusted) stays an English
   diagnostic inside the translated sentence.
+- Formats (Phase 6): whole percents ("42%") read the same in both languages and stay plain template text; anything
+  with a decimal, a size or a date goes through the formatters (`1,5` in Vietnamese). Playback / passage times keep
+  the clock style `h:mm:ss`. The Library title sort (`Intl.Collator(undefined, …)`) follows the system's collation on
+  purpose: it sorts book titles, not interface text.
+- Plurals: every counted message is a plural object chosen by `{count}` (en `one` + `other`, vi `other` only; checked
+  in `catalogue-completeness.test.ts`); no `count === 1 ? … : …` string building is left in `source/app`.
 - Device check (T045, manual): on a phone, set the system language to Vietnamese, then to French, and open the app
   with "System" chosen: Vietnamese, then English.
 

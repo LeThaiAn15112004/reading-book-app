@@ -155,9 +155,9 @@ the chosen language and follow a change without restart.
 **Goal**: dates, numbers, sizes, durations and plurals follow the chosen language.
 **Independent test**: quickstart step 6.
 
-- [ ] T053 [P] [US4] Replace the `toLocale*` / bare `Intl.*` calls with `useFormat()` / core formatters in `source/app/screens/Reader/components/sign/SignInfoPanel.tsx`, `sidebar/TocSidebar.tsx`, `chrome/WordCountPanel.tsx`, `chrome/ReaderSearchPanel.tsx`, `source/app/screens/Library/components/browse/LibraryBookTable.tsx`, `source/app/screens/AudioBook/components/AudioSidebar.tsx`
-- [ ] T054 [P] [US4] Replace ad-hoc byte / duration / percent helpers in `source/app` and `source/core/src` (find with `grep -rn "KB\|MB\|toFixed(" source/app source/core/src`) with `formatBytes` / `formatDuration` / `formatPercent` — Settings → Storage, import panels, attachment details, audio player time labels (clock style stays `h:mm:ss`)
-- [ ] T055 [US4] Audit counted texts in all areas: every "N items" message is a plural message with `count` (en `one`/`other`, vi `other`); fix any `count === 1 ? … : …` string building left in `source/app` (`grep -rn "=== 1 ?" source/app`)
+- [X] T053 [P] [US4] Replace the `toLocale*` / bare `Intl.*` calls with `useFormat()` / core formatters in `source/app/screens/Reader/components/sign/SignInfoPanel.tsx`, `sidebar/TocSidebar.tsx`, `chrome/WordCountPanel.tsx`, `chrome/ReaderSearchPanel.tsx`, `source/app/screens/Library/components/browse/LibraryBookTable.tsx`, `source/app/screens/AudioBook/components/AudioSidebar.tsx`
+- [X] T054 [P] [US4] Replace ad-hoc byte / duration / percent helpers in `source/app` and `source/core/src` (find with `grep -rn "KB\|MB\|toFixed(" source/app source/core/src`) with `formatBytes` / `formatDuration` / `formatPercent` — Settings → Storage, import panels, attachment details, audio player time labels (clock style stays `h:mm:ss`)
+- [X] T055 [US4] Audit counted texts in all areas: every "N items" message is a plural message with `count` (en `one`/`other`, vi `other`); fix any `count === 1 ? … : …` string building left in `source/app` (`grep -rn "=== 1 ?" source/app`)
 
 ---
 

@@ -1,7 +1,7 @@
 import { useRef } from 'react'
 import { useDraggableWordCountPanel, useResizableWordCountPanel } from '../../logic'
 import type { WordCountStats, WordCountStatus } from '../../logic'
-import { uiText, useT, type UiText } from '../../../../i18n'
+import { uiText, useFormat, useT, type UiText } from '../../../../i18n'
 
 type WordCountPanelProps = {
   open: boolean
@@ -54,10 +54,6 @@ function ResizeHandleIcon() {
   )
 }
 
-function formatCount(value: number): string {
-  return value.toLocaleString()
-}
-
 function Spinner() {
   return (
     <span
@@ -68,10 +64,11 @@ function Spinner() {
 }
 
 function StatRow({ label, value }: { label: string; value: number }) {
+  const format = useFormat()
   return (
     <div className="flex items-center justify-between gap-3 border-b border-lib-border-soft py-2 text-[13px] last:border-b-0">
       <span className="text-lib-text">{label}</span>
-      <span className="tabular-nums font-semibold text-lib-text-strong">{formatCount(value)}</span>
+      <span className="tabular-nums font-semibold text-lib-text-strong">{format.number(value)}</span>
     </div>
   )
 }
