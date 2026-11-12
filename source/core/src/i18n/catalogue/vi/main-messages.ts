@@ -77,8 +77,6 @@ export const vi = {
     unknownFormat: 'Không rõ định dạng tệp.',
     prepareFailed: 'Không chuẩn bị được việc tải xuống.',
     unknownProvider: 'Không rõ nhà cung cấp đám mây.',
-    driveNotConnected: 'Chưa kết nối. Đăng nhập Google Drive, hoặc cung cấp đường dẫn thư mục đồng bộ trên máy.',
-    driveConnectFirst: 'Google Drive chưa được kết nối. Hãy kết nối trước, hoặc cung cấp đường dẫn thư mục đồng bộ trên máy.',
   },
   search: {
     invalid: 'Yêu cầu tìm kiếm không hợp lệ.',

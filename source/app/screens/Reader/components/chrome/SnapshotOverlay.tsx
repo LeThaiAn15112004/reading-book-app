@@ -1,6 +1,6 @@
-/* i18n-pending: reader.chrome */
 import type { PointerEvent as ReactPointerEvent } from 'react'
 import type { SnapshotRect } from '../../logic'
+import { useT } from '../../../../i18n'
 
 type SnapshotOverlayProps = {
   active: boolean
@@ -25,6 +25,7 @@ export function SnapshotOverlay({
   onPointerMove,
   onPointerUp,
 }: SnapshotOverlayProps) {
+  const t = useT()
   if (!active) return null
 
   return (
@@ -37,7 +38,7 @@ export function SnapshotOverlay({
     >
       {!selectionRect ? (
         <div className="pointer-events-none absolute top-4 left-1/2 -translate-x-1/2 rounded-full border border-lib-border bg-lib-surface-strong px-4 py-2 text-[13px] font-semibold text-lib-text-strong shadow-xl">
-          Kéo để chọn vùng cần chụp · Esc để hủy
+          {t('reader.chrome.snapshot.hint')}
         </div>
       ) : null}
 

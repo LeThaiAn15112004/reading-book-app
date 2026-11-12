@@ -1,4 +1,3 @@
-/* i18n-pending: library */
 // @refresh reset
 import {
   AudiobookZipImportDialog,
