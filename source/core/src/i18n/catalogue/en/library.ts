@@ -167,6 +167,7 @@ export const en = {
       '“{title}” and its imported chapter files will be permanently deleted from Readmate. The original ZIP is not touched. This cannot be undone.',
     removeReferencedBody: '“{title}” will disappear from the library. The original file will not be touched.',
     removeManagedBody: '“{title}” will disappear from the library. Its imported file will be kept.',
+    removePhoneBody: '“{title}” will be removed from the library with its highlights, notes, bookmarks and reading progress. The copy of the file kept by the app is deleted too.',
     deleteFileBody: '“{title}” and its imported file will be permanently deleted. This cannot be undone.',
     remove: 'Remove',
     removeAudiobook: 'Remove audiobook',
@@ -243,6 +244,7 @@ export const en = {
     favoriteAdded: 'Added to favorites.',
     favoriteRemoved: 'Removed from favorites.',
     markedCompleted: 'Marked as completed.',
+    markedReading: 'Marked as reading.',
     metadataUpdated: 'Book metadata updated.',
     fileLocationOpened: 'Opened file location.',
     pathCopied: 'File path copied.',
@@ -306,5 +308,8 @@ export const en = {
       clear: 'Clear',
     },
     adPlaceholder: 'Ad · Banner 320 × 50',
+    sheet: {
+      close: 'Close',
+    },
   },
 } as const

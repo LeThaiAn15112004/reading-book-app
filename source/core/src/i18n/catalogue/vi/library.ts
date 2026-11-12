@@ -170,6 +170,7 @@ export const vi = {
       '“{title}” và các tệp chương đã nhập sẽ bị xóa vĩnh viễn khỏi Readmate. Tệp ZIP gốc không bị động đến. Không thể hoàn tác.',
     removeReferencedBody: '“{title}” sẽ biến mất khỏi thư viện. Tệp gốc không bị động đến.',
     removeManagedBody: '“{title}” sẽ biến mất khỏi thư viện. Tệp đã nhập vẫn được giữ lại.',
+    removePhoneBody: '“{title}” sẽ bị xóa khỏi thư viện cùng các đoạn tô sáng, ghi chú, dấu trang và tiến độ đọc. Bản sao tệp mà ứng dụng lưu giữ cũng bị xóa.',
     deleteFileBody: '“{title}” và tệp đã nhập sẽ bị xóa vĩnh viễn. Không thể hoàn tác.',
     remove: 'Gỡ',
     removeAudiobook: 'Gỡ sách nói',
@@ -246,6 +247,7 @@ export const vi = {
     favoriteAdded: 'Đã thêm vào yêu thích.',
     favoriteRemoved: 'Đã gỡ khỏi yêu thích.',
     markedCompleted: 'Đã đánh dấu đã đọc xong.',
+    markedReading: 'Đã đánh dấu đang đọc.',
     metadataUpdated: 'Đã cập nhật thông tin sách.',
     fileLocationOpened: 'Đã mở vị trí tệp.',
     pathCopied: 'Đã sao chép đường dẫn tệp.',
@@ -309,5 +311,8 @@ export const vi = {
       clear: 'Xóa bộ lọc',
     },
     adPlaceholder: 'Quảng cáo · Banner 320 × 50',
+    sheet: {
+      close: 'Đóng',
+    },
   },
 } as const satisfies AreaShape<typeof en>

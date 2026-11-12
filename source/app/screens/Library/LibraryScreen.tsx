@@ -74,6 +74,7 @@ export function LibraryScreen() {
     handleToggleFavorite,
     handleMarkCompleted,
     handleReadAgain,
+    handleMarkReading,
     handleSaveMetadata,
     handleOpenFileLocation,
     handleCopyFilePath,
@@ -254,6 +255,8 @@ export function LibraryScreen() {
           onNewCollection={() => openNewCollection(menuBook.id)}
           onToggleFavorite={handleToggleFavorite}
           onMarkCompleted={handleMarkCompleted}
+          onReadAgain={(bookId) => void handleReadAgain(bookId)}
+          onMarkReading={(bookId) => void handleMarkReading(bookId)}
           onDetails={handleBookInfo}
           onEditMetadata={setEditMetadataId}
           onOpenFileLocation={handleOpenFileLocation}
@@ -308,7 +311,10 @@ export function LibraryScreen() {
                   })
                 : t('library.confirm.removeAudiobookBodyUnknown', { title: pendingRemovalBook.title })
               : pendingRemoval.kind === 'remove'
-                ? pendingRemovalBook.fileStorage === 'referenced'
+                ? isMobileHost()
+                  ? // Mobile keeps its own copy of every book and deletes it with the book (spec 013 FR-018).
+                    t('library.confirm.removePhoneBody', { title: pendingRemovalBook.title })
+                  : pendingRemovalBook.fileStorage === 'referenced'
                   ? t('library.confirm.removeReferencedBody', { title: pendingRemovalBook.title })
                   : t('library.confirm.removeManagedBody', { title: pendingRemovalBook.title })
                 : t('library.confirm.deleteFileBody', { title: pendingRemovalBook.title })

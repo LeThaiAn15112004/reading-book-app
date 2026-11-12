@@ -3,6 +3,7 @@ import { annotationTransferApi } from '../../../../bridge'
 import { useT } from '../../../../i18n'
 import { isFeatureAvailable, isMobileHost } from '../../../../platforms/host'
 import { supportsAnnotationTransfer } from '../../../Reader/logic/annotationTransferStore'
+import { PhoneBookSheet } from './PhoneBookSheet'
 import type {
   CollectionSummary,
   LibraryBook,
@@ -36,6 +37,10 @@ export type BookItemMenuProps = {
   onImportAnnotations: (id: string) => void | Promise<void>
   /** EPUB / PDF / TXT / Markdown: save a readable Markdown copy of the book's annotations. */
   onExportReadable: (id: string) => void | Promise<void>
+  /** Phone sheet only (spec 013): "Read again" for a finished book. */
+  onReadAgain?: (id: string) => void
+  /** Phone sheet only (spec 013): "Mark as reading" for a completed book. */
+  onMarkReading?: (id: string) => void
 }
 
 export function MoreVertIcon({ className }: { className?: string }) {
@@ -86,7 +91,15 @@ export function BookMenuButton({
 const itemClass =
   'flex h-8 w-full cursor-pointer items-center justify-between gap-4 rounded-md border-none bg-transparent px-2.5 text-left text-[13px] text-lib-text-strong hover:bg-white/5 focus-visible:bg-white/5 focus-visible:outline-none disabled:cursor-default disabled:opacity-45'
 
-export function BookItemMenu({
+/**
+ * The book menu: on the Mobile host the phone bottom sheet (spec 013 US4, `PhoneBookSheet`), elsewhere the desktop
+ * pop-up menu below (unchanged).
+ */
+export function BookItemMenu(props: BookItemMenuProps) {
+  return isMobileHost() ? <PhoneBookSheet {...props} /> : <DesktopBookItemMenu {...props} />
+}
+
+function DesktopBookItemMenu({
   book,
   point,
   collections,

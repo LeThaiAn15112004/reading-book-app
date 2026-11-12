@@ -265,6 +265,14 @@ export function useLibraryScreen() {
     )
   }
 
+  /** Phone sheet (spec 013 R9): a completed book back to `reading`; its last position is kept. */
+  async function handleMarkReading(bookId: string) {
+    await runBookMutation(
+      () => libraryApi.markAsReading(bookId),
+      { key: 'library.toast.markedReading' },
+    )
+  }
+
   async function handleSaveMetadata(values: BookMetadataValues) {
     await runBookMutation(
       () => libraryApi.updateMetadata(values),
@@ -466,6 +474,7 @@ export function useLibraryScreen() {
     handleToggleFavorite,
     handleMarkCompleted,
     handleReadAgain,
+    handleMarkReading,
     handleSaveMetadata,
     handleOpenFileLocation,
     handleCopyFilePath,
