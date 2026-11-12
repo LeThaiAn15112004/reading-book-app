@@ -86,3 +86,9 @@
   content-visibility: auto;
   contain-intrinsic-size: auto 120px;
 }
+
+/* Phone grid (spec 013 FR-014): ≥ 2 columns on a 360 px screen with 16 px gutters, more in landscape. */
+:root[data-mobile-host] .phone-grid {
+  grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
+  gap: 16px 12px;
+}

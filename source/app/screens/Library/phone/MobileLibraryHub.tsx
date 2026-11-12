@@ -4,7 +4,10 @@ import { BootErrorBanner, LibraryBookGrid } from '../components'
 import type { LibraryHubProps } from '../LibraryHub'
 import { LIBRARY_FILTER_EMPTY, useLibraryBrowse, useLibraryBrowseStore } from '../logic'
 import { MobileLibraryEmptyState } from './MobileLibraryEmptyState'
+import { MobileBookList } from './MobileBookList'
 import { MobileLibraryHeader } from './MobileLibraryHeader'
+import { PhoneBrowseToolbar } from './PhoneBrowseToolbar'
+import { PhoneFilterChips } from './PhoneFilterChips'
 import { PhoneContinueCarousel } from './PhoneContinueCarousel'
 
 export type MobileLibraryHubProps = LibraryHubProps & {
@@ -34,8 +37,10 @@ export default function MobileLibraryHub({
 }: MobileLibraryHubProps) {
   const t = useT()
   const bookList = books ?? []
-  const { filter, searchActive, visibleBooks, phoneContinueBooks } = useLibraryBrowse(bookList, searchQuery)
+  const { filter, sort, layout, searchActive, visibleBooks, phoneContinueBooks } = useLibraryBrowse(bookList, searchQuery)
   const setFilter = useLibraryBrowseStore((s) => s.setFilter)
+  const setSort = useLibraryBrowseStore((s) => s.setSort)
+  const setLayout = useLibraryBrowseStore((s) => s.setLayout)
 
   // First launch (no book at all): only the header and the empty state — no chips, carousel or toolbar (US2).
   const isEmpty = books !== null && books.length === 0
@@ -65,8 +70,11 @@ export default function MobileLibraryHub({
             </button>
           ) : null}
         </div>
+      ) : layout === 'table' ? (
+        // The stored `table` layout is the phone List; the desktop table and its detail panel never render here (FR-013).
+        <MobileBookList books={visibleBooks} onOpen={onOpenBook} onBookMenu={onBookMenu} />
       ) : (
-        <LibraryBookGrid books={visibleBooks} onOpen={onOpenBook} onBookMenu={onBookMenu} />
+        <LibraryBookGrid books={visibleBooks} onOpen={onOpenBook} onBookMenu={onBookMenu} className="phone-grid" />
       )
   }
 
@@ -75,6 +83,11 @@ export default function MobileLibraryHub({
       {/* Top region (does not scroll): header, then the filter chips (US3). */}
       <div className="shrink-0 pt-3 pb-3">
         <MobileLibraryHeader searchQuery={searchQuery} onSearchChange={onSearchChange} onFromDevice={onFromDevice} />
+        {isEmpty ? null : (
+          <div className="mt-2">
+            <PhoneFilterChips filter={filter} onChange={setFilter} />
+          </div>
+        )}
       </div>
 
       {/* The one vertical scroll container: carousel (US1), toolbar + Grid / List (US3). */}
@@ -91,6 +104,16 @@ export default function MobileLibraryHub({
               onReadAgain={onReadAgain}
               onBookMenu={onBookMenu}
             />
+            {books !== null ? (
+              <PhoneBrowseToolbar
+                count={visibleBooks.length}
+                sort={sort}
+                onSortChange={setSort}
+                layout={layout}
+                onLayoutChange={setLayout}
+                sortHidden={filter === 'recent'}
+              />
+            ) : null}
             {collection}
           </>
         )}

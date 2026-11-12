@@ -67,7 +67,7 @@ export function PhoneContinueCarousel({ books, onResume, onReadAgain, onBookMenu
                     {[book.lastReadLocation, relative].filter(Boolean).join(' · ')}
                   </p>
                 </div>
-                <BookMenuButton title={book.title} onOpen={(point) => onBookMenu(book.id, point)} />
+                <BookMenuButton title={book.title} className="!size-11 -mt-1 -mr-1" onOpen={(point) => onBookMenu(book.id, point)} />
               </div>
               <div className="flex items-center gap-3">
                 <span
