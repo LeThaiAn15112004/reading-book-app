@@ -20,6 +20,7 @@ import {
   type BookAttachment,
 } from '@core'
 import type { PdfAttachmentExtractResult, PdfAttachmentListResult } from './pdf-attachments'
+import { tMain } from '../i18n/main-translate'
 
 export type AttachmentErrorCode =
   | 'invalid_request'
@@ -80,10 +81,10 @@ function errnoOf(err: unknown): string | undefined {
 function describeWriteError(err: unknown, fileName: string): AttachmentFailure {
   const code = errnoOf(err)
   if (code === 'EACCES' || code === 'EPERM') {
-    return fail('access_denied', 'Readmate was not allowed to write there. Choose another location.', fileName)
+    return fail('access_denied', tMain('main.messages.attachments.noPermission'), fileName)
   }
-  if (code === 'ENOSPC') return fail('write_failed', 'There is not enough free disk space to save this file.', fileName)
-  return fail('write_failed', 'The file could not be written.', fileName)
+  if (code === 'ENOSPC') return fail('write_failed', tMain('main.messages.attachments.noSpace'), fileName)
+  return fail('write_failed', tMain('main.messages.files.notWritten'), fileName)
 }
 
 /** `dir` is a directory Main just created; the file must be a direct child with exactly `name`. */
@@ -101,21 +102,21 @@ export function createAttachmentService(deps: AttachmentServiceDeps) {
     { ok: true; id: string; path: string; bytes: Uint8Array } | AttachmentFailure
   > {
     if (typeof bookId !== 'string' || !bookId.trim() || bookId.length > MAX_ID_LENGTH) {
-      return fail('invalid_request', 'Invalid request.')
+      return fail('invalid_request', tMain('main.messages.common.invalidRequest'))
     }
     const id = bookId.trim()
     const source = await deps.resolvePdf(id)
     if (!source.ok) {
       if (source.code === 'missing_file') {
-        return fail('missing_file', 'The book file could not be found. It may have been moved, renamed, or deleted.')
+        return fail('missing_file', tMain('main.messages.common.bookFileMissing'))
       }
-      if (source.code === 'read_failed') return fail('read_failed', 'Could not read the book file.')
-      return fail('not_found', 'Book not found.')
+      if (source.code === 'read_failed') return fail('read_failed', tMain('main.messages.common.readFailed'))
+      return fail('not_found', tMain('main.messages.common.bookNotFound'))
     }
     try {
       return { ok: true, id, path: source.path, bytes: await deps.readFile(source.path) }
     } catch {
-      return fail('read_failed', 'Could not read the book file.')
+      return fail('read_failed', tMain('main.messages.common.readFailed'))
     }
   }
 
@@ -124,21 +125,21 @@ export function createAttachmentService(deps: AttachmentServiceDeps) {
     bookId: unknown,
     attachmentId: unknown,
   ): Promise<{ ok: true; pdfPath: string; name: string; content: Uint8Array } | AttachmentFailure> {
-    if (!isAttachmentId(attachmentId)) return fail('invalid_request', 'Invalid request.')
+    if (!isAttachmentId(attachmentId)) return fail('invalid_request', tMain('main.messages.common.invalidRequest'))
     const pdf = await readPdf(bookId)
     if (!pdf.ok) return pdf
     let extracted: PdfAttachmentExtractResult
     try {
       extracted = await deps.extract(pdf.bytes, attachmentId)
     } catch {
-      return fail('extract_failed', 'The attachment could not be extracted from this PDF.')
+      return fail('extract_failed', tMain('main.messages.attachments.extractFailed'))
     }
     if (!extracted.ok) {
       switch (extracted.code) {
         case 'not_found':
-          return fail('attachment_not_found', 'This attachment is no longer in the PDF.')
+          return fail('attachment_not_found', tMain('main.messages.attachments.gone'))
         case 'empty':
-          return fail('empty', 'This attachment is empty.')
+          return fail('empty', tMain('main.messages.attachments.empty'))
         case 'too_large':
           return fail('too_large', 'This attachment is larger than the 100 MB limit.')
       }
@@ -147,7 +148,7 @@ export function createAttachmentService(deps: AttachmentServiceDeps) {
     const size = checkAttachmentSize(extracted.content.byteLength)
     if (!size.ok) {
       return size.reason === 'empty'
-        ? fail('empty', 'This attachment is empty.')
+        ? fail('empty', tMain('main.messages.attachments.empty'))
         : fail('too_large', 'This attachment is larger than the 100 MB limit.')
     }
     return { ok: true, pdfPath: pdf.path, name: sanitizeAttachmentFileName(extracted.name), content: extracted.content }
@@ -158,7 +159,7 @@ export function createAttachmentService(deps: AttachmentServiceDeps) {
     key: string,
     run: () => Promise<T>,
   ): Promise<T | AttachmentFailure> {
-    if (inFlight.has(key)) return fail('busy', 'This attachment is already being opened.')
+    if (inFlight.has(key)) return fail('busy', tMain('main.messages.attachments.alreadyOpening'))
     inFlight.add(key)
     try {
       return await run()
@@ -175,7 +176,7 @@ export function createAttachmentService(deps: AttachmentServiceDeps) {
         const { items, truncated } = await deps.list(pdf.bytes)
         return { ok: true, items, truncated }
       } catch {
-        return fail('extract_failed', 'The attachments of this PDF could not be read.')
+        return fail('extract_failed', tMain('main.messages.attachments.listFailed'))
       }
     },
 
@@ -211,7 +212,7 @@ export function createAttachmentService(deps: AttachmentServiceDeps) {
           await fsp.rm(dir, { recursive: true, force: true }).catch(() => undefined)
           return fail(
             'open_failed',
-            'No application could open this file. Install a program that handles this file type, or save it instead.',
+            tMain('main.messages.attachments.noApp'),
             name,
           )
         }
@@ -226,9 +227,9 @@ export function createAttachmentService(deps: AttachmentServiceDeps) {
         if (!loaded.ok) return loaded
         const { name, content, pdfPath } = loaded
         const target = await deps.chooseSaveTarget(name)
-        if (!target) return fail('canceled', 'Save canceled.', name)
+        if (!target) return fail('canceled', tMain('main.messages.attachments.saveCancelled'), name)
         if (deps.isForbiddenTarget(target, pdfPath)) {
-          return fail('access_denied', 'That location cannot be used. Choose another folder.', name)
+          return fail('access_denied', tMain('main.messages.attachments.badLocation'), name)
         }
         try {
           await fsp.writeFile(target, content)

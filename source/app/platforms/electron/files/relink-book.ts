@@ -4,6 +4,7 @@ import type { RelinkBookResult } from '../ipc/api-types'
 import { getLibraryStore } from '../persistence/sqlite-library-store'
 import { hashFile } from './file-hash'
 import { isPathInsideUserData } from './sandbox'
+import { tMain } from '../i18n/main-translate'
 
 function fail(
   errorCode: NonNullable<RelinkBookResult['errorCode']>,
@@ -26,15 +27,15 @@ export async function relinkBookToFile(
 ): Promise<RelinkBookResult> {
   const store = getLibraryStore()
   const book = await store.findById(bookId)
-  if (!book) return fail('not_found', 'Book not found.')
+  if (!book) return fail('not_found', tMain('main.messages.common.bookNotFound'))
   if (store.hasAudioChapters(book.id)) {
     // Its identity is the hash of an ordered list of files, not of one file.
-    return fail('wrong_file', 'An audiobook made of several chapter files cannot be relinked.')
+    return fail('wrong_file', tMain('main.messages.library.multiRelink'))
   }
 
   const resolved = path.resolve(chosenPath)
   if (isPathInsideUserData(resolved)) {
-    return fail('wrong_file', 'Choose a file outside the app’s own data folder.')
+    return fail('wrong_file', tMain('main.messages.files.fileOutsideDataFolder'))
   }
   if (resolveFormatFromExtension(path.extname(resolved).toLowerCase()) !== book.format) {
     return fail('wrong_file', `That file is not a ${book.format.toUpperCase()} book.`)
@@ -44,12 +45,12 @@ export async function relinkBookToFile(
   try {
     sha256 = (await hashFile(resolved)).sha256
   } catch {
-    return fail('read_failed', 'Could not read the selected file.')
+    return fail('read_failed', tMain('main.messages.import.selectedUnreadable'))
   }
   if (sha256 !== book.sha256) {
     return fail(
       'hash_mismatch',
-      'That file is not the same book as this library entry, so it was not linked.',
+      tMain('main.messages.files.notSameBook'),
     )
   }
 

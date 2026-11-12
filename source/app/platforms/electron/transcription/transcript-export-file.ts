@@ -1,5 +1,6 @@
 import type { TranscriptionExportOptionsDto, TranscriptionExportResult } from '../ipc/api-types'
 import type { TranscriptExportBuild } from './transcription-service'
+import { tMain } from '../i18n/main-translate'
 
 /**
  * "Export transcript…" end to end (spec 004, FR-011) with every outside effect injected: the transcript text, the Main-owned save
@@ -46,7 +47,7 @@ export async function exportTranscriptToFile(
 
   const target = /\.[^\\/.]+$/.test(picked) ? picked : `${picked}.txt`
   if (deps.isForbiddenTarget(target)) {
-    return { saved: false, errorCode: 'INVALID_ARGUMENT', errorMessage: "Choose a place outside the app's own data folder." }
+    return { saved: false, errorCode: 'INVALID_ARGUMENT', errorMessage: tMain('main.messages.transcription.outsideDataFolder') }
   }
   try {
     await deps.writeFile(target, built.text)

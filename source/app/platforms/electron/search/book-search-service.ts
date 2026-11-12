@@ -12,6 +12,7 @@ import {
   readBookChunkStats,
   type BookMatch,
 } from './book-search-query'
+import { tMain } from '../i18n/main-translate'
 
 const DEFAULT_PAGE_SIZE = 200
 const MAX_PAGE_SIZE = 1000
@@ -91,7 +92,7 @@ export async function searchBook(request: BookSearchRequestDto): Promise<BookSea
     if (ensured.state === 'indexing') return { state: 'indexing' }
     if (ensured.state === 'unsupported') return { state: 'unsupported' }
     if (ensured.state === 'error') {
-      return { state: 'error', message: 'This book could not be prepared for search.' }
+      return { state: 'error', message: tMain('main.messages.search.prepareFailed') }
     }
     // `ready`: chunking finished in the meantime, or the book has no extractable text.
     stats = readBookChunkStats(db, bookId)

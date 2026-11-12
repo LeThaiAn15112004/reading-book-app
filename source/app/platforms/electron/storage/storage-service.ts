@@ -19,6 +19,7 @@ import type {
   StorageUsageDto,
   TranslationModelDto,
 } from '../ipc/api-types'
+import { tMain } from '../i18n/main-translate'
 
 /**
  * Settings → Storage (SCR-06). Read-only usage figures plus two narrowly scoped deletions:
@@ -146,7 +147,7 @@ export async function clearCache(): Promise<ClearCacheResult> {
     return {
       ok: false,
       errorCode: 'busy',
-      errorMessage: 'A book is being indexed right now. Try again in a moment.',
+      errorMessage: tMain('main.messages.storage.indexing'),
     }
   }
   try {
@@ -154,7 +155,7 @@ export async function clearCache(): Promise<ClearCacheResult> {
       return {
         ok: false,
         errorCode: 'busy',
-        errorMessage: 'A book is being indexed right now. Try again in a moment.',
+        errorMessage: tMain('main.messages.storage.indexing'),
       }
     }
     await session.defaultSession.clearCache()
@@ -163,7 +164,7 @@ export async function clearCache(): Promise<ClearCacheResult> {
     return { ok: true }
   } catch (err) {
     console.warn('[storage] clear cache failed', err)
-    return { ok: false, errorCode: 'failed', errorMessage: 'Could not clear the cache.' }
+    return { ok: false, errorCode: 'failed', errorMessage: tMain('main.messages.storage.clearFailed') }
   }
 }
 
@@ -172,27 +173,27 @@ export async function removeTranslationModel(
   modelId: unknown,
 ): Promise<RemoveTranslationModelResult> {
   if (typeof modelId !== 'string') {
-    return { ok: false, errorCode: 'not_found', errorMessage: 'Unknown translation model.' }
+    return { ok: false, errorCode: 'not_found', errorMessage: tMain('main.messages.storage.unknownModel') }
   }
   const [org, name, ...rest] = modelId.split('/')
   if (!org || !name || rest.length > 0 || !MODEL_SEGMENT.test(org) || !MODEL_SEGMENT.test(name)) {
-    return { ok: false, errorCode: 'not_found', errorMessage: 'Unknown translation model.' }
+    return { ok: false, errorCode: 'not_found', errorMessage: tMain('main.messages.storage.unknownModel') }
   }
   const models = await listTranslationModels()
   if (!models.some((m) => m.id === modelId)) {
-    return { ok: false, errorCode: 'not_found', errorMessage: 'This model is no longer on disk.' }
+    return { ok: false, errorCode: 'not_found', errorMessage: tMain('main.messages.storage.modelGone') }
   }
   if (!releaseTranslationWorker()) {
     return {
       ok: false,
       errorCode: 'busy',
-      errorMessage: 'A translation is in progress. Try again when it finishes.',
+      errorMessage: tMain('main.messages.storage.translating'),
     }
   }
   const root = getTranslationModelsDir()
   const target = path.resolve(root, org, name)
   if (path.dirname(path.dirname(target)) !== path.resolve(root)) {
-    return { ok: false, errorCode: 'not_found', errorMessage: 'Unknown translation model.' }
+    return { ok: false, errorCode: 'not_found', errorMessage: tMain('main.messages.storage.unknownModel') }
   }
   try {
     await fsp.rm(target, { recursive: true, force: true })
@@ -201,7 +202,7 @@ export async function removeTranslationModel(
     return { ok: true }
   } catch (err) {
     console.warn('[storage] removing translation model failed', err)
-    return { ok: false, errorCode: 'failed', errorMessage: 'Could not remove the model.' }
+    return { ok: false, errorCode: 'failed', errorMessage: tMain('main.messages.storage.removeFailed') }
   }
 }
 
@@ -212,11 +213,11 @@ export async function removeTranslationModel(
  */
 export async function removeSpeechModel(modelId: unknown): Promise<RemoveSpeechModelResult> {
   if (typeof modelId !== 'string') {
-    return { ok: false, errorCode: 'not_found', errorMessage: 'Unknown speech model.' }
+    return { ok: false, errorCode: 'not_found', errorMessage: tMain('main.messages.storage.unknownSpeechModel') }
   }
   const installed = await listSpeechModelUsage(getSpeechModelsDir())
   if (!installed.some((m) => m.id === modelId)) {
-    return { ok: false, errorCode: 'not_found', errorMessage: 'This model is no longer on disk.' }
+    return { ok: false, errorCode: 'not_found', errorMessage: tMain('main.messages.storage.modelGone') }
   }
   const result = await removeSpeechModelFiles(modelId)
   return result.ok ? { ok: true } : { ok: false, errorCode: result.errorCode, errorMessage: result.errorMessage }

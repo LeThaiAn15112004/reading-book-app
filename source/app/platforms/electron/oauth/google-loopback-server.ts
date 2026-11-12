@@ -5,16 +5,18 @@ import {
   GOOGLE_OAUTH_LOOPBACK_HOST,
   GOOGLE_OAUTH_LOOPBACK_PORT,
 } from '@core/config'
+import { getMainUiLanguage } from '../i18n/main-i18n'
+import { tMain } from '../i18n/main-translate'
 
 export type LoopbackAuthResult = { code: string; state?: string } | { error: string }
 
 function renderResultPage(ok: boolean): string {
-  const title = ok ? 'Sign-in successful' : 'Sign-in failed'
+  const title = ok ? tMain('main.messages.oauth.successTitle') : tMain('main.messages.oauth.failedTitle')
   const message = ok
-    ? 'You can close this tab and return to Readmate Reader.'
-    : 'Something went wrong during sign-in. Please return to the app and try again.'
+    ? tMain('main.messages.oauth.successBody')
+    : tMain('main.messages.oauth.failedBody')
   return `<!doctype html>
-<html lang="en">
+<html lang="${getMainUiLanguage()}">
 <head>
 <meta charset="utf-8" />
 <title>${title}</title>
@@ -75,7 +77,7 @@ export function openGoogleOAuthViaLoopback(
 
       if (state !== expectedState || !code) {
         res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' }).end(renderResultPage(false))
-        finish({ error: 'Received an unexpected sign-in response.' })
+        finish({ error: tMain('main.messages.oauth.unexpected') })
         return
       }
 
@@ -94,7 +96,7 @@ export function openGoogleOAuthViaLoopback(
 
     server.listen(GOOGLE_OAUTH_LOOPBACK_PORT, GOOGLE_OAUTH_LOOPBACK_HOST, () => {
       shell.openExternal(authUrl).catch(() => {
-        finish({ error: 'Could not open the system browser to sign in.' })
+        finish({ error: tMain('main.messages.cloud.browserFailed') })
       })
     })
   })

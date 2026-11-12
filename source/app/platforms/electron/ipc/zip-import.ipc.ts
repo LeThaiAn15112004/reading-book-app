@@ -18,6 +18,7 @@ import type {
 import { ZipImportChannels } from './channels'
 import { beginCancellable, cancelInFlight, endCancellable } from './import-cancel'
 import { importDownloadedFile } from './import.ipc'
+import { tMain } from '../i18n/main-translate'
 
 const CANCEL_KEY = 'zip-inspect'
 const IMPORT_CANCEL_KEY = 'zip-import'
@@ -103,7 +104,7 @@ export function registerZipImportIpc(): void {
     try {
       picked = parent ? await dialog.showOpenDialog(parent, options) : await dialog.showOpenDialog(options)
     } catch {
-      return failure('unreadable', 'Could not open the file picker.')
+      return failure('unreadable', tMain('main.messages.import.pickerFailed'))
     }
     if (picked.canceled || picked.filePaths.length === 0) return failure('cancelled', 'Cancelled.')
     // The path comes from the native dialog, never from the renderer.
@@ -114,7 +115,7 @@ export function registerZipImportIpc(): void {
   ipcMain.handle(ZipImportChannels.inspectPicked, async (event): Promise<ZipImportPickResult> => {
     // The ZIP the user chose in the ordinary "Add file" dialog; its path never left Main and is used once.
     const zipPath = takePickedZip()
-    if (!zipPath) return failure('unreadable', 'No ZIP file was selected.')
+    if (!zipPath) return failure('unreadable', tMain('main.messages.zip.noneSelected'))
     return inspectPath(event.sender, zipPath)
   })
 

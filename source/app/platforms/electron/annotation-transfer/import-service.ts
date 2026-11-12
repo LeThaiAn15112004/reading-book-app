@@ -11,6 +11,7 @@
  * The dialog, the file read, the stores and the PDF scan are injected: `annotation-transfer.ipc.ts` passes the real
  * ones, the Main spike passes the real stores with a stubbed dialog.
  */
+import type { MessageKey } from '@core'
 import {
   contentKeyOfNote,
   decidePlacement,
@@ -32,6 +33,7 @@ import type {
 } from '../ipc/api-types'
 import type { TransferNoteRow } from '../persistence/sqlite-overlay-store'
 import { identifyBook, type IdentifyLibrary } from './identify-book'
+import { tMain } from '../i18n/main-translate'
 
 const TRANSFER_FORMATS: readonly string[] = ['epub', 'pdf', 'txt', 'md']
 
@@ -96,21 +98,21 @@ interface Session {
 
 const EMPTY_PLAN: ImportPlan = { toAdd: [], present: 0, notPlaced: [] }
 
-const MESSAGES: Partial<Record<AnnotationTransferErrorCode, string>> = {
-  not_found: 'That book or import session was not found.',
-  damaged: 'The file is damaged and cannot be imported.',
-  newer_version: 'This file was made by a newer version of Readmate. Update the app to import it.',
-  not_annotation_file: 'This is not a Readmate annotations file.',
-  format_mismatch: 'The file and the book are different formats, so the annotations cannot be imported.',
-  file_unavailable: 'The book file could not be found. Relink the book from the Library, then try again.',
-  target_not_confirmed: 'Choose the book to import into first.',
-  stale_preview: 'The book changed since the preview was made. Review the new preview and confirm again.',
-  write_failed: 'The annotations could not be saved. Nothing was changed.',
-  book_missing: 'The book this file belongs to is not in your library.',
+const MESSAGES: Partial<Record<AnnotationTransferErrorCode, MessageKey>> = {
+  not_found: 'main.messages.annotations.sessionNotFound',
+  damaged: 'main.messages.annotations.damaged',
+  newer_version: 'main.messages.annotations.newerVersion',
+  not_annotation_file: 'main.messages.annotations.notReadmate',
+  format_mismatch: 'main.messages.annotations.formatMismatch',
+  file_unavailable: 'main.messages.annotations.bookFileMissing',
+  target_not_confirmed: 'main.messages.annotations.chooseTarget',
+  stale_preview: 'main.messages.annotations.stalePreview',
+  write_failed: 'main.messages.annotations.saveFailed',
+  book_missing: 'main.messages.annotations.bookNotInLibrary',
 }
 
 function fail(errorCode: AnnotationTransferErrorCode, message?: string): { ok: false; errorCode: AnnotationTransferErrorCode; message?: string } {
-  return { ok: false, errorCode, message: message ?? MESSAGES[errorCode] }
+  return { ok: false, errorCode, message: message ?? (MESSAGES[errorCode] ? tMain(MESSAGES[errorCode]!) : undefined) }
 }
 
 function keysOf(rows: readonly TransferNoteRow[]): Set<string> {
@@ -202,7 +204,7 @@ export function createImportService(deps: ImportDeps): ImportService {
       try {
         text = await deps.readText(picked)
       } catch {
-        return fail('damaged', 'The file could not be read.')
+        return fail('damaged', tMain('main.messages.annotations.fileUnreadable'))
       }
 
       const parsed = parseAnnotationFile(text)

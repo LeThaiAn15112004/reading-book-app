@@ -2,6 +2,7 @@ import { ipcMain } from 'electron'
 import { searchBook } from '../search/book-search-service'
 import type { BookSearchRequestDto, BookSearchResultDto } from './api-types'
 import { SearchChannels } from './channels'
+import { tMain } from '../i18n/main-translate'
 
 /** Longer input is cut; the query itself is capped at TEXT_SEARCH_MAX_TOKENS words. */
 const MAX_QUERY_CHARS = 500
@@ -28,13 +29,13 @@ export function registerSearchIpc(): void {
     SearchChannels.searchBook,
     async (_event, input: unknown): Promise<BookSearchResultDto> => {
       const request = toSearchRequest(input)
-      if (!request) return { state: 'error', message: 'Invalid search request.' }
+      if (!request) return { state: 'error', message: tMain('main.messages.search.invalid') }
       try {
         return await searchBook(request)
       } catch (err) {
         return {
           state: 'error',
-          message: err instanceof Error ? err.message : 'Search failed.',
+          message: err instanceof Error ? err.message : tMain('main.messages.search.failed'),
         }
       }
     },

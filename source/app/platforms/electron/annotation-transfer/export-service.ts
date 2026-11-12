@@ -20,6 +20,7 @@ import {
 import type { EmbeddedAnnotationLedgerEntry } from '@core'
 import type { AnnotationExportResult } from '../ipc/api-types'
 import type { TransferNoteRow } from '../persistence/sqlite-overlay-store'
+import { tMain } from '../i18n/main-translate'
 
 const TRANSFER_FORMATS: readonly string[] = ['epub', 'pdf', 'txt', 'md']
 
@@ -128,11 +129,11 @@ async function buildFileFor(bookId: string, deps: ExportDeps): Promise<BuiltFile
     now: (deps.now ?? (() => new Date()))(),
   })
   // Nothing to export: say so before any dialog is shown and write nothing.
-  if (!built.ok) return { ok: false, errorCode: 'empty', message: 'This book has no annotations to export.' }
+  if (!built.ok) return { ok: false, errorCode: 'empty', message: tMain('main.messages.annotations.none') }
   return { ok: true, file: built.file, exported: built.exported, attachments: built.attachments }
 }
 
-const NOTHING_TO_EXPORT = { ok: false, errorCode: 'empty', message: 'This book has no annotations to export.' } as const
+const NOTHING_TO_EXPORT = () => ({ ok: false, errorCode: 'empty', message: tMain('main.messages.annotations.none') }) as const
 
 /** Ask for a target, refuse the app's own data folder, write atomically. */
 async function saveText(
@@ -146,12 +147,12 @@ async function saveText(
   if (!picked) return { ok: false, errorCode: 'cancelled' }
   const target = withExtension(picked)
   if (deps.isForbiddenTarget(target)) {
-    return { ok: false, errorCode: 'write_failed', message: "Choose a folder outside the app's own data folder." }
+    return { ok: false, errorCode: 'write_failed', message: tMain('main.messages.files.outsideDataFolderAscii') }
   }
   try {
     await deps.write(target, new TextEncoder().encode(text))
   } catch (err) {
-    return { ok: false, errorCode: 'write_failed', message: err instanceof Error ? err.message : 'The file could not be written.' }
+    return { ok: false, errorCode: 'write_failed', message: err instanceof Error ? err.message : tMain('main.messages.files.notWritten') }
   }
   return { ok: true }
 }
@@ -161,7 +162,7 @@ export async function exportRestoreAnnotations(bookId: string, deps: ExportDeps)
   if (!built.ok) return built
   // PDF file attachments are never in the restorable file (their content lives in the PDF, specs/007 R14): a book
   // with only attachments has nothing to restore.
-  if (built.exported === 0) return NOTHING_TO_EXPORT
+  if (built.exported === 0) return NOTHING_TO_EXPORT()
   const saved = await saveText(serializeAnnotationFile(built.file), defaultRestoreFileName(built.file.book.title), 'restore', deps, withRestoreExtension)
   return saved.ok ? { ok: true, exported: built.exported } : saved
 }

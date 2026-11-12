@@ -21,6 +21,7 @@ import {
   type ZipAudiobookImporter,
 } from './zip-import-service'
 import { ZipFormatError, extractEntryToFile, readEntryBytes } from './zip-reader'
+import { tMain } from '../i18n/main-translate'
 
 /**
  * The real import stage behind `ZipAudiobookImporter` (docs/implementation_plan/audiobook_multi_chapter_import.md §3).
@@ -57,7 +58,7 @@ export interface ZipAudiobookImporterDeps {
 
 const PARTIAL_MARKER = '.partial'
 const SPACE_MARGIN_BYTES = 64 * 1024 ** 2
-const DUPLICATE_MESSAGE = 'This audiobook is already in your local library. Open the existing copy?'
+const DUPLICATE_MESSAGE = (): string => tMain('main.messages.zip.duplicate')
 const COVER_EXT_BY_MIME: Record<string, string> = { 'image/jpeg': '.jpg', 'image/png': '.png', 'image/gif': '.gif', 'image/webp': '.webp' }
 
 const isUnique = (err: unknown): boolean => {
@@ -107,13 +108,13 @@ export function createZipAudiobookImporter(deps: ZipAudiobookImporterDeps): ZipA
     try {
       await fsp.mkdir(scratch, { recursive: true })
       if (request.chapters.length === 1) return await importOneTrack(request, scratch)
-      if (request.chapters.length < 2) return failure('invalid_selection', 'Select at least one audio track.')
+      if (request.chapters.length < 2) return failure('invalid_selection', tMain('main.messages.zip.selectTrack'))
 
       // ---- 1. room on disk (the scratch folder and the books folder share a volume in practice, so one copy of the data)
       const declared = request.chapters.reduce((n, c) => n + c.entry.size, 0)
       const free = await deps.freeBytes?.(deps.booksRoot())
       if (typeof free === 'number' && free < declared + SPACE_MARGIN_BYTES) {
-        return failure('insufficient_space', 'There is not enough free disk space to import this audiobook.')
+        return failure('insufficient_space', tMain('main.messages.zip.noSpace'))
       }
 
       // ---- 2. extract + validate every track, in playback order
@@ -152,7 +153,7 @@ export function createZipAudiobookImporter(deps: ZipAudiobookImporterDeps): ZipA
       // ---- 3. duplicate = the same tracks in the same order (whatever ZIP they came from)
       const parentSha = audiobookParentSha256(tracks.map((t) => t.sha256))
       const existing = await deps.store.findBySha256(parentSha)
-      if (existing) return failure('duplicate', DUPLICATE_MESSAGE, existing.id)
+      if (existing) return failure('duplicate', DUPLICATE_MESSAGE(), existing.id)
 
       // ---- 4. place the files in the book's own folder (marker until the database commit)
       const bookId = randomUUID()
@@ -210,11 +211,11 @@ export function createZipAudiobookImporter(deps: ZipAudiobookImporterDeps): ZipA
         if (isUnique(err)) {
           const dup = await deps.store.findBySha256(parentSha).catch(() => undefined)
           await rollback()
-          return dup ? failure('duplicate', DUPLICATE_MESSAGE, dup.id) : failure('import_failed', 'Could not save the audiobook to the library.')
+          return dup ? failure('duplicate', DUPLICATE_MESSAGE(), dup.id) : failure('import_failed', tMain('main.messages.zip.saveFailed'))
         }
         console.warn('[zip-import] saving the audiobook failed', err)
         await rollback()
-        return failure('import_failed', 'Could not save the audiobook to the library.')
+        return failure('import_failed', tMain('main.messages.zip.saveFailed'))
       }
       committed = true
       for (let attempt = 0; attempt < 3; attempt += 1) {
@@ -228,10 +229,10 @@ export function createZipAudiobookImporter(deps: ZipAudiobookImporterDeps): ZipA
       return { ok: true as const, bookId }
     } catch (err) {
       if (!committed) await rollback()
-      if (err instanceof ZipFormatError && err.code === 'cancelled') return failure('cancelled', 'Import cancelled.')
-      if (signal?.aborted) return failure('cancelled', 'Import cancelled.')
+      if (err instanceof ZipFormatError && err.code === 'cancelled') return failure('cancelled', tMain('main.messages.import.cancelled'))
+      if (signal?.aborted) return failure('cancelled', tMain('main.messages.import.cancelled'))
       console.warn('[zip-import] import failed', err)
-      return failure('import_failed', 'Could not import the audiobook. Nothing was added to your library.')
+      return failure('import_failed', tMain('main.messages.zip.importFailed'))
     } finally {
       await fsp.rm(scratch, { recursive: true, force: true }).catch(() => {})
     }
@@ -252,17 +253,17 @@ export function createZipAudiobookImporter(deps: ZipAudiobookImporterDeps): ZipA
     try {
       await extractEntryToFile(request.archivePath, request.directory.fileSize, c.entry, file, request.signal)
     } catch (err) {
-      if (err instanceof ZipFormatError && err.code === 'cancelled') return failure('cancelled', 'Import cancelled.')
+      if (err instanceof ZipFormatError && err.code === 'cancelled') return failure('cancelled', tMain('main.messages.import.cancelled'))
       return failure('invalid_track', `“${archiveBasename(c.path)}” is damaged inside the ZIP.`)
     }
-    if (request.signal?.aborted) return failure('cancelled', 'Import cancelled.')
+    if (request.signal?.aborted) return failure('cancelled', tMain('main.messages.import.cancelled'))
     request.onProgress?.({ stage: 'saving', done: 1, total: 1 })
     const result = await deps.importSingleFile(file)
     if (result.ok && result.bookId) return { ok: true as const, bookId: result.bookId }
     if (result.errorCode === 'duplicate' && result.bookId) {
-      return failure('duplicate', result.errorMessage ?? 'This book is already in your local library. Open the existing copy?', result.bookId)
+      return failure('duplicate', result.errorMessage ?? tMain('main.messages.import.duplicate'), result.bookId)
     }
-    return failure('import_failed', result.errorMessage ?? 'Could not import this audio file.')
+    return failure('import_failed', result.errorMessage ?? tMain('main.messages.zip.fileImportFailed'))
   }
 
   async function writeCover(request: AudiobookImportRequest, firstMeta: TrackMetadata): Promise<string | undefined> {

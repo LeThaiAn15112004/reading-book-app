@@ -9,6 +9,7 @@ import path from 'node:path'
 import type { EmbeddedAnnotationLedgerEntry, ExportableHighlight } from '@core'
 import type { PdfAnnotationWriteInput, PdfAnnotationWriteOutput, PdfAnnotationWriteSummary } from './pdf-annotation-write'
 import { sameSignature, statSignature } from './stable-file-watcher'
+import { tMain } from '../i18n/main-translate'
 
 export type ExportErrorCode =
   | 'cancelled'
@@ -117,7 +118,7 @@ export async function exportAnnotatedPdf(deps: ExportDeps, options: { acknowledg
   } catch {
     return { ok: false, errorCode: 'not_found' }
   }
-  if (!sameSignature(before, await statSignature(source))) return { ok: false, errorCode: 'source_changed', message: 'The book file changed while it was being read.' }
+  if (!sameSignature(before, await statSignature(source))) return { ok: false, errorCode: 'source_changed', message: tMain('main.messages.pdfExport.changedWhileReading') }
   const sourceSha = sha256(bytes)
 
   const signature = deps.verifySignature(bytes)
@@ -127,8 +128,8 @@ export async function exportAnnotatedPdf(deps: ExportDeps, options: { acknowledg
 
   const target = await deps.chooseTarget()
   if (!target) return { ok: false, errorCode: 'cancelled' }
-  if (samePath(target, source)) return { ok: false, errorCode: 'same_as_source', message: 'Choose a different file than the book itself.' }
-  if (deps.isForbiddenTarget(target)) return { ok: false, errorCode: 'permission_denied', message: 'Choose a folder outside the app’s own data folder.' }
+  if (samePath(target, source)) return { ok: false, errorCode: 'same_as_source', message: tMain('main.messages.pdfExport.sameFile') }
+  if (deps.isForbiddenTarget(target)) return { ok: false, errorCode: 'permission_denied', message: tMain('main.messages.files.outsideDataFolder') }
 
   let written: PdfAnnotationWriteOutput
   try {
@@ -143,7 +144,7 @@ export async function exportAnnotatedPdf(deps: ExportDeps, options: { acknowledg
   const prefix = Buffer.from(written.output.buffer, written.output.byteOffset, bytes.length)
   if (!prefix.equals(bytes)) return { ok: false, errorCode: 'verify_failed', message: 'The output does not start with the source bytes.' }
   try {
-    if (sha256(await fsp.readFile(source)) !== sourceSha) return { ok: false, errorCode: 'source_changed', message: 'The book file changed during the export.' }
+    if (sha256(await fsp.readFile(source)) !== sourceSha) return { ok: false, errorCode: 'source_changed', message: tMain('main.messages.pdfExport.changedDuringExport') }
   } catch {
     return { ok: false, errorCode: 'source_changed' }
   }

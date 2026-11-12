@@ -4,6 +4,7 @@ import { getDatabase } from '../persistence/db'
 import { readBookChunkStats } from '../search/book-search-query'
 import { accumulateTextStats, createTextStats } from '@core'
 import { iterateBookChunkContents } from './word-count-query'
+import { tMain } from '../i18n/main-translate'
 
 /**
  * Foxit-style Word Count statistics for one book — Words, Characters (with/without spaces),
@@ -25,7 +26,7 @@ export async function getWordCountStats(bookId: string): Promise<WordCountStatsD
     if (ensured.state === 'indexing') return { state: 'indexing' }
     if (ensured.state === 'unsupported') return { state: 'unsupported' }
     if (ensured.state === 'error') {
-      return { state: 'error', message: 'This book could not be prepared for word count.' }
+      return { state: 'error', message: tMain('main.messages.wordCount.prepareFailed') }
     }
     // `ready`: chunking finished in the meantime, or the book has no extractable text.
     stats = readBookChunkStats(db, id)

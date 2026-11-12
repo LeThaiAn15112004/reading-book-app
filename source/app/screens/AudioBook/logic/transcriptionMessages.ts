@@ -1,4 +1,18 @@
+import type { MessageKey } from '@core'
 import { getFormat, getT } from '../../../i18n'
+
+/** Speech model names by id (spec 012); Main's English `label` is the fallback for an unknown id. */
+const SPEECH_MODEL_LABELS: Readonly<Record<string, MessageKey>> = {
+  'whisper-tiny': 'audiobook.transcription.models.tiny',
+  'whisper-base': 'audiobook.transcription.models.base',
+  'whisper-small': 'audiobook.transcription.models.small',
+}
+
+/** The speech model's name in the interface language. */
+export function speechModelLabel(id: string, fallback: string): string {
+  const key = SPEECH_MODEL_LABELS[id]
+  return key ? getT()(key) : fallback
+}
 
 /**
  * Plain-language text for a transcription error code (FR-014): what happened and what the person can do about it.

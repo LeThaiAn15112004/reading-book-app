@@ -2,6 +2,7 @@ import { ipcMain } from 'electron'
 import { getTxtDocumentService } from '../txt/txt-runtime'
 import type { TxtCommitResult, TxtOpenResult } from './api-types'
 import { TxtChannels } from './channels'
+import { tMain } from '../i18n/main-translate'
 
 /**
  * Handlers for txt:* — the TXT reader's text and annotations (docs/implementation_plan/txt_reader.md).
@@ -21,7 +22,7 @@ export function registerTxtIpc(): void {
         ok: false,
         bookId: typeof bookId === 'string' ? bookId : '',
         errorCode: 'read_failed',
-        errorMessage: 'Could not read the book file.',
+        errorMessage: tMain('main.messages.common.readFailed'),
       }
     }
   })
@@ -33,7 +34,7 @@ export function registerTxtIpc(): void {
       return await service.commit(input)
     } catch (err) {
       console.warn('[txt] commit failed', err)
-      return { ok: false, errorCode: 'db_failed', errorMessage: 'Could not save your changes.' }
+      return { ok: false, errorCode: 'db_failed', errorMessage: tMain('main.messages.txt.saveFailed') }
     }
   })
 }

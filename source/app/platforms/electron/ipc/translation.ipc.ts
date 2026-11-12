@@ -8,6 +8,7 @@ import type {
   TranslationSourceSaveResultDto,
 } from './api-types'
 import { TranslationChannels } from './channels'
+import { tMain } from '../i18n/main-translate'
 
 const MAX_ID_LENGTH = 128
 const MAX_LANG_LENGTH = 16
@@ -31,7 +32,7 @@ export function registerTranslationIpc(): void {
     TranslationChannels.translate,
     async (event, raw: unknown): Promise<TranslateResultDto> => {
       const request = parseRequest(raw)
-      if (!request) return { state: 'error', code: 'INVALID_ARGUMENT', message: 'Malformed translate request.' }
+      if (!request) return { state: 'error', code: 'INVALID_ARGUMENT', message: tMain('main.messages.translation.malformed') }
       if (!watchedSenders.has(event.sender)) {
         watchedSenders.add(event.sender)
         event.sender.once('destroyed', () => cancelTranslationsFor(event.sender))

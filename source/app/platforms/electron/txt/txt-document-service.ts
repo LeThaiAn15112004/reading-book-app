@@ -32,6 +32,7 @@ import {
 } from '../persistence/sqlite-txt-store'
 import { decodeTxtBytes } from './txt-codec'
 import type { TxtWorkingCopyStore } from './txt-working-copy'
+import { tMain } from '../i18n/main-translate'
 
 /** What the service needs to know about a book (a subset of the SDK `Book`). */
 export interface TxtBookInfo {
@@ -178,35 +179,35 @@ export function createTxtDocumentService(deps: TxtDocumentServiceDeps): TxtDocum
     if (!file.ok) {
       switch (file.code) {
         case 'path_denied':
-          return { error: openError(book.id, 'path_denied', 'This book’s file location is not valid.') }
+          return { error: openError(book.id, 'path_denied', tMain('main.messages.common.locationInvalid')) }
         case 'missing_file':
           return {
             error: openError(
               book.id,
               'missing_file',
-              'The book file could not be found. It may have been moved, renamed, or deleted.',
+              tMain('main.messages.common.bookFileMissing'),
             ),
           }
         default:
-          return { error: openError(book.id, 'read_failed', 'Could not read the book file.') }
+          return { error: openError(book.id, 'read_failed', tMain('main.messages.common.readFailed')) }
       }
     }
     try {
       const stat = await fsp.stat(file.path)
       if (stat.size > TXT_MAX_FILE_BYTES) {
-        return { error: openError(book.id, 'too_large', 'This text file is too large to open.') }
+        return { error: openError(book.id, 'too_large', tMain('main.messages.txt.tooLarge')) }
       }
       return { bytes: await fsp.readFile(file.path) }
     } catch {
-      return { error: openError(book.id, 'read_failed', 'Could not read the book file.') }
+      return { error: openError(book.id, 'read_failed', tMain('main.messages.common.readFailed')) }
     }
   }
 
   async function open(bookIdRaw: unknown): Promise<TxtOpenResult> {
     const bookId = typeof bookIdRaw === 'string' ? bookIdRaw.trim() : ''
-    if (!bookId) return openError('', 'not_found', 'Book not found.')
+    if (!bookId) return openError('', 'not_found', tMain('main.messages.common.bookNotFound'))
     const book = await deps.findBook(bookId)
-    if (!book || book.format !== 'txt') return openError(bookId, 'not_found', 'Book not found.')
+    if (!book || book.format !== 'txt') return openError(bookId, 'not_found', tMain('main.messages.common.bookNotFound'))
 
     const notices: TxtOpenNotice[] = []
     const row = deps.store.getDocument(bookId)
@@ -271,10 +272,10 @@ export function createTxtDocumentService(deps: TxtDocumentServiceDeps): TxtDocum
   }
 
   async function commitNow(inputRaw: unknown): Promise<TxtCommitResult> {
-    if (!inputRaw || typeof inputRaw !== 'object') return commitFailure('invalid', 'Invalid request.')
+    if (!inputRaw || typeof inputRaw !== 'object') return commitFailure('invalid', tMain('main.messages.common.invalidRequest'))
     const input = inputRaw as Partial<TxtCommitInput>
     const bookId = typeof input.bookId === 'string' ? input.bookId.trim() : ''
-    if (!bookId) return commitFailure('not_found', 'Book not found.')
+    if (!bookId) return commitFailure('not_found', tMain('main.messages.common.bookNotFound'))
     if (!Number.isSafeInteger(input.baseRevision) || (input.baseRevision as number) < 0) {
       return commitFailure('invalid', 'Invalid revision.')
     }
@@ -291,16 +292,16 @@ export function createTxtDocumentService(deps: TxtDocumentServiceDeps): TxtDocum
       return commitFailure('invalid', 'Invalid annotations.')
     }
     if (input.text !== undefined && input.text.length > MAX_COMMIT_CHARS) {
-      return commitFailure('too_large', 'The text is too large to save.')
+      return commitFailure('too_large', tMain('main.messages.txt.tooLargeToSave'))
     }
 
     const book = await deps.findBook(bookId)
-    if (!book || book.format !== 'txt') return commitFailure('not_found', 'Book not found.')
+    if (!book || book.format !== 'txt') return commitFailure('not_found', tMain('main.messages.common.bookNotFound'))
     const session = sessions.get(bookId)
     // A commit without a prior open is a renderer bug — refuse rather than guess the base text.
-    if (!session) return commitFailure('conflict', 'The document is not open.')
+    if (!session) return commitFailure('conflict', tMain('main.messages.txt.notOpen'))
     if (session.revision !== baseRevision) {
-      return commitFailure('conflict', 'The document changed since it was opened.')
+      return commitFailure('conflict', tMain('main.messages.txt.changed'))
     }
 
     const textChanged = input.text !== undefined && input.text !== session.text
@@ -308,7 +309,7 @@ export function createTxtDocumentService(deps: TxtDocumentServiceDeps): TxtDocum
     const upserts: SdkSaveHighlightInput[] = []
     for (const raw of input.upserts) {
       const checked = validateUpsert(bookId, raw, nextText)
-      if (!checked) return commitFailure('invalid', 'An annotation does not match the text.')
+      if (!checked) return commitFailure('invalid', tMain('main.messages.txt.annotationMismatch'))
       upserts.push(checked)
     }
 
@@ -321,7 +322,7 @@ export function createTxtDocumentService(deps: TxtDocumentServiceDeps): TxtDocum
         wroteCopy = true
       } catch (err) {
         log('txt: writing the edited copy failed', err)
-        return commitFailure('write_failed', 'Could not save your changes to disk.')
+        return commitFailure('write_failed', tMain('main.messages.txt.diskSaveFailed'))
       }
     }
 
@@ -343,13 +344,13 @@ export function createTxtDocumentService(deps: TxtDocumentServiceDeps): TxtDocum
     } catch (err) {
       if (wroteCopy) await deps.copies.prune(bookId, session.revision > 0 ? session.revision : null).catch(() => {})
       if (err instanceof TxtRevisionConflictError) {
-        return commitFailure('conflict', 'The document changed since it was opened.')
+        return commitFailure('conflict', tMain('main.messages.txt.changed'))
       }
       if (err instanceof TxtRowOwnershipError) {
-        return commitFailure('invalid', 'An annotation does not belong to this book.')
+        return commitFailure('invalid', tMain('main.messages.txt.foreignAnnotation'))
       }
       log('txt: the commit transaction failed', err)
-      return commitFailure('db_failed', 'Could not save your changes.')
+      return commitFailure('db_failed', tMain('main.messages.txt.saveFailed'))
     }
 
     sessions.set(bookId, { ...session, revision: nextRevision, text: nextText })

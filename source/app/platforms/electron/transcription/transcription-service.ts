@@ -35,6 +35,7 @@ import type { SqliteTranscriptStore, TranscriptRecord } from '../persistence/sql
 import { DECODE_SAMPLE_RATE, type AudioDecoder, type DecoderAvailability } from './audio-decoder'
 import type { ModelManager } from './model-manager'
 import type { SpeechProcessHost } from './speech-process-host'
+import { tMain } from '../i18n/main-translate'
 
 /**
  * The transcription service (spec 004, tasks T015 / T016): ONE global queue, one active job, scope resolution, resume
@@ -252,8 +253,8 @@ export function createTranscriptionService(options: TranscriptionServiceOptions)
     if (!isSupportedTranscriptionLanguage(input.language)) throw new StartError('UNSUPPORTED_LANGUAGE', `Language "${input.language}" is not supported`)
 
     const book = await source.findBook(bookId)
-    if (!book) throw new StartError('INVALID_ARGUMENT', 'Unknown book')
-    if (!isAudioFormat(book.format)) throw new StartError('INVALID_ARGUMENT', 'Only audiobooks can be transcribed')
+    if (!book) throw new StartError('INVALID_ARGUMENT', tMain('main.messages.transcription.unknownBook'))
+    if (!isAudioFormat(book.format)) throw new StartError('INVALID_ARGUMENT', tMain('main.messages.transcription.onlyAudiobooks'))
 
     const tracks = source.listTracks(bookId)
     const multiTrack = tracks.length > 0
@@ -270,14 +271,14 @@ export function createTranscriptionService(options: TranscriptionServiceOptions)
       }
     }
 
-    if (jobOfBook(bookId)) throw new StartError('INVALID_ARGUMENT', 'This audiobook already has a transcription queued or running')
+    if (jobOfBook(bookId)) throw new StartError('INVALID_ARGUMENT', tMain('main.messages.transcription.alreadyRunning'))
 
     if (!models.catalog.some((model) => model.id === modelId)) throw new StartError('INVALID_ARGUMENT', `Unknown speech model "${modelId}"`)
     // The decoder comes BEFORE the "model not downloaded" answer: nobody is sent off to download a large model when the audio
     // could not be decoded anyway.
     const availability = await decoder.availability()
     if (!availability.available) throw new StartError('DECODE_FAILED', decoderUnavailableMessage(availability))
-    if (!(await models.isInstalled(modelId))) throw new StartError('MODEL_MISSING', 'The speech model is not downloaded yet')
+    if (!(await models.isInstalled(modelId))) throw new StartError('MODEL_MISSING', tMain('main.messages.transcription.modelMissing'))
     return { request: { bookId, scope, language: input.language, modelId, replace: input.replace === true }, scope }
   }
 
@@ -286,7 +287,7 @@ export function createTranscriptionService(options: TranscriptionServiceOptions)
   async function start(raw: unknown): Promise<TranscriptionStartResult> {
     // The feature gate comes first: nothing is validated, persisted, downloaded or queued while transcription is switched off.
     if (!isEnabled()) return failure('FEATURE_DISABLED', FEATURE_DISABLED_MESSAGE)
-    if (shuttingDown) return failure('ABORTED', 'The app is closing')
+    if (shuttingDown) return failure('ABORTED', tMain('main.messages.transcription.closing'))
     let validated: Awaited<ReturnType<typeof validateStart>>
     try {
       validated = await validateStart(raw)
@@ -296,10 +297,10 @@ export function createTranscriptionService(options: TranscriptionServiceOptions)
     }
     const { request, scope } = validated
     // Another start may have been accepted while we awaited the checks above.
-    if (jobOfBook(request.bookId)) return failure('INVALID_ARGUMENT', 'This audiobook already has a transcription queued or running')
+    if (jobOfBook(request.bookId)) return failure('INVALID_ARGUMENT', tMain('main.messages.transcription.alreadyRunning'))
 
     const existed = store.get(request.bookId) !== null
-    if (!store.ensure(request.bookId, { language: request.language, modelId: request.modelId })) return failure('INVALID_ARGUMENT', 'Unknown book')
+    if (!store.ensure(request.bookId, { language: request.language, modelId: request.modelId })) return failure('INVALID_ARGUMENT', tMain('main.messages.transcription.unknownBook'))
     // The marker that lets startup recovery find a job that died with the process, and the scope Resume will start again.
     store.setJobState(request.bookId, 'queued', null)
     store.setScope(request.bookId, scope)
@@ -378,7 +379,7 @@ export function createTranscriptionService(options: TranscriptionServiceOptions)
   async function durationOf(trackDurationMs: number | null, filePath: string): Promise<number> {
     if (trackDurationMs !== null && trackDurationMs > 0) return Math.round(trackDurationMs)
     const probed = await source.probeDurationMs(filePath)
-    if (probed === null || !Number.isFinite(probed) || probed <= 0) throw new StartError('DECODE_FAILED', 'The length of the audio file could not be read')
+    if (probed === null || !Number.isFinite(probed) || probed <= 0) throw new StartError('DECODE_FAILED', tMain('main.messages.transcription.lengthUnreadable'))
     return Math.round(probed)
   }
 
@@ -396,7 +397,7 @@ export function createTranscriptionService(options: TranscriptionServiceOptions)
     const units: Unit[] = []
     for (const target of targets) {
       const file = await source.resolveFile(job.bookId, target.trackId)
-      if (!file.ok) throw new StartError('FILE_MISSING', 'The audio file is missing or cannot be read')
+      if (!file.ok) throw new StartError('FILE_MISSING', tMain('main.messages.transcription.fileMissing'))
       const duration = await durationOf(target.info?.durationMs ?? null, file.path)
       const requested: TimeRange =
         job.scope.kind === 'range' ? [job.scope.startMs, Math.min(job.scope.endMs, duration)] : [0, duration]
@@ -420,7 +421,7 @@ export function createTranscriptionService(options: TranscriptionServiceOptions)
       if (signal.aborted) throw Object.assign(new Error('Transcription aborted'), { code: 'ABORTED' })
 
       const units = await buildPlan(job)
-      if (units.length === 0) throw new StartError('INVALID_ARGUMENT', 'Nothing to transcribe in the requested range')
+      if (units.length === 0) throw new StartError('INVALID_ARGUMENT', tMain('main.messages.transcription.emptyRange'))
       job.totalMs = units.reduce((sum, unit) => sum + unit.requestedMs, 0)
       job.doneMs = units.reduce((sum, unit) => sum + unit.coveredMs, 0)
       const first = units[0] as Unit
@@ -622,8 +623,8 @@ export function createTranscriptionService(options: TranscriptionServiceOptions)
     if (typeof bookId !== 'string' || !bookId.trim()) return failure('INVALID_ARGUMENT', 'Missing bookId')
     const id = bookId.trim()
     const record = store.get(id)
-    if (!record) return failure('INVALID_ARGUMENT', 'This audiobook has no transcript to export')
-    if (record.passageCount === 0) return failure('NO_SPEECH', 'The transcript has no text to export')
+    if (!record) return failure('INVALID_ARGUMENT', tMain('main.messages.transcription.noTranscript'))
+    if (record.passageCount === 0) return failure('NO_SPEECH', tMain('main.messages.transcription.noText'))
     const timestamps = !!options && typeof options === 'object' && (options as { timestamps?: unknown }).timestamps === true
     const passages: TranscriptPassage[] = []
     for (;;) {
@@ -638,7 +639,7 @@ export function createTranscriptionService(options: TranscriptionServiceOptions)
   async function downloadModel(modelId: unknown): Promise<TranscriptionDownloadModelResult> {
     // Nothing is downloaded while transcription is switched off, or while the decoder that would use the model is missing.
     if (!isEnabled()) return failure('FEATURE_DISABLED', FEATURE_DISABLED_MESSAGE)
-    if (typeof modelId !== 'string' || !models.catalog.some((model) => model.id === modelId)) return failure('INVALID_ARGUMENT', 'Unknown speech model')
+    if (typeof modelId !== 'string' || !models.catalog.some((model) => model.id === modelId)) return failure('INVALID_ARGUMENT', tMain('main.messages.transcription.unknownModel'))
     const availability = await decoder.availability()
     if (!availability.available) return failure('DECODE_FAILED', decoderUnavailableMessage(availability))
     try {
@@ -670,7 +671,7 @@ export function createTranscriptionService(options: TranscriptionServiceOptions)
       return { ok: false, errorCode: 'not_found', errorMessage: 'Unknown speech model.' }
     }
     if (isBusy() || !speech.stop()) {
-      return { ok: false, errorCode: 'busy', errorMessage: 'A transcription is in progress. Try again when it finishes.' }
+      return { ok: false, errorCode: 'busy', errorMessage: tMain('main.messages.transcription.inProgress') }
     }
     try {
       await models.remove(modelId)

@@ -31,6 +31,7 @@ import type {
 } from './api-types'
 import { pathForOtherApps } from '../files/external-path'
 import { LibraryChannels } from './channels'
+import { tMain } from '../i18n/main-translate'
 
 function toSummaryDto(
   book: Book,
@@ -111,7 +112,7 @@ export function registerLibraryIpc(): void {
           ok: false,
           bookId: '',
           errorCode: 'not_found',
-          errorMessage: 'Book not found.',
+          errorMessage: tMain('main.messages.common.bookNotFound'),
         }
       }
       return openBookContent(id.trim())
@@ -338,7 +339,7 @@ export function registerLibraryIpc(): void {
       const notFound: RelinkBookResult = {
         ok: false,
         errorCode: 'not_found',
-        errorMessage: 'Book not found.',
+        errorMessage: tMain('main.messages.common.bookNotFound'),
       }
       if (typeof id !== 'string' || !id.trim()) return notFound
       const book = await getLibraryStore().findById(id.trim())
@@ -348,7 +349,7 @@ export function registerLibraryIpc(): void {
         return {
           ok: false,
           errorCode: 'wrong_file',
-          errorMessage: 'An audiobook made of several chapter files cannot be relinked.',
+          errorMessage: tMain('main.messages.library.multiRelink'),
         }
       }
 
@@ -393,7 +394,7 @@ export function registerLibraryIpc(): void {
           ? (input as { name?: unknown; description?: unknown })
           : {}
       if (typeof value.name !== 'string' || !value.name.trim()) {
-        throw new Error('Collection name is required')
+        throw new Error(tMain('main.messages.library.collectionNameRequired'))
       }
       return getLibraryStore().createCollection({
         name: value.name,

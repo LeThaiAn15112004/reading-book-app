@@ -33,6 +33,7 @@ import type {
 } from './api-types'
 import { ImportChannels } from './channels'
 import { beginCancellable, cancelInFlight, endCancellable } from './import-cancel'
+import { tMain } from '../i18n/main-translate'
 
 /** Cancel key of the (single) in-flight import:fromUrl download. */
 const URL_CANCEL_KEY = 'url'
@@ -82,17 +83,17 @@ function unsupportedResult(err: UnsupportedFormatError): ImportResult {
 export function duplicateResult(bookId: string): ImportResult {
   return importFailure(
     'duplicate',
-    'This book is already in your local library. Open the existing copy?',
+    tMain('main.messages.import.duplicate'),
     bookId,
   )
 }
 
 export function cancelledResult(): ImportResult {
-  return importFailure('cancelled', 'Download cancelled.')
+  return importFailure('cancelled', tMain('main.messages.import.downloadCancelled'))
 }
 
 function saveFailedResult(): ImportResult {
-  return importFailure('save_failed', 'Could not save the book to the library.')
+  return importFailure('save_failed', tMain('main.messages.import.saveFailed'))
 }
 
 function errnoCode(err: unknown): string | undefined {
@@ -110,11 +111,11 @@ export function fileAccessFailure(err: unknown): ImportResult | null {
   if (code === 'ENOENT' || code === 'ENOTDIR') {
     return importFailure(
       'missing_file',
-      'The file could not be found. It may have been moved or deleted.',
+      tMain('main.messages.import.fileMissing'),
     )
   }
   if (code === 'EACCES' || code === 'EPERM') {
-    return importFailure('access_denied', 'No permission to read this file.')
+    return importFailure('access_denied', tMain('main.messages.import.noPermission'))
   }
   return null
 }
@@ -237,7 +238,7 @@ async function finishImport(
     console.warn('[import] metadata extraction failed', err)
     return importFailure(
       'corrupted',
-      'This file appears to be damaged or is not a valid book file.',
+      tMain('main.messages.import.damaged'),
     )
   }
 
@@ -331,11 +332,11 @@ async function importFromFile(sender: WebContents): Promise<ImportResult> {
         : await dialog.showOpenDialog(dialogOptions)
   } catch (err) {
     console.warn('[import] file dialog failed', err)
-    return { ok: false, bookId: null, errorMessage: 'Could not open the file picker.' }
+    return { ok: false, bookId: null, errorMessage: tMain('main.messages.import.pickerFailed') }
   }
 
   if (picked.canceled || picked.filePaths.length === 0) {
-    return importFailure('cancelled', 'Import cancelled.')
+    return importFailure('cancelled', tMain('main.messages.import.cancelled'))
   }
 
   // The path comes from the native dialog above, never from the renderer.
@@ -355,7 +356,7 @@ async function importFromFile(sender: WebContents): Promise<ImportResult> {
       // Would be mistaken for an app-owned copy (and could be deleted as one).
       return importFailure(
         'inside_app_data',
-        'Choose a book file outside the app’s own data folder.',
+        tMain('main.messages.import.outsideDataFolder'),
       )
     }
     const conflict = await rejectIfDuplicate(sourcePath)
@@ -365,7 +366,7 @@ async function importFromFile(sender: WebContents): Promise<ImportResult> {
     const access = fileAccessFailure(err)
     if (access) return access
     console.warn('[import] reading the selected file failed', err)
-    return importFailure('access_denied', 'Could not read the selected file.')
+    return importFailure('access_denied', tMain('main.messages.import.selectedUnreadable'))
   }
 
   return finishImportByReference(sourcePath)
@@ -406,7 +407,7 @@ async function importFromUrl(sender: WebContents, url: unknown): Promise<ImportR
     if (err instanceof UnsupportedFormatError) return unsupportedResult(err)
     if (err instanceof UrlFetchError) return importFailure(err.code, err.message)
     console.warn('[import] URL import failed', err)
-    return importFailure('network', 'Could not download the file.')
+    return importFailure('network', tMain('main.messages.import.downloadFileFailed'))
   } finally {
     endCancellable(URL_CANCEL_KEY, controller)
     // T2.10: always drop download temp (success copy, duplicate, cancel or error).

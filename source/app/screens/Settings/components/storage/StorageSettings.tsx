@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { ConfirmBookActionDialog } from '../../../Library/components/book/ConfirmBookActionDialog'
 import { useStorageStore } from '../../logic/storageStore'
 import { SettingsCard } from '../layout/SettingsCard'
+import { speechModelLabel } from '../../../AudioBook/logic/transcriptionMessages'
 
 
 
@@ -175,7 +176,7 @@ export function StorageSettings() {
                 className="flex min-h-[var(--ui-density-row)] items-center justify-between gap-3 px-3 py-1.5"
               >
                 <span className="min-w-0 truncate text-[12px] text-lib-text-strong" title={model.id}>
-                  {model.label}
+                  {speechModelLabel(model.id, model.label)}
                   <span className="ml-2 font-mono text-lib-faint">{model.id}</span>
                 </span>
                 <span className="flex shrink-0 items-center gap-3">

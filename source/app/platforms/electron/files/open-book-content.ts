@@ -7,6 +7,7 @@ import type {
   OpenBookContentResult,
 } from '../ipc/api-types'
 import { resolveBookFile } from './sandbox'
+import { tMain } from '../i18n/main-translate'
 
 /**
  * SHA-256 of the bytes last served per book — lets the embedded-annotation sync tell whether the
@@ -42,27 +43,27 @@ function fail(
 export async function openBookContent(bookId: string): Promise<OpenBookContentResult> {
   const id = bookId.trim()
   if (!id) {
-    return fail('', 'not_found', 'Book not found.')
+    return fail('', 'not_found', tMain('main.messages.common.bookNotFound'))
   }
 
   const book = await getLibraryStore().findById(id)
   if (!book) {
-    return fail(id, 'not_found', 'Book not found.')
+    return fail(id, 'not_found', tMain('main.messages.common.bookNotFound'))
   }
 
   const file = await resolveBookFile(book)
   if (!file.ok) {
     switch (file.code) {
       case 'path_denied':
-        return fail(id, 'path_denied', 'This book’s file location is not valid.')
+        return fail(id, 'path_denied', tMain('main.messages.common.locationInvalid'))
       case 'missing_file':
         return fail(
           id,
           'missing_file',
-          'The book file could not be found. It may have been moved, renamed, or deleted.',
+          tMain('main.messages.common.bookFileMissing'),
         )
       default:
-        return fail(id, 'read_failed', 'Could not read the book file.')
+        return fail(id, 'read_failed', tMain('main.messages.common.readFailed'))
     }
   }
 
@@ -86,7 +87,7 @@ export async function openBookContent(bookId: string): Promise<OpenBookContentRe
       const { size } = await fsp.stat(file.path)
       if (!checkMdFileSize(size).ok) return fail(id, 'too_large', describeMdTooLarge())
     } catch {
-      return fail(id, 'read_failed', 'Could not read the book file.')
+      return fail(id, 'read_failed', tMain('main.messages.common.readFailed'))
     }
   }
 
@@ -106,6 +107,6 @@ export async function openBookContent(bookId: string): Promise<OpenBookContentRe
       byteLength: data.byteLength,
     }
   } catch {
-    return fail(id, 'read_failed', 'Could not read the book file.')
+    return fail(id, 'read_failed', tMain('main.messages.common.readFailed'))
   }
 }

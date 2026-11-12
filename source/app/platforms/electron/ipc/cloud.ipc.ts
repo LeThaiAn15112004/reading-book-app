@@ -55,6 +55,7 @@ import type {
   OkResult,
 } from './api-types'
 import { CloudChannels } from './channels'
+import { tMain } from '../i18n/main-translate'
 
 /**
  * Fixed custom-scheme redirect URI, shared with the mobile app (see
@@ -225,7 +226,7 @@ function openOAuthExternal(
     shell.openExternal(authUrl).catch(() => {
       clearTimeout(timer)
       pendingAuths.delete(state)
-      resolve({ error: 'Could not open the system browser to sign in.' })
+      resolve({ error: tMain('main.messages.cloud.browserFailed') })
     })
   })
 }
@@ -259,7 +260,7 @@ export function handleOAuthCallbackUrl(url: string): boolean {
 
   const code = parsed.searchParams.get('code')
   if (!code) {
-    resolve({ error: 'No authorization code returned.' })
+    resolve({ error: tMain('main.messages.cloud.noCode') })
     return true
   }
 
@@ -270,7 +271,7 @@ export function handleOAuthCallbackUrl(url: string): boolean {
 async function connect(provider: CloudProviderDto): Promise<CloudConnectResult> {
   // Spec 010 KL-1: a provider this build does not offer (Google Drive in a packaged build) never starts a sign-in.
   if (!getCloudProviderAvailability()[provider].available) {
-    return { ok: false, errorMessage: 'This cloud source is not available in this version of Readmate yet.' }
+    return { ok: false, errorMessage: tMain('main.messages.cloud.unavailable') }
   }
   const kit = getKits()[provider]
   const state = randomUUID()
@@ -442,14 +443,14 @@ async function downloadAndImport(
   if (!accessToken) {
     return importFailure(
       'not_connected',
-      'Not connected to this cloud source. Connect it first.',
+      tMain('main.messages.cloud.notConnected'),
     )
   }
   const token = accessToken
 
   const ext = entry.formatHint?.replace(/^\./, '').toLowerCase()
   if (!ext || !isSupportedExtension(`.${ext}`)) {
-    return importFailure('unsupported_format', 'Unknown file format.')
+    return importFailure('unsupported_format', tMain('main.messages.cloud.unknownFormat'))
   }
 
   let tempDir: string
@@ -457,7 +458,7 @@ async function downloadAndImport(
     tempDir = await fsp.mkdtemp(path.join(os.tmpdir(), 'reading-book-cloud-'))
   } catch (err) {
     console.warn('[cloud] could not create a temp folder', err)
-    return importFailure('save_failed', 'Could not prepare the download.')
+    return importFailure('save_failed', tMain('main.messages.cloud.prepareFailed'))
   }
   const removeTempDir = () => fsp.rm(tempDir, { recursive: true, force: true }).catch(() => {})
   const safeName = sanitizeFilename(entry.title)
@@ -493,7 +494,7 @@ async function downloadAndImport(
         ? cancelledResult()
         : importFailure(
             'timeout',
-            'The download stalled and timed out. Check your connection and try again.',
+            tMain('main.messages.import.stalled'),
           )
     }
 
@@ -516,7 +517,7 @@ export function registerCloudIpc(): void {
     (_event, provider: unknown): Promise<CloudConnectResult> =>
       isCloudProvider(provider)
         ? connect(provider)
-        : Promise.resolve({ ok: false, errorMessage: 'Unknown cloud provider.' }),
+        : Promise.resolve({ ok: false, errorMessage: tMain('main.messages.cloud.unknownProvider') }),
   )
 
   ipcMain.removeHandler(CloudChannels.disconnect)
@@ -538,7 +539,7 @@ export function registerCloudIpc(): void {
     CloudChannels.downloadAndImport,
     (event, provider: unknown, entry: unknown): Promise<CloudDownloadResult> => {
       if (!isCloudProvider(provider) || !entry || typeof entry !== 'object') {
-        return Promise.resolve({ ok: false, bookId: null, errorMessage: 'Invalid request.' })
+        return Promise.resolve({ ok: false, bookId: null, errorMessage: tMain('main.messages.common.invalidRequest') })
       }
       const value = entry as Partial<CloudCatalogEntryDto>
       if (
@@ -546,7 +547,7 @@ export function registerCloudIpc(): void {
         !value.externalId ||
         typeof value.title !== 'string'
       ) {
-        return Promise.resolve({ ok: false, bookId: null, errorMessage: 'Invalid request.' })
+        return Promise.resolve({ ok: false, bookId: null, errorMessage: tMain('main.messages.common.invalidRequest') })
       }
       return downloadAndImport(provider, value as CloudCatalogEntryDto, event.sender).catch(
         (err: unknown): CloudDownloadResult => {

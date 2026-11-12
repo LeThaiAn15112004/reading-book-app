@@ -2,7 +2,7 @@ import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { AUTO_LANGUAGE, WHISPER_LANGUAGES } from '@core'
 import type { TranscriptionScope } from '../../../bridge'
 import { useAudioPlayerStore } from '../logic/audioPlayerStore'
-import { decoderUnavailableText, formatMegabytes, transcriptionErrorText } from '../logic/transcriptionMessages'
+import { decoderUnavailableText, formatMegabytes, speechModelLabel, transcriptionErrorText } from '../logic/transcriptionMessages'
 import { isActiveJob, useTranscriptStore } from '../logic/transcriptStore'
 import { getT, useT } from '../../../i18n'
 
@@ -192,7 +192,7 @@ function DialogBody() {
           {models.map((m) => (
             <label key={m.id} className="flex items-center gap-2 text-sm text-lib-text">
               <input type="radio" name="transcribe-model" checked={modelId === m.id} onChange={() => setModelId(m.id)} disabled={busy} />
-              <span className="min-w-0 flex-1 truncate">{m.label}</span>
+              <span className="min-w-0 flex-1 truncate">{speechModelLabel(m.id, m.label)}</span>
               <span className="shrink-0 text-[12px] text-lib-muted">{m.installed ? t('audiobook.transcription.dialog.onDevice') : formatMegabytes(m.sizeBytes)}</span>
             </label>
           ))}

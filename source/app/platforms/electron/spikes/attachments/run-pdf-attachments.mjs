@@ -26,7 +26,9 @@ import { buildPdf } from './pdf-fixtures.mjs'
 
 const { listPdfAttachmentBytes, extractPdfAttachmentBytes } = await import('../../attachments/pdf-attachments.ts')
 const { createAttachmentService, cleanAttachmentTemp } = await import('../../attachments/attachment-service.ts')
-const { ATTACHMENT_MAX_BYTES } = await import('@core')
+const { ATTACHMENT_MAX_BYTES, translate } = await import('@core')
+// Store notices are UiText (spec 012): Main's string, or a renderer catalogue key read here in English.
+const txt = (v) => (v == null || typeof v === 'string' ? v : translate('en', v.key, v.params))
 
 let passed = 0
 async function check(name, fn) {
@@ -553,7 +555,7 @@ console.log('8. renderer store (real store → real service → real PDF.js)')
     h.state.saveTarget = path.join(tmp, 'from-store.exe')
     await store.getState().saveBlocked()
     assert.equal(store.getState().blocked, null)
-    assert.match(store.getState().notice.message, /Saved as/)
+    assert.match(txt(store.getState().notice.message), /Saved as/)
     assert.equal(fs.readFileSync(h.state.saveTarget).toString(), 'MZ-but-named-exe')
     assert.equal(h.calls.open.length, 0)
   })

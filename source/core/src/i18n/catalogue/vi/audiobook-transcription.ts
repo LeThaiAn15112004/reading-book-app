@@ -27,6 +27,11 @@ export const vi = {
     notRunnable:
       'Bộ giải mã âm thanh đi kèm Readmate không khởi động được trên hệ thống này. Phần mềm bảo mật có thể đã chặn nó; cài lại Readmate hoặc cho phép nó rồi thử lại.',
   },
+  models: {
+    tiny: 'Nhanh (nhỏ nhất, kém chính xác nhất)',
+    base: 'Cân bằng',
+    small: 'Chất lượng tốt nhất (lớn nhất, chậm nhất)',
+  },
   dialog: {
     rangeInvalid: 'Nhập thời điểm bắt đầu và kết thúc theo phút (ví dụ 0 và 10).',
     rangeOrder: 'Thời điểm kết thúc phải sau thời điểm bắt đầu.',

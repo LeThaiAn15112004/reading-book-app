@@ -26,6 +26,11 @@ export const en = {
     notRunnable:
       'The audio decoder that comes with Readmate could not start on this system. Security software may have blocked it; reinstall Readmate or allow it, then try again.',
   },
+  models: {
+    tiny: 'Fast (smallest, least accurate)',
+    base: 'Balanced',
+    small: 'Best quality (largest, slowest)',
+  },
   dialog: {
     rangeInvalid: 'Enter the start and end in minutes (for example 0 and 10).',
     rangeOrder: 'The end must be after the start.',

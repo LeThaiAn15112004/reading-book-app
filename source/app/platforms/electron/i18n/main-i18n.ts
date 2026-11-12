@@ -1,15 +1,14 @@
 import { app } from 'electron'
 import {
-  createTranslator,
   isUiLanguagePreference,
   resolveUiLanguage,
   setI18nWarningHandler,
-  type Translator,
   type UiLanguage,
   type UiLanguagePreference,
 } from '@core'
 import type { SetUiLanguageResultDto } from '../ipc/api-types'
 import { readJsonPrefsFile, writeJsonPrefsFile } from '../prefs/json-prefs-file'
+import { setMainTranslatorLanguage, tMain } from './main-translate'
 
 /**
  * Main-process interface language (spec 012, contract `ui-language-ipc.md`).
@@ -25,7 +24,6 @@ const MIRROR_VERSION = 1
 
 let preference: UiLanguagePreference = 'system'
 let effective: UiLanguage = 'en'
-let translator: Translator = createTranslator('en')
 const listeners = new Set<(language: UiLanguage) => void>()
 
 setI18nWarningHandler((warning) => {
@@ -59,7 +57,7 @@ function apply(next: UiLanguagePreference): UiLanguage {
   preference = next
   const previous = effective
   effective = resolveUiLanguage(next, systemLocales())
-  translator = createTranslator(effective)
+  setMainTranslatorLanguage(effective)
   if (effective !== previous) {
     for (const listener of listeners) {
       try {
@@ -107,9 +105,8 @@ export function handleSetUiLanguage(input: unknown): SetUiLanguageResultDto {
   return saved ? { ok: true, effective: language } : { ok: false, code: 'WRITE_FAILED' }
 }
 
-/** Translate in Main's current language. */
-export const tMain: Translator = ((key: never, params?: never) =>
-  (translator as (k: unknown, p?: unknown) => string)(key, params)) as Translator
+/** Translate in Main's current language (re-exported; lives in `main-translate.ts`). */
+export { tMain }
 
 /** Called with the new effective language each time it changes (e.g. to rebuild the tray menu). */
 export function onMainUiLanguageChange(listener: (language: UiLanguage) => void): () => void {

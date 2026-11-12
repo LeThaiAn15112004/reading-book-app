@@ -1,3 +1,4 @@
+import { tMain } from '../../i18n/main-translate'
 import type { ConnectionTestResult } from '../../../../../core/src/domain/index.js';
 import type {
   ExternalCatalogEntry,
@@ -136,7 +137,7 @@ export class GoogleDriveLibraryAdapter implements ExternalLibraryProviderAdapter
 
     return {
       success: false,
-      message: 'Not connected. Sign in with Google Drive, or provide a local synced folder path.',
+      message: tMain('main.messages.cloud.driveNotConnected'),
     };
   }
 
@@ -197,7 +198,7 @@ export class GoogleDriveLibraryAdapter implements ExternalLibraryProviderAdapter
     }
 
     throw new Error(
-      'Google Drive is not connected. Connect first, or provide a local synced folder path.',
+      tMain('main.messages.cloud.driveConnectFirst'),
     );
   }
 

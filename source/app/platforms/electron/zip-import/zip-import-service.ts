@@ -1,3 +1,4 @@
+import type { MessageKey } from '@core'
 import { randomUUID } from 'node:crypto'
 import fsp from 'node:fs/promises'
 import path from 'node:path'
@@ -24,6 +25,7 @@ import {
   type ZipDirectory,
   type ZipEntryRecord,
 } from './zip-reader'
+import { tMain } from '../i18n/main-translate'
 
 /**
  * Audiobook ZIP import, Main side and Electron-free (so it can be exercised headless): inspect → preview session →
@@ -97,7 +99,7 @@ export const unavailableAudiobookImporter: ZipAudiobookImporter = async () => ({
   ok: false,
   errorCode: 'import_not_available',
   errorMessage:
-    'Your selection is valid, but importing a multi-chapter audiobook is not available yet. Nothing was added to your library.',
+    tMain('main.messages.zip.multiUnavailable'),
 })
 
 interface Session {
@@ -114,26 +116,26 @@ export function failure(errorCode: ZipImportErrorCode, errorMessage: string, boo
   return bookId === undefined ? { ok: false, errorCode, errorMessage } : { ok: false, errorCode, errorMessage, bookId }
 }
 
-const REJECT_MESSAGES: Record<ZipRejectCode, string> = {
-  invalid_zip: 'This file is not a valid ZIP archive, or it is damaged.',
-  empty_zip: 'This ZIP archive is empty.',
-  too_many_entries: `This archive has too many files (the limit is ${ZIP_IMPORT_LIMITS.maxEntries}).`,
-  too_large: 'This archive is too large to import safely.',
-  unsafe_path: 'This archive contains unsafe file paths, so it was not opened.',
-  path_too_deep: 'This archive has folders nested too deeply to import safely.',
-  duplicate_path: 'This archive contains duplicate file names, so it cannot be opened safely.',
+const REJECT_MESSAGES: Record<ZipRejectCode, MessageKey> = {
+  invalid_zip: 'main.messages.zip.invalid',
+  empty_zip: 'main.messages.zip.empty',
+  too_many_entries: 'main.messages.zip.tooManyEntries',
+  too_large: 'main.messages.zip.tooLarge',
+  unsafe_path: 'main.messages.zip.unsafePaths',
+  path_too_deep: 'main.messages.zip.tooDeep',
+  duplicate_path: 'main.messages.zip.duplicates',
 }
 
 function mapError(err: unknown): ZipImportFailure {
   if (err instanceof ZipFormatError) {
     if (err.code === 'cancelled') return failure('cancelled', 'Cancelled.')
-    if (err.code in REJECT_MESSAGES) return failure(err.code as ZipRejectCode, REJECT_MESSAGES[err.code as ZipRejectCode])
-    return failure('invalid_zip', REJECT_MESSAGES.invalid_zip)
+    if (err.code in REJECT_MESSAGES) return failure(err.code as ZipRejectCode, tMain(REJECT_MESSAGES[err.code as ZipRejectCode], { max: ZIP_IMPORT_LIMITS.maxEntries }))
+    return failure('invalid_zip', tMain(REJECT_MESSAGES.invalid_zip))
   }
   const code = (err as { code?: unknown } | null)?.code
-  if (code === 'ENOENT') return failure('unreadable', 'The ZIP file could not be found.')
-  if (code === 'EACCES' || code === 'EPERM') return failure('unreadable', 'No permission to read this ZIP file.')
-  return failure('unreadable', 'The ZIP file could not be read.')
+  if (code === 'ENOENT') return failure('unreadable', tMain('main.messages.zip.notFound'))
+  if (code === 'EACCES' || code === 'EPERM') return failure('unreadable', tMain('main.messages.zip.noPermission'))
+  return failure('unreadable', tMain('main.messages.zip.unreadable'))
 }
 
 /** Raster formats a cover may be; checked on the bytes, not the name. */
@@ -169,7 +171,7 @@ export class ZipImportService {
     const workDir = path.join(this.options.tmpRoot, randomUUID())
     try {
       const stat = await fsp.stat(zipPath)
-      if (!stat.isFile()) return failure('unreadable', 'The selected item is not a file.')
+      if (!stat.isFile()) return failure('unreadable', tMain('main.messages.zip.notAFile'))
       const directory = await readZipDirectory(zipPath)
       await fsp.mkdir(workDir, { recursive: true })
       const sessionId = randomUUID()
@@ -221,13 +223,13 @@ export class ZipImportService {
         reason: cls.reason,
       }
       if (record.isSymlink) {
-        Object.assign(preview, { kind: 'other', status: 'ignored', reason: 'Links are not imported' })
+        Object.assign(preview, { kind: 'other', status: 'ignored', reason: tMain('main.messages.zip.links') })
       } else if (cls.kind === 'audio' && cls.status === 'ok' && cls.audioFormat) {
         audio.push({ entry: record, preview, format: cls.audioFormat })
       } else if (cls.kind === 'image') {
         images.push(preview)
         if (record.size > ZIP_IMPORT_LIMITS.maxCoverBytes) {
-          Object.assign(preview, { reason: 'Image is too large to use as a cover' })
+          Object.assign(preview, { reason: tMain('main.messages.zip.imageTooLarge') })
         }
       }
       entries.push(preview)
@@ -242,10 +244,10 @@ export class ZipImportService {
       try {
         const head = await readEntryBytes(zipPath, directory.fileSize, record, 16, signal)
         if (sniffImageMime(head)) covers.push(preview)
-        else preview.reason = 'Not a valid image'
+        else preview.reason = tMain('main.messages.zip.invalidImage')
       } catch (err) {
         if (err instanceof ZipFormatError && err.code === 'cancelled') throw err
-        preview.reason = 'Image could not be read'
+        preview.reason = tMain('main.messages.zip.imageUnreadable')
       }
     }
 
@@ -262,7 +264,7 @@ export class ZipImportService {
     const ranked = rankCoverCandidates(covers)
     const warnings: ZipWarning[] = orderWarnings(trackOrder.map((id) => pathOf.get(id) as string))
     if (ranked.length === 0) {
-      warnings.push({ code: 'no_cover', message: 'No cover image was found. The default cover will be used.' })
+      warnings.push({ code: 'no_cover', message: tMain('main.messages.zip.noCover') })
     }
     return {
       sessionId,
@@ -289,9 +291,9 @@ export class ZipImportService {
       preview.eligible = false
       preview.reason = reason
     }
-    if (record.encrypted) return unsupported('The file is password protected')
-    if (record.size === 0) return unsupported('The file is empty')
-    if (record.method !== 0 && record.method !== 8) return unsupported('Unsupported compression method')
+    if (record.encrypted) return unsupported(tMain('main.messages.zip.password'))
+    if (record.size === 0) return unsupported(tMain('main.messages.zip.fileEmpty'))
+    if (record.method !== 0 && record.method !== 8) return unsupported(tMain('main.messages.zip.compression'))
     // Named by entry id, never by archive path; the extension is kept because the parser uses it as a hint.
     const temp = path.join(workDir, `${preview.id}.${archiveExtension(preview.path)}`)
     try {
@@ -309,8 +311,8 @@ export class ZipImportService {
       }
     } catch (err) {
       if (err instanceof ZipFormatError && err.code === 'cancelled') throw err
-      if (err instanceof ZipFormatError) return unsupported('The file is damaged inside the archive')
-      unsupported(err instanceof Error && err.message ? err.message : 'Not a playable audio file')
+      if (err instanceof ZipFormatError) return unsupported(tMain('main.messages.zip.entryDamaged'))
+      unsupported(err instanceof Error && err.message ? err.message : tMain('main.messages.zip.notPlayable'))
     } finally {
       await fsp.rm(temp, { force: true }).catch(() => {})
     }
@@ -319,9 +321,9 @@ export class ZipImportService {
   /** A downscale-free preview of a candidate cover: validated raster bytes ≤ 2 MB as a data URL, else no preview. */
   async coverPreview(sessionId: unknown, id: unknown): Promise<{ ok: true; dataUrl: string | null } | ZipImportFailure> {
     const session = this.get(sessionId)
-    if (!session) return failure('session_expired', 'This import preview has expired. Choose the ZIP again.')
+    if (!session) return failure('session_expired', tMain('main.messages.zip.previewExpired'))
     if (typeof id !== 'string' || !session.preview.coverCandidates.includes(id)) {
-      return failure('invalid_selection', 'Not a cover candidate.')
+      return failure('invalid_selection', tMain('main.messages.zip.notCover'))
     }
     const record = session.directory.entries[Number(id.slice(1))] as ZipEntryRecord
     if (record.size > ZIP_IMPORT_LIMITS.maxCoverPreviewBytes) return { ok: true, dataUrl: null }
@@ -344,7 +346,7 @@ export class ZipImportService {
     run: { signal?: AbortSignal; onProgress?: (progress: ZipImportProgress) => void } = {},
   ): Promise<{ ok: true; bookId: string } | ZipImportFailure> {
     const session = this.get(sessionId)
-    if (!session) return failure('session_expired', 'This import preview has expired. Choose the ZIP again.')
+    if (!session) return failure('session_expired', tMain('main.messages.zip.previewExpired'))
     const check = validateZipSelection(session.preview, input)
     if (!check.ok) return failure('invalid_selection', check.reason)
     const selection = input as ZipImportSelection
@@ -352,7 +354,7 @@ export class ZipImportService {
     try {
       const stat = await fsp.stat(session.zipPath)
       if (stat.size !== session.fileSize || stat.mtimeMs !== session.mtimeMs) {
-        return failure('archive_changed', 'The ZIP file changed after it was opened. Choose it again.')
+        return failure('archive_changed', tMain('main.messages.zip.changed'))
       }
       const fresh = await readZipDirectory(session.zipPath)
       const same = (a: ZipEntryRecord, b: ZipEntryRecord | undefined): boolean =>
@@ -367,7 +369,7 @@ export class ZipImportService {
       for (const id of chosen) {
         const index = Number(id.slice(1))
         if (!same(session.directory.entries[index] as ZipEntryRecord, fresh.entries[index])) {
-          return failure('archive_changed', 'The ZIP file changed after it was opened. Choose it again.')
+          return failure('archive_changed', tMain('main.messages.zip.changed'))
         }
       }
       const toRef = (id: string): { entryId: string; path: string; entry: ZipEntryRecord } => {

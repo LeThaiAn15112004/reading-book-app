@@ -11,6 +11,7 @@ import type {
   TranslationProgressDto,
 } from '../ipc/api-types'
 import type { TranslationWorkerData, TranslationWorkerMessage, TranslationWorkerRequest } from './translation-job'
+import { tMain } from '../i18n/main-translate'
 
 /** Emitted next to main.js by the extra bundle entry in vite.config.ts. */
 const WORKER_PATH = path.join(path.dirname(fileURLToPath(import.meta.url)), 'translation.worker.js')
@@ -100,14 +101,14 @@ function post(message: TranslationWorkerRequest): void {
 export function translate(request: TranslateRequestDto, sender: WebContents): Promise<TranslateResultDto> {
   const { requestId, text, sourceLang, targetLang } = request
   if (sourceLang === targetLang) {
-    return Promise.resolve(fail('SAME_LANGUAGE', 'Source and target language are the same.'))
+    return Promise.resolve(fail('SAME_LANGUAGE', tMain('main.messages.translation.sameLanguage')))
   }
   const route = resolveTranslationRoute(sourceLang, targetLang)
   if (!route) {
     return Promise.resolve(fail('UNSUPPORTED_LANGUAGE', `No model for ${sourceLang} → ${targetLang}.`))
   }
   const clean = sanitizeTranslationInput(text)
-  if (!clean) return Promise.resolve(fail('INVALID_ARGUMENT', 'Nothing to translate.'))
+  if (!clean) return Promise.resolve(fail('INVALID_ARGUMENT', tMain('main.messages.translation.nothing')))
   if (clean.length > MAX_INPUT_CHARS) {
     return Promise.resolve(
       fail('INVALID_ARGUMENT', `Selection is too long (${clean.length} characters, limit ${MAX_INPUT_CHARS}).`),
@@ -131,7 +132,7 @@ export function cancelTranslation(requestId: string): void {
   const entry = pending.get(requestId)
   if (!entry) return
   pending.delete(requestId)
-  entry.resolve(fail('ABORTED', 'Translation was cancelled.'))
+  entry.resolve(fail('ABORTED', tMain('main.messages.translation.cancelled')))
   worker?.postMessage({ type: 'cancel', id: requestId } satisfies TranslationWorkerRequest)
 }
 

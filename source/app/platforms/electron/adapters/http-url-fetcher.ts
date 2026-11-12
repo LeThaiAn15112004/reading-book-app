@@ -11,6 +11,7 @@ import path from 'node:path'
 import { Readable, Transform } from 'node:stream'
 import type { ReadableStream as NodeWebReadableStream } from 'node:stream/web'
 import { pipeline } from 'node:stream/promises'
+import { tMain } from '../i18n/main-translate'
 
 /** Stable error codes for FR-13 / E4 (mapped to ImportResult). */
 export type UrlFetchErrorCode =
@@ -48,10 +49,10 @@ function assertHttpsUrl(raw: string): URL {
   try {
     parsed = new URL(raw)
   } catch {
-    throw new UrlFetchError('scheme', 'Invalid URL.')
+    throw new UrlFetchError('scheme', tMain('main.messages.import.invalidUrl'))
   }
   if (!ALLOWED_SCHEMES.has(parsed.protocol)) {
-    throw new UrlFetchError('scheme', 'Only secure HTTPS links are allowed.')
+    throw new UrlFetchError('scheme', tMain('main.messages.import.httpsOnly'))
   }
   return parsed
 }
@@ -123,8 +124,8 @@ async function removeQuietly(filePath: string | undefined): Promise<void> {
   await fsp.rm(filePath, { force: true }).catch(() => {})
 }
 
-const TIMEOUT_MESSAGE = 'The download stalled and timed out. Check your connection and try again.'
-const CANCELLED_MESSAGE = 'Download cancelled.'
+const TIMEOUT_MESSAGE = (): string => tMain('main.messages.import.stalled')
+const CANCELLED_MESSAGE = (): string => tMain('main.messages.import.downloadCancelled')
 
 /**
  * Main-process HTTPS direct-file downloader (SDS §2.6 / FR-13 / T2.4).
@@ -136,7 +137,7 @@ export class HttpUrlFetcher implements UrlDocumentFetcher {
   async fetch(url: string, options: UrlFetchOptions = {}): Promise<UrlFetchResult> {
     let current = assertHttpsUrl(url.trim())
     if (options.signal?.aborted) {
-      throw new UrlFetchError('cancelled', CANCELLED_MESSAGE)
+      throw new UrlFetchError('cancelled', CANCELLED_MESSAGE())
     }
     const tempRoot = app.getPath('temp')
     let tempPath: string | undefined
@@ -166,8 +167,8 @@ export class HttpUrlFetcher implements UrlDocumentFetcher {
         controller.signal.aborted || (err instanceof Error && err.name === 'AbortError')
       if (!isAbort) return null
       return abortCause === 'cancelled'
-        ? new UrlFetchError('cancelled', CANCELLED_MESSAGE)
-        : new UrlFetchError('timeout', TIMEOUT_MESSAGE)
+        ? new UrlFetchError('cancelled', CANCELLED_MESSAGE())
+        : new UrlFetchError('timeout', TIMEOUT_MESSAGE())
     }
 
     armIdleTimeout()
@@ -188,7 +189,7 @@ export class HttpUrlFetcher implements UrlDocumentFetcher {
             abortError(err) ??
             new UrlFetchError(
               'network',
-              err instanceof Error ? err.message : 'Network error while downloading.',
+              err instanceof Error ? err.message : tMain('main.messages.import.networkError'),
             )
           )
         }
@@ -204,7 +205,7 @@ export class HttpUrlFetcher implements UrlDocumentFetcher {
           }
           redirects += 1
           if (redirects > MAX_REDIRECTS) {
-            throw new UrlFetchError('network', 'Too many redirects.')
+            throw new UrlFetchError('network', tMain('main.messages.import.tooManyRedirects'))
           }
           // Re-validate scheme on every hop (no http/file downgrade).
           current = assertHttpsUrl(new URL(location, current).href)
@@ -218,7 +219,7 @@ export class HttpUrlFetcher implements UrlDocumentFetcher {
         const status = response?.status ?? 0
         throw new UrlFetchError(
           'http_status',
-          status ? `Download failed (HTTP ${status}).` : 'Download failed.',
+          status ? `Download failed (HTTP ${status}).` : tMain('main.messages.import.downloadFailed'),
         )
       }
 
@@ -243,7 +244,7 @@ export class HttpUrlFetcher implements UrlDocumentFetcher {
       }
 
       if (!response.body) {
-        throw new UrlFetchError('network', 'Empty response body.')
+        throw new UrlFetchError('network', tMain('main.messages.import.emptyResponse'))
       }
 
       const suggestedFileName =
@@ -275,7 +276,7 @@ export class HttpUrlFetcher implements UrlDocumentFetcher {
           abortError(err) ??
           new UrlFetchError(
             'network',
-            err instanceof Error ? err.message : 'Failed to write downloaded file.',
+            err instanceof Error ? err.message : tMain('main.messages.import.writeDownloadFailed'),
           )
         )
       }
@@ -290,7 +291,7 @@ export class HttpUrlFetcher implements UrlDocumentFetcher {
       if (err instanceof UrlFetchError) throw err
       throw (
         abortError(err) ??
-        new UrlFetchError('network', err instanceof Error ? err.message : 'Download failed.')
+        new UrlFetchError('network', err instanceof Error ? err.message : tMain('main.messages.import.downloadFailed'))
       )
     } finally {
       if (timer) clearTimeout(timer)
