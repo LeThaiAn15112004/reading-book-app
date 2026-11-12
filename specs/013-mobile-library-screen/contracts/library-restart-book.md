@@ -27,7 +27,7 @@ restartBook(id: string): Promise<OkResult>   // { ok: boolean }
 
 ## Tests
 
-- core: `tests/db/library-restart.test.ts` — statements produce the patch above; `json_patch` keeps other keys
+- core: `tests/db/library-statements.test.ts` — statements produce the patch above; `json_patch` keeps other keys
   (in-memory SQLite driver used by existing db tests).
 - Mobile: `platforms/native/tests/stores.test.ts` + `bridge.test.ts` — restart on a completed book, unknown id,
   other keys kept; contract fixture in `source/core/tests/contracts/` so both hosts answer the same.

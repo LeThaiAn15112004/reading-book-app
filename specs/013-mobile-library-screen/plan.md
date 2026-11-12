@@ -85,7 +85,7 @@ source/core/src/
 
 source/core/tests/
 ├── app-models/library-phone.test.ts   # NEW
-└── db/library-restart.test.ts         # NEW (+ contract fixture in tests/contracts/)
+└── db/library-statements.test.ts      # extended (+ contract fixture in tests/contracts/)
 
 source/app/
 ├── App.tsx                            # PhoneNav rendered AFTER the content on the Mobile host

@@ -4,7 +4,7 @@
 
 | Command | Proves |
 |---|---|
-| `npm run sdk:test` | chip rules incl. `recent`, phone Continue Reading pick / action, list-row progress, `restartReading` statements (`tests/app-models/library-phone.test.ts`, `tests/db/library-restart.test.ts`) |
+| `npm run sdk:test` | chip rules incl. `recent`, phone Continue Reading pick / action, list-row progress, `restartReading` statements (`tests/app-models/library-phone.test.ts`, `tests/db/library-statements.test.ts`) |
 | `npm run mobile:test` | Mobile `library.restartBook` (completed → reading, 0 %, other keys kept, unknown id refused) |
 | `npm run typecheck` | Desktop and Mobile `window.api` both implement `restartBook` |
 | `npm run check:desktop-baseline` | the Main files touched are approved in `desktop-main-changes.json` |
