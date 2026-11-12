@@ -3,6 +3,7 @@ import { bookIndexApi } from '../../../../bridge'
 import type { EpubRendererApi } from '../../../../components/reader/renderers/epub'
 import type { PdfRendererApi } from '../../../../components/reader/renderers/pdf'
 import { useBookSearchStore, type BookSearchSurface } from '../search/bookSearchStore'
+import { getT } from '../../../../i18n'
 
 type UseReaderSearchOptions = {
   bookId: string | undefined
@@ -50,7 +51,7 @@ function pdfSearchSurface(apiRef: MutableRefObject<PdfRendererApi | null>): Book
     },
     chapterLabels: () => {
       const total = apiRef.current?.getNavState().pageTotal ?? 0
-      return Array.from({ length: total }, (_, i) => `Page ${i + 1}`)
+      return Array.from({ length: total }, (_, i) => getT()('reader.logic.page', { page: i + 1 }))
     },
   }
 }

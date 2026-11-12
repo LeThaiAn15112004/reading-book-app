@@ -32,6 +32,7 @@ import {
 } from '@core'
 import { audioApi, libraryApi, overlayApi } from '../../../bridge'
 import { registerSessionFlushHandler } from '../../Reader/logic/session/sessionFlushRegistry'
+import type { UiText } from '../../../i18n'
 
 /**
  * The audiobook player. One module-level `<audio>` element at a time (so two books can never play
@@ -66,7 +67,7 @@ type AudioPlayerState = {
   bookId: string | null
   status: PlayerStatus
   errorCode: string | null
-  errorMessage: string | null
+  errorMessage: UiText | null
   title: string
   author: string | undefined
   coverUrl: string | undefined
@@ -101,7 +102,7 @@ type AudioPlayerState = {
   /** Multi-track: the Notes could not be read, so they are neither shown as empty nor editable (an unread list must never overwrite the stored one). */
   notesUnavailable: boolean
   /** A message about the last Note action (limit reached, save refused, jump failed); `null` when there is none. */
-  noteNotice: string | null
+  noteNotice: UiText | null
   /**
    * Multi-track: the Note most recently added by `addNote` (a NEW object on every add; `null` after `load` and for single-file
    * audiobooks). Only a signal for the grouped Notes tab, which opens that Note's track row; nothing else sets it.
@@ -145,8 +146,7 @@ type AudioPlayerState = {
   dispose: () => Promise<void>
 }
 
-const MEDIA_ERROR_MESSAGE =
-  'This audio file could not be played. It may be damaged or use an encoding this app cannot decode.'
+const MEDIA_ERROR_MESSAGE: UiText = { key: 'audiobook.player.store.mediaError' }
 const VOLUME_KEY = 'readmate.audioVolume.v1'
 
 function readVolume(): number {
@@ -171,7 +171,7 @@ const INITIAL = {
   status: 'idle' as PlayerStatus,
   errorCode: null,
   errorMessage: null,
-  title: 'Untitled',
+  title: '',
   author: undefined,
   coverUrl: undefined,
   playing: false,
@@ -216,8 +216,8 @@ export function selectCanAddNote(
   return !s.switching && !!track && !s.trackErrors.has(track.id) && !s.notesUnavailable
 }
 
-const NOTE_LIMIT_NOTICE = `An audiobook can hold up to ${MAX_AUDIO_BOOKMARKS} Notes. Delete one to add another.`
-const NOTE_SAVE_NOTICE = 'Your Notes could not be saved, so the list was reloaded from your library.'
+const NOTE_LIMIT_NOTICE: UiText = { key: 'audiobook.player.store.noteLimit', params: { max: MAX_AUDIO_BOOKMARKS } }
+const NOTE_SAVE_NOTICE: UiText = { key: 'audiobook.player.store.noteSaveFailed' }
 
 function newId(): string {
   return typeof crypto !== 'undefined' && 'randomUUID' in crypto
@@ -363,7 +363,7 @@ export const useAudioPlayerStore = create<AudioPlayerState>()((set, get) => {
     pendingJump = null
   }
 
-  const fail = (code: string, message: string) => {
+  const fail = (code: string, message: UiText) => {
     stopSaveTimer()
     set({ status: 'error', errorCode: code, errorMessage: message, playing: false, buffering: false })
   }
@@ -411,8 +411,8 @@ export const useAudioPlayerStore = create<AudioPlayerState>()((set, get) => {
       openTrack(jump.originIndex, jump.originSeconds, false, false, { exact: true })
       set({
         noteNotice: origin
-          ? `“${track.title}” could not be played. You are back on “${origin.title}”.`
-          : `“${track.title}” could not be played.`,
+          ? { key: 'audiobook.player.store.trackBack', params: { title: track.title, origin: origin.title } }
+          : { key: 'audiobook.player.store.trackFailed', params: { title: track.title } },
       })
     }
   }
@@ -594,9 +594,9 @@ export const useAudioPlayerStore = create<AudioPlayerState>()((set, get) => {
           audioApi.getTracks(bookId).catch(() => ({ ok: false, tracks: [] as AudioTrack[] })),
         ])
         if (myGeneration !== generation) return
-        if (!book) return fail('not_found', 'This book is no longer in your library.')
+        if (!book) return fail('not_found', { key: 'audiobook.player.store.notInLibrary' })
         if (!opened.ok) {
-          return fail(opened.errorCode ?? 'read_failed', opened.errorMessage ?? 'Could not open this audio file.')
+          return fail(opened.errorCode ?? 'read_failed', opened.errorMessage ?? { key: 'audiobook.player.store.openFailed' })
         }
 
         // ---- multi-track audiobook: one element per track (see the header comment). Nothing below this block runs for it.
@@ -723,7 +723,7 @@ export const useAudioPlayerStore = create<AudioPlayerState>()((set, get) => {
       } catch (err) {
         if (myGeneration !== generation) return
         console.warn('[audio] could not open the book', err)
-        fail('read_failed', 'Could not open this audio file.')
+        fail('read_failed', { key: 'audiobook.player.store.openFailed' })
       }
     },
 

@@ -4,6 +4,7 @@ import type { PdfRendererApi } from '../../../../components/reader/renderers/pdf
 import { useShortcutAction } from '../../../../shortcuts'
 import type { SidebarTab } from '../../components'
 import { useBookSearchStore } from '../search/bookSearchStore'
+import { getT } from '../../../../i18n'
 
 type UseReaderShortcutsOptions = {
   /** Book content is ready and no Reader dialog (Book Info, Sign, Trash) covers the page. */
@@ -79,7 +80,7 @@ export function useReaderShortcuts({
     () => {
       if (!surfaceReady()) return false
       void goToEnd().then((reached) => {
-        if (!reached) setToast('Couldn’t reach the end of the book.')
+        if (!reached) setToast(getT()('reader.logic.toast.endUnreachable'))
       })
     },
     enabled,

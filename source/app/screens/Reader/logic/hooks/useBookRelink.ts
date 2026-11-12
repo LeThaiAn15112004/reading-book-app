@@ -1,5 +1,6 @@
 import { useCallback } from 'react'
 import { useBookRelinkStore } from '../bookRelink/bookRelinkStore'
+import { uiText, useT } from '../../../../i18n'
 
 type UseBookRelinkOptions = {
   bookId: string | undefined
@@ -13,9 +14,9 @@ type UseBookRelinkOptions = {
  */
 export function useBookRelink({ bookId, onRelinked }: UseBookRelinkOptions) {
   const locating = useBookRelinkStore((s) => s.locating)
-  const message = useBookRelinkStore((s) =>
-    bookId && s.notice?.bookId === bookId ? s.notice.text : null,
-  )
+  const t = useT()
+  const notice = useBookRelinkStore((s) => (bookId && s.notice?.bookId === bookId ? s.notice.text : null))
+  const message = notice === null ? null : uiText(t, notice)
   const locate = useBookRelinkStore((s) => s.locate)
 
   const locateFile = useCallback(async () => {

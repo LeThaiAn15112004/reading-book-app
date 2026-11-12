@@ -1,7 +1,8 @@
 import { create } from 'zustand'
 import { libraryApi } from '../../../../bridge'
+import type { UiText } from '../../../../i18n'
 
-type RelinkNotice = { bookId: string; text: string }
+type RelinkNotice = { bookId: string; text: UiText }
 
 type BookRelinkState = {
   /** A file dialog / hash check is in flight (buttons disabled meanwhile). */
@@ -12,7 +13,7 @@ type BookRelinkState = {
   locate: (bookId: string) => Promise<boolean>
 }
 
-const GENERIC_FAILURE = 'Could not link that file to this book.'
+const GENERIC_FAILURE: UiText = { key: 'reader.logic.relink.failed' }
 
 /**
  * UI state of "Locate file" on the reader's could-not-open screen. Main owns the dialog and the

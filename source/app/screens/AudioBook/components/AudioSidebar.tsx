@@ -364,7 +364,7 @@ export function AudioSidebarPanel({
   return (
     <aside
       data-audio-sidebar
-      aria-label={SIDEBAR_TAB_LABEL[tab]}
+      aria-label={SIDEBAR_TAB_LABEL[tab] /* TODO spec012 T037: t() */}
       className="absolute inset-y-0 z-[160] flex flex-col border-y border-r border-lib-border border-l-0 bg-lib-surface-strong shadow-lg"
       style={{ left: SIDEBAR_RAIL_WIDTH_PX, width: panelWidth }}
     >

@@ -4,6 +4,7 @@ import {
   useState,
   type MutableRefObject,
 } from 'react'
+import { getT } from '../../i18n'
 import { CfiLocation, Location } from '@core'
 import {
   readingPrefsFromGlobal,
@@ -91,7 +92,7 @@ export function useReaderBookOpen({
   client,
   parseResumeLocation = defaultParseResumeLocation,
 }: UseReaderBookOpenOptions) {
-  const [bookTitle, setBookTitle] = useState('Untitled')
+  const [bookTitle, setBookTitle] = useState(() => getT()('common.untitled'))
   const [coverUrl, setCoverUrl] = useState<string | undefined>()
   const [author, setAuthor] = useState<string | undefined>()
   const [contentStatus, setContentStatus] = useState<
@@ -133,7 +134,7 @@ export function useReaderBookOpen({
 
   useEffect(() => {
     if (!bookId) {
-      setBookTitle('Untitled')
+      setBookTitle(getT()('common.untitled'))
       setCoverUrl(undefined)
       setAuthor(undefined)
       setBookBytes(null)
@@ -159,7 +160,7 @@ export function useReaderBookOpen({
       .getBook(bookId)
       .then((book) => {
         if (cancelled) return
-        const title = book?.title?.trim() || 'Untitled'
+        const title = book?.title?.trim() || getT()('common.untitled')
         setBookTitle(title)
         setCoverUrl(book?.coverUrl)
         setAuthor(book?.author?.trim() || undefined)
@@ -167,7 +168,7 @@ export function useReaderBookOpen({
       })
       .catch(() => {
         if (!cancelled) {
-          setBookTitle('Untitled')
+          setBookTitle(getT()('common.untitled'))
           setCoverUrl(undefined)
           setAuthor(undefined)
         }
@@ -216,7 +217,7 @@ export function useReaderBookOpen({
         setContentStatus('error')
         setOpenErrorCode(result.errorCode ?? null)
         setOpenErrorMessage(
-          result.errorMessage ?? 'Could not open this book file.',
+          result.errorMessage ?? getT()('reader.logic.open.failed'),
         )
       })
       .catch(() => {
@@ -225,7 +226,7 @@ export function useReaderBookOpen({
         setBookFormat(null)
         setContentStatus('error')
         setOpenErrorCode(null)
-        setOpenErrorMessage('Could not open this book file.')
+        setOpenErrorMessage(getT()('reader.logic.open.failed'))
       })
 
     return () => {

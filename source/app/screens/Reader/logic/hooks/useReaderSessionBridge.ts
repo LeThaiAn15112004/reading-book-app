@@ -9,11 +9,12 @@ import {
   useReadingSessionAutosave,
   type SessionLatestSnapshot,
 } from '../session/useReadingSessionAutosave'
+import { getT } from '../../../../i18n'
 
 /** Footer label + Library progress for a PDF page (percent = pages read, 0–100). */
 function pdfSessionMeta(state: PdfNavState) {
   return {
-    label: `Page ${state.pageCurrent}`,
+    label: getT()('reader.logic.page', { page: state.pageCurrent }),
     percent: state.pageTotal > 0 ? Math.round((state.pageCurrent / state.pageTotal) * 100) : 0,
   }
 }

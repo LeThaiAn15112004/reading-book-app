@@ -15,6 +15,7 @@ import {
   type EpubRendererApi,
 } from '../../../../components/reader/renderers/epub'
 import type { PdfRendererApi } from '../../../../components/reader/renderers/pdf'
+import { getT } from '../../../../i18n'
 
 /**
  * Hold the just-jumped bookmark as "here" while epub.js settles: in continuous/scroll mode it
@@ -89,7 +90,7 @@ export function useReaderBookmarks({
         )
       })
       .catch(() => {
-        if (!cancelled) setToast('Could not load bookmarks.')
+        if (!cancelled) setToast(getT()('reader.logic.bookmarks.loadFailed'))
       })
 
     return () => {
@@ -146,15 +147,15 @@ export function useReaderBookmarks({
     void overlayApi
       .deleteBookmark({ bookId, id })
       .then((result) => {
-        if (!result.ok) setToast('Could not delete bookmark.')
+        if (!result.ok) setToast(getT()('reader.logic.bookmarks.deleteFailed'))
       })
-      .catch(() => setToast('Could not delete bookmark.'))
+      .catch(() => setToast(getT()('reader.logic.bookmarks.deleteFailed')))
   }
 
   function toggleBookmark() {
     if (!bookId) return
     if (!currentLocation) {
-      setToast('Could not bookmark this place yet.')
+      setToast(getT()('reader.logic.bookmarks.notYet'))
       return
     }
     toggleBookmarkAt(currentLocation, bookmarkChapterIndex, bookmarksHere)
@@ -169,7 +170,7 @@ export function useReaderBookmarks({
       location,
       page - 1,
       findReaderBookmarksAtLocation(bookmarks, location),
-      `Page ${page}`,
+      getT()('reader.logic.page', { page }),
     )
   }
 
@@ -184,7 +185,7 @@ export function useReaderBookmarks({
       const removeIds = new Set(existing.map((b) => b.id))
       setBookmarks((list) => list.filter((b) => !removeIds.has(b.id)))
       for (const b of existing) persistDelete(b.id)
-      setToast('Bookmark removed.')
+      setToast(getT()('reader.logic.bookmarks.removed'))
       return
     }
 
@@ -202,7 +203,7 @@ export function useReaderBookmarks({
       createdAt: new Date().toISOString(),
     }
     setBookmarks((list) => [...list, bookmark])
-    setToast('Bookmark added.')
+    setToast(getT()('reader.logic.bookmarks.added'))
 
     void overlayApi
       .saveBookmark({
@@ -218,11 +219,11 @@ export function useReaderBookmarks({
         // The store rejected it — drop the optimistic row rather than leaving an entry
         // that disappears on the next reopen.
         setBookmarks((list) => list.filter((b) => b.id !== bookmark.id))
-        setToast('Could not save bookmark.')
+        setToast(getT()('reader.logic.bookmarks.saveFailed'))
       })
       .catch(() => {
         setBookmarks((list) => list.filter((b) => b.id !== bookmark.id))
-        setToast('Could not save bookmark.')
+        setToast(getT()('reader.logic.bookmarks.saveFailed'))
       })
   }
 
@@ -269,7 +270,7 @@ export function useReaderBookmarks({
       setChromeHidden(true)
       goChapter(bookmark.chapterIndex)
     } catch {
-      setToast("Could not find this bookmark's location in the book.")
+      setToast(getT()('reader.logic.bookmarks.locationNotFound'))
     }
   }
 

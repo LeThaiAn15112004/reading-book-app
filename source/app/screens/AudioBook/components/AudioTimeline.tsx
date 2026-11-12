@@ -1,4 +1,3 @@
-/* i18n-pending: audiobook.player */
 import { useMemo, useState, type KeyboardEvent } from 'react'
 import {
   formatPlaybackTime,
@@ -11,19 +10,24 @@ import {
 } from '@core'
 import { useNoteMenuStore } from '../logic/audioNoteMenuStore'
 import { useAudioPlayerStore } from '../logic/audioPlayerStore'
+import type { MessageKey } from '@core'
+import { getT, useT, useUiLanguage } from '../../../i18n'
 
-const SCOPE_LABEL: Record<ProgressScope, string> = { book: 'Book', chapter: 'Chapter' }
+const SCOPE_LABEL: Record<ProgressScope, MessageKey> = { book: 'audiobook.player.timeline.book', chapter: 'audiobook.player.timeline.chapter' }
+const SCOPE_SHOW: Record<ProgressScope, MessageKey> = { book: 'audiobook.player.timeline.showBook', chapter: 'audiobook.player.timeline.showChapter' }
 
 /** Why Chapter scope is unavailable, or null when it is available. */
 function chapterUnavailableReason(status: string, reason: string | null): string | null {
   if (status === 'ok') return null
-  if (status === 'pending-duration') return 'Chapters are still loading'
-  if (status === 'invalid') return `The chapter list in this file could not be trusted${reason ? ` (${reason})` : ''}`
-  return 'This audiobook has no chapter information'
+  const t = getT()
+  if (status === 'pending-duration') return t('audiobook.player.timeline.chaptersLoading')
+  if (status === 'invalid') return reason ? t('audiobook.player.timeline.untrustedReason', { reason }) : t('audiobook.player.timeline.untrusted')
+  return t('audiobook.player.timeline.noChapterInfo')
 }
 
 /** Book / Chapter selector: changes how the timeline is read, never where the audio is. */
 export function ProgressScopeSelector() {
+  const t = useT()
   const scope = useAudioPlayerStore((s) => s.scope)
   const status = useAudioPlayerStore((s) => s.chapterStatus)
   const reason = useAudioPlayerStore((s) => s.chapterReason)
@@ -41,7 +45,7 @@ export function ProgressScopeSelector() {
   return (
     <div
       role="radiogroup"
-      aria-label="Progress scope"
+      aria-label={t('audiobook.player.timeline.scope')}
       className="inline-flex rounded-full border border-lib-border bg-lib-surface p-0.5 text-xs font-semibold"
       onKeyDown={onKeyDown}
     >
@@ -56,7 +60,7 @@ export function ProgressScopeSelector() {
             aria-checked={checked}
             aria-disabled={disabled || undefined}
             tabIndex={checked ? 0 : -1}
-            title={disabled ? (unavailable ?? undefined) : `Show ${SCOPE_LABEL[value].toLowerCase()} progress`}
+            title={disabled ? (unavailable ?? undefined) : t(SCOPE_SHOW[value])}
             className={`h-7 min-w-16 rounded-full px-3 ${
               checked ? 'bg-lib-accent text-lib-on-accent' : 'text-lib-muted hover:text-lib-text'
             } ${disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`}
@@ -64,7 +68,7 @@ export function ProgressScopeSelector() {
               if (!disabled) setScope(value)
             }}
           >
-            {SCOPE_LABEL[value]}
+            {t(SCOPE_LABEL[value])}
           </button>
         )
       })}
@@ -74,6 +78,8 @@ export function ProgressScopeSelector() {
 
 /** The seek bar and its three labels, for the chosen scope. Re-renders with the playback position. */
 export function AudioTimeline() {
+  const t = useT()
+  const language = useUiLanguage()
   const scope = useAudioPlayerStore((s) => s.scope)
   const position = useAudioPlayerStore((s) => s.positionSeconds)
   const duration = useAudioPlayerStore((s) => s.durationSeconds)
@@ -83,7 +89,9 @@ export function AudioTimeline() {
   const notes = useAudioPlayerStore((s) => s.notes)
   const chapterStatus = useAudioPlayerStore((s) => s.chapterStatus)
   // Multi-track: the bar spans the CURRENT track (position and duration are the track's); no chapter ticks, no note markers.
-  const trackLabel = useAudioPlayerStore((s) => trackEyebrow(s.trackIndex, s.tracks.length))
+  const trackIndexValue = useAudioPlayerStore((s) => s.trackIndex)
+  const trackCount = useAudioPlayerStore((s) => s.tracks.length)
+  const trackLabel = trackEyebrow(trackIndexValue, trackCount, language)
   // Multi-track: only the CURRENT track's Notes get markers (their seconds are relative to that track).
   const currentTrackId = useAudioPlayerStore((s) => (s.tracks.length > 0 ? s.tracks[s.trackIndex]?.id : undefined))
   const multiTrack = useAudioPlayerStore((s) => s.tracks.length > 0)
@@ -126,7 +134,7 @@ export function AudioTimeline() {
         <input type="range" aria-label="Seek" disabled className="w-full" min={0} max={1} value={0} readOnly />
         <div className="flex justify-between text-xs tabular-nums text-lib-muted">
           <span>--:--</span>
-          <span>Duration unavailable</span>
+          <span>{t('audiobook.player.timeline.durationUnavailable')}</span>
           <span>--:--</span>
         </div>
       </div>
@@ -138,7 +146,7 @@ export function AudioTimeline() {
     if (dragValue !== null) seekScoped(dragValue)
     setDragValue(null)
   }
-  const label = trackLabel ?? (view.scope === 'chapter' ? 'Chapter' : 'Whole book')
+  const label = trackLabel ?? (view.scope === 'chapter' ? t('audiobook.player.timeline.chapter') : t('audiobook.player.timeline.wholeBook'))
 
   return (
     <div className="flex w-full flex-col gap-2">
@@ -155,8 +163,8 @@ export function AudioTimeline() {
         <input
           type="range"
           data-audio-seek
-          aria-label={`Seek (${label.toLowerCase()})`}
-          aria-valuetext={`${formatPlaybackTime(shown)} of ${formatPlaybackTime(view.durationSeconds)}`}
+          aria-label={t('audiobook.player.timeline.seek', { label: label.toLowerCase() })}
+          aria-valuetext={t('audiobook.player.timeline.valueText', { shown: formatPlaybackTime(shown), total: formatPlaybackTime(view.durationSeconds) })}
           className="relative w-full cursor-pointer accent-[var(--lib-accent,currentColor)]"
           min={0}
           max={view.durationSeconds}
@@ -172,9 +180,9 @@ export function AudioTimeline() {
             key={note.id}
             type="button"
             data-audio-note-marker={note.id}
-            aria-label={`Note at ${formatPlaybackTime(at)}${note.note ? `: ${note.note}` : ''}`}
+            aria-label={note.note ? t('audiobook.player.timeline.noteAtWithText', { time: formatPlaybackTime(at), text: note.note }) : t('audiobook.player.timeline.noteAt', { time: formatPlaybackTime(at) })}
             aria-haspopup="menu"
-            title={note.note ? `${formatPlaybackTime(at)} · ${note.note}` : `Note at ${formatPlaybackTime(at)}`}
+            title={note.note ? t('audiobook.player.timeline.noteTitle', { time: formatPlaybackTime(at), text: note.note }) : t('audiobook.player.timeline.noteAt', { time: formatPlaybackTime(at) })}
             className="group absolute -top-1 z-[2] flex size-4 -translate-x-1/2 cursor-pointer items-center justify-center border-none bg-transparent p-0 hover:z-[3] focus-visible:z-[3] focus-visible:outline-none"
             // The native thumb's travel is inset by half its width at both ends; the marker uses the same inset.
             style={{ left: `calc(8px + (100% - 16px) * ${fraction})` }}
@@ -190,7 +198,7 @@ export function AudioTimeline() {
       </div>
       <div className="flex justify-between text-xs tabular-nums text-lib-muted">
         <span data-audio-elapsed>{formatPlaybackTime(shown)}</span>
-        <span>{buffering ? 'Loading…' : label}</span>
+        <span>{buffering ? t('audiobook.player.timeline.loading') : label}</span>
         <span data-audio-remaining>-{formatPlaybackTime(view.durationSeconds - shown)}</span>
       </div>
     </div>

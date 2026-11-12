@@ -1,6 +1,7 @@
 import { useCallback, useEffect, type PointerEvent as ReactPointerEvent } from 'react'
 import { appApi } from '../../../../bridge'
 import { useSnapshotStore, type SnapshotPoint } from '../snapshot/snapshotStore'
+import { getT } from '../../../../i18n'
 
 /** Smallest drag (viewport CSS px, either axis) that counts as a real selection — filters out an
  *  accidental click from cancelling the tool outright; the user just stays armed to retry. */
@@ -116,10 +117,10 @@ export function useSnapshotTool({ bookId, setToast }: UseSnapshotToolOptions) {
         .captureSnapshot(rect)
         .then((result) => {
           setToast(
-            result.ok ? 'Đã sao chép vùng chọn vào bộ nhớ tạm.' : 'Không thể chụp vùng đã chọn.',
+            result.ok ? getT()('reader.logic.toast.snapshotCopied') : getT()('reader.logic.toast.snapshotFailed'),
           )
         })
-        .catch(() => setToast('Không thể chụp vùng đã chọn.'))
+        .catch(() => setToast(getT()('reader.logic.toast.snapshotFailed')))
         .finally(() => deactivate())
     },
     [clearDrag, deactivate, setCapturing, setToast],

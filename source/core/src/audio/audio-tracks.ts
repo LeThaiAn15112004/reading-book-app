@@ -1,3 +1,5 @@
+import { translate } from '../i18n/translate.js'
+import type { UiLanguage } from '../i18n/types.js'
 import { formatPlaybackTime, knownDuration } from './audio-playback.js'
 
 /**
@@ -60,9 +62,9 @@ export function nextTrackIndex(index: number, count: number): number | null {
 }
 
 /** "Track 3 of 68", or `null` when the index does not name a track. */
-export function trackEyebrow(index: number, count: number): string | null {
+export function trackEyebrow(index: number, count: number, lang: UiLanguage = 'en'): string | null {
   if (!Number.isInteger(index) || !Number.isInteger(count) || count < 1 || index < 0 || index >= count) return null
-  return `Track ${index + 1} of ${count}`
+  return translate(lang, 'audiobook.player.screen.trackOf', { current: index + 1, total: count })
 }
 
 /** `m:ss` / `h:mm:ss`, or an em dash while the duration is unknown. */

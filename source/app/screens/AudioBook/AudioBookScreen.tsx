@@ -1,4 +1,3 @@
-/* i18n-pending: audiobook.player */
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { features } from '@core/config'
@@ -19,6 +18,7 @@ import { isActiveJob, useTranscriptStore } from './logic/transcriptStore'
 import { TranscribeDialog } from './components/TranscribeDialog'
 import { resolveAppLanguage } from '../../theme/appAppearance'
 import { useAppAppearanceStore } from '../../theme/appAppearanceStore'
+import { getT, uiText, useT, useUiLanguage } from '../../i18n'
 
 const SIDEBAR_OPEN_KEY = 'readmate.audioSidebarOpen.v1'
 /** The text reader's rail, minus Page layout (no pages) and Bookmark (audio's marked positions are its Notes). */
@@ -47,6 +47,7 @@ function readOpen(): boolean {
  * job is queued or running it only says so (the panel has the progress and Cancel).
  */
 function TranscribeEntry({ onOpen }: { onOpen: () => void }) {
+  const t = useT()
   const job = useTranscriptStore((s) => s.job)
   const hasTranscript = useTranscriptStore((s) => s.info?.transcript != null)
   const openDialog = useTranscriptStore((s) => s.openDialog)
@@ -61,7 +62,7 @@ function TranscribeEntry({ onOpen }: { onOpen: () => void }) {
         if (!running && !hasTranscript) openDialog()
       }}
     >
-      {running ? 'Transcribing…' : hasTranscript ? 'Transcript' : 'Transcribe'}
+      {running ? t('audiobook.player.screen.transcribing') : hasTranscript ? t('audiobook.player.screen.transcript') : t('audiobook.player.screen.transcribe')}
     </button>
   )
 }
@@ -69,10 +70,13 @@ function TranscribeEntry({ onOpen }: { onOpen: () => void }) {
 /** "4h 11m left" / "12m left" / "under a minute left". */
 function formatLeft(seconds: number): string {
   const m = Math.round(seconds / 60)
-  if (seconds <= 0) return 'finished'
-  if (m < 1) return 'under a minute left'
+  const t = getT()
+  if (seconds <= 0) return t('audiobook.player.screen.finished')
+  if (m < 1) return t('audiobook.player.screen.underMinute')
   const h = Math.floor(m / 60)
-  return h > 0 ? `${h}h ${String(m % 60).padStart(2, '0')}m left` : `${m}m left`
+  return h > 0
+    ? t('audiobook.player.screen.leftHours', { hours: h, minutes: String(m % 60).padStart(2, '0') })
+    : t('audiobook.player.screen.leftMinutes', { minutes: m })
 }
 
 /**
@@ -81,6 +85,8 @@ function formatLeft(seconds: number): string {
  * author as the secondary line.
  */
 function NowPlaying() {
+  const t = useT()
+  const language = useUiLanguage()
   const title = useAudioPlayerStore((s) => s.title)
   const author = useAudioPlayerStore((s) => s.author)
   const tracks = useAudioPlayerStore((s) => s.tracks)
@@ -91,7 +97,7 @@ function NowPlaying() {
   const chapter = status === 'ok' && index >= 0 ? chapters[index] : undefined
   const track = tracks[trackIndex]
   if (track) {
-    const eyebrow = trackEyebrow(trackIndex, tracks.length)
+    const eyebrow = trackEyebrow(trackIndex, tracks.length, language)
     return (
       <div className="flex flex-col gap-1.5">
         {eyebrow ? <div className="text-xs font-semibold tracking-[0.08em] text-lib-accent uppercase">{eyebrow}</div> : null}
@@ -105,7 +111,7 @@ function NowPlaying() {
     <div className="flex flex-col gap-1.5">
       {chapter ? (
         <div className="text-xs font-semibold tracking-[0.08em] text-lib-accent uppercase">
-          Chapter {index + 1} of {chapters.length}
+          {t('audiobook.player.screen.chapterOf', { current: index + 1, total: chapters.length })}
         </div>
       ) : null}
       <h1 className="m-0 text-2xl leading-tight font-bold text-lib-text-strong">{chapter ? chapter.title : title}</h1>
@@ -119,6 +125,7 @@ function NowPlaying() {
  * error); the user can try it again, skip to the next track, or pick any other track in Contents.
  */
 function TrackErrorNotice() {
+  const t = useT()
   const trackIndex = useAudioPlayerStore((s) => s.trackIndex)
   const track = useAudioPlayerStore((s) => s.tracks[s.trackIndex])
   const failed = useAudioPlayerStore((s) => {
@@ -137,15 +144,15 @@ function TrackErrorNotice() {
       className="flex w-full flex-col items-center gap-2 rounded-lg border border-amber-300/40 bg-amber-300/10 px-4 py-3 text-center text-sm text-amber-100"
     >
       <p className="m-0">
-        “{track.title}” could not be played. The file may be missing or damaged, or in a format this app cannot decode.
+        {t('audiobook.player.screen.trackFailed', { title: track.title })}
       </p>
       <div className="flex gap-2">
         <button type="button" className={button} onClick={() => goToTrack(trackIndex)}>
-          Try again
+          {t('audiobook.player.screen.tryAgain')}
         </button>
         {hasNext ? (
           <button type="button" className={button} onClick={nextChapter}>
-            Skip to next track
+            {t('audiobook.player.screen.skipNext')}
           </button>
         ) : null}
       </div>
@@ -158,6 +165,7 @@ function TrackErrorNotice() {
  * not play its track (the player is back on the track it was on). It never replaces the player or the Notes view.
  */
 function NoteNotice() {
+  const t = useT()
   const notice = useAudioPlayerStore((s) => s.noteNotice)
   const dismiss = useAudioPlayerStore((s) => s.dismissNoteNotice)
   if (!notice) return null
@@ -166,13 +174,13 @@ function NoteNotice() {
       role="status"
       className="flex w-full items-center justify-between gap-3 rounded-lg border border-amber-300/40 bg-amber-300/10 px-4 py-2 text-sm text-amber-100"
     >
-      <span>{notice}</span>
+      <span>{uiText(t, notice)}</span>
       <button
         type="button"
         className="inline-flex h-7 cursor-pointer items-center rounded-lg border border-amber-300/50 bg-transparent px-2 text-[13px] font-medium text-amber-100 hover:bg-amber-300/15"
         onClick={dismiss}
       >
-        Dismiss
+        {t('audiobook.player.screen.dismiss')}
       </button>
     </div>
   )
@@ -180,6 +188,7 @@ function NoteNotice() {
 
 /** Whole-book progress, always shown (independent of the timeline scope). */
 function BookProgress() {
+  const t = useT()
   const position = useAudioPlayerStore((s) => s.positionSeconds)
   const duration = useAudioPlayerStore((s) => s.durationSeconds)
   // A multi-track audiobook has no whole-book progress here: position and duration are those of one track.
@@ -193,7 +202,7 @@ function BookProgress() {
         <div className="h-full bg-lib-faint" style={{ width: `${view.fraction * 100}%` }} />
       </div>
       <span className="text-xs whitespace-nowrap text-lib-muted">
-        {pct}% · {formatLeft(view.remainingSeconds)}
+        {t('audiobook.player.screen.progress', { percent: pct, left: formatLeft(view.remainingSeconds) })}
       </span>
     </div>
   )
@@ -206,6 +215,7 @@ function BookProgress() {
  * Leaving to the Library is done from the menu bar, which also flushes the progress.
  */
 export function AudioBookScreen({ bookId }: { bookId: string }) {
+  const t = useT()
   const { ensureTab, updateBookTitle } = useOpenReading()
   const navigate = useNavigate()
   const status = useAudioPlayerStore((s) => s.status)
@@ -294,7 +304,7 @@ export function AudioBookScreen({ bookId }: { bookId: string }) {
     return (
       <ReaderOpenStatus
         status="error"
-        message={errorMessage}
+        message={errorMessage ? uiText(t, errorMessage) : undefined}
         onRetry={retry}
         onBack={() => void leave()}
         onLocate={
@@ -307,7 +317,7 @@ export function AudioBookScreen({ bookId }: { bookId: string }) {
             : undefined
         }
         locating={relink.locating}
-        locateMessage={relink.notice?.bookId === bookId ? relink.notice.text : null}
+        locateMessage={relink.notice?.bookId === bookId ? uiText(t, relink.notice.text) : null}
       />
     )
   }

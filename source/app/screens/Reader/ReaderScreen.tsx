@@ -1,4 +1,3 @@
-/* i18n-pending: reader.logic */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import {
@@ -115,7 +114,6 @@ import { usePdfShapePrefsStore } from './logic/pdfShapes/pdfShapePrefsStore'
 import { usePdfTypewriterPrefsStore } from './logic/pdfTypewriter/pdfTypewriterPrefsStore'
 import { useTypewriterEditorStore } from './logic/pdfTypewriter/typewriterEditorStore'
 import { usePageAttachmentsStore, writeBlockedMessage } from './logic/attachments/pageAttachmentsStore'
-import { useUiLanguage } from '../../i18n'
 import { TypewriterPropertiesPanel } from './components/rightPanel/TypewriterPropertiesPanel'
 import { useTypewriterPanelStore } from './logic/pdfTypewriter/typewriterPanelStore'
 import { PdfTypewriterEditor } from '../../components/reader/renderers/pdf/PdfTypewriterEditor'
@@ -126,6 +124,7 @@ import { pdfDeleteFocused, pdfHasFocusedMark, pdfRedo, pdfUndo } from './logic/p
 import { PdfInkPanel } from './components/chrome/PdfInkPanel'
 import { PdfInkQuickToolbar } from './components/chrome/PdfInkQuickToolbar'
 import { MD_INSERT_CARET_COLOR } from './logic/mdHighlights/mdHighlightsStore'
+import { getT, useT, useUiLanguage } from '../../i18n'
 
 /** Stand-in row for the Inserted Text editor while the caret is only a draft (nothing saved yet). */
 const PENDING_INSERT_DRAFT = {
@@ -140,6 +139,7 @@ const PENDING_INSERT_DRAFT = {
 
 /** SCR-03 — session wiring; layout/chrome live in ReaderShell (T3.2). */
 export function ReaderScreen() {
+  const t = useT()
   const { bookId } = useParams<{ bookId: string }>()
   const {
     setDocumentSubtitle,
@@ -407,7 +407,7 @@ export function ReaderScreen() {
   const pdfPageCurrent = nav.pdfNav?.pageCurrent ?? 0
   const pdfPageTotal = nav.pdfNav?.pageTotal ?? 0
   const chapterLabel = isPdfSurface
-    ? `Page ${pdfPageCurrent}`
+    ? t('reader.logic.page', { page: pdfPageCurrent })
     : isTextSurface
       ? `${txtPercent}%`
       : chapter.title
@@ -453,11 +453,11 @@ export function ReaderScreen() {
       book.isEpubSurface
         ? nav.epubSections
         : isPdfSurface
-          ? Array.from({ length: pdfPageTotal }, (_, i) => `Page ${i + 1}`)
+          ? Array.from({ length: pdfPageTotal }, (_, i) => t('reader.logic.page', { page: i + 1 }))
           : isTextSurface
-            ? ['Text']
+            ? [t('reader.logic.text')]
             : FAKE_CHAPTERS.map((c) => c.title),
-    [book.isEpubSurface, isPdfSurface, isTextSurface, nav.epubSections, pdfPageTotal],
+    [book.isEpubSurface, isPdfSurface, isTextSurface, nav.epubSections, pdfPageTotal, t],
   )
   const progress = book.isEpubSurface
     ? (nav.epubNav?.progress ?? 0)
@@ -650,7 +650,7 @@ export function ReaderScreen() {
     }
     const box = fitTypewriterBox(s.doc, s.text, s.box, s.heightRatio)
     if (!box) {
-      chrome.setToast('The text does not fit on the page — enlarge the box or reduce the size.')
+      chrome.setToast(getT()('reader.pdf.toast.doesNotFit'))
       return
     }
     typewriterStore.getState().end()
@@ -668,7 +668,7 @@ export function ReaderScreen() {
     if (!mark) return
     const fit = fitTypewriterBox(mark.doc, mark.text, box, heightRatio)
     if (!fit) {
-      chrome.setToast('The text does not fit on the page — enlarge the box or reduce the size.')
+      chrome.setToast(getT()('reader.pdf.toast.doesNotFit'))
       return
     }
     pdfHighlights.updateTypewriter(id, { box: fit, text: mark.text, doc: mark.doc })
@@ -839,7 +839,7 @@ export function ReaderScreen() {
   function copyHighlightText(text: string | undefined) {
     if (!text) return
     void navigator.clipboard.writeText(text)
-    chrome.setToast('Copied.')
+    chrome.setToast(getT()('reader.logic.toast.copied'))
   }
 
   /** Toolbar state per tool — which tools exist for this book comes from `readerCapabilities`. */
@@ -898,7 +898,7 @@ export function ReaderScreen() {
           highlights.dismissAnnotationUi()
           setActiveTool('select')
           translation.setMode(true)
-          chrome.setToast('Translate: select text to translate it — Esc to exit.')
+          chrome.setToast(getT()('reader.logic.toast.translateHint'))
         }
         return
       case 'highlight':
@@ -997,11 +997,11 @@ export function ReaderScreen() {
           audioButtonRef={audioButtonRef}
           onShare={() => {
             chrome.closeFloating()
-            chrome.setToast('Share — not available yet.')
+            chrome.setToast(getT()('reader.logic.toast.shareStub'))
           }}
           onFavorites={() => {
             chrome.closeFloating()
-            chrome.setToast('Added to Favorites (local stub).')
+            chrome.setToast(getT()('reader.logic.toast.favoritesStub'))
           }}
           onBookInfo={() => {
             chrome.closeFloating()
@@ -1059,8 +1059,8 @@ export function ReaderScreen() {
           onGoToPageUnavailable={(reason) =>
             chrome.setToast(
               reason === 'scroll'
-                ? 'Go to Page isn’t available in scroll view.'
-                : 'Page numbers aren’t ready yet.',
+                ? getT()('reader.logic.toast.goToPageScroll')
+                : getT()('reader.logic.toast.goToPageNotReady'),
             )
           }
           layout={book.prefs.layout}
@@ -1244,12 +1244,12 @@ export function ReaderScreen() {
             onChangeHighlightColor={markup.updateHighlightColor}
             onChangeHighlightNote={(id, note) => markup.updateHighlightNote(id, note)}
             onCopyHighlight={(highlight) => copyHighlightText(highlight.selectionText?.highlight)}
-            onAskAiHighlight={() => chrome.setToast('AI Ask — coming soon.')}
+            onAskAiHighlight={() => chrome.setToast(getT()('reader.logic.toast.aiSoon'))}
           />
 
           <ReaderRightSidebar
             open={!immersive && rightPanel !== null}
-            title={rightPanel === 'settings' ? 'Reading settings' : rightPanel === 'typewriter' ? 'Typewriter' : ''}
+            title={rightPanel === 'settings' ? t('reader.sidebar.rightPanel.readingSettings') : rightPanel === 'typewriter' ? t('reader.sidebar.rightPanel.typewriter') : ''}
             onClose={closeRightPanel}
             chromeHidden={toolsHidden}
             docked={rightSidebarDocked}
@@ -1310,7 +1310,7 @@ export function ReaderScreen() {
             onCancel={() => chrome.setTrashOpen(false)}
             onConfirm={() => {
               chrome.setTrashOpen(false)
-              chrome.setToast('Trash confirm — delete wiring comes later.')
+              chrome.setToast(getT()('reader.logic.toast.trashStub'))
               void session.leaveToLibrary()
             }}
           />
@@ -1490,9 +1490,9 @@ export function ReaderScreen() {
             <NoteTextboxPopup
               anchorRect={pendingInsert.anchor}
               highlight={PENDING_INSERT_DRAFT}
-              placeholder="Text to insert…"
-              ariaLabel="Insert text"
-              discardLabel="Cancel"
+              placeholder={t('reader.logic.insertPopup.placeholder')}
+              ariaLabel={t('reader.logic.insertPopup.aria')}
+              discardLabel={t('common.actions.cancel')}
               onSave={pendingInsert.commit}
               onDelete={pendingInsert.cancel}
               onDismiss={pendingInsert.cancel}
@@ -1541,7 +1541,7 @@ export function ReaderScreen() {
               onCopy={() =>
                 copyHighlightText(markup.activeHighlight?.highlight.selectionText?.highlight)
               }
-              onAskAi={() => chrome.setToast('AI Ask — coming soon.')}
+              onAskAi={() => chrome.setToast(getT()('reader.logic.toast.aiSoon'))}
               onDelete={() => markup.deleteHighlight(markup.activeHighlight!.highlight.id)}
               onDismiss={markup.closeEditPopup}
             />
@@ -1847,10 +1847,10 @@ export function ReaderScreen() {
               onLocation={session.handleMdLocation}
               onHeadings={setMdHeadings}
               onActiveHeading={setMdActiveHeading}
-              onAnchorNotFound={() => chrome.setToast('That section was not found in this document.')}
+              onAnchorNotFound={() => chrome.setToast(getT()('reader.logic.toast.sectionNotFound'))}
               onOpenExternal={(url) => {
                 void appApi.openExternalLink(url).then((result) => {
-                  if (!result.ok) chrome.setToast('That link could not be opened.')
+                  if (!result.ok) chrome.setToast(getT()('reader.logic.toast.linkFailed'))
                 })
               }}
               annotations={mdHighlights.highlights}
