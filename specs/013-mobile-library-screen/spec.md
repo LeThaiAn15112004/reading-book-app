@@ -42,6 +42,16 @@ proper phone screen around those five points.
   scanning is out of scope.
 - Q: Is a 320 × 50 ad banner part of this release? → A: No. This release shows no advertising; it only reserves the
   layout slot above the tab bar, which stays collapsed (zero height) until a later feature fills it.
+- Q: Should the Mobile Library be native React Native / NativeWind screens or the shared web interface restyled to the
+  mockup inside the existing web view? → A: The shared web interface, restyled for the phone to match the mockup
+  (dark navy `#0B1120` + orange). The native host only supplies the safe-area sizes and the status / navigation bar
+  colours; no native Library screen, no NativeWind.
+- Q: What do the four filter chips show? → A: All = every book; Recent = books opened, most recently read first;
+  Saved = favourites; Completed = finished books. Exactly one chip is active at a time.
+- Q: In this release, is the banner slot zero height or a visible dashed placeholder? → A: Zero height for users; the
+  dashed "Ad · Banner 320 × 50" placeholder is shown only in development builds, to check the layout.
+- Q: What does a List row show? → A: Cover, title, author, format badge (EPUB / PDF / TXT / MD) and ⋮, plus a thin
+  progress bar under the author line only for books that have been opened.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -102,7 +112,7 @@ it imports a book and the empty state is replaced by the Library.
 ### User Story 3 - Grid or list, remembered (Priority: P2)
 
 On the phone the reader can switch the book collection between a **grid** of covers and a compact **list** (small
-cover, title, author, progress on one row). The choice is still there the next time they open the app.
+cover, title, author, format badge and — once opened — a thin progress bar, on one row). The choice is still there the next time they open the app.
 
 **Why this priority**: A list is faster to scan for large libraries, a grid is nicer for small ones; it is a comfort
 feature built on an existing preference.
@@ -170,8 +180,8 @@ of books is fully visible above it.
    bottom and is always reachable.
 2. **Given** this release, **When** any screen is shown, **Then** no advertisement is displayed and no ad-related
    request, permission or consent screen exists.
-3. **Given** the reserved slot is empty, **When** the Library is shown, **Then** it takes zero height — no empty
-   50-pixel gap.
+3. **Given** a release build, **When** the Library is shown, **Then** the reserved slot takes zero height — no empty
+   50-pixel gap and no placeholder; in a development build the dashed placeholder may be shown instead.
 4. **Given** the last row of books, **When** scrolled to the end, **Then** it is fully visible above the tab bar, and
    the phone's system areas (notch, gesture bar) never cover a control.
 5. **Given** the slot is filled by a later feature with 320 × 50 content, **When** the user scrolls, **Then** that
@@ -223,17 +233,29 @@ of books is fully visible above it.
   clear it, never the first-launch empty state.
 - **FR-010**: Cancelling the picker MUST change nothing; a failed import MUST show a message that names the reason.
 
+**Header and filter chips**
+
+- **FR-030**: Above the Continue Reading row the Library MUST show a search box and a "+" (import) button, and below
+  them a horizontally scrollable row of filter chips: **All**, **Recent**, **Saved**, **Completed**.
+- **FR-031**: Exactly one chip MUST be active (All by default). All shows every book; Recent shows books that have been
+  opened, most recently read first; Saved shows the favourites; Completed shows the finished books.
+- **FR-032**: The active chip MUST combine with the search text and the sort order (Recent always orders by last read),
+  and a chip with no match MUST show the "nothing matches" message of FR-009.
+- **FR-033**: The "+" button MUST open the system file picker directly (the phone has only "Add file"), with the same
+  results as the empty state's "Import book" (FR-010).
+
 **Grid / list**
 
-- **FR-011**: The user MUST be able to switch the collection between a grid of covers and a one-row-per-book list
-  (cover thumbnail, title, author, progress, ⋮).
+- **FR-011**: The user MUST be able to switch the collection between a grid of covers and a one-row-per-book list. A
+  list row MUST show the cover thumbnail, title, author, a format badge (EPUB / PDF / TXT / MD) and ⋮, plus a thin
+  progress bar under the author line only when the book has been opened; the bar MUST NOT make the row taller.
 - **FR-012**: The choice MUST be remembered on the device across launches and MUST be reset to the grid by Reset App
   Settings, together with the sort order.
 - **FR-013**: On the phone a previously saved desktop "table" choice MUST be shown as the list; the desktop table and its
   detail panel MUST NOT appear.
 - **FR-014**: The grid MUST adapt its number of columns to the screen width, with at least 2 columns in portrait on a
   phone 360 px wide or more.
-- **FR-015**: Switching view MUST keep the current sort, search, filter and collection.
+- **FR-015**: Switching view MUST keep the current sort, search, active filter chip and collection.
 
 **Bottom sheet**
 
@@ -252,8 +274,10 @@ of books is fully visible above it.
 - **FR-021**: The bottom tab bar (Library, Collections, Reading, Settings) MUST stay fixed while the Library scrolls.
 - **FR-022**: The layout MUST reserve a 320 × 50 banner slot fixed directly above the tab bar; content placed in it
   MUST NOT hide or reappear with scrolling, and the slot MUST NOT exist in the Reader.
-- **FR-023**: In this release the slot MUST stay empty and take zero height; the app MUST NOT show advertising, load an
-  ad provider, or ask for ad-related consent or permissions.
+- **FR-023**: In this release the slot MUST stay empty and take zero height in builds given to users; the app MUST NOT
+  show advertising, load an ad provider, or ask for ad-related consent or permissions. Development builds MAY show a
+  dashed "Ad · Banner 320 × 50" placeholder in the slot (fixed above the tab bar) to check the layout; it MUST never
+  appear in a release build.
 - **FR-024**: The scrolling content MUST end above the fixed bars so the last book is fully visible, and no control may
   sit under the phone's system areas (notch, status bar, gesture bar).
 
@@ -263,6 +287,10 @@ of books is fully visible above it.
   follow the app theme.
 - **FR-026**: The desktop Library MUST be unchanged by this feature.
 - **FR-027**: Every tappable element MUST have a touch target of at least 44 × 44 points and an accessible label.
+- **FR-028**: The status bar and the system navigation area MUST take the app background colour, and the layout MUST
+  fit both bottom navigation styles (gesture area and three-button bar) without any control under them.
+- **FR-029**: The Mobile Library MUST be the same Library as the desktop one with phone-specific presentation; no second
+  Library implementation for the phone.
 
 ### Key Entities
 
@@ -293,10 +321,10 @@ of books is fully visible above it.
 
 ## Assumptions
 
-- **Same interface architecture as today**: the phone Library keeps being the shared Library interface with phone
-  adjustments (spec 008), not a separate native rewrite. The feature description lists React Native / NativeWind; the
-  repository's phone app does not use NativeWind and runs the shared interface in a web view. Choosing the technical
-  approach is left to `/speckit-plan`; this spec describes only behaviour.
+- **Same interface architecture as today** (clarified): the phone Library is the shared Library interface with phone
+  adjustments (spec 008), restyled to the mockup — not a native rewrite. The native host's role is limited to the
+  safe areas (status bar on top; gesture area ≈ 24 px or three-button bar ≈ 44 px at the bottom) and to colouring the
+  system bars like the app background. Opening a book stays inside the same view.
 - The four-tab bottom bar (Library, Collections, Reading, Settings) is kept as it is.
 - Import stays "Add file" through the system picker, and books stay copied into app storage (spec 008).
 - "Recently read" order, progress and completed status come from the existing reading data; no new data is stored.
