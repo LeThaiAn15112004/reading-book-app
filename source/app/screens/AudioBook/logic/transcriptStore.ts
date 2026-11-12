@@ -9,6 +9,7 @@ import {
   type TranscriptionJob,
   type TranscriptionScope,
 } from '../../../bridge'
+import { getT } from '../../../i18n'
 
 /**
  * Renderer state of one audiobook's transcript (spec 004, US1): the summary and models, the running job, the passages read so
@@ -360,7 +361,7 @@ export const useTranscriptStore = create<TranscriptState>((set, get, api) => {
         const result = await transcriptionApi.delete(bookId)
         if (!current(forToken, bookId)) return result.ok
         if (!result.ok) {
-          set({ actionError: { code: 'INVALID_ARGUMENT', message: 'The transcript could not be deleted.' } })
+          set({ actionError: { code: 'INVALID_ARGUMENT', message: getT()('audiobook.transcription.errors.deleteFailed') } })
           return false
         }
         searchSeq += 1

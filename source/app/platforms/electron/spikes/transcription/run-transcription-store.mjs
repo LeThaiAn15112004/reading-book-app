@@ -533,7 +533,8 @@ await check('T025: multi-track — looked up in the CURRENT track only; seekToPa
   alive().loaded(40)
   await until(() => !P().switching, 'the fallback to settle')
   assert.equal(P().playing, false); assert.equal(P().positionSeconds, 30, 'back at the second it was left')
-  assert.match(P().noteNotice ?? '', /could not be played/)
+  // noteNotice is UiText (spec 012): a catalogue key for this renderer-made message.
+  { const n = P().noteNotice; assert.match(typeof n === 'string' ? n : (n?.key ?? ''), /could not be played|audiobook.player.store.track(Back|Failed)/) }
   assert.equal(S().activePassageId, nth('zz-track', 1).id)
 
   // a track that is not part of the book is ignored

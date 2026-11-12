@@ -1,10 +1,10 @@
-/* i18n-pending: audiobook.transcription */
 import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { AUTO_LANGUAGE, WHISPER_LANGUAGES } from '@core'
 import type { TranscriptionScope } from '../../../bridge'
 import { useAudioPlayerStore } from '../logic/audioPlayerStore'
 import { decoderUnavailableText, formatMegabytes, transcriptionErrorText } from '../logic/transcriptionMessages'
 import { isActiveJob, useTranscriptStore } from '../logic/transcriptStore'
+import { getT, useT } from '../../../i18n'
 
 const GHOST_BTN =
   'inline-flex h-[34px] cursor-pointer items-center rounded-lg border border-lib-border bg-transparent px-3.5 text-[13px] font-medium text-lib-muted transition-colors hover:text-lib-text-strong disabled:cursor-not-allowed disabled:opacity-50'
@@ -36,6 +36,7 @@ export function TranscribeDialog({ bookId }: { bookId: string }) {
 }
 
 function DialogBody() {
+  const t = useT()
   const info = useTranscriptStore((s) => s.info)
   const job = useTranscriptStore((s) => s.job)
   const downloading = useTranscriptStore((s) => s.downloading)
@@ -82,8 +83,8 @@ function DialogBody() {
     if (scopeKind !== 'range') return { ok: true as const, startMs: 0, endMs: 0 }
     const startMs = minutesToMs(startMin)
     const endMs = minutesToMs(endMin)
-    if (startMs === null || endMs === null) return { ok: false as const, message: 'Enter the start and end in minutes (for example 0 and 10).' }
-    if (startMs >= endMs) return { ok: false as const, message: 'The end must be after the start.' }
+    if (startMs === null || endMs === null) return { ok: false as const, message: getT()('audiobook.transcription.dialog.rangeInvalid') }
+    if (startMs >= endMs) return { ok: false as const, message: getT()('audiobook.transcription.dialog.rangeOrder') }
     return { ok: true as const, startMs, endMs }
   }, [scopeKind, startMin, endMin])
   const trackMissing = (scopeKind === 'track' || (scopeKind === 'range' && multiTrack)) && !trackId
@@ -125,31 +126,31 @@ function DialogBody() {
         }}
       >
         <h2 id={titleId} className="m-0 text-base font-semibold text-lib-text-strong">
-          Transcribe this audiobook
+          {t('audiobook.transcription.dialog.title')}
         </h2>
         <p className="m-0 text-[13px] leading-relaxed text-lib-muted">
-          The speech is turned into text on this device. The audio is never sent anywhere.
-          {existing ? ' A transcript already exists: new text is added to it, and parts that are already done are skipped.' : ''}
+          {t('audiobook.transcription.dialog.intro')}
+          {existing ? t('audiobook.transcription.dialog.existing') : ''}
         </p>
 
         <fieldset className="m-0 flex flex-col gap-2 border-0 p-0">
-          <legend className={`${LABEL} mb-1 p-0`}>What to transcribe</legend>
+          <legend className={`${LABEL} mb-1 p-0`}>{t('audiobook.transcription.dialog.what')}</legend>
           <label className="flex items-center gap-2 text-sm text-lib-text">
             <input type="radio" name="transcribe-scope" checked={scopeKind === 'whole'} onChange={() => setScopeKind('whole')} disabled={busy} />
-            {multiTrack ? 'The whole audiobook (every track)' : 'The whole audiobook'}
+            {multiTrack ? t('audiobook.transcription.dialog.wholeMulti') : t('audiobook.transcription.dialog.whole')}
           </label>
           {multiTrack ? (
             <label className="flex items-center gap-2 text-sm text-lib-text">
               <input type="radio" name="transcribe-scope" checked={scopeKind === 'track'} onChange={() => setScopeKind('track')} disabled={busy} />
-              One track
+              {t('audiobook.transcription.dialog.oneTrack')}
             </label>
           ) : null}
           <label className="flex items-center gap-2 text-sm text-lib-text">
             <input type="radio" name="transcribe-scope" checked={scopeKind === 'range'} onChange={() => setScopeKind('range')} disabled={busy} />
-            {multiTrack ? 'A time range in one track' : 'A time range'}
+            {multiTrack ? t('audiobook.transcription.dialog.rangeMulti') : t('audiobook.transcription.dialog.range')}
           </label>
           {scopeKind === 'track' || (scopeKind === 'range' && multiTrack) ? (
-            <select className={FIELD} aria-label="Track" value={trackId} onChange={(event) => setTrackId(event.target.value)} disabled={busy}>
+            <select className={FIELD} aria-label={t('audiobook.transcription.dialog.track')} value={trackId} onChange={(event) => setTrackId(event.target.value)} disabled={busy}>
               {tracks.map((track, index) => (
                 <option key={track.id} value={track.id}>
                   {String(index + 1).padStart(2, '0')} · {track.title}
@@ -159,10 +160,10 @@ function DialogBody() {
           ) : null}
           {scopeKind === 'range' ? (
             <div className="flex items-center gap-2 text-sm text-lib-muted">
-              <input className={FIELD} inputMode="decimal" aria-label="Start (minutes)" value={startMin} onChange={(event) => setStartMin(event.target.value)} disabled={busy} />
+              <input className={FIELD} inputMode="decimal" aria-label={t('audiobook.transcription.dialog.start')} value={startMin} onChange={(event) => setStartMin(event.target.value)} disabled={busy} />
               <span aria-hidden>–</span>
-              <input className={FIELD} inputMode="decimal" aria-label="End (minutes)" value={endMin} onChange={(event) => setEndMin(event.target.value)} disabled={busy} />
-              <span>min</span>
+              <input className={FIELD} inputMode="decimal" aria-label={t('audiobook.transcription.dialog.end')} value={endMin} onChange={(event) => setEndMin(event.target.value)} disabled={busy} />
+              <span>{t('audiobook.transcription.dialog.min')}</span>
             </div>
           ) : null}
           {scopeKind === 'range' && !range.ok ? (
@@ -173,37 +174,36 @@ function DialogBody() {
         </fieldset>
 
         <label className="flex flex-col gap-1.5">
-          <span className={LABEL}>Spoken language</span>
+          <span className={LABEL}>{t('audiobook.transcription.dialog.language')}</span>
           <select ref={firstField} className={FIELD} value={language} onChange={(event) => setLanguage(event.target.value)} disabled={busy}>
-            <option value={AUTO_LANGUAGE}>Auto-detect{defaultLanguage === AUTO_LANGUAGE ? ' (default)' : ''}</option>
+            <option value={AUTO_LANGUAGE}>{t('audiobook.transcription.dialog.autoDetect')}{defaultLanguage === AUTO_LANGUAGE ? t('audiobook.transcription.dialog.defaultSuffix') : ''}</option>
             {LANGUAGES_BY_NAME.map((l) => (
               <option key={l.code} value={l.code}>
                 {l.name}
-                {defaultLanguage === l.code ? ' (default)' : ''}
+                {defaultLanguage === l.code ? t('audiobook.transcription.dialog.defaultSuffix') : ''}
               </option>
             ))}
           </select>
         </label>
 
         <fieldset className="m-0 flex flex-col gap-2 border-0 p-0">
-          <legend className={`${LABEL} mb-1 p-0`}>Speech model</legend>
-          {models.length === 0 ? <p className="m-0 text-[13px] text-lib-muted">The list of speech models could not be read.</p> : null}
+          <legend className={`${LABEL} mb-1 p-0`}>{t('audiobook.transcription.dialog.model')}</legend>
+          {models.length === 0 ? <p className="m-0 text-[13px] text-lib-muted">{t('audiobook.transcription.dialog.modelsUnreadable')}</p> : null}
           {models.map((m) => (
             <label key={m.id} className="flex items-center gap-2 text-sm text-lib-text">
               <input type="radio" name="transcribe-model" checked={modelId === m.id} onChange={() => setModelId(m.id)} disabled={busy} />
               <span className="min-w-0 flex-1 truncate">{m.label}</span>
-              <span className="shrink-0 text-[12px] text-lib-muted">{m.installed ? 'On this device' : formatMegabytes(m.sizeBytes)}</span>
+              <span className="shrink-0 text-[12px] text-lib-muted">{m.installed ? t('audiobook.transcription.dialog.onDevice') : formatMegabytes(m.sizeBytes)}</span>
             </label>
           ))}
           {needsDownload ? (
             <p className="m-0 text-[12px] leading-relaxed text-lib-muted">
-              This model is not on this device. Pressing the button below downloads it once ({formatMegabytes(model?.sizeBytes ?? 0)}) and checks every file before
-              it is used. Only the model is downloaded.
+              {t('audiobook.transcription.dialog.needsDownload', { size: formatMegabytes(model?.sizeBytes ?? 0) })}
             </p>
           ) : null}
           {downloading ? (
             <div className="flex flex-col gap-1" role="status">
-              <span className="text-[12px] text-lib-muted">Downloading the model{progress !== null ? ` — ${progress}%` : '…'}</span>
+              <span className="text-[12px] text-lib-muted">{progress !== null ? t('audiobook.transcription.dialog.downloadingModelPercent', { percent: progress }) : t('audiobook.transcription.dialog.downloadingModel')}</span>
               <span className="block h-1.5 overflow-hidden rounded-full bg-lib-border" aria-hidden>
                 <span className="block h-full bg-lib-accent" style={{ width: `${progress ?? 0}%` }} />
               </span>
@@ -213,12 +213,12 @@ function DialogBody() {
 
         {decoderMissing ? (
           <p role="alert" data-transcribe-decoder-missing className="m-0 text-[13px] leading-relaxed text-rose-300">
-            {decoderUnavailableText(info?.decoder.reason)} No model is downloaded until this can run.
+            {t('audiobook.transcription.dialog.decoderMissing', { reason: decoderUnavailableText(info?.decoder.reason) })}
           </p>
         ) : null}
         {alreadyRunning ? (
           <p role="status" className="m-0 text-[13px] text-lib-muted">
-            A transcription of this audiobook is already queued or running.
+            {t('audiobook.transcription.dialog.alreadyRunning')}
           </p>
         ) : null}
         {actionError ? (
@@ -229,10 +229,10 @@ function DialogBody() {
 
         <div className="flex justify-end gap-2">
           <button type="button" className={GHOST_BTN} onClick={close} disabled={busy}>
-            Cancel
+            {t('common.actions.cancel')}
           </button>
           <button type="submit" className={PRIMARY_BTN} disabled={!canStart}>
-            {busy ? (needsDownload && downloading ? 'Downloading…' : 'Starting…') : needsDownload ? `Download model and transcribe` : 'Transcribe'}
+            {busy ? (needsDownload && downloading ? t('audiobook.transcription.dialog.downloading') : t('audiobook.transcription.dialog.starting')) : needsDownload ? t('audiobook.transcription.dialog.downloadAndTranscribe') : t('audiobook.transcription.dialog.transcribe')}
           </button>
         </div>
       </form>

@@ -23,11 +23,11 @@ const { getReaderCapabilities, readerSurfaceForFormat } = await import('../../..
 
 /** The text reader's tabs before the Transcript tab existed. */
 const BEFORE = [
-  { id: 'chapters', label: 'Contents', icon: '📑' },
-  { id: 'bookmarks', label: 'Bookmark', icon: '🔖' },
-  { id: 'highlights', label: 'Notes', icon: '🖍️' },
-  { id: 'layout', label: 'Page layout', icon: '📄', requires: 'pageLayout' },
-  { id: 'attachments', label: 'Attachment', icon: '📎', requires: 'attachments' },
+  { id: 'chapters', labelKey: 'reader.sidebar.tabs.chapters', icon: '📑' },
+  { id: 'bookmarks', labelKey: 'reader.sidebar.tabs.bookmarks', icon: '🔖' },
+  { id: 'highlights', labelKey: 'reader.sidebar.tabs.highlights', icon: '🖍️' },
+  { id: 'layout', labelKey: 'reader.sidebar.tabs.layout', icon: '📄', requires: 'pageLayout' },
+  { id: 'attachments', labelKey: 'reader.sidebar.tabs.attachments', icon: '📎', requires: 'attachments' },
 ]
 const FORMATS = ['epub', 'pdf', 'txt', 'md', 'mobi', 'docx', 'fb2', '', null, undefined]
 
@@ -53,9 +53,9 @@ check('the Transcript tab is unavailable to a text book, and a leftover selectio
 check('the existing tab definitions (id, label, icon, requirement, order) are unchanged; Transcript is appended last and labelled', () => {
   assert.deepEqual(SIDEBAR_TABS.slice(0, BEFORE.length), BEFORE)
   assert.equal(SIDEBAR_TABS.length, BEFORE.length + 1)
-  assert.deepEqual(SIDEBAR_TABS.at(-1), { id: 'transcript', label: 'Transcript', icon: '📝', requires: 'transcript' })
-  for (const t of BEFORE) assert.equal(SIDEBAR_TAB_LABEL[t.id], t.label)
-  assert.equal(SIDEBAR_TAB_LABEL.transcript, 'Transcript')
+  assert.deepEqual(SIDEBAR_TABS.at(-1), { id: 'transcript', labelKey: 'reader.sidebar.tabs.transcript', icon: '📝', requires: 'transcript' })
+  for (const t of BEFORE) assert.equal(SIDEBAR_TAB_LABEL[t.id], t.labelKey)
+  assert.equal(SIDEBAR_TAB_LABEL.transcript, 'reader.sidebar.tabs.transcript')
 })
 
 check('the audiobook rail (the filter AudioBookScreen applies: no Page layout, no Bookmark) is Contents, Notes, Attachment, Transcript', () => {

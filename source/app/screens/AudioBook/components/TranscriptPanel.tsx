@@ -1,9 +1,9 @@
-/* i18n-pending: audiobook.player */
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { TranscriptionScope } from '../../../bridge'
 import { useAudioPlayerStore } from '../logic/audioPlayerStore'
 import { formatPassageTime, transcriptionErrorText } from '../logic/transcriptionMessages'
 import { SEARCH_HIT_LIMIT, isActiveJob, useTranscriptStore } from '../logic/transcriptStore'
+import { useT } from '../../../i18n'
 
 const EMPTY = 'm-0 px-2 py-3 text-sm leading-relaxed text-lib-muted'
 const GHOST_BTN =
@@ -35,12 +35,13 @@ function ProgressBar({ label, done, total }: { label: string; done: number; tota
 
 /** Inline confirmation (destructive actions ask first, like the Notes menu). */
 function ConfirmBox({ message, confirmLabel, onConfirm, onCancel }: { message: string; confirmLabel: string; onConfirm: () => void; onCancel: () => void }) {
+  const t = useT()
   return (
     <div role="alertdialog" aria-label={message} className="flex flex-col gap-2 rounded-lg border border-lib-border bg-lib-surface p-3">
       <p className="m-0 text-sm text-lib-text">{message}</p>
       <div className="flex justify-end gap-2">
         <button type="button" className={GHOST_BTN} onClick={onCancel}>
-          Cancel
+          {t('common.actions.cancel')}
         </button>
         <button type="button" className={`${GHOST_BTN} !border-rose-300/50 !text-rose-300`} onClick={onConfirm}>
           {confirmLabel}
@@ -56,6 +57,7 @@ function ConfirmBox({ message, confirmLabel, onConfirm, onCancel }: { message: s
  * interrupted job, re-run (replace) or delete — each destructive one after a confirmation. State comes from `transcriptStore`.
  */
 export function TranscriptPanel({ bookId }: { bookId: string }) {
+  const t = useT()
   void bookId
   const infoStatus = useTranscriptStore((s) => s.infoStatus)
   const info = useTranscriptStore((s) => s.info)
@@ -152,10 +154,10 @@ export function TranscriptPanel({ bookId }: { bookId: string }) {
         continue
       }
       const index = order.get(key) ?? -1
-      out.push({ key, index, title: index >= 0 ? (tracks[index]?.title ?? '') : 'Unknown track', items: [passage] })
+      out.push({ key, index, title: index >= 0 ? (tracks[index]?.title ?? '') : t('audiobook.transcription.panel.unknownTrack'), items: [passage] })
     }
     return out
-  }, [passages, tracks])
+  }, [passages, tracks, t])
 
   const run = async (action: () => Promise<unknown>): Promise<void> => {
     setBusy(true)
@@ -183,20 +185,20 @@ export function TranscriptPanel({ bookId }: { bookId: string }) {
   const trackLine = (): string | null => {
     if (!job || job.trackId === undefined) return null
     const index = tracks.findIndex((t) => t.id === job.trackId)
-    const name = index >= 0 ? `Track ${index + 1} of ${tracks.length} · ${tracks[index]?.title ?? ''}` : 'Current track'
+    const name = index >= 0 ? t('audiobook.transcription.panel.trackOf', { current: index + 1, total: tracks.length, title: tracks[index]?.title ?? '' }) : t('audiobook.transcription.panel.currentTrack')
     return name
   }
 
   let body
   if (infoStatus === 'idle' || infoStatus === 'loading') {
-    body = <p className={EMPTY}>Loading…</p>
+    body = <p className={EMPTY}>{t('audiobook.transcription.panel.loading')}</p>
   } else if (infoStatus === 'unavailable') {
     body = (
       <div className="flex flex-col gap-2">
-        <p className={EMPTY}>The transcript could not be read right now.</p>
+        <p className={EMPTY}>{t('audiobook.transcription.panel.unavailable')}</p>
         <div>
           <button type="button" className={GHOST_BTN} onClick={() => void refresh()}>
-            Try again
+            {t('audiobook.transcription.panel.tryAgain')}
           </button>
         </div>
       </div>
@@ -206,13 +208,13 @@ export function TranscriptPanel({ bookId }: { bookId: string }) {
     body = (
       <div className="flex flex-col gap-3" data-transcript-job>
         <p className="m-0 text-sm text-lib-text" role="status">
-          {queued ? 'Waiting for another transcription to finish…' : job.state === 'preparing' ? 'Preparing…' : 'Transcribing…'}
+          {queued ? t('audiobook.transcription.panel.queued') : job.state === 'preparing' ? t('audiobook.transcription.panel.preparing') : t('audiobook.transcription.panel.transcribing')}
         </p>
-        {!queued ? <ProgressBar label="Whole audiobook" done={job.doneMs} total={job.totalMs} /> : null}
+        {!queued ? <ProgressBar label={t('audiobook.transcription.panel.wholeAudiobook')} done={job.doneMs} total={job.totalMs} /> : null}
         {!queued && trackLine() ? <ProgressBar label={trackLine() as string} done={job.trackDoneMs ?? 0} total={job.trackTotalMs ?? 0} /> : null}
         <div>
           <button type="button" className={GHOST_BTN} onClick={() => void cancel()}>
-            Cancel
+            {t('common.actions.cancel')}
           </button>
         </div>
       </div>
@@ -220,10 +222,10 @@ export function TranscriptPanel({ bookId }: { bookId: string }) {
   } else if (!summary) {
     body = (
       <div className="flex flex-col gap-3">
-        <p className={EMPTY}>This audiobook has no transcript yet. Transcribing turns the speech into searchable text, on this device.</p>
+        <p className={EMPTY}>{t('audiobook.transcription.panel.none')}</p>
         <div>
           <button type="button" className={PRIMARY_BTN} onClick={openDialog}>
-            Transcribe
+            {t('audiobook.transcription.panel.transcribe')}
           </button>
         </div>
       </div>
@@ -233,16 +235,16 @@ export function TranscriptPanel({ bookId }: { bookId: string }) {
       <div className="flex flex-col gap-3" data-transcript-summary>
         <div className="flex flex-wrap items-center gap-2">
           {interrupted ? (
-            <span className={PILL}>Interrupted</span>
+            <span className={PILL}>{t('audiobook.transcription.panel.interrupted')}</span>
           ) : summary.status === 'cancelled' ? (
-            <span className={PILL}>Cancelled</span>
+            <span className={PILL}>{t('audiobook.transcription.panel.cancelled')}</span>
           ) : summary.status === 'failed' ? (
-            <span className={PILL}>Failed</span>
+            <span className={PILL}>{t('audiobook.transcription.panel.failed')}</span>
           ) : summary.status === 'complete' && !incomplete ? (
-            <span className={PILL}>Complete</span>
+            <span className={PILL}>{t('audiobook.transcription.panel.complete')}</span>
           ) : null}
-          {incomplete && summary.status !== 'failed' ? <span className={PILL} data-transcript-partial>Partial</span> : null}
-          {summary.totalMs > 0 ? <span className="text-[12px] text-lib-muted tabular-nums">{percent(summary.coveredMs, summary.totalMs)}% transcribed</span> : null}
+          {incomplete && summary.status !== 'failed' ? <span className={PILL} data-transcript-partial>{t('audiobook.transcription.panel.partial')}</span> : null}
+          {summary.totalMs > 0 ? <span className="text-[12px] text-lib-muted tabular-nums">{t('audiobook.transcription.panel.percentDone', { percent: percent(summary.coveredMs, summary.totalMs) })}</span> : null}
         </div>
         {summary.lastError === 'NO_SPEECH' ? <p className={EMPTY}>{transcriptionErrorText('NO_SPEECH')}</p> : null}
         {summary.lastError && summary.lastError !== 'NO_SPEECH' ? <p className="m-0 text-sm leading-relaxed text-lib-muted">{transcriptionErrorText(summary.lastError)}</p> : null}
@@ -251,48 +253,48 @@ export function TranscriptPanel({ bookId }: { bookId: string }) {
             {interrupted ? (
               <>
                 <button type="button" className={PRIMARY_BTN} disabled={busy} onClick={() => void resume()}>
-                  Resume
+                  {t('audiobook.transcription.panel.resume')}
                 </button>
                 <button type="button" className={GHOST_BTN} disabled={busy} onClick={() => setConfirm('restart')}>
-                  Restart
+                  {t('audiobook.transcription.panel.restart')}
                 </button>
               </>
             ) : incomplete ? (
               <button type="button" className={PRIMARY_BTN} disabled={busy} onClick={() => void resume()}>
-                {summary.status === 'failed' ? 'Try again' : 'Continue'}
+                {summary.status === 'failed' ? t('audiobook.transcription.panel.tryAgain') : t('audiobook.transcription.panel.continue')}
               </button>
             ) : null}
             {!interrupted ? (
               <button type="button" className={GHOST_BTN} disabled={busy} onClick={openDialog}>
-                Transcribe…
+                {t('audiobook.transcription.panel.transcribeMore')}
               </button>
             ) : null}
             {!interrupted && !incomplete ? (
               <button type="button" className={GHOST_BTN} disabled={busy} onClick={() => setConfirm('restart')}>
-                Re-run
+                {t('audiobook.transcription.panel.rerun')}
               </button>
             ) : null}
             {summary.passageCount > 0 ? (
               <>
                 <button type="button" className={GHOST_BTN} disabled={busy || exporting} onClick={() => void exportTranscript({ timestamps: withTimestamps })}>
-                  {exporting ? 'Exporting…' : 'Export…'}
+                  {exporting ? t('audiobook.transcription.panel.exporting') : t('audiobook.transcription.panel.export')}
                 </button>
                 <label className="flex items-center gap-1.5 text-[12px] text-lib-muted">
                   <input type="checkbox" checked={withTimestamps} onChange={(event) => setWithTimestamps(event.target.checked)} disabled={exporting} />
-                  Include timestamps
+                  {t('audiobook.transcription.panel.timestamps')}
                 </label>
               </>
             ) : null}
             <button type="button" className={`${GHOST_BTN} hover:!text-rose-300`} disabled={busy} onClick={() => setConfirm('delete')}>
-              Delete
+              {t('common.actions.delete')}
             </button>
           </div>
         ) : confirm === 'delete' ? (
-          <ConfirmBox message="Delete this transcript?" confirmLabel="Delete" onConfirm={() => void deleteAll()} onCancel={() => setConfirm(null)} />
+          <ConfirmBox message={t('audiobook.transcription.panel.deleteConfirm')} confirmLabel={t('common.actions.delete')} onConfirm={() => void deleteAll()} onCancel={() => setConfirm(null)} />
         ) : (
           <ConfirmBox
-            message="Transcribe again and replace the current text?"
-            confirmLabel="Replace"
+            message={t('audiobook.transcription.panel.replaceConfirm')}
+            confirmLabel={t('audiobook.transcription.panel.replace')}
             onConfirm={() => void restart()}
             onCancel={() => setConfirm(null)}
           />
@@ -311,12 +313,12 @@ export function TranscriptPanel({ bookId }: { bookId: string }) {
       ) : null}
       {passagesStatus === 'unavailable' ? (
         <p role="status" className="m-0 text-[12px] text-lib-muted">
-          The text could not be refreshed just now; what is shown may be out of date.
+          {t('audiobook.transcription.panel.stale')}
         </p>
       ) : null}
       {exportSaved ? (
         <p role="status" className="m-0 text-[12px] text-lib-muted">
-          Transcript saved.
+          {t('audiobook.transcription.panel.saved')}
         </p>
       ) : null}
       {summary && summary.passageCount > 0 ? (
@@ -324,8 +326,8 @@ export function TranscriptPanel({ bookId }: { bookId: string }) {
           <div className="flex items-center gap-1.5">
             <input
               type="search"
-              aria-label="Search the transcript"
-              placeholder="Search the transcript"
+              aria-label={t('audiobook.transcription.panel.search')}
+              placeholder={t('audiobook.transcription.panel.search')}
               value={queryText}
               onChange={(event) => setQueryText(event.target.value)}
               onKeyDown={(event) => {
@@ -340,7 +342,7 @@ export function TranscriptPanel({ bookId }: { bookId: string }) {
               <button
                 type="button"
                 className={GHOST_BTN}
-                aria-label="Clear search"
+                aria-label={t('audiobook.transcription.panel.clearSearch')}
                 onClick={() => {
                   setQueryText('')
                   clearSearch()
@@ -352,21 +354,21 @@ export function TranscriptPanel({ bookId }: { bookId: string }) {
           </div>
           {searchStatus === 'searching' ? (
             <p role="status" className={EMPTY}>
-              Searching…
+              {t('audiobook.transcription.panel.searching')}
             </p>
           ) : null}
           {searchStatus === 'unavailable' ? (
             <p role="status" className={EMPTY}>
-              The search could not run just now.
+              {t('audiobook.transcription.panel.searchFailed')}
             </p>
           ) : null}
           {searchStatus === 'ready' && searchHits.length === 0 ? (
             <p role="status" className={EMPTY}>
-              No matches.
+              {t('audiobook.transcription.panel.noMatches')}
             </p>
           ) : null}
           {searchHits.length > 0 ? (
-            <ul aria-label="Search results" className="m-0 flex list-none flex-col gap-1 p-0">
+            <ul aria-label={t('audiobook.transcription.panel.results')} className="m-0 flex list-none flex-col gap-1 p-0">
               {searchHits.map((hit) => {
                 const trackIndex = hit.trackId ? tracks.findIndex((t) => t.id === hit.trackId) : -1
                 return (
@@ -374,12 +376,12 @@ export function TranscriptPanel({ bookId }: { bookId: string }) {
                     <button
                       type="button"
                       data-search-hit
-                      aria-label={`Play from ${formatPassageTime(hit.startMs)}: ${hit.snippet}`}
+                      aria-label={t('audiobook.transcription.panel.playFrom', { time: formatPassageTime(hit.startMs), text: hit.snippet })}
                       className="flex w-full cursor-pointer flex-col gap-0.5 rounded-md border border-lib-border-soft bg-lib-surface px-2 py-1.5 text-left text-sm leading-snug text-lib-text transition-colors hover:bg-lib-surface-hover"
                       onClick={() => playFrom(hit)}
                     >
                       <span className="text-[11px] tabular-nums text-lib-faint">
-                        {trackIndex >= 0 ? `Track ${trackIndex + 1} · ` : ''}
+                        {trackIndex >= 0 ? t('audiobook.transcription.panel.trackPrefix', { n: trackIndex + 1 }) : ''}
                         {formatPassageTime(hit.startMs)}
                       </span>
                       <span className="min-w-0 break-words">{hit.snippet}</span>
@@ -389,23 +391,23 @@ export function TranscriptPanel({ bookId }: { bookId: string }) {
               })}
             </ul>
           ) : null}
-          {searchHits.length >= SEARCH_HIT_LIMIT ? <p className={EMPTY}>Showing the first {SEARCH_HIT_LIMIT} matches. Narrow the search to see others.</p> : null}
+          {searchHits.length >= SEARCH_HIT_LIMIT ? <p className={EMPTY}>{t('audiobook.transcription.panel.hitLimit', { count: SEARCH_HIT_LIMIT })}</p> : null}
         </div>
       ) : null}
       {passages.length > 0 && !following && activePassageId !== null ? (
         <div className="sticky top-0 z-10 flex justify-end">
           <button type="button" data-transcript-follow className={`${PRIMARY_BTN} shadow-md`} onClick={() => setFollowing(true)}>
-            Follow
+            {t('audiobook.transcription.panel.follow')}
           </button>
         </div>
       ) : null}
       {passages.length > 0 ? (
-        <div className="flex flex-col gap-2" aria-label="Transcript">
+        <div className="flex flex-col gap-2" aria-label={t('audiobook.transcription.panel.transcript')}>
           {groups
             ? groups.map((group, g) => (
                 <section key={`${group.key}-${g}`} className="flex flex-col gap-1">
                   <h3 className="m-0 px-1 pt-2 text-[11px] font-bold tracking-wide text-lib-faint uppercase">
-                    {group.index >= 0 ? `Track ${group.index + 1} · ` : ''}
+                    {group.index >= 0 ? t('audiobook.transcription.panel.trackPrefix', { n: group.index + 1 }) : ''}
                     {group.title}
                   </h3>
                   <ul className="m-0 flex list-none flex-col gap-1 p-0">
@@ -434,6 +436,7 @@ export function TranscriptPanel({ bookId }: { bookId: string }) {
  * IntersectionObserver); the button does the same by hand.
  */
 function LoadMoreRow({ shown, onLoad }: { shown: number; onLoad: () => void }) {
+  const t = useT()
   const ref = useRef<HTMLDivElement | null>(null)
   useEffect(() => {
     const element = ref.current
@@ -449,9 +452,9 @@ function LoadMoreRow({ shown, onLoad }: { shown: number; onLoad: () => void }) {
   }, [onLoad, shown])
   return (
     <div ref={ref} data-transcript-more className="flex flex-col items-start gap-2 px-1 py-2">
-      <p className={EMPTY}>Showing the first {shown} passages.</p>
+      <p className={EMPTY}>{t('audiobook.transcription.panel.shown', { count: shown })}</p>
       <button type="button" className={GHOST_BTN} onClick={onLoad}>
-        Show more
+        {t('audiobook.transcription.panel.showMore')}
       </button>
     </div>
   )
@@ -462,12 +465,13 @@ function LoadMoreRow({ shown, onLoad }: { shown: number; onLoad: () => void }) {
  * the passage being spoken is highlighted and marked `aria-current`.
  */
 function PassageRow({ id, startMs, text, active, onPlay }: { id: number; startMs: number; text: string; active: boolean; onPlay: () => void }) {
+  const t = useT()
   return (
     <li data-passage data-passage-id={id} data-active={active ? 'true' : undefined}>
       <button
         type="button"
         aria-current={active ? 'true' : undefined}
-        aria-label={`Play from ${formatPassageTime(startMs)}: ${text}`}
+        aria-label={t('audiobook.transcription.panel.playFrom', { time: formatPassageTime(startMs), text })}
         className={`flex w-full cursor-pointer gap-2 rounded-md border px-1.5 py-1 text-left text-sm leading-snug transition-colors ${
           active ? 'border-lib-accent bg-lib-accent-soft text-lib-text-strong' : 'border-transparent bg-transparent text-lib-text hover:bg-lib-surface-hover'
         }`}

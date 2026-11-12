@@ -18,7 +18,9 @@ import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import { parseAudioProgress, parseReadingState } from '@core'
+import { parseAudioProgress, parseReadingState, translate } from '@core'
+// Store messages are UiText (spec 012): a string from Main or a catalogue key; read them in English.
+const txt = (v) => (v == null || typeof v === 'string' ? v : translate('en', v.key, v.params))
 import { invoke } from '../pdf-annotations/electron-stub.mjs'
 import { getDatabase } from '../pdf-annotations/db-stub.mjs'
 
@@ -179,7 +181,7 @@ await check('a moved / deleted file is reported by the preflight, no element is 
   await S().load('gone')
   assert.equal(S().status, 'error')
   assert.equal(S().errorCode, 'missing_file')
-  assert.match(S().errorMessage, /could not be found/i)
+  assert.match(txt(S().errorMessage), /could not be found/i)
   assert.equal(elements.length, before)
   await reset()
 })
@@ -187,7 +189,7 @@ await check('a moved / deleted file is reported by the preflight, no element is 
 await check('an unknown book id → error "no longer in your library"', async () => {
   await S().load('does-not-exist')
   assert.equal(S().status, 'error')
-  assert.match(S().errorMessage, /no longer in your library/)
+  assert.match(txt(S().errorMessage), /no longer in the library/)
   await reset()
 })
 
@@ -766,7 +768,7 @@ await check('a decode / network error from the element → error state with a re
   el.fire('error')
   assert.equal(S().status, 'error')
   assert.equal(S().errorCode, 'media_error')
-  assert.match(S().errorMessage, /could not be played/)
+  assert.match(txt(S().errorMessage), /could not be played/)
   assert.equal(S().playing, false)
   await sleep(1200)
   assert.equal(calls.save.length, 0, 'the save timer stopped')
@@ -1514,7 +1516,7 @@ await check('NOTES jump FALLBACK (a): the target cannot be played → back on th
   target.fire('error')
   assert.deepEqual([S().trackIndex, S().switching, S().playing, S().status], [0, true, false, 'ready'])
   assert.deepEqual([...S().trackErrors], [ids[1]])
-  assert.ok(S().noteNotice?.includes('Track 2'), S().noteNotice)
+  assert.ok(txt(S().noteNotice)?.includes('Track 2'), txt(S().noteNotice))
   const origin = current()
   assert.notEqual(origin, target)
   assert.equal(origin.src, url('nt-f1', ids[0]))
@@ -1553,7 +1555,7 @@ await check('NOTES jump FALLBACK (b): a failure arriving AFTER a newer Contents 
   assert.equal(elements.length, n2, 'no fallback element')
   assert.deepEqual([S().trackIndex, [...S().trackErrors]], [2, []])
   c2.loaded(90)
-  assert.deepEqual([S().trackIndex, c2.currentTime, S().noteNotice], [2, 85, null])
+  assert.deepEqual([S().trackIndex, c2.currentTime, txt(S().noteNotice)], [2, 85, null])
   assert.ok(second.ids)
   await reset()
   assert.ok(ids)
@@ -1585,7 +1587,7 @@ await check('NOTES jump FALLBACK (d, e, f): a target that already loaded never r
   const n = elements.length
   b.fire('error')
   assert.equal(elements.length, n, 'no fallback after the jump completed')
-  assert.deepEqual([S().trackIndex, [...S().trackErrors], S().noteNotice], [1, [d.ids[1]], null])
+  assert.deepEqual([S().trackIndex, [...S().trackErrors], txt(S().noteNotice)], [1, [d.ids[1]], null])
   await reset()
 
   // (e1) the player was mid-switch from a Contents click: no settled origin
@@ -1628,7 +1630,7 @@ await check('NOTES cap (multi-track only): the 501st Note is NOT created, a visi
   assert.equal(S().notes.length, 500)
   assert.equal(S().addNote('one too many'), null)
   assert.equal(S().notes.length, 500)
-  assert.ok(S().noteNotice?.includes('500'), S().noteNotice)
+  assert.ok(txt(S().noteNotice)?.includes('500'), txt(S().noteNotice))
   await sleep(30)
   assert.equal(calls.bookmarks.length, 0, 'nothing was saved')
   assert.equal(stateOf2('nt-c1').audioBookmarks.length, 500)
@@ -1650,7 +1652,7 @@ await check('NOTES cap (multi-track only): the 501st Note is NOT created, a visi
     window.api.audio.saveBookmarks = realSave
   }
   assert.deepEqual(S().notes.map((n) => n.id), ['keep'], 'reloaded from Main: the refused Note is gone')
-  assert.ok(S().noteNotice?.includes('could not be saved'))
+  assert.ok(txt(S().noteNotice)?.includes('could not be saved'))
   await reset()
 
   // single-file at the cap: no notice, nothing refused, the silent truncation of before
@@ -1659,7 +1661,7 @@ await check('NOTES cap (multi-track only): the 501st Note is NOT created, a visi
   current().loaded(1000)
   assert.equal(S().notes.length, 500)
   assert.ok(S().addNote(), 'the single-file add still returns an id')
-  assert.equal(S().noteNotice, null, 'no cap notice for a single-file book')
+  assert.equal(txt(S().noteNotice), null, 'no cap notice for a single-file book')
   await sleep(30)
   assert.equal(stateOf2('nt-c3').audioBookmarks.length, 500)
   await reset()

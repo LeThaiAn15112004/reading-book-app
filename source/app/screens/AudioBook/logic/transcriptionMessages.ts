@@ -1,54 +1,62 @@
-/** Plain-language text for a transcription error code (FR-014): what happened and what the person can do about it. */
+import { getFormat, getT } from '../../../i18n'
+
+/**
+ * Plain-language text for a transcription error code (FR-014): what happened and what the person can do about it.
+ * Built when rendered, in the current interface language (spec 012).
+ */
 export function transcriptionErrorText(code: string | undefined, detail?: string): string {
+  const t = getT()
   switch (code) {
     case 'MODEL_MISSING':
-      return 'The speech model is not downloaded yet. Download it first.'
+      return t('audiobook.transcription.errors.modelMissing')
     case 'DISK_FULL':
-      return 'There is not enough free disk space for the speech model. Free some space and try again.'
+      return t('audiobook.transcription.errors.diskFull')
     case 'FILE_MISSING':
-      return 'The audio file is missing or cannot be read. Locate the file or add the audiobook again.'
+      return t('audiobook.transcription.errors.fileMissing')
     case 'UNSUPPORTED_LANGUAGE':
-      return 'That language is not supported. Choose another language or Auto-detect.'
+      return t('audiobook.transcription.errors.unsupportedLanguage')
     case 'NO_SPEECH':
-      return 'No speech was found in this audio.'
+      return t('audiobook.transcription.errors.noSpeech')
     case 'DECODE_FAILED':
-      return `The audio could not be processed. It may be damaged, or the audio decoder is not available on this system.${detail ? ` (${detail})` : ''}`
+      return detail
+        ? t('audiobook.transcription.errors.decodeFailedDetail', { detail })
+        : t('audiobook.transcription.errors.decodeFailed')
     case 'INTEGRITY_FAILED':
-      return 'The speech model files failed their integrity check, so they were not used. Download the model again.'
+      return t('audiobook.transcription.errors.integrityFailed')
     case 'INVALID_ARGUMENT':
-      return detail ? `That request is not valid: ${detail}` : 'That request is not valid.'
+      return detail ? t('audiobook.transcription.errors.invalidDetail', { detail }) : t('audiobook.transcription.errors.invalid')
     case 'FEATURE_DISABLED':
-      return 'Audiobook transcription is not available in this version of the app yet.'
+      return t('audiobook.transcription.errors.featureDisabled')
     case 'ABORTED':
-      return 'Transcription was cancelled.'
+      return t('audiobook.transcription.errors.aborted')
     case 'INTERRUPTED':
-      return 'Transcription was interrupted when the app closed. Resume to continue where it stopped.'
+      return t('audiobook.transcription.errors.interrupted')
     default:
-      return detail || 'Transcription failed.'
+      return detail || t('audiobook.transcription.errors.generic')
   }
 }
 
-/** Plain-language text for why the bundled audio decoder cannot run (`TranscriptionDecoderStatusDto.reason`). */
+/** Plain-language text for why the bundled audio decoder cannot run (the decoder status reason). */
 export function decoderUnavailableText(reason: string | undefined): string {
+  const t = getT()
   switch (reason) {
     case 'UNSUPPORTED_PLATFORM':
-      return 'Transcription is not available on this operating system or processor yet.'
+      return t('audiobook.transcription.decoder.unsupportedPlatform')
     case 'NOT_BUNDLED':
-      return 'The audio decoder that comes with Readmate is missing from this installation. Reinstall Readmate to restore it.'
+      return t('audiobook.transcription.decoder.notBundled')
     case 'INTEGRITY_FAILED':
-      return 'The audio decoder that comes with Readmate failed its integrity check, so it was not run. Reinstall Readmate to restore it.'
+      return t('audiobook.transcription.decoder.integrityFailed')
     case 'NOT_RUNNABLE':
-      return 'The audio decoder that comes with Readmate could not start on this system. Security software may have blocked it; reinstall Readmate or allow it, then try again.'
+      return t('audiobook.transcription.decoder.notRunnable')
     default:
       return transcriptionErrorText('DECODE_FAILED', reason)
   }
 }
 
-/** "123 MB" / "1.4 GB" for a model download size. */
+/** A model download size in the interface language ("123 MB" / "1,4 GB"). */
 export function formatMegabytes(bytes: number): string {
-  if (!Number.isFinite(bytes) || bytes <= 0) return '0 MB'
-  const mb = bytes / (1024 * 1024)
-  return mb >= 1000 ? `${(mb / 1024).toFixed(1)} GB` : `${Math.max(1, Math.round(mb))} MB`
+  if (!Number.isFinite(bytes) || bytes <= 0) return getFormat().bytes(0)
+  return getFormat().bytes(bytes)
 }
 
 /** `m:ss` or `h:mm:ss` for a position inside a track, from milliseconds. */
