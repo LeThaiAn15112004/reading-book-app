@@ -1,4 +1,3 @@
-/* i18n-pending: reader.text */
 import {
   Component,
   memo,
@@ -40,6 +39,7 @@ import {
   type MdSelectionInfo,
 } from './mdAnnotations'
 import { mdAssetUrl } from './mdSource'
+import { useT } from '../../../../i18n'
 import './md.css'
 
 type MarginMode = 'narrow' | 'normal' | 'wide' | 'off'
@@ -154,23 +154,24 @@ class MdErrorBoundary extends Component<
 }
 
 function MdImage({ bookId, src, alt, title }: { bookId: string; src?: string; alt?: string; title?: string }) {
+  const t = useT()
   const [failed, setFailed] = useState(false)
   const ref = classifyMdImageSrc(src)
   if (ref.kind !== 'relative') {
     const why =
       ref.reason === 'remote'
-        ? 'Remote images are blocked.'
-        : 'Only images next to the document can be shown.'
+        ? t('reader.text.md.remoteBlocked')
+        : t('reader.text.md.onlyLocal')
     return (
       <span className="md-image-blocked" title={why} data-md-image="blocked">
-        [Image not shown{alt ? `: ${alt}` : ''}]
+        {alt ? t('reader.text.md.imageNotShownAlt', { alt }) : t('reader.text.md.imageNotShown')}
       </span>
     )
   }
   if (failed) {
     return (
-      <span className="md-image-blocked" title="The image could not be loaded." data-md-image="missing">
-        [Image not found{alt ? `: ${alt}` : ''}]
+      <span className="md-image-blocked" title={t('reader.text.md.imageLoadFailed')} data-md-image="missing">
+        {alt ? t('reader.text.md.imageNotFoundAlt', { alt }) : t('reader.text.md.imageNotFound')}
       </span>
     )
   }
@@ -190,13 +191,14 @@ function MdImage({ bookId, src, alt, title }: { bookId: string; src?: string; al
 
 /** One independently parsed piece of the document. Memoised: scrolling never re-parses it. */
 const MdSegment = memo(function MdSegment({ text, components }: { text: string; components: Components }) {
+  const t = useT()
   return (
     <MdErrorBoundary
       resetKey={String(text.length)}
       fallback={
         <>
           <p className="md-notice" role="status">
-            This part could not be formatted, so it is shown as plain text.
+            {t('reader.text.md.plainFallback')}
           </p>
           <pre className="md-plain">{text}</pre>
         </>
@@ -254,6 +256,7 @@ export function MdRenderer({
   onScrolled,
   apiRef,
 }: MdRendererProps) {
+  const t = useT()
   const scrollerRef = useRef<HTMLElement | null>(null)
   const articleRef = useRef<HTMLElement | null>(null)
   const frameRef = useRef<number | null>(null)
@@ -820,7 +823,7 @@ export function MdRenderer({
       >
         {lossy ? (
           <p className="md-notice" role="status" data-md-notice="lossy">
-            This file is not valid UTF-8. Some characters could not be read and are shown as �.
+            {t('reader.text.md.lossy')}
           </p>
         ) : null}
         <article
@@ -832,7 +835,7 @@ export function MdRenderer({
         >
           {source.trim().length === 0 ? (
             <p className="md-empty" data-md-empty="">
-              This Markdown file is empty.
+              {t('reader.text.md.empty')}
             </p>
           ) : (
             pieces.slice(0, mounted).map((text, index) => (
@@ -843,7 +846,7 @@ export function MdRenderer({
           )}
           {mounted < total ? (
             <p className="md-notice" role="status" data-md-loading="">
-              Loading the rest of the document…
+              {t('reader.text.md.loadingRest')}
             </p>
           ) : null}
         </article>

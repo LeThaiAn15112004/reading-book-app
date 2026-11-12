@@ -39,6 +39,7 @@ import type {
   TxtRendererApi,
   TxtSelectionInfo,
 } from '../../../../components/reader/renderers/txt'
+import { getT } from '../../../../i18n'
 
 /** Typing waits this long for a pause before it is written… */
 export const TXT_SAVE_DEBOUNCE_MS = 700
@@ -150,31 +151,25 @@ function clearSaveTimers(): void {
 function noticeText(result: TxtOpenResult, staleCount: number): string | null {
   const parts: string[] = []
   if (result.notices?.includes('working_copy_lost')) {
-    parts.push('Your edited copy could not be read — showing the original file.')
+    parts.push(getT()('reader.text.txt.workingCopyLost'))
   }
   if (result.notices?.includes('source_changed')) {
-    parts.push('The original file was changed outside Readmate.')
+    parts.push(getT()('reader.text.txt.sourceChanged'))
   }
   if (result.notices?.includes('legacy_encoding')) {
-    parts.push('This file is not UTF-8; it was read as Windows-1252, so some characters may look wrong.')
+    parts.push(getT()('reader.text.txt.legacyEncoding'))
   }
   if (staleCount > 0) {
-    parts.push(
-      staleCount === 1
-        ? '1 annotation no longer matches the text and is hidden.'
-        : `${staleCount} annotations no longer match the text and are hidden.`,
-    )
+    parts.push(getT()('reader.text.txt.stale', { count: staleCount }))
   }
   if (result.editable === false) {
-    parts.push('This file is too large to edit here — you can still read and annotate it.')
+    parts.push(getT()('reader.text.txt.tooLarge'))
   }
   return parts.length > 0 ? parts.join(' ') : null
 }
 
 function removedNotice(count: number): string {
-  return count === 1
-    ? '1 annotation was removed because the text under it changed.'
-    : `${count} annotations were removed because the text under them changed.`
+  return getT()('reader.text.txt.removed', { count })
 }
 
 /**
@@ -252,14 +247,14 @@ export const useTxtDocumentStore = create<TxtDocumentStoreState>()((set, get) =>
           deletedIds: plan.deletedIds,
         })
       } catch {
-        result = { ok: false, errorCode: 'db_failed', errorMessage: 'Could not save your changes.' }
+        result = { ok: false, errorCode: 'db_failed', errorMessage: getT()('reader.text.txt.saveFailed') }
       }
       if (get().docBookId !== bookId) return false
       if (!result.ok || result.revision === undefined) {
         const fatal = result.errorCode === 'conflict' || result.errorCode === 'invalid' || result.errorCode === 'too_large'
         set({
           saveStatus: 'error',
-          saveError: result.errorMessage ?? 'Could not save your changes.',
+          saveError: result.errorMessage ?? getT()('reader.text.txt.saveFailed'),
           saveFatal: fatal,
         })
         if (!fatal) scheduleRetry()
@@ -361,14 +356,14 @@ export const useTxtDocumentStore = create<TxtDocumentStoreState>()((set, get) =>
       try {
         result = await txtApi.open(bookId)
       } catch {
-        result = { ok: false, bookId, errorCode: 'read_failed', errorMessage: 'Could not read the book file.' }
+        result = { ok: false, bookId, errorCode: 'read_failed', errorMessage: getT()('reader.text.txt.readFailed') }
       }
       if (mine !== generation) return
       if (!result.ok || result.text === undefined || result.revision === undefined) {
         set({
           loadStatus: 'error',
           errorCode: result.errorCode ?? 'read_failed',
-          errorMessage: result.errorMessage ?? 'Could not read the book file.',
+          errorMessage: result.errorMessage ?? getT()('reader.text.txt.readFailed'),
         })
         return
       }
@@ -449,7 +444,7 @@ export const useTxtDocumentStore = create<TxtDocumentStoreState>()((set, get) =>
       const { doc, docBookId, onToast } = get()
       if (!doc || !docBookId) return null
       if (!isValidTxtRange(selection.start, selection.end, doc.text)) {
-        onToast('Could not mark this selection.')
+        onToast(getT()('reader.text.toast.markFailed'))
         return null
       }
       const now = new Date().toISOString()

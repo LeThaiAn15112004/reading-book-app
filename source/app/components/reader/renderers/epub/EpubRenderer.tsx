@@ -1,4 +1,3 @@
-/* i18n-pending: reader.text */
 import {
   useEffect,
   useRef,
@@ -42,6 +41,7 @@ import {
   isTextNodeAtPoint,
   PAN_DRAG_THRESHOLD_PX,
 } from '../../interaction'
+import { getT, useT } from '../../../../i18n'
 /** Imperative nav for parent footer scrub / section jump. */
 export type EpubRendererApi = Pick<
   EpubjsHandle,
@@ -265,7 +265,7 @@ function withSyntheticCoverNav(
       pageCurrent: 1,
       pageTotal,
       href: '',
-      label: 'Cover',
+      label: getT()('reader.text.epub.cover'),
       progress: 0,
       percentage: 0,
       cfi: undefined,
@@ -371,7 +371,7 @@ function toApi(
     getToc: () => handle.getToc(),
     getSectionLabels: () =>
       cover.isAvailable()
-        ? ['Cover', ...handle.getSectionLabels()]
+        ? [getT()('reader.text.epub.cover'), ...handle.getSectionLabels()]
         : handle.getSectionLabels(),
     getCurrentLocation: () => handle.getCurrentLocation(),
     getCurrentExcerpt: () =>
@@ -493,6 +493,7 @@ export function EpubRenderer({
   onHandPanBy,
   apiRef,
 }: EpubRendererProps) {
+  const t = useT()
   const hostRef = useRef<HTMLDivElement>(null)
   const epubRootRef = useRef<HTMLElement>(null)
   const handleRef = useRef<EpubjsHandle | null>(null)
@@ -1266,7 +1267,7 @@ export function EpubRenderer({
         if (apiRefProp.current) apiRefProp.current.current = null
         setStatus('error')
         setErrorMessage(
-          err instanceof Error ? err.message : 'Could not open this EPUB.',
+          err instanceof Error ? err.message : getT()('reader.text.epub.openFailed'),
         )
       })
 
@@ -1437,8 +1438,8 @@ export function EpubRenderer({
             <div className="flex items-center justify-between text-sm font-medium text-lib-text-strong">
               <span>
                 {status === 'opening'
-                  ? 'Opening book...'
-                  : 'Preparing your book...'}
+                  ? t('reader.text.epub.opening')
+                  : t('reader.text.epub.preparing')}
               </span>
             </div>
             <div className="h-1.5 w-full overflow-hidden rounded-full bg-lib-border-soft">
@@ -1450,14 +1451,14 @@ export function EpubRenderer({
       {status === 'error' && (
         <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-4 bg-lib-surface-strong px-6 text-center">
           <div className="text-base font-medium text-rose-500">
-            {errorMessage ?? 'Unable to open this book'}
+            {errorMessage ?? t('reader.text.epub.unableToOpen')}
           </div>
           <button
             type="button"
             className="rounded-md bg-lib-surface-hover px-4 py-2 text-sm font-medium text-lib-text-strong hover:bg-lib-chip"
             onClick={() => window.location.reload()}
           >
-            Try Again
+            {t('reader.text.epub.tryAgain')}
           </button>
         </div>
       )}
@@ -1479,7 +1480,7 @@ export function EpubRenderer({
         >
           <img
             src={coverUrl}
-            alt="Book cover"
+            alt={t('reader.text.epub.coverAlt')}
             className="max-h-full max-w-full object-contain shadow-2xl"
             draggable={false}
           />

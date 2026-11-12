@@ -1,4 +1,3 @@
-/* i18n-pending: reader.text */
 import {
   useCallback,
   useEffect,
@@ -29,6 +28,7 @@ import {
   type ClientBox,
 } from './txtGeometry'
 import { txtMarkStyle } from './txtMarkStyle'
+import { useT } from '../../../../i18n'
 import './txt.css'
 
 export type TxtMarkupTool = MarkupInteractionTool
@@ -146,6 +146,7 @@ const BACKDROP_DEFER_MS = 180
  * from the keyboard (load, undo, redo) are written into it.
  */
 export function TxtRenderer(props: TxtRendererProps) {
+  const t = useT()
   const {
     text,
     highlights,
@@ -630,7 +631,7 @@ export function TxtRenderer(props: TxtRendererProps) {
             ref={inputRef}
             className="txt-input"
             data-txt-input=""
-            aria-label="Book text"
+            aria-label={t('reader.text.txt.bookText')}
             aria-multiline="true"
             spellCheck={false}
             autoCapitalize="off"

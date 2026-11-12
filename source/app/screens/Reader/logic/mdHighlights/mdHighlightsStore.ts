@@ -23,6 +23,7 @@ import {
 } from '@core'
 import { overlayApi } from '../../../../bridge'
 import type { MdInsertionInfo, MdRendererApi, MdSelectionInfo } from '../../../../components/reader/renderers/md'
+import { getT } from '../../../../i18n'
 
 /** Client-px box a popup anchors to (a `DOMRect` fits; same shape as the other surfaces' anchors). */
 export type MdAnnotationAnchor = {
@@ -148,7 +149,7 @@ export const useMdHighlightsStore = create<MdHighlightsStoreState>()((set, get) 
           .filter((h): h is MdReaderHighlight => h !== null),
       })
     } catch {
-      onToast('Could not load highlights.')
+      onToast(getT()('reader.text.toast.loadFailed'))
     }
   },
 
@@ -278,7 +279,7 @@ export const useMdHighlightsStore = create<MdHighlightsStoreState>()((set, get) 
     removeHighlightRow(set, id)
     const restore = () => {
       set((s) => ({ highlights: [...s.highlights, current] }))
-      onToast('Could not delete highlight.')
+      onToast(getT()('reader.text.toast.deleteFailed'))
     }
     void overlayApi
       .deleteHighlight({ bookId, id })
@@ -342,7 +343,7 @@ function persistNew(get: Get, set: Set, highlight: MdReaderHighlight, onToast: (
   if (!bookId) return
   const fail = () => {
     removeHighlightRow(set, highlight.id)
-    onToast('Could not save highlight.')
+    onToast(getT()('reader.text.toast.saveFailed'))
   }
   void overlayApi
     .saveHighlight(toSaveInput(bookId, highlight))
@@ -385,9 +386,9 @@ function persistHighlight(get: Get, h: MdReaderHighlight): void {
   void overlayApi
     .saveHighlight(toSaveInput(bookId, h))
     .then((saved) => {
-      if (!saved) onToast('Could not update highlight.')
+      if (!saved) onToast(getT()('reader.text.toast.updateFailed'))
     })
-    .catch(() => onToast('Could not update highlight.'))
+    .catch(() => onToast(getT()('reader.text.toast.updateFailed')))
 }
 
 /** Undo / redo: re-apply a snapshot (insert or overwrite) or remove — and persist either way. */
@@ -402,7 +403,7 @@ function historyHandlers(get: Get, set: Set) {
       removeHighlightRow(set, id)
       const { bookId, onToast } = get()
       if (!bookId) return
-      void overlayApi.deleteHighlight({ bookId, id }).catch(() => onToast('Could not undo.'))
+      void overlayApi.deleteHighlight({ bookId, id }).catch(() => onToast(getT()('reader.text.toast.undoFailed')))
     },
   }
 }
