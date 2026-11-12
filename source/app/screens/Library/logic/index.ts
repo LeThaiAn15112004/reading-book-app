@@ -2,6 +2,7 @@ export {
   LIBRARY_BROWSE_FILTERS,
   LIBRARY_FILTER_EMPTY,
   LIBRARY_SORTS,
+  type DesktopLibraryFilter,
   type LibraryBrowseFilter,
   type LibraryLayout,
   type LibrarySortId,

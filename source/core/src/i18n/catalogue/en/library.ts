@@ -44,6 +44,7 @@ export const en = {
     completed: 'No completed books yet. Mark a book completed from its menu.',
     favorites: 'No favorites yet. Add one from a book’s menu.',
     noMatch: 'No matching books found.',
+    recent: 'No book opened yet. Books you open appear here, most recent first.',
   },
   sorts: {
     label: 'Sort',
@@ -67,6 +68,7 @@ export const en = {
     title: 'Continue reading',
     resumeAria: 'Resume {title}',
     resume: 'Resume',
+    readAgain: 'Read again',
     read: 'Read',
     percentRead: '{percent}% read',
   },
@@ -141,6 +143,7 @@ export const en = {
     addFavorite: 'Add to favorites',
     removeFavorite: 'Remove from favorites',
     markCompleted: 'Mark as completed',
+    markReading: 'Mark as reading',
     details: 'Book details',
     editMetadata: 'Edit metadata',
     removeFromCollection: 'Remove from this collection',
@@ -275,5 +278,33 @@ export const en = {
   },
   relative: {
     justNow: 'just now',
+  },
+  phone: {
+    chips: {
+      aria: 'Filter books',
+      all: 'All',
+      recent: 'Recent',
+      saved: 'Saved',
+      completed: 'Completed',
+    },
+    add: 'Import book',
+    searchPlaceholder: 'Search books…',
+    bookCount: { one: '{count} book', other: '{count} books' },
+    layout: {
+      aria: 'View',
+      grid: 'Grid',
+      list: 'List',
+    },
+    empty: {
+      aria: 'Empty library',
+      title: 'Your library is empty',
+      body: 'Import a book from your phone to start reading. It is kept in the app, on this device only.',
+      formats: 'EPUB · PDF · TXT · Markdown',
+      import: 'Import book',
+    },
+    noMatch: {
+      clear: 'Clear',
+    },
+    adPlaceholder: 'Ad · Banner 320 × 50',
   },
 } as const

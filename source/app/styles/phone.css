@@ -41,3 +41,48 @@
     min-height: 44px;
   }
 }
+
+/*
+ * Phone Library (spec 013, contracts/phone-library-ui.md). Rendered only on the Mobile host (`MobileLibraryHub`), so
+ * these classes never appear on Desktop; they are still scoped under `[data-mobile-host]` like every rule here.
+ */
+
+/* 16 px side gutter (FR, phone layout). */
+:root[data-mobile-host] .phone-library {
+  padding-inline: 16px;
+}
+
+/* Horizontal rows (filter chips, Continue Reading): swipe sideways, snap to items, no visible scrollbar. */
+:root[data-mobile-host] .phone-hscroll {
+  display: flex;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scroll-snap-type: x mandatory;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  /* Bleed to the screen edges while the first / last item keeps the 16 px gutter. */
+  margin-inline: -16px;
+  padding-inline: 16px;
+  scroll-padding-inline: 16px;
+}
+
+:root[data-mobile-host] .phone-hscroll::-webkit-scrollbar {
+  display: none;
+}
+
+:root[data-mobile-host] .phone-hscroll > * {
+  scroll-snap-align: start;
+  flex-shrink: 0;
+}
+
+/* Large libraries (SC-005): skip layout and paint of off-screen list rows and carousel cards. */
+:root[data-mobile-host] .phone-row {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 80px;
+}
+
+:root[data-mobile-host] .phone-card {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 120px;
+}

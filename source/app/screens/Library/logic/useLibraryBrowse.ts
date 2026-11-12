@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import { matchesSearch, type LibraryBook } from '@core'
+import { matchesSearch, pickPhoneContinueReading, type LibraryBook } from '@core'
 import {
   countLibraryFilters,
   filterLibraryBooks,
@@ -22,7 +22,9 @@ export function useLibraryBrowse(books: LibraryBook[], searchQuery: string) {
 
   return useMemo(() => {
     const searched = searchActive ? books.filter((b) => matchesSearch(b, searchQuery)) : books
-    const visibleBooks = sortLibraryBooks(filterLibraryBooks(searched, filter), sort)
+    const filtered = filterLibraryBooks(searched, filter)
+    // `recent` has its own order (most recently read first) whatever the chosen sort (spec 013 FR-032).
+    const visibleBooks = filter === 'recent' ? filtered : sortLibraryBooks(filtered, sort)
     const selectedBook =
       layout === 'table' && selectedBookId
         ? (visibleBooks.find((b) => b.id === selectedBookId) ?? null)
@@ -37,6 +39,8 @@ export function useLibraryBrowse(books: LibraryBook[], searchQuery: string) {
       visibleBooks,
       /** Only on All books without a search — the strip is a shortcut, not a filter result. */
       continueBooks: filter === 'all' && !searchActive ? pickContinueReadingBooks(books) : [],
+      /** Phone carousel (spec 013): started books incl. completed ones, at most 10, newest first. */
+      phoneContinueBooks: filter === 'all' && !searchActive ? pickPhoneContinueReading(books, 10) : [],
       selectedBook,
     }
   }, [books, searchQuery, searchActive, filter, sort, layout, selectedBookId])

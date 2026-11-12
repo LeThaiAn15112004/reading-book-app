@@ -181,6 +181,17 @@ export {
   type NavFilterId,
   type ShelfId,
 } from './library-book.js'
+export {
+  PHONE_LIBRARY_CHIPS,
+  continueAction,
+  filterPhoneChip,
+  listRowProgress,
+  pickPhoneContinueReading,
+  toPhoneChip,
+  type ContinueAction,
+  type PhoneBrowseFilter,
+  type PhoneChipId,
+} from './library-phone.js'
 export { resolveActivePageTocEntry, type PageTocNode } from './page-toc.js'
 export {
   MARKUP_TOOLS,

@@ -24,8 +24,26 @@ import { useLibraryImportStore } from '../../hooks/library'
 import { annotationExportMessage } from '../../utils/annotationTransferMessages'
 import { useShortcutAction } from '../../shortcuts'
 import { uiText, useT } from '../../i18n'
-import { LibraryHub } from './LibraryHub'
+import { Suspense, lazy } from 'react'
+import { isMobileHost } from '../../platforms/host'
+import { LibraryHub, type LibraryHubProps } from './LibraryHub'
 import { useLibraryScreen } from './logic'
+
+/**
+ * The phone Library home (spec 013). A separate chunk: `isMobileHost()` is false in Electron, so `lazy` never starts
+ * loading it on Desktop.
+ */
+const MobileLibraryHub = lazy(() => import('./phone/MobileLibraryHub'))
+
+/** Desktop hub, or the phone hub on the Mobile host — same props (FR-029: one Library, two presentations). */
+function LibraryHome(props: LibraryHubProps) {
+  if (!isMobileHost()) return <LibraryHub {...props} />
+  return (
+    <Suspense fallback={<div className="flex-1" aria-busy="true" />}>
+      <MobileLibraryHub {...props} />
+    </Suspense>
+  )
+}
 
 /**
  * SCR-01 — Library shell. `hub` = the browse home (sidebar + grid/table, `LibraryHub`); the top
@@ -141,7 +159,7 @@ export function LibraryScreen() {
             onViewModeChange={setCollectionViewMode}
           />
         ) : (
-          <LibraryHub
+          <LibraryHome
             books={books}
             searchQuery={searchQuery}
             onSearchChange={setSearchQuery}

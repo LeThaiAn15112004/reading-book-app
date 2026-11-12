@@ -47,6 +47,7 @@ export const vi = {
     completed: 'Chưa có sách nào đọc xong. Đánh dấu đã đọc xong từ menu của sách.',
     favorites: 'Chưa có sách yêu thích. Thêm từ menu của sách.',
     noMatch: 'Không tìm thấy sách phù hợp.',
+    recent: 'Chưa mở cuốn sách nào. Sách bạn mở sẽ hiện ở đây, mới nhất trước.',
   },
   sorts: {
     label: 'Sắp xếp',
@@ -70,6 +71,7 @@ export const vi = {
     title: 'Đọc tiếp',
     resumeAria: 'Đọc tiếp {title}',
     resume: 'Đọc tiếp',
+    readAgain: 'Đọc lại',
     read: 'Đọc',
     percentRead: 'Đã đọc {percent}%',
   },
@@ -144,6 +146,7 @@ export const vi = {
     addFavorite: 'Thêm vào yêu thích',
     removeFavorite: 'Gỡ khỏi yêu thích',
     markCompleted: 'Đánh dấu đã đọc xong',
+    markReading: 'Đánh dấu đang đọc',
     details: 'Chi tiết sách',
     editMetadata: 'Sửa thông tin sách',
     removeFromCollection: 'Gỡ khỏi bộ sưu tập này',
@@ -278,5 +281,33 @@ export const vi = {
   },
   relative: {
     justNow: 'vừa xong',
+  },
+  phone: {
+    chips: {
+      aria: 'Lọc sách',
+      all: 'Tất cả',
+      recent: 'Gần đây',
+      saved: 'Đã lưu',
+      completed: 'Hoàn thành',
+    },
+    add: 'Nhập sách',
+    searchPlaceholder: 'Tìm sách…',
+    bookCount: { other: '{count} sách' },
+    layout: {
+      aria: 'Chế độ xem',
+      grid: 'Lưới',
+      list: 'Danh sách',
+    },
+    empty: {
+      aria: 'Thư viện trống',
+      title: 'Thư viện của bạn đang trống',
+      body: 'Nhập một cuốn sách từ điện thoại để bắt đầu đọc. Sách được lưu trong ứng dụng, chỉ trên thiết bị này.',
+      formats: 'EPUB · PDF · TXT · Markdown',
+      import: 'Nhập sách',
+    },
+    noMatch: {
+      clear: 'Xóa bộ lọc',
+    },
+    adPlaceholder: 'Quảng cáo · Banner 320 × 50',
   },
 } as const satisfies AreaShape<typeof en>

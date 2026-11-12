@@ -1,7 +1,13 @@
-import { filterByNav, type LibraryBook, type MessageKey } from '@core'
+import { filterByNav, filterPhoneChip, type LibraryBook, type MessageKey } from '@core'
 
-/** Library sidebar destinations (status filters + favorites). Collections live in the top nav. */
-export type LibraryBrowseFilter = 'all' | 'reading' | 'not-started' | 'completed' | 'favorites'
+/** Desktop sidebar destinations (status filters + favorites). Collections live in the top nav. */
+export type DesktopLibraryFilter = 'all' | 'reading' | 'not-started' | 'completed' | 'favorites'
+
+/**
+ * Every Library filter: the desktop sidebar ones plus the phone chip `recent` (spec 013 — books opened, most recently
+ * read first). The desktop sidebar never offers `recent`.
+ */
+export type LibraryBrowseFilter = DesktopLibraryFilter | 'recent'
 
 export type LibrarySortId = 'recently-added' | 'recently-read' | 'title' | 'author'
 
@@ -9,7 +15,7 @@ export type LibrarySortId = 'recently-added' | 'recently-read' | 'title' | 'auth
 export type LibraryLayout = 'grid' | 'table'
 
 /** Labels are catalogue keys, translated where they are shown (spec 012). */
-export const LIBRARY_BROWSE_FILTERS: readonly { id: LibraryBrowseFilter; labelKey: MessageKey }[] = [
+export const LIBRARY_BROWSE_FILTERS: readonly { id: DesktopLibraryFilter; labelKey: MessageKey }[] = [
   { id: 'all', labelKey: 'library.filters.all' },
   { id: 'reading', labelKey: 'library.filters.reading' },
   { id: 'not-started', labelKey: 'library.filters.notStarted' },
@@ -31,6 +37,7 @@ export const LIBRARY_FILTER_EMPTY: Record<LibraryBrowseFilter, MessageKey> = {
   'not-started': 'library.filterEmpty.notStarted',
   completed: 'library.filterEmpty.completed',
   favorites: 'library.filterEmpty.favorites',
+  recent: 'library.filterEmpty.recent',
 }
 
 /** Books matching one sidebar filter — reuses the SDK nav filters. */
@@ -40,6 +47,8 @@ export function filterLibraryBooks(books: LibraryBook[], filter: LibraryBrowseFi
       return books
     case 'not-started':
       return filterByNav(books, 'to-read')
+    case 'recent':
+      return filterPhoneChip(books, 'recent')
     default:
       return filterByNav(books, filter)
   }
@@ -52,6 +61,7 @@ export function countLibraryFilters(books: LibraryBook[]): Record<LibraryBrowseF
     'not-started': filterLibraryBooks(books, 'not-started').length,
     completed: filterLibraryBooks(books, 'completed').length,
     favorites: filterLibraryBooks(books, 'favorites').length,
+    recent: filterLibraryBooks(books, 'recent').length,
   }
 }
 
