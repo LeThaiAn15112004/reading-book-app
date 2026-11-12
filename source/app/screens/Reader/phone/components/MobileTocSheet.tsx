@@ -1,7 +1,7 @@
-/* i18n-pending: reader.phone */
 import type { EpubTocItem } from '../../../../components/reader/renderers/epub'
 import { normalizeHrefForLocation } from '../../../../components/reader/renderers/epub/href'
 import { MobileSheet, MobileSheetRow } from './MobileSheet'
+import { useT } from '../../../../i18n'
 
 interface FlatTocItem {
   item: EpubTocItem
@@ -39,11 +39,12 @@ export function MobileTocSheet({
   onSelect: (item: EpubTocItem) => void
   onClose: () => void
 }) {
+  const t = useT()
   const rows = flatten(items)
   return (
-    <MobileSheet title="Contents" onClose={onClose}>
+    <MobileSheet title={t('reader.phone.sheet.contents')} onClose={onClose}>
       {rows.length === 0 ? (
-        <p className="px-4 py-6 text-[14px] text-lib-muted">This book has no table of contents.</p>
+        <p className="px-4 py-6 text-[14px] text-lib-muted">{t('reader.sidebar.toc.empty')}</p>
       ) : (
         rows.map(({ item, depth }) => (
           <MobileSheetRow
@@ -55,7 +56,7 @@ export function MobileTocSheet({
               onClose()
             }}
           >
-            {item.label || 'Untitled'}
+            {item.label || t('common.untitled')}
           </MobileSheetRow>
         ))
       )}

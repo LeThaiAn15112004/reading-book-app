@@ -1,18 +1,19 @@
-/* i18n-pending: reader.phone */
 import { useState } from 'react'
 import type { ReaderBookmark, ReaderHighlightBase } from '@core'
 import { MobileSheet, MobileSheetRow } from './MobileSheet'
+import { useT } from '../../../../i18n'
+import type { MessageKey } from '@core'
 
 type Tab = 'bookmarks' | 'notes'
 
-const KIND_LABEL: Partial<Record<ReaderHighlightBase['styleKind'], string>> = {
-  highlight: 'Highlight',
-  underline: 'Underline',
-  strikethrough: 'Strikethrough',
-  squiggly: 'Squiggly',
-  textbox: 'Note',
-  replace: 'Replace',
-  insert: 'Insert',
+const KIND_LABEL: Partial<Record<ReaderHighlightBase['styleKind'], MessageKey>> = {
+  highlight: 'reader.sidebar.notes.types.highlight',
+  underline: 'reader.sidebar.notes.types.underline',
+  strikethrough: 'reader.sidebar.notes.types.strikethrough',
+  squiggly: 'reader.sidebar.notes.types.squiggly',
+  textbox: 'reader.sidebar.notes.types.textbox',
+  replace: 'reader.sidebar.notes.types.replace',
+  insert: 'reader.sidebar.notes.types.insert',
 }
 
 /**
@@ -43,6 +44,7 @@ export function MobileMarksSheet({
   onOpenHighlight?: (highlight: ReaderHighlightBase) => void
   onClose: () => void
 }) {
+  const t = useT()
   const [tab, setTab] = useState<Tab>(initialTab)
   const tabButton = (id: Tab, label: string, count: number) => (
     <button
@@ -52,15 +54,15 @@ export function MobileMarksSheet({
       onClick={() => setTab(id)}
       className={`min-h-[44px] flex-1 rounded-lg text-[14px] font-semibold ${tab === id ? 'bg-lib-surface text-lib-text-strong' : 'text-lib-muted'}`}
     >
-      {label} {count > 0 ? `(${count})` : ''}
+      {count > 0 ? t('reader.phone.marks.tabLabel', { label, count }) : label}
     </button>
   )
 
   return (
-    <MobileSheet title={tab === 'bookmarks' ? 'Bookmarks' : 'Notes'} onClose={onClose}>
+    <MobileSheet title={tab === 'bookmarks' ? t('reader.phone.marks.bookmarks') : t('reader.phone.marks.notes')} onClose={onClose}>
       <div role="tablist" className="m-3 flex gap-1 rounded-xl bg-lib-hint p-1">
-        {tabButton('bookmarks', 'Bookmarks', bookmarks.length)}
-        {tabButton('notes', 'Notes', highlights.length)}
+        {tabButton('bookmarks', t('reader.phone.marks.bookmarks'), bookmarks.length)}
+        {tabButton('notes', t('reader.phone.marks.notes'), highlights.length)}
       </div>
 
       {tab === 'bookmarks' ? (
@@ -71,11 +73,11 @@ export function MobileMarksSheet({
               onClick={onToggleBookmark}
               className="min-h-[44px] w-full rounded-xl border border-lib-border text-[14px] font-semibold text-lib-text-strong"
             >
-              {currentPlaceBookmarked ? 'Remove bookmark here' : 'Add bookmark here'}
+              {currentPlaceBookmarked ? t('reader.phone.marks.removeHere') : t('reader.phone.marks.addHere')}
             </button>
           </div>
           {bookmarks.length === 0 ? (
-            <p className="px-4 py-6 text-[14px] text-lib-muted">No bookmarks yet.</p>
+            <p className="px-4 py-6 text-[14px] text-lib-muted">{t('reader.phone.marks.noBookmarks')}</p>
           ) : (
             bookmarks.map((bookmark) => (
               <MobileSheetRow
@@ -87,11 +89,11 @@ export function MobileMarksSheet({
                 trailing={
                   <button
                     type="button"
-                    aria-label={`Remove bookmark ${bookmark.label}`}
+                    aria-label={t('reader.phone.marks.removeBookmark', { label: bookmark.label })}
                     onClick={() => onDeleteBookmark(bookmark.id)}
                     className="min-h-[44px] min-w-[44px] px-3 text-[13px] font-semibold text-lib-muted"
                   >
-                    Remove
+                    {t('reader.phone.marks.remove')}
                   </button>
                 }
               >
@@ -102,7 +104,7 @@ export function MobileMarksSheet({
           )}
         </>
       ) : highlights.length === 0 ? (
-        <p className="px-4 py-6 text-[14px] text-lib-muted">No notes or highlights yet. Select text to add one.</p>
+        <p className="px-4 py-6 text-[14px] text-lib-muted">{t('reader.phone.marks.noNotes')}</p>
       ) : (
         highlights.map((highlight) => (
           <MobileSheetRow
@@ -115,11 +117,11 @@ export function MobileMarksSheet({
               onOpenHighlight ? (
                 <button
                   type="button"
-                  aria-label="Edit"
+                  aria-label={t('reader.phone.marks.edit')}
                   onClick={() => onOpenHighlight(highlight)}
                   className="min-h-[44px] min-w-[44px] px-3 text-[13px] font-semibold text-lib-muted"
                 >
-                  Edit
+                  {t('reader.phone.marks.edit')}
                 </button>
               ) : undefined
             }

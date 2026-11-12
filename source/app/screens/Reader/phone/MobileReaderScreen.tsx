@@ -1,4 +1,3 @@
-/* i18n-pending: reader.phone */
 /**
  * The Mobile Reader (spec 008, T102 + T103, FR-012a / FR-012c; `contracts/phone-ui.md`, "Mobile Reader UI").
  *
@@ -50,6 +49,7 @@ import { MobileSelectionBar, type SelectionMarkKind } from './components/MobileS
 import { MobileSheet } from './components/MobileSheet'
 import { MobileTocSheet } from './components/MobileTocSheet'
 import { requestSelectionMenu, useLiveSelection } from './components/useLiveSelection'
+import { useT } from '../../../i18n'
 
 type SheetId = 'toc' | 'bookmarks' | 'notes' | 'appearance'
 
@@ -68,6 +68,7 @@ const TOAST_MS = 2400
 const EDGE_ZONE = '14%'
 
 export default function MobileReaderScreen() {
+  const t = useT()
   const { bookId } = useParams<{ bookId: string }>()
   const { setDocumentSubtitle } = useAppTitle()
   const { ensureTab, updateBookTitle } = useOpenReading()
@@ -149,7 +150,7 @@ export default function MobileReaderScreen() {
   const pdfPageCurrent = nav.pdfNav?.pageCurrent ?? 0
   const pdfPageTotal = nav.pdfNav?.pageTotal ?? 0
   const chapterLabel = isPdfSurface
-    ? `Page ${pdfPageCurrent}`
+    ? t('reader.phone.screen.page', { page: pdfPageCurrent })
     : isTextSurface
       ? `${textPercent}%`
       : (FAKE_CHAPTERS[nav.chapterIndex] ?? FAKE_CHAPTERS[0])!.title
@@ -224,8 +225,8 @@ export default function MobileReaderScreen() {
   const copyText = (text: string | undefined) => {
     if (!text) return
     void navigator.clipboard?.writeText(text).then(
-      () => setToast('Copied.'),
-      () => setToast('Could not copy.'),
+      () => setToast(t('reader.phone.screen.copied')),
+      () => setToast(t('reader.phone.screen.copyFailed')),
     )
   }
 
@@ -398,8 +399,8 @@ export default function MobileReaderScreen() {
               onLocation={session.handleMdLocation}
               onHeadings={setMdHeadings}
               onActiveHeading={setMdActiveHeading}
-              onAnchorNotFound={() => setToast('That section was not found in this document.')}
-              onOpenExternal={() => setToast('Links to other sites do not open in this release.')}
+              onAnchorNotFound={() => setToast(t('reader.phone.screen.anchorNotFound'))}
+              onOpenExternal={() => setToast(t('reader.phone.screen.externalLink'))}
               annotations={mdHighlights.highlights}
               draftCaret={null}
               focusedAnnotationId={mdHighlights.focusedHighlightId}
@@ -467,7 +468,7 @@ export default function MobileReaderScreen() {
               apiRef={txtApiRef}
             />
           ) : (
-            <ReaderOpenStatus status="error" message="This book's format does not open on the phone." onRetry={book.retryOpen} onBack={leave} />
+            <ReaderOpenStatus status="error" message={t('reader.phone.screen.formatUnsupported')} onRetry={book.retryOpen} onBack={leave} />
           )}
         </ReaderZoomViewport>
       </div>
@@ -475,15 +476,15 @@ export default function MobileReaderScreen() {
       {/* Edge tap zones: previous / next page. Narrow, so a long press on most of the text is never caught. */}
       {!selectionMenu && !liveSelection ? (
         <>
-          <button type="button" aria-label="Previous page" className="absolute top-[18%] bottom-[18%] left-0 z-[200]" style={{ width: EDGE_ZONE }} onClick={() => nav.switchPage(false)} />
-          <button type="button" aria-label="Next page" className="absolute top-[18%] right-0 bottom-[18%] z-[200]" style={{ width: EDGE_ZONE }} onClick={() => nav.switchPage(true)} />
+          <button type="button" aria-label={t('reader.chrome.footer.previousPage')} className="absolute top-[18%] bottom-[18%] left-0 z-[200]" style={{ width: EDGE_ZONE }} onClick={() => nav.switchPage(false)} />
+          <button type="button" aria-label={t('reader.chrome.footer.nextPage')} className="absolute top-[18%] right-0 bottom-[18%] z-[200]" style={{ width: EDGE_ZONE }} onClick={() => nav.switchPage(true)} />
         </>
       ) : null}
 
       {barsVisible ? (
         <>
           <MobileReaderTopBar
-            title={book.bookTitle || 'Untitled'}
+            title={book.bookTitle || t('common.untitled')}
             onBack={leave}
             bookmarked={bookmarks.isCurrentPlaceBookmarked}
             onToggleBookmark={isTxtSurface ? undefined : bookmarks.toggleBookmark}
@@ -587,7 +588,7 @@ export default function MobileReaderScreen() {
       ) : null}
 
       {sheet === 'appearance' ? (
-        <MobileSheet title="Appearance" onClose={() => setSheet(null)}>
+        <MobileSheet title={t('reader.phone.sheet.appearance')} onClose={() => setSheet(null)}>
           <div className="p-4">
             <AaSettingsPanel
               prefs={book.prefs}

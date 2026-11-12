@@ -1,5 +1,5 @@
-/* i18n-pending: reader.phone */
 import type { ReactNode } from 'react'
+import { useT } from '../../../../i18n'
 
 /**
  * A bottom sheet over the page (spec 008, T103; `contracts/phone-ui.md`, Layout: "each panel is a bottom sheet over the
@@ -18,9 +18,10 @@ export function MobileSheet({
   /** Buttons in the sheet's header, left of Close. */
   actions?: ReactNode
 }) {
+  const t = useT()
   return (
     <div className="fixed inset-0 z-[400] flex flex-col justify-end" role="presentation">
-      <button type="button" aria-label="Close" className="absolute inset-0 bg-black/40" onClick={onClose} />
+      <button type="button" aria-label={t('reader.phone.sheet.close')} className="absolute inset-0 bg-black/40" onClick={onClose} />
       <section
         role="dialog"
         aria-modal="true"
@@ -36,7 +37,7 @@ export function MobileSheet({
             onClick={onClose}
             className="min-h-[44px] min-w-[44px] rounded-lg px-2 text-[14px] font-semibold text-lib-muted"
           >
-            Close
+            {t('reader.phone.sheet.close')}
           </button>
         </header>
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">{children}</div>

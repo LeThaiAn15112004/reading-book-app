@@ -1,5 +1,5 @@
-/* i18n-pending: reader.phone */
 import type { PointerEvent as ReactPointerEvent } from 'react'
+import { useT } from '../../../../i18n'
 
 export type SelectionMarkKind = 'highlight' | 'underline' | 'strikethrough' | 'textbox'
 
@@ -31,6 +31,7 @@ export function MobileSelectionBar({
   onCopy: () => void
   onDismiss: () => void
 }) {
+  const t = useT()
   return (
     <div
       className="fixed inset-x-0 bottom-0 z-[350] px-3"
@@ -38,32 +39,32 @@ export function MobileSelectionBar({
     >
       <div
         role="toolbar"
-        aria-label="Selected text"
+        aria-label={t('reader.phone.selection.aria')}
         className="mx-auto flex max-w-[520px] items-center gap-1 rounded-2xl border border-lib-border bg-lib-surface-strong p-1.5 shadow-2xl"
       >
         {state === 'pending' ? (
           <button type="button" className={button} onPointerDown={keepSelection} onClick={onRequest}>
             <span aria-hidden className="mr-2 inline-block h-3 w-3 rounded-full align-middle" style={{ background: colorHex }} />
-            Mark selection
+            {t('reader.phone.selection.mark')}
           </button>
         ) : (
           <>
             <button type="button" className={button} onPointerDown={keepSelection} onClick={() => onMark('highlight')}>
               <span aria-hidden className="mr-1.5 inline-block h-3 w-3 rounded-full align-middle" style={{ background: colorHex }} />
-              Highlight
+              {t('reader.annotations.selection.highlight')}
             </button>
             <button type="button" className={button} onPointerDown={keepSelection} onClick={() => onMark('underline')}>
-              Underline
+              {t('reader.annotations.selection.underline')}
             </button>
             <button type="button" className={button} onPointerDown={keepSelection} onClick={() => onMark('textbox')}>
-              Note
+              {t('reader.phone.mark.note')}
             </button>
             <button type="button" className={button} onPointerDown={keepSelection} onClick={onCopy}>
-              Copy
+              {t('reader.annotations.selection.copy')}
             </button>
           </>
         )}
-        <button type="button" aria-label="Cancel" className="min-h-[44px] min-w-[44px] rounded-lg text-[18px] text-lib-muted" onClick={onDismiss}>
+        <button type="button" aria-label={t('common.actions.cancel')} className="min-h-[44px] min-w-[44px] rounded-lg text-[18px] text-lib-muted" onClick={onDismiss}>
           ×
         </button>
       </div>

@@ -1,12 +1,13 @@
-/* i18n-pending: reader.phone */
 import { useState } from 'react'
 import { HIGHLIGHT_COLOR_PRESETS, type HighlightStyleKind, type ReaderHighlightBase } from '@core'
 import { MobileSheet } from './MobileSheet'
+import { useT } from '../../../../i18n'
+import type { MessageKey } from '@core'
 
-const STYLE_CHOICES: { kind: HighlightStyleKind; label: string }[] = [
-  { kind: 'highlight', label: 'Highlight' },
-  { kind: 'underline', label: 'Underline' },
-  { kind: 'strikethrough', label: 'Strike' },
+const STYLE_CHOICES: { kind: HighlightStyleKind; label: MessageKey }[] = [
+  { kind: 'highlight', label: 'reader.phone.mark.highlight' },
+  { kind: 'underline', label: 'reader.sidebar.notes.types.underline' },
+  { kind: 'strikethrough', label: 'reader.phone.mark.strike' },
 ]
 
 /**
@@ -34,6 +35,7 @@ export function MobileMarkSheet({
   onDelete: () => void
   onClose: () => void
 }) {
+  const t = useT()
   const [note, setNote] = useState(highlight.note ?? '')
   const isNote = highlight.styleKind === 'textbox'
   const canRestyle = STYLE_CHOICES.some((choice) => choice.kind === highlight.styleKind)
@@ -46,7 +48,7 @@ export function MobileMarkSheet({
   }
 
   return (
-    <MobileSheet title={isNote ? 'Note' : 'Highlight'} onClose={close}>
+    <MobileSheet title={isNote ? t('reader.phone.mark.note') : t('reader.phone.mark.highlight')} onClose={close}>
       <div className="flex flex-col gap-4 p-4">
         {highlight.selectionText?.highlight ? (
           <blockquote className="line-clamp-3 border-l-4 pl-3 text-[14px] text-lib-text" style={{ borderColor: highlight.colorHex || undefined }}>
@@ -54,7 +56,7 @@ export function MobileMarkSheet({
           </blockquote>
         ) : null}
 
-        <div className="flex items-center gap-3" role="radiogroup" aria-label="Colour">
+        <div className="flex items-center gap-3" role="radiogroup" aria-label={t('reader.chrome.ink.color')}>
           {HIGHLIGHT_COLOR_PRESETS.map((preset) => {
             const selected = highlight.colorHex.toLowerCase() === preset.hex.toLowerCase()
             return (
@@ -63,7 +65,7 @@ export function MobileMarkSheet({
                 type="button"
                 role="radio"
                 aria-checked={selected}
-                aria-label={preset.label}
+                aria-label={t(`reader.annotations.colors.${preset.id as 'yellow'}`) || preset.label}
                 onClick={() => onChangeColor(preset.hex)}
                 className="h-11 w-11 shrink-0 rounded-full"
                 style={{
@@ -77,7 +79,7 @@ export function MobileMarkSheet({
         </div>
 
         {canRestyle ? (
-          <div className="flex gap-1 rounded-xl bg-lib-hint p-1" role="radiogroup" aria-label="Style">
+          <div className="flex gap-1 rounded-xl bg-lib-hint p-1" role="radiogroup" aria-label={t('reader.phone.mark.style')}>
             {STYLE_CHOICES.map((choice) => (
               <button
                 key={choice.kind}
@@ -87,19 +89,19 @@ export function MobileMarkSheet({
                 onClick={() => onChangeStyle(choice.kind)}
                 className={`min-h-[44px] flex-1 rounded-lg text-[14px] font-semibold ${highlight.styleKind === choice.kind ? 'bg-lib-surface text-lib-text-strong' : 'text-lib-muted'}`}
               >
-                {choice.label}
+                {t(choice.label)}
               </button>
             ))}
           </div>
         ) : null}
 
         <label className="flex flex-col gap-1.5">
-          <span className="text-[12px] font-bold tracking-wide text-lib-faint uppercase">Note</span>
+          <span className="text-[12px] font-bold tracking-wide text-lib-faint uppercase">{t('reader.phone.mark.note')}</span>
           <textarea
             value={note}
             onChange={(event) => setNote(event.target.value)}
             rows={3}
-            placeholder="Add a note…"
+            placeholder={t('reader.phone.mark.placeholder')}
             // 16 px: iOS zooms the page into a smaller field on focus.
             className="min-h-[88px] w-full resize-none rounded-xl border border-lib-border bg-lib-input p-3 text-[16px] text-lib-text"
           />
@@ -112,13 +114,13 @@ export function MobileMarkSheet({
             onClick={() => onChangeNote(note)}
             className="min-h-[44px] flex-1 rounded-xl bg-lib-accent text-[14px] font-semibold text-lib-on-accent disabled:opacity-40"
           >
-            Save note
+            {t('reader.phone.mark.saveNote')}
           </button>
           <button type="button" onClick={onCopy} className="min-h-[44px] flex-1 rounded-xl border border-lib-border text-[14px] font-semibold text-lib-text-strong">
-            Copy
+            {t('reader.annotations.edit.copy')}
           </button>
           <button type="button" onClick={onDelete} className="min-h-[44px] flex-1 rounded-xl border border-lib-border text-[14px] font-semibold text-red-500">
-            Delete
+            {t('common.actions.delete')}
           </button>
         </div>
       </div>
