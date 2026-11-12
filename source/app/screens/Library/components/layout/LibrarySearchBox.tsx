@@ -10,6 +10,12 @@ export type LibrarySearchBoxProps = {
   /** A search was finished (Enter, leaving the box, or picking a recent one) — record it. */
   onCommit: (query: string) => void
   onRemoveRecent: (query: string) => void
+  /** Placeholder text; defaults to the desktop one. */
+  placeholder?: string
+  /** Width classes of the wrapper; defaults to the desktop `max-w-80 flex-1`. */
+  className?: string
+  /** Input height in px; defaults to 38 (desktop). */
+  inputHeight?: number
 }
 
 function SearchIcon({ className }: { className?: string }) {
@@ -38,6 +44,9 @@ export function LibrarySearchBox({
   recentSearches,
   onCommit,
   onRemoveRecent,
+  placeholder,
+  className = 'max-w-80 flex-1',
+  inputHeight = 38,
 }: LibrarySearchBoxProps) {
   const t = useT()
   const listId = useId()
@@ -81,7 +90,7 @@ export function LibrarySearchBox({
   }
 
   return (
-    <div className="relative min-w-0 max-w-80 flex-1" data-no-drag>
+    <div className={`relative min-w-0 ${className}`} data-no-drag>
       <SearchIcon className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-lib-faint" />
       <input
         ref={inputRef}
@@ -91,8 +100,9 @@ export function LibrarySearchBox({
         aria-controls={listId}
         aria-autocomplete="list"
         aria-activedescendant={activeId}
-        className="h-[38px] w-full rounded-lg border border-lib-border bg-lib-input py-0 pr-3.5 pl-9 text-sm text-lib-text-strong outline-none transition-[border-color,box-shadow] placeholder:text-lib-faint focus:border-lib-accent focus:shadow-[0_0_0_3px_var(--color-lib-accent-soft)]"
-        placeholder={t('library.search.placeholder')}
+        style={{ height: inputHeight }}
+        className="w-full rounded-lg border border-lib-border bg-lib-input py-0 pr-3.5 pl-9 text-sm text-lib-text-strong outline-none transition-[border-color,box-shadow] placeholder:text-lib-faint focus:border-lib-accent focus:shadow-[0_0_0_3px_var(--color-lib-accent-soft)]"
+        placeholder={placeholder ?? t('library.search.placeholder')}
         aria-label={t('library.search.aria')}
         value={value}
         onChange={(e) => {
