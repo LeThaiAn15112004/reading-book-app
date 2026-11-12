@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { overlayApi } from '../../../../bridge'
+import { getT } from '../../../../i18n'
 
 export type PendingSignedWrite = { bookId: string; signerName?: string }
 
@@ -29,15 +30,15 @@ export const usePdfSignedWriteStore = create<PdfSignedWriteState>()((set, get) =
     set({ pending: null })
     try {
       const result = await overlayApi.confirmSignedPdfWrite(pending.bookId)
-      if (!result.ok) onToast('Could not write into the signed PDF.')
+      if (!result.ok) onToast(getT()('reader.annotations.pdfExport.signedWriteFailed'))
     } catch {
-      onToast('Could not write into the signed PDF.')
+      onToast(getT()('reader.annotations.pdfExport.signedWriteFailed'))
     }
   },
 
   decline: (onToast) => {
     set({ pending: null })
-    onToast('Your annotations are kept in Readmate but not written into the signed PDF.')
+    onToast(getT()('reader.annotations.pdfExport.signedDeclined'))
   },
 
   reset: () => set({ pending: null }),

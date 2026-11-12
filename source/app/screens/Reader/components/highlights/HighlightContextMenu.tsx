@@ -1,7 +1,7 @@
-/* i18n-pending: reader.annotations */
 import { useLayoutEffect, useRef, useState } from 'react'
 import type { ViewportRectLike } from '../../../../components/reader/renderers/epub'
 import { highlightPopoverPosition, useDismissOnOutsideOrEscape } from '../../logic'
+import { useT } from '../../../../i18n'
 
 export type HighlightContextMenuPoint = { x: number; y: number }
 
@@ -24,7 +24,6 @@ type HighlightContextMenuProps = {
   onDismiss: () => void
 }
 
-const NOT_YET = 'Not available for this format yet'
 
 const FALLBACK_SIZE = { width: 190, height: 292 }
 
@@ -45,6 +44,8 @@ export function HighlightContextMenu({
   onTranslate,
   onDismiss,
 }: HighlightContextMenuProps) {
+  const t = useT()
+  const NOT_YET = t('reader.annotations.selection.notYet')
   const containerRef = useRef<HTMLDivElement | null>(null)
   const [size, setSize] = useState(FALLBACK_SIZE)
 
@@ -81,7 +82,7 @@ export function HighlightContextMenu({
       className="fixed z-[400] flex w-[190px] flex-col gap-0.5 rounded-xl border border-lib-border bg-lib-surface-strong p-1.5 shadow-xl"
       style={{ top, left }}
       role="menu"
-      aria-label="Selection options"
+      aria-label={t('reader.annotations.selection.aria')}
       onContextMenu={(event) => {
         event.preventDefault()
         event.stopPropagation()
@@ -95,7 +96,7 @@ export function HighlightContextMenu({
         title={onHighlight ? undefined : NOT_YET}
         onClick={() => onHighlight && run(onHighlight)}
       >
-        Highlight
+        {t('reader.annotations.selection.highlight')}
       </button>
       <button
         type="button"
@@ -105,7 +106,7 @@ export function HighlightContextMenu({
         title={onUnderline ? undefined : NOT_YET}
         onClick={() => onUnderline && run(onUnderline)}
       >
-        Underline
+        {t('reader.annotations.selection.underline')}
       </button>
       <button
         type="button"
@@ -115,7 +116,7 @@ export function HighlightContextMenu({
         title={onStrikethrough ? undefined : NOT_YET}
         onClick={() => onStrikethrough && run(onStrikethrough)}
       >
-        Strikethrough
+        {t('reader.annotations.selection.strikethrough')}
       </button>
 
       <div className="my-0.5 border-t border-lib-border-soft" />
@@ -128,7 +129,7 @@ export function HighlightContextMenu({
         onClick={() => run(onTranslate)}
       >
         <span aria-hidden className="mr-1.5">🌐</span>
-        Translate
+        {t('reader.annotations.selection.translate')}
       </button>
       <button
         type="button"
@@ -139,7 +140,7 @@ export function HighlightContextMenu({
         onClick={() => onAddNote && run(onAddNote)}
       >
         <span aria-hidden className="mr-1.5">📝</span>
-        Add note
+        {t('reader.annotations.selection.addNote')}
       </button>
       <button
         type="button"
@@ -148,7 +149,7 @@ export function HighlightContextMenu({
         onClick={() => run(onBookmarkHere)}
       >
         <span aria-hidden className="mr-1.5">🔖</span>
-        Bookmark here
+        {t('reader.annotations.selection.bookmarkHere')}
       </button>
 
       <div className="my-0.5 border-t border-lib-border-soft" />
@@ -160,7 +161,7 @@ export function HighlightContextMenu({
         disabled={!selectedText}
         onClick={() => run(onCopy)}
       >
-        Copy
+        {t('reader.annotations.selection.copy')}
       </button>
       <button
         type="button"
@@ -169,7 +170,7 @@ export function HighlightContextMenu({
         disabled={!selectedText}
         onClick={() => run(onCopyWithCitation)}
       >
-        Copy with Citation
+        {t('reader.annotations.selection.copyCitation')}
       </button>
     </div>
   )

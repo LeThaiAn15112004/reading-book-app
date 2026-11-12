@@ -1,9 +1,9 @@
-/* i18n-pending: reader.annotations */
 import { type ReactNode, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import type { ReaderHighlightBase } from '@core'
 import type { ViewportRectLike } from '../../../../components/reader/renderers/epub'
 import { highlightPopoverPosition, useDismissOnOutsideOrEscape } from '../../logic'
+import { useT } from '../../../../i18n'
 
 type NoteTextboxPopupProps = {
   anchorRect: ViewportRectLike
@@ -36,10 +36,11 @@ export function NoteTextboxPopup({
   onDelete,
   onDismiss,
   conflict,
-  placeholder = 'Note…',
-  ariaLabel = 'Note',
-  discardLabel = 'Delete',
+  placeholder,
+  ariaLabel,
+  discardLabel,
 }: NoteTextboxPopupProps) {
+  const t = useT()
   const containerRef = useRef<HTMLDivElement | null>(null)
   const [draft, setDraft] = useState(highlight.note ?? '')
   const [size, setSize] = useState(FALLBACK_SIZE)
@@ -71,7 +72,7 @@ export function NoteTextboxPopup({
     <div
       ref={containerRef}
       role="dialog"
-      aria-label={ariaLabel}
+      aria-label={ariaLabel ?? t('reader.annotations.noteBox.aria')}
       className="fixed z-[400] flex w-[240px] flex-col gap-2 rounded-xl border border-lib-border bg-lib-surface-strong p-2 shadow-xl"
       style={{ top, left }}
       onContextMenu={(e) => {
@@ -90,7 +91,7 @@ export function NoteTextboxPopup({
             save()
           }
         }}
-        placeholder={placeholder}
+        placeholder={placeholder ?? t('reader.annotations.noteBox.placeholder')}
         rows={4}
         className="w-full resize-none rounded-md border border-lib-border bg-lib-bg-mid/50 p-1.5 text-[12px] text-lib-text"
       />
@@ -100,7 +101,7 @@ export function NoteTextboxPopup({
           className="h-7 flex-1 cursor-pointer rounded-md border border-lib-border bg-transparent text-[12px] font-semibold text-lib-text hover:bg-lib-surface-hover"
           onClick={save}
         >
-          Save
+          {t('common.actions.save')}
         </button>
         <button
           type="button"
@@ -110,7 +111,7 @@ export function NoteTextboxPopup({
             onDelete()
           }}
         >
-          {discardLabel}
+          {discardLabel ?? t('common.actions.delete')}
         </button>
       </div>
     </div>,

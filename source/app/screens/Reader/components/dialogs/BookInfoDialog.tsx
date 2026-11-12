@@ -1,4 +1,3 @@
-/* i18n-pending: reader.annotations */
 import { BookCover } from '../../../Library/components/book/BookCover'
 import {
   SIGNATURE_CHECKING,
@@ -6,6 +5,7 @@ import {
   SIGNATURE_UNAVAILABLE,
 } from '../../logic/bookSignature/signatureLabels'
 import { useBookSignature } from '../../logic/hooks/useBookSignature'
+import { useT } from '../../../../i18n'
 
 type BookInfoDialogProps = {
   open: boolean
@@ -26,6 +26,7 @@ export function BookInfoDialog({
   coverUrl,
   onClose,
 }: BookInfoDialogProps) {
+  const t = useT()
   const { signature, loading } = useBookSignature(bookId, open)
   if (!open) return null
 
@@ -52,7 +53,7 @@ export function BookInfoDialog({
           className="text-base font-semibold text-lib-text-strong"
           id="book-info-title"
         >
-          Book info
+          {t('reader.annotations.bookInfo.title')}
         </div>
 
         <div className="flex gap-4">
@@ -67,10 +68,10 @@ export function BookInfoDialog({
           <dl className="m-0 flex min-w-0 flex-1 flex-col gap-2.5">
             {(
               [
-                ['Title', title],
-                ['Location', chapterLabel],
-                ['Format', formatBadge],
-                ['Signature', signatureText],
+                [t('reader.annotations.bookInfo.bookTitle'), title],
+                [t('reader.annotations.bookInfo.location'), chapterLabel],
+                [t('reader.annotations.bookInfo.format'), formatBadge],
+                [t('reader.annotations.bookInfo.signature'), signatureText],
               ] as const
             ).map(([k, v]) => (
               <div key={k} className="grid grid-cols-[72px_1fr] gap-2 text-[13px]">
@@ -87,7 +88,7 @@ export function BookInfoDialog({
             type="button"
             onClick={onClose}
           >
-            Close
+            {t('common.actions.close')}
           </button>
         </div>
       </div>

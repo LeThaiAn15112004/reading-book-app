@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { overlayApi } from '../../../../bridge'
+import { getT } from '../../../../i18n'
 
 /** Derived from the bridge: the renderer never imports from electron/. */
 type ExportResult = Awaited<ReturnType<typeof overlayApi.exportAnnotatedPdf>>
@@ -16,35 +17,48 @@ type PdfExportState = {
 }
 
 function messageFor(result: ExportResult): string | null {
+  // Shown at once in a short toast, so it is translated now (spec 012).
+  const t = getT()
   if (result.ok) {
     const s = result.summary
-    const parts = s ? [`${s.added} added`, s.replaced ? `${s.replaced} updated` : '', s.removed ? `${s.removed} removed` : ''].filter(Boolean) : []
-    const skipped = result.skippedTypewriter ? ` ${result.skippedTypewriter} Typewriter note${result.skippedTypewriter === 1 ? ' was' : 's were'} left out (see its reason in Notes).` : ''
-    return `Exported “${result.fileName}”${parts.length ? ` — ${parts.join(', ')}` : ''}.${skipped}`
+    const parts = s
+      ? [
+          t('reader.annotations.pdfExport.added', { count: s.added }),
+          s.replaced ? t('reader.annotations.pdfExport.updated', { count: s.replaced }) : '',
+          s.removed ? t('reader.annotations.pdfExport.removed', { count: s.removed }) : '',
+        ].filter(Boolean)
+      : []
+    const skipped = result.skippedTypewriter
+      ? t('reader.annotations.pdfExport.skippedTypewriter', { count: result.skippedTypewriter })
+      : ''
+    const head = parts.length
+      ? t('reader.annotations.pdfExport.exportedWithSummary', { file: result.fileName ?? '', summary: parts.join(', ') })
+      : t('reader.annotations.pdfExport.exported', { file: result.fileName ?? '' })
+    return head + skipped
   }
   switch (result.errorCode) {
     case 'cancelled':
       return null
     case 'encrypted':
-      return 'This PDF is encrypted — exporting annotations into it is not supported.'
+      return t('reader.annotations.pdfExport.encrypted')
     case 'unsupported_pdf':
-      return 'This PDF’s structure is not supported for writing annotations.'
+      return t('reader.annotations.pdfExport.unsupported')
     case 'verify_failed':
-      return 'The exported file did not pass verification, so it was not saved.'
+      return t('reader.annotations.pdfExport.verifyFailed')
     case 'same_as_source':
-      return 'Choose a different file than the book itself.'
+      return t('reader.annotations.pdfExport.sameFile')
     case 'source_changed':
-      return 'The book file changed during the export. Try again.'
+      return t('reader.annotations.pdfExport.changed')
     case 'no_space':
-      return 'Not enough disk space to save the exported PDF.'
+      return t('reader.annotations.pdfExport.noSpace')
     case 'permission_denied':
-      return result.message || 'No permission to write there. Choose another folder.'
+      return result.message || t('reader.annotations.pdfExport.noPermission')
     case 'busy':
-      return 'That file is open in another app. Close it or choose another name.'
+      return t('reader.annotations.pdfExport.busy')
     case 'not_found':
-      return 'The book file could not be found.'
+      return t('reader.annotations.pdfExport.missing')
     default:
-      return 'Could not export the PDF.'
+      return t('reader.annotations.pdfExport.failed')
   }
 }
 
@@ -67,7 +81,7 @@ export const usePdfExportStore = create<PdfExportState>()((set, get) => ({
       }
       onToast(messageFor(result))
     } catch {
-      onToast('Could not export the PDF.')
+      onToast(getT()('reader.annotations.pdfExport.failed'))
     } finally {
       set({ busy: false })
     }
@@ -80,7 +94,7 @@ export const usePdfExportStore = create<PdfExportState>()((set, get) => ({
     try {
       onToast(messageFor(await overlayApi.exportAnnotatedPdf(pending.bookId, { acknowledgeSignature: true })))
     } catch {
-      onToast('Could not export the PDF.')
+      onToast(getT()('reader.annotations.pdfExport.failed'))
     } finally {
       set({ busy: false })
     }

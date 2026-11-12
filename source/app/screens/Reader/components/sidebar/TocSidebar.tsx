@@ -28,7 +28,7 @@ import {
 } from './sidebarTabs'
 import { readerChromeTopInset } from '../../../../components/reader/chrome'
 import type { MessageKey, Translator } from '@core'
-import { getFormat, getT, useT } from '../../../../i18n'
+import { getFormat, getT, uiText, useT } from '../../../../i18n'
 
 export type SidebarTab = 'chapters' | 'bookmarks' | 'highlights' | 'layout' | 'attachments' | 'transcript'
 
@@ -891,7 +891,7 @@ export function TocSidebar({
 
                 {notesFilterError ? (
                   <p className="m-0 rounded-md bg-lib-hint/70 px-2.5 py-1.5 text-[11px] text-lib-muted" role="alert">
-                    {notesFilterError}
+                    {uiText(t, notesFilterError)}
                   </p>
                 ) : null}
 

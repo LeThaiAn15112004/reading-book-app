@@ -1,4 +1,3 @@
-/* i18n-pending: reader.annotations */
 import { useState } from 'react'
 import { HexAlphaColorPicker, HexColorInput } from 'react-colorful'
 import {
@@ -7,6 +6,8 @@ import {
   withHighlightAlpha,
   type HighlightStyleKind,
 } from '@core'
+import { useT } from '../../../../i18n'
+import type { MessageKey } from '@core'
 
 type HighlightColorPickerProps = {
   value: string
@@ -41,7 +42,21 @@ const LEGACY_ALPHA: Record<HighlightStyleKind, number> = {
  * specific shade or transparency. `colorHex` round-trips as plain `#RRGGBB` for a preset pick, or
  * `#RRGGBBAA` once alpha has been touched — see `splitHighlightColor`/`withHighlightAlpha`.
  */
+const PRESET_LABELS: Readonly<Record<string, MessageKey>> = {
+  yellow: 'reader.annotations.colors.yellow',
+  blue: 'reader.annotations.colors.blue',
+  green: 'reader.annotations.colors.green',
+  pink: 'reader.annotations.colors.pink',
+  purple: 'reader.annotations.colors.purple',
+}
+
+function presetLabel(t: (key: MessageKey) => string, preset: { id: string; label: string }): string {
+  const key = PRESET_LABELS[preset.id]
+  return key ? t(key) : preset.label
+}
+
 export function HighlightColorPicker({ value, styleKind, onChange }: HighlightColorPickerProps) {
+  const t = useT()
   const [customOpen, setCustomOpen] = useState(false)
   const { hex6, alpha } = splitHighlightColor(value, LEGACY_ALPHA[styleKind])
   const pickerColor = withHighlightAlpha(hex6, alpha)
@@ -56,8 +71,8 @@ export function HighlightColorPicker({ value, styleKind, onChange }: HighlightCo
           <button
             key={preset.id}
             type="button"
-            title={preset.label}
-            aria-label={preset.label}
+            title={presetLabel(t, preset)}
+            aria-label={presetLabel(t, preset)}
             className="h-6 w-6 shrink-0 cursor-pointer rounded-full"
             style={{
               backgroundColor: preset.hex,
@@ -77,8 +92,8 @@ export function HighlightColorPicker({ value, styleKind, onChange }: HighlightCo
         ))}
         <button
           type="button"
-          title="Custom color"
-          aria-label="Custom color"
+          title={t('reader.annotations.colors.custom')}
+          aria-label={t('reader.annotations.colors.custom')}
           aria-pressed={customOpen}
           className="flex h-6 w-6 shrink-0 cursor-pointer items-center justify-center rounded-full text-[11px]"
           style={{

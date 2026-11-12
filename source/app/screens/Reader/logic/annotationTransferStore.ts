@@ -6,6 +6,7 @@ import {
   type AnnotationTransferProgressDto,
 } from '../../../bridge'
 import { annotationExportMessage } from '../../../utils/annotationTransferMessages'
+import { getT, type UiText } from '../../../i18n'
 
 /** Formats whose books carry annotations that can be exported / imported (audiobooks and the rest never do). */
 export const ANNOTATION_TRANSFER_FORMATS: readonly string[] = ['epub', 'pdf', 'txt', 'md']
@@ -30,7 +31,8 @@ export function registerAnnotationReloader(bookId: string, reload: AnnotationRel
   }
 }
 
-export type ImportFailure = { errorCode: string; message: string }
+/** `message`: Main's text or a renderer message translated when shown (spec 012). */
+export type ImportFailure = { errorCode: string; message: UiText }
 
 type AnnotationTransferState = {
   /** Annotation count of `countBookId` (what Export would write); 0 until known. */
@@ -61,7 +63,7 @@ type AnnotationTransferState = {
 }
 
 function failureOf(result: { errorCode: string; message?: string }): ImportFailure {
-  return { errorCode: result.errorCode, message: result.message || 'The annotations could not be imported.' }
+  return { errorCode: result.errorCode, message: result.message || { key: 'reader.annotations.import.failedDefault' } }
 }
 
 let unsubscribeProgress: (() => void) | null = null
@@ -112,7 +114,7 @@ export const useAnnotationTransferStore = create<AnnotationTransferState>()((set
         const shown = annotationExportMessage(await annotationTransferApi.exportRestore(bookId))
         if (shown) onToast(shown.message)
       } catch {
-        onToast('Could not export the annotations.')
+        onToast(getT()('reader.annotations.export.failed'))
       } finally {
         set({ exporting: false })
       }
@@ -125,7 +127,7 @@ export const useAnnotationTransferStore = create<AnnotationTransferState>()((set
         const shown = annotationExportMessage(await annotationTransferApi.exportReadable(bookId), 'readable copy')
         if (shown) onToast(shown.message)
       } catch {
-        onToast('Could not export the readable copy.')
+        onToast(getT()('reader.annotations.export.failedReadable'))
       } finally {
         set({ exporting: false })
       }
@@ -138,7 +140,7 @@ export const useAnnotationTransferStore = create<AnnotationTransferState>()((set
       try {
         applyPreview(await annotationTransferApi.pickFile({ bookId }), false)
       } catch {
-        set({ importFailure: { errorCode: 'write_failed', message: 'The file could not be opened.' }, preview: null })
+        set({ importFailure: { errorCode: 'write_failed', message: { key: 'reader.annotations.import.fileNotOpened' } }, preview: null })
       } finally {
         set({ picking: false })
       }
@@ -151,7 +153,7 @@ export const useAnnotationTransferStore = create<AnnotationTransferState>()((set
       try {
         applyPreview(await annotationTransferApi.setTarget(current.sessionId, bookId), true)
       } catch {
-        set({ importFailure: { errorCode: 'write_failed', message: 'The book could not be checked.' } })
+        set({ importFailure: { errorCode: 'write_failed', message: { key: 'reader.annotations.import.bookNotChecked' } } })
       } finally {
         set({ picking: false })
       }
@@ -183,10 +185,10 @@ export const useAnnotationTransferStore = create<AnnotationTransferState>()((set
           }
         }
         set({ preview: null })
-        const parts = [`${result.added} added`, `${result.present} already there`, `${result.notPlaced} could not be placed`]
-        onToast(`Imported annotations: ${parts.join(', ')}.${reloaded ? '' : ' They will show after you reopen the book.'}`)
+        const counts = { added: result.added, present: result.present, notPlaced: result.notPlaced }
+        onToast(getT()(reloaded ? 'reader.annotations.import.result' : 'reader.annotations.import.resultReopen', counts))
       } catch {
-        set({ importFailure: { errorCode: 'write_failed', message: 'The annotations could not be imported. Nothing was changed.' } })
+        set({ importFailure: { errorCode: 'write_failed', message: { key: 'reader.annotations.import.nothingChanged' } } })
       } finally {
         set({ importing: false })
       }

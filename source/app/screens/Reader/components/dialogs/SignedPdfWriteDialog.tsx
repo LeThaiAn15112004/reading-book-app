@@ -1,4 +1,4 @@
-/* i18n-pending: reader.annotations */
+import { useT } from '../../../../i18n'
 type SignedPdfWriteDialogProps = {
   open: boolean
   /** "Export" (a new file) or "Write" (the book's own file, two-way sync). */
@@ -14,6 +14,7 @@ type SignedPdfWriteDialogProps = {
  * invalid). Signature validity is never claimed to survive.
  */
 export function SignedPdfWriteDialog({ open, action, signerName, onCancel, onConfirm }: SignedPdfWriteDialogProps) {
+  const t = useT()
   if (!open) return null
   return (
     <div className="fixed inset-0 z-[250] flex items-center justify-center bg-lib-bg-deep/60 p-4 backdrop-blur-sm" onClick={onCancel}>
@@ -24,13 +25,13 @@ export function SignedPdfWriteDialog({ open, action, signerName, onCancel, onCon
         onClick={(e) => e.stopPropagation()}
       >
         <div className="text-base font-semibold text-lib-text-strong" id="signed-pdf-title">
-          This PDF is digitally signed
+          {t('reader.annotations.signed.title')}
         </div>
         <p className="m-0 border-l-[3px] border-lib-accent pl-2.5 text-sm leading-snug text-lib-muted">
-          {signerName ? `Signed by ${signerName}. ` : ''}
+          {signerName ? t('reader.annotations.signed.signedBy', { name: signerName }) : ''}
           {action === 'export'
-            ? 'The exported copy will contain your annotations as a change made after signing. PDF readers may show the signature as modified or invalid in that copy. The book file itself is not changed.'
-            : 'Writing your annotations into this file adds a change after signing. PDF readers may then show the signature as modified or invalid.'}
+            ? t('reader.annotations.signed.exportBody')
+            : t('reader.annotations.signed.writeBody')}
         </p>
         <div className="flex justify-end gap-2">
           <button
@@ -38,14 +39,14 @@ export function SignedPdfWriteDialog({ open, action, signerName, onCancel, onCon
             type="button"
             onClick={onCancel}
           >
-            Cancel
+            {t('common.actions.cancel')}
           </button>
           <button
             className="h-10 cursor-pointer rounded-lg border border-lib-accent bg-lib-accent-soft px-4 text-[13px] font-semibold text-lib-text-strong"
             type="button"
             onClick={onConfirm}
           >
-            {action === 'export' ? 'Export anyway' : 'Write anyway'}
+            {action === 'export' ? t('reader.annotations.signed.exportAnyway') : t('reader.annotations.signed.writeAnyway')}
           </button>
         </div>
       </div>

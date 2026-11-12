@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import type { HighlightStyleKind } from '@core'
+import type { UiText } from '../../../../i18n'
 
 export type NotesSortBy = 'readingOrder' | 'chronological'
 
@@ -23,7 +24,7 @@ type NotesFilterState = {
   /** Row 3 (type filter + sort) visibility — toggled by the row 2 filter icon. */
   filtersOpen: boolean
   /** Last input-validation problem, surfaced inline instead of thrown. */
-  error: string | null
+  error: UiText | null
   setSearchTerm: (value: string) => void
   setActiveType: (type: NotesTypeFilter) => void
   setSortBy: (sortBy: NotesSortBy) => void
@@ -70,13 +71,13 @@ export const useNotesFilterStore = create<NotesFilterState>()((set) => ({
       if (safe.length > MAX_SEARCH_TERM_LENGTH) {
         set({
           searchTerm: safe.slice(0, MAX_SEARCH_TERM_LENGTH),
-          error: `Search term truncated to ${MAX_SEARCH_TERM_LENGTH} characters.`,
+          error: { key: 'reader.annotations.store.searchTruncated', params: { max: MAX_SEARCH_TERM_LENGTH } },
         })
         return
       }
       set({ searchTerm: safe, error: null })
     } catch {
-      set({ error: 'Could not update the search field.' })
+      set({ error: { key: 'reader.annotations.store.searchFailed' } })
     }
   },
 

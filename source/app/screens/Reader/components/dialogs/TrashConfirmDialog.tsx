@@ -1,4 +1,4 @@
-/* i18n-pending: reader.annotations */
+import { useT } from '../../../../i18n'
 type TrashConfirmDialogProps = {
   open: boolean
   bookTitle: string
@@ -12,6 +12,7 @@ export function TrashConfirmDialog({
   onCancel,
   onConfirm,
 }: TrashConfirmDialogProps) {
+  const t = useT()
   if (!open) return null
 
   return (
@@ -26,11 +27,10 @@ export function TrashConfirmDialog({
         onClick={(e) => e.stopPropagation()}
       >
         <div className="text-base font-semibold text-lib-text-strong" id="trash-title">
-          Move to trash?
+          {t('reader.annotations.trash.title')}
         </div>
         <p className="m-0 border-l-[3px] border-lib-accent pl-2.5 text-sm leading-snug text-lib-muted">
-          “{bookTitle}” and its local annotations will be removed in a later
-          phase. This is a UI confirm only.
+          {t('reader.annotations.trash.body', { title: bookTitle })}
         </p>
         <div className="flex justify-end gap-2">
           <button
@@ -38,14 +38,14 @@ export function TrashConfirmDialog({
             type="button"
             onClick={onCancel}
           >
-            Cancel
+            {t('common.actions.cancel')}
           </button>
           <button
             className="h-10 cursor-pointer rounded-lg border border-red-400/45 bg-red-400/15 px-4 text-[13px] font-semibold text-red-400"
             type="button"
             onClick={onConfirm}
           >
-            Move to trash
+            {t('reader.annotations.trash.confirm')}
           </button>
         </div>
       </div>

@@ -1,4 +1,3 @@
-/* i18n-pending: reader.annotations */
 import { type ReactNode, useLayoutEffect, useRef, useState } from 'react'
 import { HIGHLIGHT_TAG_PRESETS, type ReaderHighlightBase } from '@core'
 import type { ViewportRectLike } from '../../../../components/reader/renderers/epub'
@@ -7,6 +6,7 @@ import {
   useDismissOnOutsideOrEscape,
 } from '../../logic'
 import { HighlightColorPicker } from './HighlightColorPicker'
+import { useT } from '../../../../i18n'
 
 type HighlightEditPopupProps = {
   anchorRect: ViewportRectLike
@@ -38,6 +38,7 @@ export function HighlightEditPopup({
   onClose,
   conflict,
 }: HighlightEditPopupProps) {
+  const t = useT()
   const containerRef = useRef<HTMLDivElement | null>(null)
   const [size, setSize] = useState(FALLBACK_SIZE)
   const [noteDraft, setNoteDraft] = useState(highlight.note ?? '')
@@ -82,7 +83,7 @@ export function HighlightEditPopup({
       className="fixed z-[400] flex w-[260px] flex-col gap-3 rounded-xl border border-lib-border bg-lib-surface-strong p-3 shadow-xl"
       style={{ top, left }}
       role="dialog"
-      aria-label="Edit highlight"
+      aria-label={t('reader.annotations.edit.aria')}
     >
       {conflict}
       <div className="flex items-start gap-1.5">
@@ -93,20 +94,22 @@ export function HighlightEditPopup({
         />
         <button
           type="button"
-          title="Toggle underline"
+          title={t('reader.annotations.edit.toggleUnderline')}
           aria-pressed={highlight.styleKind === 'underline'}
           className="ml-1 flex h-6 w-6 shrink-0 cursor-pointer items-center justify-center rounded-md border border-lib-border text-[12px] font-bold text-lib-text underline"
           onClick={() => onToggleUnderline(highlight.styleKind !== 'underline')}
         >
+          {/* i18n-ignore: glyph of the underline toggle */}
           U
         </button>
         <button
           type="button"
-          title="Toggle strikethrough"
+          title={t('reader.annotations.edit.toggleStrikethrough')}
           aria-pressed={highlight.styleKind === 'strikethrough'}
           className="flex h-6 w-6 shrink-0 cursor-pointer items-center justify-center rounded-md border border-lib-border text-[12px] font-bold text-lib-text line-through"
           onClick={() => onToggleStrikethrough(highlight.styleKind !== 'strikethrough')}
         >
+          {/* i18n-ignore: glyph of the strikethrough toggle */}
           S
         </button>
       </div>
@@ -119,10 +122,10 @@ export function HighlightEditPopup({
         }}
         placeholder={
           highlight.styleKind === 'replace'
-            ? 'Replace with…'
+            ? t('reader.annotations.edit.replaceWith')
             : highlight.styleKind === 'insert'
-              ? 'Text to insert…'
-              : 'Add a note…'
+              ? t('reader.annotations.edit.textToInsert')
+              : t('reader.annotations.edit.addNote')
         }
         rows={3}
         className="w-full resize-none rounded-md border border-lib-border bg-lib-bg-mid/50 p-2 text-[12px] text-lib-text"
@@ -138,7 +141,7 @@ export function HighlightEditPopup({
               {tag}
               <button
                 type="button"
-                aria-label={`Remove tag ${tag}`}
+                aria-label={t('reader.annotations.edit.removeTag', { tag })}
                 className="cursor-pointer text-lib-muted"
                 onClick={() => removeTag(tag)}
               >
@@ -170,7 +173,7 @@ export function HighlightEditPopup({
               setTagDraft('')
             }
           }}
-          placeholder="Add a tag…"
+          placeholder={t('reader.annotations.edit.addTag')}
           className="h-7 w-full rounded-md border border-lib-border bg-lib-bg-mid/50 px-2 text-[12px] text-lib-text"
         />
       </div>
@@ -180,14 +183,14 @@ export function HighlightEditPopup({
         className="w-full cursor-pointer rounded-lg border border-lib-border px-3 py-1.5 text-[12px] font-semibold text-lib-text"
         onClick={onCopy}
       >
-        Copy
+        {t('reader.annotations.edit.copy')}
       </button>
       <button
         type="button"
         className="w-full cursor-pointer rounded-lg border border-red-400/45 bg-red-400/15 px-3 py-1.5 text-[12px] font-semibold text-red-400"
         onClick={onDelete}
       >
-        Delete highlight
+        {t('reader.annotations.edit.deleteHighlight')}
       </button>
     </div>
   )

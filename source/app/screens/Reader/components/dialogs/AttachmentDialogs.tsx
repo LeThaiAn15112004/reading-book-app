@@ -1,4 +1,4 @@
-/* i18n-pending: reader.annotations */
+import { useT } from '../../../../i18n'
 const OVERLAY =
   'fixed inset-0 z-[250] flex items-center justify-center bg-lib-bg-deep/60 p-4 backdrop-blur-sm'
 const CARD =
@@ -19,6 +19,7 @@ type AttachmentOpenDialogProps = {
  * to extract and open the file (and Main may still refuse it by policy).
  */
 export function AttachmentOpenDialog({ fileName, onCancel, onContinue }: AttachmentOpenDialogProps) {
+  const t = useT()
   if (fileName === null) return null
   return (
     <div className={OVERLAY} onClick={onCancel}>
@@ -30,22 +31,21 @@ export function AttachmentOpenDialog({ fileName, onCancel, onContinue }: Attachm
         onClick={(e) => e.stopPropagation()}
       >
         <div className="text-base font-semibold text-lib-text-strong" id="attachment-open-title">
-          Open attachment?
+          {t('reader.annotations.attachment.openTitle')}
         </div>
         <p className="m-0 break-all text-sm font-semibold text-lib-text">{fileName}</p>
         <p
           className="m-0 border-l-[3px] border-lib-accent pl-2.5 text-sm leading-snug text-lib-muted"
           id="attachment-open-body"
         >
-          Files embedded in a document can contain unsafe content. Only continue if you trust where this
-          document came from. The file will open in the application your system uses for this file type.
+          {t('reader.annotations.attachment.openBody')}
         </p>
         <div className="flex justify-end gap-2">
           <button className={SECONDARY} type="button" onClick={onCancel}>
-            Cancel
+            {t('common.actions.cancel')}
           </button>
           <button className={PRIMARY} type="button" autoFocus onClick={onContinue}>
-            Continue
+            {t('reader.annotations.attachment.continue')}
           </button>
         </div>
       </div>
@@ -63,6 +63,7 @@ type AttachmentBlockedDialogProps = {
 
 /** The file's type is on the do-not-launch list: the only way forward is an explicit Save As. */
 export function AttachmentBlockedDialog({ fileName, reason, busy, onSaveAs, onClose }: AttachmentBlockedDialogProps) {
+  const t = useT()
   if (fileName === null) return null
   return (
     <div className={OVERLAY} onClick={onClose}>
@@ -73,18 +74,18 @@ export function AttachmentBlockedDialog({ fileName, reason, busy, onSaveAs, onCl
         onClick={(e) => e.stopPropagation()}
       >
         <div className="text-base font-semibold text-lib-text-strong" id="attachment-blocked-title">
-          Readmate can’t open this file
+          {t('reader.annotations.attachment.blockedTitle')}
         </div>
         <p className="m-0 break-all text-sm font-semibold text-lib-text">{fileName}</p>
         <p className="m-0 border-l-[3px] border-lib-accent pl-2.5 text-sm leading-snug text-lib-muted">
-          {reason} You can save a copy and decide what to do with it yourself.
+          {t('reader.annotations.attachment.blockedBody', { reason })}
         </p>
         <div className="flex justify-end gap-2">
           <button className={SECONDARY} type="button" autoFocus onClick={onClose}>
-            Close
+            {t('common.actions.close')}
           </button>
           <button className={SECONDARY} type="button" disabled={busy} onClick={onSaveAs}>
-            Save As…
+            {t('reader.annotations.attachment.saveAs')}
           </button>
         </div>
       </div>

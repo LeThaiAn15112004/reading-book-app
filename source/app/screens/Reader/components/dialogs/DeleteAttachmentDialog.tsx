@@ -1,5 +1,5 @@
-/* i18n-pending: reader.annotations */
 import type { PdfAttachmentPin } from '../../../../components/reader/renderers/pdf'
+import { useT } from '../../../../i18n'
 
 const OVERLAY =
   'fixed inset-0 z-[250] flex items-center justify-center bg-lib-bg-deep/60 p-4 backdrop-blur-sm'
@@ -22,6 +22,7 @@ type DeleteAttachmentDialogProps = {
  * versions and the PDF does not get smaller. Cancel does nothing; Delete removes the icon from the page.
  */
 export function DeleteAttachmentDialog({ pin, busy, onCancel, onDelete }: DeleteAttachmentDialogProps) {
+  const t = useT()
   if (!pin) return null
   return (
     <div className={OVERLAY} onClick={onCancel}>
@@ -40,19 +41,18 @@ export function DeleteAttachmentDialog({ pin, busy, onCancel, onDelete }: Delete
         }}
       >
         <div className="text-base font-semibold text-lib-text-strong" id="attachment-delete-title">
-          Delete attachment?
+          {t('reader.annotations.attachment.deleteTitle')}
         </div>
         <p className="m-0 break-all text-sm font-semibold text-lib-text">{pin.name}</p>
         <p className="m-0 border-l-[3px] border-lib-accent pl-2.5 text-sm leading-snug text-lib-muted" id="attachment-delete-body">
-          The attachment is removed from page {pin.pageIndex + 1}, and other PDF readers will no longer show it. The file
-          itself stays inside the PDF’s earlier versions, so the PDF does not get smaller.
+          {t('reader.annotations.attachment.deleteBody', { page: pin.pageIndex + 1 })}
         </p>
         <div className="flex justify-end gap-2">
           <button className={SECONDARY} type="button" autoFocus onClick={onCancel}>
-            Cancel
+            {t('common.actions.cancel')}
           </button>
           <button className={DANGER} type="button" disabled={busy} onClick={onDelete}>
-            Delete
+            {t('common.actions.delete')}
           </button>
         </div>
       </div>

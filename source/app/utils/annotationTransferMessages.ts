@@ -1,10 +1,19 @@
 import type { AnnotationExportResult } from '../bridge'
+import { getT } from '../i18n'
 
 /** Toast text for the result of an annotation export; null when nothing should be shown (the user cancelled). */
-export function annotationExportMessage(result: AnnotationExportResult, what = 'annotation'): { message: string; variant: 'success' | 'error' | 'info' } | null {
+export function annotationExportMessage(
+  result: AnnotationExportResult,
+  what: 'annotation' | 'readable copy' = 'annotation',
+): { message: string; variant: 'success' | 'error' | 'info' } | null {
+  // Shown at once in a short toast, so it is translated now (spec 012).
+  const t = getT()
   if (result.ok) {
     return {
-      message: what === 'annotation' ? `Exported ${result.exported} annotation${result.exported === 1 ? '' : 's'}.` : `Saved the ${what} (${result.exported} annotation${result.exported === 1 ? '' : 's'}).`,
+      message:
+        what === 'annotation'
+          ? t('reader.annotations.export.exported', { count: result.exported })
+          : t('reader.annotations.export.savedReadable', { count: result.exported }),
       variant: 'success',
     }
   }
@@ -12,10 +21,15 @@ export function annotationExportMessage(result: AnnotationExportResult, what = '
     case 'cancelled':
       return null
     case 'empty':
-      return { message: 'This book has no annotations to export.', variant: 'info' }
+      return { message: t('reader.annotations.export.empty'), variant: 'info' }
     case 'not_found':
-      return { message: 'This book cannot be exported.', variant: 'error' }
+      return { message: t('reader.annotations.export.notFound'), variant: 'error' }
     default:
-      return { message: result.message || (what === 'annotation' ? 'Could not export the annotations.' : `Could not export the ${what}.`), variant: 'error' }
+      return {
+        message:
+          result.message ||
+          (what === 'annotation' ? t('reader.annotations.export.failed') : t('reader.annotations.export.failedReadable')),
+        variant: 'error',
+      }
   }
 }

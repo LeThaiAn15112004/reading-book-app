@@ -26,6 +26,7 @@ import type {
   EpubSelectionInfo,
   ViewportRectLike,
 } from '../../../../components/reader/renderers/epub'
+import { getT } from '../../../../i18n'
 
 export type ActiveHighlight = { highlight: ReaderHighlight; rect: ViewportRectLike }
 
@@ -211,7 +212,7 @@ export const useHighlightsStore = create<HighlightsStoreState>()((set, get) => (
           .filter((h): h is ReaderHighlight => h != null),
       })
     } catch {
-      if (get().bookId === bookId) onToast('Could not load highlights.')
+      if (get().bookId === bookId) onToast(getT()('reader.annotations.store.loadFailed'))
     }
   },
 
@@ -343,11 +344,11 @@ export const useHighlightsStore = create<HighlightsStoreState>()((set, get) => (
       .then((saved) => {
         if (saved) return
         removeHighlightRow(set, highlight.id)
-        onToast('Could not save highlight.')
+        onToast(getT()('reader.annotations.store.saveFailed'))
       })
       .catch(() => {
         removeHighlightRow(set, highlight.id)
-        onToast('Could not save highlight.')
+        onToast(getT()('reader.annotations.store.saveFailed'))
       })
   },
 
@@ -398,7 +399,7 @@ export const useHighlightsStore = create<HighlightsStoreState>()((set, get) => (
         styleKind: current.styleKind,
         colorHex: current.colorHex,
       })
-      onToast('Could not delete highlight.')
+      onToast(getT()('reader.annotations.store.deleteFailed'))
     }
 
     void overlayApi
@@ -509,9 +510,9 @@ function persistHighlight(get: Get, next: ReaderHighlight): void {
       createdAt: next.createdAt,
     })
     .then((saved) => {
-      if (!saved) onToast('Could not update highlight.')
+      if (!saved) onToast(getT()('reader.annotations.store.updateFailed'))
     })
-    .catch(() => onToast('Could not update highlight.'))
+    .catch(() => onToast(getT()('reader.annotations.store.updateFailed')))
 }
 
 /**
@@ -547,7 +548,7 @@ function historyHandlers(get: Get, set: Set) {
       if (current) get().epubApiRef?.current?.removeHighlight(current.cfiRange, current.styleKind)
       const { bookId, onToast } = get()
       if (!bookId) return
-      void overlayApi.deleteHighlight({ bookId, id }).catch(() => onToast('Could not undo.'))
+      void overlayApi.deleteHighlight({ bookId, id }).catch(() => onToast(getT()('reader.annotations.store.undoFailed')))
     },
   }
 }
