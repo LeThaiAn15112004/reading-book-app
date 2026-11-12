@@ -29,6 +29,7 @@ export {
   formatDate,
   formatDateTime,
   formatDuration,
+  formatLanguageName,
   formatNumber,
   formatPercent,
 } from './format.js'

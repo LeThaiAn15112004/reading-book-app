@@ -93,6 +93,14 @@ export const vi = {
     signature: 'Chữ ký số',
   },
   import: {
+    reasons: {
+      notFoundOnce: 'không tìm thấy đúng một lần đoạn văn của nó trong ấn bản này',
+      noQuote: 'không có đoạn trích để đối chiếu',
+      otherEdition: 'là ấn bản khác của sách',
+      pageBeyondEnd: 'trang nằm ngoài số trang của tài liệu đích',
+      attachment: 'không nhập tệp đính kèm',
+      damaged: 'chú thích trong tệp bị hỏng',
+    },
     title: 'Nhập chú thích',
     otherBook: 'Hoặc chọn sách khác:',
     selectBook: 'Chọn một cuốn sách…',
@@ -151,6 +159,7 @@ export const vi = {
   },
   store: {
     loadFailed: 'Không tải được tô sáng.',
+    locationNotFound: 'Không tìm thấy vị trí của đoạn tô sáng này trong sách.',
     saveFailed: 'Không lưu được tô sáng.',
     deleteFailed: 'Không xóa được tô sáng.',
     updateFailed: 'Không cập nhật được tô sáng.',

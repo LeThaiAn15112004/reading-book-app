@@ -18,6 +18,7 @@ import { GoogleDriveLibraryAdapter, type FileSystemScanner } from './google-driv
 import { DropboxLibraryAdapter } from './dropbox-adapter.js';
 import { OneDriveLibraryAdapter } from './onedrive-adapter.js';
 import type { ExternalLibraryProviderAdapter } from './types.js';
+import { tConnector } from './connector-language.js';
 
 function createStoredConfig(options?: LinkLibraryOptions): ExternalLibraryInfo['config'] {
   return {
@@ -78,7 +79,7 @@ export class CompositeExternalLibraryConnector implements ExternalLibraryConnect
   ): Promise<ExternalLibraryInfo> {
     const adapter = this.adapters.get(provider);
     if (!adapter) {
-      throw new Error(`Provider không được hỗ trợ: ${provider}`);
+      throw new Error(tConnector('appHooks.cloud.connection.unsupported', { provider }));
     }
 
     // Verify connection / path
@@ -160,7 +161,7 @@ export class CompositeExternalLibraryConnector implements ExternalLibraryConnect
     if (!adapter) {
       return {
         success: false,
-        message: `Provider không được hỗ trợ: ${provider}`,
+        message: tConnector('appHooks.cloud.connection.unsupported', { provider }),
       };
     }
     return adapter.testConnection(options);

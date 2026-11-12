@@ -248,7 +248,7 @@ export function createSpeechProcessHost(options: SpeechProcessHostOptions) {
             } catch {
               alive = false
             }
-            if (!alive) fail('The speech process is no longer running', 'process-exit')
+            if (!alive) fail('The speech process is no longer running', 'process-exit') // i18n-ignore: diagnostic with a code
           }, livenessIntervalMs)
         }
         // structured clone copies the samples; the caller keeps its buffer

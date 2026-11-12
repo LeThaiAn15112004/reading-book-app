@@ -1,3 +1,4 @@
+// i18n-ignore-file: English language names; the picker shows each with its native name (spec 012)
 /**
  * Languages the translation UI offers, and which model translates a given pair.
  *

@@ -187,7 +187,7 @@ await check('every Main-owned dialog title / filter name comes from the catalogu
     const source = fs.readFileSync(new URL(`../../ipc/${name}.ipc.ts`, import.meta.url), 'utf8')
     const keys = [...source.matchAll(/tMain\('(main\.shell\.dialogs\.[A-Za-z]+)'/g)].map((m) => m[1])
     assert.ok(keys.length > 0, `${name}.ipc.ts has no catalogue dialog text`)
-    assert.doesNotMatch(source, /(title|name|buttonLabel): '[A-Z][a-z]/, `${name}.ipc.ts still has an English dialog literal`)
+    assert.doesNotMatch(source, /\b(title|name|buttonLabel): '[A-Z][a-z]/, `${name}.ipc.ts still has an English dialog literal`)
     let translated = 0 // format names ("Markdown (*.md)") may read the same; titles may not
     for (const key of keys) {
       i18n.handleSetUiLanguage('en')

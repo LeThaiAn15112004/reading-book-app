@@ -8,6 +8,8 @@ import type {
   LinkLibraryOptions,
 } from '@core';
 import { CompositeExternalLibraryConnector } from '../../platforms/electron/host-adapters/external-libraries/composite-connector.js';
+import { setConnectorLanguage } from '../../platforms/electron/host-adapters/external-libraries/connector-language.js';
+import { getUiLanguage, useUiLanguage } from '../../i18n';
 import {
   getAllExternalLibrariesStatus,
   linkExternalLibrary,
@@ -20,6 +22,7 @@ let defaultConnectorInstance: ExternalLibraryConnector | null = null;
 
 function getSharedConnector(): ExternalLibraryConnector {
   if (!defaultConnectorInstance) {
+    setConnectorLanguage(getUiLanguage());
     defaultConnectorInstance = new CompositeExternalLibraryConnector();
   }
   return defaultConnectorInstance;
@@ -32,10 +35,13 @@ export interface UseLinkedLibrariesOptions {
 
 export function useLinkedLibraries(options?: UseLinkedLibrariesOptions) {
   const connector = options?.connector ?? getSharedConnector();
+  // Connection messages are built in the interface language (spec 012).
+  const uiLanguage = useUiLanguage();
+  useEffect(() => setConnectorLanguage(uiLanguage), [uiLanguage]);
   const [providers, setProviders] = useState<Record<ExternalLibraryProvider, ExternalLibraryInfo>>({
     google_drive: {
       provider: 'google_drive',
-      name: 'Google Drive',
+      name: 'Google Drive', // i18n-ignore: product name
       status: 'unlinked',
       config: { apiKey: 'xxx' },
     },
@@ -47,7 +53,7 @@ export function useLinkedLibraries(options?: UseLinkedLibrariesOptions) {
     },
     onedrive: {
       provider: 'onedrive',
-      name: 'Microsoft OneDrive',
+      name: 'Microsoft OneDrive', // i18n-ignore: product name
       status: 'unlinked',
       config: { apiKey: 'xxx' },
     },

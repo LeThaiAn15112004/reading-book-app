@@ -141,7 +141,7 @@ class StartError extends Error {
   }
 }
 
-const FEATURE_DISABLED_MESSAGE = 'Audiobook transcription is not available in this version of the app yet.'
+const FEATURE_DISABLED_MESSAGE = 'Audiobook transcription is not available in this version of the app yet.' // i18n-ignore: the renderer shows FEATURE_DISABLED by code
 
 function decoderUnavailableMessage(availability: Extract<DecoderAvailability, { available: false }>): string {
   return `The audio decoder is not available on this system (${availability.reason}${availability.detail ? `: ${availability.detail}` : ''})`
@@ -668,7 +668,7 @@ export function createTranscriptionService(options: TranscriptionServiceOptions)
    */
   async function removeModel(modelId: unknown): Promise<RemoveModelResult> {
     if (typeof modelId !== 'string' || !models.catalog.some((model) => model.id === modelId)) {
-      return { ok: false, errorCode: 'not_found', errorMessage: 'Unknown speech model.' }
+      return { ok: false, errorCode: 'not_found', errorMessage: 'Unknown speech model.' } // i18n-ignore: invalid request from the renderer
     }
     if (isBusy() || !speech.stop()) {
       return { ok: false, errorCode: 'busy', errorMessage: tMain('main.messages.transcription.inProgress') }

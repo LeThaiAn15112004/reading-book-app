@@ -1,3 +1,4 @@
+import { tConnector } from '../../external-libraries/connector-language.js';
 import {
   GOOGLE_DRIVE_API_BASE,
   GOOGLE_DRIVE_SUPPORTED_BOOK_EXTENSIONS,
@@ -241,7 +242,7 @@ export class GoogleDriveSyncService {
             const change: GoogleDriveFileChange = {
               type: 'deleted',
               fileId,
-              name: rawChange.file?.name ?? 'Unknown File',
+              name: rawChange.file?.name ?? tConnector('appHooks.cloud.connection.unknownFile'),
               formatHint: undefined,
             };
             changes.push(change);

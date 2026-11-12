@@ -39,7 +39,7 @@ export interface TranscriptionModelSpec {
 export const TRANSCRIPTION_MODELS: readonly TranscriptionModelSpec[] = [
   {
     id: 'whisper-tiny',
-    label: 'Fast (smallest, least accurate)',
+    label: 'Fast (smallest, least accurate)', // i18n-ignore: fallback; the UI labels models by id
     repo: 'onnx-community/whisper-tiny',
     revision: 'ff4177021cc41f7db950912b73ea4fdf7d01d8e7',
     dtype: 'q8',
@@ -73,7 +73,7 @@ export const TRANSCRIPTION_MODELS: readonly TranscriptionModelSpec[] = [
   },
   {
     id: 'whisper-small',
-    label: 'Best quality (largest, slowest)',
+    label: 'Best quality (largest, slowest)', // i18n-ignore: fallback; the UI labels models by id
     repo: 'onnx-community/whisper-small',
     revision: '36050c46d777d46dc4b5f43f6d90574fc38f8732',
     dtype: 'q8',

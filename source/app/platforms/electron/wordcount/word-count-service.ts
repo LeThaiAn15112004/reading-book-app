@@ -17,7 +17,7 @@ import { tMain } from '../i18n/main-translate'
  */
 export async function getWordCountStats(bookId: string): Promise<WordCountStatsDto> {
   const id = bookId.trim()
-  if (!id) return { state: 'error', message: 'Missing book id.' }
+  if (!id) return { state: 'error', message: 'Missing book id.' } // i18n-ignore: invalid request from the renderer
 
   const db = getDatabase()
   let stats = readBookChunkStats(db, id)

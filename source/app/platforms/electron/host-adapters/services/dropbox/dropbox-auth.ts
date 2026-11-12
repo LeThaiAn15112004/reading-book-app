@@ -242,7 +242,7 @@ export class DropboxAuthService {
 
     if (!tokenToUse) {
       throw new Error(
-        'Dropbox Refresh Error: No refresh token available. User must re-authenticate.',
+        'Dropbox Refresh Error: No refresh token available. User must re-authenticate.', // i18n-ignore: thrown diagnostic
       );
     }
 

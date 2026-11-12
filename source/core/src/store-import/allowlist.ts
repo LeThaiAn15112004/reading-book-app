@@ -32,7 +32,7 @@ export const STORE_IMPORT_ALLOWLIST: readonly StoreImportAllowEntry[] = [
   { name: 'background-prefs.json', kind: 'file', what: 'System Tray / Run in Background preferences' },
   { name: 'notification-prefs.json', kind: 'file', what: 'notification + reading reminder preferences' },
   { name: 'reading-reminder-state.json', kind: 'file', what: 'reading reminder state' },
-  { name: 'Local Storage', kind: 'dir', what: 'renderer preferences (Appearance, Library browse, reading defaults …)' },
+  { name: 'Local Storage', kind: 'dir', what: 'renderer preferences (Appearance, Library browse, reading defaults …)' }, // i18n-ignore: Chromium folder name
 ]
 
 /** Never copied, with the reason (anything not in the allowlist is skipped too). */

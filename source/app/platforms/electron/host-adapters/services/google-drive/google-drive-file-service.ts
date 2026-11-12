@@ -1,3 +1,4 @@
+import { tConnector } from '../../external-libraries/connector-language.js';
 import {
   GOOGLE_DRIVE_API_BASE,
   GOOGLE_DRIVE_SUPPORTED_BOOK_EXTENSIONS,
@@ -326,7 +327,7 @@ export class GoogleDriveFileService {
     const data = (await response.json()) as DriveApiFolderListResponse;
     return (data.files ?? []).map((f) => ({
       id: f.id ?? '',
-      name: f.name ?? 'Untitled Folder',
+      name: f.name ?? tConnector('appHooks.cloud.connection.untitledFolder'),
       mimeType: 'application/vnd.google-apps.folder' as const,
       parents: f.parents,
     }));

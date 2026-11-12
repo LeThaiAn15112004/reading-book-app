@@ -9,6 +9,8 @@ import { isConsistentTxtHighlight, parseTxtAnnotation } from '../txt/txt-annotat
 import { isConsistentMdHighlight, parseMdAnnotation } from '../md/md-annotations.js'
 import { contentKeyOf } from './content-key.js'
 import { anchorByQuote } from './quote-match.js'
+import { translate, type MessageKey } from '../i18n/translate.js'
+import type { UiLanguage } from '../i18n/types.js'
 import type { AnnotationFile, RejectedAnnotation, TransferAnnotation, TransferAnnotationType } from './file-format.js'
 
 /** An annotation ready to be written to the target book. Payloads are the re-validated (normalised) ones. */
@@ -91,6 +93,8 @@ export function decidePlacement(file: Pick<AnnotationFile, 'book' | 'txt'>, targ
 
 export interface PlanImportInput {
   file: AnnotationFile
+  /** Language of the `notPlaced` reasons (spec 012); `en` when omitted. */
+  lang?: UiLanguage
   /** Annotations of the file that failed validation while parsing. */
   rejected: readonly RejectedAnnotation[]
   /** Content keys of the target's current annotations (`contentKeyOfNote`). */
@@ -146,12 +150,28 @@ function validatePayload(a: TransferAnnotation, format: AnnotationFile['book']['
   }
   const parsed = parseMdAnnotation(a.mdAnnotation)
   if (!parsed) return { ok: false, reason: 'invalid Markdown anchor' }
-  if (!isConsistentMdHighlight(a.locator, parsed)) return { ok: false, reason: 'Markdown location does not match its anchor' }
+  if (!isConsistentMdHighlight(a.locator, parsed)) return { ok: false, reason: 'Markdown location does not match its anchor' } // i18n-ignore: English detail; other languages show reasons.damaged
   return { ok: true, payloads: { mdAnnotation: parsed } }
+}
+
+/** English reasons the user can act on, by key; any other reason is a validation detail of a damaged entry. */
+const REASON_KEYS: Readonly<Record<string, MessageKey>> = {
+  'its text was not found exactly once in this edition': 'reader.annotations.import.reasons.notFoundOnce',
+  'it has no quote to match': 'reader.annotations.import.reasons.noQuote',
+  'different edition of the book': 'reader.annotations.import.reasons.otherEdition',
+  'page is beyond the end of the target document': 'reader.annotations.import.reasons.pageBeyondEnd',
+  'file attachments are not imported': 'reader.annotations.import.reasons.attachment',
+}
+
+/** The reason in `lang`: English stays as written (with its technical detail); other languages get the translation. */
+function reasonIn(lang: UiLanguage, reason: string): string {
+  if (lang === 'en') return reason
+  return translate(lang, REASON_KEYS[reason] ?? 'reader.annotations.import.reasons.damaged')
 }
 
 export function planImport(input: PlanImportInput): ImportPlan {
   const { file } = input
+  const lang = input.lang ?? 'en'
   const plan: ImportPlan = { toAdd: [], present: 0, notPlaced: input.rejected.map((r) => ({ type: r.type, quote: r.quote, reason: r.reason })) }
   const seen = new Set<string>(input.existingKeys)
   const usedIds = new Set<string>()
@@ -225,5 +245,6 @@ export function planImport(input: PlanImportInput): ImportPlan {
     if (a.tags) add.tags = a.tags
     plan.toAdd.push(add)
   }
+  if (lang !== 'en') plan.notPlaced = plan.notPlaced.map((n) => ({ ...n, reason: reasonIn(lang, n.reason) }))
   return plan
 }

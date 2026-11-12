@@ -169,7 +169,7 @@ export function isTrivialSectionStartCfi(cfi: string): boolean {
 function isStartContainerLog(args: unknown[]): boolean {
   return (
     typeof args[0] === 'string' &&
-    args[0].startsWith('No startContainer found')
+    args[0].startsWith('No startContainer found') // i18n-ignore: a library warning matched by text
   )
 }
 

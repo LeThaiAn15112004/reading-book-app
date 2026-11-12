@@ -5,6 +5,7 @@ import {
   formatDate,
   formatDateTime,
   formatDuration,
+  formatLanguageName,
   formatNumber,
   formatPercent,
   type MessageRef,
@@ -42,6 +43,8 @@ export type BoundFormat = {
   percent: (ratio0to1: number) => string
   bytes: (bytes: number) => string
   duration: (seconds: number, style: 'clock' | 'long') => string
+  /** A language's name in the interface language; `fallback` = its English name. */
+  languageName: (code: string, fallback: string) => string
 }
 
 function bindFormat(language: UiLanguage): BoundFormat {
@@ -52,6 +55,7 @@ function bindFormat(language: UiLanguage): BoundFormat {
     percent: (ratio) => formatPercent(language, ratio),
     bytes: (bytes) => formatBytes(language, bytes),
     duration: (seconds, style) => formatDuration(language, seconds, style),
+    languageName: (code, fallback) => formatLanguageName(language, code, fallback),
   }
 }
 

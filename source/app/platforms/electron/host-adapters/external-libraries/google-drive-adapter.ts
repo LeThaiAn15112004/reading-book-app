@@ -5,6 +5,7 @@ import type {
   LinkLibraryOptions,
 } from '../../../../../core/src/domain-ports/index.js';
 import type { ExternalLibraryProviderAdapter } from './types.js';
+import { tConnector } from './connector-language.js';
 import {
   GoogleDriveAuthService,
   GoogleDriveFileService,
@@ -113,7 +114,7 @@ export class GoogleDriveLibraryAdapter implements ExternalLibraryProviderAdapter
         const result = await this.fileService.listFiles(token, { pageSize: 1 });
         return {
           success: true,
-          message: `Google Drive connected successfully. Found ${result.entries.length} book file(s) on first page.`,
+          message: tConnector('appHooks.cloud.connection.connected', { provider: 'Google Drive', count: result.entries.length }),
           itemCount: result.entries.length,
         };
       } catch (err: unknown) {
@@ -121,7 +122,7 @@ export class GoogleDriveLibraryAdapter implements ExternalLibraryProviderAdapter
         console.error('[GoogleDriveAdapter] testConnection failed:', err);
         return {
           success: false,
-          message: `Google Drive connection failed: ${msg}`,
+          message: tConnector('appHooks.cloud.connection.failed', { provider: 'Google Drive', error: msg }),
         };
       }
     }
@@ -130,13 +131,13 @@ export class GoogleDriveLibraryAdapter implements ExternalLibraryProviderAdapter
     if (options?.folderPath && this.fileScanner) {
       return {
         success: true,
-        message: `Connected to local Google Drive folder: ${options.folderPath}`,
+        message: tConnector('appHooks.cloud.connection.folderLinked', { provider: 'Google Drive', path: options.folderPath }),
       };
     }
 
     return {
       success: false,
-      message: 'Not connected. Sign in with Google Drive, or provide a local synced folder path.',
+      message: tConnector('appHooks.cloud.connection.notConnected', { provider: 'Google Drive' }),
     };
   }
 
@@ -164,7 +165,7 @@ export class GoogleDriveLibraryAdapter implements ExternalLibraryProviderAdapter
           { folderId, query, error: err },
         );
         const msg = err instanceof Error ? err.message : String(err);
-        throw new Error(`Google Drive sync failed: ${msg}`);
+        throw new Error(tConnector('appHooks.cloud.connection.syncFailed', { provider: 'Google Drive', error: msg }));
       }
     }
 
@@ -197,7 +198,7 @@ export class GoogleDriveLibraryAdapter implements ExternalLibraryProviderAdapter
     }
 
     throw new Error(
-      'Google Drive is not connected. Connect first, or provide a local synced folder path.',
+      tConnector('appHooks.cloud.connection.notConnected', { provider: 'Google Drive' }),
     );
   }
 

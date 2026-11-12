@@ -90,6 +90,14 @@ export const en = {
     signature: 'Signature',
   },
   import: {
+    reasons: {
+      notFoundOnce: 'its text was not found exactly once in this edition',
+      noQuote: 'it has no quote to match',
+      otherEdition: 'different edition of the book',
+      pageBeyondEnd: 'page is beyond the end of the target document',
+      attachment: 'file attachments are not imported',
+      damaged: 'the annotation in the file is damaged',
+    },
     title: 'Import annotations',
     otherBook: 'Or choose another book:',
     selectBook: 'Select a book…',
@@ -152,6 +160,7 @@ export const en = {
   },
   store: {
     loadFailed: 'Could not load highlights.',
+    locationNotFound: "Could not find this highlight's location in the book.",
     saveFailed: 'Could not save highlight.',
     deleteFailed: 'Could not delete highlight.',
     updateFailed: 'Could not update highlight.',

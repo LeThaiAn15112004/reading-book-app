@@ -1,4 +1,5 @@
 import { createTranslator, type Translator, type UiLanguage } from '@core'
+import { setConnectorLanguage } from '../host-adapters/external-libraries/connector-language'
 
 /**
  * Main's translator (spec 012), kept apart from `main-i18n.ts` so services can use {@link tMain} without importing
@@ -10,6 +11,8 @@ let language: UiLanguage = 'en'
 export function setMainTranslatorLanguage(next: UiLanguage): void {
   translator = createTranslator(next)
   language = next
+  // The cloud services Main runs share the connector's message table (spec 012).
+  setConnectorLanguage(next)
 }
 
 /** Main's current interface language (for texts built outside the catalogue lookup, e.g. the readable export). */
