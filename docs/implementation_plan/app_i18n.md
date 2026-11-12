@@ -10,7 +10,7 @@ Spec, plan, contracts: `specs/012-app-ui-i18n/`. Glossary (authoritative Vietnam
 | Core i18n module, catalogue layout, tests | done (Phase 2) |
 | Renderer store / `useT` / `TransText`, Main mirror + `app:setUiLanguage` | done (Phase 2) |
 | Lint rule `readmate/no-ui-literals` + pending headers on 112 files | done (Phase 2) |
-| Areas translated | `common` only — every other area is a `pendingArea(…)` marker and shows English |
+| Areas translated (Phase 3) | every renderer area + `main.messages`; `main.shell` and `exports` (US3) are still pending |
 | Release gate (`tests/i18n/i18n-release-gate.test.ts`) | not yet (T059) — **not releasable** until it exists and passes |
 
 ## Modules
@@ -80,3 +80,23 @@ first line of each converted file, `npm run typecheck && npm run lint && npm run
   the host, OD-1).
 - Core has no `console`: warnings (missing key / param) go through `setI18nWarningHandler`, set by the renderer
   store and by Main.
+- State kept in stores holds `UiText` (a Main string or a `MessageRef`) and is translated when shown; short toasts are
+  translated when raised (`getT()`), so a toast already on screen keeps its language.
+- Main: `tMain` lives in `platforms/electron/i18n/main-translate.ts` (no `electron` import) so services and their Node
+  spikes can use it; `main-i18n.ts` sets its language. Never call `tMain` at module level (it would freeze English):
+  keep keys in tables and call `tMain(key)` where the message is produced.
+- Core helpers that build text take `lang` (default `en`, so existing tests keep their English):
+  `describeAttachFailure`, `describeAttachmentBlock`, `trackEyebrow`, `formatRelativeLastRead`; others return keys
+  (`singleFileImportNotes`, `shelfProgressForBook`).
+- Selectors must never use `aria-label` / `title` (they are translated): the Reader sidebar uses
+  `data-reader-sidebar-nav` / `data-reader-sidebar-toggle`.
+- E2E (manual) still finds elements by English names: run it with an English system language until the specs pin
+  the language.
+- Persisted labels (bookmark "Page n", last-read label) are written in the language active when they are saved.
+
+## Live switch (T041)
+
+Checked 2026-11-12: no component is keyed by the language (`key={language}`), the language setter never navigates,
+and `useT()` / `useUiLanguage()` are only read for rendering (JSX, one `useMemo` of page labels in `ReaderScreen`). A
+change re-renders the visible texts; `ReaderRoute`, `AudioBookScreen` and their stores (open book, position, player)
+are not remounted or reset, and no effect lists `t` as a dependency, so no renderer reopens its book.

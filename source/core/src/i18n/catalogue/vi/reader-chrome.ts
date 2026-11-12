@@ -214,6 +214,9 @@ export const vi = {
     objectTools: 'Công cụ đối tượng',
     penOpaque: 'Bút mực luôn có độ đậm tối đa.',
   },
+  snapshot: {
+    hint: 'Kéo để chọn vùng cần chụp · Esc để hủy',
+  },
   shape: {
     settings: 'Cài đặt hình vẽ',
     shape: 'Hình',

@@ -211,6 +211,9 @@ export const en = {
     objectTools: 'Object tools',
     penOpaque: 'The Pen is always fully opaque.',
   },
+  snapshot: {
+    hint: 'Drag to select the area to capture · Esc to cancel',
+  },
   shape: {
     settings: 'Shape settings',
     shape: 'Shape',

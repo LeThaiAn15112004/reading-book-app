@@ -74,8 +74,6 @@ export const en = {
     unknownFormat: 'Unknown file format.',
     prepareFailed: 'Could not prepare the download.',
     unknownProvider: 'Unknown cloud provider.',
-    driveNotConnected: 'Not connected. Sign in with Google Drive, or provide a local synced folder path.',
-    driveConnectFirst: 'Google Drive is not connected. Connect first, or provide a local synced folder path.',
   },
   search: {
     invalid: 'Invalid search request.',
