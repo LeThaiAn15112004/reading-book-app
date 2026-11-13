@@ -1,3 +1,4 @@
+// i18n-ignore-file: placeholder book content of the demo reader, not interface text (spec 012)
 /** Fake chapters for T3.0 SCR-03 — not tied to real EPUB/PDF bytes. */
 
 export type FakeChapter = {

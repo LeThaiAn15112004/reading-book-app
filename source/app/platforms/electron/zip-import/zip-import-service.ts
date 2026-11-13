@@ -25,7 +25,7 @@ import {
   type ZipDirectory,
   type ZipEntryRecord,
 } from './zip-reader'
-import { tMain } from '../i18n/main-translate'
+import { getMainTranslatorLanguage, tMain } from '../i18n/main-translate'
 
 /**
  * Audiobook ZIP import, Main side and Electron-free (so it can be exercised headless): inspect → preview session →
@@ -211,7 +211,7 @@ export class ZipImportService {
     const images: ZipPreviewEntry[] = []
 
     for (const record of directory.entries) {
-      const cls = classifyEntry(record.path, record.isDirectory)
+      const cls = classifyEntry(record.path, record.isDirectory, getMainTranslatorLanguage())
       const preview: ZipPreviewEntry = {
         id: entryId(record),
         path: record.path,
@@ -347,7 +347,7 @@ export class ZipImportService {
   ): Promise<{ ok: true; bookId: string } | ZipImportFailure> {
     const session = this.get(sessionId)
     if (!session) return failure('session_expired', tMain('main.messages.zip.previewExpired'))
-    const check = validateZipSelection(session.preview, input)
+    const check = validateZipSelection(session.preview, input, getMainTranslatorLanguage())
     if (!check.ok) return failure('invalid_selection', check.reason)
     const selection = input as ZipImportSelection
 

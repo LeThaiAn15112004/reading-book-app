@@ -147,6 +147,6 @@ export function cancelTranslationsFor(sender: WebContents): void {
 export function disposeTranslationWorker(): void {
   const current = worker
   worker = null
-  failAllPending('App is quitting.')
+  failAllPending('App is quitting.') // i18n-ignore: ABORTED while quitting, never shown
   void current?.terminate()
 }

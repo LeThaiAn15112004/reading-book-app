@@ -4,7 +4,7 @@ import type { TranscriptionScope } from '../../../bridge'
 import { useAudioPlayerStore } from '../logic/audioPlayerStore'
 import { decoderUnavailableText, formatMegabytes, speechModelLabel, transcriptionErrorText } from '../logic/transcriptionMessages'
 import { isActiveJob, useTranscriptStore } from '../logic/transcriptStore'
-import { getT, useT } from '../../../i18n'
+import { getT, useFormat, useT, useUiLanguage } from '../../../i18n'
 
 const GHOST_BTN =
   'inline-flex h-[34px] cursor-pointer items-center rounded-lg border border-lib-border bg-transparent px-3.5 text-[13px] font-medium text-lib-muted transition-colors hover:text-lib-text-strong disabled:cursor-not-allowed disabled:opacity-50'
@@ -23,7 +23,6 @@ function minutesToMs(text: string): number | null {
   return Number.isFinite(value) && value >= 0 ? Math.round(value * 60_000) : null
 }
 
-const LANGUAGES_BY_NAME = [...WHISPER_LANGUAGES].sort((a, b) => a.name.localeCompare(b.name))
 
 /**
  * "Transcribe" (FR-001 / FR-005 / FR-013 / FR-014): what to transcribe (whole audiobook, one track, or a time range), in which
@@ -37,6 +36,16 @@ export function TranscribeDialog({ bookId }: { bookId: string }) {
 
 function DialogBody() {
   const t = useT()
+  const format = useFormat()
+  const uiLanguage = useUiLanguage()
+  // Names in the interface language, sorted the way that language sorts (spec 012).
+  const languages = useMemo(
+    () =>
+      WHISPER_LANGUAGES.map((l) => ({ code: l.code, name: format.languageName(l.code, l.name) })).sort((a, b) =>
+        a.name.localeCompare(b.name, uiLanguage),
+      ),
+    [format, uiLanguage],
+  )
   const info = useTranscriptStore((s) => s.info)
   const job = useTranscriptStore((s) => s.job)
   const downloading = useTranscriptStore((s) => s.downloading)
@@ -177,7 +186,7 @@ function DialogBody() {
           <span className={LABEL}>{t('audiobook.transcription.dialog.language')}</span>
           <select ref={firstField} className={FIELD} value={language} onChange={(event) => setLanguage(event.target.value)} disabled={busy}>
             <option value={AUTO_LANGUAGE}>{t('audiobook.transcription.dialog.autoDetect')}{defaultLanguage === AUTO_LANGUAGE ? t('audiobook.transcription.dialog.defaultSuffix') : ''}</option>
-            {LANGUAGES_BY_NAME.map((l) => (
+            {languages.map((l) => (
               <option key={l.code} value={l.code}>
                 {l.name}
                 {defaultLanguage === l.code ? t('audiobook.transcription.dialog.defaultSuffix') : ''}

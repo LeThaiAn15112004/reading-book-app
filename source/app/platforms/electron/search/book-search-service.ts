@@ -77,7 +77,7 @@ function toMatchDto(match: BookMatch): BookSearchMatchDto {
 export async function searchBook(request: BookSearchRequestDto): Promise<BookSearchResultDto> {
   const startedAt = performance.now()
   const bookId = request.bookId.trim()
-  if (!bookId) return { state: 'error', message: 'Missing book id.' }
+  if (!bookId) return { state: 'error', message: 'Missing book id.' } // i18n-ignore: invalid request from the renderer
 
   const query = parseTextSearchQuery(request.query, {
     matchCase: request.matchCase === true,

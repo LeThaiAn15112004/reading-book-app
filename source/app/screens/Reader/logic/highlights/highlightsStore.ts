@@ -424,7 +424,7 @@ export const useHighlightsStore = create<HighlightsStoreState>()((set, get) => (
         })
       })
     } catch {
-      onToast("Could not find this highlight's location in the book.")
+      onToast(getT()('reader.annotations.store.locationNotFound'))
     }
   },
 

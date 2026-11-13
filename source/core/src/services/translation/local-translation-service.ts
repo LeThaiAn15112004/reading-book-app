@@ -136,7 +136,7 @@ export class LocalTranslationService {
       throw new SdkError(
         'INVALID_ARGUMENT',
         `translate: input is ${sourceText.length} characters, limit is ${this.options.maxInputChars}. ` +
-          'Translate the selection in smaller parts.',
+          'Translate the selection in smaller parts.', // i18n-ignore: part of an INVALID_ARGUMENT diagnostic
       )
     }
 

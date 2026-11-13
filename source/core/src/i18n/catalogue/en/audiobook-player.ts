@@ -49,6 +49,7 @@ export const en = {
     book: 'Book',
     chapter: 'Chapter',
     wholeBook: 'Whole book',
+    untitledChapter: 'Chapter {n}',
     chaptersLoading: 'Chapters are still loading',
     untrusted: 'The chapter list in this file could not be trusted',
     untrustedReason: 'The chapter list in this file could not be trusted ({reason})',

@@ -6,7 +6,7 @@ import type {
   ReadingViewMode,
   TextAlign,
 } from '@core'
-import { useT } from '../../../../i18n'
+import { getFormat, useT } from '../../../../i18n'
 
 export type MarginMode = 'narrow' | 'normal' | 'wide' | 'off'
 
@@ -204,7 +204,7 @@ export function AaSettingsPanel({
             }
           />
           <span className="min-w-8 text-right text-xs font-bold text-lib-text-strong">
-            {prefs.lineHeight.toFixed(2)}
+            {getFormat().number(prefs.lineHeight, 2)}
           </span>
         </div>
       </div>

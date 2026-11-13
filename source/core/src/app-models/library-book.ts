@@ -91,22 +91,22 @@ export const NAV_FILTERS: Record<
 > = {
   favorites: {
     title: 'Favorites',
-    empty: 'No favorites yet. Star a book from the library to see it here.',
+    empty: 'No favorites yet. Star a book from the library to see it here.', // i18n-ignore: unused by the UI (Library texts come from the catalogue)
     showStar: true,
   },
   completed: {
     title: 'Completed',
-    empty: 'No completed books yet. Mark a book completed to see it here.',
+    empty: 'No completed books yet. Mark a book completed to see it here.', // i18n-ignore: unused by the UI (Library texts come from the catalogue)
     showStar: false,
   },
   'to-read': {
-    title: 'To read',
-    empty: 'Nothing queued yet. Books you have not started appear here.',
+    title: 'To read', // i18n-ignore: unused by the UI (Library texts come from the catalogue)
+    empty: 'Nothing queued yet. Books you have not started appear here.', // i18n-ignore: unused by the UI (Library texts come from the catalogue)
     showStar: false,
   },
   reading: {
-    title: 'Recent Books',
-    empty: 'No recent books. Start reading to see them here.',
+    title: 'Recent Books', // i18n-ignore: unused by the UI (Library texts come from the catalogue)
+    empty: 'No recent books. Start reading to see them here.', // i18n-ignore: unused by the UI (Library texts come from the catalogue)
     showStar: false,
   },
 }

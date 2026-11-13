@@ -6,6 +6,8 @@
  * "chapter position" that could drift. Switching scope therefore changes how the timeline is
  * interpreted, never where the audio is.
  */
+import { translate } from '../i18n/translate.js'
+import type { UiLanguage } from '../i18n/types.js'
 import { knownDuration } from './audio-playback.js'
 
 export type ProgressScope = 'book' | 'chapter'
@@ -63,9 +65,10 @@ function isFiniteNumber(value: unknown): value is number {
  * Rules: every start / end finite and ≥ 0; start < end; strictly ordered; contiguous within
  * {@link CHAPTER_SNAP_SECONDS} (a gap or overlap bigger than that → invalid); the first chapter
  * begins at ~0; the last ends at ~duration (a missing end means "to the end"); nothing past the
- * duration. Titles are trimmed; an empty title becomes "Chapter N" (a position label, not content).
+ * duration. Titles are trimmed; an empty title becomes "Chapter N" in `lang` (a position label, not content;
+ * spec 012). `reason` stays an English diagnostic.
  */
-export function normalizeChapters(raw: unknown, duration: unknown): ChapterValidation {
+export function normalizeChapters(raw: unknown, duration: unknown, lang: UiLanguage = 'en'): ChapterValidation {
   if (raw == null || (Array.isArray(raw) && raw.length === 0)) return { status: 'none', chapters: [] }
   if (!Array.isArray(raw)) return invalid('chapter list is not an array')
   if (raw.length > MAX_CHAPTERS) return invalid(`more than ${MAX_CHAPTERS} chapters`)
@@ -107,7 +110,7 @@ export function normalizeChapters(raw: unknown, duration: unknown): ChapterValid
     const id = ids.has(rawId) ? `${rawId}#${i + 1}` : rawId
     ids.add(id)
     const rawTitle = typeof item.title === 'string' ? item.title.trim().slice(0, 300) : ''
-    chapters.push({ id, title: rawTitle || `Chapter ${i + 1}`, startSeconds: start, endSeconds: end })
+    chapters.push({ id, title: rawTitle || translate(lang, 'audiobook.player.timeline.untitledChapter', { n: i + 1 }), startSeconds: start, endSeconds: end })
   }
   if (Math.abs((chapters[chapters.length - 1] as AudioChapter).endSeconds - total) > CHAPTER_SNAP_SECONDS) {
     return invalid('the chapters stop before the end of the audio')

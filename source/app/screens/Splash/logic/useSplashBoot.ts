@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { bootErrorMessage, sleep, withTimeout } from '@core'
 import type { BootLocationState } from '../../boot'
+import { getT } from '../../../i18n'
 import { INIT_TIMEOUT_MS, MIN_BRAND_MS, probeReady } from './splashBoot'
 
 /** SCR-00 boot gate — probe Main IPC then navigate to Library. */
@@ -16,7 +17,7 @@ export function useSplashBoot() {
         (): string | undefined => undefined,
         (err: unknown): string => {
           console.error('[splash] init probe failed', err)
-          return bootErrorMessage(err)
+          return bootErrorMessage(err, getT()('library.boot.fallback'))
         },
       )
 

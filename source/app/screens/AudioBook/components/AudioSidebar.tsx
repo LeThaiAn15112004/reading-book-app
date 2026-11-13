@@ -15,7 +15,7 @@ import { selectNoteGroupOpen, useNoteGroupsStore } from '../logic/audioNoteGroup
 import { useNoteMenuStore } from '../logic/audioNoteMenuStore'
 import { selectCanAddNote, useAudioPlayerStore } from '../logic/audioPlayerStore'
 import { TranscriptPanel } from './TranscriptPanel'
-import { useT } from '../../../i18n'
+import { useFormat, useT } from '../../../i18n'
 
 const EMPTY = 'm-0 px-2 py-4 text-sm leading-relaxed text-lib-muted'
 
@@ -166,6 +166,7 @@ function useIsHere(at: number, trackId: string | undefined): boolean {
  */
 function NoteCard({ note: n, at, chapterTitle }: { note: AudioBookmark; at: number; chapterTitle: string | undefined }) {
   const t = useT()
+  const format = useFormat()
   const goToNote = useAudioPlayerStore((s) => s.goToNote)
   const openFor = useNoteMenuStore((s) => s.openFor)
   const isHere = useIsHere(at, n.trackId)
@@ -199,7 +200,7 @@ function NoteCard({ note: n, at, chapterTitle }: { note: AudioBookmark; at: numb
           {n.note ?? t('audiobook.player.sidebar.noText')}
         </span>
         {created && !Number.isNaN(created.getTime()) ? (
-          <span className="mt-1 block text-[11px] text-lib-faint">{created.toLocaleString()}</span>
+          <span className="mt-1 block text-[11px] text-lib-faint">{format.dateTime(created)}</span>
         ) : null}
       </button>
       <button

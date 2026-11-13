@@ -50,14 +50,25 @@ function walk(dir, out = []) {
 
 const STRING = /(['"`])((?:\\.|(?!\1).)*)\1/g
 const LOOKS_LIKE_TEXT = /^[A-Z][a-z’']*(?:[ ,][A-Za-z…’'.,:!?()-]+)+$/
-const SKIP_LINE = /console\.|^\s*import |^\s*export \* from|^\s*\/\/|^\s*\*|className|data-testid|throw new Error\(`?\[/
+const SKIP_LINE = /console\.|^\s*import |^\s*export \* from|^\s*\/\/|^\s*\/?\*|className|data-testid|throw new Error\(`?\[/
+/**
+ * Developer-facing text: errors thrown or logged with a code the UI translates, HTTP bodies of the app's own protocols.
+ * They are diagnostics, not interface text (spec 012 FR-001 scope).
+ */
+const DEVELOPER_TEXT = /new [A-Z]\w*Error\(|\bError\(|\.(warn|error|info|debug)\(|new Response\(|toSdkError\(|\bstorage\('|\bfail\('[A-Z_]+',|commitFailure\(|\bfailure\('[A-Za-z_]+', '[A-Z]/
+
+/** Already translated: the quoted text on the line is a parameter (a product name), not a message. */
+const TRANSLATED = /\b(tConnector|tMain|translate|getT\(\)|t)\('[a-z][A-Za-z]*\./
 
 function heuristicFindings(file) {
   const findings = []
-  fs.readFileSync(file, 'utf8')
+  const source = fs.readFileSync(file, 'utf8')
+  // A whole file of non-interface text (sample data, product / font / language names), with its reason.
+  if (/i18n-ignore-file: \S/.test(source)) return findings
+  source
     .split(/\r?\n/)
     .forEach((line, index) => {
-      if (SKIP_LINE.test(line) || /i18n-ignore:/.test(line)) return
+      if (SKIP_LINE.test(line) || DEVELOPER_TEXT.test(line) || TRANSLATED.test(line) || /i18n-ignore:/.test(line)) return
       for (const match of line.matchAll(STRING)) {
         const text = match[2]
         if (text.includes('${') || !LOOKS_LIKE_TEXT.test(text.trim())) continue

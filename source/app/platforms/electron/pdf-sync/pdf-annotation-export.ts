@@ -142,7 +142,7 @@ export async function exportAnnotatedPdf(deps: ExportDeps, options: { acknowledg
 
   // The output must be the untouched source plus the update, and the source must still be what we read.
   const prefix = Buffer.from(written.output.buffer, written.output.byteOffset, bytes.length)
-  if (!prefix.equals(bytes)) return { ok: false, errorCode: 'verify_failed', message: 'The output does not start with the source bytes.' }
+  if (!prefix.equals(bytes)) return { ok: false, errorCode: 'verify_failed', message: 'The output does not start with the source bytes.' } // i18n-ignore: diagnostic; the renderer shows verify_failed by code
   try {
     if (sha256(await fsp.readFile(source)) !== sourceSha) return { ok: false, errorCode: 'source_changed', message: tMain('main.messages.pdfExport.changedDuringExport') }
   } catch {

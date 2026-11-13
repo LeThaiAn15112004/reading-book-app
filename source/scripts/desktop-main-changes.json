@@ -115,6 +115,9 @@
     "source/app/platforms/electron/ipc/search.ipc.ts": "spec 012 T040: user-visible messages returned to the renderer built with tMain (Main interface language)",
     "source/app/platforms/electron/ipc/txt.ipc.ts": "spec 012 T040: user-visible messages returned to the renderer built with tMain (Main interface language)",
     "source/app/platforms/electron/ipc/word-count.ipc.ts": "spec 012 T040: user-visible messages returned to the renderer built with tMain (Main interface language)",
-    "source/app/platforms/electron/transcription/transcript-export-file.ts": "spec 012 T040: user-visible messages returned to the renderer built with tMain (Main interface language)"
+    "source/app/platforms/electron/transcription/transcript-export-file.ts": "spec 012 T040: user-visible messages returned to the renderer built with tMain (Main interface language)",
+    "source/app/platforms/electron/background/background-mode.ts": "spec 012 T046: tray tooltip + menu labels from tMain, rebuilt on a Main interface language change (trayMenuTemplate exported for spike:i18n:main)",
+    "source/app/platforms/electron/ipc/annotation-transfer.ipc.ts": "spec 012 T048: save / open dialog titles and filter names from tMain",
+    "source/app/platforms/electron/reminders/reminder-schedule.ts": "spec 012 T047: reminder notification title / body from tMain, built when the notification is created"
   }
 }

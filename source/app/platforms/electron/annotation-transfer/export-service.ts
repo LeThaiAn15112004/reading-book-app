@@ -20,7 +20,7 @@ import {
 import type { EmbeddedAnnotationLedgerEntry } from '@core'
 import type { AnnotationExportResult } from '../ipc/api-types'
 import type { TransferNoteRow } from '../persistence/sqlite-overlay-store'
-import { tMain } from '../i18n/main-translate'
+import { getMainTranslatorLanguage, tMain } from '../i18n/main-translate'
 
 const TRANSFER_FORMATS: readonly string[] = ['epub', 'pdf', 'txt', 'md']
 
@@ -173,6 +173,6 @@ export async function exportReadableAnnotations(bookId: string, deps: ExportDeps
   if (!built.ok) return built
   // EPUB headings are `Chapter N` from the stored chapter index: Main has no EPUB table-of-contents reader (research R9, T048).
   // PDF file attachments are listed under their page (`📎 name (size), page n`), never restorable (specs/007 R14).
-  const saved = await saveText(renderReadableMarkdown(built.file, { attachments: built.attachments }), defaultReadableFileName(built.file.book.title), 'readable', deps, withReadableExtension)
+  const saved = await saveText(renderReadableMarkdown(built.file, { attachments: built.attachments, lang: getMainTranslatorLanguage() }), defaultReadableFileName(built.file.book.title), 'readable', deps, withReadableExtension)
   return saved.ok ? { ok: true, exported: built.exported } : saved
 }

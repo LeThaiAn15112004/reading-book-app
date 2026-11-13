@@ -21,6 +21,7 @@ import { getTxtStore } from '../persistence/sqlite-txt-store'
 import type { AnnotationExportResult, AnnotationImportPreviewResult, AnnotationImportResult, OkResult } from './api-types'
 import { AnnotationTransferChannels } from './channels'
 import { runInScanWorker } from './overlay.ipc'
+import { tMain } from '../i18n/main-translate'
 
 /** The formats that carry annotations (audiobooks and unknown formats are never offered the feature). */
 const TRANSFER_FORMATS = new Set(['epub', 'pdf', 'txt', 'md'])
@@ -63,12 +64,12 @@ function exportDeps(event: Electron.IpcMainInvokeEvent): ExportDeps {
     chooseTarget: async (defaultFileName, kind) => {
       const parent = BrowserWindow.fromWebContents(event.sender) ?? undefined
       const options: Electron.SaveDialogOptions = {
-        title: kind === 'readable' ? 'Export readable copy' : 'Export annotations',
+        title: kind === 'readable' ? tMain('main.shell.dialogs.exportReadable') : tMain('main.shell.dialogs.exportAnnotations'),
         defaultPath: path.join(app.getPath('documents'), defaultFileName),
         filters:
           kind === 'readable'
-            ? [{ name: 'Markdown (*.md)', extensions: ['md'] }]
-            : [{ name: 'Readmate annotations (*.readmate-notes.json)', extensions: ['json'] }],
+            ? [{ name: tMain('main.shell.dialogs.markdownFilter'), extensions: ['md'] }]
+            : [{ name: tMain('main.shell.dialogs.annotationsFilter'), extensions: ['json'] }],
         properties: ['showOverwriteConfirmation', 'createDirectory'],
       }
       const picked = parent ? await dialog.showSaveDialog(parent, options) : await dialog.showSaveDialog(options)
@@ -94,11 +95,11 @@ function importDeps(): ImportDeps {
     pickFilePath: async () => {
       const parent = (progressTarget && BrowserWindow.fromWebContents(progressTarget)) || undefined
       const options: Electron.OpenDialogOptions = {
-        title: 'Import annotations',
+        title: tMain('main.shell.dialogs.importAnnotations'),
         properties: ['openFile'],
         filters: [
-          { name: 'Annotation files (*.readmate-notes.json)', extensions: ['json'] },
-          { name: 'All files', extensions: ['*'] },
+          { name: tMain('main.shell.dialogs.annotationFilesFilter'), extensions: ['json'] },
+          { name: tMain('main.shell.dialogs.allFiles'), extensions: ['*'] },
         ],
       }
       const picked = parent ? await dialog.showOpenDialog(parent, options) : await dialog.showOpenDialog(options)

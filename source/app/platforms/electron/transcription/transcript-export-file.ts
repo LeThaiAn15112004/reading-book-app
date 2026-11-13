@@ -27,7 +27,7 @@ export async function exportTranscriptToFile(
   bookId: unknown,
   options: unknown,
 ): Promise<TranscriptionExportResult> {
-  if (typeof bookId !== 'string' || !bookId.trim()) return { saved: false, errorCode: 'INVALID_ARGUMENT', errorMessage: 'Missing bookId' }
+  if (typeof bookId !== 'string' || !bookId.trim()) return { saved: false, errorCode: 'INVALID_ARGUMENT', errorMessage: 'Missing bookId' } // i18n-ignore: invalid request from the renderer
   const id = bookId.trim()
   const exportOptions: TranscriptionExportOptionsDto = {
     timestamps: !!options && typeof options === 'object' && (options as { timestamps?: unknown }).timestamps === true,

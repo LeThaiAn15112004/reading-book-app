@@ -36,7 +36,8 @@ export function withTimeout<T>(
   })
 }
 
-export function bootErrorMessage(err: unknown): string {
+/** The error's own message, else `fallback` (the caller passes it in the interface language). */
+export function bootErrorMessage(err: unknown, fallback = 'App failed to initialize'): string { // i18n-ignore: English default for callers without a translator
   if (err instanceof Error && err.message) return err.message
-  return 'App failed to initialize'
+  return fallback
 }

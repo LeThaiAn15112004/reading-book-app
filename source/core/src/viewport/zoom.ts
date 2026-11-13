@@ -21,10 +21,10 @@ export const ZOOM_LAYOUT_PRESETS: ReadonlyArray<{
   id: ZoomLayoutPreset
   label: string
 }> = [
-  { id: 'actual-size', label: 'Actual Size' },
-  { id: 'fit-page', label: 'Fit Page' },
-  { id: 'fit-width', label: 'Fit Width' },
-  { id: 'fit-visible', label: 'Fit Visible' },
+  { id: 'actual-size', label: 'Actual Size' }, // i18n-ignore: fallback; ZoomControl labels presets by id
+  { id: 'fit-page', label: 'Fit Page' }, // i18n-ignore: fallback; ZoomControl labels presets by id
+  { id: 'fit-width', label: 'Fit Width' }, // i18n-ignore: fallback; ZoomControl labels presets by id
+  { id: 'fit-visible', label: 'Fit Visible' }, // i18n-ignore: fallback; ZoomControl labels presets by id
 ]
 
 export function clampZoom(scale: number): number {

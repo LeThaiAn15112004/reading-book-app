@@ -52,14 +52,14 @@ function openDialogFilters(): Electron.FileFilter[] {
   const zip = zipEnabled()
   return [
     {
-      name: 'Documents',
+      name: tMain('main.shell.dialogs.documents'),
       extensions: [...SUPPORTED_EXTENSIONS.map(extensionWithoutDot), ...(zip ? ['zip'] : [])],
     },
     ...SUPPORTED_FORMATS.map((descriptor) => ({
       name: descriptor.displayName,
       extensions: descriptor.extensions.map(extensionWithoutDot),
     })),
-    ...(zip ? [{ name: 'Audiobook ZIP', extensions: ['zip'] }] : []),
+    ...(zip ? [{ name: tMain('main.shell.dialogs.audiobookZip'), extensions: ['zip'] }] : []),
   ]
 }
 

@@ -33,7 +33,7 @@ import type {
 } from '../ipc/api-types'
 import type { TransferNoteRow } from '../persistence/sqlite-overlay-store'
 import { identifyBook, type IdentifyLibrary } from './identify-book'
-import { tMain } from '../i18n/main-translate'
+import { getMainTranslatorLanguage, tMain } from '../i18n/main-translate'
 
 const TRANSFER_FORMATS: readonly string[] = ['epub', 'pdf', 'txt', 'md']
 
@@ -182,6 +182,7 @@ export function createImportService(deps: ImportDeps): ImportService {
     const taken = deps.existingNoteIds(file.annotations.map((a) => a.sourceId))
     const plan = planImport({
       file,
+      lang: getMainTranslatorLanguage(),
       rejected,
       existingKeys,
       scanKeys,

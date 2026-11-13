@@ -11,6 +11,7 @@ import {
   DropboxSyncService,
 } from '../services/dropbox/index.js';
 import type { ExternalLibraryProviderAdapter } from './types.js';
+import { tConnector } from './connector-language.js';
 
 export interface DropboxFileSystemScanner {
   scanDirectory(path: string): Promise<Array<{
@@ -57,7 +58,7 @@ export class DropboxLibraryAdapter implements ExternalLibraryProviderAdapter {
     if (options?.folderPath) {
       return {
         success: true,
-        message: `Đã kết nối thư mục Dropbox đồng bộ: ${options.folderPath}`,
+        message: tConnector('appHooks.cloud.connection.folderLinked', { provider: 'Dropbox', path: options.folderPath }),
       };
     }
 
@@ -75,14 +76,14 @@ export class DropboxLibraryAdapter implements ExternalLibraryProviderAdapter {
         });
         return {
           success: true,
-          message: `Kết nối Dropbox API thành công. Tìm thấy ${result.entries.length} tệp sách mẫu.`,
+          message: tConnector('appHooks.cloud.connection.connected', { provider: 'Dropbox', count: result.entries.length }),
           itemCount: result.entries.length,
         };
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err);
         return {
           success: false,
-          message: `Lỗi kết nối Dropbox API: ${msg}`,
+          message: tConnector('appHooks.cloud.connection.failed', { provider: 'Dropbox', error: msg }),
         };
       }
     }
@@ -91,13 +92,13 @@ export class DropboxLibraryAdapter implements ExternalLibraryProviderAdapter {
     if (options?.oauthClientId || this.authService.getAppKey()) {
       return {
         success: true,
-        message: 'Dropbox OAuth App Key đã được cấu hình sẵn sàng.',
+        message: tConnector('appHooks.cloud.connection.clientConfigured', { provider: 'Dropbox' }),
       };
     }
 
     return {
       success: true,
-      message: 'Dropbox kết nối ở chế độ mặc định (App Key: 9s1ipeb0zmce4en).',
+      message: tConnector('appHooks.cloud.connection.defaultMode', { provider: 'Dropbox' }),
     };
   }
 
@@ -181,20 +182,20 @@ export class DropboxLibraryAdapter implements ExternalLibraryProviderAdapter {
       {
         externalId: 'dropbox_sample_01',
         sourceProvider: 'dropbox',
-        title: 'Dropbox Cloud Novel Sample',
-        authorNames: ['Cloud Novelist'],
+        title: 'Dropbox Cloud Novel Sample', // i18n-ignore: sample catalogue entry (demo mode)
+        authorNames: ['Cloud Novelist'], // i18n-ignore: sample catalogue entry (demo mode)
         formatHint: 'epub',
         localPath: options?.folderPath ? `${options.folderPath}/NovelSample.epub` : undefined,
-        description: 'Tài liệu mẫu từ kho lưu trữ Dropbox.',
+        description: 'Tài liệu mẫu từ kho lưu trữ Dropbox.', // i18n-ignore: sample catalogue entry (demo mode)
       },
       {
         externalId: 'dropbox_sample_02',
         sourceProvider: 'dropbox',
-        title: 'Dropbox Documentation Guide',
-        authorNames: ['Dropbox Team'],
+        title: 'Dropbox Documentation Guide', // i18n-ignore: sample catalogue entry (demo mode)
+        authorNames: ['Dropbox Team'], // i18n-ignore: sample catalogue entry (demo mode)
         formatHint: 'pdf',
         localPath: options?.folderPath ? `${options.folderPath}/Guide.pdf` : undefined,
-        description: 'Tài liệu hướng dẫn PDF từ Dropbox.',
+        description: 'Tài liệu hướng dẫn PDF từ Dropbox.', // i18n-ignore: sample catalogue entry (demo mode)
       },
     ];
 

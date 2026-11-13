@@ -162,8 +162,8 @@ const KEY_LABELS: Record<string, { win: string; mac: string }> = {
   ArrowRight: { win: '→', mac: '→' },
   ArrowUp: { win: '↑', mac: '↑' },
   ArrowDown: { win: '↓', mac: '↓' },
-  PageUp: { win: 'Page Up', mac: 'Page Up' },
-  PageDown: { win: 'Page Down', mac: 'Page Down' },
+  PageUp: { win: 'Page Up', mac: 'Page Up' }, // i18n-ignore: key name as printed on the keyboard
+  PageDown: { win: 'Page Down', mac: 'Page Down' }, // i18n-ignore: key name as printed on the keyboard
   Escape: { win: 'Esc', mac: 'Esc' },
 }
 

@@ -1,3 +1,4 @@
+// i18n-ignore-file: English fallback names; the Transcribe dialog shows Intl names in the interface language (spec 012)
 /**
  * Spoken languages the Whisper models know (spec 004, FR-005) and how a default is chosen. Pure data + functions: Main uses the
  * list to reject an unknown language (`UNSUPPORTED_LANGUAGE`), the dialog uses it for its picker.

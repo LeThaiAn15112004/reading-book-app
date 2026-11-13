@@ -70,6 +70,7 @@ import type {
   WatchPdfEmbeddedAnnotationsResult,
 } from './api-types'
 import { OverlayChannels } from './channels'
+import { tMain } from '../i18n/main-translate'
 
 function toSessionDto(state: SessionRecord): ReadingSessionStateDto {
   const dto: ReadingSessionStateDto = {
@@ -496,7 +497,7 @@ export function registerOverlayIpc(): void {
             const parent = BrowserWindow.fromWebContents(event.sender) ?? undefined
             const safeTitle = (book.title || 'book').replace(/[\\/:*?"<>|]+/g, ' ').trim() || 'book'
             const dialogOptions: Electron.SaveDialogOptions = {
-              title: 'Export PDF with annotations',
+              title: tMain('main.shell.dialogs.exportPdf'),
               defaultPath: path.join(app.getPath('documents'), `${safeTitle} (annotated).pdf`),
               filters: [{ name: 'PDF', extensions: ['pdf'] }],
               properties: ['showOverwriteConfirmation', 'createDirectory'],

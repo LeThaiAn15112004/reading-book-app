@@ -230,6 +230,17 @@ describe('placement', () => {
     expect(byPage.notPlaced.map((n) => n.reason)).toEqual(['page is beyond the end of the target document'])
     expect(plan(file, { placement: 'pdf-page-position' }).toAdd).toEqual([])
   })
+
+  it('reasons follow the interface language (spec 012); a validation detail becomes "damaged" outside English', () => {
+    const file = fileOf('pdf', [pdf('p3', 3), pdf('p20', 20)])
+    expect(plan(file, { placement: 'none', lang: 'vi' }).notPlaced[0]!.reason).toBe('là ấn bản khác của sách')
+    expect(plan(file, { placement: 'pdf-page-position', targetPageCount: 10, lang: 'vi' }).notPlaced[0]!.reason).toBe(
+      'trang nằm ngoài số trang của tài liệu đích',
+    )
+    const rejected = [{ index: 0, reason: 'invalid colour' }]
+    expect(plan(file, { rejected, lang: 'vi' }).notPlaced[0]!.reason).toBe('chú thích trong tệp bị hỏng')
+    expect(plan(file, { rejected }).notPlaced[0]!.reason).toBe('invalid colour')
+  })
 })
 
 describe('TXT quote re-anchoring (placement txt-quote)', () => {

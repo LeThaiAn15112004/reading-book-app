@@ -60,6 +60,11 @@ describe('normalizeArchivePath', () => {
 })
 
 describe('classifyEntry', () => {
+  it('writes its reasons in the interface language (spec 012)', () => {
+    expect(classifyEntry('notes.pdf', false, 'vi').reason).toBe('Không phải tệp âm thanh')
+    expect(classifyEntry('a.aif', false, 'vi').reason).toBe('Readmate không phát được AIF')
+    expect(classifyEntry('notes.pdf', false).reason).toBe('Not an audio file')
+  })
   it('marks playable audio candidates and records the format', () => {
     expect(classifyEntry('01.mp3', false)).toMatchObject({ kind: 'audio', status: 'ok', audioFormat: 'mp3' })
     expect(classifyEntry('x/Ch.M4B', false)).toMatchObject({ kind: 'audio', status: 'ok', audioFormat: 'm4b' })

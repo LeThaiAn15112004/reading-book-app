@@ -1,3 +1,4 @@
+// i18n-ignore-file: cloud product names (spec 012)
 /**
  * External library catalog connector (Phase 3 / Giai đoạn 8 — SDS §2.9 / SRS FR-30, NFR-11, BR-08).
  *

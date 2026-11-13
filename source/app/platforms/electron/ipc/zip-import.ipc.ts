@@ -98,7 +98,7 @@ export function registerZipImportIpc(): void {
     const parent = BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0]
     const options: Electron.OpenDialogOptions = {
       properties: ['openFile'],
-      filters: [{ name: 'Audiobook ZIP', extensions: ['zip'] }],
+      filters: [{ name: tMain('main.shell.dialogs.audiobookZip'), extensions: ['zip'] }],
     }
     let picked: Electron.OpenDialogReturnValue
     try {

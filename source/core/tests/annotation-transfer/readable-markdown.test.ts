@@ -181,3 +181,30 @@ describe('renderReadableMarkdown — PDF file attachments (specs/007 research R1
     expect(renderReadableMarkdown(file, { utcOffsetMinutes: 0, attachments: [] })).toBe(renderReadableMarkdown(file, { utcOffsetMinutes: 0 }))
   })
 })
+
+describe('renderReadableMarkdown — interface language (spec 012 FR-012)', () => {
+  it('writes its own words in Vietnamese when lang is vi; the book text is untouched', () => {
+    const epub = renderReadableMarkdown(
+      fileOf('epub', [base({ selectionText: { highlight: 'Lời trích' }, note: 'ghi chú' })]),
+      { utcOffsetMinutes: 0, lang: 'vi' },
+    )
+    expect(epub).toContain('Xuất ngày 2026-10-28 · 1 chú thích')
+    expect(epub).toContain('## Chương 3')
+    expect(epub).toContain('> Lời trích')
+    expect(epub).toContain('**Tô sáng** · ')
+    expect(epub).toContain('Bình luận: ghi chú')
+    const pdf = renderReadableMarkdown(
+      fileOf('pdf', [base({ type: 'rectangle', locator: { kind: 'page-rect', page: 12, chapterIndex: 11 } })]),
+      { utcOffsetMinutes: 0, lang: 'vi', attachments: [{ name: 'a.txt', sizeBytes: 5, page: 12, createdAt: '2026-10-20T13:01:12.000Z' }] },
+    )
+    expect(pdf).toContain('## Trang 12')
+    expect(pdf).toContain('> [Hình chữ nhật ở trang 12]')
+    expect(pdf).toContain('📎 a.txt (')
+    expect(pdf).toContain('), trang 12')
+  })
+
+  it('English is the default and equals lang: en', () => {
+    const file = fileOf('epub', [base({ selectionText: { highlight: 'x' } })])
+    expect(renderReadableMarkdown(file, { utcOffsetMinutes: 0, lang: 'en' })).toBe(renderReadableMarkdown(file, { utcOffsetMinutes: 0 }))
+  })
+})

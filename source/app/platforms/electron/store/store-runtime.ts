@@ -14,7 +14,7 @@ import path from 'node:path'
  */
 
 /** userData folder name (under %APPDATA%) of the Store build. */
-export const STORE_USER_DATA_DIR_NAME = 'Readmate Reader Store'
+export const STORE_USER_DATA_DIR_NAME = 'Readmate Reader Store' // i18n-ignore: folder name on disk
 /** userData folder name of the direct (NSIS / dev) build — `extraMetadata.name` in electron-builder.json5. */
 export const DIRECT_USER_DATA_DIR_NAME = 'reading-book-desktop'
 

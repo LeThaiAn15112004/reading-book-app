@@ -1,3 +1,4 @@
+// i18n-ignore-file: cloud product names (spec 012)
 import { DocumentFormat, isDocumentFormat } from '../book/document-format.js';
 
 export type ExternalLibraryProvider =

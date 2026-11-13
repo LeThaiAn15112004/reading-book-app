@@ -1,11 +1,13 @@
 /**
  * Node resolve hook for the Background & System Tray checks: `electron` → a recording stub
  * (electron-stub.mjs), and extensionless relative imports → the `.ts` file next to the importer, so
- * the real Main-process modules run under plain `node --experimental-strip-types`.
+ * the real Main-process modules run under plain `node --experimental-strip-types`. `@core` → the REAL core i18n
+ * module (the tray menu and reminder texts are built with `tMain`, spec 012), with `./x.js` in core → `./x.ts`.
  */
 import { register } from 'node:module'
 
 const electronStub = new URL('./electron-stub.mjs', import.meta.url).href
+const coreI18n = new URL('../../../../../core/src/i18n/index.ts', import.meta.url).href
 
 register(
   'data:text/javascript,' +
@@ -14,6 +16,11 @@ register(
       import { fileURLToPath } from 'node:url'
       export async function resolve(specifier, context, next) {
         if (specifier === 'electron') return { url: ${JSON.stringify(electronStub)}, shortCircuit: true }
+        if (specifier === '@core') return { url: ${JSON.stringify(coreI18n)}, shortCircuit: true }
+        if ((specifier.startsWith('./') || specifier.startsWith('../')) && specifier.endsWith('.js') && context.parentURL?.startsWith('file:')) {
+          const ts = new URL(specifier.slice(0, -3) + '.ts', context.parentURL)
+          if (existsSync(fileURLToPath(ts))) return { url: ts.href, shortCircuit: true }
+        }
         if (
           (specifier.startsWith('./') || specifier.startsWith('../')) &&
           !/\.[cm]?[jt]sx?$/.test(specifier) &&

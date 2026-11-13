@@ -4,7 +4,7 @@ import { Location } from '../domain/reading/location.js'
 export const STARTED_LOCATION_LABEL = 'Started'
 
 /** Fallback Library label when CFI JSON has no embedded `label`. */
-export const IN_PROGRESS_LOCATION_LABEL = 'In progress'
+export const IN_PROGRESS_LOCATION_LABEL = 'In progress' // i18n-ignore: stored label, written in the language active when saved
 
 /**
  * Pack domain Location + optional display label into one TEXT column value.

@@ -1,3 +1,4 @@
+import { tMain } from '../i18n/main-translate'
 /**
  * Reading reminder rules — pure (no Electron / SQLite), so they can be checked with any clock and
  * time zone (spikes/reminders). Every date here is the system's LOCAL wall-clock date: a reminder
@@ -74,8 +75,9 @@ export function decideReminder(input: {
 
 /** Notification copy. `bookTitle` = the book in progress the click will open, if any. */
 export function reminderMessage(bookTitle: string | null): { title: string; body: string } {
+  // Built when the notification is created, in Main's current interface language (spec 012 US3).
   return {
-    title: '📚 Time to read',
-    body: bookTitle ? `Continue reading ${bookTitle}?` : 'Pick a book from your library and read a few pages?',
+    title: tMain('main.shell.reminder.title'),
+    body: bookTitle ? tMain('main.shell.reminder.continue', { title: bookTitle }) : tMain('main.shell.reminder.pick'),
   }
 }

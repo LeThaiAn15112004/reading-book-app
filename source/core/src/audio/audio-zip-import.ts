@@ -1,4 +1,5 @@
-import type { MessageKey } from '../i18n/translate.js'
+import { translate, type MessageKey } from '../i18n/translate.js'
+import type { UiLanguage } from '../i18n/types.js'
 import { audioFormatFromExtension, audioPlaybackStatus } from './audio-formats.js'
 
 /**
@@ -104,26 +105,27 @@ export interface ZipEntryClassification {
  * Classify by name. An audio extension only makes a *candidate*: the desktop probe (container + codec) has the
  * final say, and a format the app cannot play (aiff) is reported unsupported with the reason.
  */
-export function classifyEntry(path: string, isDirectory: boolean): ZipEntryClassification {
+export function classifyEntry(path: string, isDirectory: boolean, lang: UiLanguage = 'en'): ZipEntryClassification {
+  const why = (key: MessageKey, params?: Record<string, string>) => translate(lang, key, params)
   if (isDirectory) return { kind: 'folder', status: 'ignored' }
-  if (isJunkPath(path)) return { kind: 'junk', status: 'ignored', reason: 'Archive-generated metadata' }
+  if (isJunkPath(path)) return { kind: 'junk', status: 'ignored', reason: why('import.zip.reasons.archiveMetadata') }
   const ext = archiveExtension(path)
   const audioFormat = audioFormatFromExtension(ext)
   if (audioFormat) {
     const status = audioPlaybackStatus(audioFormat)
     if (status === 'unsupported') {
-      return { kind: 'audio', status: 'unsupported', audioFormat, reason: `${ext.toUpperCase()} cannot be played by Readmate` }
+      return { kind: 'audio', status: 'unsupported', audioFormat, reason: why('import.zip.reasons.cannotPlay', { ext: ext.toUpperCase() }) }
     }
     return { kind: 'audio', status: 'ok', audioFormat }
   }
   if (COVER_EXTENSIONS.has(ext)) return { kind: 'image', status: 'ignored' }
   if (ext === 'svg' || ext === 'bmp' || ext === 'tif' || ext === 'tiff' || ext === 'heic') {
-    return { kind: 'image', status: 'ignored', reason: 'Image format not usable as a cover' }
+    return { kind: 'image', status: 'ignored', reason: why('import.zip.reasons.imageNotCover') }
   }
-  if (ARCHIVE_EXTENSIONS.has(ext)) return { kind: 'archive', status: 'ignored', reason: 'Nested archives are not imported' }
-  if (DOCUMENT_EXTENSIONS.has(ext)) return { kind: 'document', status: 'ignored', reason: 'Not an audio file' }
-  if (METADATA_EXTENSIONS.has(ext)) return { kind: 'metadata', status: 'ignored', reason: 'Descriptive file, not a chapter' }
-  return { kind: 'other', status: 'ignored', reason: 'Not an audio file' }
+  if (ARCHIVE_EXTENSIONS.has(ext)) return { kind: 'archive', status: 'ignored', reason: why('import.zip.reasons.nestedArchive') }
+  if (DOCUMENT_EXTENSIONS.has(ext)) return { kind: 'document', status: 'ignored', reason: why('import.zip.reasons.notAudio') }
+  if (METADATA_EXTENSIONS.has(ext)) return { kind: 'metadata', status: 'ignored', reason: why('import.zip.reasons.descriptive') }
+  return { kind: 'other', status: 'ignored', reason: why('import.zip.reasons.notAudio') }
 }
 
 const collator = new Intl.Collator('en', { numeric: true, sensitivity: 'base' })
@@ -169,17 +171,17 @@ export function orderWarnings(trackPaths: readonly string[]): ZipWarning[] {
   const nums = trackPaths.map(leadingNumber)
   const numbered = nums.filter((n) => n !== null).length
   if (numbered === 0) {
-    return [{ code: 'no_numbering', message: 'File names are not numbered, so the chapter order is alphabetical. Check it before importing.' }]
+    return [{ code: 'no_numbering', message: 'File names are not numbered, so the chapter order is alphabetical. Check it before importing.' }] // i18n-ignore: English fallback; the dialog translates by code
   }
   if (numbered < trackPaths.length) {
-    return [{ code: 'partial_numbering', message: 'Only some file names start with a number, so the chapter order may not be what you expect.' }]
+    return [{ code: 'partial_numbering', message: 'Only some file names start with a number, so the chapter order may not be what you expect.' }] // i18n-ignore: English fallback; the dialog translates by code
   }
   const seen = new Set<string>()
   for (let i = 0; i < trackPaths.length; i += 1) {
     const dir = trackPaths[i]!.slice(0, trackPaths[i]!.lastIndexOf('/') + 1)
     const key = `${dir}\u0000${nums[i]}`
     if (seen.has(key)) {
-      return [{ code: 'duplicate_numbers', message: 'Two files in the same folder share a track number, so their relative order is a guess.' }]
+      return [{ code: 'duplicate_numbers', message: 'Two files in the same folder share a track number, so their relative order is a guess.' }] // i18n-ignore: English fallback; the dialog translates by code
     }
     seen.add(key)
   }
@@ -292,20 +294,21 @@ export function singleFileImportNotes(selection: ZipImportSelection): { cover: M
 export type SelectionCheck = { ok: true } | { ok: false; reason: string }
 
 /** Re-checks a selection against the preview (Main runs this again at confirmation; the renderer is not trusted). */
-export function validateZipSelection(preview: ZipImportPreview, input: unknown): SelectionCheck {
-  if (!input || typeof input !== 'object') return { ok: false, reason: 'No selection.' }
+export function validateZipSelection(preview: ZipImportPreview, input: unknown, lang: UiLanguage = 'en'): SelectionCheck {
+  const fail = (key: MessageKey): SelectionCheck => ({ ok: false, reason: translate(lang, key) })
+  if (!input || typeof input !== 'object') return fail('import.zip.selection.none')
   const { trackIds, coverId } = input as { trackIds?: unknown; coverId?: unknown }
-  if (!Array.isArray(trackIds) || trackIds.length === 0) return { ok: false, reason: 'Select at least one audio track.' }
-  if (trackIds.length > preview.trackOrder.length) return { ok: false, reason: 'Too many tracks selected.' }
+  if (!Array.isArray(trackIds) || trackIds.length === 0) return fail('import.zip.selection.selectTrack')
+  if (trackIds.length > preview.trackOrder.length) return fail('import.zip.selection.tooMany')
   const seen = new Set<string>()
   for (const id of trackIds) {
-    if (typeof id !== 'string' || seen.has(id)) return { ok: false, reason: 'Invalid track selection.' }
-    if (!preview.trackOrder.includes(id)) return { ok: false, reason: 'A selected file is not a valid audio track.' }
+    if (typeof id !== 'string' || seen.has(id)) return fail('import.zip.selection.invalid')
+    if (!preview.trackOrder.includes(id)) return fail('import.zip.selection.notAudioTrack')
     seen.add(id)
   }
   if (coverId !== null && coverId !== undefined) {
     if (typeof coverId !== 'string' || !preview.coverCandidates.includes(coverId)) {
-      return { ok: false, reason: 'The selected cover image is not valid.' }
+      return fail('import.zip.selection.invalidCover')
     }
   }
   return { ok: true }

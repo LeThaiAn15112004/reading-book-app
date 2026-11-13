@@ -10,7 +10,10 @@ Spec, plan, contracts: `specs/012-app-ui-i18n/`. Glossary (authoritative Vietnam
 | Core i18n module, catalogue layout, tests | done (Phase 2) |
 | Renderer store / `useT` / `TransText`, Main mirror + `app:setUiLanguage` | done (Phase 2) |
 | Lint rule `readmate/no-ui-literals` + pending headers on 112 files | done (Phase 2) |
-| Areas translated (Phase 3) | every renderer area + `main.messages`; `main.shell` and `exports` (US3) are still pending |
+| Areas translated (Phase 3) | every renderer area + `main.messages` |
+| System language (Phase 4) | renderer and Main resolve `system` by the same rule; no locale API → English |
+| Main shell + export (Phase 5) | tray, reminder notifications, Main-owned dialogs (`main.shell`), readable `.md` export (`exports`) |
+| Formats + plurals (Phase 6) | no `toLocale*` left in `source/app`; decimals, sizes, dates through `useFormat()` / `getFormat()`; plural shape tested |
 | Release gate (`tests/i18n/i18n-release-gate.test.ts`) | not yet (T059) — **not releasable** until it exists and passes |
 
 ## Modules
@@ -93,6 +96,25 @@ first line of each converted file, `npm run typecheck && npm run lint && npm run
 - E2E (manual) still finds elements by English names: run it with an English system language until the specs pin
   the language.
 - Persisted labels (bookmark "Page n", last-read label) are written in the language active when they are saved.
+- Main shell (Phase 5): the tray tooltip and menu are rebuilt on every Main language change
+  (`onMainUiLanguageChange` in `initBackgroundMode`); a reminder notification and a dialog's title / filter names are
+  built when they are shown, so one already open keeps its language. Format names ("Markdown (*.md)") may read the
+  same in both languages. Checked by `spike:i18n:main` (tray vi → en with no restart, reminder text, every IPC file
+  that opens a dialog).
+- The readable `.md` export (`renderReadableMarkdown`, option `lang`, default `en`) is written in Main's interface
+  language when it is exported (`getMainTranslatorLanguage()`); the English output is unchanged byte for byte. Book
+  text, titles and comments are never translated. The restorable `.readmate-notes.json` has no interface words.
+- Audiobook chapters with no title get "Chapter N" / "Chương N" in the language active when the chapter list is
+  validated (`normalizeChapters(raw, duration, lang)`); the list's `reason` (why it was not trusted) stays an English
+  diagnostic inside the translated sentence.
+- Formats (Phase 6): whole percents ("42%") read the same in both languages and stay plain template text; anything
+  with a decimal, a size or a date goes through the formatters (`1,5` in Vietnamese). Playback / passage times keep
+  the clock style `h:mm:ss`. The Library title sort (`Intl.Collator(undefined, …)`) follows the system's collation on
+  purpose: it sorts book titles, not interface text.
+- Plurals: every counted message is a plural object chosen by `{count}` (en `one` + `other`, vi `other` only; checked
+  in `catalogue-completeness.test.ts`); no `count === 1 ? … : …` string building is left in `source/app`.
+- Device check (T045, manual): on a phone, set the system language to Vietnamese, then to French, and open the app
+  with "System" chosen: Vietnamese, then English.
 
 ## Live switch (T041)
 

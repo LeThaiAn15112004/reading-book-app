@@ -39,6 +39,7 @@ describe('catalogue completeness (spec 012 FR-015)', () => {
       for (const { path, value } of leaves(enAreas[area], area)) {
         for (const text of texts(value)) expect(text.trim(), path).not.toBe('')
         if (typeof value !== 'string') expect(Object.keys(value).sort(), path).toEqual(['one', 'other'])
+        if (typeof value !== 'string') expect(texts(value).flatMap(placeholders), `${path}: a plural is chosen by {count}`).toContain('count')
       }
     }
   })
@@ -64,6 +65,8 @@ describe('catalogue completeness (spec 012 FR-015)', () => {
           expect(slots(text), `${path}: slot tags`).toEqual(slots(texts(enValue)[0]!))
         }
         if (typeof value !== 'string') expect(value.other, `${path}: other`).toBeTypeOf('string')
+        // Vietnamese has no grammatical number: one form, chosen by `count` (spec 012 FR-011).
+        if (typeof value !== 'string') expect(Object.keys(value), `${path}: vi plural forms`).toEqual(['other'])
       }
     })
   }

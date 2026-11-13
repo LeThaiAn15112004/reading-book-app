@@ -5,7 +5,7 @@ import { usePdfShapePrefsStore } from '../../logic/pdfShapes/pdfShapePrefsStore'
 import { useDismissOnOutsideOrEscape } from '../../logic/highlights/useDismissOnOutsideOrEscape'
 import { CommitSlider, InkColorControl } from './InkStyleControls'
 import { isInkColorPickerOpen } from './inkColorPickerState'
-import { useT } from '../../../../i18n'
+import { getFormat, useT } from '../../../../i18n'
 import type { MessageKey } from '@core'
 
 const KIND_ICONS: Record<PdfShapeKind, ReactNode> = {
@@ -119,7 +119,7 @@ export function ShapeSettingsPopover({ anchorRef, onClose }: ShapeSettingsPopove
             <label htmlFor="shape-thickness" className={sectionLabel}>
               {t('reader.chrome.ink.thickness')}
             </label>
-            <span className="text-[12px] font-semibold text-lib-text-strong">{t('reader.chrome.ink.points', { value: inkWidthToPoints(widthLive ?? width).toFixed(1) })}</span>
+            <span className="text-[12px] font-semibold text-lib-text-strong">{t('reader.chrome.ink.points', { value: getFormat().number(inkWidthToPoints(widthLive ?? width), 1) })}</span>
           </div>
           <CommitSlider id="shape-thickness" min={PDF_SHAPE_MIN_STROKE} max={PDF_SHAPE_MAX_STROKE} step={0.0005} value={width} onCommit={setWidth} onDraft={setWidthLive} />
         </div>

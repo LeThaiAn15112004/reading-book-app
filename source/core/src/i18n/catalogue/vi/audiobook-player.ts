@@ -52,6 +52,7 @@ export const vi = {
     book: 'Cả sách',
     chapter: 'Chương',
     wholeBook: 'Cả sách',
+    untitledChapter: 'Chương {n}',
     chaptersLoading: 'Đang tải danh sách chương',
     untrusted: 'Danh sách chương trong tệp này không đáng tin cậy',
     untrustedReason: 'Danh sách chương trong tệp này không đáng tin cậy ({reason})',

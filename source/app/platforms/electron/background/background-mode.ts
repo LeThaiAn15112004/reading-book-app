@@ -7,6 +7,8 @@ import {
   normalizeBackgroundPrefs,
   saveBackgroundPrefs,
 } from './background-prefs'
+import { onMainUiLanguageChange } from '../i18n/main-i18n'
+import { tMain } from '../i18n/main-translate'
 
 /**
  * Background mode + System Tray (Settings → Background & System Tray).
@@ -73,7 +75,14 @@ export function initBackgroundMode(options: { showWindow: () => void; publicDir:
   iconDir = path.join(options.publicDir, 'tray')
   prefs = loadBackgroundPrefs()
   syncTray()
+  // A language change rebuilds the open tray's menu at once — no restart (spec 012 US3).
+  stopTrayLanguage?.()
+  stopTrayLanguage = onMainUiLanguageChange(() => {
+    if (tray) applyTrayTexts(tray)
+  })
 }
+
+let stopTrayLanguage: (() => void) | null = null
 
 export function disposeTray(): void {
   tray?.destroy()
@@ -89,16 +98,25 @@ function trayIcon(): Electron.NativeImage {
   return image
 }
 
+/** The tray menu in Main's current interface language (spec 012); rebuilt when the language changes. */
+export function trayMenuTemplate(): Electron.MenuItemConstructorOptions[] {
+  return [
+    { label: tMain('main.shell.tray.open', { app: APP_SHORT_NAME }), click: () => showMainWindow() },
+    { type: 'separator' },
+    { label: tMain('main.shell.tray.quit', { app: APP_SHORT_NAME }), click: () => quitApp() },
+  ]
+}
+
+const APP_SHORT_NAME = 'Readmate'
+
+function applyTrayTexts(target: Tray): void {
+  target.setToolTip(tMain('main.shell.tray.tooltip'))
+  target.setContextMenu(Menu.buildFromTemplate(trayMenuTemplate()))
+}
+
 function createTray(): Tray {
   const created = new Tray(trayIcon())
-  created.setToolTip('Readmate Reader')
-  created.setContextMenu(
-    Menu.buildFromTemplate([
-      { label: 'Open Readmate', click: () => showMainWindow() },
-      { type: 'separator' },
-      { label: 'Quit Readmate', click: () => quitApp() },
-    ]),
-  )
+  applyTrayTexts(created)
   // Windows / Linux: a left click opens the window; the menu stays on right click.
   // (macOS shows the context menu on click.)
   if (process.platform !== 'darwin') created.on('click', () => showMainWindow())

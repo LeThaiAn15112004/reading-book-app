@@ -1,3 +1,4 @@
+// i18n-ignore-file: font family names (spec 012)
 /**
  * Typewriter fonts: the shipped families, their real faces and which characters they cover.
  * Data only — the bytes live in the desktop app (`assets/fonts/typewriter/`, see its COVERAGE.md).

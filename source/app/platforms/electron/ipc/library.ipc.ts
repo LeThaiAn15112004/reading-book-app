@@ -369,7 +369,7 @@ export function registerLibraryIpc(): void {
       // The renderer only ever names a book id — the path comes from this native dialog.
       const descriptor = SUPPORTED_FORMATS.find((d) => d.format === book.format)
       const dialogOptions: Electron.OpenDialogOptions = {
-        title: `Locate “${book.title}”`,
+        title: tMain('main.shell.dialogs.locateBook', { title: book.title }),
         properties: ['openFile'],
         filters: descriptor
           ? [

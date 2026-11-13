@@ -5,6 +5,7 @@ import type {
   LinkLibraryOptions,
 } from '../../../../../core/src/domain-ports/index.js';
 import type { ExternalLibraryProviderAdapter } from './types.js';
+import { tConnector } from './connector-language.js';
 import type { FileSystemScanner } from './google-drive-adapter.js';
 import {
   OneDriveAuthService,
@@ -59,14 +60,14 @@ export class OneDriveLibraryAdapter implements ExternalLibraryProviderAdapter {
         const result = await this.fileService.listFiles(token, { top: 1 });
         return {
           success: true,
-          message: `Microsoft OneDrive connected successfully. Found ${result.entries.length} book file(s).`,
+          message: tConnector('appHooks.cloud.connection.connected', { provider: 'Microsoft OneDrive', count: result.entries.length }),
           itemCount: result.entries.length,
         };
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err);
         return {
           success: false,
-          message: `OneDrive connection test failed: ${msg}`,
+          message: tConnector('appHooks.cloud.connection.failed', { provider: 'Microsoft OneDrive', error: msg }),
         };
       }
     }
@@ -75,7 +76,7 @@ export class OneDriveLibraryAdapter implements ExternalLibraryProviderAdapter {
     if (options?.folderPath) {
       return {
         success: true,
-        message: `Connected to local OneDrive directory: ${options.folderPath}`,
+        message: tConnector('appHooks.cloud.connection.folderLinked', { provider: 'Microsoft OneDrive', path: options.folderPath }),
       };
     }
 
@@ -83,13 +84,13 @@ export class OneDriveLibraryAdapter implements ExternalLibraryProviderAdapter {
     if (options?.oauthClientId) {
       return {
         success: true,
-        message: 'Microsoft OneDrive Azure Client is configured. Ready to authenticate.',
+        message: tConnector('appHooks.cloud.connection.clientConfigured', { provider: 'Microsoft OneDrive' }),
       };
     }
 
     return {
       success: true,
-      message: 'Microsoft OneDrive ready (folder-first mode; authenticate to enable cloud sync).',
+      message: tConnector('appHooks.cloud.connection.defaultMode', { provider: 'Microsoft OneDrive' }),
     };
   }
 
@@ -147,20 +148,20 @@ export class OneDriveLibraryAdapter implements ExternalLibraryProviderAdapter {
       {
         externalId: 'onedrive_sample_01',
         sourceProvider: 'onedrive',
-        title: 'Clean Architecture on Azure',
-        authorNames: ['Cloud Architect'],
+        title: 'Clean Architecture on Azure', // i18n-ignore: sample catalogue entry (demo mode)
+        authorNames: ['Cloud Architect'], // i18n-ignore: sample catalogue entry (demo mode)
         formatHint: 'epub',
         localPath: options?.folderPath ? `${options.folderPath}/Architecture.epub` : undefined,
-        description: 'Sample eBook from Microsoft OneDrive.',
+        description: 'Sample eBook from Microsoft OneDrive.', // i18n-ignore: sample catalogue entry (demo mode)
       },
       {
         externalId: 'onedrive_sample_02',
         sourceProvider: 'onedrive',
-        title: 'OneDrive Synchronization Guide',
-        authorNames: ['Microsoft Graph Team'],
+        title: 'OneDrive Synchronization Guide', // i18n-ignore: sample catalogue entry (demo mode)
+        authorNames: ['Microsoft Graph Team'], // i18n-ignore: sample catalogue entry (demo mode)
         formatHint: 'pdf',
         localPath: options?.folderPath ? `${options.folderPath}/SyncGuide.pdf` : undefined,
-        description: 'Sample PDF report from OneDrive storage.',
+        description: 'Sample PDF report from OneDrive storage.', // i18n-ignore: sample catalogue entry (demo mode)
       },
     ];
 

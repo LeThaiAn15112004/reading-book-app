@@ -97,3 +97,28 @@ export function formatDuration(lang: UiLanguage, seconds: number, style: 'clock'
   if (m > 0) parts.push(translate(lang, 'common.duration.minutes', { count: m }))
   return parts.join(' ')
 }
+
+const languageNames = new Map<UiLanguage, Intl.DisplayNames | null>()
+
+/**
+ * A language's name in the interface language ("Tiếng Pháp" / "French") from its BCP 47 code; `fallback` (the English
+ * name of the list it comes from) when the platform has no name for it.
+ */
+export function formatLanguageName(lang: UiLanguage, code: string, fallback: string): string {
+  if (lang === 'en') return fallback
+  let names = languageNames.get(lang)
+  if (names === undefined) {
+    try {
+      names = new Intl.DisplayNames([localeTag(lang)], { type: 'language', fallback: 'none' })
+    } catch {
+      names = null
+    }
+    languageNames.set(lang, names)
+  }
+  try {
+    const name = names?.of(code)
+    return name ? name.charAt(0).toLocaleUpperCase(localeTag(lang)) + name.slice(1) : fallback
+  } catch {
+    return fallback
+  }
+}

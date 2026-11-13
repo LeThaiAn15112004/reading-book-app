@@ -24,7 +24,7 @@ export const SUPPORTED_FORMATS: readonly FormatDescriptor[] = [
     format: DocumentFormat.Txt,
     extensions: ['.txt'],
     mimeTypes: ['text/plain'],
-    displayName: 'Plain Text',
+    displayName: 'Plain Text', // i18n-ignore: format name, not shown by the UI
   },
   {
     format: DocumentFormat.Md,
@@ -40,8 +40,8 @@ export const SUPPORTED_FORMATS: readonly FormatDescriptor[] = [
   { format: DocumentFormat.Aac, extensions: ['.aac'], mimeTypes: ['audio/aac'], displayName: 'AAC Audio' },
   { format: DocumentFormat.Wav, extensions: ['.wav'], mimeTypes: ['audio/wav'], displayName: 'WAV Audio' },
   { format: DocumentFormat.Flac, extensions: ['.flac'], mimeTypes: ['audio/flac'], displayName: 'FLAC Audio' },
-  { format: DocumentFormat.Ogg, extensions: ['.ogg'], mimeTypes: ['audio/ogg'], displayName: 'Ogg Audio' },
-  { format: DocumentFormat.Opus, extensions: ['.opus'], mimeTypes: ['audio/ogg'], displayName: 'Opus Audio' },
+  { format: DocumentFormat.Ogg, extensions: ['.ogg'], mimeTypes: ['audio/ogg'], displayName: 'Ogg Audio' }, // i18n-ignore: format name, not shown by the UI
+  { format: DocumentFormat.Opus, extensions: ['.opus'], mimeTypes: ['audio/ogg'], displayName: 'Opus Audio' }, // i18n-ignore: format name, not shown by the UI
 ] as const;
 
 export const SUPPORTED_EXTENSIONS: readonly string[] = SUPPORTED_FORMATS.flatMap(

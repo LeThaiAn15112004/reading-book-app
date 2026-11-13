@@ -47,7 +47,7 @@ export const vi = {
     completed: 'Chưa có sách nào đọc xong. Đánh dấu đã đọc xong từ menu của sách.',
     favorites: 'Chưa có sách yêu thích. Thêm từ menu của sách.',
     noMatch: 'Không tìm thấy sách phù hợp.',
-    recent: 'Chưa mở cuốn sách nào. Sách bạn mở sẽ hiện ở đây, mới nhất trước.',
+    recent: 'Chưa mở cuốn sách nào. Sách đã mở sẽ hiện ở đây, mới nhất trước.',
   },
   sorts: {
     label: 'Sắp xếp',
@@ -302,7 +302,7 @@ export const vi = {
     },
     empty: {
       aria: 'Thư viện trống',
-      title: 'Thư viện của bạn đang trống',
+      title: 'Thư viện đang trống',
       body: 'Nhập một cuốn sách từ điện thoại để bắt đầu đọc. Sách được lưu trong ứng dụng, chỉ trên thiết bị này.',
       formats: 'EPUB · PDF · TXT · Markdown',
       import: 'Nhập sách',
