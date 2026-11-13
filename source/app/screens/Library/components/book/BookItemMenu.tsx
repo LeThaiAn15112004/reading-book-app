@@ -1,15 +1,17 @@
-import { useEffect, useRef, useState, type MouseEvent as ReactMouseEvent } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, type MouseEvent as ReactMouseEvent } from 'react'
 import { annotationTransferApi } from '../../../../bridge'
 import { useT } from '../../../../i18n'
 import { isFeatureAvailable, isMobileHost } from '../../../../platforms/host'
 import { supportsAnnotationTransfer } from '../../../Reader/logic/annotationTransferStore'
 import { PhoneBookSheet } from './PhoneBookSheet'
+import { placeMenu, submenuOffsetY, type MenuPlacement } from '@core'
 import type {
   CollectionSummary,
   LibraryBook,
 } from '@core'
 
-export type BookMenuPoint = { x: number; y: number }
+/** `flipY`: where the menu ends when it has to open upwards (the opening button's top); default `y`. */
+export type BookMenuPoint = { x: number; y: number; flipY?: number }
 
 export type BookItemMenuProps = {
   book: LibraryBook
@@ -75,7 +77,7 @@ export function BookMenuButton({
         event.preventDefault()
         event.stopPropagation()
         const rect = event.currentTarget.getBoundingClientRect()
-        onOpen({ x: rect.right, y: rect.bottom + 4 })
+        onOpen({ x: rect.right, y: rect.bottom + 4, flipY: rect.top - 4 })
       }}
       onContextMenu={(event) => {
         event.preventDefault()
@@ -140,9 +142,43 @@ function DesktopBookItemMenu({
       live = false
     }
   }, [book.id, canExportAnnotations])
-  const left = Math.max(8, Math.min(point.x, window.innerWidth - 282))
-  const top = Math.max(8, Math.min(point.y, window.innerHeight - 390))
+  // Placed from the menu's MEASURED size (before paint), so it never runs past the window's edge — with the
+  // window maximized, that edge is the taskbar. Hidden until measured; re-placed when the window is resized.
+  const [placement, setPlacement] = useState<MenuPlacement | null>(null)
+  useLayoutEffect(() => {
+    if (phone) return
+    const place = () => {
+      const menu = menuRef.current
+      if (!menu) return
+      setPlacement(
+        placeMenu({
+          x: point.x,
+          y: point.y,
+          flipY: point.flipY,
+          width: menu.offsetWidth,
+          height: menu.scrollHeight,
+          viewportWidth: window.innerWidth,
+          viewportHeight: window.innerHeight,
+        }),
+      )
+    }
+    place()
+    window.addEventListener('resize', place)
+    return () => window.removeEventListener('resize', place)
+  }, [phone, point.x, point.y, point.flipY])
+  const left = placement?.left ?? 0
   const openCollectionsLeft = left + 506 <= window.innerWidth
+  // The collections submenu opens beside its row and moves up when it would pass the window's bottom.
+  const collectionsRowRef = useRef<HTMLDivElement>(null)
+  const collectionsMenuRef = useRef<HTMLDivElement>(null)
+  const [collectionsOffsetY, setCollectionsOffsetY] = useState(0)
+  useLayoutEffect(() => {
+    if (phone || !collectionsOpen) return
+    const row = collectionsRowRef.current
+    const sub = collectionsMenuRef.current
+    if (!row || !sub) return
+    setCollectionsOffsetY(submenuOffsetY(row.getBoundingClientRect().top, sub.offsetHeight, window.innerHeight))
+  }, [phone, collectionsOpen, collections.length, placement])
 
   useEffect(() => {
     const closeOnPointer = (event: PointerEvent) => {
@@ -179,13 +215,27 @@ function DesktopBookItemMenu({
           ? 'phone-sheet fixed inset-x-0 bottom-0 z-[300] max-h-[80vh] overflow-y-auto rounded-t-2xl border border-lib-border bg-lib-surface-strong p-2 shadow-[0_-12px_40px_rgba(0,0,0,0.45)]'
           : 'fixed z-[300] w-[274px] rounded-xl border border-lib-border bg-lib-surface-strong p-1.5 shadow-[0_18px_48px_rgba(0,0,0,0.45)]'
       }
-      style={phone ? undefined : { left, top }}
+      style={
+        phone
+          ? undefined
+          : placement
+            ? {
+                left: placement.left,
+                top: placement.top,
+                ...(placement.maxHeight !== undefined ? { maxHeight: placement.maxHeight, overflowY: 'auto' } : {}),
+              }
+            : { left: 0, top: 0, visibility: 'hidden' }
+      }
       onContextMenu={blockContextMenu}
     >
       <button className={itemClass} role="menuitem" onClick={() => run(() => onResume(book.id))}>
         {t('library.menu.resume')}
       </button>
-      <div className="relative" onMouseLeave={phone ? undefined : () => setCollectionsOpen(false)}>
+      <div
+        ref={collectionsRowRef}
+        className="relative"
+        onMouseLeave={phone ? undefined : () => setCollectionsOpen(false)}
+      >
         <button
           className={itemClass}
           role="menuitem"
@@ -199,10 +249,12 @@ function DesktopBookItemMenu({
         </button>
         {collectionsOpen ? (
           <div
+            ref={collectionsMenuRef}
+            style={phone ? undefined : { top: collectionsOffsetY }}
             className={
               phone
                 ? 'pl-3'
-                : `absolute top-0 w-[230px] ${
+                : `absolute w-[230px] ${
                     openCollectionsLeft
                       ? 'left-full pl-1.5'
                       : 'right-full pr-1.5'

@@ -241,3 +241,9 @@ export {
   shelfProgressForBook,
   type ShelfProgressView,
 } from './shelf-progress.js'
+export {
+  placeMenu,
+  submenuOffsetY,
+  type MenuPlacement,
+  type MenuPlacementInput,
+} from './menu-placement.js'
