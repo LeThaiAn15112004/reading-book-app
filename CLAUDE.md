@@ -423,6 +423,14 @@ imports the shared UI's `@app/main` unchanged. **No Desktop file is copied into 
   `screens/Reader/phone/MobileReaderScreen.tsx` on the Mobile host only, which runs the same core hooks as Desktop
   (`screens/Reader/logic/reader-core/`: `useReaderCore`, `useReaderAnnotations`, pure derivations) — never copy logic
   into it, and add no Mobile-only store without writing the reason in `contracts/phone-ui.md`.
+- **Mobile Library (spec 013, `specs/013-mobile-library-screen/`)**: on the Mobile host `LibraryScreen` lazy-loads
+  `screens/Library/phone/MobileLibraryHub.tsx` instead of `LibraryHub` (same props, stores and hooks): search header
+  with a "+" (Add file), filter chips incl. `recent` (opened books, most recently read first; rules in core
+  `app-models/library-phone.ts`), a Continue Reading carousel with "Read again" (`library.restartBook` on both hosts:
+  status `reading`, position back to the start, one transaction), Grid / List (the stored `table` layout is the phone
+  List) and the book menu as `PhoneBookSheet`. `PhoneNav` is a bottom tab bar rendered after the content in `App.tsx`;
+  `AdSlot` (320 × 50, above it, Library hub only) renders only in development builds — no ad SDK, nothing in release.
+  The desktop Library is unchanged.
 - **Dependency rules** are enforced by `source/scripts/boundaries/` (`npm run check:boundaries`); `check:build-split`
   proves the two bundles share no host code.
 ### AI port

@@ -124,11 +124,11 @@ Desktop UI has no runner, so UI is checked by `npm run check` + the device pass 
 
 **Independent Test**: scroll 200 books to the end with gesture and 3-button navigation: bar fixed, last row visible, navigation area in the tab bar colour; release build has no slot, dev build shows the dashed placeholder.
 
-- [ ] T032 [US5] In `source/app/App.tsx`, on the Mobile host (`!isFeatureAvailable('desktopChrome')`) render `<PhoneNav />` AFTER the content container instead of in the top chrome block (desktop `AppTitlebar` / `AppMenubar` branch unchanged); immersive reading still hides nothing new (PhoneNav already returns `null` in `/reader`)
-- [ ] T033 [US5] Restyle `source/app/components/chrome/PhoneNav.tsx` as a bottom bar: `border-t` instead of `border-b`, background `bg-lib-bg-deep` (opaque, so the host's bottom-edge colour reading in `platforms/window-system-bars.ts` matches it), each item an icon above its label (inline SVGs: book, layers, open-book, gear; `aria-hidden`), active item in `text-lib-accent`; keep the 44 px targets and the reading badge (FR-021, FR-028)
-- [ ] T034 [P] [US5] Create `source/app/screens/Library/phone/AdSlot.tsx`: `if (!import.meta.env.DEV) return null`; otherwise a centered dashed box 320 × 50 (`max-width: 100%`, 4 px vertical padding) with `library.phone.adPlaceholder`, `aria-hidden`; no network, no SDK (FR-022, FR-023)
-- [ ] T035 [US5] Render `AdSlot` in `MobileLibraryHub.tsx` after the scroll container (outside it, so it never scrolls) and only on the Library hub (not in Collections / Settings / Reader); make sure the scroll container ends above it so the last row is fully visible (FR-024)
-- [ ] T036 [US5] Verify the edge colours reported by `source/app/platforms/window-system-bars.ts` after the move (top edge = header background, bottom edge = tab bar); adjust which element it samples if it read the old top `PhoneNav` (FR-028)
+- [X] T032 [US5] In `source/app/App.tsx`, on the Mobile host (`!isFeatureAvailable('desktopChrome')`) render `<PhoneNav />` AFTER the content container instead of in the top chrome block (desktop `AppTitlebar` / `AppMenubar` branch unchanged); immersive reading still hides nothing new (PhoneNav already returns `null` in `/reader`)
+- [X] T033 [US5] Restyle `source/app/components/chrome/PhoneNav.tsx` as a bottom bar: `border-t` instead of `border-b`, background `bg-lib-bg-deep` (opaque, so the host's bottom-edge colour reading in `platforms/window-system-bars.ts` matches it), each item an icon above its label (inline SVGs: book, layers, open-book, gear; `aria-hidden`), active item in `text-lib-accent`; keep the 44 px targets and the reading badge (FR-021, FR-028)
+- [X] T034 [P] [US5] Create `source/app/screens/Library/phone/AdSlot.tsx`: `if (!import.meta.env.DEV) return null`; otherwise a centered dashed box 320 × 50 (`max-width: 100%`, 4 px vertical padding) with `library.phone.adPlaceholder`, `aria-hidden`; no network, no SDK (FR-022, FR-023)
+- [X] T035 [US5] Render `AdSlot` in `MobileLibraryHub.tsx` after the scroll container (outside it, so it never scrolls) and only on the Library hub (not in Collections / Settings / Reader); make sure the scroll container ends above it so the last row is fully visible (FR-024)
+- [X] T036 [US5] Verify the edge colours reported by `source/app/platforms/window-system-bars.ts` after the move (top edge = header background, bottom edge = tab bar); adjust which element it samples if it read the old top `PhoneNav` (FR-028)
 
 **Checkpoint**: quickstart step 6 passes.
 
@@ -136,11 +136,11 @@ Desktop UI has no runner, so UI is checked by `npm run check` + the device pass 
 
 ## Phase 8: Polish & cross-cutting
 
-- [ ] T037 [P] Theme pass: grep `source/app/screens/Library/phone/` and `PhoneNav.tsx` for literal colours (`#`, `rgb(`) and replace them with `--lib-*` / Tailwind `lib-*` tokens (FR-025, R4); check Paper / Sepia and a non-orange accent
-- [ ] T038 [P] Accessibility pass on the new components: every icon button has an `aria-label`, chips / toggle expose state, touch targets ≥ 44 × 44 (FR-027); remove `/* i18n-pending */` markers only where all text is now translated
-- [ ] T039 [P] Docs: add a "Library (spec 013)" row to `specs/008-shared-core-architecture/contracts/phone-ui.md` (As built table) and a short "Mobile Library (spec 013)" paragraph to the Mobile app section of `CLAUDE.md` (phone hub under `screens/Library/phone/`, chips incl. `recent`, `library.restartBook`, dev-only `AdSlot`, PhoneNav at the bottom)
-- [ ] T040 Run `npm run check` (typecheck, lint `--max-warnings 0`, sdk + mobile tests, boundaries, platform-adapters, builds, build-split) and `npm run check:desktop-baseline`; fix anything red
-- [ ] T041 Release-bundle check from quickstart: `npm run build:web` then confirm the placeholder string is absent (`grep -c "Banner 320" source/app/platforms/native/web-dist/assets/*.js` → 0) and no ad package is imported
+- [X] T037 [P] Theme pass: grep `source/app/screens/Library/phone/` and `PhoneNav.tsx` for literal colours (`#`, `rgb(`) and replace them with `--lib-*` / Tailwind `lib-*` tokens (FR-025, R4); check Paper / Sepia and a non-orange accent
+- [X] T038 [P] Accessibility pass on the new components: every icon button has an `aria-label`, chips / toggle expose state, touch targets ≥ 44 × 44 (FR-027); remove `/* i18n-pending */` markers only where all text is now translated
+- [X] T039 [P] Docs: add a "Library (spec 013)" row to `specs/008-shared-core-architecture/contracts/phone-ui.md` (As built table) and a short "Mobile Library (spec 013)" paragraph to the Mobile app section of `CLAUDE.md` (phone hub under `screens/Library/phone/`, chips incl. `recent`, `library.restartBook`, dev-only `AdSlot`, PhoneNav at the bottom)
+- [X] T040 Run `npm run check` (typecheck, lint `--max-warnings 0`, sdk + mobile tests, boundaries, platform-adapters, builds, build-split) and `npm run check:desktop-baseline`; fix anything red
+- [X] T041 Release-bundle check from quickstart: `npm run build:web` then confirm the placeholder string is absent (`grep -c "Banner 320" source/app/platforms/native/web-dist/assets/*.js` → 0) and no ad package is imported
 - [ ] T042 Device pass: run quickstart.md steps 1–8 on Android (gesture and three-button navigation, 1 000-book performance), and the Desktop regression check (SC-007); record results at the bottom of `specs/013-mobile-library-screen/quickstart.md`
 
 ---

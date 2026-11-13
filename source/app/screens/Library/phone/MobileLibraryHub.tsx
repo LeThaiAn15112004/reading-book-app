@@ -9,6 +9,7 @@ import { MobileLibraryHeader } from './MobileLibraryHeader'
 import { PhoneBrowseToolbar } from './PhoneBrowseToolbar'
 import { PhoneFilterChips } from './PhoneFilterChips'
 import { PhoneContinueCarousel } from './PhoneContinueCarousel'
+import { AdSlot } from './AdSlot'
 
 export type MobileLibraryHubProps = LibraryHubProps & {
   /** "Read again" on a finished book (spec 013 US1): restart it at the beginning, then open it. */
@@ -119,7 +120,8 @@ export default function MobileLibraryHub({
         )}
       </div>
 
-      {/* Banner slot (US5) goes here, outside the scroll container. */}
+      {/* Banner slot (US5): outside the scroll container, so it never scrolls and the list ends above it (FR-024). */}
+      <AdSlot />
     </div>
   )
 }

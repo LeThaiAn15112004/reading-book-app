@@ -40,6 +40,16 @@
   :root[data-mobile-host] .phone-nav button {
     min-height: 44px;
   }
+
+  /* Spec 013 FR-027: the Library search's recent-searches rows and their remove button (shared with Desktop). */
+  :root[data-mobile-host] .phone-library [role='listbox'] > [role='option'] {
+    min-height: 44px;
+  }
+  :root[data-mobile-host] .phone-library [role='listbox'] .hover-reveal {
+    width: 44px;
+    height: 44px;
+    margin-right: -0.75rem;
+  }
 }
 
 /*

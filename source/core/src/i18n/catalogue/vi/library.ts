@@ -310,7 +310,6 @@ export const vi = {
     noMatch: {
       clear: 'Xóa bộ lọc',
     },
-    adPlaceholder: 'Quảng cáo · Banner 320 × 50',
     sheet: {
       close: 'Đóng',
     },

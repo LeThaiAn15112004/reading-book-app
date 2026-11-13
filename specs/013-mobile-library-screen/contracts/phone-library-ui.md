@@ -44,7 +44,7 @@ remove audiobook (audiobooks unavailable).
 
 `library.phone.chips.{all,recent,saved,completed}`, `library.phone.add`, `library.phone.searchPlaceholder`,
 `library.continue.readAgain`, `library.phone.empty.{title,body,formats,import}`, `library.phone.noMatch.clear`,
-`library.phone.layout.{grid,list}`, `library.menu.markReading`, `library.phone.adPlaceholder`.
+`library.phone.layout.{grid,list}`, `library.menu.markReading`. (The dev-only `AdSlot` placeholder "Ad · Banner 320 × 50" is NOT a catalogue key: a catalogue entry ships in every build, and the release bundle must not contain the string — it is an `i18n-ignore` literal behind `import.meta.env.DEV`; T041.)
 
 ## Theme
 

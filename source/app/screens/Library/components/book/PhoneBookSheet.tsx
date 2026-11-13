@@ -15,7 +15,7 @@ const FLING_PX_PER_MS = 0.6
 const SHEET_HISTORY_KEY = 'readmateBookSheet'
 
 const itemClass =
-  'flex min-h-12 w-full cursor-pointer items-center justify-between gap-4 rounded-lg border-none bg-transparent px-3 text-left text-[15px] text-lib-text-strong active:bg-white/5 disabled:cursor-default disabled:opacity-45'
+  'flex min-h-12 w-full cursor-pointer items-center justify-between gap-4 rounded-lg border-none bg-transparent px-3 text-left text-[15px] text-lib-text-strong active:bg-lib-surface-hover disabled:cursor-default disabled:opacity-45'
 
 /**
  * The book menu on the phone (spec 013 US4, FR-016 – FR-020): a bottom sheet with the same actions in the same order
@@ -138,7 +138,7 @@ export function PhoneBookSheet({
       <div
         role="menu"
         aria-label={t('library.menu.actionsFor', { title: book.title })}
-        className="phone-sheet absolute inset-x-0 bottom-0 max-h-[85vh] overflow-y-auto rounded-t-2xl border border-lib-border bg-lib-surface-strong px-2 shadow-[0_-12px_40px_rgba(0,0,0,0.45)]"
+        className="phone-sheet absolute inset-x-0 bottom-0 max-h-[85vh] overflow-y-auto rounded-t-2xl border border-lib-border bg-lib-surface-strong px-2 shadow-[var(--lib-overlay-shadow)]"
         style={{
           transform: dragY ? `translateY(${dragY}px)` : undefined,
           transition: dragY ? 'none' : 'transform 160ms ease-out',

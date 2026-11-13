@@ -57,7 +57,7 @@ export function PhoneBrowseToolbar({ count, sort, onSortChange, layout, onLayout
               aria-pressed={pressed}
               aria-label={view.label}
               title={view.label}
-              className={`inline-flex size-10 cursor-pointer items-center justify-center rounded-md border-none transition-colors ${
+              className={`inline-flex size-11 cursor-pointer items-center justify-center rounded-md border-none transition-colors ${
                 pressed ? 'bg-lib-accent-soft text-lib-accent' : 'bg-transparent text-lib-faint'
               }`}
               onClick={() => onLayoutChange(view.id)}

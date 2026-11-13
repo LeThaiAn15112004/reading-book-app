@@ -19,7 +19,7 @@ export const UI_ORIGIN = 'http://192.168.1.20:8081'
 export class MemoryFs implements HostFs {
   readonly files = new Map<string, Uint8Array>()
   readonly dirs = new Set<string>()
-  readonly picks: Array<{ name: string; bytes: Uint8Array } | null> = []
+  readonly picks: ({ name: string; bytes: Uint8Array } | null)[] = []
   private readonly cache = new Map<string, Uint8Array>()
   private uriCounter = 0
   available = 10 * 1024 * 1024 * 1024

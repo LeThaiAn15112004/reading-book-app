@@ -39,19 +39,19 @@ function AppChromeFrame({ children }: { children: ReactNode }) {
         }`}
         aria-hidden={immersive || undefined}
       >
-        {/* Desktop window chrome; the Mobile host has a compact phone navigation instead (spec 008, T070). */}
+        {/* Desktop window chrome; the Mobile host has a bottom tab bar instead (spec 008 T070, spec 013 US5). */}
         {isFeatureAvailable('desktopChrome') ? (
           <>
             <AppTitlebar />
             <AppMenubar />
           </>
-        ) : (
-          <PhoneNav />
-        )}
+        ) : null}
       </div>
       <div className="relative min-h-0 flex-1 overflow-hidden">
         {children}
       </div>
+      {/* Phone tab bar: after the content, so it stays fixed at the bottom while the screen scrolls (FR-021). */}
+      {isFeatureAvailable('desktopChrome') ? null : <PhoneNav />}
     </div>
   )
 }

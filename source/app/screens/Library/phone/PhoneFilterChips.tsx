@@ -25,8 +25,9 @@ export function PhoneFilterChips({ filter, onChange }: PhoneFilterChipsProps) {
             type="button"
             role="radio"
             aria-checked={checked}
-            // 36 px pill; the 4 px vertical padding of the row brings the touch area to 44 px.
-            className={`inline-flex h-9 cursor-pointer items-center rounded-full border px-4 text-[13px] font-medium whitespace-nowrap transition-colors ${
+            // 36 px pill; the `before:` layer extends the button's own hit area 4 px above and below to 44 px (FR-027)
+            // — the row's padding alone would not, it is not part of the button.
+            className={`relative inline-flex h-9 cursor-pointer before:absolute before:inset-x-0 before:-inset-y-1 before:content-['']  items-center rounded-full border px-4 text-[13px] font-medium whitespace-nowrap transition-colors ${
               checked
                 ? 'border-lib-accent bg-lib-accent-soft text-lib-accent'
                 : 'border-lib-border-soft bg-lib-surface text-lib-muted active:bg-lib-chip'

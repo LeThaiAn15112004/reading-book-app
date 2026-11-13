@@ -307,7 +307,6 @@ export const en = {
     noMatch: {
       clear: 'Clear',
     },
-    adPlaceholder: 'Ad · Banner 320 × 50',
     sheet: {
       close: 'Close',
     },

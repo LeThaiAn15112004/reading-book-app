@@ -42,9 +42,10 @@ Hidden, never disabled, matching the toolbar's existing rule.
 | Import | `components/import/ImportMenu.tsx` | Only "Add file" |
 | Library | `LibraryTopBar.tsx`, `BookItemMenu.tsx` | No annotation import / export, no "Open file location" / "Copy file path"; the book menu is a bottom sheet and its collection list opens inline |
 | Settings | `settingsNavStore.ts`, `SettingsSidebar.tsx`, `AdvancedSettings.tsx`, `resetAppSettings.ts` | Sections: Appearance, Privacy, Advanced (without Updates), About; the section rail stays collapsed (icons); Reset App Settings resets only the groups that exist (no Main-owned notifications / background) |
-| Chrome | `chrome/PhoneNav.tsx`, `App.tsx` | Library, Collections, Reading, Settings instead of `AppTitlebar` + `AppMenubar` (Cloud Sources is reached only from the menubar) |
+| Chrome | `chrome/PhoneNav.tsx`, `App.tsx` | Library, Collections, Reading, Settings instead of `AppTitlebar` + `AppMenubar` (Cloud Sources is reached only from the menubar); at the bottom since spec 013 |
 | Long press | `platform/long-press.ts` | `{...withLongPress(handler)}` on the 4 Library cards; in Electron it is `{ onContextMenu: handler }`. The Reader's right-click menus are the Mobile Reader's (T103) |
 | CSS | `styles/phone.css` | Every rule under `[data-mobile-host]`; width rules also inside `max-width: 899.98px`. `.hover-reveal` marks controls that only appear on hover |
+| Library (spec 013) | `screens/Library/phone/` (`MobileLibraryHub`, lazy chunk), `components/book/PhoneBookSheet.tsx`, core `app-models/library-phone.ts` | Phone Library home: header (search + 44 px "+" = Add file), filter chips All / Recent / Favourites / Completed, Continue Reading carousel (All without search) with "Read again" (`library.restartBook`, both hosts), toolbar (count · sort · Grid / List, stored `table` = phone List), one scroll container; book sheet in a fixed order. `PhoneNav` is a bottom tab bar (icons over labels, opaque `bg-lib-bg-deep`, rendered after the content in `App.tsx`); a dev-only 320 × 50 `AdSlot` sits above it on the Library hub only (nothing, zero height in release builds; no network / SDK). Spec `specs/013-mobile-library-screen/` |
 
 ## Touch replacements
 
