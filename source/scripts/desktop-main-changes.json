@@ -77,6 +77,7 @@
     "source/app/platforms/electron/transcription/transcription-job.ts": "T049: import name @reading-book/* replaced by @core/* (import specifier only)",
     "source/app/platforms/electron/transcription/transcription-runtime.ts": "T049: import name @reading-book/* replaced by @core/* (import specifier only)",
     "source/app/platforms/electron/transcription/transcription-service.ts": "T049: import name @reading-book/* replaced by @core/* (import specifier only) | spec 012 T040: user-visible messages returned to the renderer built with tMain (Main interface language)",
+    "source/app/platforms/electron/transcription/transcription-models.ts": "spec 012 T059: comment only (i18n-ignore on the two fallback model labels; the UI labels models by id)",
     "source/app/platforms/electron/transcription/transcription.process.ts": "T049: import name @reading-book/* replaced by @core/* (import specifier only)",
     "source/app/platforms/electron/transcription/whisper-engine.ts": "T049: import name @reading-book/* replaced by @core/* (import specifier only)",
     "source/app/platforms/electron/translation/translation-job.ts": "T049: import name @reading-book/* replaced by @core/* (import specifier only)",

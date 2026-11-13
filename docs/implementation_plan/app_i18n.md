@@ -14,7 +14,9 @@ Spec, plan, contracts: `specs/012-app-ui-i18n/`. Glossary (authoritative Vietnam
 | System language (Phase 4) | renderer and Main resolve `system` by the same rule; no locale API → English |
 | Main shell + export (Phase 5) | tray, reminder notifications, Main-owned dialogs (`main.shell`), readable `.md` export (`exports`) |
 | Formats + plurals (Phase 6) | no `toLocale*` left in `source/app`; decimals, sizes, dates through `useFormat()` / `getFormat()`; plural shape tested |
-| Release gate (`tests/i18n/i18n-release-gate.test.ts`) | not yet (T059) — **not releasable** until it exists and passes |
+| Glossary anchors + no "bạn" (`tests/i18n/glossary-anchors.test.ts`) | done (T057) |
+| Release gate (`tests/i18n/i18n-release-gate.test.ts`) | done (T059): no pending area, no pending header — fails the build if one comes back |
+| Layout pass in Tiếng Việt (T056), startup cost (T058) | manual, not yet recorded |
 
 ## Modules
 
@@ -28,7 +30,8 @@ Spec, plan, contracts: `specs/012-app-ui-i18n/`. Glossary (authoritative Vietnam
 | `source/scripts/eslint-rules/no-ui-literals.mjs` | the lint rule (its test runs in `desktop:lint`) |
 | `source/scripts/i18n-inventory.mjs` | `npm run i18n:inventory` — remaining literal texts (`--files`, `--json`, `--only <prefix>`) |
 
-Checks: `npm run sdk:test` (`tests/i18n/*`), `npm run spike:i18n:main`, `npm run lint`.
+Checks: `npm run sdk:test` (`tests/i18n/*`, incl. the release gate and glossary anchors), `npm run spike:i18n:main`,
+`npm run lint`, `npm run i18n:inventory`.
 
 ## How to add a text
 
