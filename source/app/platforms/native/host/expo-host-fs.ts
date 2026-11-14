@@ -33,7 +33,7 @@ function info(rel: string) {
 function reader(file: File): ByteReader {
   const handle = file.open(FileMode.ReadOnly)
   return {
-    read: (length) => handle.readBytes(length),
+    read: (length) => handle.readBytesSync(length),
     close: () => handle.close(),
   }
 }
@@ -103,7 +103,7 @@ export function createExpoHostFs(): HostFs {
       const handle = appFile(rel).open(FileMode.ReadOnly)
       try {
         handle.offset = offset
-        return handle.readBytes(length)
+        return handle.readBytesSync(length)
       } finally {
         handle.close()
       }

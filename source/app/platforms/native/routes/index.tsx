@@ -36,7 +36,8 @@ export default function ReaderHost() {
   const [sqlite, setSqlite] = useState<string | null>(null)
   // Bumped to remount the WebView after its process died; the UI then re-reads everything from SQLite.
   const [generation, setGeneration] = useState(0)
-  const webView = useRef<WebView>(null)
+  // `<object>`: react-native-webview 14 declares `WebView<P = undefined>` over `WebViewProps & P`, which is `never` with the default.
+  const webView = useRef<WebView<object>>(null)
 
   const [runtime, setRuntime] = useState<HostRuntime | null>(null)
   // Edge-to-edge: the status and navigation bars are transparent, so the app paints the areas behind them in the
@@ -115,7 +116,7 @@ export default function ReaderHost() {
       {statusBar}
       <View style={{ height: insets.top, backgroundColor: bars.top }} />
       {sqlite && <Text selectable style={styles.report}>{sqlite}</Text>}
-      <WebView
+      <WebView<object>
         key={generation}
         ref={webView}
         style={[styles.fill, { backgroundColor: bars.bottom }]}
