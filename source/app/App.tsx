@@ -28,7 +28,7 @@ function AppChromeFrame({ children }: { children: ReactNode }) {
 
   return (
     <div
-      className="flex h-screen flex-col overflow-hidden"
+      className="app-frame flex h-screen flex-col overflow-hidden"
       data-immersive-reading={immersive ? '' : undefined}
     >
       <div

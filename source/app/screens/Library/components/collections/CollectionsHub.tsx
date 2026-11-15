@@ -78,7 +78,7 @@ export function CollectionsHub({
         </button>
       </header>
 
-      <div className="flex-1 overflow-x-hidden overflow-y-auto px-7 py-7">
+      <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain px-7 py-7">
         {collections.length === 0 ? (
           <div className="mx-auto flex max-w-md flex-col items-center py-16 text-center">
             <p className="m-0 mb-2 text-base font-semibold text-lib-text-strong">

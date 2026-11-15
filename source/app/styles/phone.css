@@ -13,9 +13,29 @@
   -webkit-tap-highlight-color: transparent;
 }
 
-:root[data-mobile-host] body {
-  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+/*
+ * The document never scrolls: header, tab bar and ad banner are fixed, only a screen's own list scrolls. Body padding
+ * (safe areas) used to add to the frame's 100vh, making the page taller than the viewport and scrollable.
+ */
+:root[data-mobile-host],
+:root[data-mobile-host] body,
+:root[data-mobile-host] #root {
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
   overscroll-behavior: none;
+}
+
+:root[data-mobile-host] body {
+  box-sizing: border-box;
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+  position: fixed;
+  inset: 0;
+  width: 100%;
+}
+
+:root[data-mobile-host] .app-frame {
+  height: 100%;
 }
 
 :root[data-mobile-host] button,
