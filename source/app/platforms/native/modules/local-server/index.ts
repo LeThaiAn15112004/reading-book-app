@@ -1,4 +1,4 @@
-import { requireNativeModule } from 'expo'
+import { requireOptionalNativeModule } from 'expo'
 
 type LocalServerNative = {
   /**
@@ -10,4 +10,8 @@ type LocalServerNative = {
   isRunning(): boolean
 }
 
-export default requireNativeModule<LocalServerNative>('LocalServer')
+/**
+ * `null` when the running binary does not carry the module: Expo Go, or a native build made before the module (or
+ * before an SDK upgrade) — `npm run android` rebuilds it. Callers decide what to do; loading never throws.
+ */
+export default requireOptionalNativeModule<LocalServerNative>('LocalServer')
