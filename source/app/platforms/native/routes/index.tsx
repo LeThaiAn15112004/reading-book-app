@@ -137,6 +137,8 @@ export default function ReaderHost() {
         allowFileAccess={FILE_ROUTE}
         allowFileAccessFromFileURLs={FILE_ROUTE}
         allowUniversalAccessFromFileURLs={FILE_ROUTE}
+        bounces={false}
+        overScrollMode="never"
         javaScriptCanOpenWindowsAutomatically={false}
         setSupportMultipleWindows={false}
         webviewDebuggingEnabled={__DEV__ || FEASIBILITY}
