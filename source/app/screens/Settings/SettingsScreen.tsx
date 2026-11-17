@@ -1,5 +1,7 @@
+import { Suspense, lazy } from 'react'
 import type { MessageKey } from '@core'
 import { useT } from '../../i18n'
+import { isMobileHost } from '../../platforms/host'
 import {
   AboutSettings,
   AdvancedSettings,
@@ -27,8 +29,27 @@ const SECTION_DESCRIPTIONS: Partial<Record<SettingsSectionId, MessageKey>> = {
   about: 'settings.sectionDescriptions.about',
 }
 
-/** SCR-06 — App Settings: section sidebar (collapsible) + content panel. */
+/**
+ * The phone "More" screen (spec 014): section list ⇄ section page. A separate chunk: `isMobileHost()` is false in
+ * Electron, so `lazy` never starts loading it on Desktop.
+ */
+const MobileSettingsScreen = lazy(() => import('./phone/MobileSettingsScreen'))
+
+/** SCR-06 — App Settings: section sidebar (collapsible) + content panel; on the phone, the More screen (spec 014). */
 export function SettingsScreen() {
+  if (isMobileHost()) {
+    return (
+      <div className="lib-chrome flex h-full w-full select-none overflow-hidden font-[system-ui,'Segoe_UI',sans-serif] text-lib-text antialiased">
+        <Suspense fallback={<div className="flex-1" aria-busy="true" />}>
+          <MobileSettingsScreen />
+        </Suspense>
+      </div>
+    )
+  }
+  return <DesktopSettingsScreen />
+}
+
+function DesktopSettingsScreen() {
   const t = useT()
   const activeSection = useSettingsNavStore((s) => s.activeSection)
   const sections = visibleSettingsSections()

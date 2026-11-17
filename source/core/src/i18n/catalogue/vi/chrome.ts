@@ -8,7 +8,7 @@ export const vi = {
     collections: 'Bộ sưu tập',
     cloudSources: 'Nguồn đám mây',
     reading: 'Đang đọc',
-    settings: 'Cài đặt',
+    settings: 'Khác',
     tools: 'Công cụ',
     mainNavigation: 'Điều hướng chính',
     cloudProviders: 'Các nguồn đám mây',

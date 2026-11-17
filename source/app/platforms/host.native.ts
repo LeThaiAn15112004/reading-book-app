@@ -15,6 +15,7 @@ const MOBILE_UNAVAILABLE: ReadonlySet<AppFeature> = new Set<AppFeature>([
   'notificationSettings',
   'keyboardShortcuts',
   'updates',
+  'uiDensity',
   'fileSystemActions',
   'desktopChrome',
 ])

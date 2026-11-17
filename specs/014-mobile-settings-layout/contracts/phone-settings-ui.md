@@ -39,13 +39,14 @@ Desktop: `/settings/:section` renders exactly what `/settings` renders today.
 | `.settings-switch-row` | the flex row wrapping label + `SettingsSwitch` | `position: relative; min-height: 48px` |
 | `.settings-switch` | `SettingsSwitch` button | `::after { content:''; position:absolute; inset:0 }` (whole row toggles) |
 | `.settings-action` | action buttons (Clear data, Reset, Open in store, dialog buttons) | `min-height: 48px` |
-| `[data-tone="danger"]` | Clear data, Reset, dialog destructive button | `color` / `border-color: var(--lib-danger)` at rest |
+| `[data-tone="danger"]` | Clear data, Reset (outlined buttons) | `color` / `border-color: var(--lib-danger)` at rest |
+| `[data-tone="danger-filled"]` | dialog destructive buttons (filled red) | background / border `#dc2626`, text white (4.83:1; desktop red-500 is 3.76:1) |
 | `.settings-choice-row` | `ClearDataDialog` option `<label>` | `min-height: 48px`, whole row toggles the checkbox |
 | secondary text | `.text-[10px]`, `.text-[11px]` inside `.phone-settings` | `font-size: 12px` |
 | width | list + section body | `max-width: 640px; margin-inline: auto` at `min-width: 900px` |
 | density | `:root[data-mobile-host]` | `--ui-density-*` fixed to the phone values regardless of `data-density` |
 
-Token: `--lib-danger` in `theme.css` (Night/Sepia `#f87171`, Paper `#dc2626`). Desktop does not use it in this feature.
+Token: `--lib-danger` in `theme.css` (Night/Sepia `#f87171`, Paper `#b91c1c`). Desktop does not use it in this feature.
 
 ## 5. Back-closable dialogs
 

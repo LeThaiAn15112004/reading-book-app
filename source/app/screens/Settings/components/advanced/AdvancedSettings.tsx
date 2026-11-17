@@ -125,7 +125,7 @@ export function AdvancedSettings() {
             </div>
             <button
               type="button"
-              className="inline-flex h-9 shrink-0 cursor-pointer items-center gap-2 rounded-lg border border-lib-border bg-transparent px-4 text-[13px] font-semibold text-lib-text-strong transition-colors hover:border-lib-accent hover:bg-lib-accent-soft focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-lib-accent disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:border-lib-border disabled:hover:bg-transparent"
+              className="settings-action inline-flex h-9 shrink-0 cursor-pointer items-center gap-2 rounded-lg border border-lib-border bg-transparent px-4 text-[13px] font-semibold text-lib-text-strong transition-colors hover:border-lib-accent hover:bg-lib-accent-soft focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-lib-accent disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:border-lib-border disabled:hover:bg-transparent"
               disabled={checking}
               aria-busy={checking}
               onClick={() => void checkForUpdates()}
@@ -159,7 +159,8 @@ export function AdvancedSettings() {
       >
         <button
           type="button"
-          className="inline-flex h-9 cursor-pointer items-center gap-2 rounded-lg border border-lib-border bg-transparent px-4 text-[13px] font-semibold text-lib-text-strong transition-colors hover:border-red-400 hover:text-red-400 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-lib-accent disabled:cursor-wait disabled:opacity-60 disabled:hover:border-lib-border disabled:hover:text-lib-text-strong"
+          data-tone="danger"
+          className="settings-action inline-flex h-9 cursor-pointer items-center gap-2 rounded-lg border border-lib-border bg-transparent px-4 text-[13px] font-semibold text-lib-text-strong transition-colors hover:border-red-400 hover:text-red-400 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-lib-accent disabled:cursor-wait disabled:opacity-60 disabled:hover:border-lib-border disabled:hover:text-lib-text-strong"
           disabled={resetting}
           aria-busy={resetting}
           onClick={() => {

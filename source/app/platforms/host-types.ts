@@ -16,6 +16,8 @@ export type AppFeature =
   | 'keyboardShortcuts'
   /** Settings → Advanced → Updates. */
   | 'updates'
+  /** Settings → Appearance → UI Density (spec 014 FR-017: the phone uses fixed touch sizes). */
+  | 'uiDensity'
   /** Show in folder, copy file path, locate file, signature checks: things about a file on a computer. */
   | 'fileSystemActions'
   /** Desktop's title bar and menu bar (window chrome). */

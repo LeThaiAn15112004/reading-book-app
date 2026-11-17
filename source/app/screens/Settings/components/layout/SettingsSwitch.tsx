@@ -22,7 +22,7 @@ export function SettingsSwitch({
       aria-describedby={describedBy}
       aria-busy={disabled || undefined}
       disabled={disabled}
-      className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full border-none transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-lib-accent disabled:cursor-wait disabled:opacity-70 ${
+      className={`settings-switch relative inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full border-none transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-lib-accent disabled:cursor-wait disabled:opacity-70 ${
         checked ? 'bg-lib-accent' : 'bg-lib-chip'
       }`}
       onClick={() => onChange(!checked)}

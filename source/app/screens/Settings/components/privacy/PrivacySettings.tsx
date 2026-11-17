@@ -43,7 +43,7 @@ export function PrivacySettings() {
       ) : null}
 
       <SettingsCard title={t('settings.privacy.searchHistory')}>
-        <div className="flex items-start justify-between gap-4">
+        <div className="settings-switch-row flex items-start justify-between gap-4">
           <div className="min-w-0">
             <p id="privacy-search-history-label" className="m-0 text-[13px] text-lib-text-strong">
               {t('settings.privacy.searchHistoryLabel')}
@@ -70,7 +70,8 @@ export function PrivacySettings() {
       >
         <button
           type="button"
-          className="inline-flex h-9 cursor-pointer items-center rounded-lg border border-lib-border bg-transparent px-4 text-[13px] font-semibold text-lib-text-strong transition-colors hover:border-red-400 hover:text-red-400 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-lib-accent"
+          data-tone="danger"
+          className="settings-action inline-flex h-9 cursor-pointer items-center rounded-lg border border-lib-border bg-transparent px-4 text-[13px] font-semibold text-lib-text-strong transition-colors hover:border-red-400 hover:text-red-400 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-lib-accent"
           onClick={() => {
             setCleared(false)
             setDialogOpen(true)

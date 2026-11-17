@@ -3,7 +3,11 @@ import type { en } from '../en/settings.js'
 
 /** Area `settings` in Vietnamese (glossary: specs/012-app-ui-i18n/contracts/glossary.md). */
 export const vi = {
-  title: 'Cài đặt',
+  title: 'Khác',
+  phone: {
+    back: 'Quay lại',
+    listAria: 'Các mục cài đặt',
+  },
   sidebar: {
     aria: 'Các mục cài đặt',
     expand: 'Mở rộng thanh cài đặt',
@@ -345,6 +349,7 @@ export const vi = {
     links: 'Liên kết',
     notAvailable: 'Chưa khả dụng',
     notAvailableTitle: '{label} chưa khả dụng',
+    openInStore: 'Mở trong cửa hàng',
     items: {
       privacyPolicy: 'Chính sách quyền riêng tư',
       termsOfService: 'Điều khoản dịch vụ',

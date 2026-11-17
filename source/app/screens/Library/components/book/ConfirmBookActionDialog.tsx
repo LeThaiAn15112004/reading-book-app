@@ -1,4 +1,5 @@
 import { useEffect } from 'react'
+import { useBackClose } from '../../../../hooks/app/useBackClose'
 import { useT } from '../../../../i18n'
 
 export type ConfirmBookActionDialogProps = {
@@ -19,6 +20,8 @@ export function ConfirmBookActionDialog({
   onConfirm,
 }: ConfirmBookActionDialogProps) {
   const t = useT()
+  // Phone: system Back closes the dialog first (spec 014 FR-005).
+  useBackClose(true, onCancel)
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
       if (e.key === 'Escape') {
@@ -50,12 +53,13 @@ export function ConfirmBookActionDialog({
           {message}
         </p>
         <div className="flex justify-end gap-2">
-          <button type="button" className="h-10 cursor-pointer rounded-lg border border-lib-border bg-transparent px-4 text-[13px] font-semibold text-lib-muted" onClick={onCancel}>
+          <button type="button" className="settings-action h-10 cursor-pointer rounded-lg border border-lib-border bg-transparent px-4 text-[13px] font-semibold text-lib-muted" onClick={onCancel}>
             {t('common.actions.cancel')}
           </button>
           <button
             type="button"
-            className={`h-10 cursor-pointer rounded-lg border px-4 text-[13px] font-semibold ${
+            data-tone={destructive ? 'danger-filled' : undefined}
+            className={`settings-action h-10 cursor-pointer rounded-lg border px-4 text-[13px] font-semibold ${
               destructive
                 ? 'border-red-500 bg-red-500 text-white hover:bg-red-400'
                 : 'border-lib-accent bg-lib-accent text-lib-on-accent'

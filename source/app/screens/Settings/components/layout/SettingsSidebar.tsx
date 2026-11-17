@@ -4,7 +4,6 @@ import {
   useSettingsNavStore,
 } from '../../logic/settingsNavStore'
 import { SettingsSectionIcon } from './SettingsSectionIcon'
-import { isMobileHost } from '../../../../platforms/host'
 
 /** Same chevron paths as the Reader sidebar edge handle (`SidebarEdgeRail`). */
 function ChevronIcon({ collapsed }: { collapsed: boolean }) {
@@ -35,9 +34,8 @@ function ChevronIcon({ collapsed }: { collapsed: boolean }) {
 export function SettingsSidebar() {
   const t = useT()
   const activeSection = useSettingsNavStore((s) => s.activeSection)
-  // Mobile host (spec 008, T069): the icon rail leaves the phone's width to the content; there is no toggle there.
-  const phone = isMobileHost()
-  const collapsed = useSettingsNavStore((s) => s.collapsed) || phone
+  // Desktop only: the Mobile host shows its own More screen instead (spec 014, `phone/MobileSettingsScreen.tsx`).
+  const collapsed = useSettingsNavStore((s) => s.collapsed)
   const setActiveSection = useSettingsNavStore((s) => s.setActiveSection)
   const toggleCollapsed = useSettingsNavStore((s) => s.toggleCollapsed)
   const toggleLabel = collapsed ? t('settings.sidebar.expand') : t('settings.sidebar.collapse')
@@ -103,7 +101,6 @@ export function SettingsSidebar() {
         </nav>
       </aside>
 
-      {phone ? null : (
       <button
         type="button"
         className="absolute top-0 bottom-0 left-full flex w-5 cursor-pointer items-center justify-center rounded-r-md border border-l-0 border-lib-border-soft bg-lib-surface-strong text-lib-muted shadow-md transition-colors hover:border-lib-accent-ring hover:text-lib-accent focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-lib-accent"
@@ -114,7 +111,6 @@ export function SettingsSidebar() {
       >
         <ChevronIcon collapsed={collapsed} />
       </button>
-      )}
     </div>
   )
 }

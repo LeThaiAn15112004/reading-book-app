@@ -27,6 +27,8 @@
   --lib-accent-soft: rgb(245 158 11 / 0.14);
   --lib-accent-ring: rgb(245 158 11 / 0.28);
   --lib-on-accent: #0f172a;
+  /* Destructive text / border at rest (spec 014 FR-014): ≥ 4.5:1 on this theme's page. */
+  --lib-danger: #f87171;
   --lib-input: rgb(15 23 42 / 0.45);
   --lib-topbar: rgb(15 23 42 / 0.35);
   --lib-hint: rgb(15 23 42 / 0.28);
@@ -72,6 +74,8 @@
   --lib-accent-soft: rgb(245 158 11 / 0.16);
   --lib-accent-ring: rgb(245 158 11 / 0.3);
   --lib-on-accent: #0f172a;
+  /* Destructive text / border at rest (spec 014 FR-014): ≥ 4.5:1 on this theme's page. */
+  --lib-danger: #f87171;
   --lib-input: rgb(22 18 14 / 0.55);
   --lib-topbar: rgb(22 18 14 / 0.45);
   --lib-hint: rgb(37 31 25 / 0.4);
@@ -118,6 +122,8 @@
   --lib-accent-soft: rgb(217 119 6 / 0.12);
   --lib-accent-ring: rgb(217 119 6 / 0.28);
   --lib-on-accent: #0f172a;
+  /* Destructive text / border at rest (spec 014 FR-014): ≥ 4.5:1 on this theme's page. */
+  --lib-danger: #b91c1c;
   --lib-input: rgb(255 255 255 / 0.85);
   --lib-topbar: rgb(255 255 255 / 0.65);
   --lib-hint: rgb(241 245 249 / 0.8);

@@ -1,6 +1,11 @@
 /** English texts of area `settings` (spec 012): Settings screen, every section, keyboard shortcut names. */
 export const en = {
-  title: 'Settings',
+  title: 'More',
+  /** Phone layout (spec 014): section list ⇄ section page. */
+  phone: {
+    back: 'Back',
+    listAria: 'Settings sections',
+  },
   sidebar: {
     aria: 'Settings sections',
     expand: 'Expand settings sidebar',
@@ -342,6 +347,7 @@ export const en = {
     links: 'Links',
     notAvailable: 'Not available yet',
     notAvailableTitle: '{label} is not available yet',
+    openInStore: 'Open in store',
     items: {
       privacyPolicy: 'Privacy Policy',
       termsOfService: 'Terms of Service',

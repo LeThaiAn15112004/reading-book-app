@@ -74,7 +74,7 @@ function App() {
                       <Route path="/" element={<SplashScreen />} />
                       <Route path="/library" element={<LibraryScreen />} />
                       <Route path="/reader/:bookId" element={<ReaderRoute />} />
-                      <Route path="/settings" element={<SettingsScreen />} />
+                      <Route path="/settings/:section?" element={<SettingsScreen />} />
                       {/* T3.1 spike harness — not linked from Library → Reader */}
                       <Route path="/spike/epub" element={<SpikeEpubScreen />} />
                       <Route

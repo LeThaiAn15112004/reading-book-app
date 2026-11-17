@@ -1,3 +1,4 @@
+import { useBackClose } from '../../../../hooks/app/useBackClose'
 import { useT } from '../../../../i18n'
 import { useEffect, useId, useState } from 'react'
 
@@ -27,6 +28,8 @@ export function ClearDataDialog({ options, onCancel, onClear }: ClearDataDialogP
   const titleId = useId()
   const descId = useId()
   const [selected, setSelected] = useState<ReadonlySet<string>>(new Set())
+  // Phone: system Back closes the dialog first (spec 014 FR-005).
+  useBackClose(true, onCancel)
 
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
@@ -70,7 +73,7 @@ export function ClearDataDialog({ options, onCancel, onClear }: ClearDataDialogP
           {options.map((option) => (
             <li key={option.id}>
               <label
-                className={`flex items-start gap-3 rounded-lg border border-lib-border-soft px-3 py-2.5 ${
+                className={`settings-choice-row flex items-start gap-3 rounded-lg border border-lib-border-soft px-3 py-2.5 ${
                   option.empty ? 'cursor-not-allowed opacity-60' : 'cursor-pointer hover:border-lib-border'
                 }`}
               >
@@ -99,14 +102,15 @@ export function ClearDataDialog({ options, onCancel, onClear }: ClearDataDialogP
         <div className="mt-5 flex justify-end gap-2">
           <button
             type="button"
-            className="h-10 cursor-pointer rounded-lg border border-lib-border bg-transparent px-4 text-[13px] font-semibold text-lib-muted hover:text-lib-text-strong"
+            className="settings-action h-10 cursor-pointer rounded-lg border border-lib-border bg-transparent px-4 text-[13px] font-semibold text-lib-muted hover:text-lib-text-strong"
             onClick={onCancel}
           >
             {t('common.actions.cancel')}
           </button>
           <button
             type="button"
-            className="h-10 cursor-pointer rounded-lg border border-red-500 bg-red-500 px-4 text-[13px] font-semibold text-white hover:bg-red-400 disabled:cursor-not-allowed disabled:opacity-50"
+            data-tone="danger-filled"
+            className="settings-action h-10 cursor-pointer rounded-lg border border-red-500 bg-red-500 px-4 text-[13px] font-semibold text-white hover:bg-red-400 disabled:cursor-not-allowed disabled:opacity-50"
             disabled={selected.size === 0}
             onClick={() => onClear([...selected])}
           >

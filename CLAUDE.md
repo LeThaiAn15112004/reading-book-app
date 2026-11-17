@@ -431,6 +431,17 @@ imports the shared UI's `@app/main` unchanged. **No Desktop file is copied into 
   List) and the book menu as `PhoneBookSheet`. `PhoneNav` is a bottom tab bar rendered after the content in `App.tsx`;
   `AdSlot` (320 × 50, above it, Library hub only) renders only in development builds — no ad SDK, nothing in release.
   The desktop Library is unchanged.
+- **Mobile Settings = "More" (spec 014, `specs/014-mobile-settings-layout/`)**: the Settings nav entry is labelled
+  "More" / "Khác" on both hosts (`chrome.nav.settings`, `settings.title`). Route `/settings/:section?`: on the Mobile
+  host `SettingsScreen` lazy-loads `screens/Settings/phone/MobileSettingsScreen.tsx` — `/settings` is the section list,
+  `/settings/:section` one section as its own page (slide in / out, instant under reduced motion; state in
+  `phoneSettingsNavStore`), so Android Back (`history.back()`) returns to the list; Desktop ignores the param and keeps its
+  sidebar. Section dialogs use `useBackClose` (`hooks/app/`, zustand `backCloseStore`) so Back closes them first.
+  Phone standards for the shared building blocks are CSS hooks in `phone.css` scoped to `.phone-settings`
+  (`settings-switch-row` / `settings-switch`, `settings-action`, `data-tone="danger" | "danger-filled"`,
+  `settings-choice-row`; token `--lib-danger`). Feature `uiDensity` is unavailable on the phone (Density hidden, sizes
+  fixed). About shows the installed version (`updatesStore` → `getAppInfo`) and only rows with a real destination
+  (`@core/config` `app-links.ts`: Privacy Policy URL, `storePageUrl(platform)`); the phone's Updates card opens the store.
 - **Dependency rules** are enforced by `source/scripts/boundaries/` (`npm run check:boundaries`); `check:build-split`
   proves the two bundles share no host code.
 ### AI port

@@ -44,3 +44,5 @@ export {
 export type { CloudProviderAvailability } from './cloudProviderAvailabilityStore.js'
 export type { UseLinkedLibrariesOptions } from './useLinkedLibraries.js'
 
+
+export { useBackClose } from './useBackClose.js'

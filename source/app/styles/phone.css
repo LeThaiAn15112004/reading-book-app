@@ -131,3 +131,132 @@
   margin-right: -6px;
   opacity: 1;
 }
+
+/*
+ * Phone "More" screen (spec 014, specs/014-mobile-settings-layout/contracts/phone-settings-ui.md). Rendered only on the
+ * Mobile host (`MobileSettingsScreen`); every rule is still scoped under `[data-mobile-host]`.
+ */
+:root[data-mobile-host] .phone-settings {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* Only the page body scrolls; the header stays (FR-007). Never sideways, down to 320 px (FR-013). */
+:root[data-mobile-host] .phone-settings-body {
+  flex: 1;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-inline: 16px;
+}
+
+/* Wide screens keep list → detail, centred about 640 px wide (FR-015). */
+@media (min-width: 900px) {
+  :root[data-mobile-host] .phone-settings-content {
+    max-width: 640px;
+    margin-inline: auto;
+  }
+}
+
+/* Directional slide (FR-016): transform only; the exit layer ignores input; none under reduced motion. */
+@keyframes phone-settings-in {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+@keyframes phone-settings-out {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(100%);
+  }
+}
+
+:root[data-mobile-host] .phone-settings-page {
+  animation: phone-settings-in 220ms cubic-bezier(0, 0, 0.2, 1) both;
+}
+
+:root[data-mobile-host] .phone-settings-page--leaving {
+  animation: phone-settings-out 200ms cubic-bezier(0.4, 0, 1, 1) both;
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root[data-mobile-host] .phone-settings-page,
+  :root[data-mobile-host] .phone-settings-page--leaving {
+    animation: none;
+  }
+}
+
+/*
+ * Shared building blocks at phone standards (spec 014 FR-014, contract §4). Scoped to the More screen: the same dialogs
+ * elsewhere (e.g. the Library's confirmations) and every Desktop window keep their look.
+ */
+
+/* A setting row with a switch: 48 dp high and tappable over the whole row (label included). The switch stays the one
+   labelled `role="switch"` control; its ::after stretches the hit area over the row. */
+:root[data-mobile-host] .phone-settings .settings-switch-row {
+  position: relative;
+  min-height: 48px;
+  align-items: center;
+}
+
+:root[data-mobile-host] .phone-settings .settings-switch-row .settings-switch {
+  position: static;
+}
+
+:root[data-mobile-host] .phone-settings .settings-switch-row .settings-switch::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+}
+
+/* Action and dialog buttons, dialog choice rows: 48 dp. */
+:root[data-mobile-host] .phone-settings .settings-action {
+  min-height: 48px;
+}
+
+:root[data-mobile-host] .phone-settings .settings-choice-row {
+  min-height: 48px;
+  align-items: center;
+}
+
+/* Destructive actions look destructive at rest, not only on hover (≥ 4.5:1 in every theme). */
+:root[data-mobile-host] .phone-settings [data-tone='danger'] {
+  color: var(--lib-danger);
+  border-color: var(--lib-danger);
+}
+
+/* Filled destructive confirmations: white on #dc2626 is 4.83:1 (the desktop red-500 is 3.76:1). */
+:root[data-mobile-host] .phone-settings [data-tone='danger-filled'] {
+  background-color: #dc2626;
+  border-color: #dc2626;
+  color: #fff;
+}
+
+/* Secondary text at least 12 px. */
+:root[data-mobile-host] .phone-settings .text-\[10px\],
+:root[data-mobile-host] .phone-settings .text-\[11px\] {
+  font-size: 12px;
+}
+
+/* Density does not apply on the phone (FR-017): fixed phone sizes whatever the stored `data-density` says. */
+:root[data-mobile-host],
+:root[data-mobile-host][data-density] {
+  --ui-density-row: 3rem;
+  --ui-density-gap: 1rem;
+  --ui-density-pad: 1rem;
+  --ui-density-content-x: 0px;
+  --ui-density-content-y: 1rem;
+}

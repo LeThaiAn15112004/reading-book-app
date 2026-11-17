@@ -2,6 +2,7 @@ import type { ReactNode } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useT } from '../../i18n'
 import { flushRegisteredSession } from '../../screens/Reader/logic'
+import { usePhoneSettingsNavStore } from '../../screens/Settings/logic/phoneSettingsNavStore'
 import { useAppNav, type AppNavId } from './AppNavContext'
 import { useOpenReading } from './OpenReadingContext'
 
@@ -30,10 +31,11 @@ const NAV_ICONS: Record<PhoneTabId, (props: NavIconProps) => ReactNode> = {
       <path d="M22 5h-6a4 4 0 0 0-4 4v11a3 3 0 0 1 3-3h7z" />
     </svg>
   ),
+  // "More" (spec 014 FR-018): three dots in a rounded square — the tab opens the settings sections list.
   settings: ({ className }) => (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden>
-      <circle cx="12" cy="12" r="3" />
-      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+      <rect x="3" y="3" width="18" height="18" rx="5" />
+      <path d="M8 12h.01M12 12h.01M16 12h.01" strokeWidth="2.6" />
     </svg>
   ),
 }
@@ -75,7 +77,18 @@ export function PhoneNav() {
       onSelect: () => leaveReaderThen(() => (libraryNav ? libraryNav.onStubNav('collections') : navigate('/library', { state: { openNav: 'collections' } }))),
     },
     { id: 'reading', label: t('chrome.nav.reading'), onSelect: () => goReading(), badge: tabs.length, disabled: tabs.length === 0 },
-    { id: 'settings', label: t('chrome.nav.settings'), onSelect: () => leaveReaderThen(() => navigate('/settings')) },
+    {
+      id: 'settings',
+      label: t('chrome.nav.settings'),
+      // Always the section list (spec 014 FR-006): from another tab the list starts at the top; tapping the tab while
+      // already in More replaces the entry, so Back does not return to an abandoned section page.
+      onSelect: () =>
+        leaveReaderThen(() => {
+          const inMore = path.startsWith('/settings')
+          if (!inMore) usePhoneSettingsNavStore.getState().resetListScroll()
+          navigate('/settings', { replace: inMore })
+        }),
+    },
   ]
 
   return (

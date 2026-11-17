@@ -11,6 +11,7 @@ import {
   type UiDensity,
 } from '../../../../theme/appAppearance'
 import { useAppAppearanceStore } from '../../../../theme/appAppearanceStore'
+import { isFeatureAvailable } from '../../../../platforms/host'
 import { SettingsCard } from '../layout/SettingsCard'
 import { AccentColorPicker } from './AccentColorPicker'
 
@@ -246,6 +247,8 @@ export function AppearanceSettings() {
         </div>
       </SettingsCard>
 
+      {/* Not on the phone (spec 014 FR-017): its touch sizes are fixed; the stored value is kept for Desktop. */}
+      {isFeatureAvailable('uiDensity') ? (
       <SettingsCard
         title={t('settings.appearance.density.title')}
         description={t('settings.appearance.density.description')}
@@ -288,6 +291,7 @@ export function AppearanceSettings() {
           })}
         </div>
       </SettingsCard>
+      ) : null}
 
       <SettingsCard
         title={t('settings.appearance.language.title')}
