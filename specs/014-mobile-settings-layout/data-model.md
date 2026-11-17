@@ -48,7 +48,7 @@ Desktop: the hook is a no-op (Escape handling stays in each dialog).
 |---|---|---|
 | `id` | string | existing ids (`privacy-policy`, `terms-of-service`, …, `store-page`, `website`) |
 | `labelKey` | `MessageKey` | existing |
-| `destination` | `string \| null` | `privacy-policy` → `PRIVACY_POLICY_URL`; `store-page` → `storePageUrl(platform)`; all others `null` |
+| `destination` | `string \| null` | `privacy-policy` → `PRIVACY_POLICY_URL`; all others `null` (the `store-page` row was removed; `storePageUrl(platform)` feeds the phone Updates card) |
 
 Rendering: rows with `destination === null` are not rendered; a group (Legal, Support, Links) with no rendered row is
 not rendered (FR-020). Activating a row calls `openExternalLink(destination)`.

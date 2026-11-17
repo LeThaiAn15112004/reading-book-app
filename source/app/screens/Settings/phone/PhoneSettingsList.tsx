@@ -3,13 +3,14 @@ import { useT } from '../../../i18n'
 import { SettingsSectionIcon } from '../components/layout/SettingsSectionIcon'
 import type { SettingsSectionId } from '../logic/settingsNavStore'
 
+/** One line per section. Appearance and Advanced say less than on Desktop: the phone has no Density and no update check. */
 const DESCRIPTIONS: Record<SettingsSectionId, MessageKey> = {
-  appearance: 'settings.sectionDescriptions.appearance',
+  appearance: 'settings.phone.descriptions.appearance',
   storage: 'settings.sectionDescriptions.storage',
   notifications: 'settings.sectionDescriptions.notifications',
   keyboard: 'settings.sectionDescriptions.keyboard',
   privacy: 'settings.sectionDescriptions.privacy',
-  advanced: 'settings.sectionDescriptions.advanced',
+  advanced: 'settings.phone.descriptions.advanced',
   about: 'settings.sectionDescriptions.about',
 }
 
@@ -41,6 +42,7 @@ export function PhoneSettingsList({ sections, onOpen }: PhoneSettingsListProps) 
         <li key={section.id}>
           <button
             type="button"
+            data-section={section.id}
             className="flex min-h-12 w-full cursor-pointer items-center gap-3 border-none bg-transparent px-4 py-3 text-left transition-colors focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-lib-accent active:bg-lib-surface-hover"
             onClick={() => onOpen(section.id)}
           >

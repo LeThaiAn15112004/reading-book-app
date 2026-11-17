@@ -7,6 +7,10 @@ export const vi = {
   phone: {
     back: 'Quay lại',
     listAria: 'Các mục cài đặt',
+    descriptions: {
+      appearance: 'Chủ đề, màu nhấn và ngôn ngữ cho toàn bộ ứng dụng.',
+      advanced: 'Khôi phục các tùy chọn ứng dụng về giá trị mặc định.',
+    },
   },
   sidebar: {
     aria: 'Các mục cài đặt',
@@ -350,6 +354,7 @@ export const vi = {
     notAvailable: 'Chưa khả dụng',
     notAvailableTitle: '{label} chưa khả dụng',
     openInStore: 'Mở trong cửa hàng',
+    storeUpdatesNote: 'Bản cập nhật của Readmate Reader được cung cấp qua cửa hàng ứng dụng.',
     items: {
       privacyPolicy: 'Chính sách quyền riêng tư',
       termsOfService: 'Điều khoản dịch vụ',

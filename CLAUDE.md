@@ -441,7 +441,7 @@ imports the shared UI's `@app/main` unchanged. **No Desktop file is copied into 
   (`settings-switch-row` / `settings-switch`, `settings-action`, `data-tone="danger" | "danger-filled"`,
   `settings-choice-row`; token `--lib-danger`). Feature `uiDensity` is unavailable on the phone (Density hidden, sizes
   fixed). About shows the installed version (`updatesStore` → `getAppInfo`) and only rows with a real destination
-  (`@core/config` `app-links.ts`: Privacy Policy URL, `storePageUrl(platform)`); the phone's Updates card opens the store.
+  (`@core/config` `app-links.ts`: Privacy Policy URL); the phone's Updates card opens the store (`storePageUrl(platform)`).
 - **Dependency rules** are enforced by `source/scripts/boundaries/` (`npm run check:boundaries`); `check:build-split`
   proves the two bundles share no host code.
 ### AI port

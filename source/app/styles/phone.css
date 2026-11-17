@@ -183,8 +183,10 @@
   }
 }
 
+/* `backwards`, not `both`: a transform kept after the slide would make the page the containing block of every
+   `position: fixed` descendant, so a section dialog would cover only the page and leave the tab bar tappable. */
 :root[data-mobile-host] .phone-settings-page {
-  animation: phone-settings-in 220ms cubic-bezier(0, 0, 0.2, 1) both;
+  animation: phone-settings-in 220ms cubic-bezier(0, 0, 0.2, 1) backwards;
 }
 
 :root[data-mobile-host] .phone-settings-page--leaving {
@@ -243,6 +245,48 @@
   background-color: #dc2626;
   border-color: #dc2626;
   color: #fff;
+}
+
+/* Pressed feedback (no hover on a touch screen). */
+:root[data-mobile-host] .phone-settings [data-tone='danger']:active:not(:disabled) {
+  background-color: color-mix(in srgb, var(--lib-danger) 14%, transparent);
+}
+
+:root[data-mobile-host] .phone-settings [data-tone='danger-filled']:active:not(:disabled) {
+  background-color: #b91c1c;
+  border-color: #b91c1c;
+}
+
+/* Theme cards: their name and hint wrap instead of being cut at 320 px. */
+:root[data-mobile-host] .phone-settings .theme-option-text {
+  overflow: visible;
+  text-overflow: clip;
+  white-space: normal;
+}
+
+/* Custom accent picker: a centred dialog over a scrim, rendered in <body> (an anchored popover was cut off at the
+   screen edge), hence not under `.phone-settings`. */
+:root[data-mobile-host] .accent-picker {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  right: auto;
+  z-index: 320;
+  width: min(20rem, calc(100vw - 2rem));
+  margin: 0;
+  transform: translate(-50%, -50%);
+}
+
+:root[data-mobile-host] .accent-picker-hue {
+  height: 1.5rem;
+}
+
+:root[data-mobile-host] .accent-picker input {
+  min-height: 44px;
+}
+
+:root[data-mobile-host] .accent-picker .settings-action {
+  min-height: 48px;
 }
 
 /* Secondary text at least 12 px. */

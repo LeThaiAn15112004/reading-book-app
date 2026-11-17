@@ -29,19 +29,22 @@ Desktop: `/settings/:section` renders exactly what `/settings` renders today.
 | `MobileSettingsScreen` | — | lazy-loaded by `SettingsScreen` only when `isMobileHost()`; root class `phone-settings`; list always mounted under the section layer |
 | `PhoneSettingsHeader` | `title`, `onBack?` | back control is a `<button>` ≥ 48 × 48, SVG chevron (`aria-hidden`), accessible name `settings.phone.back`; title truncates with ellipsis; header never scrolls |
 | `PhoneSettingsList` | `sections`, `onOpen(id)` | `<ul>` of `<li><button>` rows ≥ 48 dp: icon, name, description (≤ 2 lines, wraps), chevron; whole row is the target; focus ring `outline-lib-accent` |
-| `PhoneSettingsSectionPage` | `section` | renders the existing section component unchanged; body `overflow-x: hidden` |
+| `PhoneSettingsSectionPage` | `section` | renders the existing section component unchanged; body `overflow-x: hidden`; on open moves focus to its `h1` (`tabIndex=-1`); back on the list, focus returns to the closed section's row (`data-section`) unless the user moved it |
 
 ## 4. CSS hooks (`styles/phone.css`, all under `:root[data-mobile-host] .phone-settings`)
 
 | Hook | Added on | Phone rule |
 |---|---|---|
-| `.phone-settings-page` (enter) / `.phone-settings-page--leaving` | section layer | slide 220 ms in / 200 ms out, `transform` only; `prefers-reduced-motion: reduce` → none |
+| `.phone-settings-page` (enter) / `.phone-settings-page--leaving` | section layer | slide 220 ms in / 200 ms out, `transform` only; enter fill-mode `backwards` (a kept transform would trap `position: fixed` dialogs inside the page); `prefers-reduced-motion: reduce` → none |
 | `.settings-switch-row` | the flex row wrapping label + `SettingsSwitch` | `position: relative; min-height: 48px` |
 | `.settings-switch` | `SettingsSwitch` button | `::after { content:''; position:absolute; inset:0 }` (whole row toggles) |
 | `.settings-action` | action buttons (Clear data, Reset, Open in store, dialog buttons) | `min-height: 48px` |
 | `[data-tone="danger"]` | Clear data, Reset (outlined buttons) | `color` / `border-color: var(--lib-danger)` at rest |
 | `[data-tone="danger-filled"]` | dialog destructive buttons (filled red) | background / border `#dc2626`, text white (4.83:1; desktop red-500 is 3.76:1) |
 | `.settings-choice-row` | `ClearDataDialog` option `<label>` | `min-height: 48px`, whole row toggles the checkbox |
+| `.theme-option-text` | Appearance theme card name / hint | wrap instead of ellipsis |
+| `:active` on `[data-tone]` | danger buttons | pressed background (no hover on touch) |
+| headings | `SettingsCard` title | `h2` on the phone (under the page `h1`), `h3` on Desktop |
 | secondary text | `.text-[10px]`, `.text-[11px]` inside `.phone-settings` | `font-size: 12px` |
 | width | list + section body | `max-width: 640px; margin-inline: auto` at `min-width: 900px` |
 | density | `:root[data-mobile-host]` | `--ui-density-*` fixed to the phone values regardless of `data-density` |
@@ -61,8 +64,10 @@ went before.
 |---|---|---|
 | Density card (Appearance) | hidden (`isFeatureAvailable('uiDensity')` false) | unchanged |
 | About version | `getAppInfo().version` ("Loading…" / "Unknown") | same |
-| About link rows | only rows with a destination: Privacy Policy (URL), Store page (Play on Android, App Store on iOS); empty groups hidden | Privacy Policy only (store row hidden); empty groups hidden |
-| About Updates card | version + "Open in store" (`settings-action`) → store page; button hidden if no store URL | unchanged |
+| About link rows | only rows with a destination: Privacy Policy (URL); no Store page row; "opens outside" icon; empty groups hidden | same |
+| About Updates card | `settings.about.storeUpdatesNote` + "Open in store" (`settings-action`) → `storePageUrl(platform)`; button hidden if no store URL | unchanged |
+| List descriptions | Appearance / Advanced use `settings.phone.descriptions.*` (no Density, no update check) | `settings.sectionDescriptions.*` |
+| Custom accent picker | portal in `<body>`, centred `.accent-picker` over a scrim, Back closes it (`useBackClose`) | anchored popover, unchanged |
 
 ## 7. i18n keys (en / vi, `settings` and `chrome` areas)
 

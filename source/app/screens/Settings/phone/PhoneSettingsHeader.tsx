@@ -1,9 +1,12 @@
+import type { Ref } from 'react'
 import { useT } from '../../../i18n'
 
 export type PhoneSettingsHeaderProps = {
   title: string
   /** Section pages only: the back control (spec 014 FR-004). The list page has no back control. */
   onBack?: () => void
+  /** The title, focusable by script only: a section page moves focus here when it opens (spec 014, contract §3). */
+  headingRef?: Ref<HTMLHeadingElement>
 }
 
 function ChevronLeftIcon() {
@@ -15,7 +18,7 @@ function ChevronLeftIcon() {
 }
 
 /** Phone Settings header (spec 014, contract §3): never scrolls; title truncates; 48 × 48 back control. */
-export function PhoneSettingsHeader({ title, onBack }: PhoneSettingsHeaderProps) {
+export function PhoneSettingsHeader({ title, onBack, headingRef }: PhoneSettingsHeaderProps) {
   const t = useT()
   return (
     <header
@@ -33,7 +36,7 @@ export function PhoneSettingsHeader({ title, onBack }: PhoneSettingsHeaderProps)
           <ChevronLeftIcon />
         </button>
       ) : null}
-      <h1 className="m-0 min-w-0 truncate text-lg font-semibold tracking-tight text-lib-text-strong">{title}</h1>
+      <h1 ref={headingRef} tabIndex={-1} className="m-0 min-w-0 truncate outline-none text-lg font-semibold tracking-tight text-lib-text-strong">{title}</h1>
     </header>
   )
 }

@@ -45,7 +45,14 @@ export default function MobileSettingsScreen() {
       return
     }
     store.setOpenedFromList(false)
-    if (previous && !prefersReducedMotion()) store.startLeaving(previous)
+    if (!previous) return
+    if (!prefersReducedMotion()) store.startLeaving(previous)
+    // Back on the list: focus returns to the row of the section just closed, unless the user already put it somewhere
+    // else (e.g. a tab of the bottom bar).
+    const active = document.activeElement
+    if (!active || active === document.body || active.closest('.phone-settings-page')) {
+      listBody.current?.querySelector<HTMLElement>(`[data-section="${previous}"]`)?.focus({ preventScroll: true })
+    }
   }, [sectionId])
 
   // Back on the list: restore its scroll position before paint (FR-006).

@@ -12,7 +12,8 @@ const ABOUT_APP_NAME = 'Readmate Reader'
 
 /**
  * One About row. A row is shown only once it has a real, official destination (spec 014 FR-020): no placeholder URLs
- * and no disabled rows. `store-page` depends on the platform the app runs on (Play Store / App Store; none on Desktop).
+ * and no disabled rows. There is no Store page row: on the phone the Updates card already opens the store (FR-021), and
+ * Desktop has no store page.
  */
 type AboutLinkItem = {
   id: string
@@ -37,10 +38,10 @@ const SUPPORT_ITEMS: readonly AboutLinkItem[] = [
 
 const LINK_ITEMS: readonly AboutLinkItem[] = [
   { id: 'website', labelKey: 'settings.about.items.website', destination: NONE },
-  { id: 'store-page', labelKey: 'settings.about.items.storePage', destination: storePageUrl },
 ]
 
-function ChevronRightIcon() {
+/** Every About row opens outside the app (browser / store), so the row ends with "opens outside", not a chevron. */
+function ExternalLinkIcon() {
   return (
     <svg
       className="size-4 shrink-0"
@@ -51,7 +52,7 @@ function ChevronRightIcon() {
       stroke="currentColor"
       aria-hidden
     >
-      <path strokeLinecap="round" strokeLinejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
+      <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 6H5.25A2.25 2.25 0 0 0 3 8.25v10.5A2.25 2.25 0 0 0 5.25 21h10.5A2.25 2.25 0 0 0 18 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
     </svg>
   )
 }
@@ -69,7 +70,7 @@ function availableLinks(items: readonly AboutLinkItem[], platform: string | null
   })
 }
 
-/** A group of link rows (label + chevron). Renders nothing when no row has a destination (FR-020). */
+/** A group of link rows (label + "opens outside" icon). Renders nothing when no row has a destination (FR-020). */
 function AboutLinkGroup({
   title,
   items,
@@ -97,7 +98,7 @@ function AboutLinkGroup({
             >
               <span className="min-w-0 truncate">{t(item.labelKey)}</span>
               <span className="flex shrink-0 items-center text-lib-faint">
-                <ChevronRightIcon />
+                <ExternalLinkIcon />
               </span>
             </button>
           </li>
@@ -137,12 +138,17 @@ export function AboutSettings() {
 
       <SettingsCard title={t('settings.advanced.updates')}>
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="min-w-0">
-            <p className="m-0 text-[13px] text-lib-muted">{t('settings.advanced.currentVersion')}</p>
-            <p className="m-0 mt-0.5 text-[15px] font-semibold text-lib-text-strong tabular-nums select-text">
-              {versionText}
-            </p>
-          </div>
+          {phone ? (
+            // The version is already in App Information just above; the phone says where updates come from.
+            <p className="m-0 min-w-0 flex-1 text-[13px] text-lib-muted">{t('settings.about.storeUpdatesNote')}</p>
+          ) : (
+            <div className="min-w-0">
+              <p className="m-0 text-[13px] text-lib-muted">{t('settings.advanced.currentVersion')}</p>
+              <p className="m-0 mt-0.5 text-[15px] font-semibold text-lib-text-strong tabular-nums select-text">
+                {versionText}
+              </p>
+            </div>
+          )}
           {phone ? (
             // Phone (FR-021): the store updates the app, so the button opens its store page.
             storeUrl ? (

@@ -5,6 +5,11 @@ export const en = {
   phone: {
     back: 'Back',
     listAria: 'Settings sections',
+    /** Section descriptions where the phone shows less than Desktop (no Density, no update check). */
+    descriptions: {
+      appearance: 'Theme, accent color and language for the whole app.',
+      advanced: 'Restore application preferences to their default values.',
+    },
   },
   sidebar: {
     aria: 'Settings sections',
@@ -348,6 +353,7 @@ export const en = {
     notAvailable: 'Not available yet',
     notAvailableTitle: '{label} is not available yet',
     openInStore: 'Open in store',
+    storeUpdatesNote: 'Updates for Readmate Reader come from the app store.',
     items: {
       privacyPolicy: 'Privacy Policy',
       termsOfService: 'Terms of Service',

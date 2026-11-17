@@ -1,4 +1,7 @@
+import { useBackClose } from '../../../../hooks/app/useBackClose'
 import { useT } from '../../../../i18n'
+import { isMobileHost } from '../../../../platforms/host'
+import { createPortal } from 'react-dom'
 import { useEffect, useId, useRef, useState, type KeyboardEvent, type PointerEvent } from 'react'
 import {
   hexToHsv,
@@ -55,6 +58,9 @@ export function AccentColorPicker({ value, onApply, onCancel }: AccentColorPicke
   const panelRef = useRef<HTMLDivElement>(null)
   const hexId = useId()
   const errorId = useId()
+  // Phone: a centred dialog (phone.css `.accent-picker`) that system Back closes (spec 014 FR-005).
+  const phone = isMobileHost()
+  useBackClose(true, onCancel)
 
   const parsedHex = normalizeHex(hexText)
   const color = parsedHex ?? hsvToHex(hsv)
@@ -131,12 +137,18 @@ export function AccentColorPicker({ value, onApply, onCancel }: AccentColorPicke
 
   const hueColor = hsvToHex({ h: hsv.h, s: 1, v: 1 })
 
-  return (
+  const content = (
+    <>
+    {phone ? (
+      // Phone scrim: a tap outside cancels without reaching the controls underneath.
+      <div className="fixed inset-0 z-[315] bg-lib-bg-deep/65" aria-hidden onClick={onCancel} />
+    ) : null}
     <div
       ref={panelRef}
       role="dialog"
+      aria-modal={phone || undefined}
       aria-label={t('settings.appearance.picker.aria')}
-      className="absolute top-full right-0 z-20 mt-2 w-64 rounded-xl border border-lib-border bg-lib-surface-strong p-3 shadow-xl"
+      className="accent-picker absolute top-full right-0 z-20 mt-2 w-64 rounded-xl border border-lib-border bg-lib-surface-strong p-3 shadow-xl"
     >
       <div
         role="slider"
@@ -168,7 +180,7 @@ export function AccentColorPicker({ value, onApply, onCancel }: AccentColorPicke
         aria-valuemin={0}
         aria-valuemax={360}
         aria-valuenow={Math.round(hsv.h)}
-        className={`relative mt-3 h-3 w-full cursor-pointer touch-none rounded-full ${focusRing}`}
+        className={`accent-picker-hue relative mt-3 h-3 w-full cursor-pointer touch-none rounded-full ${focusRing}`}
         style={{
           background:
             'linear-gradient(to right, #f00, #ff0 17%, #0f0 33%, #0ff 50%, #00f 67%, #f0f 83%, #f00)',
@@ -223,7 +235,7 @@ export function AccentColorPicker({ value, onApply, onCancel }: AccentColorPicke
       <div className="mt-3 flex justify-end gap-2">
         <button
           type="button"
-          className={`h-8 cursor-pointer rounded-lg border border-lib-border bg-transparent px-3 text-[12px] font-semibold text-lib-muted hover:text-lib-text-strong ${focusRing}`}
+          className={`settings-action h-8 cursor-pointer rounded-lg border border-lib-border bg-transparent px-3 text-[12px] font-semibold text-lib-muted hover:text-lib-text-strong ${focusRing}`}
           onClick={onCancel}
         >
           {t('common.actions.cancel')}
@@ -231,7 +243,7 @@ export function AccentColorPicker({ value, onApply, onCancel }: AccentColorPicke
         <button
           type="button"
           disabled={!parsedHex}
-          className={`h-8 cursor-pointer rounded-lg border border-transparent px-3 text-[12px] font-semibold disabled:cursor-not-allowed disabled:opacity-50 ${focusRing}`}
+          className={`settings-action h-8 cursor-pointer rounded-lg border border-transparent px-3 text-[12px] font-semibold disabled:cursor-not-allowed disabled:opacity-50 ${focusRing}`}
           style={{ background: color, color: onAccentColor(color) }}
           onClick={apply}
         >
@@ -239,5 +251,8 @@ export function AccentColorPicker({ value, onApply, onCancel }: AccentColorPicke
         </button>
       </div>
     </div>
+    </>
   )
+  // Phone: in <body>, so no ancestor (the page's `@container`, a transform) can become its containing block.
+  return phone ? createPortal(content, document.body) : content
 }

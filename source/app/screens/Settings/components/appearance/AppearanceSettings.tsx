@@ -131,10 +131,10 @@ export function AppearanceSettings() {
                 <ThemePreview mode={mode} />
                 <span className="flex items-center justify-between gap-2 px-0.5">
                   <span className="min-w-0">
-                    <span className="block truncate text-[13px] font-semibold text-lib-text-strong">
+                    <span className="theme-option-text block truncate text-[13px] font-semibold text-lib-text-strong">
                       {t(THEME_LABELS[mode].label)}
                     </span>
-                    <span className="block truncate text-[11px] text-lib-faint">
+                    <span className="theme-option-text block truncate text-[11px] text-lib-faint">
                       {t(THEME_LABELS[mode].hint)}
                     </span>
                   </span>
@@ -315,7 +315,7 @@ export function AppearanceSettings() {
                   role="radio"
                   aria-checked={selected}
                   lang={option.id === 'system' ? undefined : option.id}
-                  className={`flex cursor-pointer items-center justify-between gap-3 rounded-lg border px-3 py-2.5 text-left transition-colors ${focusRing} ${
+                  className={`settings-choice-row flex cursor-pointer items-center justify-between gap-3 rounded-lg border px-3 py-2.5 text-left transition-colors ${focusRing} ${
                     selected
                       ? 'border-lib-accent bg-lib-accent-soft'
                       : 'border-lib-border-soft bg-transparent hover:border-lib-border'

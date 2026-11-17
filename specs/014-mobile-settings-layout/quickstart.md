@@ -33,9 +33,10 @@ Expected: all green. `check:desktop-baseline` needs no new approval (no Main fil
    buttons ≥ 48 dp; system Back closes the dialog and stays on Privacy; a second Back returns to the list.
 8. **Density (FR-017)**: Appearance has no Density card.
 9. **About (FR-019/020/021)**: version equals the installed build (Android Settings → Apps → Readmate → version);
-   "Privacy Policy" opens `https://lethaian15112004.github.io/reading-book-app-privacy-policy/` in the browser; "Store
-   page" and the Updates card's "Open in store" open the Play Store page of `com.anle.readmate`; no disabled rows, no
-   "Not available" badges, no empty group.
+   "Privacy Policy" (row ends with the "opens outside" icon) opens
+   `https://lethaian15112004.github.io/reading-book-app-privacy-policy/` in the browser; the Updates card says updates
+   come from the store (no second version line) and "Open in store" opens the Play Store page of `com.anle.readmate`; no
+   Store page row, no disabled rows, no "Not available" badges, no empty group.
 10. **Themes & accent (US3, FR-008)**: switch Dark / Light / Sepia and an accent (e.g. blue) in Appearance, go back →
     list and header follow at once; nothing under the status bar or the tab bar.
 11. **Language (US4, FR-009)**: Appearance → App Language → Tiếng Việt → tab "Khác", title "Khác", Vietnamese rows,

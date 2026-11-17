@@ -248,11 +248,14 @@ in Vietnamese; switch back → English.
 - **FR-020**: On both hosts, the About page MUST NOT show disabled link rows. The "Privacy Policy" row MUST open
   https://lethaian15112004.github.io/reading-book-app-privacy-policy/ in the device's default browser (outside the app). Every other About link row that has no
   official destination yet MUST be hidden, and MUST appear (enabled) only once it has one; a group left with no row is
-  hidden with it. The "Store page" row MUST open https://play.google.com/store/apps/details?id=com.anle.readmate on Android and https://apps.apple.com/us/app/readmate-reader/id6789796532
-  on iOS (the store app if installed, else the browser); on Desktop it MUST be hidden until a Desktop store link exists.
-- **FR-021**: On the phone, the About page's Updates card MUST show the current version (FR-019) and an enabled "Open in
-  store" button (interface-language catalogue) that opens the app's store page (FR-020: Play Store on Android, App Store
-  on iOS); it MUST NOT show a disabled "Check for updates" button. The Desktop About Updates card MUST be unchanged.
+  hidden with it. There is no "Store page" row on either host (UI review 2026-11-17): on the phone the Updates card
+  already opens the store (FR-021) and Desktop has no store link. Link rows end with an "opens outside the app" icon, not
+  a chevron.
+- **FR-021**: On the phone, the About page's Updates card MUST say that updates come from the app store (the version
+  is shown once, in App Information — FR-019) and show an enabled "Open in store" button (interface-language catalogue)
+  that opens https://play.google.com/store/apps/details?id=com.anle.readmate on Android and
+  https://apps.apple.com/us/app/readmate-reader/id6789796532 on iOS (the store app if installed, else the browser); it
+  MUST NOT show a disabled "Check for updates" button. The Desktop About Updates card MUST be unchanged.
 
 ### Key Entities
 
