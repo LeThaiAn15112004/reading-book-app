@@ -41,7 +41,7 @@ or reordered by this feature; they are shown inside the new frame through those 
   or must section content stay strictly untouched? → A: The frame owns the shared building blocks and brings them to
   phone standards on the phone only (whole switch row tappable, ≥ 48 dp targets, destructive actions always shown as
   destructive, secondary text ≥ 12 px); no control is added, removed or reordered inside a section. Section-specific
-  issues (accent picker popover, About rows, Density option) stay out of scope for a later feature.
+  issues (accent picker popover, About rows) stay out of scope for a later feature.
 - Q: On a wide screen (phone in landscape or tablet, ≥ 900 px), list → detail or a two-pane layout? → A: Always list →
   detail; on wide screens the list and the section pages are limited to about 640 px wide and centred.
 - Q: Are the dialogs opened from a section (Clear Data, Reset App Settings) part of the frame on the phone? → A: Yes,
@@ -52,6 +52,9 @@ or reordered by this feature; they are shown inside the new frame through those 
   Back during the slide acts at once.
 - Q: After leaving Settings from a section page (another tab) and coming back, list or that section? → A: Always the
   section list (also after a launch).
+- Q: How should the Density option (Settings → Appearance) be handled on the phone? → A: Hidden on the phone (a stated
+  exception to FR-011); the phone frame uses fixed phone sizes and ignores the density setting; the saved value is kept
+  for Desktop, and Desktop is unchanged. Applying density to the whole app is not part of this feature.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -157,6 +160,8 @@ in Vietnamese; switch back → English.
   section pages are limited to about 640 px wide and centred, the header and tab bar keep the full width.
 - **Fast repeated taps / Back during the slide**: the last action wins; the screen never ends between two pages or
   shows a section page under the list.
+- **Density already set to Compact (or Comfortable) on the phone before this change**: the phone ignores the stored
+  value and shows its fixed phone sizes; the Density option no longer appears, and the stored value is not reset.
 - **Desktop**: nothing changes — the desktop Settings keeps its sidebar (expand / collapse) and content panel.
 
 ## Requirements *(mandatory)*
@@ -185,7 +190,8 @@ in Vietnamese; switch back → English.
 - **FR-010**: Sections hidden on the phone MUST stay hidden (not shown as disabled rows).
 - **FR-011**: The frame MUST NOT change what any setting does, where it is stored, or when it is saved, and MUST NOT add,
   remove or reorder controls inside a section. Changing the look and touch size of the shared building blocks
-  (FR-014) is allowed; changing a single section's own layout is not.
+  (FR-014) is allowed; changing a single section's own layout is not. Sole exception: the Density option is hidden on
+  the phone (FR-017).
 - **FR-012**: The desktop Settings screen MUST be unchanged (layout, sidebar collapse preference, behaviour).
 - **FR-013**: The section pages MUST never scroll horizontally at widths down to 320 px.
 - **FR-014**: On the phone app, the shared building blocks used by every section MUST meet phone standards: a setting
@@ -200,6 +206,9 @@ in Vietnamese; switch back → English.
 - **FR-016**: Opening a section MUST slide its page in from the right and going back MUST slide it out to the right, in
   about 200–250 ms; when the system's reduced-motion setting is on, the change MUST be instant. The slide MUST never
   block input: a tap or Back during it takes effect immediately and leaves the screen in the right final state.
+- **FR-017**: The phone app MUST NOT show the Density option in Appearance, and the phone frame and shared building
+  blocks MUST use fixed phone sizes that do not change with the density setting. The stored density value MUST be left
+  as it is (Desktop keeps using it), and the Desktop Density option MUST be unchanged.
 
 ### Key Entities
 
@@ -227,7 +236,8 @@ in Vietnamese; switch back → English.
 
 - "Chỉ là khung thôi" is read as: rework the screen's shell, navigation and the shared building blocks of every
   section (see Clarifications); each section's own controls and layout are kept as they are (a later feature may
-  redesign them one by one, starting with the accent colour picker popover, the About rows and the Density option).
+  redesign them one by one, starting with the accent colour picker popover and the About rows). The Density option is
+  the one exception: it is hidden on the phone (FR-017).
 - Phone navigation pattern is the usual list → detail (as in iOS / Android system settings), not tabs or an
   accordion.
 - Confirmed (Clarifications): when the user leaves Settings from a section page (another tab) and comes back, Settings
