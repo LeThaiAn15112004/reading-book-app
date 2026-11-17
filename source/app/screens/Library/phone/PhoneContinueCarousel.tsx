@@ -84,7 +84,7 @@ export function PhoneContinueCarousel({ books, onResume, onReadAgain, onBookMenu
                   className={`inline-flex min-h-11 shrink-0 cursor-pointer items-center rounded-lg px-4 text-[13px] font-semibold transition-colors ${
                     action === 'read-again'
                       ? 'border border-lib-accent bg-transparent text-lib-accent active:bg-lib-accent-soft'
-                      : 'border-none bg-lib-accent text-lib-bg-deep active:bg-lib-accent-hover'
+                      : 'border-none bg-lib-accent text-lib-on-accent active:bg-lib-accent-hover'
                   }`}
                   onClick={run}
                 >

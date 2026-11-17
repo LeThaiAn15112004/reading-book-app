@@ -123,3 +123,11 @@
   grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
   gap: 16px 12px;
 }
+
+/* Grid card ⋮ menu: 44 px touch target and full opacity (no hover on touch screens to reveal it). */
+:root[data-mobile-host] .phone-grid .book-card-menu {
+  width: 44px;
+  height: 44px;
+  margin-right: -6px;
+  opacity: 1;
+}

@@ -124,7 +124,7 @@ export function ShelfRailCard({
         </span>
         <BookMenuButton
           title={book.title}
-          className="shrink-0 opacity-75 group-hover:opacity-100 focus-visible:opacity-100"
+          className="book-card-menu shrink-0 opacity-75 group-hover:opacity-100 focus-visible:opacity-100"
           onOpen={(point) => onBookMenu(book.id, point)}
         />
       </div>

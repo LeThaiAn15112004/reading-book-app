@@ -34,7 +34,7 @@ export function MobileLibraryHeader({ searchQuery, onSearchChange, onFromDevice 
       />
       <button
         type="button"
-        className="inline-flex size-11 shrink-0 cursor-pointer items-center justify-center rounded-xl border-none bg-lib-accent text-lib-bg-deep transition-colors active:bg-lib-accent-hover"
+        className="inline-flex size-11 shrink-0 cursor-pointer items-center justify-center rounded-xl border-none bg-lib-accent text-lib-on-accent transition-colors active:bg-lib-accent-hover"
         aria-label={t('library.phone.add')}
         title={t('library.phone.add')}
         onClick={onFromDevice}

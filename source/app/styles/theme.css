@@ -21,7 +21,7 @@
   --lib-text: #cbd5e1;
   --lib-text-strong: #f1f5f9;
   --lib-muted: #94a3b8;
-  --lib-faint: #64748b;
+  --lib-faint: #8391a7;
   --lib-accent: #f59e0b;
   --lib-accent-hover: #d97706;
   --lib-accent-soft: rgb(245 158 11 / 0.14);
@@ -66,7 +66,7 @@
   --lib-text: #e1cfb3;
   --lib-text-strong: #f3e6d0;
   --lib-muted: #b8a48a;
-  --lib-faint: #8a7660;
+  --lib-faint: #a08a71;
   --lib-accent: #f59e0b;
   --lib-accent-hover: #d97706;
   --lib-accent-soft: rgb(245 158 11 / 0.16);
@@ -112,7 +112,7 @@
   --lib-text: #334155;
   --lib-text-strong: #0f172a;
   --lib-muted: #64748b;
-  --lib-faint: #94a3b8;
+  --lib-faint: #64748b;
   --lib-accent: #d97706;
   --lib-accent-hover: #b45309;
   --lib-accent-soft: rgb(217 119 6 / 0.12);

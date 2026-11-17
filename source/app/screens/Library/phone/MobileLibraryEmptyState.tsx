@@ -39,7 +39,7 @@ export function MobileLibraryEmptyState({ onFromDevice }: MobileLibraryEmptyStat
       <p className="m-0 mb-8 text-xs font-medium tracking-wide text-lib-faint">{t('library.phone.empty.formats')}</p>
       <button
         type="button"
-        className="inline-flex min-h-12 cursor-pointer items-center gap-2 rounded-xl border-none bg-lib-accent px-6 text-[15px] font-semibold text-lib-bg-deep transition-colors active:bg-lib-accent-hover"
+        className="inline-flex min-h-12 cursor-pointer items-center gap-2 rounded-xl border-none bg-lib-accent px-6 text-[15px] font-semibold text-lib-on-accent transition-colors active:bg-lib-accent-hover"
         onClick={onFromDevice}
       >
         <svg

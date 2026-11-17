@@ -23,6 +23,7 @@
   --lib-accent-hover: #1d4ed8;
   --lib-accent-soft: rgb(37 99 235 / 0.12);
   --lib-accent-ring: rgb(37 99 235 / 0.3);
+  --lib-on-accent: #ffffff;
 }
 
 :root[data-accent='purple'] {
@@ -39,6 +40,7 @@
   --lib-accent-hover: #6d28d9;
   --lib-accent-soft: rgb(124 58 237 / 0.12);
   --lib-accent-ring: rgb(124 58 237 / 0.3);
+  --lib-on-accent: #ffffff;
 }
 
 :root[data-accent='green'] {
@@ -87,6 +89,7 @@
   --lib-accent-hover: #b91c1c;
   --lib-accent-soft: rgb(220 38 38 / 0.12);
   --lib-accent-ring: rgb(220 38 38 / 0.3);
+  --lib-on-accent: #ffffff;
 }
 
 :root[data-accent='slate'] {
@@ -103,6 +106,7 @@
   --lib-accent-hover: #334155;
   --lib-accent-soft: rgb(71 85 105 / 0.12);
   --lib-accent-ring: rgb(71 85 105 / 0.3);
+  --lib-on-accent: #ffffff;
 }
 
 :root,
