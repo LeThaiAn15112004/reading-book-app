@@ -44,6 +44,25 @@ A UI/UX review of the current screen (2026-11-17) found these problems, which th
    the collection page grid leaves a ragged gap on narrow screens; the card lift on hover ignores "reduce motion"; the
    phone's Back button does not close the collection dialogs.
 
+## Clarifications
+
+### Session 2026-11-18
+
+- Q: Does feature 015 include the two new capabilities (multi-book picker, real covers on cards), or only the low-risk
+  fixes? → A: Full scope in one feature, but delivered in order: the fixes (themes / contrast, phone card actions,
+  focus and Back — FR-001…FR-006, FR-016, FR-017, FR-020) are finished and shippable first; the picker (User Story 2)
+  and real covers (User Story 3) come after.
+- Q: How is the "Add books" picker presented on the phone? → A: A full-screen page (search at the top, a fixed
+  "Add (n)" button at the bottom, closed by Back); on Desktop a centred dialog.
+- Q: When the "Add to collection" toggle in a book's menu removes the book from a collection, is there a safeguard?
+  → A: It removes at once and shows a message with "Undo", exactly like removal on the collection page (FR-015); no
+  confirmation dialog.
+- Q: On the phone, does a long-press on a collection card also open its Edit / Delete menu? → A: Yes — the same menu
+  as the "more" (⋮) control, consistent with long-press on book cards; ⋮ stays the visible primary way.
+- Q: How is the Collections list shown on a phone (about 360 px wide)? → A: A one-column list of compact rows (small
+  stacked covers on the left · name, one-line description and book count · ⋮ on the right); Desktop keeps the card
+  grid.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Collections are readable and safe to use in every theme and on the phone (Priority: P1)
@@ -69,7 +88,7 @@ neighbouring action.
    is marked as destructive by colour AND by its label or icon, and its text is readable on that theme.
 4. **Given** the phone, **When** the user looks at a collection card, **Then** its actions are reached through one
    separate "more" control of at least 44 × 44 px that does not overlap the area that opens the collection.
-5. **Given** the phone, **When** the user taps the "more" control of a card, **Then** a menu (or sheet) offers Edit and
+5. **Given** the phone, **When** the user taps the "more" control of a card or long-presses the card, **Then** a menu (or sheet) offers Edit and
    Delete as separate full-width rows, and Delete still asks for confirmation.
 6. **Given** Desktop, **When** the user uses the pointer, **Then** the card's actions are also available from a visible
    "more" control and from right-click on the card, not only on hover.
@@ -151,8 +170,8 @@ collection from its page and check the app returns to the Collections list.
 4. **Given** a book in a collection, **When** the user removes it from the collection, **Then** a message offers "Undo"
    for at least 5 seconds, and Undo puts the book back at the same place in the collection's order.
 5. **Given** a book's menu in the Library, **When** the user opens "Add to collection", **Then** each collection shows
-   whether the book is in it, and choosing a collection that already holds the book removes it (a toggle), with the
-   state announced to screen readers.
+   whether the book is in it, and choosing a collection that already holds the book removes it at once (a toggle) with
+   the same "Undo" message as in scenario 4, the state being announced to screen readers.
 
 ---
 
@@ -207,8 +226,9 @@ resize the window from phone width to wide and check the Grid has no ragged gap.
 
 ### Edge Cases
 
-- A collection name or description that is very long, or in a script that is wider than Latin text: it wraps up to two
-  lines on cards and is cut with an ellipsis after that, with the full text available (title / on its page).
+- A collection name or description that is very long, or in a script that is wider than Latin text: the name wraps up
+  to two lines (description: two lines on Desktop cards, one line on phone rows) and is cut with an ellipsis after
+  that, with the full text available on the collection's page.
 - A collection whose books were all removed from the library: it is shown as empty, with "Add books".
 - A book in the collection whose file is missing: it is still shown in the collection (as in the Library) and can be
   removed from it.
@@ -239,7 +259,8 @@ resize the window from phone width to wide and check the Grid has no ragged gap.
 **Collection card actions and touch**
 
 - **FR-004**: Each collection card MUST offer its actions (Edit, Delete) through one visible "more" control placed
-  outside the area that opens the collection; on Desktop the same actions MUST also be available by right-click.
+  outside the area that opens the collection; the same menu MUST also open by right-click on Desktop and by long-press
+  on the phone (a long-press MUST NOT also open the collection).
 - **FR-005**: On the phone, every interactive target on the Collections list, collection page, dialogs and picker MUST be
   at least 44 × 44 px with at least 8 px between neighbouring targets; the "New collection" button included.
 - **FR-006**: Deleting a collection MUST always ask for confirmation stating that its books stay in the library.
@@ -248,13 +269,15 @@ resize the window from phone width to wide and check the Grid has no ragged gap.
 
 - **FR-007**: The collection page MUST offer an "Add books" action in its header and in its empty state.
 - **FR-008**: "Add books" MUST open a picker listing all library books (cover, title, author) with a search that filters
-  by title or author while typing, multi-selection, a count of ticked books, and Confirm / Cancel.
+  by title or author while typing, multi-selection, a count of ticked books, and Confirm / Cancel. On the phone the
+  picker is a full-screen page with the search field at the top and a fixed "Add (n)" confirm button at the bottom
+  (kept above the keyboard and the system gesture area), closed by the system Back; on Desktop it is a centred dialog.
 - **FR-009**: Books already in the collection MUST be shown as included and not selectable in the picker.
 - **FR-010**: Confirming MUST add all ticked books to the end of the collection in the order they were ticked, in one
   action, and report the number added (and the number that failed, if any).
 - **FR-011**: The "Add to collection" list in a book's menu MUST show for each collection whether the book is in it and
   MUST let the user add the book to or remove it from that collection (a toggle), with the state exposed to assistive
-  technology.
+  technology. A removal made through this toggle follows FR-015 (immediate, with Undo, no confirmation dialog).
 
 **Card appearance**
 
@@ -262,12 +285,16 @@ resize the window from phone width to wide and check the Grid has no ragged gap.
   the Library's generated cover for books without an image, and theme-coloured placeholders for missing places.
 - **FR-013**: A card MUST show the name, the description (if any) and the number of books; long names and descriptions
   MUST be limited to two lines with the full text available.
+- **FR-013a**: On the phone, the Collections list MUST be a one-column list of compact rows: the small stacked covers of
+  FR-012 on the left, then name (up to two lines), description (one line) and book count, then the "more" control on
+  the right; a 360 px wide screen MUST show at least 6 rows without scrolling. Desktop keeps the card grid.
 
 **Collection page management**
 
 - **FR-014**: The collection page MUST offer Edit and Delete for the collection; deleting from the page MUST return the
   user to the Collections list.
-- **FR-015**: Removing a book from a collection MUST offer Undo for at least 5 seconds; Undo MUST restore the book at its
+- **FR-015**: Removing a book from a collection (from the collection page or from the book menu's toggle) MUST happen
+  at once without a confirmation dialog and MUST offer Undo for at least 5 seconds; Undo MUST restore the book at its
   previous position.
 
 **Keyboard, screen reader and navigation**
@@ -324,6 +351,9 @@ resize the window from phone width to wide and check the Grid has no ragged gap.
 
 ## Assumptions
 
+- **Delivery order** (clarified 2026-11-18): first the fixes — themes / contrast (FR-001…FR-003), phone card actions
+  and touch sizes (FR-004…FR-006), dialog focus and phone Back (FR-016, FR-017, FR-020) — as a shippable increment;
+  then the "Add books" picker (User Story 2) and real covers (User Story 3); then the remaining P2 / P3 stories.
 - The redesign covers both hosts (Desktop and the phone), since they share the Collections screen; phone-specific rules
   (targets, Back, sheet menus) apply only on the phone, and the overall layout keeps the existing visual style of the
   Library.
