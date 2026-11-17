@@ -55,23 +55,32 @@ or reordered by this feature; they are shown inside the new frame through those 
 - Q: How should the Density option (Settings → Appearance) be handled on the phone? → A: Hidden on the phone (a stated
   exception to FR-011); the phone frame uses fixed phone sizes and ignores the density setting; the saved value is kept
   for Desktop, and Desktop is unchanged. Applying density to the whole app is not part of this feature.
+- Q: Should a "More" (Khác) tab replace the existing Settings tab or be added as a 5th tab? → A: Replace it: the last
+  tab stays the 4th tab, renamed "More" / "Khác" with a new icon; on Desktop the menubar entry is renamed the same way,
+  and the title of the list page (phone) and of the sidebar (Desktop) becomes "More" / "Khác". The Desktop layout is
+  otherwise unchanged.
+- Q: Should the More list add new sections such as "Account" or "Reading"? → A: No. It lists only the sections the
+  phone has today (Appearance, Privacy, Advanced, About); Account and Reading sections are out of scope for this feature.
+- Q: On a wide screen in the phone app (tablet, landscape, ≥ 900 px), should More show a fixed left sidebar like Desktop?
+  → A: No — FR-015 stands: list → detail at every width (centred, about 640 px, at ≥ 900 px); the sidebar exists only
+  on Desktop.
 
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Find a setting from a readable list (Priority: P1)
 
-A reader taps **Settings** in the bottom tab bar and sees a full-width list of the available sections, each row with
+A reader taps **More** (Khác; formerly referred to as the Settings tab) in the bottom tab bar and sees a full-width list of the available sections, each row with
 an icon, the section name and a short description, so they know where to go without guessing what an icon means.
 
 **Why this priority**: This is the entry point of the whole screen; without a readable list the rest of the frame has
 no value.
 
-**Independent Test**: Open the phone app, tap Settings → a titled list with one row per visible section (icon + name +
+**Independent Test**: Open the phone app, tap More → a "More" titled list with one row per visible section (icon + name +
 description + a "go" chevron) fills the width; no icon rail is shown.
 
 **Acceptance Scenarios**:
 
-1. **Given** the phone app on any screen, **When** the user taps the Settings tab, **Then** a "Settings" page title and
+1. **Given** the phone app on any screen, **When** the user taps the More tab, **Then** a "More" page title and
    the list of visible sections (Appearance, Privacy, Advanced, About, in that order) are shown, each with its icon,
    name and short description.
 2. **Given** the Settings list, **When** the user looks at it, **Then** no section that is hidden on the phone
@@ -162,13 +171,14 @@ in Vietnamese; switch back → English.
   shows a section page under the list.
 - **Density already set to Compact (or Comfortable) on the phone before this change**: the phone ignores the stored
   value and shows its fixed phone sizes; the Density option no longer appears, and the stored value is not reset.
-- **Desktop**: nothing changes — the desktop Settings keeps its sidebar (expand / collapse) and content panel.
+- **Desktop**: only the names change — the menubar entry and the sidebar title read "More" / "Khác" (FR-018); the
+  desktop Settings keeps its sidebar (expand / collapse), sections and content panel.
 
 ## Requirements *(mandatory)*
 
 ### Functional Requirements
 
-- **FR-001**: On the phone app, Settings MUST open on a **section list** page: a page title ("Settings") and one row per
+- **FR-001**: On the phone app, Settings MUST open on a **section list** page: a page title ("More" / "Khác") and one row per
   section visible on the phone, in the existing section order.
 - **FR-002**: Each row MUST show the section's icon, its name, a short description of what it contains, and a forward
   indicator; the whole row MUST be the tap target, at least 48 × 48 dp high.
@@ -178,7 +188,7 @@ in Vietnamese; switch back → English.
   accessible name) and the section name; the section's content is the existing content, unchanged.
 - **FR-005**: The header back control and the Android system Back button MUST both return from a section page to the
   section list; system Back MUST first close an open dialog of the section.
-- **FR-006**: Returning to the list MUST keep the list's scroll position. Opening the Settings tab (from another tab
+- **FR-006**: Returning to the list MUST keep the list's scroll position. Opening the More tab (from another tab
   or after a launch) MUST always show the section list, never the last section page.
 - **FR-007**: Only the page body MUST scroll; the page header (title / back) and the app's bottom tab bar MUST stay
   fixed, and content MUST respect the device safe areas.
@@ -187,12 +197,14 @@ in Vietnamese; switch back → English.
   they change.
 - **FR-009**: Every text of the frame MUST come from the app's interface-language catalogue in English and Vietnamese;
   no literal interface text.
-- **FR-010**: Sections hidden on the phone MUST stay hidden (not shown as disabled rows).
+- **FR-010**: Sections hidden on the phone MUST stay hidden (not shown as disabled rows). The list MUST contain only the
+  existing phone sections (Appearance, Privacy, Advanced, About); no new section (e.g. Account, Reading) is added.
 - **FR-011**: The frame MUST NOT change what any setting does, where it is stored, or when it is saved, and MUST NOT add,
   remove or reorder controls inside a section. Changing the look and touch size of the shared building blocks
   (FR-014) is allowed; changing a single section's own layout is not. Sole exception: the Density option is hidden on
   the phone (FR-017).
-- **FR-012**: The desktop Settings screen MUST be unchanged (layout, sidebar collapse preference, behaviour).
+- **FR-012**: The desktop Settings screen MUST be unchanged (layout, sidebar collapse preference, behaviour), except
+  for the names in FR-018.
 - **FR-013**: The section pages MUST never scroll horizontally at widths down to 320 px.
 - **FR-014**: On the phone app, the shared building blocks used by every section MUST meet phone standards: a setting
   row with a switch MUST be tappable over the whole row (label included) and at least 48 dp high; action buttons MUST be
@@ -209,6 +221,10 @@ in Vietnamese; switch back → English.
 - **FR-017**: The phone app MUST NOT show the Density option in Appearance, and the phone frame and shared building
   blocks MUST use fixed phone sizes that do not change with the density setting. The stored density value MUST be left
   as it is (Desktop keeps using it), and the Desktop Density option MUST be unchanged.
+- **FR-018**: On both hosts the navigation entry that opens Settings MUST be named "More" (English) / "Khác"
+  (Vietnamese) with a new "more" icon: the phone's 4th bottom tab (still 4 tabs, same position) and the Desktop menubar
+  entry (same position). The title of the phone list page and of the Desktop Settings sidebar MUST read the same. Section
+  names, section pages and the route are unchanged. The Vietnamese text follows the project glossary.
 
 ### Key Entities
 
@@ -222,7 +238,7 @@ in Vietnamese; switch back → English.
 
 - **SC-001**: A first-time user can name what each Settings section contains from the list alone (without opening it)
   for 4 of 4 sections.
-- **SC-002**: From the Settings tab, a user reaches any section in 1 tap and returns to the list in 1 tap or 1 system
+- **SC-002**: From the More tab, a user reaches any section in 1 tap and returns to the list in 1 tap or 1 system
   Back press, 100 % of the time.
 - **SC-003**: On a 360 × 800 phone and on a 320 px-wide phone, no Settings page scrolls horizontally and no row text
   overflows its row, in both languages and both themes.
@@ -230,7 +246,8 @@ in Vietnamese; switch back → English.
   and destructive buttons, dialog buttons and dialog choice rows) measures at least 48 dp high on the phone.
 - **SC-005**: Every setting behaves exactly as before the change (same values kept after changing a setting, leaving
   and reopening the app), checked for all controls in the four phone sections.
-- **SC-006**: The desktop Settings screen shows no visible or behavioural difference.
+- **SC-006**: The desktop Settings screen shows no visible or behavioural difference other than the "More" / "Khác"
+  names of FR-018.
 
 ## Assumptions
 
@@ -242,9 +259,9 @@ in Vietnamese; switch back → English.
   accordion.
 - Confirmed (Clarifications): when the user leaves Settings from a section page (another tab) and comes back, Settings
   opens on the list. After a launch it also opens on the list (today it opens on Appearance).
-- Row descriptions reuse the existing per-section descriptions (already translated); new texts are only the page title
+- Row descriptions reuse the existing per-section descriptions (already translated); new texts are only the "More" / "Khác" navigation label and page title
   if needed and the back control's accessible name.
 - The section icons are the existing section icons.
-- Only the Mobile host is in scope; iOS follows when the iOS app exists, with the same rules (system Back = swipe-back
+- Only the Mobile host is in scope (on Desktop only the "More" / "Khác" names of FR-018 change); iOS follows when the iOS app exists, with the same rules (system Back = swipe-back
   gesture is not required in this release).
 - No advertising, no new settings and no new sections are part of this feature.
