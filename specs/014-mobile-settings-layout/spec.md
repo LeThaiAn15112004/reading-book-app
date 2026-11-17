@@ -41,7 +41,8 @@ or reordered by this feature; they are shown inside the new frame through those 
   or must section content stay strictly untouched? → A: The frame owns the shared building blocks and brings them to
   phone standards on the phone only (whole switch row tappable, ≥ 48 dp targets, destructive actions always shown as
   destructive, secondary text ≥ 12 px); no control is added, removed or reordered inside a section. Section-specific
-  issues (accent picker popover, About rows) stay out of scope for a later feature.
+  issues (accent picker popover) stay out of scope for a later feature (the About page was later brought in: FR-019,
+  FR-020).
 - Q: On a wide screen (phone in landscape or tablet, ≥ 900 px), list → detail or a two-pane layout? → A: Always list →
   detail; on wide screens the list and the section pages are limited to about 640 px wide and centred.
 - Q: Are the dialogs opened from a section (Clear Data, Reset App Settings) part of the frame on the phone? → A: Yes,
@@ -64,6 +65,17 @@ or reordered by this feature; they are shown inside the new frame through those 
 - Q: On a wide screen in the phone app (tablet, landscape, ≥ 900 px), should More show a fixed left sidebar like Desktop?
   → A: No — FR-015 stands: list → detail at every width (centred, about 640 px, at ≥ 900 px); the sidebar exists only
   on Desktop.
+- Q: Where should the version number on the About page come from, and on which hosts? → A: From the installed app
+  itself — the same app-info source the Advanced page already uses (Desktop: the app's release version; phone: the
+  native build's version) — on both Desktop and the phone, replacing the fixed "0.0.0"; "Loading…" while it is read,
+  "Unknown" if it cannot be read.
+- Q: Which About rows should work, and where do they lead? → A: No About row is shown disabled any more. "Privacy
+  Policy" opens https://lethaian15112004.github.io/reading-book-app-privacy-policy/ in the device's browser on both hosts; About rows that have no destination yet are hidden
+  (not disabled) until one exists. "Store page" opens https://play.google.com/store/apps/details?id=com.anle.readmate on Android and
+  https://apps.apple.com/us/app/readmate-reader/id6789796532 on iOS; on Desktop it has no destination yet and is hidden.
+- Q: On the phone, should the About page's Updates card be removed, or kept with a working button that opens the app's
+  store page? → A: Kept, with an enabled "Open in store" button that opens the same Play Store / App Store page as the
+  "Store page" row (this replaces the earlier idea of hiding it); the Desktop About Updates card is unchanged.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -171,7 +183,11 @@ in Vietnamese; switch back → English.
   shows a section page under the list.
 - **Density already set to Compact (or Comfortable) on the phone before this change**: the phone ignores the stored
   value and shows its fixed phone sizes; the Density option no longer appears, and the stored value is not reset.
-- **Desktop**: only the names change — the menubar entry and the sidebar title read "More" / "Khác" (FR-018); the
+- **Version cannot be read** (app info unavailable): About shows "Unknown" instead of a number, never "0.0.0" or an
+  empty value.
+- **Privacy Policy link when offline / no browser**: the row still opens the link through the system; the app does not
+  show its own error page or copy of the policy.
+- **Desktop**: besides the About version and link rows (FR-019, FR-020), only the names change — the menubar entry and the sidebar title read "More" / "Khác" (FR-018); the
   desktop Settings keeps its sidebar (expand / collapse), sections and content panel.
 
 ## Requirements *(mandatory)*
@@ -202,9 +218,9 @@ in Vietnamese; switch back → English.
 - **FR-011**: The frame MUST NOT change what any setting does, where it is stored, or when it is saved, and MUST NOT add,
   remove or reorder controls inside a section. Changing the look and touch size of the shared building blocks
   (FR-014) is allowed; changing a single section's own layout is not. Sole exception: the Density option is hidden on
-  the phone (FR-017).
+  the phone (FR-017). The About page's version number (FR-019) and its link rows and Updates card (FR-020, FR-021) are the other exceptions.
 - **FR-012**: The desktop Settings screen MUST be unchanged (layout, sidebar collapse preference, behaviour), except
-  for the names in FR-018.
+  for the names in FR-018, the real version number on the About page (FR-019) and the About link rows (FR-020).
 - **FR-013**: The section pages MUST never scroll horizontally at widths down to 320 px.
 - **FR-014**: On the phone app, the shared building blocks used by every section MUST meet phone standards: a setting
   row with a switch MUST be tappable over the whole row (label included) and at least 48 dp high; action buttons MUST be
@@ -225,6 +241,18 @@ in Vietnamese; switch back → English.
   (Vietnamese) with a new "more" icon: the phone's 4th bottom tab (still 4 tabs, same position) and the Desktop menubar
   entry (same position). The title of the phone list page and of the Desktop Settings sidebar MUST read the same. Section
   names, section pages and the route are unchanged. The Vietnamese text follows the project glossary.
+- **FR-019**: On both hosts the About page MUST show the version number reported by the installed app itself (the
+  same source the Advanced page uses), never a fixed value; the About and Advanced pages MUST show the same number. While
+  it is being read the page MUST show "Loading…", and if it cannot be read, "Unknown" (both from the interface-language
+  catalogue).
+- **FR-020**: On both hosts, the About page MUST NOT show disabled link rows. The "Privacy Policy" row MUST open
+  https://lethaian15112004.github.io/reading-book-app-privacy-policy/ in the device's default browser (outside the app). Every other About link row that has no
+  official destination yet MUST be hidden, and MUST appear (enabled) only once it has one; a group left with no row is
+  hidden with it. The "Store page" row MUST open https://play.google.com/store/apps/details?id=com.anle.readmate on Android and https://apps.apple.com/us/app/readmate-reader/id6789796532
+  on iOS (the store app if installed, else the browser); on Desktop it MUST be hidden until a Desktop store link exists.
+- **FR-021**: On the phone, the About page's Updates card MUST show the current version (FR-019) and an enabled "Open in
+  store" button (interface-language catalogue) that opens the app's store page (FR-020: Play Store on Android, App Store
+  on iOS); it MUST NOT show a disabled "Check for updates" button. The Desktop About Updates card MUST be unchanged.
 
 ### Key Entities
 
@@ -247,13 +275,13 @@ in Vietnamese; switch back → English.
 - **SC-005**: Every setting behaves exactly as before the change (same values kept after changing a setting, leaving
   and reopening the app), checked for all controls in the four phone sections.
 - **SC-006**: The desktop Settings screen shows no visible or behavioural difference other than the "More" / "Khác"
-  names of FR-018.
+  names of FR-018, the About page's real version number (FR-019) and its link rows (FR-020).
 
 ## Assumptions
 
 - "Chỉ là khung thôi" is read as: rework the screen's shell, navigation and the shared building blocks of every
   section (see Clarifications); each section's own controls and layout are kept as they are (a later feature may
-  redesign them one by one, starting with the accent colour picker popover and the About rows). The Density option is
+  redesign them one by one, starting with the accent colour picker popover). The Density option is
   the one exception: it is hidden on the phone (FR-017).
 - Phone navigation pattern is the usual list → detail (as in iOS / Android system settings), not tabs or an
   accordion.
