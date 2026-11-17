@@ -7,7 +7,7 @@ import { SpinnerIcon } from './SpinnerIcon'
 const GHOST_BTN =
   'inline-flex h-8 cursor-pointer items-center rounded-lg border border-lib-border bg-transparent px-3 text-[13px] font-medium text-lib-muted transition-colors hover:text-lib-text-strong disabled:cursor-not-allowed disabled:opacity-50'
 const PRIMARY_BTN =
-  'inline-flex h-8 cursor-pointer items-center rounded-lg border-none bg-lib-accent px-3.5 text-[13px] font-semibold text-lib-bg-deep transition-colors hover:bg-lib-accent-hover disabled:cursor-not-allowed disabled:opacity-50'
+  'inline-flex h-8 cursor-pointer items-center rounded-lg border-none bg-lib-accent px-3.5 text-[13px] font-semibold text-lib-on-accent transition-colors hover:bg-lib-accent-hover disabled:cursor-not-allowed disabled:opacity-50'
 
 function Progress({ job }: { job: ZipImportJob }) {
   const saving = job.progress?.stage === 'saving'

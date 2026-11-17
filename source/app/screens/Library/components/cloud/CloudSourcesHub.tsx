@@ -254,7 +254,7 @@ export function CloudSourcesHub({
               className={
                 isLinked
                   ? 'inline-flex h-9 cursor-pointer items-center rounded-lg border border-lib-border bg-transparent px-3.5 text-[13px] font-semibold text-lib-muted transition-colors hover:bg-white/5 hover:text-lib-text-strong disabled:cursor-not-allowed disabled:opacity-60'
-                  : 'inline-flex h-9 cursor-pointer items-center rounded-lg border-none bg-lib-accent px-3.5 text-[13px] font-semibold text-lib-bg-deep transition-colors hover:bg-lib-accent-hover disabled:cursor-not-allowed disabled:opacity-60'
+                  : 'inline-flex h-9 cursor-pointer items-center rounded-lg border-none bg-lib-accent px-3.5 text-[13px] font-semibold text-lib-on-accent transition-colors hover:bg-lib-accent-hover disabled:cursor-not-allowed disabled:opacity-60'
               }
               disabled={isConnecting}
               onClick={() => (isLinked ? onDisconnect() : onConnect())}

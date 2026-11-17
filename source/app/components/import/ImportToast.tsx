@@ -80,7 +80,7 @@ export function ImportToast({
       {action ? (
         <button
           type="button"
-          className="pointer-events-auto ml-1 inline-flex h-7 shrink-0 cursor-pointer items-center rounded-md border-none bg-lib-accent-soft px-2.5 text-[12px] font-semibold text-lib-accent transition-colors hover:bg-lib-accent hover:text-lib-bg-deep"
+          className="pointer-events-auto ml-1 inline-flex h-7 shrink-0 cursor-pointer items-center rounded-md border-none bg-lib-accent-soft px-2.5 text-[12px] font-semibold text-lib-accent transition-colors hover:bg-lib-accent hover:text-lib-on-accent"
           onClick={() => {
             onClose()
             action.run()

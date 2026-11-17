@@ -9,7 +9,7 @@ const EMPTY = 'm-0 px-2 py-3 text-sm leading-relaxed text-lib-muted'
 const GHOST_BTN =
   'inline-flex h-8 cursor-pointer items-center rounded-lg border border-lib-border bg-transparent px-3 text-[13px] font-medium text-lib-muted transition-colors hover:text-lib-text-strong disabled:cursor-not-allowed disabled:opacity-50'
 const PRIMARY_BTN =
-  'inline-flex h-8 cursor-pointer items-center rounded-lg border-none bg-lib-accent px-3 text-[13px] font-semibold text-lib-bg-deep transition-colors hover:bg-lib-accent-hover disabled:cursor-not-allowed disabled:opacity-50'
+  'inline-flex h-8 cursor-pointer items-center rounded-lg border-none bg-lib-accent px-3 text-[13px] font-semibold text-lib-on-accent transition-colors hover:bg-lib-accent-hover disabled:cursor-not-allowed disabled:opacity-50'
 const PILL = 'inline-flex items-center rounded-full bg-lib-accent/15 px-2 py-0.5 text-[11px] font-bold text-lib-accent'
 
 type Confirm = 'delete' | 'restart' | null

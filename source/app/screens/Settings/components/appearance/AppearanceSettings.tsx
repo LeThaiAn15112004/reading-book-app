@@ -140,7 +140,7 @@ export function AppearanceSettings() {
                   <span
                     className={`inline-flex size-[18px] shrink-0 items-center justify-center rounded-full border ${
                       selected
-                        ? 'border-lib-accent bg-lib-accent text-lib-bg-deep'
+                        ? 'border-lib-accent bg-lib-accent text-lib-on-accent'
                         : 'border-lib-border bg-transparent text-transparent'
                     }`}
                     aria-hidden
@@ -328,7 +328,7 @@ export function AppearanceSettings() {
                   <span
                     className={`inline-flex size-[18px] shrink-0 items-center justify-center rounded-full border ${
                       selected
-                        ? 'border-lib-accent bg-lib-accent text-lib-bg-deep'
+                        ? 'border-lib-accent bg-lib-accent text-lib-on-accent'
                         : 'border-lib-border bg-transparent text-transparent'
                     }`}
                     aria-hidden

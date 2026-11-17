@@ -9,7 +9,7 @@ import { getT, useFormat, useT, useUiLanguage } from '../../../i18n'
 const GHOST_BTN =
   'inline-flex h-[34px] cursor-pointer items-center rounded-lg border border-lib-border bg-transparent px-3.5 text-[13px] font-medium text-lib-muted transition-colors hover:text-lib-text-strong disabled:cursor-not-allowed disabled:opacity-50'
 const PRIMARY_BTN =
-  'inline-flex h-[34px] cursor-pointer items-center rounded-lg border-none bg-lib-accent px-4 text-[13px] font-semibold text-lib-bg-deep transition-colors hover:bg-lib-accent-hover disabled:cursor-not-allowed disabled:opacity-50'
+  'inline-flex h-[34px] cursor-pointer items-center rounded-lg border-none bg-lib-accent px-4 text-[13px] font-semibold text-lib-on-accent transition-colors hover:bg-lib-accent-hover disabled:cursor-not-allowed disabled:opacity-50'
 const FIELD =
   'h-[34px] w-full rounded-lg border border-lib-border bg-lib-input px-2.5 text-sm text-lib-text outline-none focus:border-lib-accent-ring disabled:opacity-50'
 const LABEL = 'text-[11px] font-bold tracking-wide text-lib-faint uppercase'

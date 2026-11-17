@@ -1,7 +1,8 @@
-import { useEffect } from 'react'
+import { useCallback, useEffect } from 'react'
 import type { LibraryBook } from '@core'
 import { useT } from '../../../../i18n'
 import { BookMenuButton, LibraryBookInfoContent, type BookMenuPoint } from '../book'
+import { CloseIcon, StarIcon } from '../book/LibraryIcons'
 
 export type LibraryBookDetailPanelProps = {
   book: LibraryBook
@@ -23,13 +24,27 @@ export function LibraryBookDetailPanel({
   onBookMenu,
 }: LibraryBookDetailPanelProps) {
   const t = useT()
+  const bookId = book.id
+  const close = useCallback(() => {
+    onClose()
+    // Give keyboard focus back to the row the panel was describing.
+    requestAnimationFrame(() => {
+      document.querySelector<HTMLElement>(`[data-library-row="${CSS.escape(bookId)}"]`)?.focus()
+    })
+  }, [onClose, bookId])
+
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
-      if (e.key === 'Escape' && !e.defaultPrevented) onClose()
+      if (e.key !== 'Escape' || e.defaultPrevented) return
+      // Esc belongs to whatever overlay is open (dialog, menu, dropdown), not to the panel.
+      const target = e.target instanceof Element ? e.target : null
+      if (target?.closest('[role="dialog"], [role="alertdialog"], [role="menu"], [role="listbox"], [role="combobox"]')) return
+      if (document.querySelector('[aria-modal="true"], [role="menu"]')) return
+      close()
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [onClose])
+  }, [close])
 
   const progress =
     book.status === 'reading' && book.progressPercent != null
@@ -50,9 +65,9 @@ export function LibraryBookDetailPanel({
           className="inline-flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-md border-none bg-transparent text-lib-muted transition-colors hover:bg-lib-surface-hover hover:text-lib-text-strong"
           title={t('library.detail.close')}
           aria-label={t('library.detail.close')}
-          onClick={onClose}
+          onClick={close}
         >
-          ✕
+          <CloseIcon className="size-4" />
         </button>
       </div>
 
@@ -60,14 +75,14 @@ export function LibraryBookDetailPanel({
         <div className="flex items-center gap-2">
           <button
             type="button"
-            className="inline-flex h-9 flex-1 cursor-pointer items-center justify-center rounded-lg border-none bg-lib-accent px-4 text-[13px] font-semibold text-lib-bg-deep transition-colors hover:bg-lib-accent-hover"
+            className="inline-flex h-9 flex-1 cursor-pointer items-center justify-center rounded-lg border-none bg-lib-accent px-4 text-[13px] font-semibold text-lib-on-accent transition-colors hover:bg-lib-accent-hover"
             onClick={() => onOpen(book.id)}
           >
             {book.status === 'reading' ? t('library.continue.resume') : t('library.continue.read')}
           </button>
           <button
             type="button"
-            className={`inline-flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-lg border border-lib-border bg-transparent text-[15px] transition-colors hover:border-lib-accent ${
+            className={`inline-flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-lg border border-lib-border bg-transparent transition-colors hover:border-lib-accent ${
               book.isFavorite ? 'text-lib-accent' : 'text-lib-muted'
             }`}
             title={book.isFavorite ? t('library.detail.removeFavorite') : t('library.detail.addFavorite')}
@@ -75,13 +90,16 @@ export function LibraryBookDetailPanel({
             aria-pressed={book.isFavorite}
             onClick={() => onToggleFavorite(book)}
           >
-            {book.isFavorite ? '★' : '☆'}
+            <StarIcon filled={book.isFavorite} className="size-[18px]" />
           </button>
           <BookMenuButton title={book.title} onOpen={(point) => onBookMenu(book.id, point)} />
         </div>
 
         {progress !== undefined ? (
-          <div className="flex items-center gap-2 text-[12px] text-lib-muted">
+          <div
+            className="flex items-center gap-2 text-[12px] text-lib-muted"
+            role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={progress} aria-label={t('library.continue.percentRead', { percent: progress })}
+          >
             <span className="h-1.5 flex-1 overflow-hidden rounded-full bg-lib-chip">
               <span className="block h-full rounded-full bg-lib-accent" style={{ width: `${progress}%` }} />
             </span>

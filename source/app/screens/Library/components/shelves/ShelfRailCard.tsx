@@ -74,7 +74,7 @@ export function ShelfRailCard({
     >
       <button
         type="button"
-        className="flex cursor-pointer flex-col gap-2 border-none bg-transparent p-0 text-left font-[inherit] text-inherit focus-visible:outline-none"
+        className="flex cursor-pointer flex-col gap-2 border-none bg-transparent p-0 rounded-md text-left font-[inherit] text-inherit focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-lib-accent"
         onClick={() => onOpen(book.id)}
         aria-label={t('library.card.openAria', { title: book.title })}
       >
@@ -83,13 +83,13 @@ export function ShelfRailCard({
           title={book.title}
           coverUrl={book.coverUrl}
           isFavorite={book.isFavorite}
-          className="aspect-[2/3] h-auto w-full rounded-md shadow-[0_10px_28px_rgba(0,0,0,0.35)] transition-[border-color,transform] group-hover:-translate-y-0.5 group-hover:border-lib-accent-ring group-focus-visible:-translate-y-0.5 group-focus-visible:border-lib-accent-ring"
+          className="aspect-[2/3] h-auto w-full rounded-md shadow-[0_10px_28px_rgba(0,0,0,0.35)] transition-[border-color,transform] motion-safe:group-hover:-translate-y-0.5 group-hover:border-lib-accent-ring motion-safe:group-focus-visible:-translate-y-0.5 group-focus-visible:border-lib-accent-ring"
         />
         <div className="min-w-0 px-0.5">
-          <p className="m-0 truncate text-[12px] font-semibold text-lib-text-strong">
+          <p className="m-0 truncate text-[13px] font-semibold text-lib-text-strong">
             {book.title}
           </p>
-          <p className="m-0 truncate text-[11px] text-lib-faint">{book.author}</p>
+          <p className="m-0 truncate text-[12px] text-lib-faint">{book.author}</p>
           {lastReadLine && book.lastReadLocation ? (
             <p className="m-0 truncate text-[11px] text-lib-muted" aria-label={lastReadLine}>
               {t('library.progress.lastAtPrefix')}
@@ -108,13 +108,13 @@ export function ShelfRailCard({
               <span className="h-1 flex-1 overflow-hidden rounded-full bg-lib-chip">
                 <span className="block h-full rounded-full bg-lib-accent" style={{ width: `${progress}%` }} />
               </span>
-              <span className="text-[10px] text-lib-faint tabular-nums">{progress}%</span>
+              <span className="text-[11px] text-lib-faint tabular-nums">{progress}%</span>
             </div>
           ) : null}
         </div>
       </button>
       <div className="mt-auto flex min-h-9 items-center justify-between gap-2 px-0.5">
-        <span className="inline-flex items-center gap-1 rounded bg-lib-chip px-1.5 py-0.5 text-[9px] font-bold tracking-wide text-lib-muted uppercase">
+        <span className="inline-flex items-center gap-1 rounded bg-lib-chip px-1.5 py-0.5 text-[11px] font-bold tracking-wide text-lib-muted uppercase">
           {book.format}
           {book.sourceProvider ? (
             <span title={t('library.card.syncedFrom', { provider: PROVIDER_LABEL[book.sourceProvider] })}>
@@ -124,7 +124,7 @@ export function ShelfRailCard({
         </span>
         <BookMenuButton
           title={book.title}
-          className="book-card-menu shrink-0 opacity-75 group-hover:opacity-100 focus-visible:opacity-100"
+          className="book-card-menu shrink-0"
           onOpen={(point) => onBookMenu(book.id, point)}
         />
       </div>

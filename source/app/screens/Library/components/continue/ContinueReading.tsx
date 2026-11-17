@@ -41,6 +41,7 @@ export function ContinueReading({ books, onResume, onBookMenu }: ContinueReading
               <button
                 type="button"
                 className="shrink-0 cursor-pointer border-none bg-transparent p-0"
+                tabIndex={-1}
                 aria-label={t('library.continue.resumeAria', { title: book.title })}
                 onClick={() => onResume(book.id)}
               >
@@ -62,25 +63,25 @@ export function ContinueReading({ books, onResume, onBookMenu }: ContinueReading
                   {[book.lastReadLocation, relative].filter(Boolean).join(' · ')}
                 </p>
                 {progress !== undefined ? (
-                  <span className="mt-1 flex items-center gap-2" aria-label={t('library.continue.percentRead', { percent: progress })}>
+                  <span className="mt-1 flex items-center gap-2" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={progress} aria-label={t('library.continue.percentRead', { percent: progress })}>
                     <span className="h-1 flex-1 overflow-hidden rounded-full bg-lib-chip">
                       <span className="block h-full rounded-full bg-lib-accent" style={{ width: `${progress}%` }} />
                     </span>
-                    <span className="text-[10px] text-lib-faint tabular-nums">{progress}%</span>
+                    <span className="text-[11px] text-lib-faint tabular-nums">{progress}%</span>
                   </span>
                 ) : null}
               </div>
               <div className="flex shrink-0 flex-col items-end gap-1">
                 <button
                   type="button"
-                  className="inline-flex h-8 cursor-pointer items-center rounded-lg border-none bg-lib-accent px-3 text-[12px] font-semibold text-lib-bg-deep transition-colors hover:bg-lib-accent-hover"
+                  className="inline-flex h-8 cursor-pointer items-center rounded-lg border-none bg-lib-accent px-3 text-[12px] font-semibold text-lib-on-accent transition-colors hover:bg-lib-accent-hover"
                   onClick={() => onResume(book.id)}
                 >
                   {t('library.continue.resume')}
                 </button>
                 <BookMenuButton
                   title={book.title}
-                  className="opacity-60 group-hover:opacity-100 focus-visible:opacity-100"
+                  className="shrink-0"
                   onOpen={(point) => onBookMenu(book.id, point)}
                 />
               </div>

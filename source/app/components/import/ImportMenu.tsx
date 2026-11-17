@@ -152,8 +152,8 @@ export function ImportMenu({
   const iconClass = isLg ? 'size-5' : 'size-4'
 
   const primaryClass = isLg
-    ? 'inline-flex h-12 cursor-pointer items-center gap-2.5 rounded-xl border-none bg-lib-accent px-7 text-[15px] font-semibold text-lib-bg-deep shadow-[0_6px_20px_rgba(245,158,11,0.28)] transition-colors hover:bg-lib-accent-hover'
-    : 'inline-flex h-[38px] shrink-0 cursor-pointer items-center gap-2 rounded-lg border-none bg-lib-accent px-4 text-[13px] font-semibold text-lib-bg-deep shadow-[0_4px_14px_rgba(245,158,11,0.22)] transition-colors hover:bg-lib-accent-hover'
+    ? 'inline-flex h-12 cursor-pointer items-center gap-2.5 rounded-xl border-none bg-lib-accent px-7 text-[15px] font-semibold text-lib-on-accent shadow-[0_6px_20px_var(--lib-accent-ring)] transition-colors hover:bg-lib-accent-hover'
+    : 'inline-flex h-[38px] shrink-0 cursor-pointer items-center gap-2 rounded-lg border-none bg-lib-accent px-4 text-[13px] font-semibold text-lib-on-accent shadow-[0_4px_14px_var(--lib-accent-ring)] transition-colors hover:bg-lib-accent-hover'
 
   const secondaryClass = isLg
     ? 'inline-flex h-12 cursor-pointer items-center gap-2.5 rounded-xl border border-lib-border bg-transparent px-7 text-[15px] font-semibold text-lib-text-strong transition-colors hover:border-lib-accent hover:bg-lib-accent-soft'
@@ -290,8 +290,8 @@ function ImportDropdown({
   }
 
   const triggerClass = isLg
-    ? 'inline-flex h-12 cursor-pointer items-center gap-2.5 rounded-xl border-none bg-lib-accent px-7 text-[15px] font-semibold text-lib-bg-deep shadow-[0_6px_20px_rgba(245,158,11,0.28)] transition-colors hover:bg-lib-accent-hover'
-    : 'inline-flex h-[38px] shrink-0 cursor-pointer items-center gap-2 rounded-lg border-none bg-lib-accent px-4 text-[13px] font-semibold text-lib-bg-deep shadow-[0_4px_14px_rgba(245,158,11,0.22)] transition-colors hover:bg-lib-accent-hover'
+    ? 'inline-flex h-12 cursor-pointer items-center gap-2.5 rounded-xl border-none bg-lib-accent px-7 text-[15px] font-semibold text-lib-on-accent shadow-[0_6px_20px_var(--lib-accent-ring)] transition-colors hover:bg-lib-accent-hover'
+    : 'inline-flex h-[38px] shrink-0 cursor-pointer items-center gap-2 rounded-lg border-none bg-lib-accent px-4 text-[13px] font-semibold text-lib-on-accent shadow-[0_4px_14px_var(--lib-accent-ring)] transition-colors hover:bg-lib-accent-hover'
 
   return (
     <div ref={rootRef} className="relative inline-flex shrink-0">

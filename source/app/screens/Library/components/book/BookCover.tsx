@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { StarIcon } from './LibraryIcons'
 
 const COVER_GRADS = [
   'linear-gradient(135deg, #1e3a8a, #3b82f6)',
@@ -68,7 +69,7 @@ export function BookCover({
 
       {formatBadge ? (
         <span
-          className={`absolute ${badgePad} z-[1] rounded px-1 py-px text-[8px] font-bold tracking-wide text-white/90 bg-black/45`}
+          className={`absolute ${badgePad} z-[1] rounded px-1 py-px text-[10px] font-bold tracking-wide text-white/90 bg-black/45`}
         >
           {formatBadge}
         </span>
@@ -76,9 +77,9 @@ export function BookCover({
 
       {isFavorite ? (
         <span
-          className={`absolute ${favPad} z-[1] text-[11px] text-lib-accent [text-shadow:0_1px_2px_rgba(0,0,0,0.6)]`}
+          className={`absolute ${favPad} z-[1] text-lib-accent drop-shadow-[0_1px_2px_rgba(0,0,0,0.6)]`}
         >
-          ★
+          <StarIcon filled className={compact ? 'size-3' : 'size-3.5'} />
         </span>
       ) : null}
 

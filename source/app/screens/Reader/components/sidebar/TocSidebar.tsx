@@ -936,7 +936,7 @@ export function TocSidebar({
                                   {group.label}
                                 </span>
                                 <span className="flex shrink-0 items-center gap-1.5">
-                                  <span className="inline-flex min-w-[22px] items-center justify-center rounded-full bg-lib-accent px-2 py-0.5 text-[11px] font-bold text-lib-bg-deep shadow-[0_0_10px_-2px_var(--lib-accent)]">
+                                  <span className="inline-flex min-w-[22px] items-center justify-center rounded-full bg-lib-accent px-2 py-0.5 text-[11px] font-bold text-lib-on-accent shadow-[0_0_10px_-2px_var(--lib-accent)]">
                                     {group.items.length}
                                   </span>
                                   <span

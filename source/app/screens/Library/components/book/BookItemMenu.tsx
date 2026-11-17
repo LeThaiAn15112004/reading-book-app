@@ -70,7 +70,7 @@ export function BookMenuButton({
   return (
     <button
       type="button"
-      className={`inline-flex size-9 cursor-pointer items-center justify-center rounded-lg border-none bg-transparent text-lib-faint transition-[opacity,color,background-color] hover:bg-white/5 hover:text-lib-text-strong focus-visible:bg-white/5 focus-visible:text-lib-text-strong focus-visible:outline-none ${className}`}
+      className={`inline-flex size-9 cursor-pointer items-center justify-center rounded-lg border-none bg-transparent text-lib-faint transition-[opacity,color,background-color] hover:bg-lib-surface-hover hover:text-lib-text-strong focus-visible:bg-lib-surface-hover focus-visible:text-lib-text-strong focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-lib-accent ${className}`}
       aria-label={t('library.menu.moreActionsFor', { title })}
       title={t('library.menu.moreActions')}
       onClick={(event) => {
@@ -91,7 +91,7 @@ export function BookMenuButton({
 }
 
 const itemClass =
-  'flex h-8 w-full cursor-pointer items-center justify-between gap-4 rounded-md border-none bg-transparent px-2.5 text-left text-[13px] text-lib-text-strong hover:bg-white/5 focus-visible:bg-white/5 focus-visible:outline-none disabled:cursor-default disabled:opacity-45'
+  'flex h-8 w-full cursor-pointer items-center justify-between gap-4 rounded-md border-none bg-transparent px-2.5 text-left text-[13px] text-lib-text-strong hover:bg-lib-chip focus-visible:bg-lib-chip focus-visible:outline-none disabled:cursor-default disabled:opacity-45'
 
 /**
  * The book menu: on the Mobile host the phone bottom sheet (spec 013 US4, `PhoneBookSheet`), elsewhere the desktop

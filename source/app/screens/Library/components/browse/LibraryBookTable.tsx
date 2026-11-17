@@ -2,6 +2,7 @@ import { useRef, type KeyboardEvent } from 'react'
 import { formatRelativeLastRead, type LibraryBook } from '@core'
 import { useFormat, useT, useUiLanguage, type BoundFormat } from '../../../../i18n'
 import { BookCover, BookMenuButton, type BookMenuPoint } from '../book'
+import { StarIcon } from '../book/LibraryIcons'
 import { withLongPress } from '../../../../platforms/longPress'
 
 export type LibraryBookTableProps = {
@@ -33,7 +34,7 @@ function ProgressCell({ book }: { book: LibraryBook }) {
     }
     const value = Math.round(book.progressPercent)
     return (
-      <span className="flex items-center gap-2" aria-label={t('library.continue.percentRead', { percent: value })}>
+      <span className="flex items-center gap-2" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={value} aria-label={t('library.continue.percentRead', { percent: value })}>
         <span className="h-1 w-16 overflow-hidden rounded-full bg-lib-chip">
           <span className="block h-full rounded-full bg-lib-accent" style={{ width: `${value}%` }} />
         </span>
@@ -91,7 +92,7 @@ export function LibraryBookTable({
 
   return (
     <div className="@container rounded-xl border border-lib-border-soft">
-      <table className="w-full border-collapse text-[13px]" role="grid" aria-label={t('library.books')}>
+      <table className="w-full border-collapse text-[13px]" aria-label={t('library.books')}>
         <thead>
           <tr>
             <th className={`${th} w-[52px]`}>
@@ -119,7 +120,8 @@ export function LibraryBookTable({
                   else rowRefs.current.delete(book.id)
                 }}
                 tabIndex={0}
-                aria-selected={selected}
+                data-library-row={book.id}
+                aria-current={selected ? 'true' : undefined}
                 className={`group cursor-pointer outline-none transition-colors focus-visible:bg-lib-surface-hover ${
                   selected ? 'bg-lib-accent-soft' : 'hover:bg-lib-surface-hover'
                 }`}
@@ -148,8 +150,8 @@ export function LibraryBookTable({
                       {book.title}
                     </span>
                     {book.isFavorite ? (
-                      <span className="shrink-0 text-[11px] text-lib-accent" aria-label={t('library.card.favorite')}>
-                        ★
+                      <span className="inline-flex shrink-0 text-lib-accent" role="img" aria-label={t('library.card.favorite')}>
+                        <StarIcon filled className="size-3.5" />
                       </span>
                     ) : null}
                   </div>
@@ -159,7 +161,7 @@ export function LibraryBookTable({
                   {book.author}
                 </td>
                 <td className={td}>
-                  <span className="inline-flex rounded bg-lib-chip px-1.5 py-0.5 text-[10px] font-bold tracking-wide text-lib-muted uppercase">
+                  <span className="inline-flex rounded bg-lib-chip px-1.5 py-0.5 text-[11px] font-bold tracking-wide text-lib-muted uppercase">
                     {book.format}
                   </span>
                 </td>
@@ -175,7 +177,7 @@ export function LibraryBookTable({
                 <td className={`${td} px-1`}>
                   <BookMenuButton
                     title={book.title}
-                    className="opacity-60 group-hover:opacity-100 focus-visible:opacity-100"
+                    className="shrink-0"
                     onOpen={(point) => {
                       onSelect(book.id)
                       onBookMenu(book.id, point)

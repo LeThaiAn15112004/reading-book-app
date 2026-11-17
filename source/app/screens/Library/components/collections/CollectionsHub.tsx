@@ -70,7 +70,7 @@ export function CollectionsHub({
         </div>
         <button
           type="button"
-          className="inline-flex h-[38px] shrink-0 cursor-pointer items-center gap-2 rounded-lg border-none bg-lib-accent px-4 text-[13px] font-semibold text-lib-bg-deep shadow-[0_4px_14px_rgba(245,158,11,0.22)] transition-colors hover:bg-lib-accent-hover"
+          className="inline-flex h-[38px] shrink-0 cursor-pointer items-center gap-2 rounded-lg border-none bg-lib-accent px-4 text-[13px] font-semibold text-lib-on-accent shadow-[0_4px_14px_rgba(245,158,11,0.22)] transition-colors hover:bg-lib-accent-hover"
           onClick={onNewCollection}
         >
           <PlusIcon className="size-4" />
@@ -89,7 +89,7 @@ export function CollectionsHub({
             </p>
             <button
               type="button"
-              className="inline-flex h-11 cursor-pointer items-center gap-2 rounded-lg border-none bg-lib-accent px-5 text-[13px] font-semibold text-lib-bg-deep transition-colors hover:bg-lib-accent-hover"
+              className="inline-flex h-11 cursor-pointer items-center gap-2 rounded-lg border-none bg-lib-accent px-5 text-[13px] font-semibold text-lib-on-accent transition-colors hover:bg-lib-accent-hover"
               onClick={onNewCollection}
             >
               <PlusIcon className="size-4" />
