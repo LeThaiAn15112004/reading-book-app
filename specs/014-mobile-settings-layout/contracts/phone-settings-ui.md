@@ -67,7 +67,8 @@ went before.
 
 Changed values: `chrome.nav.settings` → "More" / "Khác"; `settings.title` → "More" / "Khác".
 New keys: `settings.phone.back` ("Back" / "Quay lại"), `settings.phone.listAria` (section list name),
-`settings.about.openInStore` ("Open in store" / "Mở trong cửa hàng"), ("Loading…" / "Unknown" reuse the existing `settings.loading` and `settings.advanced.unknown`).
+`settings.about.openInStore` ("Open in store" / "Mở trong cửa hàng"). "Loading…" / "Unknown" reuse the existing `settings.loading` and
+`settings.advanced.unknown`.
 Glossary: add "More (navigation entry) → Khác".
 
 ## 8. Mobile-only stores (reason, per spec 008 `contracts/phone-ui.md`)
