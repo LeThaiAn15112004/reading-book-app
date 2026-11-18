@@ -234,8 +234,9 @@ resize the window from phone width to wide and check the Grid has no ragged gap.
   removed from it.
 - The picker with a large library (1 000+ books): it stays responsive while scrolling and searching.
 - The picker with a search that matches nothing: it says no book matches and keeps the ticked books ticked.
-- Adding books fails part-way: the user is told how many were added and how many failed; nothing is reported as added
-  that was not.
+- Adding books fails: nothing is added, the user is told, and the picker stays open with the ticked books kept. Some
+  ticked books can no longer be added (removed from the library, or added from elsewhere meanwhile): the others are
+  added and the user is told how many were added and how many were skipped; nothing is reported as added that was not.
 - Undo is pressed after the collection was deleted or the book removed from the library: Undo does nothing harmful and
   says it can no longer be undone.
 - Two collections with the same name: allowed (as today); cards stay distinguishable by their covers and description.
@@ -274,7 +275,8 @@ resize the window from phone width to wide and check the Grid has no ragged gap.
   (kept above the keyboard and the system gesture area), closed by the system Back; on Desktop it is a centred dialog.
 - **FR-009**: Books already in the collection MUST be shown as included and not selectable in the picker.
 - **FR-010**: Confirming MUST add all ticked books to the end of the collection in the order they were ticked, in one
-  action, and report the number added (and the number that failed, if any).
+  action that either succeeds or changes nothing, and report the number added and, if any, the number skipped (already
+  in the collection or no longer in the library); if the action fails, nothing is added and the user is told so.
 - **FR-011**: The "Add to collection" list in a book's menu MUST show for each collection whether the book is in it and
   MUST let the user add the book to or remove it from that collection (a toggle), with the state exposed to assistive
   technology. A removal made through this toggle follows FR-015 (immediate, with Undo, no confirmation dialog).

@@ -40,12 +40,12 @@ No migration, no new table, no new column. The SQLite tables `collections` and `
 
 ## Derived (pure, core)
 
-- `collectionCoverSlots(bookIds, booksById, count = 3) → CoverSlot[]` where
+- `collectionCoverSlots(bookIds, hasBook: (id) => boolean, count = 3) → CoverSlot[]` where
   `CoverSlot = { kind: 'book'; bookId: string } | { kind: 'empty' }` — first `count` ids that still exist in the
   library, padded with `empty`.
 - `pickerRows(books, collectionBookIds, query) → { book, included: boolean }[]` — `matchesSearch` filter over the
   Library-sorted books; `included` = already in the collection.
-- `bulkAddSummary(requested, result) → { added: number; skipped: number; failed: boolean }` for the toast text.
+- `bulkAddSummary(result: { ok; added; skipped }) → { kind: 'added' | 'partial' | 'failed'; added: number; skipped: number }` for the toast text (`ok: false` → `failed`; any skipped → `partial`).
 
 ## State transitions
 

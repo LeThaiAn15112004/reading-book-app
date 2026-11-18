@@ -11,7 +11,7 @@ theme tokens; all text from the i18n catalogue (`library` area, en + vi).
 | `CollectionCard` | `…/collections/CollectionCard.tsx` (NEW) | covers (R5) · `<h2>` name (2 lines) · description (2 lines) · count · ⋮; open button is an overlay sibling; right-click → menu |
 | `PhoneCollectionRow` | `…/collections/PhoneCollectionRow.tsx` (NEW) | stacked covers · name / description / count · ⋮ 44 × 44; long-press → menu |
 | `CollectionCovers` | `…/collections/CollectionCovers.tsx` (NEW) | `variant: 'card' \| 'stack'`; uses `BookCover compact`; empty slot = `bg-lib-chip` |
-| `CollectionItemMenu` | `…/collections/CollectionItemMenu.tsx` (NEW) | Desktop popover (`placeMenu`) / phone `phone-sheet`; items: [Add books (page only)], Edit, Delete (danger) |
+| `CollectionItemMenu` | `…/collections/CollectionItemMenu.tsx` (NEW) | Desktop popover (`placeMenu`) / phone `phone-sheet`; items: Edit, Delete (danger) |
 | `NewCollectionDialog` | `…/collections/NewCollectionDialog.tsx` (EDIT) | token colours, `useDialogFocus`, `useBackClose` |
 | `AddBooksPicker` | `…/collections/AddBooksPicker.tsx` (NEW) | Desktop dialog / phone full-screen page (R8) |
 | `ShelfDetailView` | `…/shelves/ShelfDetailView.tsx` (EDIT) | optional `headerActions` slot (Add books + ⋮) and `emptyState` slot; CSS-grid Grid |
@@ -40,6 +40,6 @@ theme tokens; all text from the i18n catalogue (`library` area, en + vi).
 `collections.moreActionsAria`, `collections.openAria`, `collections.addBooks`, `collections.emptyAddHint`,
 `picker.title`, `picker.searchPlaceholder`, `picker.searchLabel`, `picker.selectedCount` ({count} plural),
 `picker.add` ({count} plural, "Add (n)"), `picker.inCollection`, `picker.noMatch`, `picker.libraryEmpty`,
-`picker.libraryEmptyAction`, `toast.addedMany` ({count} plural), `toast.addedSomeSkipped` ({added}, {skipped}),
+`picker.libraryEmptyAction`, `toast.addManyFailed`, `toast.addedMany` ({count} plural), `toast.addedSomeSkipped` ({added}, {skipped}),
 `toast.undo`, `toast.undoUnavailable`, `toast.restored`, `menu.inCollection` (checkbox state text).
 Vietnamese per `specs/012-app-ui-i18n/contracts/glossary.md` (no "bạn").
