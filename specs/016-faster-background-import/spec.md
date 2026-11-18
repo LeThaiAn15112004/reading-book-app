@@ -32,7 +32,7 @@ after it (step 1), and a non-blocking, background import with visible progress (
 
 **Not in this feature**: opening a book progressively (reading only the part of the file the current page needs, step 3
 of the analysis). It changes how annotations are written back into PDFs and needs its own feature. Work that this
-feature moves out of the way of opening a book (FR-012) is the only opening-related change here.
+feature moves out of the way of opening a book (FR-015) is the only opening-related change here.
 
 ## Clarifications
 
@@ -42,6 +42,16 @@ feature moves out of the way of opening a book (FR-012) is the only opening-rela
   the phone's copy of each book into app storage is one of the measured and optimised steps (FR-002, FR-003).
 - Q: Several files at once? → A: Yes — "Add file" lets the reader pick several files at once; they are imported one
   after another in the queue, each with its own result.
+- Q: What happens when the reader quits or closes the window while imports run? → A: Closing the window follows the
+  existing Run in Background setting (kept running → imports continue). Quitting completely while imports are running
+  or waiting asks first; if confirmed, they are cancelled and cleaned up (FR-013a).
+- Q: On the phone, what happens to an import when the reader leaves the app? → A: It continues while the system allows
+  it; if the system stopped it, on return the interrupted file shows "Interrupted" with "Try again", waiting files
+  resume on their own, and nothing half-imported is left (FR-013b). No native background service.
+- Q: How many files may one "Add file" pick hold? → A: Up to 50; picking more adds the first 50 and says the rest
+  were not added ("Pick at most 50 files at a time") (FR-011a).
+- Q: Can an import still be cancelled during its last step, "Saving"? → A: No — Cancel works in every step before
+  "Saving"; during "Saving" it is disabled ("Finishing…") and the import completes (FR-009).
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -125,6 +135,7 @@ and open Settings; the import keeps going, its progress is visible, and the new 
    and the card offers to open the existing book, as today's duplicate message does.
 7. **Given** an import is running, **When** the reader presses "Cancel" on the card, **Then** the import stops, nothing
    is added to the library and no file the import created is left behind; the reader's own file is never touched.
+   During the last step ("Saving") Cancel is disabled and shows "Finishing…"; the import then completes.
 8. **Given** an import is running, **When** the reader starts another import, **Then** the new one waits in line and
    starts when the previous one ends; the card shows how many are waiting.
 9. **Given** "Add file", **When** the reader picks several files at once, **Then** each file becomes its own import in
@@ -158,8 +169,11 @@ page appears is not longer than the baseline, and background work on that book s
 
 ### Edge Cases
 
-- The reader quits the app while an import runs: on the next start nothing half-imported is in the library and no
+- The reader quits the app while an import runs: the app asks first (FR-013a); if the reader confirms — or the app is
+  ended without asking (crash, system shutdown) — on the next start nothing half-imported is in the library and no
   leftover file from that import remains; the reader's own file is untouched.
+- The reader closes the window while an import runs: with Run in Background on, the app keeps running and the import
+  continues; the result is shown when the window is opened again. With it off, closing is a quit (FR-013a).
 - The reader's file is moved, renamed or changed while it is being imported: the import fails with "the file changed or
   is no longer there" and adds nothing.
 - The disk runs out of space during an import of a downloaded book (URL / cloud): the import fails, the partial copy is
@@ -171,6 +185,13 @@ page appears is not longer than the baseline, and background work on that book s
   nothing is written for that book.
 - The signature check fails or is interrupted: the book keeps "not checked yet" and is checked again the next time the
   signature is asked for (existing behaviour).
+- On the phone the reader switches to another app or the screen turns off during an import: the import goes on while
+  the system lets the app run; if the system paused or stopped it, the reader finds that file marked "Interrupted" with
+  "Try again" on returning, the files still waiting continue, and nothing half-imported is in the library (FR-013b).
+- The reader picks more than 50 files at once: the first 50 are queued, the reader is told the rest were not added
+  (FR-011a); picking again adds the next ones to the same queue.
+- The reader presses Cancel just as the import reaches "Saving": the import completes and the book is added (Cancel
+  was already disabled); the reader can remove it from the library as usual.
 - An audiobook ZIP picked through "Add file": keeps its own preview and background job (unchanged).
 - The interface language is English or Vietnamese: every new text is translated; file names and book titles are never
   translated.
@@ -209,13 +230,15 @@ page appears is not longer than the baseline, and background work on that book s
   the reader can use every screen while the import runs.
 - **FR-009**: A progress indicator MUST be visible or reachable in one action from every screen while an import runs,
   showing the file name, the current step, a percentage while the file is read or downloaded, the number of imports
-  waiting, and a Cancel action.
+  waiting, and a Cancel action. Cancel is available in every step before "Saving"; during "Saving" (which writes the
+  library entry all at once) it is disabled and labelled "Finishing…", and the import completes.
 - **FR-010**: While a book is being imported, the Library MUST show it as a placeholder that cannot be opened, edited,
   added to a collection or removed; on success it becomes the real book, on failure or cancel it disappears.
 - **FR-011**: Imports MUST run one at a time; an import started while another runs waits in line (first started, first
   run), and each queued import can be cancelled before it starts.
-- **FR-011a**: "Add file" MUST let the reader pick several files at once; each becomes its own queued import. When a
-  batch ends, the reader MUST get one summary (added / already in the library / failed) with each failure's cause, and
+- **FR-011a**: "Add file" MUST let the reader pick several files at once — at most 50 per pick; each becomes its own
+  queued import. When more than 50 are picked, the first 50 (in the picker's order) are queued and the reader is told
+  how many were not added and that at most 50 files can be picked at a time. When a batch ends, the reader MUST get one summary (added / already in the library / failed) with each failure's cause, and
   "Open" when exactly one book was added.
 - **FR-012**: On success the reader MUST be told (with "Open"); on a duplicate the reader MUST be offered the existing
   book; on failure the reader MUST be told the cause and offered "Try again" when retrying can help. These messages are
@@ -223,6 +246,15 @@ page appears is not longer than the baseline, and background work on that book s
 - **FR-013**: Cancelling, failing or quitting the app during an import MUST leave the library and the app's storage as
   if the import never started (no entry, no app-owned copy, no cover); the reader's own file is never modified, moved
   or deleted.
+- **FR-013a**: Closing the window MUST follow the existing Run in Background setting: when the app keeps running, imports
+  continue. Quitting the app completely (window close with Run in Background off, tray Quit, menu Quit, keyboard
+  shortcut) while imports are running or waiting MUST first ask the reader, naming how many; Cancel keeps the app and
+  the imports going, Quit cancels them (FR-013 cleanup applies). A system shutdown or crash quits without asking and
+  the next start finds nothing left behind.
+- **FR-013b**: On the phone, an import MUST keep going while the system lets the app run in the background, and MUST NOT
+  rely on running when the system stops the app. When the reader returns after the system interrupted an import, that
+  import MUST be shown as "Interrupted" with "Try again", everything it had written MUST be cleaned up (FR-013), and the
+  imports still waiting MUST continue. No background service or system notification is added for imports.
 - **FR-014**: The existing audiobook ZIP import (preview + its own background job) MUST keep working as today; the two
   kinds of import MUST NOT run their heavy work at the same time.
 
@@ -245,7 +277,7 @@ page appears is not longer than the baseline, and background work on that book s
 ### Key Entities
 
 - **Import job**: one requested import — its source (the reader's file, a URL, a cloud file), file name shown to the
-  reader, state (waiting, running, done, duplicate, failed, cancelled), current step, progress (bytes done / total
+  reader, state (waiting, running, done, duplicate, failed, cancelled, interrupted), current step, progress (bytes done / total
   when known), the resulting book (on success) or the cause (on failure). Session-only: never stored across launches.
 - **Import queue**: the ordered list of import jobs of this session; one runs at a time. A pick of several files adds
   one job per file and forms a batch whose summary is shown when its last job ends.
