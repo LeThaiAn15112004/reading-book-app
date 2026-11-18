@@ -30,8 +30,10 @@ export const libraryApi = {
     input: Parameters<typeof api.library.updateCollection>[1],
   ) => api.library.updateCollection(id, input),
   deleteCollection: (id: string) => api.library.deleteCollection(id),
-  addBookToCollection: (collectionId: string, bookId: string) =>
-    api.library.addBookToCollection(collectionId, bookId),
+  addBookToCollection: (collectionId: string, bookId: string, sortOrder?: number) =>
+    api.library.addBookToCollection(collectionId, bookId, sortOrder),
+  addBooksToCollection: (collectionId: string, bookIds: string[]) =>
+    api.library.addBooksToCollection(collectionId, bookIds),
   removeBookFromCollection: (collectionId: string, bookId: string) =>
     api.library.removeBookFromCollection(collectionId, bookId),
 }

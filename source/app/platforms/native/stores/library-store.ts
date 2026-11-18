@@ -230,10 +230,53 @@ export class MobileLibraryStore implements LibraryStore {
     return (await queryOne(this.db, q.selectCollectionExists(id))) !== undefined
   }
 
+  /** Undo of a removal (spec 015): the link back at its former `sortOrder`. */
+  async addBookToCollectionAt(collectionId: string, bookId: string, sortOrder: number): Promise<void> {
+    const now = new Date().toISOString()
+    await this.db.transaction([q.insertCollectionBook(collectionId, bookId, sortOrder, now), q.touchCollection(collectionId, now)])
+  }
+
+  /**
+   * Bulk add (spec 015 FR-010): every new id gets the next order in the order given, the collection is touched once,
+   * all in ONE transaction. Unknown, repeated and already present ids are skipped.
+   */
+  async addBooksToCollection(collectionId: string, bookIds: readonly string[]): Promise<{ added: string[]; skipped: string[] }> {
+    const existingStatement = q.selectCollectionBookIds(collectionId)
+    const existing = new Set(
+      (await this.db.query<{ book_id: string }>(existingStatement.sql, existingStatement.params)).map((r) => r.book_id),
+    )
+    const next = await queryOne<{ value: number }>(this.db, q.selectNextCollectionSortOrder(collectionId))
+    let order = next?.value ?? 0
+    const now = new Date().toISOString()
+    const added: string[] = []
+    const skipped: string[] = []
+    const seen = new Set<string>()
+    const statements: SqlStatement[] = []
+    for (const bookId of bookIds) {
+      if (seen.has(bookId) || existing.has(bookId) || !(await this.findById(bookId))) {
+        skipped.push(bookId)
+        continue
+      }
+      seen.add(bookId)
+      added.push(bookId)
+      statements.push(q.insertCollectionBook(collectionId, bookId, order++, now))
+    }
+    if (statements.length > 0) {
+      statements.push(q.touchCollection(collectionId, now))
+      await this.db.transaction(statements)
+    }
+    return { added, skipped }
+  }
+
   async addBookToCollection(collectionId: string, bookId: string): Promise<void> {
     const now = new Date().toISOString()
     const next = await queryOne<{ value: number }>(this.db, q.selectNextCollectionSortOrder(collectionId))
     await this.db.transaction([q.insertCollectionBook(collectionId, bookId, next?.value ?? 0, now), q.touchCollection(collectionId, now)])
+  }
+
+  /** The link's position before a removal (spec 015 Undo); undefined when the book is not in the collection. */
+  async collectionBookSortOrder(collectionId: string, bookId: string): Promise<number | undefined> {
+    return (await queryOne<{ value: number }>(this.db, q.selectCollectionBookSortOrder(collectionId, bookId)))?.value
   }
 
   async removeBookFromCollection(collectionId: string, bookId: string): Promise<boolean> {

@@ -322,6 +322,20 @@ export interface CollectionSummaryDto {
   updatedAt: string
 }
 
+/** `library:addBooksToCollection` (spec 015): one transaction; `added` in the order given. */
+export interface AddBooksToCollectionResultDto {
+  ok: boolean
+  added: string[]
+  /** Unknown id, repeated in the request, or already in the collection. */
+  skipped: string[]
+}
+
+/** `library:removeBookFromCollection`: `sortOrder` of the removed link, so Undo can restore the position. */
+export interface RemoveFromCollectionResultDto {
+  ok: boolean
+  sortOrder?: number
+}
+
 /** Stable codes for library.openBookContent failures (T3.4). */
 export type OpenBookErrorCode =
   | 'not_found'
@@ -1092,11 +1106,14 @@ export interface DesktopApi {
       input: { name: string; description?: string },
     ): Promise<CollectionSummaryDto | null>
     deleteCollection(id: string): Promise<OkResult>
-    addBookToCollection(collectionId: string, bookId: string): Promise<OkResult>
+    /** `sortOrder` (spec 015 Undo): an integer 0…2^31-1 to insert at that position; omitted = at the end. */
+    addBookToCollection(collectionId: string, bookId: string, sortOrder?: number): Promise<OkResult>
+    /** Several books at the end of the collection, in the order given, in one transaction (1–2 000 ids). */
+    addBooksToCollection(collectionId: string, bookIds: string[]): Promise<AddBooksToCollectionResultDto>
     removeBookFromCollection(
       collectionId: string,
       bookId: string,
-    ): Promise<OkResult>
+    ): Promise<RemoveFromCollectionResultDto>
   }
   import: {
     fromFile(): Promise<ImportResult>

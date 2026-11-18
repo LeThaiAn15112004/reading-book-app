@@ -8,15 +8,18 @@ import {
   useLibraryView,
   useZipImportStore,
 } from '../../../hooks/library/index.js'
-import { type LibraryBook, type MessageRef } from '@core'
+import { bulkAddSummary, type LibraryBook, type MessageRef } from '@core'
 import { importApi, libraryApi } from '../../../bridge'
 import { useAppNav, useOpenReading, type AppStubNavId } from '../../../components/chrome'
 import type { BootLocationState } from '../../boot'
 import type {
   BookMenuPoint,
   BookMetadataValues,
+  CollectionMenuPoint,
   ShelfDetailItemData,
 } from '../components'
+import { useAddBooksPickerStore } from './addBooksPickerStore'
+import { sortLibraryBooks } from './libraryBrowse'
 import { toShelfDetailItem } from './toShelfDetailItem'
 import { canGenerateCover, generateBookCover, markCoverAttempted } from './generateBookCover'
 import { useLibraryBrowseStore } from './libraryBrowseStore'
@@ -61,8 +64,15 @@ export function useLibraryScreen() {
   const [pendingCollectionBookId, setPendingCollectionBookId] = useState<
     string | null
   >(null)
-  /** Grid / list toggle of the collection detail view (top-nav Collections). */
-  const [collectionViewMode, setCollectionViewMode] = useState<'grid' | 'list'>('grid')
+  /** Grid / list of every collection page — remembered and reset with the Library prefs (spec 015 FR-021). */
+  const collectionViewMode = useLibraryBrowseStore((s) => s.collectionView)
+  const setCollectionViewMode = useLibraryBrowseStore((s) => s.setCollectionView)
+  const librarySort = useLibraryBrowseStore((s) => s.sort)
+  /** The open collection ⋮ menu (spec 015 FR-004): which collection, and where (null = phone sheet / keyboard). */
+  const [collectionMenu, setCollectionMenu] = useState<{
+    collectionId: string
+    point: CollectionMenuPoint | null
+  } | null>(null)
 
   const { books, refreshLibrary } = useLibraryBooks({
     client: libraryApi,
@@ -192,6 +202,7 @@ export function useLibraryScreen() {
     updateCollection,
     deleteCollection,
     addBookToCollection,
+    addBooksToCollection,
     removeBookFromCollection,
     refreshCollections,
   } = useCollections({
@@ -389,19 +400,85 @@ export function useLibraryScreen() {
     }
   }
 
+  /**
+   * Remove a book from a collection — from the collection page or the book menu's toggle (spec 015 FR-015): at once,
+   * no confirmation, with "Undo" in the toast that puts the book back at the same place.
+   */
   async function handleRemoveFromCollection(
     collectionId: string,
     bookId: string,
   ) {
+    const name = collections.find((item) => item.id === collectionId)?.name
     try {
       const removed = await removeBookFromCollection(collectionId, bookId)
+      if (!removed.ok) {
+        showToast({ key: 'library.toast.removeFromCollectionFailed' }, 'error')
+        return
+      }
       showToast(
-        { key: removed ? 'library.toast.removedFromCollection' : 'library.toast.removeFromCollectionFailed' },
-        removed ? 'success' : 'error',
+        name ? { key: 'library.toast.removedFromNamed', params: { name } } : { key: 'library.toast.removedFromCollection' },
+        'success',
+        {
+          label: { key: 'library.toast.undo' },
+          run: () => void undoRemoveFromCollection(collectionId, bookId, removed.sortOrder),
+        },
       )
     } catch {
       showToast({ key: 'library.toast.removeFromCollectionFailed' }, 'error')
     }
+  }
+
+  /** Undo: harmless after the collection or the book is gone — it then says it can no longer be undone. */
+  async function undoRemoveFromCollection(collectionId: string, bookId: string, sortOrder: number | undefined) {
+    let restored = false
+    try {
+      restored = await addBookToCollection(collectionId, bookId, sortOrder)
+    } catch {
+      restored = false
+    }
+    const name = collectionsRef.current.find((item) => item.id === collectionId)?.name
+    if (restored && name) showToast({ key: 'library.toast.restored', params: { name } }, 'success')
+    else showToast({ key: 'library.toast.undoUnavailable' }, 'info')
+  }
+
+  /**
+   * "Add (n)" of the picker (spec 015 FR-010): one call, one transaction. Resolves false when nothing was added — the
+   * picker then stays open with its selection; otherwise it closes and the toast says how many were added / skipped.
+   */
+  async function handleAddBooksToCollection(collectionId: string, bookIds: string[]): Promise<boolean> {
+    const name = collections.find((item) => item.id === collectionId)?.name ?? ''
+    let summary: ReturnType<typeof bulkAddSummary>
+    try {
+      summary = bulkAddSummary(await addBooksToCollection(collectionId, bookIds))
+    } catch {
+      summary = bulkAddSummary({ ok: false, added: [], skipped: [] })
+    }
+    if (summary.kind === 'failed' || summary.added === 0) {
+      if (summary.kind !== 'failed') showToast({ key: 'library.toast.addManyFailed' }, 'error')
+      return false
+    }
+    useAddBooksPickerStore.getState().close()
+    showToast(
+      summary.kind === 'partial'
+        ? { key: 'library.toast.addedSomeSkipped', params: { added: summary.added, skipped: summary.skipped, name } }
+        : { key: 'library.toast.addedMany', params: { count: summary.added, name } },
+      'success',
+    )
+    return true
+  }
+
+  function openCollectionMenu(collectionId: string, point: CollectionMenuPoint | null) {
+    setCollectionMenu({ collectionId, point })
+  }
+
+  function closeCollectionMenu() {
+    setCollectionMenu(null)
+  }
+
+  /** "Add books" in the picker's empty state: close it and start the ordinary import. */
+  function importBooksFromPicker() {
+    useAddBooksPickerStore.getState().close()
+    void handleFromDevice()
   }
 
   async function confirmPendingRemoval() {
@@ -442,6 +519,39 @@ export function useLibraryScreen() {
       (collection) => collection.id === pendingCollectionDeleteId,
     )
     : undefined
+  const collectionsRef = useRef(collections)
+  collectionsRef.current = collections
+  const menuCollection = collectionMenu
+    ? collections.find((collection) => collection.id === collectionMenu.collectionId)
+    : undefined
+  /** Library books in the Library's current sort order (the picker lists them like the Library, T027). */
+  const pickerBooks = sortLibraryBooks(bookList, librarySort)
+
+  // R13: the collection open on its page was deleted elsewhere (or from its own page) → back to the list.
+  const seenActiveCollection = useRef<string | null>(null)
+  useEffect(() => {
+    if (view.kind !== 'collection') {
+      seenActiveCollection.current = null
+      return
+    }
+    if (activeCollection) seenActiveCollection.current = activeCollection.id
+    else if (seenActiveCollection.current === view.collectionId) {
+      seenActiveCollection.current = null
+      goCollections()
+    }
+  })
+
+  // The picker belongs to one collection page: leaving it (or the collection vanishing) closes the picker.
+  const pickerCollectionId = useAddBooksPickerStore((s) => (s.open ? s.collectionId : null))
+  useEffect(() => {
+    if (pickerCollectionId && pickerCollectionId !== activeCollection?.id) useAddBooksPickerStore.getState().close()
+  }, [pickerCollectionId, activeCollection?.id])
+
+  // A menu whose collection no longer exists closes.
+  useEffect(() => {
+    if (collectionMenu && !menuCollection) setCollectionMenu(null)
+  }, [collectionMenu, menuCollection])
+
   const collectionItems: ShelfDetailItemData[] = activeCollection
     ? activeCollection.bookIds
       .map((id) => bookList.find((b) => b.id === id))
@@ -511,6 +621,13 @@ export function useLibraryScreen() {
     collectionItems,
     collectionViewMode,
     setCollectionViewMode,
+    collectionMenu,
+    menuCollection,
+    openCollectionMenu,
+    closeCollectionMenu,
+    handleAddBooksToCollection,
+    importBooksFromPicker,
+    pickerBooks,
     cloudSources,
     books,
     bookList,

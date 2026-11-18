@@ -110,7 +110,7 @@ const OUT_OF_SCOPE = {
 const NON_DEFAULT_APPEARANCE = {
   themeMode: 'light', accent: 'custom', customAccent: '#123456', density: 'compact', language: 'vi',
 }
-const NON_DEFAULT_LIBRARY = { sort: 'title', layout: 'table' }
+const NON_DEFAULT_LIBRARY = { sort: 'title', layout: 'table', collectionView: 'list' }
 
 for (const [key, value] of Object.entries(OUT_OF_SCOPE)) storage.set(key, value)
 storage.set(KEYS.appearance, JSON.stringify(NON_DEFAULT_APPEARANCE))
@@ -138,8 +138,8 @@ const appearance = () => {
   return { themeMode, accent, customAccent, density, language }
 }
 const library = () => {
-  const { sort, layout } = useLibraryBrowseStore.getState()
-  return { sort, layout }
+  const { sort, layout, collectionView } = useLibraryBrowseStore.getState()
+  return { sort, layout, collectionView }
 }
 const notifications = () => useNotificationsStore.getState().prefs
 const stored = (key) => JSON.parse(storage.get(key))
@@ -154,6 +154,7 @@ function customize() {
   const l = useLibraryBrowseStore.getState()
   l.setSort(NON_DEFAULT_LIBRARY.sort)
   l.setLayout(NON_DEFAULT_LIBRARY.layout)
+  l.setCollectionView(NON_DEFAULT_LIBRARY.collectionView)
   l.setFilter('favorites')
   l.selectBook('book-1')
   // Enabling goes through the OS permission check (IPC) — seed the granted state directly instead.
@@ -187,7 +188,7 @@ await check('defaults: single source of truth holds the documented values', asyn
   assert.deepEqual(DEFAULT_APP_APPEARANCE, {
     themeMode: 'dark', accent: 'orange', customAccent: '#ec4899', density: 'balanced', language: 'system',
   })
-  assert.deepEqual(DEFAULT_LIBRARY_BROWSE_PREFS, { sort: 'recently-added', layout: 'grid' })
+  assert.deepEqual(DEFAULT_LIBRARY_BROWSE_PREFS, { sort: 'recently-added', layout: 'grid', collectionView: 'grid' })
   assert.deepEqual(APP_SETTINGS_RESETTERS.map((r) => r.id), ['appearance', 'library', 'pdf-view', 'pdf-ink', 'pdf-shape', 'pdf-typewriter', 'notifications', 'background', 'keyboard-shortcuts'])
 })
 

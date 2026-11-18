@@ -267,19 +267,24 @@ function DesktopBookItemMenu({
               className={phone ? 'w-full' : 'w-56 rounded-xl border border-lib-border bg-lib-surface-strong p-1.5 shadow-[0_18px_48px_rgba(0,0,0,0.45)]'}
             >
               {collections.map((collection) => {
+                // Spec 015 FR-011: a toggle — choosing a collection that holds the book removes it (with Undo).
                 const included = collection.bookIds.includes(book.id)
                 return (
                   <button
                     key={collection.id}
                     className={itemClass}
-                    role="menuitem"
-                    disabled={included}
+                    role="menuitemcheckbox"
+                    aria-checked={included}
                     onClick={() =>
-                      run(() => onAddToCollection(collection.id, book.id))
+                      run(() =>
+                        included
+                          ? onRemoveFromCollection(collection.id, book.id)
+                          : onAddToCollection(collection.id, book.id),
+                      )
                     }
                   >
                     <span className="truncate">{collection.name}</span>
-                    {included ? <span aria-label={t('library.menu.alreadyAdded')}>✓</span> : null}
+                    {included ? <CheckIcon className="size-4 shrink-0 text-lib-accent" /> : null}
                   </button>
                 )
               })}
@@ -363,7 +368,7 @@ function DesktopBookItemMenu({
         // A multi-chapter audiobook's files are all app-owned copies: "remove the record, keep the files" would leave
         // an unreachable folder, so there is one action and it says what it deletes.
         <button
-          className={`${itemClass} text-red-400 hover:text-red-300`}
+          className={`${itemClass} text-lib-danger`}
           role="menuitem"
           onClick={() => run(() => onRemoveAudiobook(book.id))}
         >
@@ -377,7 +382,7 @@ function DesktopBookItemMenu({
       {/* Only app-owned copies can be deleted; a referenced book's file is the user's own. */}
       {!book.chapterCount && book.fileStorage === 'managed' ? (
         <button
-          className={`${itemClass} text-red-400 hover:text-red-300`}
+          className={`${itemClass} text-lib-danger`}
           role="menuitem"
           onClick={() => run(() => onDeleteFile(book.id))}
         >
@@ -385,6 +390,14 @@ function DesktopBookItemMenu({
         </button>
       ) : null}
     </div>
+  )
+}
+
+export function CheckIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} className={className} aria-hidden>
+      <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+    </svg>
   )
 }
 

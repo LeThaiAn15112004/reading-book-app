@@ -2,7 +2,7 @@ import { continueAction } from '@core'
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
 import { useT } from '../../../../i18n'
 import { BookCover } from './BookCover'
-import type { BookItemMenuProps } from './BookItemMenu'
+import { CheckIcon, type BookItemMenuProps } from './BookItemMenu'
 
 /** `onReadAgain` / `onMarkReading` (research R9: `markAsReading`, the location is kept) are used here only. */
 export type PhoneBookSheetProps = BookItemMenuProps
@@ -197,17 +197,24 @@ export function PhoneBookSheet({
         {collectionsOpen ? (
           <div role="menu" aria-label={t('library.menu.collections')} className="pl-4">
             {collections.map((collection) => {
+              // Spec 015 FR-011: a toggle — choosing a collection that holds the book removes it (with Undo).
               const included = collection.bookIds.includes(book.id)
               return (
                 <button
                   key={collection.id}
                   className={itemClass}
-                  role="menuitem"
-                  disabled={included}
-                  onClick={() => run(() => onAddToCollection(collection.id, book.id))}
+                  role="menuitemcheckbox"
+                  aria-checked={included}
+                  onClick={() =>
+                    run(() =>
+                      included
+                        ? onRemoveFromCollection(collection.id, book.id)
+                        : onAddToCollection(collection.id, book.id),
+                    )
+                  }
                 >
                   <span className="truncate">{collection.name}</span>
-                  {included ? <span aria-label={t('library.menu.alreadyAdded')}>✓</span> : null}
+                  {included ? <CheckIcon className="size-5 shrink-0 text-lib-accent" /> : null}
                 </button>
               )
             })}
@@ -253,7 +260,7 @@ export function PhoneBookSheet({
         ) : null}
 
         <SheetSeparator />
-        <button className={`${itemClass} text-red-400`} role="menuitem" onClick={() => run(() => onRemove(book.id))}>
+        <button className={`${itemClass} text-lib-danger`} role="menuitem" onClick={() => run(() => onRemove(book.id))}>
           {t('library.menu.removeFromLibrary')}
         </button>
       </div>

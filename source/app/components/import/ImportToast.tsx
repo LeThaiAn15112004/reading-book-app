@@ -1,4 +1,5 @@
 import { useEffect } from 'react'
+import { isMobileHost } from '../../platforms/host'
 
 export type ImportToastVariant = 'success' | 'error' | 'info'
 
@@ -80,7 +81,9 @@ export function ImportToast({
       {action ? (
         <button
           type="button"
-          className="pointer-events-auto ml-1 inline-flex h-7 shrink-0 cursor-pointer items-center rounded-md border-none bg-lib-accent-soft px-2.5 text-[12px] font-semibold text-lib-accent transition-colors hover:bg-lib-accent hover:text-lib-on-accent"
+          className={`pointer-events-auto ml-1 inline-flex shrink-0 cursor-pointer items-center rounded-md border-none bg-lib-accent-soft text-[12px] font-semibold text-lib-accent transition-colors hover:bg-lib-accent hover:text-lib-on-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-lib-accent ${
+            isMobileHost() ? 'h-11 min-w-11 justify-center px-3' : 'h-7 px-2.5'
+          }`}
           onClick={() => {
             onClose()
             action.run()

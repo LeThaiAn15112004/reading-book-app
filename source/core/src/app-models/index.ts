@@ -11,6 +11,8 @@ export {
   type ReaderBookmark,
 } from './bookmark-location.js'
 export type { CollectionSummary } from './collection-summary.js'
+export { bulkAddSummary, collectionCoverSlots, pickerRows } from './collection-view.js'
+export type { BulkAddResult, BulkAddSummary, CollectionCoverSlot, PickerRow } from './collection-view.js'
 export {
   formatHighlightCitation,
   type HighlightCitationInput,

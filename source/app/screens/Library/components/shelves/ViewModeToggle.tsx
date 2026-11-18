@@ -1,4 +1,5 @@
 import { useT } from '../../../../i18n'
+import { isMobileHost } from '../../../../platforms/host'
 
 export type ViewMode = 'grid' | 'list'
 
@@ -50,9 +51,12 @@ export type ViewModeToggleProps = {
 /** Grid/List switch shown on section + collection full-page views. */
 export function ViewModeToggle({ viewMode, onChange }: ViewModeToggleProps) {
   const t = useT()
+  // Phone: 44 px targets at least 8 px apart (spec 015 FR-005).
+  const phone = isMobileHost()
+  const size = phone ? 'size-11' : 'size-8'
   return (
     <div
-      className="flex shrink-0 items-center gap-0.5 rounded-lg bg-lib-chip/50 p-0.5"
+      className={`flex shrink-0 items-center rounded-lg bg-lib-chip/50 p-0.5 ${phone ? 'gap-2' : 'gap-0.5'}`}
       role="group"
       aria-label={t('library.layout.changeViewMode')}
     >
@@ -62,7 +66,7 @@ export function ViewModeToggle({ viewMode, onChange }: ViewModeToggleProps) {
         aria-label={t('library.layout.grid')}
         title={t('library.layout.grid')}
         onClick={() => onChange('grid')}
-        className={`inline-flex size-8 cursor-pointer items-center justify-center rounded-md border-none transition-colors ${
+        className={`inline-flex ${size} cursor-pointer items-center justify-center rounded-md border-none transition-colors focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-lib-accent ${
           viewMode === 'grid'
             ? 'bg-lib-text-strong text-lib-bg-deep'
             : 'bg-transparent text-lib-muted hover:text-lib-text-strong'
@@ -76,7 +80,7 @@ export function ViewModeToggle({ viewMode, onChange }: ViewModeToggleProps) {
         aria-label={t('library.layout.list')}
         title={t('library.layout.list')}
         onClick={() => onChange('list')}
-        className={`inline-flex size-8 cursor-pointer items-center justify-center rounded-md border-none transition-colors ${
+        className={`inline-flex ${size} cursor-pointer items-center justify-center rounded-md border-none transition-colors focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-lib-accent ${
           viewMode === 'list'
             ? 'bg-lib-text-strong text-lib-bg-deep'
             : 'bg-transparent text-lib-muted hover:text-lib-text-strong'

@@ -111,7 +111,7 @@ export function ShelfDetailItem({
   return (
     <li>
       <div
-        className="group relative flex w-full items-center gap-3.5 rounded-[10px] border border-lib-border bg-lib-surface p-3 transition-[border-color,background-color,transform] hover:-translate-y-px hover:border-lib-accent-ring hover:bg-[rgb(30_41_59/0.55)] focus-within:border-lib-accent-ring"
+        className="group relative flex w-full items-center gap-3.5 rounded-[10px] border border-lib-border bg-lib-surface p-3 transition-[border-color,background-color,transform] motion-safe:hover:-translate-y-px hover:border-lib-accent-ring hover:bg-lib-surface-hover focus-within:border-lib-accent-ring"
         {...withLongPress((event) => {
           event.preventDefault()
           onBookMenu(item.id, { x: event.clientX, y: event.clientY })
@@ -119,7 +119,7 @@ export function ShelfDetailItem({
       >
         <button
           type="button"
-          className="flex min-w-0 flex-1 cursor-pointer items-center gap-3.5 border-none bg-transparent p-0 text-left font-[inherit] text-inherit focus-visible:outline-none"
+          className="flex min-w-0 flex-1 cursor-pointer items-center gap-3.5 rounded-md border-none bg-transparent p-0 text-left font-[inherit] text-inherit focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-lib-accent"
           onClick={() => onOpen(item.id)}
         >
           <BookCover

@@ -102,6 +102,7 @@
     "spike:annotations:store": "cd source/app/platforms/electron && node --experimental-transform-types --import ./spikes/txt/register-alias.mjs spikes/annotations/run-annotations-store.mjs",
     "spike:audio:zip-store": "cd source/app/platforms/electron && node --experimental-transform-types --import ./spikes/txt/register-alias.mjs spikes/audio/run-zip-import-store.mjs",
     "spike:audio:chapters": "cd source/app/platforms/electron && node --experimental-transform-types --import ./spikes/pdf-annotations/register-alias.mjs spikes/audio/run-audio-chapters-store.mjs",
+    "spike:collections:main": "cd source/app/platforms/electron && node --experimental-transform-types --import ./spikes/pdf-annotations/register-alias.mjs spikes/collections/run-collections-main.mjs",
     "spike:sql:driver": "cd source/app/platforms/electron && node spikes/sql-driver/run-sql-driver.mjs",
     "spike:audio:migration": "cd source/app/platforms/electron && node spikes/audio/run-audio-migration.mjs",
     "spike:transcription:main": "cd source/app/platforms/electron && node spikes/transcription/run-transcription-main.mjs",

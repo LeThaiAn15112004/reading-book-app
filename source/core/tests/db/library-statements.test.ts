@@ -59,6 +59,7 @@ describe('library statements', () => {
       q.insertCollectionBook('c', 'b', 0, now),
       q.touchCollection('c', now),
       q.deleteCollectionBook('c', 'b'),
+      q.selectCollectionBookSortOrder('c', 'b'),
       q.insertAudioChapter(['i', 'b', 0, 't', 'f', 's', 'mp3', 1, 'h', null]),
       q.selectAudioChapters('b'),
       q.selectAudioChapter('b', 'c'),
@@ -66,6 +67,17 @@ describe('library statements', () => {
       q.selectAudioChapterCounts(),
     ]
     for (const statement of all) expect(statement.params.length, statement.sql).toBe(placeholders(statement.sql))
+  })
+
+  it('selectCollectionBookSortOrder reads one link\'s sort_order as "value" (spec 015 Undo)', () => {
+    const statement = q.selectCollectionBookSortOrder('c1', 'b1')
+    expect(statement.sql).toMatch(/^SELECT sort_order AS value FROM collection_books WHERE collection_id = \? AND book_id = \?$/)
+    expect(statement.params).toEqual(['c1', 'b1'])
+  })
+
+  it('the bulk-add rule: the next order is max + 1, and inserts keep a book once per collection', () => {
+    expect(q.selectNextCollectionSortOrder('c').sql).toContain('COALESCE(MAX(sort_order), -1) + 1')
+    expect(q.insertCollectionBook('c', 'b', 4, 't').sql).toMatch(/^INSERT OR IGNORE INTO collection_books/)
   })
 
   it('insertBook takes the 15 values of bookToRowValues, in column order', () => {

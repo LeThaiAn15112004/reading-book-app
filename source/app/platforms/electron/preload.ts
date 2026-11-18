@@ -101,12 +101,15 @@ const api: DesktopApi = {
       ipcRenderer.invoke(LibraryChannels.updateCollection, id, input),
     deleteCollection: (id) =>
       ipcRenderer.invoke(LibraryChannels.deleteCollection, id),
-    addBookToCollection: (collectionId, bookId) =>
+    addBookToCollection: (collectionId, bookId, sortOrder) =>
       ipcRenderer.invoke(
         LibraryChannels.addBookToCollection,
         collectionId,
         bookId,
+        sortOrder,
       ),
+    addBooksToCollection: (collectionId, bookIds) =>
+      ipcRenderer.invoke(LibraryChannels.addBooksToCollection, collectionId, bookIds),
     removeBookFromCollection: (collectionId, bookId) =>
       ipcRenderer.invoke(
         LibraryChannels.removeBookFromCollection,

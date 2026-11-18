@@ -8,15 +8,23 @@ import {
   ImportUrlDialog,
 } from '../../components/import'
 import {
+  AddBooksPicker,
   BookItemMenu,
   CloudSourcesHub,
+  CollectionCovers,
+  CollectionItemMenu,
   CollectionsHub,
   ConfirmBookActionDialog,
   EditBookMetadataDialog,
   LibraryBookInfoDialog,
+  MoreVertIcon,
   NewCollectionDialog,
+  PlusIcon,
   ShelfDetailView,
 } from './components'
+import { menuPointFromButton } from './components/collections/menuPoint'
+import { useAddBooksPickerStore } from './logic/addBooksPickerStore'
+import { collectionCoverSlots, type CollectionSummary } from '@core'
 import { annotationTransferApi } from '../../bridge'
 import { ImportPreviewDialog } from '../../components/annotation-transfer/ImportPreviewDialog'
 import { useAnnotationTransferStore } from '../Reader/logic/annotationTransferStore'
@@ -24,7 +32,7 @@ import { useLibraryImportStore } from '../../hooks/library'
 import { annotationExportMessage } from '../../utils/annotationTransferMessages'
 import { useShortcutAction } from '../../shortcuts'
 import { uiText, useT } from '../../i18n'
-import { Suspense, lazy } from 'react'
+import { Suspense, lazy, useMemo } from 'react'
 import { isMobileHost } from '../../platforms/host'
 import { LibraryHub, type LibraryHubProps } from './LibraryHub'
 import { useLibraryScreen } from './logic'
@@ -110,11 +118,47 @@ export function LibraryScreen() {
     collectionItems,
     collectionViewMode,
     setCollectionViewMode,
+    collectionMenu,
+    menuCollection,
+    openCollectionMenu,
+    closeCollectionMenu,
+    handleAddBooksToCollection,
+    importBooksFromPicker,
+    pickerBooks,
     cloudSources,
     books,
     bookList,
   } = useLibraryScreen()
   useShortcutAction('general.openBook', () => void handleFromDevice())
+  const phone = isMobileHost()
+  const openPicker = useAddBooksPickerStore((s) => s.openFor)
+  const booksById = useMemo(() => new Map(bookList.map((book) => [book.id, book])), [bookList])
+
+  /** Spec 015 US3: the covers of the first three books of a collection (cards and phone rows). */
+  function renderCovers(collection: CollectionSummary, variant: 'card' | 'stack') {
+    return (
+      <CollectionCovers
+        variant={variant}
+        booksById={booksById}
+        slots={collectionCoverSlots(collection.bookIds, (id) => booksById.has(id))}
+      />
+    )
+  }
+
+  /** "Add books" on the collection page (FR-007): label on Desktop, icon-only 44 px on the phone. */
+  const addBooksButton = (collectionId: string, inEmptyState = false) => (
+    <button
+      type="button"
+      className={`inline-flex shrink-0 cursor-pointer items-center justify-center gap-2 rounded-lg border-none bg-lib-accent text-[13px] font-semibold text-lib-on-accent transition-colors hover:bg-lib-accent-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-lib-accent ${
+        inEmptyState ? 'h-11 px-5' : phone ? 'size-11' : 'h-9 px-3.5'
+      }`}
+      aria-label={!inEmptyState && phone ? t('library.collections.addBooks') : undefined}
+      onClick={() => openPicker(collectionId)}
+    >
+      <PlusIcon className="size-4" />
+      {!inEmptyState && phone ? null : <span>{t('library.collections.addBooks')}</span>}
+    </button>
+  )
 
   return (
     <div className="lib-chrome relative flex h-full w-full select-none overflow-hidden font-[system-ui,'Segoe_UI',sans-serif] text-lib-text antialiased">
@@ -122,10 +166,11 @@ export function LibraryScreen() {
         {view.kind === 'collections' ? (
           <CollectionsHub
             collections={collections}
+            menuCollectionId={collectionMenu?.collectionId ?? null}
             onNewCollection={() => openNewCollection()}
             onOpenCollection={openCollection}
-            onEditCollection={openEditCollection}
-            onDeleteCollection={setPendingCollectionDeleteId}
+            onOpenMenu={openCollectionMenu}
+            renderCovers={renderCovers}
           />
         ) : view.kind === 'cloud-sources' ? (
           <CloudSourcesHub
@@ -150,12 +195,40 @@ export function LibraryScreen() {
         ) : activeCollection ? (
           <ShelfDetailView
             title={activeCollection.name}
+            description={activeCollection.description}
             items={collectionItems}
             onBack={goCollections}
             onOpenItem={openReader}
             onBookMenu={handleOpenBookMenu}
             countLabel={t('library.bookCount', { count: collectionItems.length })}
             emptyMessage={t('library.shelf.emptyCollection')}
+            emptyState={
+              <div className="mx-auto flex max-w-md flex-col items-center gap-2 py-14 text-center">
+                <p className="m-0 text-base font-semibold text-lib-text-strong">{t('library.shelf.emptyCollection')}</p>
+                <p className="m-0 mb-4 text-sm text-lib-muted">{t('library.collections.emptyAddHint')}</p>
+                {addBooksButton(activeCollection.id, true)}
+              </div>
+            }
+            headerActions={
+              <>
+                {addBooksButton(activeCollection.id)}
+                <button
+                  type="button"
+                  className={`inline-flex shrink-0 cursor-pointer items-center justify-center rounded-lg border-none bg-transparent text-lib-muted transition-colors hover:bg-lib-surface-hover hover:text-lib-text-strong focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-lib-accent ${
+                    phone ? 'size-11' : 'size-9'
+                  }`}
+                  aria-haspopup="menu"
+                  aria-expanded={collectionMenu?.collectionId === activeCollection.id}
+                  aria-label={t('library.collections.moreActionsAria', { name: activeCollection.name })}
+                  title={t('library.menu.moreActions')}
+                  onClick={(event) =>
+                    openCollectionMenu(activeCollection.id, phone ? null : menuPointFromButton(event.currentTarget))
+                  }
+                >
+                  <MoreVertIcon className="size-5" />
+                </button>
+              </>
+            }
             backAriaLabel={t('library.shelf.backToCollections')}
             viewMode={collectionViewMode}
             onViewModeChange={setCollectionViewMode}
@@ -184,6 +257,25 @@ export function LibraryScreen() {
         action={toast?.action ? { label: uiText(t, toast.action.label), run: toast.action.run } : undefined}
         onClose={clearToast}
       />
+
+      {collectionMenu && menuCollection ? (
+        <CollectionItemMenu
+          collection={menuCollection}
+          point={collectionMenu.point}
+          onClose={closeCollectionMenu}
+          onEdit={() => openEditCollection(menuCollection.id)}
+          onDelete={() => setPendingCollectionDeleteId(menuCollection.id)}
+        />
+      ) : null}
+
+      {activeCollection ? (
+        <AddBooksPicker
+          books={pickerBooks}
+          collection={activeCollection}
+          onConfirm={(bookIds) => handleAddBooksToCollection(activeCollection.id, bookIds)}
+          onImportBooks={importBooksFromPicker}
+        />
+      ) : null}
 
       <NewCollectionDialog
         open={newCollectionOpen}

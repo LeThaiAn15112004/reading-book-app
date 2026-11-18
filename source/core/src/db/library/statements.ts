@@ -136,6 +136,9 @@ export const touchCollection = (collectionId: string, now: string) =>
   s('UPDATE collections SET updated_at = ? WHERE id = ?', now, collectionId)
 export const deleteCollectionBook = (collectionId: string, bookId: string) =>
   s('DELETE FROM collection_books WHERE collection_id = ? AND book_id = ?', collectionId, bookId)
+/** The link's position, read before a removal so Undo can put the book back at the same place (spec 015 R6). */
+export const selectCollectionBookSortOrder = (collectionId: string, bookId: string) =>
+  s('SELECT sort_order AS value FROM collection_books WHERE collection_id = ? AND book_id = ?', collectionId, bookId)
 
 // --- multi-chapter audiobooks (Desktop only) -----------------------------------------------------------------------
 

@@ -21,6 +21,25 @@ type OpenBookContentResult = Awaited<ReturnType<Library['openBookContent']>>
 const PNG_MAGIC = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]
 const COVER_MAX_BYTES = 4 * 1024 * 1024
 
+/** Same limits as Desktop's `library.ipc.ts` (spec 015 contracts/collections-ipc.md). */
+const MAX_BULK_BOOK_IDS = 2000
+const MAX_SORT_ORDER = 2147483647
+
+function isSortOrder(value: unknown): value is number {
+  return typeof value === 'number' && Number.isInteger(value) && value >= 0 && value <= MAX_SORT_ORDER
+}
+
+/** 1–2 000 non-empty strings, trimmed; anything else → undefined (refused). */
+function bookIdListOf(value: unknown): string[] | undefined {
+  if (!Array.isArray(value) || value.length === 0 || value.length > MAX_BULK_BOOK_IDS) return undefined
+  const ids: string[] = []
+  for (const item of value) {
+    if (typeof item !== 'string' || !item.trim()) return undefined
+    ids.push(item.trim())
+  }
+  return ids
+}
+
 export function createLibraryGroup(ctx: BridgeContext): Library {
   const { library, writes } = ctx
 
@@ -173,20 +192,38 @@ export function createLibraryGroup(ctx: BridgeContext): Library {
         return { ok: id ? await library.deleteCollection(id) : false }
       }),
 
-    addBookToCollection: (collectionId, bookIdRaw) =>
+    addBookToCollection: (collectionId, bookIdRaw, sortOrder) =>
       writes.run(async () => {
         const id = idOf(collectionId)
         const bookId = idOf(bookIdRaw)
+        if (sortOrder !== undefined && !isSortOrder(sortOrder)) return { ok: false }
         if (!id || !bookId || !(await library.collectionExists(id)) || !(await library.findById(bookId))) return { ok: false }
-        await library.addBookToCollection(id, bookId)
+        if (sortOrder === undefined) await library.addBookToCollection(id, bookId)
+        else await library.addBookToCollectionAt(id, bookId, sortOrder)
         return { ok: true }
+      }),
+
+    addBooksToCollection: (collectionId, bookIdsRaw) =>
+      writes.run(async () => {
+        const refused = { ok: false, added: [], skipped: [] }
+        const id = idOf(collectionId)
+        const bookIds = bookIdListOf(bookIdsRaw)
+        if (!id || !bookIds || !(await library.collectionExists(id))) return refused
+        try {
+          return { ok: true, ...(await library.addBooksToCollection(id, bookIds)) }
+        } catch {
+          return refused
+        }
       }),
 
     removeBookFromCollection: (collectionId, bookIdRaw) =>
       writes.run(async () => {
         const id = idOf(collectionId)
         const bookId = idOf(bookIdRaw)
-        return { ok: id && bookId ? await library.removeBookFromCollection(id, bookId) : false }
+        if (!id || !bookId) return { ok: false }
+        const sortOrder = await library.collectionBookSortOrder(id, bookId)
+        if (sortOrder === undefined || !(await library.removeBookFromCollection(id, bookId))) return { ok: false }
+        return { ok: true, sortOrder }
       }),
 
     showInFolder: notAvailable('library.showInFolder'),

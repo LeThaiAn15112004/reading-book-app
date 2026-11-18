@@ -14,6 +14,10 @@ export function filterByNav() {
   throw new Error('filterByNav is not used by the Reset App Settings checks')
 }
 
+export function filterPhoneChip() {
+  throw new Error('filterPhoneChip is not used by the Reset App Settings checks')
+}
+
 // The PDF shape preferences store validates against these (import-free pure geometry module of the real SDK).
 export * from '../../../../../core/src/app-models/pdf-shape.ts'
 

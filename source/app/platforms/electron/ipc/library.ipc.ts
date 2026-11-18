@@ -21,7 +21,9 @@ import { removeTxtData } from '../txt/txt-runtime'
 import type {
   BookSummaryDto,
   CheckSignatureResult,
+  AddBooksToCollectionResultDto,
   CollectionSummaryDto,
+  RemoveFromCollectionResultDto,
   DocumentFormatDto,
   OkResult,
   OpenBookContentResult,
@@ -469,24 +471,40 @@ export function registerLibraryIpc(): void {
       _event,
       collectionId: unknown,
       bookId: unknown,
+      sortOrder: unknown,
     ): Promise<OkResult> => {
       if (
         typeof collectionId !== 'string' ||
         !collectionId.trim() ||
         typeof bookId !== 'string' ||
-        !bookId.trim()
+        !bookId.trim() ||
+        (sortOrder !== undefined && !isCollectionSortOrder(sortOrder))
       ) {
         return { ok: false }
       }
       const store = getLibraryStore()
-      const hasCollection = store
-        .listCollections()
-        .some((collection) => collection.id === collectionId.trim())
-      if (!hasCollection || !(await store.findById(bookId.trim()))) {
+      if (!collectionExists(store, collectionId.trim()) || !(await store.findById(bookId.trim()))) {
         return { ok: false }
       }
-      store.addBookToCollection(collectionId.trim(), bookId.trim())
+      store.addBookToCollection(collectionId.trim(), bookId.trim(), sortOrder as number | undefined)
       return { ok: true }
+    },
+  )
+
+  ipcMain.removeHandler(LibraryChannels.addBooksToCollection)
+  ipcMain.handle(
+    LibraryChannels.addBooksToCollection,
+    async (_event, collectionId: unknown, bookIds: unknown): Promise<AddBooksToCollectionResultDto> => {
+      const refused: AddBooksToCollectionResultDto = { ok: false, added: [], skipped: [] }
+      const ids = bookIdListOf(bookIds)
+      if (typeof collectionId !== 'string' || !collectionId.trim() || !ids) return refused
+      const store = getLibraryStore()
+      if (!collectionExists(store, collectionId.trim())) return refused
+      try {
+        return { ok: true, ...store.addBooksToCollection(collectionId.trim(), ids) }
+      } catch {
+        return refused
+      }
     },
   )
 
@@ -497,7 +515,7 @@ export function registerLibraryIpc(): void {
       _event,
       collectionId: unknown,
       bookId: unknown,
-    ): Promise<OkResult> => {
+    ): Promise<RemoveFromCollectionResultDto> => {
       if (
         typeof collectionId !== 'string' ||
         !collectionId.trim() ||
@@ -506,12 +524,31 @@ export function registerLibraryIpc(): void {
       ) {
         return { ok: false }
       }
-      return {
-        ok: getLibraryStore().removeBookFromCollection(
-          collectionId.trim(),
-          bookId.trim(),
-        ),
-      }
+      const result = getLibraryStore().removeBookFromCollection(collectionId.trim(), bookId.trim())
+      return result.removed ? { ok: true, sortOrder: result.sortOrder } : { ok: false }
     },
   )
+}
+
+/** Spec 015 limits (contracts/collections-ipc.md). */
+const MAX_BULK_BOOK_IDS = 2000
+const MAX_SORT_ORDER = 2147483647
+
+function isCollectionSortOrder(value: unknown): value is number {
+  return typeof value === 'number' && Number.isInteger(value) && value >= 0 && value <= MAX_SORT_ORDER
+}
+
+/** 1–2 000 non-empty strings, trimmed; anything else → undefined (refused). */
+function bookIdListOf(value: unknown): string[] | undefined {
+  if (!Array.isArray(value) || value.length === 0 || value.length > MAX_BULK_BOOK_IDS) return undefined
+  const ids: string[] = []
+  for (const item of value) {
+    if (typeof item !== 'string' || !item.trim()) return undefined
+    ids.push(item.trim())
+  }
+  return ids
+}
+
+function collectionExists(store: ReturnType<typeof getLibraryStore>, collectionId: string): boolean {
+  return store.listCollections().some((collection) => collection.id === collectionId)
 }

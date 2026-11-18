@@ -1,5 +1,8 @@
 import { useT } from '../../../../i18n'
 import { useEffect, useId, useRef, useState, type FormEvent } from 'react'
+import { useBackClose } from '../../../../hooks/app/useBackClose'
+import { useDialogFocus } from '../../../../hooks/app/useDialogFocus'
+import { isMobileHost } from '../../../../platforms/host'
 
 export type NewCollectionDialogProps = {
   open: boolean
@@ -21,18 +24,24 @@ export function NewCollectionDialog({
   const t = useT()
   const titleId = useId()
   const nameRef = useRef<HTMLInputElement>(null)
+  const dialogRef = useRef<HTMLDivElement>(null)
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
   const [submitting, setSubmitting] = useState(false)
+  // Phone: every target at least 44 px high (FR-005).
+  const control = isMobileHost() ? 'h-11' : 'h-10'
+  const action = isMobileHost() ? 'h-11' : 'h-[38px]'
 
   useEffect(() => {
     if (!open) return
     setName(collection?.name ?? '')
     setDescription(collection?.description ?? '')
     setSubmitting(false)
-    const timer = window.setTimeout(() => nameRef.current?.focus(), 0)
-    return () => window.clearTimeout(timer)
   }, [open, collection])
+
+  // FR-016: focus stays inside while open and returns to the opener; FR-020: the phone's Back closes it.
+  useDialogFocus(open, dialogRef, { initialFocusRef: nameRef })
+  useBackClose(open, onClose)
 
   useEffect(() => {
     if (!open) return
@@ -66,17 +75,18 @@ export function NewCollectionDialog({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-4 backdrop-blur-[2px]"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-lib-bg-deep/65 p-4 backdrop-blur-[2px]"
       role="presentation"
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) onClose()
       }}
     >
       <div
+        ref={dialogRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
-        className="w-full max-w-md rounded-xl border border-lib-border bg-[#0f172a] p-5 shadow-[0_20px_48px_rgba(0,0,0,0.45)]"
+        className="w-full max-w-md rounded-xl border border-lib-border bg-lib-surface-strong p-5 shadow-[0_20px_48px_rgba(0,0,0,0.45)]"
       >
         <h2
           id={titleId}
@@ -91,7 +101,7 @@ export function NewCollectionDialog({
         </p>
 
         <form className="flex flex-col gap-3" onSubmit={handleSubmit}>
-          <label className="flex flex-col gap-1.5 text-[13px] text-lib-muted">
+          <label className="flex flex-col gap-1.5 text-[13px] text-lib-text">
             {t('library.collections.dialog.name')}
             <input
               ref={nameRef}
@@ -100,19 +110,19 @@ export function NewCollectionDialog({
               maxLength={80}
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="h-10 rounded-lg border border-lib-border bg-lib-input px-3 text-sm text-lib-text-strong outline-none focus:border-lib-accent focus:shadow-[0_0_0_3px_var(--color-lib-accent-soft)]"
+              className={`${control} rounded-lg border border-lib-border bg-lib-input px-3 text-sm text-lib-text-strong outline-none focus:border-lib-accent focus:shadow-[0_0_0_3px_var(--color-lib-accent-soft)]`}
               placeholder={t('library.collections.dialog.namePlaceholder')}
             />
           </label>
-          <label className="flex flex-col gap-1.5 text-[13px] text-lib-muted">
+          <label className="flex flex-col gap-1.5 text-[13px] text-lib-text">
             {t('library.collections.dialog.description')}{' '}
-            <span className="text-lib-faint">{t('library.collections.dialog.optional')}</span>
+            <span className="text-lib-muted">{t('library.collections.dialog.optional')}</span>
             <input
               type="text"
               maxLength={160}
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              className="h-10 rounded-lg border border-lib-border bg-lib-input px-3 text-sm text-lib-text-strong outline-none focus:border-lib-accent focus:shadow-[0_0_0_3px_var(--color-lib-accent-soft)]"
+              className={`${control} rounded-lg border border-lib-border bg-lib-input px-3 text-sm text-lib-text-strong outline-none focus:border-lib-accent focus:shadow-[0_0_0_3px_var(--color-lib-accent-soft)]`}
               placeholder={t('library.collections.dialog.descriptionPlaceholder')}
             />
           </label>
@@ -120,14 +130,14 @@ export function NewCollectionDialog({
           <div className="mt-2 flex justify-end gap-2.5">
             <button
               type="button"
-              className="inline-flex h-[38px] cursor-pointer items-center rounded-lg border border-lib-border bg-transparent px-4 text-[13px] font-medium text-lib-muted transition-colors hover:text-lib-text-strong"
+              className={`inline-flex ${action} cursor-pointer items-center rounded-lg border border-lib-border bg-transparent px-4 text-[13px] font-medium text-lib-muted transition-colors hover:bg-lib-surface-hover hover:text-lib-text-strong focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-lib-accent`}
               onClick={onClose}
             >
               {t('common.actions.cancel')}
             </button>
             <button
               type="submit"
-              className="inline-flex h-[38px] cursor-pointer items-center rounded-lg border-none bg-lib-accent px-4 text-[13px] font-semibold text-lib-on-accent transition-colors hover:bg-lib-accent-hover disabled:cursor-not-allowed disabled:opacity-50"
+              className={`inline-flex ${action} cursor-pointer items-center rounded-lg border-none bg-lib-accent px-4 text-[13px] font-semibold text-lib-on-accent transition-colors hover:bg-lib-accent-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-lib-accent disabled:cursor-not-allowed disabled:opacity-50`}
               disabled={!name.trim() || submitting}
             >
               {submitting

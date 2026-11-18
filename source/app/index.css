@@ -33,6 +33,7 @@
   --color-lib-topbar: var(--lib-topbar);
   --color-lib-hint: var(--lib-hint);
   --color-lib-chip: var(--lib-chip);
+  --color-lib-danger: var(--lib-danger);
 
   /* SCR-00 Splash brand motion */
   --animate-splash-pulse: splash-pulse 2.5s ease-in-out infinite;

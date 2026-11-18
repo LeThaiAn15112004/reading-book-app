@@ -355,21 +355,58 @@ export class SqliteLibraryStore implements LibraryStore {
     return this.sql.run(q.deleteCollection(collectionId)).changes > 0
   }
 
-  addBookToCollection(collectionId: string, bookId: string): void {
+  /** `sortOrder` given (spec 015 Undo): the link goes back at that position; omitted: at the end. */
+  addBookToCollection(collectionId: string, bookId: string, sortOrder?: number): void {
     const now = new Date().toISOString()
     this.sql.transaction(() => {
-      const next = this.sql.get<{ value: number }>(q.selectNextCollectionSortOrder(collectionId)) as { value: number }
-      this.sql.run(q.insertCollectionBook(collectionId, bookId, next.value, now))
+      const order =
+        sortOrder ??
+        (this.sql.get<{ value: number }>(q.selectNextCollectionSortOrder(collectionId)) as { value: number }).value
+      this.sql.run(q.insertCollectionBook(collectionId, bookId, order, now))
       this.sql.run(q.touchCollection(collectionId, now))
     })
   }
 
-  removeBookFromCollection(collectionId: string, bookId: string): boolean {
-    const result = this.sql.run(q.deleteCollectionBook(collectionId, bookId))
-    if (result.changes > 0) {
+  /**
+   * Bulk add (spec 015 FR-010): in ONE transaction every new id gets the next order, in the order given, and the
+   * collection is touched once. Unknown, repeated and already present ids are skipped. Throws → nothing written.
+   */
+  addBooksToCollection(collectionId: string, bookIds: readonly string[]): { added: string[]; skipped: string[] } {
+    const added: string[] = []
+    const skipped: string[] = []
+    const now = new Date().toISOString()
+    this.sql.transaction(() => {
+      const existing = new Set(
+        this.sql.all<{ book_id: string }>(q.selectCollectionBookIds(collectionId)).map((row) => row.book_id),
+      )
+      let order = (this.sql.get<{ value: number }>(q.selectNextCollectionSortOrder(collectionId)) as { value: number }).value
+      const seen = new Set<string>()
+      for (const bookId of bookIds) {
+        if (seen.has(bookId) || existing.has(bookId) || !this.sql.get(q.selectBookById(bookId))) {
+          skipped.push(bookId)
+          continue
+        }
+        seen.add(bookId)
+        this.sql.run(q.insertCollectionBook(collectionId, bookId, order++, now))
+        added.push(bookId)
+      }
+      if (added.length > 0) this.sql.run(q.touchCollection(collectionId, now))
+    })
+    return { added, skipped }
+  }
+
+  /** Reads the link's position, then removes it — one transaction (spec 015: Undo restores the position). */
+  removeBookFromCollection(collectionId: string, bookId: string): { removed: boolean; sortOrder?: number } {
+    let outcome: { removed: boolean; sortOrder?: number } = { removed: false }
+    this.sql.transaction(() => {
+      const row = this.sql.get<{ value: number }>(q.selectCollectionBookSortOrder(collectionId, bookId))
+      if (!row) return
+      const result = this.sql.run(q.deleteCollectionBook(collectionId, bookId))
+      if (result.changes === 0) return
       this.sql.run(q.touchCollection(collectionId, new Date().toISOString()))
-    }
-    return result.changes > 0
+      outcome = { removed: true, sortOrder: row.value }
+    })
+    return outcome
   }
 
   authorNamesForBook(bookId: string): string {

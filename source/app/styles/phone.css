@@ -40,7 +40,8 @@
 }
 
 :root[data-mobile-host] button,
-:root[data-mobile-host] [role='menuitem'] {
+:root[data-mobile-host] [role='menuitem'],
+:root[data-mobile-host] [role='menuitemcheckbox'] {
   -webkit-touch-callout: none;
   touch-action: manipulation;
 }
@@ -58,8 +59,14 @@
 @media (max-width: 899.98px) {
   /* Targets at least 44 px (contracts/phone-ui.md, Touch replacements). */
   :root[data-mobile-host] [role='menuitem'],
+  :root[data-mobile-host] [role='menuitemcheckbox'],
   :root[data-mobile-host] .phone-nav button {
     min-height: 44px;
+  }
+
+  /* Spec 015 FR-013a: compact Collections rows; at 72 px a 360 × 640 screen shows at least 6 of them. */
+  :root[data-mobile-host] .phone-collections [role='listitem'] {
+    min-height: 72px;
   }
 
   /* Spec 013 FR-027: the Library search's recent-searches rows and their remove button (shared with Desktop). */

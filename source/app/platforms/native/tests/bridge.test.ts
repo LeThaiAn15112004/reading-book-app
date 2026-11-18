@@ -264,3 +264,73 @@ describe('library, overlay and txt over the bridge', () => {
     expect(flushed).toBe(1)
   })
 })
+
+describe('collections: bulk add and undo position (spec 015)', () => {
+  async function setup(n: number) {
+    host = await createFakeHost()
+    const ids: string[] = []
+    for (let i = 0; i < n; i++) ids.push(await importText(`Book ${i}.txt`, `Body number ${i}.`))
+    const collection = await host.api.library.createCollection({ name: 'Shelf' })
+    return { ids, collectionId: collection.id }
+  }
+  const bookIdsOf = async (collectionId: string) =>
+    (await host.api.library.listCollections()).find((c) => c.id === collectionId)!.bookIds
+  const updatedAtOf = (collectionId: string) =>
+    (host.sql.db.prepare('SELECT updated_at FROM collections WHERE id = ?').get(collectionId) as { updated_at: string }).updated_at
+
+  it('appends the given books in order after the existing ones, in one step', async () => {
+    const { ids, collectionId } = await setup(4)
+    expect(await host.api.library.addBookToCollection(collectionId, ids[3]!)).toEqual({ ok: true })
+    const result = await host.api.library.addBooksToCollection(collectionId, [ids[1]!, ids[0]!, ids[2]!])
+    expect(result).toEqual({ ok: true, added: [ids[1], ids[0], ids[2]], skipped: [] })
+    expect(await bookIdsOf(collectionId)).toEqual([ids[3], ids[1], ids[0], ids[2]])
+  })
+
+  it('skips unknown, already present and repeated ids; the collection is touched once', async () => {
+    const { ids, collectionId } = await setup(3)
+    await host.api.library.addBookToCollection(collectionId, ids[0]!)
+    host.sql.db.prepare("UPDATE collections SET updated_at = '2000-01-01T00:00:00.000Z' WHERE id = ?").run(collectionId)
+    const result = await host.api.library.addBooksToCollection(collectionId, [ids[0]!, 'unknown', ids[1]!, ids[1]!, ids[2]!])
+    expect(result).toEqual({ ok: true, added: [ids[1], ids[2]], skipped: [ids[0], 'unknown', ids[1]] })
+    expect(await bookIdsOf(collectionId)).toEqual([ids[0], ids[1], ids[2]])
+    expect(updatedAtOf(collectionId)).not.toBe('2000-01-01T00:00:00.000Z')
+  })
+
+  it('refuses an unknown collection and an invalid list without changing anything', async () => {
+    const { ids, collectionId } = await setup(1)
+    const refused = { ok: false, added: [], skipped: [] }
+    expect(await host.api.library.addBooksToCollection('missing', ids)).toEqual(refused)
+    expect(await host.api.library.addBooksToCollection(collectionId, [])).toEqual(refused)
+    expect(await host.api.library.addBooksToCollection(collectionId, [1 as unknown as string])).toEqual(refused)
+    expect(await host.api.library.addBooksToCollection(collectionId, Array.from({ length: 2001 }, () => ids[0]!))).toEqual(refused)
+    expect(await bookIdsOf(collectionId)).toEqual([])
+  })
+
+  it('rolls back the whole add when the transaction fails', async () => {
+    const { ids, collectionId } = await setup(2)
+    host.sql.failNextTransactionMatching(/INSERT OR IGNORE INTO collection_books/)
+    expect(await host.api.library.addBooksToCollection(collectionId, ids)).toEqual({ ok: false, added: [], skipped: [] })
+    expect(await bookIdsOf(collectionId)).toEqual([])
+  })
+
+  it('remove returns the sort order, and adding with it restores the same order (Undo)', async () => {
+    const { ids, collectionId } = await setup(4)
+    await host.api.library.addBooksToCollection(collectionId, ids)
+    const removed = await host.api.library.removeBookFromCollection(collectionId, ids[1]!)
+    expect(removed).toEqual({ ok: true, sortOrder: 1 })
+    expect(await host.api.library.removeBookFromCollection(collectionId, ids[1]!)).toEqual({ ok: false })
+    expect(await host.api.library.addBookToCollection(collectionId, ids[1]!, removed.sortOrder)).toEqual({ ok: true })
+    expect(await bookIdsOf(collectionId)).toEqual(ids)
+  })
+
+  it('refuses a sort order that is not an integer in 0…2^31-1, and an undo after the collection or book is gone', async () => {
+    const { ids, collectionId } = await setup(2)
+    for (const bad of [-1, 1.5, Number.NaN, 2 ** 31, '3' as unknown as number]) {
+      expect(await host.api.library.addBookToCollection(collectionId, ids[0]!, bad), String(bad)).toEqual({ ok: false })
+    }
+    expect(await host.api.library.removeBook(ids[1]!)).toMatchObject({ ok: true })
+    expect(await host.api.library.addBookToCollection(collectionId, ids[1]!, 0)).toEqual({ ok: false })
+    expect(await host.api.library.deleteCollection(collectionId)).toEqual({ ok: true })
+    expect(await host.api.library.addBookToCollection(collectionId, ids[0]!, 0)).toEqual({ ok: false })
+  })
+})

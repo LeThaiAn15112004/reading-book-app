@@ -46,3 +46,5 @@ export type { UseLinkedLibrariesOptions } from './useLinkedLibraries.js'
 
 
 export { useBackClose } from './useBackClose.js'
+export { useDialogFocus } from './useDialogFocus.js'
+export type { UseDialogFocusOptions } from './useDialogFocus.js'

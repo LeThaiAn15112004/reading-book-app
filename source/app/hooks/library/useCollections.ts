@@ -23,11 +23,17 @@ export type UseCollectionsOptions = {
     addBookToCollection: (
       collectionId: string,
       bookId: string,
+      sortOrder?: number,
     ) => Promise<{ ok: boolean }>
+    /** Spec 015 bulk add; optional so older clients still fit. */
+    addBooksToCollection?: (
+      collectionId: string,
+      bookIds: string[],
+    ) => Promise<{ ok: boolean; added: string[]; skipped: string[] }>
     removeBookFromCollection: (
       collectionId: string,
       bookId: string,
-    ) => Promise<{ ok: boolean }>
+    ) => Promise<{ ok: boolean; sortOrder?: number }>
   }
   onCreated?: (collection: CollectionSummary) => void
 }
@@ -115,13 +121,22 @@ export function useCollections(options: UseCollectionsOptions = {}) {
     return true
   }
 
-  async function addBookToCollection(collectionId: string, bookId: string) {
+  /**
+   * `sortOrder` (Undo of a removal, spec 015 FR-015): the book goes back at that position; the list is then re-read
+   * so the local order is exactly the stored one.
+   */
+  async function addBookToCollection(collectionId: string, bookId: string, sortOrder?: number) {
     if (clientRef.current) {
       const result = await clientRef.current.addBookToCollection(
         collectionId,
         bookId,
+        sortOrder,
       )
       if (!result.ok) return false
+      if (sortOrder !== undefined) {
+        await refreshCollections().catch(() => {})
+        return true
+      }
     }
     const now = new Date().toISOString()
     setCollections((prev) =>
@@ -138,16 +153,42 @@ export function useCollections(options: UseCollectionsOptions = {}) {
     return true
   }
 
+  /** Several books at the end, in the given order (spec 015 FR-010); returns the client's result as is. */
+  async function addBooksToCollection(collectionId: string, bookIds: string[]) {
+    const client = clientRef.current
+    const result = client?.addBooksToCollection
+      ? await client.addBooksToCollection(collectionId, bookIds)
+      : { ok: !client, added: client ? [] : [...new Set(bookIds)], skipped: [] }
+    if (result.ok && result.added.length > 0) {
+      const now = new Date().toISOString()
+      setCollections((prev) =>
+        prev.map((collection) =>
+          collection.id === collectionId
+            ? {
+                ...collection,
+                bookIds: [...collection.bookIds, ...result.added.filter((id) => !collection.bookIds.includes(id))],
+                updatedAt: now,
+              }
+            : collection,
+        ),
+      )
+    }
+    return result
+  }
+
+  /** `sortOrder` = the removed link's position (for Undo); absent without a client. */
   async function removeBookFromCollection(
     collectionId: string,
     bookId: string,
-  ) {
+  ): Promise<{ ok: boolean; sortOrder?: number }> {
+    let sortOrder: number | undefined
     if (clientRef.current) {
       const result = await clientRef.current.removeBookFromCollection(
         collectionId,
         bookId,
       )
-      if (!result.ok) return false
+      if (!result.ok) return { ok: false }
+      sortOrder = result.sortOrder
     }
     const now = new Date().toISOString()
     setCollections((prev) =>
@@ -161,7 +202,7 @@ export function useCollections(options: UseCollectionsOptions = {}) {
           : collection,
       ),
     )
-    return true
+    return { ok: true, sortOrder }
   }
 
   return {
@@ -172,6 +213,7 @@ export function useCollections(options: UseCollectionsOptions = {}) {
     updateCollection,
     deleteCollection,
     addBookToCollection,
+    addBooksToCollection,
     removeBookFromCollection,
     refreshCollections,
   }

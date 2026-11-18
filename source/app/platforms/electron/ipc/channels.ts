@@ -55,6 +55,7 @@ export const LibraryChannels = {
   updateCollection: 'library:updateCollection',
   deleteCollection: 'library:deleteCollection',
   addBookToCollection: 'library:addBookToCollection',
+  addBooksToCollection: 'library:addBooksToCollection',
   removeBookFromCollection: 'library:removeBookFromCollection',
 } as const
 

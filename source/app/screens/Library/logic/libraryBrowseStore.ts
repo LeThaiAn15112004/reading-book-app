@@ -8,10 +8,17 @@ import {
 
 const PREFS_STORAGE_KEY = 'reading-book.library.browse-prefs.v1'
 
-type BrowsePrefs = { sort: LibrarySortId; layout: LibraryLayout }
+/** Grid / List of every collection page (spec 015 FR-021: one choice for all collections). */
+export type CollectionView = 'grid' | 'list'
+
+type BrowsePrefs = { sort: LibrarySortId; layout: LibraryLayout; collectionView: CollectionView }
 
 /** Single source of the Library view defaults (first run and Settings → Reset App Settings). */
-export const DEFAULT_LIBRARY_BROWSE_PREFS: Readonly<BrowsePrefs> = { sort: 'recently-added', layout: 'grid' }
+export const DEFAULT_LIBRARY_BROWSE_PREFS: Readonly<BrowsePrefs> = {
+  sort: 'recently-added',
+  layout: 'grid',
+  collectionView: 'grid',
+}
 
 function loadPrefs(): BrowsePrefs {
   try {
@@ -23,6 +30,10 @@ function loadPrefs(): BrowsePrefs {
         ? (parsed?.sort as LibrarySortId)
         : DEFAULT_LIBRARY_BROWSE_PREFS.sort,
       layout: parsed?.layout === 'table' || parsed?.layout === 'grid' ? parsed.layout : DEFAULT_LIBRARY_BROWSE_PREFS.layout,
+      collectionView:
+        parsed?.collectionView === 'list' || parsed?.collectionView === 'grid'
+          ? parsed.collectionView
+          : DEFAULT_LIBRARY_BROWSE_PREFS.collectionView,
     }
   } catch {
     return { ...DEFAULT_LIBRARY_BROWSE_PREFS }
@@ -47,9 +58,11 @@ type LibraryBrowseState = BrowsePrefs & {
   setFilter: (filter: LibraryBrowseFilter) => void
   setSort: (sort: LibrarySortId) => void
   setLayout: (layout: LibraryLayout) => void
+  setCollectionView: (collectionView: CollectionView) => void
   selectBook: (bookId: string | null) => void
   /**
-   * Settings → Advanced → Reset App Settings: sort + layout back to `DEFAULT_LIBRARY_BROWSE_PREFS`.
+   * Settings → Advanced → Reset App Settings: sort, layout and the collection view back to
+   * `DEFAULT_LIBRARY_BROWSE_PREFS`.
    * Returns false when the write failed (state is still reset for this session).
    */
   reset: () => boolean
@@ -66,16 +79,20 @@ export const useLibraryBrowseStore = create<LibraryBrowseState>()((set, get) => 
   setFilter: (filter) => set({ filter, selectedBookId: null }),
   setSort: (sort) => {
     set({ sort })
-    savePrefs({ sort, layout: get().layout })
+    savePrefs({ sort, layout: get().layout, collectionView: get().collectionView })
   },
   setLayout: (layout) => {
     set({ layout, selectedBookId: layout === 'grid' ? null : get().selectedBookId })
-    savePrefs({ sort: get().sort, layout })
+    savePrefs({ sort: get().sort, layout, collectionView: get().collectionView })
+  },
+  setCollectionView: (collectionView) => {
+    set({ collectionView })
+    savePrefs({ sort: get().sort, layout: get().layout, collectionView })
   },
   selectBook: (selectedBookId) => set({ selectedBookId }),
   reset: () => {
-    const { sort, layout } = DEFAULT_LIBRARY_BROWSE_PREFS
-    set({ sort, layout, selectedBookId: null })
-    return savePrefs({ sort, layout })
+    const { sort, layout, collectionView } = DEFAULT_LIBRARY_BROWSE_PREFS
+    set({ sort, layout, collectionView, selectedBookId: null })
+    return savePrefs({ sort, layout, collectionView })
   },
 }))

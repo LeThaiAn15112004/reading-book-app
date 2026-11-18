@@ -15,6 +15,22 @@ In Dark, Day, Paper, Sepia: open Collections, hover a card, open New / Edit, ope
 open the picker. Expected: every title, label, field, button readable; Delete red with its label. Measure with the
 DevTools contrast picker: text ≥ 4.5 : 1, icons / focus outline ≥ 3 : 1. Record any Sepia miss (R2).
 
+Computed from `styles/theme.css` (translucent layers composited over `--lib-bg-deep`), 2026-11-18:
+
+| Pair | Dark | Sepia | Day / Paper |
+|---|---|---|---|
+| title (`text-strong`) on dialog (`surface-strong`) | 16.30 | 15.12 | 17.79 |
+| labels (`text`) on dialog | 12.02 | 12.23 | 10.32 |
+| grey text (`muted`) on dialog / picker | 6.96 | 7.73 | 4.74 |
+| grey text (`muted`) on card (`surface`) | 6.42 | 7.22 | 4.70 |
+| grey text on a hovered card (`surface-hover`) | 6.29 | 6.77 | 4.35 → uses `text` while hovered |
+| Delete (`danger`) on menu | 6.45 | 6.74 | 6.45 |
+| focus outline (`accent`) on page / card (≥ 3) | 8.31 / 7.66 | 8.68 / 8.10 | 3.04 / 3.15 |
+| button text (`on-accent`) on `accent` | 8.31 | 8.31 | 5.60 |
+
+No Sepia miss (R2). The one miss (Day / Paper hovered card, 4.35) is fixed by switching that text to `--lib-text` on
+hover. The filled Delete confirmation is white on `#dc2626` (4.83) in every theme.
+
 ## 2. Phone card actions (US1, FR-004…FR-006, SC-003)
 
 360 px phone: tap 20 times across card rows (name, covers, count, ⋮). Expected: only ⋮ / long-press open the sheet;
