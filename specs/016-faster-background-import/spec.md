@@ -22,6 +22,8 @@ A reader adds a book with Import → "Add file" (or from a URL / a linked cloud 
 - Right after an import, books without a cover image (PDF, TXT, Markdown) have their first page drawn as a cover: the
   app reads the whole book again and sends all of it to the screen just to draw one page, then reloads the whole
   Library list.
+- On the phone, an import copies the picked file into app storage through the app, then reads the whole copy again to
+  fingerprint it, and an EPUB is then handed whole to the interface to read its details.
 - Opening a book in the reader also reads, fingerprints and copies the whole file before the first page appears, and
   background work (search index, word count, signature check) starts on the same file at the same moment.
 
@@ -52,6 +54,29 @@ feature moves out of the way of opening a book (FR-015) is the only opening-rela
   were not added ("Pick at most 50 files at a time") (FR-011a).
 - Q: Can an import still be cancelled during its last step, "Saving"? → A: No — Cancel works in every step before
   "Saving"; during "Saving" it is disabled ("Finishing…") and the import completes (FR-009).
+
+### Session 2026-11-21
+
+- Q: On the phone, which import steps stop reading the whole file and work by path instead? → A: All of them — the copy
+  into app storage is a system copy by path, the fingerprint is one read of that copy by path in parts, and an EPUB's
+  details are read from the needed parts of the file by path; no import step holds the whole file in memory or sends it
+  whole to the interface (FR-003, FR-004a).
+- Q: On the phone, if the system ends the app completely during an import, does the next launch remember the queue? →
+  A: Yes — the phone keeps a small list of unfinished import jobs (shown name, source, state, order; never file bytes).
+  On the next launch the leftover staging is cleaned first, the job that was running shows "Interrupted" with "Try
+  again", and waiting jobs continue; a waiting job whose picked file can no longer be read also shows "Interrupted"
+  (FR-013b).
+- Q: How do the audiobook ZIP import and the new import queue relate, and what about a ZIP among several picked files?
+  → A: One shared queue — the ZIP keeps its own preview; pressing Import there adds its job at the end of the same
+  queue, shown on the same progress card. A ZIP among several picked files is left out of the batch and the reader is
+  told to pick it on its own to see its preview (FR-014).
+- Q: Which groups does the batch summary count? → A: Five — added, already in the library, failed (each with its
+  cause), cancelled, interrupted (with "Try again"); a group with 0 is hidden; the counts always add up to the number
+  of files queued in that batch (FR-011a).
+- Q: Are the 40 % / 30 % speed-ups fixed gates or set after the baseline? → A: Defaults; they may be lowered only after
+  story 1's report shows the repeated reads are not the main cost, with the new figure and its reason written under the
+  criterion before story 2 starts — from then on it is a fixed gate. "Not slower than the baseline" in SC-005 allows
+  5 % (SC-002, SC-005, SC-009).
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -140,7 +165,8 @@ and open Settings; the import keeps going, its progress is visible, and the new 
    starts when the previous one ends; the card shows how many are waiting.
 9. **Given** "Add file", **When** the reader picks several files at once, **Then** each file becomes its own import in
    the queue, in the order shown by the picker; when all are done the card sums up how many were added, were already in
-   the library and failed, and lists each failure with its cause.
+   the library, failed (each failure with its cause), were cancelled and were interrupted, hiding the groups with 0;
+   the counts add up to the number of files queued.
 10. **Given** the phone, **When** the reader imports a book, **Then** the same progress card, queue and placeholder are
    shown, the card stays clear of the bottom navigation and the system gesture area, and the system Back does not
    cancel the import.
@@ -187,12 +213,15 @@ page appears is not longer than the baseline, and background work on that book s
   signature is asked for (existing behaviour).
 - On the phone the reader switches to another app or the screen turns off during an import: the import goes on while
   the system lets the app run; if the system paused or stopped it, the reader finds that file marked "Interrupted" with
-  "Try again" on returning, the files still waiting continue, and nothing half-imported is in the library (FR-013b).
+  "Try again" on returning, the files still waiting continue, and nothing half-imported is in the library — also when
+  the system ended the app completely and it is started again (FR-013b).
 - The reader picks more than 50 files at once: the first 50 are queued, the reader is told the rest were not added
   (FR-011a); picking again adds the next ones to the same queue.
 - The reader presses Cancel just as the import reaches "Saving": the import completes and the book is added (Cancel
   was already disabled); the reader can remove it from the library as usual.
-- An audiobook ZIP picked through "Add file": keeps its own preview and background job (unchanged).
+- An audiobook ZIP picked alone through "Add file": keeps its own preview; its job then joins the import queue (FR-014).
+- An audiobook ZIP among several picked files: it is left out of the batch, the other files are queued, and the reader
+  is told to pick the ZIP on its own to see its preview (FR-014).
 - The interface language is English or Vietnamese: every new text is translated; file names and book titles are never
   translated.
 
@@ -213,9 +242,12 @@ page appears is not longer than the baseline, and background work on that book s
 
 - **FR-003**: An import MUST compute the file's fingerprint once and use that one value for the duplicate check, the
   library entry and anything else that needs it during that import. On the phone, where every book is copied into app
-  storage, the file MUST NOT be read again after the copy just to fingerprint it when the fingerprint can be computed
-  while copying.
+  storage, the copy MUST be made by path by the system (not by reading the file through the app), and the fingerprint
+  MUST be computed by one read of that copy, by path and in parts; no import step may hold the whole file in memory.
 - **FR-004**: Importing an EPUB MUST unpack it once for its details and its cover.
+- **FR-004a**: On the phone, reading an EPUB's details and cover during import MUST read only the parts of the file it
+  needs (the archive's index and the entries for details and cover), by path; the interface MUST NOT receive the whole
+  file during an import.
 - **FR-005**: The digital signature check of an imported PDF MUST NOT delay the book's appearance in the library: it
   runs after the book is saved, in the background, and the book shows the existing "not checked yet" state until it
   ends. A failed or interrupted check leaves "not checked yet" (never "unsigned").
@@ -238,8 +270,9 @@ page appears is not longer than the baseline, and background work on that book s
   run), and each queued import can be cancelled before it starts.
 - **FR-011a**: "Add file" MUST let the reader pick several files at once — at most 50 per pick; each becomes its own
   queued import. When more than 50 are picked, the first 50 (in the picker's order) are queued and the reader is told
-  how many were not added and that at most 50 files can be picked at a time. When a batch ends, the reader MUST get one summary (added / already in the library / failed) with each failure's cause, and
-  "Open" when exactly one book was added.
+  how many were not added and that at most 50 files can be picked at a time. When a batch ends, the reader MUST get one summary with five groups — added, already in the library, failed (each with
+  its cause), cancelled, interrupted (each with "Try again") — hiding groups with 0, whose counts add up to the number of
+  files queued in that batch, and "Open" when exactly one book was added.
 - **FR-012**: On success the reader MUST be told (with "Open"); on a duplicate the reader MUST be offered the existing
   book; on failure the reader MUST be told the cause and offered "Try again" when retrying can help. These messages are
   announced to screen readers without moving focus.
@@ -254,9 +287,17 @@ page appears is not longer than the baseline, and background work on that book s
 - **FR-013b**: On the phone, an import MUST keep going while the system lets the app run in the background, and MUST NOT
   rely on running when the system stops the app. When the reader returns after the system interrupted an import, that
   import MUST be shown as "Interrupted" with "Try again", everything it had written MUST be cleaned up (FR-013), and the
-  imports still waiting MUST continue. No background service or system notification is added for imports.
-- **FR-014**: The existing audiobook ZIP import (preview + its own background job) MUST keep working as today; the two
-  kinds of import MUST NOT run their heavy work at the same time.
+  imports still waiting MUST continue. This MUST also hold when the system ended the app completely: the phone keeps
+  the list of unfinished import jobs (shown name, source, state, order — never file bytes) across launches; on the next
+  launch the leftover staging is cleaned before anything else, the job that was running shows "Interrupted" with "Try
+  again", the waiting jobs continue in order, and a waiting job whose picked file can no longer be read (the system
+  withdrew the app's access to it) shows "Interrupted" too, with "Try again" opening the picker. An entry leaves the
+  list when its job ends or is dismissed. No background service or system notification is added for imports.
+- **FR-014**: The existing audiobook ZIP import MUST keep its preview (choice of tracks and cover) as today; pressing
+  Import in the preview MUST add the ZIP's job at the end of the same import queue, shown on the same progress card
+  (step, percentage, Cancel, result with "Open audiobook"), so ZIP and book imports never run at the same time. A ZIP
+  among several files picked at once MUST be left out of that batch (the other files are queued) and the reader told to
+  pick it on its own to see its preview; the batch summary does not count it.
 
 **Opening without competition**
 
@@ -278,8 +319,11 @@ page appears is not longer than the baseline, and background work on that book s
 
 - **Import job**: one requested import — its source (the reader's file, a URL, a cloud file), file name shown to the
   reader, state (waiting, running, done, duplicate, failed, cancelled, interrupted), current step, progress (bytes done / total
-  when known), the resulting book (on success) or the cause (on failure). Session-only: never stored across launches.
-- **Import queue**: the ordered list of import jobs of this session; one runs at a time. A pick of several files adds
+  when known), the resulting book (on success) or the cause (on failure). On Desktop session-only: never stored across
+  launches. On the phone, unfinished jobs (shown name, source, state, order — never file bytes) are kept across launches
+  until they end or are dismissed (FR-013b).
+- **Import queue**: the ordered list of import jobs (this session's, plus on the phone the unfinished ones kept from the
+  last launch); one runs at a time. A pick of several files adds
   one job per file and forms a batch whose summary is shown when its last job ends.
 - **Placeholder book**: what the Library shows for a running or waiting import job; not a library entry.
 - **Step timing**: one measured step (name, format, size, duration); only when timing is turned on.
@@ -291,28 +335,31 @@ page appears is not longer than the baseline, and background work on that book s
 - **SC-001**: For each sample book of story 1, a timing report gives the duration of every step listed in FR-002, before
   and after the change.
 - **SC-002**: Importing each large sample book (PDF and EPUB) from the reader's disk takes at least 40 % less time than
-  its baseline, with an identical library entry.
+  its baseline, with an identical library entry. 40 % is the default target: it may be lowered only once, after story
+  1's report shows the repeated reads are not the main cost, with the new figure and its reason written here before
+  story 2 starts; from then on the figure is a fixed pass / fail gate.
 - **SC-003**: After choosing a file, the reader can use the app (navigate, open another book) within 1 second, for any
   file size.
 - **SC-004**: During an import of a file of several hundred MB, the progress shown changes at least every 2 seconds, and
   the app answers a click or a key press within 200 ms.
 - **SC-005**: Opening a book while another book is imported in the background shows the first page no more than 20 %
-  later than the same open with nothing running; and opening a book right after its import is not slower than the
-  baseline.
+  later than the same open with nothing running; and opening a book right after its import shows the first page no
+  more than 5 % later than the baseline.
 - **SC-006**: In 20 cancelled or failed imports (including quitting the app mid-import), 0 library entries, 0 app-owned
   copies and 0 covers are left behind, and the reader's files are unchanged (same fingerprint).
 - **SC-007**: In a check of 10 users importing a large book, every user finds the import's progress and can open the new
   book when it ends without help.
 - **SC-008**: Picking 20 books at once adds them all in one action (no further step per book), and the summary's
-  counts match the library exactly; the same holds on the phone.
+  counts match the library exactly and add up to the 20 files picked; the same holds on the phone.
 - **SC-009**: On the phone, importing each large sample book takes at least 30 % less time than its baseline (the copy
-  into app storage included).
+  into app storage included). 30 % is the default target and follows the same rule as SC-002 (lowered at most once,
+  after story 1's report, with the figure and reason written here before story 2; then a fixed gate).
 
 ## Assumptions
 
 - The sample books for story 1 are chosen by the team (at least one PDF and one EPUB above 100 MB, and one small book);
-  real slow cases reported by the user are added when available. The success percentages of SC-002 are reviewed after
-  story 1's report and may be lowered if the measured baseline shows the repeated reads are not the main cost.
+  real slow cases reported by the user are added when available. The success percentages of SC-002 and SC-009 are reviewed after
+  story 1's report and may be lowered once, as those criteria describe; the figures are fixed before story 2 starts.
 - Timing output is for developers only (logs or a report file, off by default); it never reaches other people.
 - The pattern of the existing audiobook ZIP background job (dialog closes at once, a job card with progress, cancel and
   result) is the reference for the progress card and queue; the card replaces today's blocking "Importing…" dialog.
