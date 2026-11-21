@@ -37,6 +37,6 @@ action"). It stays mounted in `App.tsx` above every route (Library, Reader, Coll
 `queue.step.{downloading,copying,checking,reading,saving}`, `queue.waiting` ({count}), `queue.cancel`,
 `queue.finishing`, `queue.open`, `queue.openExisting`, `queue.tryAgain`, `queue.dismiss`, `queue.clearFinished`,
 `queue.summary.{added,already,failed,cancelled,interrupted}` (plurals), `queue.tooMany` ({count}), `queue.zipAlone`,
-`queue.placeholder.{importing,waiting}`, `queue.pill` ({current},{total},{percent}), `queue.interrupted`,
+`queue.placeholder.{importing,waiting}`, `queue.pill` ({current},{total},{percent}), `queue.pillElapsed` ({current},{total},{elapsed}), `queue.elapsed` ({seconds}), `queue.interrupted`,
 `main.messages.import.{fileChanged,quitConfirm.*}` (Main, `tMain`). File names / titles are params, never translated.
 Vietnamese per `specs/012-app-ui-i18n/contracts/glossary.md`.

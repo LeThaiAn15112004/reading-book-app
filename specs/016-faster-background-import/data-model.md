@@ -14,6 +14,7 @@ small queue file, or developer-only timing lines. `books` rows are written exact
 | `sizeBytes` | number \| null | from the pick; null for a URL until the download knows it |
 | `state` | `waiting` \| `running` \| `done` \| `duplicate` \| `failed` \| `cancelled` \| `interrupted` | |
 | `step` | `downloading` \| `copying` \| `checking` \| `reading` \| `saving` \| null | only while `running` |
+| `stepStartedAt` | number | null | time the current `step` began (set on each step change, null unless `running`); the UI derives the elapsed-seconds counter from it (spec SC-004) |
 | `progress` | `{ done: number; total: number \| null }` \| null | bytes; `total` null → indeterminate bar |
 | `cancelRequested` | boolean | |
 | `bookId` | string \| null | `done`: the new book; `duplicate`: the existing one |
