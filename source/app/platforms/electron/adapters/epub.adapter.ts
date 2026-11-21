@@ -228,7 +228,7 @@ function parseContainerRootfile(containerXml: string): string | undefined {
  * Spec 016 (FR-004, research R4): an EPUB opened by ranges — only the end records, the central directory and the
  * entries asked for are read (container, OPF, cover), never the whole file. Same parser and output as before.
  */
-async function openEpubArchive(filePath: string): Promise<{ archive: ArchiveReader; close: () => Promise<void> }> {
+export async function openEpubArchive(filePath: string): Promise<{ archive: ArchiveReader; close: () => Promise<void> }> {
   const handle = await fsp.open(filePath, 'r')
   try {
     const { size } = await handle.stat()

@@ -14,6 +14,7 @@ import { idOf, type BridgeContext } from './context'
 import { toSummaryDto, type BookSummaryDto } from './dto'
 import { HostCallError } from './host-client'
 import { notAvailable, notAvailableResult } from './unavailable'
+import { createCoverSourceMethods } from './cover-source'
 
 type Library = Window['api']['library']
 type OpenBookContentResult = Awaited<ReturnType<Library['openBookContent']>>
@@ -56,6 +57,7 @@ export function createLibraryGroup(ctx: BridgeContext): Library {
   })
 
   return {
+    ...createCoverSourceMethods(ctx),
     async listBooks() {
       return Promise.all((await library.listItems()).map(summary))
     },
@@ -131,7 +133,10 @@ export function createLibraryGroup(ctx: BridgeContext): Library {
         try {
           await ctx.client.call('files', 'writeCover', { bookId, base64: bytesToBase64(bytes) })
           await library.setCoverPath(bookId)
-          return { ok: true }
+          // Spec 016 (FR-006): the URL lets the Library patch this one entry.
+          const saved = await library.findById(bookId)
+          const coverUrl = saved ? await ctx.content.coverUrl(bookId, saved.updatedAt) : undefined
+          return coverUrl ? { ok: true, coverUrl } : { ok: false }
         } catch {
           return { ok: false }
         }

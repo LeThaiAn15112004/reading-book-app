@@ -10,6 +10,11 @@ export const libraryApi = {
   restartBook: (id: string) => api.library.restartBook(id),
   setGeneratedCover: (id: string, png: ArrayBuffer) =>
     api.library.setGeneratedCover(id, png),
+  /** Spec 016: what a generated cover is drawn from (text / EPUB documents / PDF size). */
+  getCoverSource: (id: string) => api.library.getCoverSource(id),
+  /** Spec 016: ≤ 1 MiB of a book's file (PDF page 1 by ranges). */
+  readBookRange: (bookId: string, offset: number, length: number) =>
+    api.library.readBookRange({ bookId, offset, length }),
   setFavorite: (id: string, value: boolean) =>
     api.library.setFavorite(id, value),
   updateMetadata: (input: Parameters<typeof api.library.updateMetadata>[0]) =>

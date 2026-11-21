@@ -129,6 +129,7 @@
     "source/app/platforms/electron/background/quit-guard.ts": "spec 016: new — confirmation before quitting with imports pending",
     "source/app/platforms/electron/perf/timing-log.ts": "spec 016: new — developer timing (READMATE_TIMING=1) to {userData}/logs/timing.jsonl",
     "source/app/platforms/electron/perf/reader-opening-gate.ts": "spec 016: new — background work waits for the first page",
-    "source/app/platforms/electron/spikes/import/": "spec 016: new — spike:import:timing|parity|queue|cleanup"
+    "source/app/platforms/electron/spikes/import/": "spec 016: new — spike:import:timing|parity|queue|cleanup",
+    "source/app/platforms/electron/files/cover-source.ts": "spec 016: new — getCoverSource / readBookRange (generated covers without the whole book)"
   }
 }

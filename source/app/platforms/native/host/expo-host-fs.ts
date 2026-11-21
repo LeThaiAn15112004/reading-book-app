@@ -15,7 +15,7 @@ import * as DocumentPicker from 'expo-document-picker'
 import { Directory, File, FileMode, Paths } from 'expo-file-system'
 import { Platform } from 'react-native'
 
-import type { ByteReader, ByteWriter, HostFs, PickedDocument } from './file-service'
+import { NativeCopyRefusedError, type ByteReader, type ByteWriter, type HostFs, type PickedDocument } from './file-service'
 
 /** Android reads the picked document in place (see above); iOS reads a cache copy. */
 const COPY_PICKED_TO_CACHE = Platform.OS !== 'android'
@@ -82,6 +82,24 @@ export function createExpoHostFs(): HostFs {
     openRead: (rel) => reader(appFile(rel)),
 
     openReadUri: (uri) => reader(new File(uri)),
+
+    // Spec 016 (research R5): `File.copy()` and `File.digest()` are native and async (expo-file-system 58).
+    async copyUri(uri, rel) {
+      const target = appFile(rel)
+      if (target.exists) target.delete()
+      try {
+        await new File(uri).copy(target)
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error)
+        // Some `content://` providers refuse a native copy (the Expo Go case noted above): read it in chunks instead.
+        if (/permission/i.test(message) || /InvalidPermission/i.test(error instanceof Error ? error.name : '')) {
+          throw new NativeCopyRefusedError(message)
+        }
+        throw error
+      }
+    },
+
+    digest: (rel) => appFile(rel).digest('SHA-256'),
 
     openWrite(rel): ByteWriter {
       const file = appFile(rel)

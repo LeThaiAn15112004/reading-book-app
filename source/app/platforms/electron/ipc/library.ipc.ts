@@ -6,6 +6,7 @@ import { BrowserWindow, clipboard, dialog, ipcMain, shell } from 'electron'
 import type { Book } from '@core'
 import { coverUrlForBookId } from '../files/cover-protocol'
 import { openBookContent } from '../files/open-book-content'
+import { readBookRange, readCoverSource } from '../files/cover-source'
 import { relinkBookToFile } from '../files/relink-book'
 import { checkBookSignature, toSignatureDto } from '../signature/book-signature'
 import {
@@ -19,7 +20,10 @@ import { getLibraryStore } from '../persistence/sqlite-library-store'
 import { cancelTranscriptionOfBook } from '../transcription/transcription-runtime'
 import { removeTxtData } from '../txt/txt-runtime'
 import type {
+  BookRangeResultDto,
   BookSummaryDto,
+  CoverSourceDto,
+  SetGeneratedCoverResultDto,
   CheckSignatureResult,
   AddBooksToCollectionResultDto,
   CollectionSummaryDto,
@@ -171,7 +175,7 @@ export function registerLibraryIpc(): void {
   ipcMain.removeHandler(LibraryChannels.setGeneratedCover)
   ipcMain.handle(
     LibraryChannels.setGeneratedCover,
-    async (_event, id: unknown, png: unknown): Promise<OkResult> => {
+    async (_event, id: unknown, png: unknown): Promise<SetGeneratedCoverResultDto> => {
       if (typeof id !== 'string' || !id.trim() || !(png instanceof ArrayBuffer)) {
         return { ok: false }
       }
@@ -187,9 +191,16 @@ export function registerLibraryIpc(): void {
       const dest = path.join(ensureCoversDir(), `${randomUUID()}.png`)
       await fsp.writeFile(dest, bytes)
       store.setCoverPath(book.id, dest)
-      return { ok: true }
+      // Spec 016 (FR-006): the URL lets the Library patch this one entry.
+      return { ok: true, coverUrl: coverUrlForBookId(book.id) }
     },
   )
+
+  ipcMain.removeHandler(LibraryChannels.getCoverSource)
+  ipcMain.handle(LibraryChannels.getCoverSource, (_event, id: unknown): Promise<CoverSourceDto> => readCoverSource(id))
+
+  ipcMain.removeHandler(LibraryChannels.readBookRange)
+  ipcMain.handle(LibraryChannels.readBookRange, (_event, input: unknown): Promise<BookRangeResultDto> => readBookRange(input))
 
   ipcMain.removeHandler(LibraryChannels.setFavorite)
   ipcMain.handle(

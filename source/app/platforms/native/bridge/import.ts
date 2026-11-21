@@ -9,9 +9,9 @@
  * behind. Metadata is read in the WebView: EPUB through the SDK's OPF reader, everything else from the file name.
  * Covers are not made here: the Library renders one for each book that has none (`generateBookCover.ts`).
  */
-import { Book, parseDocumentFormat, readEpubImportMetadata, type ArchiveReader, type DocumentFormat } from '@core'
+import { Book, parseDocumentFormat, readEpubImportMetadata, type DocumentFormat } from '@core'
 import { phoneStepTimer } from './app'
-import JSZip from 'jszip'
+import { openBookZip } from './ranged-book'
 import type { PickResult } from '../host/file-service'
 import type { ImportProgressPayload } from '../host/protocol'
 import { bookFilePath } from '../stores/library-store'
@@ -48,20 +48,12 @@ interface Metadata {
   pageCount?: number
 }
 
-function jszipArchive(zip: JSZip): ArchiveReader {
-  const entries = Object.keys(zip.files).filter((name) => !zip.files[name]!.dir)
-  return {
-    listEntries: () => entries,
-    readText: async (path) => (zip.file(path) ? zip.file(path)!.async('string') : null),
-    readBytes: async (path) => (zip.file(path) ? zip.file(path)!.async('uint8array') : null),
-  }
-}
-
 async function readMetadata(ctx: BridgeContext, bookId: string, format: DocumentFormat): Promise<Metadata> {
   if (format !== 'epub') return { authors: [], genres: [] }
   try {
-    const zip = await JSZip.loadAsync(await ctx.content.read(bookId))
-    const meta = await readEpubImportMetadata(jszipArchive(zip), { includeCover: false })
+    // Spec 016 (FR-004a): only the archive's index and the container / OPF entries are read, by ranges from the
+    // local server — the WebView never receives the whole file during an import. Same parser, same result.
+    const meta = await readEpubImportMetadata(await openBookZip(ctx, bookId), { includeCover: false })
     return { title: meta.title, authors: meta.authors, genres: meta.genres, description: meta.description, pageCount: meta.pageCount }
   } catch (error) {
     // Desktop falls back to the file name too when the OPF cannot be read.
@@ -91,7 +83,14 @@ export function createImportGroup(ctx: BridgeContext): ImportGroup {
   ctx.client.onEvent('importProgress', (raw) => {
     const p = raw as ImportProgressPayload
     if (!running || p?.stagingId !== running.stagingId) return
-    emit({ stage: 'importing', filename: running.filename, receivedBytes: p.doneBytes, totalBytes: p.totalBytes })
+    emit({
+      stage: 'importing',
+      filename: running.filename,
+      receivedBytes: p.doneBytes,
+      totalBytes: p.totalBytes,
+      step: p.step === 'copying' ? 'copying' : 'checking',
+      doneBytes: p.doneBytes,
+    })
   })
 
   async function discard(stagingId: string) {
@@ -122,10 +121,10 @@ export function createImportGroup(ctx: BridgeContext): ImportGroup {
     const timing = { format: picked.extension, sizeBytes: picked.size ?? 0 }
     try {
       // copying
-      const copyMark = timer.start('import', 'copy', timing)
+      const copyStartedAt = Date.now()
       try {
-        await ctx.client.call('files', 'stage', { pickId: picked.pickId, stagingId }, { timeoutMs: 0 })
-        copyMark.end()
+        const staged = await ctx.client.call<{ size: number; fallback?: boolean }>('files', 'stage', { pickId: picked.pickId, stagingId }, { timeoutMs: 0 })
+        timer.record('import', staged.fallback ? 'copy-fallback' : 'copy', timing, Date.now() - copyStartedAt)
       } catch (error) {
         const code = error instanceof HostCallError ? error.code : ''
         console.warn('[bridge] import: copying the picked file failed', code, error instanceof Error ? error.message : error)

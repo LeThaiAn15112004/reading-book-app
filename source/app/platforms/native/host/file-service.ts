@@ -51,9 +51,27 @@ export interface HostFs {
   openWrite(rel: string): ByteWriter
   writeFile(rel: string, bytes: Uint8Array): void
   readRange(rel: string, offset: number, length: number): Uint8Array
+  /**
+   * Spec 016 (FR-003, research R5): native copy of a picked URI into app storage, by path — no byte crosses the JS
+   * bridge. Rejects with `NativeCopyRefusedError` when the provider refuses it (then the chunked copy is used).
+   */
+  copyUri?(uri: string, rel: string): Promise<void>
+  /** Spec 016 (FR-003): native SHA-256 of an app file, lowercase hex — one read by path, in parts, outside JS. */
+  digest?(rel: string): Promise<string>
   /** Removes a picked cache copy; never throws. */
   discardUri(uri: string): void
 }
+
+/** Spec 016: the provider refused a native copy of this URI (e.g. `InvalidPermission`); the chunked copy is used. */
+export class NativeCopyRefusedError extends Error {
+  constructor(message: string) {
+    super(message)
+    this.name = 'NativeCopyRefusedError'
+  }
+}
+
+/** Spec 016: how often the staging file's size is read while a native copy runs (progress). */
+export const NATIVE_COPY_POLL_MS = 250
 
 export interface FileServiceOptions {
   fs: HostFs
@@ -157,7 +175,24 @@ export function createFileService(options: FileServiceOptions) {
     return { status: 'picked', pickId, name, size: picked.size, extension: extension as ImportableExtension }
   }
 
-  async function stage(raw: unknown): Promise<{ size: number }> {
+  /** Spec 016: native copy with size polling for the percentage; a cancel is honoured once `copy()` resolves. */
+  async function copyNative(uri: string, target: string, stagingId: string, totalBytes: number): Promise<number> {
+    options.emitProgress?.({ stagingId, step: 'copying', doneBytes: 0, totalBytes })
+    const poll = setInterval(() => {
+      const now = fs.fileSize(target)
+      if (now !== undefined) options.emitProgress?.({ stagingId, step: 'copying', doneBytes: now, totalBytes })
+    }, NATIVE_COPY_POLL_MS)
+    try {
+      await fs.copyUri!(uri, target)
+    } finally {
+      clearInterval(poll)
+    }
+    const size = fs.fileSize(target)
+    if (size === undefined) throw new HostServiceError('WRITE_FAILED', 'The book could not be copied into the app')
+    return size
+  }
+
+  async function stage(raw: unknown): Promise<{ size: number; fallback: boolean }> {
     const args = argsObject(raw)
     const stagingId = requireUuid(args.stagingId, 'stagingId')
     const picked = typeof args.pickId === 'string' ? picks.get(args.pickId) : undefined
@@ -172,6 +207,24 @@ export function createFileService(options: FileServiceOptions) {
         throw new HostServiceError('NO_SPACE', 'There is not enough free space on this device for this book')
       }
       fs.mkdirp(stagingDir(stagingId))
+      // Spec 016 (FR-003): the system copies the file by path; the chunked loop below is only the fallback.
+      let fallback = false
+      if (fs.copyUri) {
+        try {
+          const size = await copyNative(picked.uri, target, stagingId, picked.size)
+          if (job.cancelled) throw new HostServiceError('CANCELLED', 'Import cancelled')
+          options.emitProgress?.({ stagingId, step: 'copying', doneBytes: size, totalBytes: size })
+          return { size, fallback }
+        } catch (error) {
+          if (!(error instanceof NativeCopyRefusedError)) {
+            if (error instanceof HostServiceError) throw error
+            if (isNoSpace(error)) throw new HostServiceError('NO_SPACE', 'The device ran out of space while copying the book')
+            throw new HostServiceError('READ_FAILED', `The picked file could not be copied: ${detail(error)}`)
+          }
+          fs.remove(target)
+          fallback = true
+        }
+      }
       try {
         reader = fs.openReadUri(picked.uri)
       } catch (error) {
@@ -206,7 +259,7 @@ export function createFileService(options: FileServiceOptions) {
       writer.close()
       writer = undefined
       options.emitProgress?.({ stagingId, step: 'copying', doneBytes: done, totalBytes: done })
-      return { size: done }
+      return { size: done, fallback }
     } catch (error) {
       writer?.close()
       fs.remove(stagingDir(stagingId))
@@ -226,6 +279,20 @@ export function createFileService(options: FileServiceOptions) {
     const size = fs.fileSize(file)
     if (size === undefined) throw new HostServiceError('NOT_FOUND', 'Nothing is staged under this id')
     const job = startJob(stagingId)
+    // Spec 016 (FR-003): native digest by path — one read of the copy, in parts, outside JS; no intermediate progress.
+    if (fs.digest) {
+      try {
+        options.emitProgress?.({ stagingId, step: 'hashing', doneBytes: 0, totalBytes: null })
+        const sha256 = (await fs.digest(file)).toLowerCase()
+        if (job.cancelled) throw new HostServiceError('CANCELLED', 'Import cancelled')
+        return { sha256, size }
+      } catch (error) {
+        if (error instanceof HostServiceError) throw error
+        throw new HostServiceError('READ_FAILED', 'The staged book could not be read')
+      } finally {
+        jobs.delete(stagingId)
+      }
+    }
     const reader = fs.openRead(file)
     try {
       const hash = new Sha256()

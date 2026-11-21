@@ -8,7 +8,13 @@ export {
   type OpfPackage,
   type OpfSpineItem,
 } from './opf.js'
-export { readEpubImportMetadata, readEpubPackage, type EpubImportMetadata } from './epub-package.js'
+export {
+  EPUB_LEADING_DOCUMENTS_LIMITS,
+  readEpubImportMetadata,
+  readEpubLeadingDocuments,
+  readEpubPackage,
+  type EpubImportMetadata,
+} from './epub-package.js'
 export {
   decodeXmlEntities,
   findElements,

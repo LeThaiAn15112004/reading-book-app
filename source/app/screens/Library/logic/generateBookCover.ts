@@ -1,5 +1,11 @@
-import { libraryApi, txtApi } from '../../../bridge'
+import { libraryApi } from '../../../bridge'
 import { startStep } from '../../../hooks/app/stepTimer'
+import { useLibraryBooksStore } from '../../../hooks/library/libraryBooksStore'
+
+/** Spec 016 (FR-006): pdf.js asks for ranges; each call to Main / the local server reads at most 1 MiB. */
+const RANGE_MAX_BYTES = 1024 * 1024
+/** First bytes handed to pdf.js up front (header + often the xref of a linearized file). */
+const PDF_INITIAL_BYTES = 64 * 1024
 
 const COVER_W = 400
 const COVER_H = 560
@@ -29,12 +35,37 @@ function newCanvas(): { canvas: HTMLCanvasElement; ctx: CanvasRenderingContext2D
   return { canvas, ctx }
 }
 
-/** First page of a PDF, scaled to fit the cover box. */
-async function renderPdfFirstPage(data: ArrayBuffer): Promise<HTMLCanvasElement> {
-  const { getDocument, GlobalWorkerOptions } = await import('pdfjs-dist')
+/** `length` bytes from `offset`, in calls of at most 1 MiB. */
+async function readRange(bookId: string, offset: number, length: number): Promise<Uint8Array> {
+  const out = new Uint8Array(length)
+  let done = 0
+  while (done < length) {
+    const take = Math.min(RANGE_MAX_BYTES, length - done)
+    const result = await libraryApi.readBookRange(bookId, offset + done, take)
+    if (!result.ok) throw new Error(`range read failed: ${result.errorCode}`)
+    out.set(new Uint8Array(result.data), done)
+    done += take
+  }
+  return out
+}
+
+/**
+ * First page of a PDF, scaled to fit the cover box. Spec 016 (FR-006): pdf.js reads the file by ranges
+ * (`PDFDataRangeTransport`, no auto-fetch, no streaming) — only the xref and page 1's objects, never the whole book.
+ */
+async function renderPdfFirstPage(bookId: string, sizeBytes: number): Promise<HTMLCanvasElement> {
+  const { getDocument, GlobalWorkerOptions, PDFDataRangeTransport } = await import('pdfjs-dist')
   const workerUrl = (await import('pdfjs-dist/build/pdf.worker.min.mjs?url')).default
   GlobalWorkerOptions.workerSrc = workerUrl
-  const task = getDocument({ data: new Uint8Array(data.slice(0)) })
+  const initial = await readRange(bookId, 0, Math.min(sizeBytes, PDF_INITIAL_BYTES))
+  const transport = new PDFDataRangeTransport(sizeBytes, initial)
+  transport.requestDataRange = (begin: number, end: number) => {
+    void readRange(bookId, begin, Math.min(end, sizeBytes) - begin).then(
+      (chunk) => transport.onDataRange(begin, chunk),
+      () => transport.abort(),
+    )
+  }
+  const task = getDocument({ range: transport, length: sizeBytes, disableAutoFetch: true, disableStream: true })
   try {
     const pdf = await task.promise
     const page = await pdf.getPage(1)
@@ -92,27 +123,12 @@ function renderTextPage(text: string): HTMLCanvasElement {
   return canvas
 }
 
-/** Text of the first spine document that has any (EPUB without a cover image). */
-async function epubFirstText(data: ArrayBuffer): Promise<string> {
-  const { default: JSZip } = await import('jszip')
-  const zip = await JSZip.loadAsync(data)
-  const parse = (xml: string) => new DOMParser().parseFromString(xml, 'application/xml')
-  const container = await zip.file('META-INF/container.xml')?.async('string')
-  const opfPath = container
-    ? parse(container).querySelector('rootfile')?.getAttribute('full-path')
-    : null
-  if (!opfPath) return ''
-  const opf = parse((await zip.file(opfPath)?.async('string')) ?? '')
-  const dir = opfPath.includes('/') ? opfPath.slice(0, opfPath.lastIndexOf('/') + 1) : ''
-  const hrefById = new Map<string, string>()
-  for (const item of Array.from(opf.querySelectorAll('manifest > item'))) {
-    hrefById.set(item.getAttribute('id') ?? '', item.getAttribute('href') ?? '')
-  }
-  for (const ref of Array.from(opf.querySelectorAll('spine > itemref'))) {
-    const href = hrefById.get(ref.getAttribute('idref') ?? '')
-    if (!href) continue
-    const html = await zip.file(decodeURIComponent(dir + href))?.async('string')
-    if (!html) continue
+/**
+ * Text of the first spine document that has any (EPUB without a cover image). Spec 016: the documents come from
+ * `getCoverSource` (read by ranges by the host) instead of the whole book; the text is taken exactly as before.
+ */
+function epubFirstText(documents: readonly string[]): string {
+  for (const html of documents) {
     const doc = new DOMParser().parseFromString(html, 'text/html')
     doc.querySelectorAll('script,style').forEach((n) => n.remove())
     const text = (doc.body?.innerText ?? doc.body?.textContent ?? '')
@@ -125,26 +141,17 @@ async function epubFirstText(data: ArrayBuffer): Promise<string> {
 }
 
 async function renderCover(bookId: string, format: string): Promise<HTMLCanvasElement | null> {
-  if (format === 'txt') {
-    const opened = await txtApi.open(bookId)
-    return opened.ok && opened.text?.trim() ? renderTextPage(opened.text.slice(0, 4000)) : null
+  // Spec 016 (FR-006): never the whole book — the host sends only what the first page needs.
+  const source = await libraryApi.getCoverSource(bookId)
+  if (!source.ok) return null
+  if (source.kind === 'pdf') return format === 'pdf' ? renderPdfFirstPage(bookId, source.sizeBytes) : null
+  if (source.kind === 'html') {
+    const text = epubFirstText(source.documents).slice(0, 4000)
+    return text ? renderTextPage(text) : null
   }
-  const content = await libraryApi.openBookContent(bookId)
-  if (!content.ok || !content.data) return null
-  switch (format) {
-    case 'pdf':
-      return renderPdfFirstPage(content.data)
-    case 'epub': {
-      const text = (await epubFirstText(content.data)).slice(0, 4000)
-      return text ? renderTextPage(text) : null
-    }
-    case 'md': {
-      const text = new TextDecoder('utf-8').decode(content.data).slice(0, 4000)
-      return text.trim() ? renderTextPage(text.replace(/^[#>*\-\s`]+/gm, '')) : null
-    }
-    default:
-      return null
-  }
+  const text = source.text.slice(0, 4000)
+  if (!text.trim()) return null
+  return renderTextPage(format === 'md' ? text.replace(/^[#>*\-\s`]+/gm, '') : text)
 }
 
 /** One stuck file must not hold up the covers of every book after it. */
@@ -177,9 +184,14 @@ export async function generateBookCover(bookId: string, format: string): Promise
     const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/png'))
     if (!blob) return false
     const result = await libraryApi.setGeneratedCover(bookId, await blob.arrayBuffer())
-    if (!result.ok) console.warn('[cover] not saved', bookId, format)
+    if (!result.ok) {
+      console.warn('[cover] not saved', bookId, format)
+      return false
+    }
+    // Spec 016 (FR-006): patch this one Library entry — no reload of the whole list.
+    useLibraryBooksStore.getState().patchBook(bookId, { coverUrl: result.coverUrl })
     mark.end()
-    return result.ok
+    return true
   } catch (err) {
     console.warn('[cover] generation failed', bookId, err)
     return false

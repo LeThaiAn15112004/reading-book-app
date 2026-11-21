@@ -124,6 +124,98 @@ describe('files.readChunk (development only, T091)', () => {
   })
 })
 
+/**
+ * Spec 016 (FR-003, research R5): the host copies and fingerprints by path with the native `File.copy()` /
+ * `File.digest()` — no byte crosses the JS bridge; a provider refusing the native copy falls back to the chunked loop.
+ */
+class NativeMemoryFs extends MemoryFs {
+  copies = 0
+  digests = 0
+  chunkedReads = 0
+  refuseCopy = false
+  /** Resolves the pending native copy (lets a test cancel while it runs). */
+  private releaseCopy: (() => void) | null = null
+  holdCopy = false
+
+  async copyUri(uri: string, rel: string) {
+    this.copies++
+    if (this.refuseCopy) {
+      const { NativeCopyRefusedError } = await import('../host/file-service')
+      throw new NativeCopyRefusedError('InvalidPermissionException: cannot copy this content:// URI')
+    }
+    const reader = super.openReadUri(uri)
+    const parts: Uint8Array[] = []
+    for (let c = reader.read(1 << 20); c.length; c = reader.read(1 << 20)) parts.push(c)
+    if (this.holdCopy) await new Promise<void>((resolve) => (this.releaseCopy = resolve))
+    this.writeFile(rel, Buffer.concat(parts))
+  }
+  release() {
+    this.releaseCopy?.()
+  }
+  async digest(rel: string) {
+    this.digests++
+    return createHash('sha256').update(this.files.get(rel)!).digest('hex').toUpperCase() // host lower-cases it
+  }
+  override openReadUri(uri: string) {
+    this.chunkedReads++
+    return super.openReadUri(uri)
+  }
+}
+
+describe('files.stage / files.hashStaged on the native path (spec 016)', () => {
+  async function staged(fs: NativeMemoryFs, bytes: Uint8Array, events: unknown[] = []) {
+    const files = createFileService({ fs, devChunks: false, emitProgress: (p) => events.push(p) })
+    fs.queuePick('Book.pdf', bytes)
+    const picked = (await files.pick!({ extensions: ['pdf'] })) as { pickId: string }
+    const stagingId = testUuid()
+    return { files, picked, stagingId }
+  }
+
+  it('copies natively, then fingerprints natively in lowercase hex — no chunked read', async () => {
+    const fs = new NativeMemoryFs()
+    const bytes = randomBytes(3 * 1024 * 1024 + 17)
+    const events: { step: string; totalBytes: number | null }[] = []
+    const { files, picked, stagingId } = await staged(fs, bytes, events)
+    const result = (await files.stage!({ pickId: picked.pickId, stagingId })) as { size: number; fallback: boolean }
+    expect(result).toEqual({ size: bytes.length, fallback: false })
+    const hashed = (await files.hashStaged!({ stagingId })) as { sha256: string; size: number }
+    expect(hashed).toEqual({ sha256: createHash('sha256').update(bytes).digest('hex'), size: bytes.length })
+    expect([fs.copies, fs.digests, fs.chunkedReads]).toEqual([1, 1, 0])
+    expect(events.some((e) => e.step === 'hashing' && e.totalBytes === null)).toBe(true)
+  })
+
+  it('falls back to the chunked copy for that file only when the provider refuses the native copy', async () => {
+    const fs = new NativeMemoryFs()
+    fs.refuseCopy = true
+    const bytes = randomBytes(2048)
+    const { files, picked, stagingId } = await staged(fs, bytes)
+    const result = (await files.stage!({ pickId: picked.pickId, stagingId })) as { size: number; fallback: boolean }
+    expect(result).toEqual({ size: 2048, fallback: true })
+    expect(fs.chunkedReads).toBe(1)
+    expect(Buffer.from(fs.files.get(`staging/${stagingId}/file`) ?? new Uint8Array())).toEqual(bytes)
+  })
+
+  it('honours a cancel once the native copy resolves: CANCELLED and the staging folder removed', async () => {
+    const fs = new NativeMemoryFs()
+    fs.holdCopy = true
+    const { files, picked, stagingId } = await staged(fs, randomBytes(4096))
+    const pending = files.stage!({ pickId: picked.pickId, stagingId }) as Promise<unknown>
+    await new Promise((r) => setTimeout(r, 5))
+    await files.cancel!({ stagingId })
+    fs.release()
+    await expect(pending).rejects.toMatchObject({ code: 'CANCELLED' })
+    expect(fs.paths().some((p) => p.startsWith(`staging/${stagingId}`))).toBe(false)
+  })
+
+  it('keeps the NO_SPACE check before copying', async () => {
+    const fs = new NativeMemoryFs()
+    fs.available = 10
+    const { files, picked, stagingId } = await staged(fs, randomBytes(4096))
+    await expect(files.stage!({ pickId: picked.pickId, stagingId }) as Promise<unknown>).rejects.toMatchObject({ code: 'NO_SPACE' })
+    expect(fs.copies).toBe(0)
+  })
+})
+
 describe('app service', () => {
   it('opens https links to public hosts only', async () => {
     const opened: string[] = []

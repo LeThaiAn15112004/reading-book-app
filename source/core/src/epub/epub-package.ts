@@ -16,6 +16,35 @@ export interface EpubImportMetadata {
 
 const IMAGE_EXTENSIONS = new Set(['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'bmp'])
 
+/** Spec 016 (FR-006): bounds of `readEpubLeadingDocuments`. */
+export const EPUB_LEADING_DOCUMENTS_LIMITS = { maxDocuments: 6, maxDocumentBytes: 512 * 1024, maxTotalBytes: 1024 * 1024 }
+
+/**
+ * Spec 016 (FR-006): the HTML of the first spine documents, in reading order — what a "first page" cover of an EPUB
+ * without a cover image is drawn from. Read through the archive (by ranges on both hosts), so the whole book is never
+ * sent to the screen. Documents above the per-document bound are skipped; reading stops at the total bound.
+ */
+export async function readEpubLeadingDocuments(
+  archive: ArchiveReader,
+  limits: Partial<typeof EPUB_LEADING_DOCUMENTS_LIMITS> = {},
+): Promise<string[]> {
+  const { maxDocuments, maxDocumentBytes, maxTotalBytes } = { ...EPUB_LEADING_DOCUMENTS_LIMITS, ...limits }
+  const pkg = await readEpubPackage(archive)
+  const out: string[] = []
+  let total = 0
+  for (const item of pkg.spine) {
+    if (out.length >= maxDocuments || total >= maxTotalBytes) break
+    if (!item.path) continue
+    const bytes = await archive.readBytes(item.path).catch(() => null)
+    if (!bytes || bytes.length > maxDocumentBytes) continue
+    const html = await archive.readText(item.path)
+    if (html === null) continue
+    out.push(html)
+    total += bytes.length
+  }
+  return out
+}
+
 /** Locate and parse the OPF package document through the injected archive reader. */
 export async function readEpubPackage(archive: ArchiveReader): Promise<OpfPackage> {
   const containerXml = await archive.readText(EPUB_CONTAINER_PATH)

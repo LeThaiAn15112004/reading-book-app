@@ -87,10 +87,10 @@ export function useLibraryScreen() {
     if (pending.length === 0) return
     void (async () => {
       for (const book of pending) {
-        if (await generateBookCover(book.id, book.format)) await refreshLibrary()
+        // Spec 016 (FR-006): a saved cover patches that one book in libraryBooksStore; the list is not reloaded.
+        await generateBookCover(book.id, book.format)
       }
     })()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [books])
 
   function openReader(bookId: string) {

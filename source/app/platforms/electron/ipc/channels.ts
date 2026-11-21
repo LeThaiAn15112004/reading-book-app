@@ -43,6 +43,10 @@ export const LibraryChannels = {
   setFavorite: 'library:setFavorite',
   /** Renderer-rendered first page (PDF / DOCX / TXT / MD) stored as the book's cover when it has none. */
   setGeneratedCover: 'library:setGeneratedCover',
+  /** Spec 016: source of a generated cover — text, an EPUB's first documents, or a PDF's size (read by ranges). */
+  getCoverSource: 'library:getCoverSource',
+  /** Spec 016: ≤ 1 MiB of a library book's validated file (renderer never gets a path). */
+  readBookRange: 'library:readBookRange',
   updateMetadata: 'library:updateMetadata',
   showInFolder: 'library:showInFolder',
   copyFilePath: 'library:copyFilePath',

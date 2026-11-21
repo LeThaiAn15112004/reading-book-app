@@ -5,6 +5,25 @@ import type { StepTiming, ZipImportPreview, ZipImportSelection } from '@core'
 /** Spec 016: one developer step timing line (format, size, duration only — see core `perf/step-timing`). */
 export type StepTimingDto = StepTiming
 
+/**
+ * Spec 016 (FR-006, contracts/import-ipc.md): what a "first page" cover is drawn from, without sending the whole book.
+ * `text`: TXT / MD (≤ 4 000 chars from the first 64 KiB); `html`: an EPUB's first spine documents (the renderer takes
+ * the text of the first one that has any, as before); `pdf`: page 1 is read by ranges with `readBookRange`.
+ */
+export type CoverSourceDto =
+  | { ok: true; kind: 'text'; text: string }
+  | { ok: true; kind: 'html'; documents: string[] }
+  | { ok: true; kind: 'pdf'; sizeBytes: number }
+  | { ok: false; errorCode: 'not_found' | 'missing_file' | 'path_denied' | 'read_failed' | 'nothing_to_render' }
+
+/** Spec 016: `1 ≤ length ≤ 1 048 576`, `offset ≥ 0`, `offset + length ≤ size` (else `range`). */
+export type BookRangeResultDto =
+  | { ok: true; data: ArrayBuffer; sizeBytes: number }
+  | { ok: false; errorCode: 'not_found' | 'missing_file' | 'path_denied' | 'range' | 'read_failed' }
+
+/** Spec 016 (FR-006): the saved cover's URL, so the Library patches that one entry instead of reloading the list. */
+export type SetGeneratedCoverResultDto = { ok: true; coverUrl: string } | { ok: false }
+
 export type DocumentFormatDto =
   | 'epub'
   | 'pdf'
@@ -1091,7 +1110,11 @@ export interface DesktopApi {
     restartBook(id: string): Promise<OkResult>
     setFavorite(id: string, value: boolean): Promise<OkResult>
     /** Store a PNG rendered by the renderer as the cover; refused when the book already has one. */
-    setGeneratedCover(id: string, png: ArrayBuffer): Promise<OkResult>
+    setGeneratedCover(id: string, png: ArrayBuffer): Promise<SetGeneratedCoverResultDto>
+    /** Spec 016 (FR-006): what the book's "first page" cover is drawn from (never the whole book). */
+    getCoverSource(id: string): Promise<CoverSourceDto>
+    /** Spec 016 (FR-006): bytes of a library book's validated file, ≤ 1 MiB per call (PDF page 1 by ranges). */
+    readBookRange(input: { bookId: string; offset: number; length: number }): Promise<BookRangeResultDto>
     updateMetadata(input: UpdateBookMetadataInput): Promise<OkResult>
     showInFolder(id: string): Promise<OkResult>
     copyFilePath(id: string): Promise<OkResult>

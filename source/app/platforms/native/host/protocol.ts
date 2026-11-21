@@ -41,7 +41,8 @@ export interface ImportProgressPayload {
   stagingId: string
   step: 'copying' | 'hashing'
   doneBytes: number
-  totalBytes: number
+  /** Spec 016: `null` while the native digest runs (it reports no intermediate progress). */
+  totalBytes: number | null
 }
 
 /**

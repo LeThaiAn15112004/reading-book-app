@@ -19,5 +19,10 @@ export function createBookContentSource(_client?: BookContentHost, _boot?: BookC
     async coverUrl(bookId, version) {
       return `rb-cover://local/${encodeURIComponent(bookId)}?v=${encodeURIComponent(version)}`
     },
+    async readRange(bookId, offset, length) {
+      const result = await api.library.readBookRange({ bookId, offset, length })
+      if (!result.ok) throw new Error(`The book could not be read (${result.errorCode})`)
+      return { data: new Uint8Array(result.data), sizeBytes: result.sizeBytes }
+    },
   }
 }

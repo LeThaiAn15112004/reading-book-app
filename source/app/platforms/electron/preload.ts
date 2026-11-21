@@ -84,6 +84,8 @@ const api: DesktopApi = {
     restartBook: (id) => ipcRenderer.invoke(LibraryChannels.restartBook, id),
     setGeneratedCover: (id, png) =>
       ipcRenderer.invoke(LibraryChannels.setGeneratedCover, id, png),
+    getCoverSource: (id) => ipcRenderer.invoke(LibraryChannels.getCoverSource, id),
+    readBookRange: (input) => ipcRenderer.invoke(LibraryChannels.readBookRange, input),
     setFavorite: (id, value) =>
       ipcRenderer.invoke(LibraryChannels.setFavorite, id, value),
     updateMetadata: (input) =>

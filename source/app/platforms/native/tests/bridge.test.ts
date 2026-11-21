@@ -206,7 +206,7 @@ describe('library, overlay and txt over the bridge', () => {
     host = await createFakeHost()
     const bookId = await importText('My Book.pdf', '%PDF-1.4')
     const png = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3])
-    expect(await host.api.library.setGeneratedCover(bookId, png.buffer)).toEqual({ ok: true })
+    expect(await host.api.library.setGeneratedCover(bookId, png.buffer)).toEqual({ ok: true, coverUrl: expect.stringMatching(/^data:image\/png;base64,/) })
     expect(await host.api.library.setGeneratedCover(bookId, png.buffer)).toEqual({ ok: false })
     const [book] = await host.api.library.listBooks()
     expect(book).toMatchObject({ id: bookId, title: 'My Book', format: 'pdf', fileStorage: 'referenced', readingStatus: 'not-started' })

@@ -56,6 +56,37 @@ describe('success', () => {
     nothingLeftBehind(host, 1)
   })
 
+  it('reads an EPUB’s details by ranges: the WebView never receives the whole file during an import (spec 016 FR-004a)', async () => {
+    host = await createFakeHost()
+    const zip = new JSZip()
+    zip.file('mimetype', 'application/epub+zip')
+    zip.file(
+      'META-INF/container.xml',
+      '<?xml version="1.0"?><container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container"><rootfiles><rootfile full-path="content.opf" media-type="application/oebps-package+xml"/></rootfiles></container>',
+    )
+    zip.file(
+      'content.opf',
+      '<?xml version="1.0"?><package xmlns="http://www.idpf.org/2007/opf" version="3.0"><metadata xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:title>Ranged</dc:title><dc:creator>A. Uthor</dc:creator></metadata><manifest><item id="c" href="c.xhtml" media-type="application/xhtml+xml"/><item id="big" href="big.bin" media-type="application/octet-stream"/></manifest><spine><itemref idref="c"/></spine></package>',
+    )
+    zip.file('c.xhtml', '<html><body><p>x</p></body></html>')
+    zip.file('big.bin', new Uint8Array(6 * 1024 * 1024).map((_, i) => (i * 31) % 251), { compression: 'STORE' })
+    const bytes = await zip.generateAsync({ type: 'uint8array', compression: 'DEFLATE' })
+    host.fs.queuePick('ranged.epub', bytes)
+    let readFromBook = 0
+    const readRange = host.fs.readRange.bind(host.fs)
+    host.fs.readRange = (rel: string, offset: number, length: number) => {
+      const out = readRange(rel, offset, length)
+      if (rel.startsWith('books/')) readFromBook += out.length
+      return out
+    }
+    const result = await host.api.import.fromFile()
+    expect(result.ok).toBe(true)
+    const row = host.sql.db.prepare('SELECT title FROM books WHERE id = ?').get(result.bookId!) as { title: string }
+    expect(row.title).toBe('Ranged')
+    expect(bytes.length).toBeGreaterThan(6 * 1024 * 1024)
+    expect(readFromBook).toBeLessThan(256 * 1024)
+  })
+
   it('takes the title from the file name when there is no metadata (and for a broken EPUB)', async () => {
     host = await createFakeHost()
     host.fs.queuePick('Bài giảng 01.pdf', '%PDF-1.7')
