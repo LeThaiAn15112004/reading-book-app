@@ -1,5 +1,7 @@
 import { HashRouter, Navigate, Route, Routes } from 'react-router-dom'
-import type { ReactNode } from 'react'
+import { useEffect, type ReactNode } from 'react'
+import { ImportQueueCard } from './components/import/ImportQueueCard'
+import { startImportQueue } from './hooks/library/importQueueStore'
 import {
   AppAppearanceBridge,
   AppMenubar,
@@ -25,6 +27,10 @@ import { SpikeEpubScreen } from './spikes/epub-engine/SpikeEpubScreen'
 
 function AppChromeFrame({ children }: { children: ReactNode }) {
   const { immersive } = useImmersiveReading()
+  // Spec 016: the import queue runs for the whole app session (and restores the phone's saved queue).
+  useEffect(() => {
+    void startImportQueue()
+  }, [])
 
   return (
     <div
@@ -49,6 +55,8 @@ function AppChromeFrame({ children }: { children: ReactNode }) {
       </div>
       <div className="relative min-h-0 flex-1 overflow-hidden">
         {children}
+        {/* Spec 016: background import progress — above every route, inside the content area (clear of PhoneNav). */}
+        <ImportQueueCard />
       </div>
       {/* Phone tab bar: after the content, so it stays fixed at the bottom while the screen scrolls (FR-021). */}
       {isFeatureAvailable('desktopChrome') ? null : <PhoneNav />}

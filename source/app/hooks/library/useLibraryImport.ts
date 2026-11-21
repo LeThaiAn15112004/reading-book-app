@@ -8,7 +8,8 @@ import {
   type ImportToastAction,
 } from './libraryImportStore.js'
 import { useZipImportStore } from './zipImportStore.js'
-import type { UiText } from '../../i18n'
+import { registerPickAndQueue, useImportQueueStore } from './importQueueStore.js'
+import { getT, type UiText } from '../../i18n'
 
 /** Step / byte progress pushed by the platform while an import runs. */
 export type LibraryImportProgress = {
@@ -18,8 +19,17 @@ export type LibraryImportProgress = {
   totalBytes?: number | null
 }
 
+/** Spec 016: one file of a multi-file pick (pick ids only). */
+export type LibraryPickedItem = { pickId: string; name: string; sizeBytes: number; kind: 'book' | 'zip' | 'unsupported' }
+
 export type LibraryImportClient = {
   fromFile: () => Promise<ImportClientResult>
+  /** Spec 016: multi-file pick (≤ 50) for the background queue. */
+  pickFiles?: () => Promise<
+    | { status: 'cancelled' }
+    | { status: 'failed'; errorMessage: string }
+    | { status: 'picked'; items: LibraryPickedItem[]; notAdded: number }
+  >
   fromUrl: (url: string) => Promise<ImportClientResult>
   /** Abort the in-flight URL download, when the platform supports it. */
   cancel?: () => Promise<unknown>
@@ -120,7 +130,43 @@ export function useLibraryImport({
     [onImported, openBookAction],
   )
 
+  /**
+   * Spec 016 (FR-008 / FR-011a): Add file → the picker (several files, ≤ 50) → jobs queued → the menu is already
+   * closed; the app stays usable while the queue runs. A ZIP picked alone keeps its preview (FR-014); a ZIP among
+   * several files is left out with a message; an unsupported file is queued as failed and counted in the summary.
+   */
+  const pickIntoQueue = useCallback(async () => {
+    if (!client.pickFiles) return
+    const result = await client.pickFiles().catch(() => null)
+    const store = useLibraryImportStore.getState()
+    if (!result) {
+      store.showToast({ key: 'library.toast.importFailed' }, 'error')
+      return
+    }
+    if (result.status === 'cancelled') return
+    if (result.status === 'failed') {
+      store.showToast(result.errorMessage, 'error')
+      return
+    }
+    const zips = result.items.filter((i) => i.kind === 'zip')
+    if (result.items.length === 1 && zips.length === 1) {
+      void useZipImportStore.getState().startFromPicked()
+      return
+    }
+    if (zips.length > 0) store.showToast({ key: 'import.queue.zipAlone' }, 'info')
+    if (result.notAdded > 0) store.showToast({ key: 'import.queue.tooMany', params: { count: result.notAdded } }, 'info')
+    useImportQueueStore.getState().addPicked(result.items, result.notAdded, getT()('import.queue.unsupported'))
+  }, [client])
+
+  useEffect(() => {
+    registerPickAndQueue(pickIntoQueue)
+  }, [pickIntoQueue])
+
   const handleFromDevice = useCallback(async () => {
+    if (client.pickFiles) {
+      await pickIntoQueue()
+      return
+    }
     const store = useLibraryImportStore.getState()
     if (store.busy) return
     // No overlay yet: the native picker is open. Main reports `importing` once a file is picked.
@@ -144,7 +190,7 @@ export function useLibraryImport({
       after.setBusy(false)
       after.setProgress(null)
     }
-  }, [client, handleCommonResult])
+  }, [client, handleCommonResult, pickIntoQueue])
 
   const handleFromUrl = useCallback(() => {
     useLibraryImportStore.getState().openUrlDialog()
@@ -152,6 +198,12 @@ export function useLibraryImport({
 
   const handleUrlSubmit = useCallback(
     async (url: string) => {
+      // Spec 016 (FR-008): the link joins the background queue; the dialog closes at once.
+      if (client.pickFiles) {
+        useLibraryImportStore.getState().closeUrlDialog()
+        useImportQueueStore.getState().addUrl(url, filenameFromUrl(url) ?? url)
+        return
+      }
       async function run(target: string): Promise<void> {
         const store = useLibraryImportStore.getState()
         if (store.busy) return

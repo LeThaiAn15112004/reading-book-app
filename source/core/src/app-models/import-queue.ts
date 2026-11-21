@@ -72,7 +72,7 @@ export type NewImportJob = {
   failed?: { code: string; message: ImportMessage }
 }
 
-export type ImportOutcome =
+export type ImportJobOutcome =
   | { kind: 'done'; bookId: string }
   | { kind: 'duplicate'; bookId: string }
   | { kind: 'failed'; error: { code: string; message: ImportMessage } }
@@ -195,7 +195,7 @@ export function progressJob(
   })
 }
 
-export function finishJob(queue: ImportQueue, id: string, outcome: ImportOutcome, _now: number): ImportQueue {
+export function finishJob(queue: ImportQueue, id: string, outcome: ImportJobOutcome, _now: number): ImportQueue {
   let finished: ImportJob | null = null
   const next = replaceJob(queue, id, (job) => {
     if (isFinishedJob(job)) return job

@@ -166,6 +166,7 @@ export const vi = {
       label: 'Đang nhập {name}',
     },
     state: {
+      running: 'Đang nhập',
       waiting: 'Đang chờ',
       done: 'Đã thêm',
       duplicate: 'Đã có trong thư viện',

@@ -3,7 +3,6 @@ import {
   AudiobookZipImportDialog,
   AudiobookZipJobPanel,
   ImportConflictDialog,
-  ImportProgressDialog,
   ImportToast,
   ImportUrlDialog,
 } from '../../components/import'
@@ -90,15 +89,12 @@ export function LibraryScreen() {
     handleRemoveFromCollection,
     toast,
     clearToast,
-    progress,
-    canCancel,
     conflict,
     urlDialog,
     closeUrlDialog,
     handleFromDevice,
     handleFromUrl,
     handleUrlSubmit,
-    handleCancelImport,
     handleConflictDiscard,
     handleConflictOpenExisting,
     view,
@@ -295,14 +291,7 @@ export function LibraryScreen() {
       <AudiobookZipImportDialog />
       <AudiobookZipJobPanel onOpenBook={openReader} />
 
-      <ImportProgressDialog
-        open={progress !== null}
-        status={progress?.stage === 'downloading' ? t('library.progressDialog.downloading') : t('library.progressDialog.importing')}
-        filename={progress?.filename}
-        receivedBytes={progress?.receivedBytes}
-        totalBytes={progress?.totalBytes}
-        onCancel={canCancel ? handleCancelImport : undefined}
-      />
+      {/* Spec 016: the blocking progress dialog is gone — the import queue card (App.tsx) shows every import. */}
 
       <ImportConflictDialog
         open={conflict !== null}

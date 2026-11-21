@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 import { useT } from '../../../i18n'
+import { LibraryImportPlaceholders } from '../../../components/import/LibraryImportPlaceholders'
 import { BootErrorBanner, LibraryBookGrid } from '../components'
 import type { LibraryHubProps } from '../LibraryHub'
 import { LIBRARY_FILTER_EMPTY, useLibraryBrowse, useLibraryBrowseStore } from '../logic'
@@ -73,9 +74,16 @@ export default function MobileLibraryHub({
         </div>
       ) : layout === 'table' ? (
         // The stored `table` layout is the phone List; the desktop table and its detail panel never render here (FR-013).
-        <MobileBookList books={visibleBooks} onOpen={onOpenBook} onBookMenu={onBookMenu} />
+        <>
+          <LibraryImportPlaceholders layout="table" visible={filter === 'all' && !searchActive} />
+          <MobileBookList books={visibleBooks} onOpen={onOpenBook} onBookMenu={onBookMenu} />
+        </>
       ) : (
-        <LibraryBookGrid books={visibleBooks} onOpen={onOpenBook} onBookMenu={onBookMenu} className="phone-grid" />
+        <>
+          {/* Spec 016 (FR-010): coming books first, in "All books" only. */}
+          <LibraryImportPlaceholders layout="grid" visible={filter === 'all' && !searchActive} />
+          <LibraryBookGrid books={visibleBooks} onOpen={onOpenBook} onBookMenu={onBookMenu} className="phone-grid" />
+        </>
       )
   }
 

@@ -168,6 +168,7 @@ export const en = {
       label: 'Importing {name}',
     },
     state: {
+      running: 'Importing',
       waiting: 'Waiting',
       done: 'Added',
       duplicate: 'Already in the library',

@@ -1,6 +1,7 @@
 import type { LibraryBook } from '@core'
 import { useSearchHistoryStore } from '../../hooks/library/index.js'
 import { useT } from '../../i18n'
+import { LibraryImportPlaceholders } from '../../components/import/LibraryImportPlaceholders'
 import {
   BootErrorBanner,
   ContinueReading,
@@ -102,6 +103,9 @@ export function LibraryHub({
                     layout={layout}
                     onLayoutChange={setLayout}
                   />
+
+                  {/* Spec 016 (FR-010): coming books first, in "All books" only. */}
+                  <LibraryImportPlaceholders layout={layout} visible={filter === 'all' && !searchActive} />
 
                   {visibleBooks.length === 0 ? (
                     <p className="mt-10 text-center text-sm text-lib-faint" role="status">

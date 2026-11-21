@@ -13,6 +13,11 @@ import {
 import { audioApi, zipImportApi } from '../../bridge'
 import type { UiText } from '../../i18n'
 import { useLibraryImportStore } from './libraryImportStore.js'
+import { registerZipJobCancel, registerZipJobRunner, useImportQueueStore } from './importQueueStore.js'
+import type { ImportJobOutcome, ImportStep } from '@core'
+
+/** Spec 016 (FR-014): what a queued ZIP job carries — the confirmed preview and selection. */
+type QueuedZip = { preview: ZipImportPreview; selection: ZipImportSelection; selectedNames: string[] }
 
 /** Chapters written so far while an import runs (from Main). */
 export type ZipImportProgress = { stage: 'extracting' | 'saving'; done: number; total: number; name?: string }
@@ -231,66 +236,18 @@ export const useZipImportStore = create<ZipImportState>()((set, get) => ({
     const byId = new Map(preview.entries.map((e) => [e.id, e.name]))
     const selectedNames = selection.trackIds.map((id) => stem(byId.get(id) ?? 'Track'))
 
-    // The dialog goes away NOW; everything below happens in the background while the app stays usable.
-    set({
-      phase: 'closed',
-      preview: null,
-      selection: EMPTY_SELECTION,
-      coverUrls: {},
-      error: null,
-      job: { archiveName: preview.archiveName, status: 'running', total: selection.trackIds.length, progress: null, cancelling: false },
-      panelOpen: false,
-    })
-    const off = zipImportApi.onProgress((progress) =>
-      set((s) => (s.job?.status === 'running' ? { job: { ...s.job, progress } } : {})),
-    )
-    const fail = (error: ZipImportError, retryable: boolean) =>
-      set((s) => ({
-        job: s.job ? { ...s.job, status: 'failed', error, progress: null, cancelling: false, retry: retryable ? { preview, selection } : undefined } : s.job,
-        panelOpen: true,
-      }))
-    try {
-      const result = await zipImportApi.confirm({ sessionId: preview.sessionId, selection })
-      if (result.ok) {
-        const tracks = await importedTracks(result.bookId, selectedNames)
-        set((s) => ({
-          job: s.job ? { ...s.job, status: 'done', bookId: result.bookId, tracks, progress: null, cancelling: false } : s.job,
-          panelOpen: true,
-          importedNonce: s.importedNonce + 1,
-        }))
-        return
-      }
-      if (result.errorCode === 'cancelled') {
-        // The user stopped it: nothing was added. The preview session is still in Main; drop it.
-        set({ job: null, panelOpen: false })
-        void zipImportApi.discard(preview.sessionId).catch(() => {})
-        useLibraryImportStore.getState().showToast({ key: 'library.toast.zipCancelled' }, 'info')
-        return
-      }
-      if (result.errorCode === 'duplicate' && result.bookId) {
-        // Same tracks, same order: reuse the Library's "already in your library — open it?" dialog.
-        set({ job: null, panelOpen: false })
-        void zipImportApi.discard(preview.sessionId).catch(() => {})
-        useLibraryImportStore.getState().setConflict({ bookId: result.bookId, message: result.errorMessage })
-        return
-      }
-      // A vanished or changed ZIP cannot be retried from the same preview; anything else can (adjust and try again).
-      fail(
-        { code: result.errorCode, message: result.errorMessage },
-        result.errorCode !== 'session_expired' && result.errorCode !== 'archive_changed',
-      )
-    } catch {
-      fail({ code: 'import_failed', message: { key: 'library.toast.zipImportFailed' } }, true)
-    } finally {
-      off()
-    }
+    // The dialog goes away NOW. Spec 016 (FR-014): the ZIP's job joins the end of the shared import queue, so a ZIP
+    // and a book import never run at the same time; the queue runs it through `runQueuedZip` below.
+    set({ phase: 'closed', preview: null, selection: EMPTY_SELECTION, coverUrls: {}, error: null, panelOpen: false })
+    const queued: QueuedZip = { preview, selection, selectedNames }
+    useImportQueueStore.getState().addZip(queued, preview.archiveName, null)
   },
 
   cancelJob: async () => {
     const { job } = get()
     if (!job || job.status !== 'running' || job.cancelling) return
     set({ job: { ...job, cancelling: true } })
-    // Main stops at the next step (or ignores it once the database write began); confirm() then resolves and settles the job.
+    // Main stops at the next step (or ignores it once the database write began); the run then resolves and settles the job.
     await zipImportApi.cancelImport().catch(() => {})
   },
 
@@ -311,3 +268,70 @@ export const useZipImportStore = create<ZipImportState>()((set, get) => ({
     if (preview.defaultCoverId) void get().loadCover(preview.defaultCoverId)
   },
 }))
+
+/**
+ * Spec 016 (FR-014): runs a queued ZIP job — the same import as before (`zipImport:confirm`), with its progress
+ * mapped onto the queue job (`extracting` → `copying` with tracks done / total, `saving` → `saving`, not cancellable)
+ * and the result kept for the ZIP panel ("Open audiobook").
+ */
+async function runQueuedZip(
+  payload: unknown,
+  onQueueProgress: (update: { step: ImportStep; done: number; total: number | null }) => void,
+): Promise<ImportJobOutcome> {
+  const { preview, selection, selectedNames } = payload as QueuedZip
+  const set = useZipImportStore.setState
+  set({ job: { archiveName: preview.archiveName, status: 'running', total: selection.trackIds.length, progress: null, cancelling: false } })
+  {
+    const off = zipImportApi.onProgress((progress) => {
+      set((s) => (s.job?.status === 'running' ? { job: { ...s.job, progress } } : {}))
+      onQueueProgress(
+        progress.stage === 'saving'
+          ? { step: 'saving', done: progress.done, total: progress.total }
+          : { step: 'copying', done: progress.done, total: progress.total },
+      )
+    })
+    const fail = (error: ZipImportError, retryable: boolean) =>
+      set((s) => ({
+        job: s.job ? { ...s.job, status: 'failed', error, progress: null, cancelling: false, retry: retryable ? { preview, selection } : undefined } : s.job,
+        panelOpen: true,
+      }))
+    try {
+      const result = await zipImportApi.confirm({ sessionId: preview.sessionId, selection })
+      if (result.ok) {
+        const tracks = await importedTracks(result.bookId, selectedNames)
+        set((s) => ({
+          job: s.job ? { ...s.job, status: 'done', bookId: result.bookId, tracks, progress: null, cancelling: false } : s.job,
+          panelOpen: true,
+          importedNonce: s.importedNonce + 1,
+        }))
+        return { kind: 'done', bookId: result.bookId }
+      }
+      if (result.errorCode === 'cancelled') {
+        // The user stopped it: nothing was added. The preview session is still in Main; drop it.
+        set({ job: null, panelOpen: false })
+        void zipImportApi.discard(preview.sessionId).catch(() => {})
+        return { kind: 'cancelled' }
+      }
+      if (result.errorCode === 'duplicate' && result.bookId) {
+        // Same tracks, same order: the queue card offers "Open existing".
+        set({ job: null, panelOpen: false })
+        void zipImportApi.discard(preview.sessionId).catch(() => {})
+        return { kind: 'duplicate', bookId: result.bookId }
+      }
+      // A vanished or changed ZIP cannot be retried from the same preview; anything else can (adjust and try again).
+      fail(
+        { code: result.errorCode, message: result.errorMessage },
+        result.errorCode !== 'session_expired' && result.errorCode !== 'archive_changed',
+      )
+      return { kind: 'failed', error: { code: result.errorCode, message: result.errorMessage } }
+    } catch {
+      fail({ code: 'import_failed', message: { key: 'library.toast.zipImportFailed' } }, true)
+      return { kind: 'failed', error: { code: 'import_failed', message: { key: 'library.toast.zipImportFailed' } } }
+    } finally {
+      off()
+    }
+  }
+}
+
+registerZipJobRunner(runQueuedZip)
+registerZipJobCancel(() => useZipImportStore.getState().cancelJob())

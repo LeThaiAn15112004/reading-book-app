@@ -1,0 +1,221 @@
+/*
+ * Spec 016 (contracts/import-ui.md, FR-017): the background import card / pill and the Library placeholders.
+ * Theme tokens only (--lib-*); targets ≥ 44 px on the phone; figures in tabular digits so the counter never jitters;
+ * reduced motion → static bar, the elapsed counter alone shows progress.
+ */
+
+.import-queue {
+  position: absolute;
+  right: 16px;
+  bottom: 16px;
+  z-index: 150; /* above the screens, below dialogs (z-50 overlays sit in their own stacking context at the root) */
+  display: flex;
+  width: min(360px, calc(100% - 32px));
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+  pointer-events: none;
+}
+.import-queue > * {
+  pointer-events: auto;
+}
+
+.import-queue-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-height: min(70vh, 560px);
+  overflow: hidden;
+  border: 1px solid var(--lib-border);
+  border-radius: 12px;
+  background: var(--lib-surface-strong);
+  padding: 14px 16px;
+  box-shadow: var(--lib-overlay-shadow, 0 20px 48px rgba(0, 0, 0, 0.35));
+}
+
+.import-queue-pill-row {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.import-queue-pill {
+  display: inline-flex;
+  min-height: 44px;
+  max-width: 100%;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid var(--lib-border);
+  border-radius: 999px;
+  background: var(--lib-surface-strong);
+  padding: 0 16px;
+  color: var(--lib-text-strong);
+  font-size: 13px;
+  font-weight: 600;
+  box-shadow: var(--lib-overlay-shadow, 0 10px 24px rgba(0, 0, 0, 0.3));
+  cursor: pointer;
+}
+.import-queue-pill:hover {
+  background: var(--lib-surface-hover);
+}
+.import-queue-pill:focus-visible,
+.import-queue-action:focus-visible {
+  outline: 2px solid var(--lib-accent-ring, var(--lib-accent));
+  outline-offset: 2px;
+}
+
+.import-queue-figure {
+  font-variant-numeric: tabular-nums;
+}
+
+.import-queue-action {
+  display: inline-flex;
+  min-height: 32px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--lib-border);
+  border-radius: 8px;
+  background: var(--lib-surface);
+  padding: 0 10px;
+  color: var(--lib-text-strong);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.import-queue-action:hover:not(:disabled) {
+  background: var(--lib-surface-hover);
+}
+.import-queue-action:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.import-queue-action[data-tone='primary'] {
+  border-color: transparent;
+  background: var(--lib-accent);
+  color: var(--lib-on-accent);
+}
+.import-queue-action[data-tone='primary']:hover {
+  background: var(--lib-accent-hover);
+}
+.import-queue-action[data-tone='quiet'] {
+  border-color: transparent;
+  background: transparent;
+  color: var(--lib-muted);
+}
+
+.import-queue-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border-radius: 8px;
+  padding: 6px 4px;
+}
+
+.import-queue-bar {
+  position: relative;
+  height: 4px;
+  overflow: hidden;
+  border-radius: 2px;
+  background: var(--lib-border-soft);
+}
+.import-queue-bar-fill {
+  height: 100%;
+  border-radius: 2px;
+  background: var(--lib-accent);
+  transition: width 150ms linear;
+}
+.import-queue-bar[data-indeterminate] .import-queue-bar-fill {
+  width: 30%;
+  animation: import-queue-slide 1.2s ease-in-out infinite;
+}
+@keyframes import-queue-slide {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(340%);
+  }
+}
+
+.import-queue-spinner {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  border: 2px solid var(--lib-border-soft);
+  border-top-color: var(--lib-accent);
+  border-radius: 999px;
+  animation: import-queue-spin 0.9s linear infinite;
+}
+@keyframes import-queue-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Library placeholders (FR-010) */
+.import-placeholder-tile {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 6px;
+  opacity: 0.85;
+}
+.import-placeholder-cover {
+  display: flex;
+  aspect-ratio: 2 / 3;
+  width: 100%;
+  align-items: center;
+  justify-content: center;
+  border: 1px dashed var(--lib-border);
+  border-radius: 6px;
+  background: var(--lib-surface);
+}
+.import-placeholder-cover--small {
+  width: 32px;
+  flex-shrink: 0;
+}
+.import-placeholder-row {
+  display: flex;
+  min-height: 44px;
+  align-items: center;
+  gap: 12px;
+  border-bottom: 1px solid var(--lib-border-soft);
+  padding: 6px 12px;
+  opacity: 0.85;
+}
+
+/* Phone (contracts/import-ui.md): full width minus 16 px gutters, above the tab bar (the card sits in the content
+   area, which ends above PhoneNav and the gesture area); 44 × 44 targets. */
+[data-mobile-host] .import-queue {
+  left: 16px;
+  right: 16px;
+  width: auto;
+}
+[data-mobile-host] .import-queue-pill-row {
+  justify-content: stretch;
+}
+[data-mobile-host] .import-queue-pill {
+  flex: 1;
+  justify-content: center;
+}
+[data-mobile-host] .import-queue-action {
+  min-height: 44px;
+  min-width: 44px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .import-queue-bar[data-indeterminate] .import-queue-bar-fill {
+    width: 100%;
+    animation: none;
+    opacity: 0.35;
+  }
+  .import-queue-spinner {
+    animation: none;
+  }
+  .import-queue-bar-fill {
+    transition: none;
+  }
+}
