@@ -12,12 +12,12 @@
 import { Book, parseDocumentFormat, readEpubImportMetadata, type DocumentFormat } from '@core'
 import { phoneStepTimer } from './app'
 import { openBookZip } from './ranged-book'
-import type { PickResult } from '../host/file-service'
+import type { ImportableExtension, MultiPickResult, PickResult } from '../host/file-service'
 import type { ImportProgressPayload } from '../host/protocol'
 import { bookFilePath } from '../stores/library-store'
 import type { BridgeContext } from './context'
 import { HostCallError } from './host-client'
-import { notAvailableResult } from './unavailable'
+import { noEvents, notAvailableResult } from './unavailable'
 
 type ImportGroup = Window['api']['import']
 type ImportResult = Awaited<ReturnType<ImportGroup['fromFile']>>
@@ -68,7 +68,7 @@ function isUniqueViolation(error: unknown): boolean {
 
 export function createImportGroup(ctx: BridgeContext): ImportGroup {
   const listeners = new Set<(progress: ImportProgressDto) => void>()
-  let running: { stagingId: string; filename: string; cancelled: boolean; committed: boolean } | null = null
+  let running: { stagingId: string; filename: string; cancelled: boolean; committed: boolean; jobId?: string } | null = null
 
   const emit = (progress: ImportProgressDto) => {
     for (const handler of listeners) {
@@ -90,6 +90,7 @@ export function createImportGroup(ctx: BridgeContext): ImportGroup {
       totalBytes: p.totalBytes,
       step: p.step === 'copying' ? 'copying' : 'checking',
       doneBytes: p.doneBytes,
+      jobId: running.jobId,
     })
   })
 
@@ -111,11 +112,19 @@ export function createImportGroup(ctx: BridgeContext): ImportGroup {
     }
     if (picked.status === 'cancelled') return failure('cancelled', 'Import cancelled.')
     if (picked.status === 'unsupported') return failure('unsupported_format', `“${picked.name}” is not a book format Readmate can open here (EPUB, PDF, TXT or Markdown).`)
+    return runPicked(picked)
+  }
 
+  /** One picked file: copy → fingerprint → duplicate check → move into the library → details → row. */
+  async function runPicked(
+    picked: { pickId: string; name: string; size: number; extension: ImportableExtension },
+    jobId?: string,
+  ): Promise<ImportResult> {
+    if (running) return failure('save_failed', 'Another import is still running.')
     const stagingId = ctx.newId()
-    const job = { stagingId, filename: picked.name, cancelled: false, committed: false }
+    const job = { stagingId, filename: picked.name, cancelled: false, committed: false, jobId }
     running = job
-    emit({ stage: 'importing', filename: picked.name })
+    emit({ stage: 'importing', filename: picked.name, jobId, step: 'copying', doneBytes: 0, totalBytes: picked.size })
     // Spec 016 (US1): developer step timing — format + size only; a no-op unless timing is on.
     const timer = phoneStepTimer()
     const timing = { format: picked.extension, sizeBytes: picked.size ?? 0 }
@@ -173,6 +182,7 @@ export function createImportGroup(ctx: BridgeContext): ImportGroup {
         const meta = await readMetadata(ctx, bookId, format)
         detailsMark.end()
         const now = new Date().toISOString()
+        emit({ stage: 'importing', filename: picked.name, jobId, step: 'saving', doneBytes: 0, totalBytes: null })
         const book = new Book({
           id: bookId,
           title: meta.title?.trim() || titleFromFilename(picked.name),
@@ -209,8 +219,62 @@ export function createImportGroup(ctx: BridgeContext): ImportGroup {
     }
   }
 
+  /** Spec 016 (FR-011a): multi-file pick (≤ 50, picker order); pick ids only, never a path or URI. */
+  async function pickFiles(): Promise<Awaited<ReturnType<ImportGroup['pickFiles']>>> {
+    let picked: MultiPickResult
+    try {
+      picked = await ctx.client.call<MultiPickResult>('files', 'pick', { extensions: MOBILE_IMPORT_EXTENSIONS, multiple: true }, { timeoutMs: 0 })
+    } catch {
+      return { status: 'failed', errorMessage: 'Could not open the file picker.' }
+    }
+    if (picked.status === 'cancelled') return { status: 'cancelled' }
+    return {
+      status: 'picked',
+      notAdded: picked.notAdded,
+      items: picked.items.map((item) =>
+        item.extension
+          ? { pickId: item.pickId, name: item.name, sizeBytes: item.size, kind: 'book' as const, format: item.extension }
+          : { pickId: '', name: item.name, sizeBytes: item.size, kind: 'unsupported' as const },
+      ),
+    }
+  }
+
+  /** Spec 016: one queue job. The pick is looked up in the host (it may be from before a relaunch). */
+  async function runJob(input: { jobId: string; pickId: string }): Promise<ImportResult> {
+    const { jobId, pickId } = (input ?? {}) as { jobId?: unknown; pickId?: unknown }
+    if (typeof jobId !== 'string' || typeof pickId !== 'string') return failure('save_failed', 'Could not save the book to the library.')
+    let info: { readable: boolean; name?: string; size?: number; extension?: string }
+    try {
+      info = await ctx.client.call('files', 'checkPick', { pickId })
+    } catch {
+      info = { readable: false }
+    }
+    if (!info.readable || !info.name || !(MOBILE_IMPORT_EXTENSIONS as readonly string[]).includes(info.extension ?? '')) {
+      return failure('missing_file', 'Could not read the selected file.')
+    }
+    return runPicked({ pickId, name: info.name, size: info.size ?? 0, extension: info.extension as ImportableExtension }, jobId)
+  }
+
   return {
     fromFile,
+    pickFiles,
+    runJob,
+    /** Refused while saving (the file is already in the library); otherwise stops copying / hashing. */
+    async cancelJob(input) {
+      const job = running
+      if (!job || job.jobId !== input?.jobId) return { ok: false, reason: 'unknown' }
+      if (job.committed) return { ok: false, reason: 'saving' }
+      job.cancelled = true
+      try {
+        await ctx.client.call('files', 'cancel', { stagingId: job.stagingId })
+      } catch {
+        // The flag above still stops the job between steps.
+      }
+      return { ok: true }
+    },
+    // No quit dialog on the phone (FR-013b): the system ends the app; the saved queue covers it.
+    reportActivity: async () => ({ ok: true }),
+    onCancelAll: noEvents,
     /** Stops copying or hashing; once the file is in the library the import is short and finishes. */
     async cancel() {
       const job = running

@@ -30,13 +30,21 @@ import { fileTimingContext, mainTimer, timeStep, timingFormatOf } from '../perf/
 import type { TimingContext } from '@core'
 import { holdPickedZip } from '../zip-import/picked-zip'
 import type {
+  CancelImportJobResultDto,
+  DocumentFormatDto,
   ImportErrorCode,
+  ImportStepDto,
+  PickedItemDto,
+  PickFilesResultDto,
   ImportProgressDto,
   ImportResult,
   OkResult,
 } from './api-types'
 import { ImportChannels } from './channels'
 import { beginCancellable, cancelInFlight, endCancellable } from './import-cancel'
+import { holdPickedFile, takePickedFile } from './picked-files'
+import { HashCancelledError } from '../files/file-hash'
+import { setImportActivity } from '../background/quit-guard'
 import { tMain } from '../i18n/main-translate'
 
 /** Cancel key of the (single) in-flight import:fromUrl download. */
@@ -265,12 +273,19 @@ function persistImportedBook(
  * may a failure delete it: a referenced book's file belongs to the user, and so does its folder.
  * The extracted cover is always app-owned and always cleaned up.
  */
+/** Spec 016: how a queue job follows and stops an import (cancel before "Saving", step changes for its card). */
+export type ImportControl = {
+  signal?: AbortSignal
+  onStep?: (step: ImportStepDto) => void
+}
+
 async function finishImport(
   filePath: string,
   options: FinishImportOptions,
   ownsFile: boolean,
   timing: TimingContext | null = null,
   fingerprint?: ImportFingerprint,
+  control: ImportControl = {},
 ): Promise<ImportResult> {
   let coverPath: string | undefined
   const discardImportArtifacts = async (): Promise<void> => {
@@ -294,6 +309,12 @@ async function finishImport(
     )
   }
 
+  // Spec 016 (FR-009): cancelled while reading its details — nothing is added; the extracted cover goes.
+  if (control.signal?.aborted) {
+    await discardImportArtifacts()
+    return cancelledResult()
+  }
+
   // Spec 016 (FR-003 / edge case): a referenced file that changed or vanished since it was fingerprinted is not
   // added — its hash would not describe it any more.
   if (fingerprint && !ownsFile && (await fileChangedSince(filePath, fingerprint))) {
@@ -315,6 +336,8 @@ async function finishImport(
       )
 
   try {
+    // Spec 016 (FR-009): "Saving" writes the entry all at once and can no longer be cancelled.
+    control.onStep?.('saving')
     const bookId = await timeStep('import', 'save', timing, () => persistImportedBook(meta, options, signature))
     if (checkLater) scheduleSignatureCheck(bookId)
     return { ok: true, bookId }
@@ -386,8 +409,9 @@ function finishImportByReference(
   options: FinishImportOptions = {},
   timing: TimingContext | null = null,
   fingerprint?: ImportFingerprint,
+  control: ImportControl = {},
 ): Promise<ImportResult> {
-  return finishImport(sourcePath, options, false, timing, fingerprint)
+  return finishImport(sourcePath, options, false, timing, fingerprint, control)
 }
 
 async function importFromFile(sender: WebContents): Promise<ImportResult> {
@@ -422,6 +446,17 @@ async function importFromFile(sender: WebContents): Promise<ImportResult> {
   }
   // Progress starts only now that a file is picked (never while the picker is open).
   sendProgress(sender, { stage: 'importing', filename: path.basename(sourcePath) })
+  return importPickedPath(sourcePath)
+}
+
+/**
+ * The import of one file picked from the reader's disk, by reference (never copied): format check → ONE fingerprint
+ * + duplicate check → details → "Saving". Shared by `import:fromFile` and the queue's `import:runJob`.
+ */
+async function importPickedPath(
+  sourcePath: string,
+  control: ImportControl & { onBytes?: (done: number, total: number) => void } = {},
+): Promise<ImportResult> {
   const timing = await fileTimingContext(sourcePath)
 
   let fingerprint: ImportFingerprint
@@ -434,18 +469,117 @@ async function importFromFile(sender: WebContents): Promise<ImportResult> {
         tMain('main.messages.import.outsideDataFolder'),
       )
     }
-    const checked = await fingerprintAndCheck(sourcePath, timing)
+    const checked = await fingerprintAndCheck(sourcePath, timing, { signal: control.signal, onProgress: control.onBytes })
     if ('conflict' in checked) return checked.conflict
     fingerprint = checked.fingerprint
   } catch (err) {
+    if (err instanceof HashCancelledError) return cancelledResult()
     if (err instanceof UnsupportedFormatError) return unsupportedResult(err)
     const access = fileAccessFailure(err)
     if (access) return access
     console.warn('[import] reading the selected file failed', err)
     return importFailure('access_denied', tMain('main.messages.import.selectedUnreadable'))
   }
+  if (control.signal?.aborted) return cancelledResult()
+  control.onStep?.('reading')
+  return finishImportByReference(sourcePath, {}, timing, fingerprint, control)
+}
 
-  return finishImportByReference(sourcePath, {}, timing, fingerprint)
+/** FR-011a: at most 50 files per pick; the rest are reported as not added. */
+export const MAX_FILES_PER_PICK = 50
+/** Progress events at most this often during the fingerprint read (SC-004: a change at least every 2 s). */
+const JOB_PROGRESS_MS = 250
+
+/**
+ * Spec 016 (FR-011a, research R7): the multi-file "Add file" dialog. Paths stay in Main (`picked-files.ts`); the
+ * renderer gets one pick id per book file. A ZIP picked alone keeps today's preview route; a ZIP among several files
+ * is reported as `zip` and left out by the renderer.
+ */
+async function pickFiles(): Promise<PickFilesResultDto> {
+  const parent = dialogParentWindow()
+  const dialogOptions: Electron.OpenDialogOptions = {
+    properties: ['openFile', 'multiSelections'],
+    filters: openDialogFilters(),
+  }
+  let picked: Electron.OpenDialogReturnValue
+  try {
+    picked = parent !== undefined ? await dialog.showOpenDialog(parent, dialogOptions) : await dialog.showOpenDialog(dialogOptions)
+  } catch (err) {
+    console.warn('[import] file dialog failed', err)
+    return { status: 'failed', errorMessage: tMain('main.messages.import.pickerFailed') }
+  }
+  if (picked.canceled || picked.filePaths.length === 0) return { status: 'cancelled' }
+
+  const all = picked.filePaths.map((p) => path.resolve(p))
+  const kept = all.slice(0, MAX_FILES_PER_PICK)
+  const items: PickedItemDto[] = []
+  for (const filePath of kept) {
+    const name = path.basename(filePath)
+    let sizeBytes = 0
+    try {
+      sizeBytes = (await fsp.stat(filePath)).size
+    } catch {
+      // reported when the job runs (missing / unreadable)
+    }
+    if (zipEnabled() && path.extname(filePath).toLowerCase() === '.zip') {
+      if (kept.length === 1) holdPickedZip(filePath)
+      items.push({ pickId: '', name, sizeBytes, kind: 'zip' })
+      continue
+    }
+    let format: DocumentFormatDto | undefined
+    try {
+      format = assertSupportedExtension(filePath) as DocumentFormatDto
+    } catch {
+      items.push({ pickId: '', name, sizeBytes, kind: 'unsupported' })
+      continue
+    }
+    items.push({ pickId: holdPickedFile(filePath), name, sizeBytes, kind: 'book', format })
+  }
+  return { status: 'picked', items, notAdded: all.length - kept.length }
+}
+
+/** The one queue job Main is running (one at a time — the renderer queue never asks for two). */
+let activeJob: { jobId: string; controller: AbortController; step: ImportStepDto } | null = null
+
+async function runJob(sender: WebContents, input: unknown): Promise<ImportResult> {
+  const { jobId, pickId } = (input && typeof input === 'object' ? input : {}) as Record<string, unknown>
+  if (typeof jobId !== 'string' || !jobId) return importFailure('save_failed', tMain('main.messages.import.saveFailed'))
+  if (activeJob) return importFailure('save_failed', tMain('main.messages.import.busy'))
+  const sourcePath = takePickedFile(pickId)
+  if (!sourcePath) return importFailure('missing_file', tMain('main.messages.import.selectedUnreadable'))
+  const controller = new AbortController()
+  const job = { jobId, controller, step: 'checking' as ImportStepDto }
+  activeJob = job
+  const filename = path.basename(sourcePath)
+  let lastSentAt = 0
+  const emit = (step: ImportStepDto, doneBytes: number, totalBytes: number | null) => {
+    job.step = step
+    sendProgress(sender, { stage: 'importing', filename, jobId, step, doneBytes, totalBytes })
+  }
+  try {
+    emit('checking', 0, null)
+    return await importPickedPath(sourcePath, {
+      signal: controller.signal,
+      onStep: (step) => emit(step, 0, null),
+      onBytes: (done, total) => {
+        const now = Date.now()
+        if (now - lastSentAt < JOB_PROGRESS_MS && done !== total) return
+        lastSentAt = now
+        emit('checking', done, total)
+      },
+    })
+  } finally {
+    if (activeJob === job) activeJob = null
+  }
+}
+
+/** FR-009: refused while "Saving"; a referenced file is never touched by a cancel. */
+function cancelJob(input: unknown): CancelImportJobResultDto {
+  const { jobId } = (input && typeof input === 'object' ? input : {}) as Record<string, unknown>
+  if (!activeJob || activeJob.jobId !== jobId) return { ok: false, reason: 'unknown' }
+  if (activeJob.step === 'saving') return { ok: false, reason: 'saving' }
+  activeJob.controller.abort()
+  return { ok: true }
 }
 
 async function importFromUrl(sender: WebContents, url: unknown): Promise<ImportResult> {
@@ -513,4 +647,17 @@ export function registerImportIpc(): void {
     ImportChannels.cancel,
     (): OkResult => ({ ok: cancelInFlight(URL_CANCEL_KEY) }),
   )
+
+  // Spec 016: the background import queue (renderer state; Main runs one job when asked).
+  ipcMain.removeHandler(ImportChannels.pickFiles)
+  ipcMain.handle(ImportChannels.pickFiles, () => pickFiles())
+
+  ipcMain.removeHandler(ImportChannels.runJob)
+  ipcMain.handle(ImportChannels.runJob, (event, input: unknown) => runJob(event.sender, input))
+
+  ipcMain.removeHandler(ImportChannels.cancelJob)
+  ipcMain.handle(ImportChannels.cancelJob, (_event, input: unknown) => cancelJob(input))
+
+  ipcMain.removeHandler(ImportChannels.reportActivity)
+  ipcMain.handle(ImportChannels.reportActivity, (_event, input: unknown): OkResult => ({ ok: setImportActivity(input) }))
 }

@@ -51,7 +51,7 @@ describe('success', () => {
     expect(JSON.parse(row.metadata_json!)).toMatchObject({ fileSizeBytes: bytes.length, pageCount: 2 })
     expect(JSON.parse(row.genres_json!)).toEqual(['Thiếu nhi'])
     expect(await host.api.library.getBook(bookId)).toMatchObject({ author: 'Tô Hoài', genres: ['Thiếu nhi'], pageCount: 2 })
-    expect(progress[0]).toEqual({ stage: 'importing', filename: 'de-men.epub' })
+    expect(progress[0]).toMatchObject({ stage: 'importing', filename: 'de-men.epub', step: 'copying' })
     expect(progress.length).toBeGreaterThan(1)
     nothingLeftBehind(host, 1)
   })

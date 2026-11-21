@@ -15,6 +15,7 @@ import {
   disposeTray,
   hasTray,
   initBackgroundMode,
+  cancelQuitting,
   isQuitting,
   markQuitting,
   shouldHideOnClose,
@@ -27,6 +28,8 @@ import { disposePdfAnnotationSync } from './ipc/overlay.ipc'
 import { disposeTranslationWorker } from './translation/translation-service'
 import { ensureBooksSandbox } from './files/sandbox'
 import { registerAllIpcHandlers } from './ipc'
+import { confirmQuitWithImports, markShuttingDown, shouldAskBeforeQuit } from './background/quit-guard'
+import { sweepImportLeftovers } from './files/import-sweep'
 import { loadMainUiLanguage } from './i18n/main-i18n'
 import { disposeTranscription, recoverInterruptedTranscripts } from './transcription/transcription-runtime'
 import { installFullscreenShortcuts } from './ipc/app.ipc'
@@ -303,6 +306,15 @@ function createWindow({ showOnReady = true }: { showOnReady?: boolean } = {}) {
     const target = win
     if (!target || target.isDestroyed()) return
 
+    // Spec 016 (FR-013a): this close quits the app (no Run in Background) while imports run or wait — ask first.
+    if (!shouldHideOnClose() && !isQuitting() && shouldAskBeforeQuit()) {
+      event.preventDefault()
+      void confirmQuitWithImports(target).then((quit) => {
+        if (quit) app.quit()
+      })
+      return
+    }
+
     const decision = decideWindowClose({
       flushing: flushingClose,
       sessionFlushed: sessionFlushDone,
@@ -347,9 +359,11 @@ function createWindow({ showOnReady = true }: { showOnReady?: boolean } = {}) {
   // so a background-mode window doesn't block the session from ending. `query-session-end` comes
   // first (before the windows get `close`); `session-end` is the backstop.
   win.on('query-session-end', () => {
+    markShuttingDown()
     markQuitting()
   })
   win.on('session-end', () => {
+    markShuttingDown()
     markQuitting()
   })
 
@@ -427,7 +441,16 @@ app.on('second-instance', (_event, argv) => {
 
 // Every quit path (Cmd+Q, tray / Settings Quit, app.quit()) passes here: mark it so the close
 // handler closes instead of hiding, and the deferred window close can re-enter app.quit().
-app.on('before-quit', () => {
+app.on('before-quit', (event) => {
+  // Spec 016 (FR-013a): tray / menu / shortcut quit while imports run or wait — ask first (never on shutdown).
+  if (shouldAskBeforeQuit()) {
+    event.preventDefault()
+    cancelQuitting()
+    void confirmQuitWithImports(BrowserWindow.getAllWindows()[0]).then((quit) => {
+      if (quit) app.quit()
+    })
+    return
+  }
   markQuitting()
 })
 
@@ -466,12 +489,19 @@ app.whenReady().then(async () => {
   // Transcripts whose job was cut short by the last quit / crash become `partial` + INTERRUPTED before `transcription:start`
   // can be served; nothing is restarted automatically (the panel offers Resume).
   recoverInterruptedTranscripts()
+  // Spec 016 (FR-013, SC-006): leftovers of an import cut short by the last quit / crash, before any import can run.
+  try {
+    await sweepImportLeftovers()
+  } catch (err) {
+    console.warn('[import-sweep] failed', err)
+  }
   registerAllIpcHandlers()
   // Tray + Run in Background prefs (Main-owned) before the window, so its close button knows them.
   initBackgroundMode({ showWindow: showMainWindow, publicDir: process.env.VITE_PUBLIC })
   initNotificationSettings()
   // macOS / Linux shutdown or reboot: quit instead of hiding.
   powerMonitor.on('shutdown', () => {
+    markShuttingDown()
     markQuitting()
   })
   // Start at Login: stay hidden in the tray — only when the tray exists, so there is a way back.

@@ -1,6 +1,6 @@
 /** Narrow Desktop API exposed to the renderer via contextBridge (`window.api`). */
 
-import type { StepTiming, ZipImportPreview, ZipImportSelection } from '@core'
+import type { QueueSnapshot, StepTiming, ZipImportPreview, ZipImportSelection } from '@core'
 
 /** Spec 016: one developer step timing line (format, size, duration only — see core `perf/step-timing`). */
 export type StepTimingDto = StepTiming
@@ -455,6 +455,23 @@ export interface ImportProgressDto {
   /** Spec 016: bytes done in the current step (read, copied or downloaded). */
   doneBytes?: number
 }
+
+/** Spec 016: one file of a multi-file pick. `pickId` is empty for `zip` / `unsupported` items (they are not run). */
+export interface PickedItemDto {
+  pickId: string
+  /** File name only (user data, never translated). */
+  name: string
+  sizeBytes: number
+  kind: 'book' | 'zip' | 'unsupported'
+  format?: DocumentFormatDto
+}
+
+export type PickFilesResultDto =
+  | { status: 'cancelled' }
+  | { status: 'failed'; errorMessage: string }
+  | { status: 'picked'; items: PickedItemDto[]; notAdded: number }
+
+export type CancelImportJobResultDto = { ok: boolean; reason?: 'saving' | 'unknown' }
 
 /** Spec 016: steps of one import job, in order (`downloading` for URL / cloud, `copying` on the phone). */
 export type ImportStepDto = 'downloading' | 'copying' | 'checking' | 'reading' | 'saving'
@@ -1063,6 +1080,14 @@ export type SetUiLanguageResultDto =
   | { ok: false; code: 'INVALID_ARGUMENT' | 'WRITE_FAILED' }
 
 export interface DesktopApi {
+  /**
+   * Spec 016 (FR-013b): the phone keeps its unfinished import jobs across launches; Desktop has no such group
+   * (its queue is session-only), so it is optional.
+   */
+  importQueue?: {
+    load(): Promise<QueueSnapshot | null>
+    save(snapshot: QueueSnapshot): Promise<OkResult>
+  }
   ping(): Promise<'pong'>
   getAppInfo(): Promise<AppInfo>
   /** Sanitized Google OAuth client config loaded from local client_secret_*.json. */
@@ -1165,6 +1190,16 @@ export interface DesktopApi {
     cancel(): Promise<OkResult>
     /** Subscribe to step / byte progress of the running import. Returns unsubscribe. */
     onProgress(handler: (progress: ImportProgressDto) => void): () => void
+    /** Spec 016: multi-file pick (≤ 50 per pick, `notAdded` beyond); never a path. */
+    pickFiles(): Promise<PickFilesResultDto>
+    /** Spec 016: import one picked file as queue job `jobId`; progress events carry the job id. */
+    runJob(input: { jobId: string; pickId: string }): Promise<ImportResult>
+    /** Spec 016: cancel the running queue job; refused (`saving`) while it saves. */
+    cancelJob(input: { jobId: string }): Promise<CancelImportJobResultDto>
+    /** Spec 016: running / waiting counts for the quit confirmation (Desktop; the phone ignores it). */
+    reportActivity(input: { running: number; waiting: number }): Promise<OkResult>
+    /** Spec 016: Main asks the renderer to cancel every import before a confirmed quit. Returns unsubscribe. */
+    onCancelAll(handler: () => void): () => void
   }
   graphics: {
     /** Graphic objects inside a PDF book (read-only scan; descriptors only). */

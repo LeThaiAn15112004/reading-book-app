@@ -36,6 +36,10 @@ export interface ByteWriter {
 export interface HostFs {
   /** Native picker; the result is a copy in the cache, or null when the user cancelled. */
   pickDocument(): Promise<PickedDocument | null>
+  /** Spec 016 (FR-011a): the system picker with multi-selection, in the picker's order; null when cancelled. */
+  pickDocuments?(): Promise<PickedDocument[] | null>
+  /** Spec 016 (FR-013b): whether a picked URI can still be read (after a relaunch the system may withdraw access). */
+  uriReadable?(uri: string): boolean
   availableBytes(): number
   exists(rel: string): boolean
   /** Size of a file, or undefined when it does not exist. */
@@ -81,7 +85,16 @@ export interface FileServiceOptions {
   /** Lets cancel requests through between chunks. */
   yieldToEvents?: () => Promise<void>
   newPickId?: () => string
+  /** Spec 016 (FR-013b): keeps the pick map across launches (`import-picks.json`, host only). */
+  pickStore?: { load(): Map<string, PickedDocument>; save(map: Map<string, PickedDocument>): void }
 }
+
+/** FR-011a: files per multi-file pick. */
+export const MAX_PICKED_FILES = 50
+
+export type MultiPickResult =
+  | { status: 'cancelled' }
+  | { status: 'picked'; items: { pickId: string; name: string; size: number; extension: ImportableExtension | null }[]; notAdded: number }
 
 export const FILE_LIMITS = {
   chunkBytes: 1024 * 1024,
@@ -140,7 +153,8 @@ export function createFileService(options: FileServiceOptions) {
   const yieldToEvents = options.yieldToEvents ?? (() => Promise.resolve())
   let pickCounter = 0
   const newPickId = options.newPickId ?? (() => `pick-${++pickCounter}-${Math.random().toString(36).slice(2, 12)}`)
-  const picks = new Map<string, PickedDocument>()
+  const picks = options.pickStore?.load() ?? new Map<string, PickedDocument>()
+  const savePicks = () => options.pickStore?.save(picks)
   /** Running stage / hash jobs; `cancelled` is read between chunks. */
   const jobs = new Map<string, { cancelled: boolean }>()
 
@@ -151,12 +165,39 @@ export function createFileService(options: FileServiceOptions) {
     return job
   }
 
-  async function pick(raw: unknown): Promise<PickResult> {
+  /** Spec 016 (FR-011a): several files at once — the first 50 in the picker's order; unsupported ones get no pick id. */
+  async function pickMany(wanted: string[]): Promise<MultiPickResult> {
+    let picked: PickedDocument[] | null
+    try {
+      picked = fs.pickDocuments ? await fs.pickDocuments() : await fs.pickDocument().then((p) => (p ? [p] : null))
+    } catch {
+      throw new HostServiceError('READ_FAILED', 'The file picker could not open the file')
+    }
+    if (!picked || picked.length === 0) return { status: 'cancelled' }
+    const kept = picked.slice(0, MAX_PICKED_FILES)
+    for (const extra of picked.slice(MAX_PICKED_FILES)) fs.discardUri(extra.uri)
+    const items = kept.map((doc) => {
+      const name = safeDisplayName(doc.name)
+      const extension = extensionOf(name)
+      if (!wanted.includes(extension)) {
+        fs.discardUri(doc.uri)
+        return { pickId: '', name, size: doc.size, extension: null }
+      }
+      const pickId = newPickId()
+      picks.set(pickId, { ...doc, name })
+      return { pickId, name, size: doc.size, extension: extension as ImportableExtension }
+    })
+    savePicks()
+    return { status: 'picked', items, notAdded: picked.length - kept.length }
+  }
+
+  async function pick(raw: unknown): Promise<PickResult | MultiPickResult> {
     const args = argsObject(raw)
     const wanted = args.extensions
     if (!Array.isArray(wanted) || wanted.length === 0 || !wanted.every((e) => (IMPORTABLE_EXTENSIONS as readonly unknown[]).includes(e))) {
       throw new HostServiceError('INVALID_ARGUMENT', `extensions must be a non-empty subset of ${IMPORTABLE_EXTENSIONS.join(', ')}`)
     }
+    if (args.multiple === true) return pickMany(wanted as string[])
     let picked: PickedDocument | null
     try {
       picked = await fs.pickDocument()
@@ -172,7 +213,22 @@ export function createFileService(options: FileServiceOptions) {
     }
     const pickId = newPickId()
     picks.set(pickId, { ...picked, name })
+    savePicks()
     return { status: 'picked', pickId, name, size: picked.size, extension: extension as ImportableExtension }
+  }
+
+  /** Spec 016 (FR-013b): is this pick still known and readable? (Used after a relaunch.) Never throws. */
+  function checkPick(raw: unknown): { readable: boolean; name?: string; size?: number; extension?: string } {
+    const pickId = argsObject(raw).pickId
+    const doc = typeof pickId === 'string' ? picks.get(pickId) : undefined
+    if (!doc) return { readable: false }
+    let readable = true
+    try {
+      readable = fs.uriReadable ? fs.uriReadable(doc.uri) : true
+    } catch {
+      readable = false
+    }
+    return { readable, name: doc.name, size: doc.size, extension: extensionOf(doc.name) }
   }
 
   /** Spec 016: native copy with size polling for the percentage; a cancel is honoured once `copy()` resolves. */
@@ -198,6 +254,7 @@ export function createFileService(options: FileServiceOptions) {
     const picked = typeof args.pickId === 'string' ? picks.get(args.pickId) : undefined
     if (!picked) throw new HostServiceError('NOT_FOUND', 'Unknown pickId')
     picks.delete(args.pickId as string)
+    savePicks()
     const job = startJob(stagingId)
     const target = stagingFile(stagingId)
     let reader: ByteReader | undefined
@@ -447,6 +504,7 @@ export function createFileService(options: FileServiceOptions) {
 
   const methods: Record<string, (args: unknown) => unknown> = {
     pick,
+    checkPick,
     stage,
     hashStaged,
     commitStaged,

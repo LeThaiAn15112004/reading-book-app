@@ -16,6 +16,7 @@ import type { BridgeContext } from './context'
 import { createHostClient, createWriteQueue, readBootValues, type HostClient, type HostTransport } from './host-client'
 import { createHostSqlDriver } from './host-sql-driver'
 import { createImportGroup } from './import'
+import { createImportQueueGroup } from './import-queue'
 import { createLibraryGroup } from './library'
 import { createOverlayGroup } from './overlay'
 import { createTxtGroup } from './txt'
@@ -47,6 +48,7 @@ export function createMobileApi(options: MobileApiOptions): { api: DesktopApi; c
     ...createAppGroup(ctx),
     library: createLibraryGroup(ctx),
     import: createImportGroup(ctx),
+    importQueue: createImportQueueGroup(ctx),
     overlay: createOverlayGroup(ctx),
     txt: createTxtGroup(ctx),
     graphics: unavailableGroup<DesktopApi['graphics']>('graphics'),

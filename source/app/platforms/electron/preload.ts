@@ -137,6 +137,17 @@ const api: DesktopApi = {
         ipcRenderer.removeListener(ImportChannels.progress, listener)
       }
     },
+    pickFiles: () => ipcRenderer.invoke(ImportChannels.pickFiles),
+    runJob: (input) => ipcRenderer.invoke(ImportChannels.runJob, input),
+    cancelJob: (input) => ipcRenderer.invoke(ImportChannels.cancelJob, input),
+    reportActivity: (input) => ipcRenderer.invoke(ImportChannels.reportActivity, input),
+    onCancelAll: (handler) => {
+      const listener = (): void => handler()
+      ipcRenderer.on(ImportChannels.cancelAll, listener)
+      return () => {
+        ipcRenderer.removeListener(ImportChannels.cancelAll, listener)
+      }
+    },
   },
   attachments: {
     list: (bookId) => ipcRenderer.invoke(AttachmentChannels.list, bookId),

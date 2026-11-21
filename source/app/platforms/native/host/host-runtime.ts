@@ -9,6 +9,7 @@ import { createAppService, type SystemBarColors } from './app-service'
 import { createExpoHostFs } from './expo-host-fs'
 import { openExpoSqliteEngine } from './expo-sqlite-engine'
 import { createFileService } from './file-service'
+import { createImportQueueService, createPickStore, snapshotPickIds } from './import-queue-file'
 import { RPC_VERSION, type BootValues, type HostEvent, type HostEventName, type RpcResponse } from './protocol'
 import { createRpcDispatcher, type ServiceTable } from './rpc'
 import { createSqlService, type SqlEngine } from './sql-service'
@@ -47,10 +48,34 @@ export function createHostRuntime(
     exclusiveTransaction: async (task) => (await sqlEngine()).exclusiveTransaction(task),
   }
 
+  const hostFs = createExpoHostFs()
+  // Spec 016 (FR-013b, contracts/phone-host.md): picks of the saved queue survive a relaunch; any other pick is
+  // forgotten (and its cache copy removed) before the WebView loads.
+  const pickStore = createPickStore(hostFs)
+  const keptPicks = snapshotPickIds(hostFs)
+  const startupPicks = {
+    load: () => {
+      const map = pickStore.load()
+      let dropped = false
+      for (const [id, doc] of map) {
+        if (keptPicks.has(id)) continue
+        map.delete(id)
+        hostFs.discardUri(doc.uri)
+        dropped = true
+      }
+      if (dropped) pickStore.save(map)
+      return map
+    },
+    save: pickStore.save,
+  }
+  const importQueue = createImportQueueService(hostFs)
+
   const services: ServiceTable = {
     sql: createSqlService(lazySql),
+    importQueue: { load: () => importQueue.load(), save: (args) => importQueue.save(args) },
     files: createFileService({
-      fs: createExpoHostFs(),
+      fs: hostFs,
+      pickStore: startupPicks,
       devChunks,
       emitProgress: (payload) => send('importProgress', payload),
       yieldToEvents: nextTick,

@@ -40,6 +40,30 @@ function reader(file: File): ByteReader {
 
 export function createExpoHostFs(): HostFs {
   return {
+    // Spec 016 (FR-011a): multi-selection in the system picker, in its order (expo-document-picker 58 `multiple`).
+    async pickDocuments(): Promise<PickedDocument[] | null> {
+      const result = await DocumentPicker.getDocumentAsync({ type: '*/*', copyToCacheDirectory: COPY_PICKED_TO_CACHE, multiple: true })
+      if (result.canceled || !result.assets?.length) return null
+      return result.assets.map((asset) => ({ uri: asset.uri, name: asset.name, size: asset.size ?? new File(asset.uri).size }))
+    },
+
+    // Spec 016 (FR-013b): after a relaunch the system may have withdrawn the app's access to a picked document.
+    uriReadable(uri) {
+      try {
+        const file = new File(uri)
+        if (!file.exists) return false
+        const handle = file.open(FileMode.ReadOnly)
+        try {
+          handle.readBytesSync(1)
+        } finally {
+          handle.close()
+        }
+        return true
+      } catch {
+        return false
+      }
+    },
+
     async pickDocument(): Promise<PickedDocument | null> {
       const result = await DocumentPicker.getDocumentAsync({ type: '*/*', copyToCacheDirectory: COPY_PICKED_TO_CACHE, multiple: false })
       if (result.canceled || !result.assets?.length) return null

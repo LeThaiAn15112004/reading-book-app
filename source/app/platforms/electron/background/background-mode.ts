@@ -29,6 +29,11 @@ export function markQuitting(): void {
   quitting = true
 }
 
+/** Spec 016: the reader cancelled a quit (imports still running): the app keeps running and hides on close again. */
+export function cancelQuitting(): void {
+  quitting = false
+}
+
 export function isQuitting(): boolean {
   return quitting
 }

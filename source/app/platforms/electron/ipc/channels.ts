@@ -74,6 +74,16 @@ export const ImportChannels = {
   cancel: 'import:cancel',
   /** Main → renderer: step / byte progress, sent only once a file has been picked. */
   progress: 'import:progress',
+  /** Spec 016: multi-file pick (≤ 50); paths stay in Main, the renderer gets pick ids. */
+  pickFiles: 'import:pickFiles',
+  /** Spec 016: import one picked file as queue job `jobId` (one at a time). */
+  runJob: 'import:runJob',
+  /** Spec 016: cancel the running queue job (refused while "Saving"). */
+  cancelJob: 'import:cancelJob',
+  /** Spec 016: renderer → Main, how many imports run / wait (quit confirmation). */
+  reportActivity: 'import:reportActivity',
+  /** Spec 016: Main → renderer, a confirmed quit: cancel every import now. */
+  cancelAll: 'import:cancelAll',
 } as const
 
 export const CloudChannels = {
