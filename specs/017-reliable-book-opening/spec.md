@@ -117,7 +117,8 @@ off, with a screen reader; compare the screens and timings with the requirements
 
 1. **Given** the reader taps a book, **When** the reader screen appears, **Then** within 100 ms it shows that book's
    cover (or the generated cover style when it has none) and title, and keeps the same screen until the first page is
-   shown — no second or third waiting screen in another style for any format.
+   shown — no second or third waiting screen in another style for any format; the indicator and step line join it
+   after 300 ms if the page is not ready yet.
 2. **Given** a book is opening, **When** the step changes (for example from reading the file to preparing the first
    page), **Then** the line of text changes with it; the words never suggest a download for a book stored on the
    device.
@@ -246,8 +247,9 @@ and reopen it. Check the batch summary and the Library.
 - **FR-009**: There MUST be one waiting screen, the same for every format (EPUB, PDF, TXT, Markdown) and on both the
   computer and the phone, from the tap until the first page is shown. It shows the book's cover (or the generated
   cover style) and title, an indeterminate progress indicator, one line naming the current step, and the Back control.
-- **FR-010**: The waiting screen MUST appear within 100 ms of the tap; when the first page is ready in under 300 ms,
-  the waiting screen MUST NOT be shown at all (no flash).
+- **FR-010**: Within 100 ms of the tap the reader screen MUST show the book's cover and title (a still frame, not a
+  waiting animation). The progress indicator and the step line appear only if the first page is not ready after
+  300 ms, so a quick opening shows no waiting screen flashing before the page.
 - **FR-011**: The step line MUST change with the step (for example "Opening the book…", "Preparing the first page…",
   "Going back to where you left off…") and MUST NOT suggest a download for a book stored on the device. After 5 s a
   second line MUST say that large books can take a little longer.
