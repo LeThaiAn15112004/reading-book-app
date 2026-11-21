@@ -23,6 +23,7 @@ export const vi = {
     cancelled: 'Đã hủy nhập.',
     outsideDataFolder: 'Chọn một tệp sách nằm ngoài thư mục dữ liệu riêng của ứng dụng.',
     downloadFileFailed: 'Không tải được tệp xuống.',
+    fileChanged: 'Tệp đã thay đổi hoặc không còn ở đó.',
   },
   annotations: {
     none: 'Sách này không có chú thích nào để xuất.',

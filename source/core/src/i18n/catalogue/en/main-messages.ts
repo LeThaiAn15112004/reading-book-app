@@ -20,6 +20,7 @@ export const en = {
     cancelled: 'Import cancelled.',
     outsideDataFolder: 'Choose a book file outside the app’s own data folder.',
     downloadFileFailed: 'Could not download the file.',
+    fileChanged: 'The file changed or is no longer there.',
   },
   annotations: {
     none: 'This book has no annotations to export.',

@@ -24,6 +24,10 @@ export const AppChannels = {
   captureSnapshot: 'app:captureSnapshot',
   /** Open a document link (http/https/mailto only) in the OS default handler. */
   openExternalLink: 'app:openExternalLink',
+  /** Spec 016: whether developer step timing is on (`READMATE_TIMING=1`). */
+  getTimingEnabled: 'app:getTimingEnabled',
+  /** Spec 016: renderer → Main, one step timing line appended to `{userData}/logs/timing.jsonl` (ignored when off). */
+  recordTiming: 'app:recordTiming',
 } as const
 
 export const LibraryChannels = {

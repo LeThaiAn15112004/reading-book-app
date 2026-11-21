@@ -1,6 +1,9 @@
 /** Narrow Desktop API exposed to the renderer via contextBridge (`window.api`). */
 
-import type { ZipImportPreview, ZipImportSelection } from '@core'
+import type { StepTiming, ZipImportPreview, ZipImportSelection } from '@core'
+
+/** Spec 016: one developer step timing line (format, size, duration only — see core `perf/step-timing`). */
+export type StepTimingDto = StepTiming
 
 export type DocumentFormatDto =
   | 'epub'
@@ -412,6 +415,10 @@ export type ImportErrorCode =
   | 'not_connected'
   /** User cancelled an in-flight download. */
   | 'cancelled'
+  /** Spec 016: the file changed (size / modified time) or vanished while it was being imported. Retryable. */
+  | 'file_changed'
+  /** Spec 016: the phone app was stopped by the system while this import ran (shown after a relaunch). Retryable. */
+  | 'interrupted'
 
 /** Main → renderer: which step a Library import is on (sent only after a file was picked). */
 export interface ImportProgressDto {
@@ -422,7 +429,16 @@ export interface ImportProgressDto {
   receivedBytes?: number
   /** Content-Length when known. */
   totalBytes?: number | null
+  /** Spec 016: the queue job this event belongs to (absent for imports started outside the queue). */
+  jobId?: string
+  /** Spec 016: the current step; `stage` is kept for one release. */
+  step?: ImportStepDto
+  /** Spec 016: bytes done in the current step (read, copied or downloaded). */
+  doneBytes?: number
 }
+
+/** Spec 016: steps of one import job, in order (`downloading` for URL / cloud, `copying` on the phone). */
+export type ImportStepDto = 'downloading' | 'copying' | 'checking' | 'reading' | 'saving'
 
 export interface ImportResult {
   ok: boolean
@@ -1060,6 +1076,10 @@ export interface DesktopApi {
   /** Opens an http(s) / mailto link from a document in the OS default handler. Main re-validates
    *  the URL; anything else is refused (`ok: false`). */
   openExternalLink(url: string): Promise<OkResult>
+  /** Spec 016: whether developer step timing is on (Desktop: `READMATE_TIMING=1`; phone: dev build + `readmate.devTiming`). */
+  getTimingEnabled(): Promise<boolean>
+  /** Spec 016: records one renderer step timing line; `ok: false` when timing is off or the line is invalid. */
+  recordTiming(line: StepTimingDto): Promise<OkResult>
   library: {
     listBooks(): Promise<BookSummaryDto[]>
     getBook(id: string): Promise<BookSummaryDto | null>

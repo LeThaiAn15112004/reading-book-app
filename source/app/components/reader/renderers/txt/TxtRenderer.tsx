@@ -29,6 +29,7 @@ import {
 } from './txtGeometry'
 import { txtMarkStyle } from './txtMarkStyle'
 import { useT } from '../../../../i18n'
+import { markFirstPageDrawn } from '../../../../hooks/reader/firstPageSignal'
 import './txt.css'
 
 export type TxtMarkupTool = MarkupInteractionTool
@@ -187,6 +188,12 @@ export function TxtRenderer(props: TxtRendererProps) {
 
   const highlightById = useMemo(() => new Map(view.highlights.map((h) => [h.id, h])), [view.highlights])
   const segments = useMemo(() => segmentTxt(view.text.length, view.highlights), [view.text.length, view.highlights])
+
+  // Spec 016: the text is on screen after its first paint — that ends the opening.
+  useEffect(() => {
+    const frame = requestAnimationFrame(() => markFirstPageDrawn())
+    return () => cancelAnimationFrame(frame)
+  }, [])
 
   useEffect(() => {
     if (!deferBackdrop) return

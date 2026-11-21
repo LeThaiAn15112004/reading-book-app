@@ -30,6 +30,22 @@ export const appApi = {
     api.captureSnapshot(region),
   /** Open an http(s) / mailto link from a document in the OS default handler (validated in Main). */
   openExternalLink: (url: string) => api.openExternalLink(url),
+  /** Spec 016: developer step timing on? Never throws (false on any failure). */
+  getTimingEnabled: async (): Promise<boolean> => {
+    try {
+      return await api.getTimingEnabled()
+    } catch {
+      return false
+    }
+  },
+  /** Spec 016: one step timing line → Main / the phone log. Never throws. */
+  recordTiming: async (line: Parameters<typeof api.recordTiming>[0]): Promise<void> => {
+    try {
+      await api.recordTiming(line)
+    } catch {
+      // timing is best effort
+    }
+  },
 }
 
 export type SnapshotRegion = Parameters<typeof api.captureSnapshot>[0]

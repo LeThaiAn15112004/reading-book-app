@@ -7,6 +7,7 @@ import type { LifecyclePayload } from '../host/protocol'
 import type { BridgeContext } from './context'
 import { startSystemBarSync } from '@app/platforms/window-system-bars'
 import { noEvents, notAvailable } from './unavailable'
+import { createStepTimer, parseTimingLine, type StepTimer, type StepTiming } from '@core'
 
 type Api = Window['api']
 type AppMethods = Pick<
@@ -23,7 +24,46 @@ type AppMethods = Pick<
   | 'onRequestFlushSession'
   | 'captureSnapshot'
   | 'openExternalLink'
+  | 'getTimingEnabled'
+  | 'recordTiming'
 >
+
+/** Spec 016: the last timing lines kept for the WebView devtools (development builds only). */
+const TIMING_KEEP = 500
+
+/** Spec 016 (research R1): timing is on only in a development build with `localStorage['readmate.devTiming'] = '1'`. */
+function phoneTimingEnabled(): boolean {
+  if (!import.meta.env.DEV) return false
+  try {
+    return typeof localStorage !== 'undefined' && localStorage.getItem('readmate.devTiming') === '1'
+  } catch {
+    return false
+  }
+}
+
+/** Spec 016: logs one timing line (logcat) and keeps it for the devtools. */
+function recordPhoneTimingLine(line: StepTiming): boolean {
+  if (!phoneTimingEnabled()) return false
+  console.info('[timing]', JSON.stringify(line))
+  if (typeof window !== 'undefined') {
+    const kept = (window.__readmateTiming ??= [])
+    kept.push(line)
+    if (kept.length > TIMING_KEEP) kept.splice(0, kept.length - TIMING_KEEP)
+  }
+  return true
+}
+
+/** Spec 016: the bridge's own step timer (copy, fingerprint, details, save — `host: 'phone'`). No-op when off. */
+export function phoneStepTimer(): StepTimer {
+  return createStepTimer({ enabled: phoneTimingEnabled(), host: 'phone', sink: (t) => void recordPhoneTimingLine(t) })
+}
+
+declare global {
+  interface Window {
+    /** Spec 016: developer timing lines (development builds with `readmate.devTiming` only). */
+    __readmateTiming?: unknown[]
+  }
+}
 
 export function createAppGroup(ctx: BridgeContext): AppMethods {
   const flushHandlers = new Set<() => void | Promise<void>>()
@@ -67,6 +107,12 @@ export function createAppGroup(ctx: BridgeContext): AppMethods {
       return () => flushHandlers.delete(handler)
     },
     captureSnapshot: notAvailable('captureSnapshot'),
+    getTimingEnabled: async () => phoneTimingEnabled(),
+    // Logged for `adb logcat | grep '\[timing\]'`; the line carries format, size and duration only (core step-timing).
+    async recordTiming(line) {
+      const timing = parseTimingLine(line)
+      return { ok: timing !== null && recordPhoneTimingLine(timing) }
+    },
     async openExternalLink(url) {
       try {
         await ctx.client.call('app', 'openExternal', { url })

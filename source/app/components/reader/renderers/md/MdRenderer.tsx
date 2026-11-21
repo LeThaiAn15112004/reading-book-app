@@ -40,6 +40,7 @@ import {
 } from './mdAnnotations'
 import { mdAssetUrl } from './mdSource'
 import { useT } from '../../../../i18n'
+import { markFirstPageDrawn } from '../../../../hooks/reader/firstPageSignal'
 import './md.css'
 
 type MarginMode = 'narrow' | 'normal' | 'wide' | 'off'
@@ -323,6 +324,12 @@ export function MdRenderer({
   const onLocationRef = useRef(onLocation)
   onLocationRef.current = onLocation
   const pendingRef = useRef<{ anchor?: string; fraction?: number; heading?: number }>({})
+
+  // Spec 016: the text is on screen after its first paint — that ends the opening.
+  useEffect(() => {
+    const frame = requestAnimationFrame(() => markFirstPageDrawn())
+    return () => cancelAnimationFrame(frame)
+  }, [])
 
   // A different document starts again from its first pieces.
   const sourceRef = useRef(source)

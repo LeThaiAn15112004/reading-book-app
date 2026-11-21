@@ -7,6 +7,7 @@ export {
 export { useCollections } from './useCollections.js'
 export type { UseCollectionsOptions } from './useCollections.js'
 export { useLibraryBooks } from './useLibraryBooks.js'
+export { useLibraryBooksStore } from './libraryBooksStore.js'
 export type {
   LibraryBooksClient,
   UseLibraryBooksOptions,

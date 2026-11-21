@@ -42,6 +42,7 @@ import {
   PAN_DRAG_THRESHOLD_PX,
 } from '../../interaction'
 import { getT, useT } from '../../../../i18n'
+import { markFirstPageDrawn } from '../../../../hooks/reader/firstPageSignal'
 /** Imperative nav for parent footer scrub / section jump. */
 export type EpubRendererApi = Pick<
   EpubjsHandle,
@@ -814,6 +815,7 @@ export function EpubRenderer({
       },
       onFirstRender: () => {
         if (ac.signal.aborted) return
+        markFirstPageDrawn()
         // No longer setStatus('ready') here, it's handled by onStatusChange
       },
       onLocationsReady: () => {

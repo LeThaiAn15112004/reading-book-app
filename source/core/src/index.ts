@@ -129,3 +129,5 @@ export * from './store-import/index.js'
 // App interface language (spec 012)
 export * from './i18n/index.js'
 export * from './settings/index.js'
+// Developer-only import / open step timing (spec 016)
+export * from './perf/step-timing.js'

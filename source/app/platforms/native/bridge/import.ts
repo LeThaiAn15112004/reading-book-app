@@ -10,6 +10,7 @@
  * Covers are not made here: the Library renders one for each book that has none (`generateBookCover.ts`).
  */
 import { Book, parseDocumentFormat, readEpubImportMetadata, type ArchiveReader, type DocumentFormat } from '@core'
+import { phoneStepTimer } from './app'
 import JSZip from 'jszip'
 import type { PickResult } from '../host/file-service'
 import type { ImportProgressPayload } from '../host/protocol'
@@ -116,10 +117,15 @@ export function createImportGroup(ctx: BridgeContext): ImportGroup {
     const job = { stagingId, filename: picked.name, cancelled: false, committed: false }
     running = job
     emit({ stage: 'importing', filename: picked.name })
+    // Spec 016 (US1): developer step timing — format + size only; a no-op unless timing is on.
+    const timer = phoneStepTimer()
+    const timing = { format: picked.extension, sizeBytes: picked.size ?? 0 }
     try {
       // copying
+      const copyMark = timer.start('import', 'copy', timing)
       try {
         await ctx.client.call('files', 'stage', { pickId: picked.pickId, stagingId }, { timeoutMs: 0 })
+        copyMark.end()
       } catch (error) {
         const code = error instanceof HostCallError ? error.code : ''
         console.warn('[bridge] import: copying the picked file failed', code, error instanceof Error ? error.message : error)
@@ -131,8 +137,10 @@ export function createImportGroup(ctx: BridgeContext): ImportGroup {
       // hashing
       let sha256: string
       let size: number
+      const hashMark = timer.start('import', 'fingerprint', timing)
       try {
         ;({ sha256, size } = await ctx.client.call<{ sha256: string; size: number }>('files', 'hashStaged', { stagingId }, { timeoutMs: 0 }))
+        hashMark.end()
       } catch (error) {
         await discard(stagingId)
         if ((error instanceof HostCallError && error.code === 'CANCELLED') || job.cancelled) return failure('cancelled', 'Import cancelled.')
@@ -145,7 +153,9 @@ export function createImportGroup(ctx: BridgeContext): ImportGroup {
 
       // checking + storing, in the write queue: no other write can slip between the duplicate check and the row.
       return await ctx.writes.run(async () => {
+        const dupMark = timer.start('import', 'duplicate-check', timing)
         const existing = await ctx.library.findBySha256(sha256)
+        dupMark.end()
         if (existing) {
           await discard(stagingId)
           return failure('duplicate', 'This book is already in your local library. Open the existing copy?', existing.id)
@@ -160,7 +170,9 @@ export function createImportGroup(ctx: BridgeContext): ImportGroup {
         }
         job.committed = true
         const format = parseDocumentFormat(picked.extension)
+        const detailsMark = timer.start('import', 'details', timing)
         const meta = await readMetadata(ctx, bookId, format)
+        detailsMark.end()
         const now = new Date().toISOString()
         const book = new Book({
           id: bookId,
@@ -174,8 +186,10 @@ export function createImportGroup(ctx: BridgeContext): ImportGroup {
           addedAt: now,
           updatedAt: now,
         })
+        const saveMark = timer.start('import', 'save', timing)
         try {
           await ctx.library.persistImported(book, meta.authors, meta.genres)
+          saveMark.end()
         } catch (error) {
           // The move succeeded and the commit failed: the file goes (data-model.md).
           try {

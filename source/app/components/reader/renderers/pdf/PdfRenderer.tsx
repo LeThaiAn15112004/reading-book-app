@@ -100,6 +100,7 @@ import { isTypingTarget } from '../../../../shortcuts/iframeKeydown'
 // `?url` makes Vite emit the worker as a local asset in dist/ — never loaded from a CDN.
 import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
 import { getT, useT } from '../../../../i18n'
+import { markFirstPageDrawn } from '../../../../hooks/reader/firstPageSignal'
 import 'pdfjs-dist/web/pdf_viewer.css'
 
 GlobalWorkerOptions.workerSrc = pdfWorkerUrl
@@ -948,6 +949,8 @@ export function PdfRenderer({
         canvas.height = 0
         return
       }
+      // Spec 016: the first drawn page ends the opening (later pages do nothing).
+      markFirstPageDrawn()
       if (entry.canvas) {
         entry.canvas.width = 0
         entry.canvas.height = 0

@@ -24,6 +24,10 @@ export type ImportErrorCode =
   | 'cancelled'
   /** The picked file is an audiobook ZIP: not a failure — the platform opens the ZIP import preview instead. */
   | 'audiobook_zip'
+  /** Spec 016: the file changed (size / modified time) or vanished while it was being imported. Retryable. */
+  | 'file_changed'
+  /** Spec 016: the phone app was stopped by the system while this import ran (shown after a relaunch). Retryable. */
+  | 'interrupted'
 
 /** Platform-agnostic import outcome for Library import UX hook. */
 export type ImportClientResult = {

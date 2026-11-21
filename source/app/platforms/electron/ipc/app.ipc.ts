@@ -11,6 +11,7 @@ import { applyChromeThemeToWindow } from '../theme/titlebar-overlay'
 import { loadGoogleOAuthClientConfig } from '../config/google-oauth-config'
 import { isTranscriptionPlatformSupported } from '../transcription/ffmpeg-artifacts'
 import { handleSetUiLanguage } from '../i18n/main-i18n'
+import { isTimingEnabled, recordRendererTiming } from '../perf/timing-log'
 
 function windowFromEvent(event: Electron.IpcMainInvokeEvent): BrowserWindow | null {
   return BrowserWindow.fromWebContents(event.sender)
@@ -116,6 +117,13 @@ export function registerAppIpc(): void {
       return { ok: false }
     }
   })
+
+  // Spec 016: developer step timing (READMATE_TIMING=1). The renderer's lines are untrusted and re-validated.
+  ipcMain.removeHandler(AppChannels.getTimingEnabled)
+  ipcMain.handle(AppChannels.getTimingEnabled, (): boolean => isTimingEnabled())
+
+  ipcMain.removeHandler(AppChannels.recordTiming)
+  ipcMain.handle(AppChannels.recordTiming, (_event, line: unknown): OkResult => ({ ok: recordRendererTiming(line) }))
 
   ipcMain.removeHandler(AppChannels.captureSnapshot)
   ipcMain.handle(

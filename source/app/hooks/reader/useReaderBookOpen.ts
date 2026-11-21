@@ -5,6 +5,7 @@ import {
   type MutableRefObject,
 } from 'react'
 import { getT } from '../../i18n'
+import { beginOpening, setOpeningFile } from './firstPageSignal'
 import { CfiLocation, Location } from '@core'
 import {
   readingPrefsFromGlobal,
@@ -198,12 +199,14 @@ export function useReaderBookOpen({
         if (!cancelled) setSessionLoadStatus('ready')
       })
 
-    // T3.4: open book file content.
+    // T3.4: open book file content. Spec 016: the opening starts now; the renderer marks its first page drawn.
+    beginOpening(bookId)
     client
       .openBookContent(bookId)
       .then((result) => {
         if (cancelled) return
         if (result.ok && result.data) {
+          setOpeningFile(bookId, result.format, result.data.byteLength)
           // Normalize payload (ArrayBuffer or typed array) into a fresh buffer.
           setBookBytes(toArrayBuffer(result.data))
           setBookFormat(result.format ?? null)

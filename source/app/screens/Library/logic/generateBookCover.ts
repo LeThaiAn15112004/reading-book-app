@@ -1,4 +1,5 @@
 import { libraryApi, txtApi } from '../../../bridge'
+import { startStep } from '../../../hooks/app/stepTimer'
 
 const COVER_W = 400
 const COVER_H = 560
@@ -165,6 +166,8 @@ function withTimeout<T>(work: Promise<T>, ms: number): Promise<T> {
 
 /** Render the book's first page and store it as its cover. Resolves true when a cover was saved. */
 export async function generateBookCover(bookId: string, format: string): Promise<boolean> {
+  // Spec 016: `cover` step timing (size unknown here: 0).
+  const mark = startStep('import', 'cover', { format: format.toLowerCase(), sizeBytes: 0 })
   try {
     const canvas = await withTimeout(renderCover(bookId, format.toLowerCase()), 30_000)
     if (!canvas) {
@@ -175,6 +178,7 @@ export async function generateBookCover(bookId: string, format: string): Promise
     if (!blob) return false
     const result = await libraryApi.setGeneratedCover(bookId, await blob.arrayBuffer())
     if (!result.ok) console.warn('[cover] not saved', bookId, format)
+    mark.end()
     return result.ok
   } catch (err) {
     console.warn('[cover] generation failed', bookId, err)

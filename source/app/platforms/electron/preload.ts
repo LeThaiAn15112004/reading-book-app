@@ -72,6 +72,8 @@ const api: DesktopApi = {
   },
   captureSnapshot: (region) => ipcRenderer.invoke(AppChannels.captureSnapshot, region),
   openExternalLink: (url) => ipcRenderer.invoke(AppChannels.openExternalLink, url),
+  getTimingEnabled: () => ipcRenderer.invoke(AppChannels.getTimingEnabled),
+  recordTiming: (line) => ipcRenderer.invoke(AppChannels.recordTiming, line),
   library: {
     listBooks: () => ipcRenderer.invoke(LibraryChannels.listBooks),
     getBook: (id) => ipcRenderer.invoke(LibraryChannels.getBook, id),

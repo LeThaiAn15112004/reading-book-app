@@ -24,6 +24,8 @@ import {
 } from '../files/sandbox'
 import { getLibraryStore } from '../persistence/sqlite-library-store'
 import { verifyOnImport } from '../signature/book-signature'
+import { fileTimingContext, mainTimer, timeStep, timingFormatOf } from '../perf/timing-log'
+import type { TimingContext } from '@core'
 import { holdPickedZip } from '../zip-import/picked-zip'
 import type {
   ImportErrorCode,
@@ -153,9 +155,12 @@ function filenameFromUrl(url: string): string | undefined {
  * BR-03 / T2.7: hash local file; if sha256 already in DB, return duplicate
  * before anything is copied or registered.
  */
-export async function rejectIfDuplicate(localPath: string): Promise<ImportResult | null> {
-  const { sha256 } = await hashFile(localPath)
-  const existing = await getLibraryStore().findBySha256(sha256)
+export async function rejectIfDuplicate(
+  localPath: string,
+  timing: TimingContext | null = null,
+): Promise<ImportResult | null> {
+  const { sha256 } = await timeStep('import', 'fingerprint', timing, () => hashFile(localPath))
+  const existing = await timeStep('import', 'duplicate-check', timing, () => getLibraryStore().findBySha256(sha256))
   if (!existing) return null
   return duplicateResult(existing.id)
 }
@@ -219,6 +224,7 @@ async function finishImport(
   filePath: string,
   options: FinishImportOptions,
   ownsFile: boolean,
+  timing: TimingContext | null = null,
 ): Promise<ImportResult> {
   let coverPath: string | undefined
   const discardImportArtifacts = async (): Promise<void> => {
@@ -228,7 +234,7 @@ async function finishImport(
 
   let meta: DomainImportResult
   try {
-    meta = await extractMetadata(filePath)
+    meta = await timeStep('import', 'details', timing, () => extractMetadata(filePath))
     coverPath = meta.coverPath
   } catch (err) {
     await discardImportArtifacts()
@@ -244,13 +250,15 @@ async function finishImport(
 
   // Signature status is detected (never created) while the file is at hand; a failure here only
   // leaves the book "not checked yet" and never fails the import.
-  const signature = await verifyOnImport(meta.format, filePath, {
-    sha256: meta.sha256,
-    fileSizeBytes: meta.fileSizeBytes,
-  })
+  const signature = await timeStep('import', 'signature', timing, () =>
+    verifyOnImport(meta.format, filePath, {
+      sha256: meta.sha256,
+      fileSizeBytes: meta.fileSizeBytes,
+    }),
+  )
 
   try {
-    const bookId = persistImportedBook(meta, options, signature)
+    const bookId = await timeStep('import', 'save', timing, () => persistImportedBook(meta, options, signature))
     return { ok: true, bookId }
   } catch (err) {
     await discardImportArtifacts()
@@ -271,8 +279,9 @@ async function finishImport(
 function finishImportAfterCopy(
   destPath: string,
   options: FinishImportOptions = {},
+  timing: TimingContext | null = null,
 ): Promise<ImportResult> {
-  return finishImport(destPath, options, true)
+  return finishImport(destPath, options, true, timing)
 }
 
 /**
@@ -284,9 +293,10 @@ export async function importDownloadedFile(
   tempPath: string,
   options: FinishImportOptions = {},
 ): Promise<ImportResult> {
+  const timing = await fileTimingContext(tempPath)
   try {
     assertSupportedExtension(tempPath)
-    const conflict = await rejectIfDuplicate(tempPath)
+    const conflict = await rejectIfDuplicate(tempPath, timing)
     if (conflict) return conflict
   } catch (err) {
     if (err instanceof UnsupportedFormatError) return unsupportedResult(err)
@@ -303,7 +313,7 @@ export async function importDownloadedFile(
     console.warn('[import] copying into the library failed', err)
     return saveFailedResult()
   }
-  return finishImportAfterCopy(destPath, options)
+  return finishImportAfterCopy(destPath, options, timing)
 }
 
 /**
@@ -313,8 +323,9 @@ export async function importDownloadedFile(
 function finishImportByReference(
   sourcePath: string,
   options: FinishImportOptions = {},
+  timing: TimingContext | null = null,
 ): Promise<ImportResult> {
-  return finishImport(sourcePath, options, false)
+  return finishImport(sourcePath, options, false, timing)
 }
 
 async function importFromFile(sender: WebContents): Promise<ImportResult> {
@@ -349,6 +360,7 @@ async function importFromFile(sender: WebContents): Promise<ImportResult> {
   }
   // Progress starts only now that a file is picked (never while the picker is open).
   sendProgress(sender, { stage: 'importing', filename: path.basename(sourcePath) })
+  const timing = await fileTimingContext(sourcePath)
 
   try {
     assertSupportedExtension(sourcePath)
@@ -359,7 +371,7 @@ async function importFromFile(sender: WebContents): Promise<ImportResult> {
         tMain('main.messages.import.outsideDataFolder'),
       )
     }
-    const conflict = await rejectIfDuplicate(sourcePath)
+    const conflict = await rejectIfDuplicate(sourcePath, timing)
     if (conflict) return conflict
   } catch (err) {
     if (err instanceof UnsupportedFormatError) return unsupportedResult(err)
@@ -369,7 +381,7 @@ async function importFromFile(sender: WebContents): Promise<ImportResult> {
     return importFailure('access_denied', tMain('main.messages.import.selectedUnreadable'))
   }
 
-  return finishImportByReference(sourcePath)
+  return finishImportByReference(sourcePath, {}, timing)
 }
 
 async function importFromUrl(sender: WebContents, url: unknown): Promise<ImportResult> {
@@ -386,6 +398,7 @@ async function importFromUrl(sender: WebContents, url: unknown): Promise<ImportR
     assertSupportedUrlPathExtension(trimmed)
 
     sendProgress(sender, { stage: 'downloading', filename, receivedBytes: 0, totalBytes: null })
+    const downloadStartedAt = Date.now()
     let lastSentAt = 0
     const fetched = await httpUrlFetcher.fetch(trimmed, {
       signal: controller.signal,
@@ -398,6 +411,10 @@ async function importFromUrl(sender: WebContents, url: unknown): Promise<ImportR
     })
     tempPath = fetched.tempPath
     if (controller.signal.aborted) return cancelledResult()
+    const downloaded = await fileTimingContext(tempPath)
+    if (downloaded) {
+      mainTimer().record('import', 'download', { ...downloaded, format: timingFormatOf(fetched.suggestedFileName ?? tempPath) }, Date.now() - downloadStartedAt)
+    }
 
     // The bytes are here: from now on the import is short and no longer cancellable.
     endCancellable(URL_CANCEL_KEY, controller)

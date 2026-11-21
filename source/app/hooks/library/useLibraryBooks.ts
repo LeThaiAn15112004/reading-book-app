@@ -1,47 +1,25 @@
-import { useEffect, useRef, useState } from 'react'
-import {
-  mapBookSummary,
-  type BookSummaryInput,
-  type LibraryBook,
-} from '@core'
+import { useEffect, useRef } from 'react'
+import { useLibraryBooksStore, type LibraryBooksClient } from './libraryBooksStore.js'
 
-export type LibraryBooksClient = {
-  listBooks: () => Promise<BookSummaryInput[]>
-}
+export type { LibraryBooksClient } from './libraryBooksStore.js'
 
 export type UseLibraryBooksOptions = {
   /** Injected by desktop (IPC) / mobile (store) — no Electron in shared. */
   client: LibraryBooksClient
 }
 
-/** Load + refresh library rows via injected client. */
+/** Load + refresh library rows via injected client. The list itself lives in `libraryBooksStore` (spec 016). */
 export function useLibraryBooks({ client }: UseLibraryBooksOptions) {
-  const [books, setBooks] = useState<LibraryBook[] | null>(null)
+  const books = useLibraryBooksStore((s) => s.books)
   const clientRef = useRef(client)
   clientRef.current = client
 
-  async function refreshLibrary() {
-    try {
-      const rows = await clientRef.current.listBooks()
-      setBooks(rows.map(mapBookSummary))
-    } catch {
-      setBooks([])
-    }
+  function refreshLibrary() {
+    return useLibraryBooksStore.getState().load(clientRef.current)
   }
 
   useEffect(() => {
-    let cancelled = false
-    clientRef.current
-      .listBooks()
-      .then((rows) => {
-        if (!cancelled) setBooks(rows.map(mapBookSummary))
-      })
-      .catch(() => {
-        if (!cancelled) setBooks([])
-      })
-    return () => {
-      cancelled = true
-    }
+    void useLibraryBooksStore.getState().load(clientRef.current)
   }, [])
 
   return { books, refreshLibrary }

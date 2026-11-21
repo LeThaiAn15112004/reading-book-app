@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto'
+import { mainTimer, isTimingEnabled } from '../perf/timing-log'
 import fsp from 'node:fs/promises'
 import { checkMdFileSize, describeMdTooLarge, isAudioFormat } from '@core'
 import { getLibraryStore } from '../persistence/sqlite-library-store'
@@ -92,6 +93,8 @@ export async function openBookContent(bookId: string): Promise<OpenBookContentRe
   }
 
   try {
+    // Spec 016: `open-read` = read + fingerprint + copy before the bytes go to the renderer (timing on only).
+    const openStartedAt = isTimingEnabled() ? Date.now() : 0
     const buf = await fsp.readFile(file.path)
     // The file may have grown between stat and read.
     if (book.format === 'md' && !checkMdFileSize(buf.byteLength).ok) {
@@ -99,6 +102,9 @@ export async function openBookContent(bookId: string): Promise<OpenBookContentRe
     }
     servedSha256.set(id, createHash('sha256').update(buf).digest('hex'))
     const data = bufferToArrayBuffer(buf)
+    if (openStartedAt) {
+      mainTimer().record('open', 'open-read', { format: book.format, sizeBytes: buf.byteLength }, Date.now() - openStartedAt)
+    }
     return {
       ok: true,
       bookId: id,
