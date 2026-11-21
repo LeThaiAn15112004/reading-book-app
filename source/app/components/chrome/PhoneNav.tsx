@@ -4,12 +4,14 @@ import { useT } from '../../i18n'
 import { flushRegisteredSession } from '../../screens/Reader/logic'
 import { usePhoneSettingsNavStore } from '../../screens/Settings/logic/phoneSettingsNavStore'
 import { useAppNav, type AppNavId } from './AppNavContext'
-import { useOpenReading } from './OpenReadingContext'
 
 type NavIconProps = { className?: string }
 
-/** The four tabs of the phone bar (a subset of `AppNavId`). */
-type PhoneTabId = Extract<AppNavId, 'library' | 'collections' | 'reading' | 'settings'>
+/**
+ * The three tabs of the phone bar (a subset of `AppNavId`). No Reading tab: a book is opened from the Library
+ * (Continue Reading) and the Reader is full screen with its own back button.
+ */
+type PhoneTabId = Extract<AppNavId, 'library' | 'collections' | 'settings'>
 
 /** Inline icons of the tab bar (decorative: the label is the button's name). */
 const NAV_ICONS: Record<PhoneTabId, (props: NavIconProps) => ReactNode> = {
@@ -23,12 +25,6 @@ const NAV_ICONS: Record<PhoneTabId, (props: NavIconProps) => ReactNode> = {
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden>
       <path d="m12 3 9 5-9 5-9-5z" />
       <path d="m3 13 9 5 9-5" />
-    </svg>
-  ),
-  reading: ({ className }) => (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden>
-      <path d="M2 5h6a4 4 0 0 1 4 4v11a3 3 0 0 0-3-3H2z" />
-      <path d="M22 5h-6a4 4 0 0 0-4 4v11a3 3 0 0 1 3-3h7z" />
     </svg>
   ),
   // "More" (spec 014 FR-018): three dots in a rounded square — the tab opens the settings sections list.
@@ -52,7 +48,6 @@ export function PhoneNav() {
   const location = useLocation()
   const navigate = useNavigate()
   const { libraryNav } = useAppNav()
-  const { tabs, goReading } = useOpenReading()
 
   const path = location.pathname
   if (path === '/') return null
@@ -76,7 +71,6 @@ export function PhoneNav() {
       label: t('chrome.nav.collections'),
       onSelect: () => leaveReaderThen(() => (libraryNav ? libraryNav.onStubNav('collections') : navigate('/library', { state: { openNav: 'collections' } }))),
     },
-    { id: 'reading', label: t('chrome.nav.reading'), onSelect: () => goReading(), badge: tabs.length, disabled: tabs.length === 0 },
     {
       id: 'settings',
       label: t('chrome.nav.settings'),

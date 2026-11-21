@@ -15,7 +15,7 @@ targets; CSS under `[data-mobile-host]`).
 | 4 | Toolbar | `phone/PhoneBrowseToolbar.tsx` | with list | "N books" · sort select · Grid / List toggle |
 | 5 | Collection | `LibraryBookGrid` (phone columns) or `phone/MobileBookList.tsx` | vertical | list row = cover 48 × 64 · title · author · thin progress (opened only) · format badge · ⋮ |
 | 6 | Banner slot | `phone/AdSlot.tsx` | no | DEV build: dashed 320 × 50 placeholder; release: `null` |
-| 7 | Tab bar | `components/chrome/PhoneNav.tsx` (moved to bottom) | no | icon + label; Library · Collections · Reading · Settings; hidden in Reader |
+| 7 | Tab bar | `components/chrome/PhoneNav.tsx` (moved to bottom) | no | icon + label; Library · Collections · More (no Reading tab: a book opens from the Library, the Reader is full screen with its own back button); hidden in Reader |
 | 8 | System navigation | host | — | painted with the page's bottom-edge colour (= tab bar) |
 
 Regions 1–2 stay at the top; 3–5 are one vertical scroll container; 6–7 are outside it, so the last row is never
