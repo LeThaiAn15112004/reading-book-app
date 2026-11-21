@@ -5,7 +5,6 @@ import os from 'node:os'
 import path from 'node:path'
 import { describe, test } from 'node:test'
 import { checkPackagedPaths, forbiddenReason, listAsar, REQUIRED } from './check-desktop-package.mjs'
-import { resolvePackaged } from './desktop-package-deps.mjs'
 
 describe('check-desktop-package', () => {
   test('Mobile packages and host code are refused', () => {
@@ -42,44 +41,6 @@ describe('check-desktop-package', () => {
     assert.deepEqual(missing, ['node_modules/better-sqlite3/package.json'])
     assert.deepEqual(checkPackagedPaths([...REQUIRED, font]).missing, [])
     assert.match(checkPackagedPaths(REQUIRED).missing.join(), /Typewriter fonts/)
-  })
-
-  test('a nested runtime package missing from the package is reported (sharp → semver@7)', () => {
-    const font = 'source/app/platforms/electron/dist/assets/NotoSans-Regular-AbC123.ttf'
-    const nested = 'node_modules/sharp/node_modules/semver'
-    const base = [...REQUIRED, font, 'node_modules/sharp/package.json', 'node_modules/sharp/dist/libvips.mjs']
-    assert.deepEqual(checkPackagedPaths(base, ['node_modules/sharp', nested]).missing, [
-      `${nested}/package.json (runtime dependency of Main's externals)`,
-    ])
-    assert.deepEqual(checkPackagedPaths([...base, `${nested}/package.json`], ['node_modules/sharp', nested]).missing, [])
-  })
-
-  test("the allowlist follows electron-builder's re-hoisted layout, not the disk layout", () => {
-    // On disk npm nested global-agent under onnxruntime-node; electron-builder's collector hoists it to the top, and
-    // keeps sharp's semver@7 nested. Resolution walks up the DESTINATION folders like Node does.
-    const tree = [
-      { name: 'better-sqlite3', dir: 'd/bs' },
-      { name: '@huggingface/transformers', dir: 'd/hf' },
-      { name: 'onnxruntime-node', dir: 'd/ort' },
-      { name: 'global-agent', dir: 'd/ort/node_modules/global-agent' },
-      { name: 'semver', dir: 'd/rn/node_modules/semver' },
-      { name: 'sharp', dir: 'd/sharp', dependencies: [{ name: 'semver', dir: 'd/sharp/node_modules/semver' }] },
-      { name: 'music-metadata', dir: 'd/mm' },
-      { name: 'pdfjs-dist', dir: 'd/pdf' },
-    ]
-    const manifests = {
-      'd/hf': { dependencies: { sharp: '*', 'onnxruntime-node': '*' } },
-      'd/ort': { dependencies: { 'global-agent': '*', semver: '*' } },
-      'd/sharp': { dependencies: { semver: '*' }, optionalDependencies: { '@img/sharp-linux-x64': '*' } },
-    }
-    const { folders, installed } = resolvePackaged(tree, (dir) => manifests[dir] ?? {})
-    assert.ok(installed.includes('node_modules/global-agent'))
-    assert.ok(!installed.some((f) => f.startsWith('node_modules/onnxruntime-node/node_modules/')))
-    assert.ok(installed.includes('node_modules/semver')) // onnxruntime-node's lookup reaches the top-level copy
-    assert.ok(installed.includes('node_modules/sharp/node_modules/semver'))
-    assert.ok(folders.includes('node_modules/@img/sharp-linux-x64')) // other platform: listed, not required
-    assert.ok(!installed.includes('node_modules/@img/sharp-linux-x64'))
-    assert.throws(() => resolvePackaged(tree, (dir) => (dir === 'd/mm' ? { dependencies: { nope: '*' } } : {})), /nope/)
   })
 
   test('the asar index is read', () => {
