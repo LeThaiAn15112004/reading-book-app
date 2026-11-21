@@ -36,6 +36,10 @@ A reader taps a book in the Library (grid, list, Continue Reading or the book me
   whole. After the first page, an EPUB is opened a second time in the background to count its pages, which can make
   the first page turns stutter.
 
+**Not in this feature**: opening a large book progressively (reading only the parts of the file the current page
+needs). It is planned as its own feature; here a large book still reads its file before the first page, but with the
+waiting screen, time limits and Back of this feature.
+
 Feature 016 already made background work (search index, word count, signature check, new covers, the next import)
 wait for the first page of the book being opened. This feature builds on that.
 
@@ -44,10 +48,9 @@ wait for the first page of the book being opened. This feature builds on that.
 ### Session 2026-11-21
 
 - Q: Does this feature also open large books progressively (only the part of the file the current page needs, without
-  reading the whole book first)? → A: [NEEDS CLARIFICATION: progressive opening changes how a PDF's annotations are
-  kept in step with its file (feature 016 left it out for that reason). Include it here (as the last, separate story),
-  or keep this feature to reliability, the waiting screen and removing repeated work, and plan progressive opening as
-  its own feature?]
+  reading the whole book first)? → A: No. This feature covers reliability, the waiting screen and removing repeated
+  work; progressive opening is planned as its own feature (it changes how a PDF's annotations are kept in step with its
+  file).
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -149,26 +152,6 @@ and after; turn ten pages right after the first page of a large EPUB and note an
 
 ---
 
-### User Story 4 - Large books open without reading the whole file first (Priority: P3)
-
-Depends on the clarification above. If included: a large book shows its first page after reading only the parts of the
-file that page needs; the rest is read when needed.
-
-**Why this priority**: the largest gain for very large books, but the most work and the largest risk (PDF annotations
-written back into the file); it is useful only once US1–US3 are in place.
-
-**Independent Test**: Open a book larger than 300 MB; the first page appears before the whole file has been read;
-annotations added and saved on that PDF stay in step with the file as today.
-
-**Acceptance Scenarios**:
-
-1. **Given** a book larger than 100 MB, **When** it is opened, **Then** its first page appears without the whole file
-   having been read.
-2. **Given** a PDF opened this way, **When** the reader adds, changes or removes an annotation, **Then** the annotation
-   reaches the file and stays in step exactly as it does today.
-
----
-
 ### Edge Cases
 
 - The reader presses Back, then opens the same book again before the first opening has stopped: the second opening
@@ -250,11 +233,6 @@ annotations added and saved on that PDF stay in step with the file as today.
 - **FR-019**: The developer timing of feature 016 MUST record each opening step (content, preparing, first page,
   restoring the position) by format and size only, and the outcome (opened, left by the reader, failed with its
   cause), so the targets below can be measured.
-
-**Progressive opening (US4, only if included by the clarification)**
-
-- **FR-020**: A book larger than 100 MB MUST show its first page after reading only the parts of the file that page
-  needs; for a PDF, annotations MUST reach the file and stay in step exactly as today.
 
 ### Key Entities
 

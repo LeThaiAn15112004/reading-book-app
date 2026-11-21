@@ -13,7 +13,7 @@
 
 ## Requirement Completeness
 
-- [ ] No [NEEDS CLARIFICATION] markers remain
+- [x] No [NEEDS CLARIFICATION] markers remain
 - [x] Requirements are testable and unambiguous
 - [x] Success criteria are measurable
 - [x] Success criteria are technology-agnostic (no implementation details)
@@ -31,7 +31,7 @@
 
 ## Notes
 
-- One open question (Clarifications, Q1): whether progressive opening of large books (US4 / FR-020) is part of this
-  feature. Everything else is decided with documented defaults (Assumptions).
+- Q1 answered 2026-11-22: progressive opening is NOT part of this feature (planned as its own feature); US4 / FR-020
+  removed. Everything else is decided with documented defaults (Assumptions).
 - "Fingerprint" and "annotation sync" are product-level terms from features 016 / PDF two-way sync, not
   implementation choices.
