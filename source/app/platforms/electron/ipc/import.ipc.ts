@@ -24,6 +24,8 @@ import {
 } from '../files/sandbox'
 import { getLibraryStore } from '../persistence/sqlite-library-store'
 import { verifyOnImport } from '../signature/book-signature'
+import { scheduleSignatureCheck } from '../signature/signature-queue'
+import { signatureNeedsFileContent } from '../signature/signature-service'
 import { fileTimingContext, mainTimer, timeStep, timingFormatOf } from '../perf/timing-log'
 import type { TimingContext } from '@core'
 import { holdPickedZip } from '../zip-import/picked-zip'
@@ -159,16 +161,59 @@ export async function rejectIfDuplicate(
   localPath: string,
   timing: TimingContext | null = null,
 ): Promise<ImportResult | null> {
-  const { sha256 } = await timeStep('import', 'fingerprint', timing, () => hashFile(localPath))
+  const checked = await fingerprintAndCheck(localPath, timing)
+  return 'conflict' in checked ? checked.conflict : null
+}
+
+/**
+ * Spec 016 (FR-003, research R2): the file's one fingerprint for this import, plus what it looked like on disk when
+ * it was read (size + modified time) so a change before "Saving" can be detected.
+ */
+export type ImportFingerprint = {
+  known: { sha256: string; fileSizeBytes: number }
+  onDisk: { size: number; mtimeMs: number }
+}
+
+export type FingerprintOptions = {
+  signal?: AbortSignal
+  onProgress?: (doneBytes: number, totalBytes: number) => void
+  pause?: () => Promise<void> | void
+}
+
+/** Hashes `localPath` ONCE and checks for a duplicate; the hash is reused for the library entry. */
+export async function fingerprintAndCheck(
+  localPath: string,
+  timing: TimingContext | null = null,
+  options: FingerprintOptions = {},
+): Promise<{ conflict: ImportResult } | { fingerprint: ImportFingerprint }> {
+  const before = await fsp.stat(localPath)
+  const { sha256, fileSizeBytes } = await timeStep('import', 'fingerprint', timing, () => hashFile(localPath, options))
   const existing = await timeStep('import', 'duplicate-check', timing, () => getLibraryStore().findBySha256(sha256))
-  if (!existing) return null
-  return duplicateResult(existing.id)
+  if (existing) return { conflict: duplicateResult(existing.id) }
+  return { fingerprint: { known: { sha256, fileSizeBytes }, onDisk: { size: before.size, mtimeMs: before.mtimeMs } } }
+}
+
+/** `true` when the file is no longer the one that was fingerprinted (moved, removed, resized or rewritten). */
+async function fileChangedSince(filePath: string, fingerprint: ImportFingerprint): Promise<boolean> {
+  try {
+    const now = await fsp.stat(filePath)
+    return now.size !== fingerprint.onDisk.size || now.mtimeMs !== fingerprint.onDisk.mtimeMs
+  } catch {
+    return true
+  }
+}
+
+export function fileChangedResult(): ImportResult {
+  return importFailure('file_changed', tMain('main.messages.import.fileChanged'))
 }
 
 /** Resolve format → extract metadata (T2.6). Reads `filePath`; never writes next to it. */
-async function extractMetadata(filePath: string): Promise<DomainImportResult> {
+async function extractMetadata(
+  filePath: string,
+  known?: ImportFingerprint['known'],
+): Promise<DomainImportResult> {
   const format = assertSupportedExtension(filePath)
-  return getDocumentImporter(format).import(filePath)
+  return getDocumentImporter(format).import(filePath, known ? { known } : undefined)
 }
 
 export type FinishImportOptions = {
@@ -225,6 +270,7 @@ async function finishImport(
   options: FinishImportOptions,
   ownsFile: boolean,
   timing: TimingContext | null = null,
+  fingerprint?: ImportFingerprint,
 ): Promise<ImportResult> {
   let coverPath: string | undefined
   const discardImportArtifacts = async (): Promise<void> => {
@@ -234,7 +280,7 @@ async function finishImport(
 
   let meta: DomainImportResult
   try {
-    meta = await timeStep('import', 'details', timing, () => extractMetadata(filePath))
+    meta = await timeStep('import', 'details', timing, () => extractMetadata(filePath, fingerprint?.known))
     coverPath = meta.coverPath
   } catch (err) {
     await discardImportArtifacts()
@@ -248,17 +294,29 @@ async function finishImport(
     )
   }
 
-  // Signature status is detected (never created) while the file is at hand; a failure here only
-  // leaves the book "not checked yet" and never fails the import.
-  const signature = await timeStep('import', 'signature', timing, () =>
-    verifyOnImport(meta.format, filePath, {
-      sha256: meta.sha256,
-      fileSizeBytes: meta.fileSizeBytes,
-    }),
-  )
+  // Spec 016 (FR-003 / edge case): a referenced file that changed or vanished since it was fingerprinted is not
+  // added — its hash would not describe it any more.
+  if (fingerprint && !ownsFile && (await fileChangedSince(filePath, fingerprint))) {
+    await discardImportArtifacts()
+    return fileChangedResult()
+  }
+
+  // Spec 016 (FR-005): a format whose signature needs the file's content (PDF) is checked AFTER saving, in the
+  // background (`scheduleSignatureCheck` below); until then the book is "not checked yet". Every other format gets
+  // its format-only answer now, as before, without reading the file.
+  const checkLater = signatureNeedsFileContent(meta.format)
+  const signature = checkLater
+    ? undefined
+    : await timeStep('import', 'signature', timing, () =>
+        verifyOnImport(meta.format, filePath, {
+          sha256: meta.sha256,
+          fileSizeBytes: meta.fileSizeBytes,
+        }),
+      )
 
   try {
     const bookId = await timeStep('import', 'save', timing, () => persistImportedBook(meta, options, signature))
+    if (checkLater) scheduleSignatureCheck(bookId)
     return { ok: true, bookId }
   } catch (err) {
     await discardImportArtifacts()
@@ -280,8 +338,9 @@ function finishImportAfterCopy(
   destPath: string,
   options: FinishImportOptions = {},
   timing: TimingContext | null = null,
+  fingerprint?: ImportFingerprint,
 ): Promise<ImportResult> {
-  return finishImport(destPath, options, true, timing)
+  return finishImport(destPath, options, true, timing, fingerprint)
 }
 
 /**
@@ -294,10 +353,12 @@ export async function importDownloadedFile(
   options: FinishImportOptions = {},
 ): Promise<ImportResult> {
   const timing = await fileTimingContext(tempPath)
+  let fingerprint: ImportFingerprint
   try {
     assertSupportedExtension(tempPath)
-    const conflict = await rejectIfDuplicate(tempPath, timing)
-    if (conflict) return conflict
+    const checked = await fingerprintAndCheck(tempPath, timing)
+    if ('conflict' in checked) return checked.conflict
+    fingerprint = checked.fingerprint
   } catch (err) {
     if (err instanceof UnsupportedFormatError) return unsupportedResult(err)
     const access = fileAccessFailure(err)
@@ -313,7 +374,7 @@ export async function importDownloadedFile(
     console.warn('[import] copying into the library failed', err)
     return saveFailedResult()
   }
-  return finishImportAfterCopy(destPath, options, timing)
+  return finishImportAfterCopy(destPath, options, timing, fingerprint)
 }
 
 /**
@@ -324,8 +385,9 @@ function finishImportByReference(
   sourcePath: string,
   options: FinishImportOptions = {},
   timing: TimingContext | null = null,
+  fingerprint?: ImportFingerprint,
 ): Promise<ImportResult> {
-  return finishImport(sourcePath, options, false, timing)
+  return finishImport(sourcePath, options, false, timing, fingerprint)
 }
 
 async function importFromFile(sender: WebContents): Promise<ImportResult> {
@@ -362,6 +424,7 @@ async function importFromFile(sender: WebContents): Promise<ImportResult> {
   sendProgress(sender, { stage: 'importing', filename: path.basename(sourcePath) })
   const timing = await fileTimingContext(sourcePath)
 
+  let fingerprint: ImportFingerprint
   try {
     assertSupportedExtension(sourcePath)
     if (isPathInsideUserData(sourcePath)) {
@@ -371,8 +434,9 @@ async function importFromFile(sender: WebContents): Promise<ImportResult> {
         tMain('main.messages.import.outsideDataFolder'),
       )
     }
-    const conflict = await rejectIfDuplicate(sourcePath, timing)
-    if (conflict) return conflict
+    const checked = await fingerprintAndCheck(sourcePath, timing)
+    if ('conflict' in checked) return checked.conflict
+    fingerprint = checked.fingerprint
   } catch (err) {
     if (err instanceof UnsupportedFormatError) return unsupportedResult(err)
     const access = fileAccessFailure(err)
@@ -381,7 +445,7 @@ async function importFromFile(sender: WebContents): Promise<ImportResult> {
     return importFailure('access_denied', tMain('main.messages.import.selectedUnreadable'))
   }
 
-  return finishImportByReference(sourcePath, {}, timing)
+  return finishImportByReference(sourcePath, {}, timing, fingerprint)
 }
 
 async function importFromUrl(sender: WebContents, url: unknown): Promise<ImportResult> {

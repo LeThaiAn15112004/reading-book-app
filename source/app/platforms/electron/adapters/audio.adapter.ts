@@ -1,4 +1,4 @@
-import type { DocumentFormat, DocumentImporter, ImportResult } from '@core'
+import type { DocumentFormat, DocumentImporter, DocumentImportOptions, ImportResult } from '@core'
 import { audioFormatFromExtension } from '@core'
 import { parseFile, type IAudioMetadata } from 'music-metadata'
 import { randomUUID } from 'node:crypto'
@@ -68,7 +68,7 @@ export function createAudioAdapter(format: DocumentFormat, options: { coversDir:
     canHandle(filePath: string): boolean {
       return audioFormatFromExtension(path.extname(path.basename(filePath))) === format
     },
-    async import(filePath: string): Promise<ImportResult> {
+    async import(filePath: string, importOptions?: DocumentImportOptions): Promise<ImportResult> {
       const parsed = await probeAudioFile(filePath, format)
       const { common } = parsed
       const artists = (common.artists?.length ? common.artists : common.artist ? [common.artist] : [])
@@ -94,7 +94,7 @@ export function createAudioAdapter(format: DocumentFormat, options: { coversDir:
         coverPath,
         description: common.album ? `Album: ${common.album}` : undefined,
         genreNames: (common.genre ?? []).slice(0, 8),
-      })
+      }, importOptions?.known)
     },
   }
 }

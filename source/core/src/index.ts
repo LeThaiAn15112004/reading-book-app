@@ -131,3 +131,5 @@ export * from './i18n/index.js'
 export * from './settings/index.js'
 // Developer-only import / open step timing (spec 016)
 export * from './perf/step-timing.js'
+// Ranged ZIP reader (spec 016): an ArchiveReader that reads only the requested entries
+export * from './zip/ranged-zip.js'

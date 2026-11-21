@@ -1,4 +1,4 @@
-import type { DocumentFormat, DocumentImporter, ImportResult } from '@core'
+import type { DocumentFormat, DocumentImporter, DocumentImportOptions, ImportResult } from '@core'
 import path from 'node:path'
 import { resolveFormatFromExtension } from '@core/config'
 import { hashFile } from '../files/file-hash'
@@ -13,6 +13,8 @@ export interface MetadataExtras {
   pageCount?: number
 }
 
+export type KnownFile = NonNullable<DocumentImportOptions['known']>
+
 /**
  * Build domain ImportResult for a sandboxed file (hash + format + title fallback).
  * Used by T2.9 stub importers and as the final step after EPUB OPF extract.
@@ -21,8 +23,10 @@ export async function buildImportResult(
   filePath: string,
   format: DocumentFormat,
   extras: MetadataExtras = {},
+  known?: KnownFile,
 ): Promise<ImportResult> {
-  const { sha256, fileSizeBytes } = await hashFile(filePath)
+  // Spec 016 (FR-003): the caller hashed the file once already — reuse that value instead of reading it again.
+  const { sha256, fileSizeBytes } = known ?? (await hashFile(filePath))
   const title = extras.title?.trim() || titleFromFilename(filePath)
   const authorNames = extras.authorNames
     ?.map((n) => n.trim())
@@ -68,8 +72,8 @@ export function createFilenameFallbackImporter(format: DocumentFormat): Document
       const ext = path.extname(path.basename(filePath)).toLowerCase()
       return resolveFormatFromExtension(ext) === format
     },
-    async import(filePath: string): Promise<ImportResult> {
-      return buildImportResult(filePath, format)
+    async import(filePath: string, options?: DocumentImportOptions): Promise<ImportResult> {
+      return buildImportResult(filePath, format, {}, options?.known)
     },
   }
 }

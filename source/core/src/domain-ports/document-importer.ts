@@ -27,7 +27,12 @@ export interface ImportResult {
  * Import a local document into the sandbox and extract metadata (SDS §2.6).
  * Adapters: Epub / Pdf / Txt / Md Importers.
  */
+/** Spec 016 (FR-003): what the caller already knows about the file, so the importer does not hash it again. */
+export interface DocumentImportOptions {
+  known?: { sha256: string; fileSizeBytes: number };
+}
+
 export interface DocumentImporter {
   canHandle(path: string): boolean;
-  import(path: string): Promise<ImportResult>;
+  import(path: string, options?: DocumentImportOptions): Promise<ImportResult>;
 }
