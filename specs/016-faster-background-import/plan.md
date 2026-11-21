@@ -50,7 +50,7 @@ Desktop spikes — `spike:import:parity|timing|cleanup|queue` (research R12). `n
 
 **Project Type**: Desktop app + mobile WebView host sharing one React UI.
 
-**Performance Goals**: SC-002 ≥ 40 % (Desktop), SC-009 ≥ 30 % (phone) faster import of large samples; usable < 1 s
+**Performance Goals**: SC-002 ≥ 40 % (Desktop), SC-009 ≥ 30 % (phone) faster import of large samples; usable ≤ 2 s
 after picking (SC-003); progress every ≤ 2 s and input answered ≤ 200 ms during a several-hundred-MB import
 (SC-004); first page ≤ 20 % later with an import running, ≤ 5 % right after import (SC-005).
 

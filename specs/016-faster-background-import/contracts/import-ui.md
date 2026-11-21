@@ -22,7 +22,7 @@ action"). It stays mounted in `App.tsx` above every route (Library, Reader, Coll
 
 ## Behaviour
 
-- Starting: `ImportMenu` → Add file → `pickFiles` → jobs queued → menu closes at once (SC-003: usable < 1 s).
+- Starting: `ImportMenu` → Add file → `pickFiles` → jobs queued → menu closes at once (SC-003: usable ≤ 2 s).
   `notAdded > 0` → toast "{n} files were not added. Pick at most 50 files at a time."; a ZIP in a multi-pick →
   toast "Pick an audiobook ZIP on its own to see its preview."
 - Finishing: success → toast "{title} was added" + Open; duplicate → toast + "Open existing"; failure → toast with

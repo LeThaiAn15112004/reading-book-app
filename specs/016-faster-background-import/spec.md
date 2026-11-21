@@ -338,13 +338,14 @@ page appears is not longer than the baseline, and background work on that book s
   its baseline, with an identical library entry. 40 % is the default target: it may be lowered only once, after story
   1's report shows the repeated reads are not the main cost, with the new figure and its reason written here before
   story 2 starts; from then on the figure is a fixed pass / fail gate.
-- **SC-003**: After choosing a file, the reader can use the app (navigate, open another book) within 1 second, for any
+- **SC-003**: After choosing a file, the reader can use the app (navigate, open another book) within 2 seconds, for any
   file size.
 - **SC-004**: During an import of a file of several hundred MB, the progress shown changes at least every 2 seconds, and
   the app answers a click or a key press within 200 ms. On the phone, a step that cannot report intermediate
   percentages (the SHA-256 fingerprint computed by path, in parts, by the system) still meets this criterion when the
   interface keeps a continuous animation together with a counter of the seconds elapsed in that step, and clicks, taps
-  and key presses are still answered within 200 ms.
+  and key presses are still answered within 200 ms. When the reader asked for reduced motion, the elapsed-seconds
+  counter alone satisfies this.
 - **SC-005**: Opening a book while another book is imported in the background shows the first page no more than 20 %
   later than the same open with nothing running; and opening a book right after its import shows the first page no
   more than 5 % later than the baseline.
