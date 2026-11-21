@@ -11,4 +11,6 @@ root with `npm run spike:import:<name>`.
 | `run-import-queue.mjs` (`spike:import:queue`) | The real `importQueueStore` with a scriptable fake `importApi`: order, cancel, Saving not cancellable, duplicates, batch summary, ZIP job, cancel-all, snapshot restore. Automated only. |
 | `run-import-cleanup.mjs` (`spike:import:cleanup`) | 20 cancelled / failed / killed imports, then the startup sweep: no row, no app-owned copy, no cover left, sources unchanged (SC-006). |
 
+`import-samples.mjs` is shared by the capture and parity scripts (synthetic sample set, import through the real `import:fromFile` handler, row projection). `out/` holds local timing summaries and is not committed.
+
 Sample files live outside the repository and outside `{userData}`; reports name them only by format and size.

@@ -19,7 +19,7 @@ export interface HashFileOptions {
 export class HashCancelledError extends Error {
   readonly code = 'CANCELLED'
   constructor() {
-    super('Hashing cancelled')
+    super('Hashing cancelled') // i18n-ignore: internal error, never shown (the import answers `cancelled`)
   }
 }
 
