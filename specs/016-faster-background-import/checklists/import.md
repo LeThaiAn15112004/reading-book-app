@@ -66,6 +66,22 @@ competition) are complete, clear and consistent enough to start `/speckit-plan`.
 - [ ] CHK035 - Is the assumption that the phone's system picker supports multi-selection on every supported Android version validated, with a fallback? [Assumption, Spec Assumptions]
 - [ ] CHK036 - Is the dependency on the existing Run in Background / `isQuitting` quit paths (tray, menu, shortcut, OS shutdown) listed so every quit path gets the confirmation? [Dependency, Spec §FR-013a]
 
+## Decisions of 2026-11-21 (progress card, pill, measurement) — appended 2026-11-21
+
+- [ ] CHK037 - Is SC-003's new threshold (≤ 2 s) reflected identically in spec, plan, contracts/import-ui.md and quickstart, with no remaining "< 1 s"? [Consistency, Spec §SC-003]
+- [ ] CHK038 - Does SC-003 define its start and end points precisely enough to measure ("file chosen" = picker closed? "can use the app" = first navigation answered?) [Measurability, Spec §SC-003]
+- [ ] CHK039 - Is "input latency ≤ 200 ms" in SC-004 defined by what is measured (input event → visible response) and under which import load (file size, step)? [Clarity, Spec §SC-004]
+- [ ] CHK040 - Is the phone exception in SC-004 (continuous animation + elapsed-seconds counter) consistent with FR-009, which asks for a percentage "while the file is read"? [Conflict, Spec §SC-004, FR-009]
+- [ ] CHK041 - Is the reduced-motion rule (static bar, counter alone) stated as a requirement in the spec, or only in SC-004 and contracts — and does it also apply on Desktop? [Completeness, Spec §SC-004, FR-017]
+- [ ] CHK042 - Are the elapsed-counter rules (shown from the 2nd second, reset on step change, not announced by screen readers) captured in the spec / contracts, not only in tasks.md? [Traceability, Gap]
+- [ ] CHK043 - Is the screen-reader behaviour fully specified: which events are announced (step change, result), in what wording, and that the counter is never announced? [Clarity, Spec §FR-012, FR-017]
+- [ ] CHK044 - Are the pill's visibility rules (shown while running / waiting, result pill after, auto-hide after 10 s without failures, kept with failures / interruptions, nothing when the queue is empty) traceable to a spec requirement (FR-009 / FR-011a)? [Traceability, Gap]
+- [ ] CHK045 - Is it defined what the result pill does when the reader is in the Reader (does it cover the page-turn zone, is the 10 s auto-hide paused while it has focus or is hovered)? [Edge Case, Gap]
+- [ ] CHK046 - Is it defined how the result pill and the success toast (FR-012 "Open") relate, so the same result is not shown twice in two places? [Consistency, Gap, Spec §FR-012]
+- [ ] CHK047 - Is the pill's behaviour defined when a new import starts while a result pill is still shown (replaced, or combined with the earlier batch)? [Edge Case, Gap, Spec §FR-011a]
+- [ ] CHK048 - Is FR-007's "same cover" quantified for generated covers (pixel dimensions + ≤ 1 % pixel difference) in the spec, not only in tasks T021 / T042? [Measurability, Spec §FR-007]
+- [ ] CHK049 - Is the baseline for FR-007 / SC-002 (the rows captured from today's pipeline before story 2) named as a requirement or assumption in the spec? [Assumption, Spec §SC-002, Assumptions]
+
 ## Notes
 
 - Mark items `[x]` only after review confirms the requirement-quality criterion is satisfied
