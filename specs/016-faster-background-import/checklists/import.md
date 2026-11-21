@@ -11,76 +11,76 @@ competition) are complete, clear and consistent enough to start `/speckit-plan`.
 
 ## Requirement Completeness
 
-- [ ] CHK001 - Does FR-002 list the download step of a URL / cloud import among the timed steps, or is it intentionally left out? [Gap, Spec §FR-002]
-- [ ] CHK002 - Is it specified how the team turns timing on and where the timing report goes (log, file, which host)? [Clarity, Spec §FR-001, Assumptions]
-- [ ] CHK003 - Is the progress shown for steps that have no percentage (duplicate check of a small file, "Saving") defined? [Gap, Spec §FR-009]
-- [ ] CHK004 - Is the progress shown when a download's total size is unknown (no Content-Length) defined? [Edge Case, Gap, Spec §FR-009]
-- [ ] CHK005 - Is the list of failure causes complete, with which ones offer "Try again" ("when it can help" is not defined)? [Clarity, Spec §FR-012, US3 AS5]
-- [ ] CHK006 - Is it defined where the placeholder appears in the Library (sort position, search / filter results, Collections, Continue Reading)? [Gap, Spec §FR-010]
-- [ ] CHK007 - Is it defined how long finished / failed cards stay and whether several finished results can be dismissed at once? [Gap, Spec §US3 AS4–AS5]
-- [ ] CHK008 - Is there an upper limit on the whole queue (repeated picks of 50), or is an unlimited queue intended? [Gap, Spec §FR-011a]
-- [ ] CHK009 - Is the "one action" that reaches the progress indicator from every screen specified (on Desktop and on the phone)? [Clarity, Spec §FR-009]
-- [ ] CHK010 - Is it defined what the reader sees about results that ended while the window was hidden (Run in Background on)? [Gap, Spec §FR-013a, Edge Cases]
+- [x] CHK001 - Does FR-002 list the download step of a URL / cloud import among the timed steps, or is it intentionally left out? [Gap, Spec §FR-002] — resolved: `download` step in data-model StepTiming + T013 (FR-002 text unchanged)
+- [x] CHK002 - Is it specified how the team turns timing on and where the timing report goes (log, file, which host)? [Clarity, Spec §FR-001, Assumptions] — resolved: research R1 + quickstart §1 (READMATE_TIMING / readmate.devTiming, timing.jsonl / logcat)
+- [x] CHK003 - Is the progress shown for steps that have no percentage (duplicate check of a small file, "Saving") defined? [Gap, Spec §FR-009] — resolved: contracts/import-ui.md + T060 — indeterminate bar + elapsed counter; Saving shows "Finishing…"
+- [x] CHK004 - Is the progress shown when a download's total size is unknown (no Content-Length) defined? [Edge Case, Gap, Spec §FR-009] — resolved: data-model `progress.total: null` → indeterminate bar + elapsed counter (SC-004)
+- [x] CHK005 - Is the list of failure causes complete, with which ones offer "Try again" ("when it can help" is not defined)? [Clarity, Spec §FR-012, US3 AS5] — resolved: data-model `retryable` list per error code; today's messages kept (Assumptions)
+- [x] CHK006 - Is it defined where the placeholder appears in the Library (sort position, search / filter results, Collections, Continue Reading)? [Gap, Spec §FR-010] — resolved: research R8 + contracts/import-ui.md — first in "All books" only (not Collections, other chips, search, Continue Reading)
+- [x] CHK007 - Is it defined how long finished / failed cards stay and whether several finished results can be dismissed at once? [Gap, Spec §US3 AS4–AS5] — resolved: the list keeps them until Dismiss / "Clear finished"; the result pill auto-hides after 10 s unless failures (contracts/import-ui.md)
+- [ ] CHK008 - Is there an upper limit on the whole queue (repeated picks of 50), or is an unlimited queue intended? [Gap, Spec §FR-011a] — open: no overall queue cap on Desktop; the phone snapshot is capped at 200 jobs / 256 KiB but what the reader sees when that is exceeded is not defined
+- [x] CHK009 - Is the "one action" that reaches the progress indicator from every screen specified (on Desktop and on the phone)? [Clarity, Spec §FR-009] — resolved: the pill — one click / tap opens the card on every screen (contracts/import-ui.md)
+- [ ] CHK010 - Is it defined what the reader sees about results that ended while the window was hidden (Run in Background on)? [Gap, Spec §FR-013a, Edge Cases] — open: the result pill's 10 s auto-hide is not said to wait while the window is hidden — a success could disappear before the reader returns
 
 ## Requirement Clarity
 
-- [ ] CHK011 - Is "reads the file as few times as it can" turned into a measurable rule per format (number of full reads allowed)? [Measurability, Spec §US2, FR-003]
-- [ ] CHK012 - Is "MUST NOT send the whole book to the screen" for cover drawing stated as an observable limit (e.g. only the first page's data)? [Clarity, Spec §FR-006]
-- [ ] CHK013 - Is the quit confirmation's wording and what "naming how many" counts (running + waiting) specified? [Clarity, Spec §FR-013a]
-- [ ] CHK014 - Is "the app stays responsive" for very large files tied to SC-004's 200 ms figure in the edge case? [Consistency, Spec Edge Cases, SC-004]
-- [ ] CHK015 - Is the desktop position of the progress card specified (the phone's is: clear of the bottom navigation)? [Gap, Spec §FR-018]
+- [x] CHK011 - Is "reads the file as few times as it can" turned into a measurable rule per format (number of full reads allowed)? [Measurability, Spec §US2, FR-003] — resolved: FR-003 / FR-004 / FR-005 give the per-step rule (one fingerprint read, EPUB unpacked once, signature after saving)
+- [x] CHK012 - Is "MUST NOT send the whole book to the screen" for cover drawing stated as an observable limit (e.g. only the first page's data)? [Clarity, Spec §FR-006] — resolved: research R10 + contracts/import-ipc.md — PDF xref + page 1 by ranges ≤ 1 MiB, text ≤ 4 000 chars from the first 64 KiB
+- [x] CHK013 - Is the quit confirmation's wording and what "naming how many" counts (running + waiting) specified? [Clarity, Spec §FR-013a] — resolved: research R11 wording; count = running + waiting; texts via `tMain` (T049)
+- [x] CHK014 - Is "the app stays responsive" for very large files tied to SC-004's 200 ms figure in the edge case? [Consistency, Spec Edge Cases, SC-004] — resolved: SC-004 (≤ 200 ms during a several-hundred-MB import) governs the edge case
+- [x] CHK015 - Is the desktop position of the progress card specified (the phone's is: clear of the bottom navigation)? [Gap, Spec §FR-018] — resolved: contracts/import-ui.md — bottom-right, 16 px from the edges, 360 px wide
 
 ## Requirement Consistency
 
-- [ ] CHK016 - Is "Import job … Session-only: never stored across launches" consistent with FR-013b, which shows "Interrupted" and resumes waiting files after the system stopped the phone app (a killed process loses the session)? [Conflict, Spec §Key Entities, FR-013b]
-- [ ] CHK017 - Does the placeholder apply to waiting jobs too (Key Entities says "running or waiting", US3 AS3 says "an import is running")? [Consistency, Spec §FR-010, US3 AS3]
-- [ ] CHK018 - Does FR-015 list the same background work as US4 (US4 also names cover drawing and a background import)? [Consistency, Spec §FR-015, US4]
-- [ ] CHK019 - Does the batch summary (added / already in the library / failed) cover cancelled and interrupted jobs as well? [Gap, Spec §FR-011a, US3 AS9]
-- [ ] CHK020 - Is FR-014's "MUST NOT run their heavy work at the same time" defined: which import waits, and does a ZIP job join the same queue? [Clarity, Spec §FR-014]
-- [ ] CHK021 - Does "Add file" with a ZIP among several picked files have defined behaviour (ZIP preview vs. queued book files)? [Gap, Spec §FR-011a, FR-014]
+- [x] CHK016 - Is "Import job … Session-only: never stored across launches" consistent with FR-013b, which shows "Interrupted" and resumes waiting files after the system stopped the phone app (a killed process loses the session)? [Conflict, Spec §Key Entities, FR-013b] — resolved 2026-11-21: Key Entities — Desktop session-only, the phone keeps a minimal list of unfinished jobs (no bytes) across launches (FR-013b)
+- [x] CHK017 - Does the placeholder apply to waiting jobs too (Key Entities says "running or waiting", US3 AS3 says "an import is running")? [Consistency, Spec §FR-010, US3 AS3] — resolved: data-model `placeholdersOf` covers waiting + running; the contract shows "Waiting"
+- [ ] CHK018 - Does FR-015 list the same background work as US4 (US4 also names cover drawing and a background import)? [Consistency, Spec §FR-015, US4] — open: FR-015 still lists only indexing, word count and the signature check; US4, plan R9 and T074 also hold back cover drawing and the import runner — FR-015 should name them
+- [x] CHK019 - Does the batch summary (added / already in the library / failed) cover cancelled and interrupted jobs as well? [Gap, Spec §FR-011a, US3 AS9] — resolved: FR-011a — five groups incl. cancelled and interrupted
+- [x] CHK020 - Is FR-014's "MUST NOT run their heavy work at the same time" defined: which import waits, and does a ZIP job join the same queue? [Clarity, Spec §FR-014] — resolved: FR-014 — the ZIP job joins the same queue, never runs at the same time
+- [x] CHK021 - Does "Add file" with a ZIP among several picked files have defined behaviour (ZIP preview vs. queued book files)? [Gap, Spec §FR-011a, FR-014] — resolved: FR-014 — the ZIP is left out of the batch, the reader is told to pick it alone
 
 ## Acceptance Criteria Quality
 
-- [ ] CHK022 - Is SC-002's 40 % target usable as a gate while the Assumptions allow lowering it after story 1 (who decides, recorded where)? [Ambiguity, Spec §SC-002, Assumptions]
-- [ ] CHK023 - Is "not slower than the baseline" in SC-005 given a margin, as the first half of SC-005 is? [Measurability, Spec §SC-005]
-- [ ] CHK024 - Is SC-007 (10 users) feasible for this project, or should it be replaced by an internal check? [Measurability, Spec §SC-007]
-- [ ] CHK025 - Is the "identical library entry" of FR-007 / SC-002 defined field by field, including cover bytes and the signature state after the background check? [Clarity, Spec §FR-007, SC-002]
-- [ ] CHK026 - Are SC-002 and SC-009 measured on named sample files and hardware so before / after are comparable? [Measurability, Spec §SC-001, Assumptions]
+- [x] CHK022 - Is SC-002's 40 % target usable as a gate while the Assumptions allow lowering it after story 1 (who decides, recorded where)? [Ambiguity, Spec §SC-002, Assumptions] — resolved: SC-002 — lowered at most once after story 1, written under the criterion, then a fixed gate (T020)
+- [x] CHK023 - Is "not slower than the baseline" in SC-005 given a margin, as the first half of SC-005 is? [Measurability, Spec §SC-005] — resolved: SC-005 — 5 % margin
+- [ ] CHK024 - Is SC-007 (10 users) feasible for this project, or should it be replaced by an internal check? [Measurability, Spec §SC-007] — open: SC-007 (10 users) has no task and may not be feasible — decide: keep as a post-release check or replace with an internal check
+- [ ] CHK025 - Is the "identical library entry" of FR-007 / SC-002 defined field by field, including cover bytes and the signature state after the background check? [Clarity, Spec §FR-007, SC-002] — open: fields are listed in T021 / T042, but comparing `signatureStatus` after the background check is not stated, and the generated-cover rule is only in tasks (see CHK048)
+- [x] CHK026 - Are SC-002 and SC-009 measured on named sample files and hardware so before / after are comparable? [Measurability, Spec §SC-001, Assumptions] — resolved: Assumptions + T020 — samples named by format + size, machine / device named
 
 ## Scenario & Edge Case Coverage
 
-- [ ] CHK027 - Is the outcome defined when two queued imports are the same file and the FIRST one fails or is cancelled? [Edge Case, Gap, Spec Edge Cases]
-- [ ] CHK028 - Is the outcome defined when the reader removes or edits the existing book while its duplicate is being imported? [Edge Case, Gap]
-- [ ] CHK029 - Is the startup clean-up after a crash / shutdown mid-import specified as a requirement on both hosts (what is swept, when)? [Recovery, Spec §FR-013a, SC-006]
-- [ ] CHK030 - Is the interaction between a background signature check and a later open of the same PDF defined (FR-015 forbids a check before the first page)? [Consistency, Spec §FR-005, FR-015]
-- [ ] CHK031 - Are requirements defined for an import started while the target book's file is open in the Reader (re-import of the same file)? [Edge Case, Gap]
+- [x] CHK027 - Is the outcome defined when two queued imports are the same file and the FIRST one fails or is cancelled? [Edge Case, Gap, Spec Edge Cases] — resolved: data-model rules — if the first fails / is cancelled, the second imports normally
+- [ ] CHK028 - Is the outcome defined when the reader removes or edits the existing book while its duplicate is being imported? [Edge Case, Gap] — open: not defined what happens when the existing book is removed after the duplicate check ("Open existing" on a removed book)
+- [x] CHK029 - Is the startup clean-up after a crash / shutdown mid-import specified as a requirement on both hosts (what is swept, when)? [Recovery, Spec §FR-013a, SC-006] — resolved: FR-013a / FR-013b + research R11 (Desktop sweep before the IPC handlers, phone staging sweep first)
+- [x] CHK030 - Is the interaction between a background signature check and a later open of the same PDF defined (FR-015 forbids a check before the first page)? [Consistency, Spec §FR-005, FR-015] — resolved: research R9 + T073 — the signature queue waits while that book is opening
+- [x] CHK031 - Are requirements defined for an import started while the target book's file is open in the Reader (re-import of the same file)? [Edge Case, Gap] — resolved: the duplicate rule (same fingerprint = same book) decides it; the reader's file is only read
 
 ## Non-Functional Requirements
 
-- [ ] CHK032 - Are screen-reader announcements specified for each step change, or only for the end results (FR-012)? [Coverage, Spec §FR-012, FR-017]
-- [ ] CHK033 - Is reduced-motion behaviour of the card / progress bar specified? [Gap, Spec §FR-017]
-- [ ] CHK034 - Does FR-001's privacy rule also cover URL hosts and cloud folder names in timing output? [Coverage, Spec §FR-001]
+- [x] CHK032 - Are screen-reader announcements specified for each step change, or only for the end results (FR-012)? [Coverage, Spec §FR-012, FR-017] — resolved: contracts/import-ui.md — step changes and results announced in `aria-live=polite`, focus never moves
+- [x] CHK033 - Is reduced-motion behaviour of the card / progress bar specified? [Gap, Spec §FR-017] — resolved: SC-004 + contracts/import-ui.md (static bar, elapsed counter under reduced motion)
+- [x] CHK034 - Does FR-001's privacy rule also cover URL hosts and cloud folder names in timing output? [Coverage, Spec §FR-001] — resolved: StepTiming has no field for a URL host or a cloud folder name (data-model, T007)
 
 ## Dependencies & Assumptions
 
-- [ ] CHK035 - Is the assumption that the phone's system picker supports multi-selection on every supported Android version validated, with a fallback? [Assumption, Spec Assumptions]
-- [ ] CHK036 - Is the dependency on the existing Run in Background / `isQuitting` quit paths (tray, menu, shortcut, OS shutdown) listed so every quit path gets the confirmation? [Dependency, Spec §FR-013a]
+- [ ] CHK035 - Is the assumption that the phone's system picker supports multi-selection on every supported Android version validated, with a fallback? [Assumption, Spec Assumptions] — open: multi-selection of the Android system picker is assumed on every supported version; no check and no single-file fallback is written
+- [x] CHK036 - Is the dependency on the existing Run in Background / `isQuitting` quit paths (tray, menu, shortcut, OS shutdown) listed so every quit path gets the confirmation? [Dependency, Spec §FR-013a] — resolved: FR-013a lists window close, tray Quit, menu Quit, shortcut, shutdown; research R11 uses `before-quit` / `isQuitting`
 
 ## Decisions of 2026-11-21 (progress card, pill, measurement) — appended 2026-11-21
 
-- [ ] CHK037 - Is SC-003's new threshold (≤ 2 s) reflected identically in spec, plan, contracts/import-ui.md and quickstart, with no remaining "< 1 s"? [Consistency, Spec §SC-003]
-- [ ] CHK038 - Does SC-003 define its start and end points precisely enough to measure ("file chosen" = picker closed? "can use the app" = first navigation answered?) [Measurability, Spec §SC-003]
-- [ ] CHK039 - Is "input latency ≤ 200 ms" in SC-004 defined by what is measured (input event → visible response) and under which import load (file size, step)? [Clarity, Spec §SC-004]
+- [x] CHK037 - Is SC-003's new threshold (≤ 2 s) reflected identically in spec, plan, contracts/import-ui.md and quickstart, with no remaining "< 1 s"? [Consistency, Spec §SC-003] — resolved: no "< 1 s" left in spec, plan, contracts, quickstart, tasks
+- [x] CHK038 - Does SC-003 define its start and end points precisely enough to measure ("file chosen" = picker closed? "can use the app" = first navigation answered?) [Measurability, Spec §SC-003] — resolved: T014 — start = picker / menu closed, end = first navigation answered; T070 reuses the same method
+- [ ] CHK039 - Is "input latency ≤ 200 ms" in SC-004 defined by what is measured (input event → visible response) and under which import load (file size, step)? [Clarity, Spec §SC-004] — open: "handled" in T014 is not defined as input → next visible response, and the moment of the measurement during the > 300 MB import is not fixed
 - [x] CHK040 - Is the phone exception in SC-004 (continuous animation + elapsed-seconds counter) consistent with FR-009, which asks for a percentage "while the file is read"? [Conflict, Spec §SC-004, FR-009] — reviewer: accepted 2026-11-21, no conflict
-- [ ] CHK041 - Is the reduced-motion rule (static bar, counter alone) stated as a requirement in the spec, or only in SC-004 and contracts — and does it also apply on Desktop? [Completeness, Spec §SC-004, FR-017]
-- [ ] CHK042 - Are the elapsed-counter rules (shown from the 2nd second, reset on step change, not announced by screen readers) captured in the spec / contracts, not only in tasks.md? [Traceability, Gap]
-- [ ] CHK043 - Is the screen-reader behaviour fully specified: which events are announced (step change, result), in what wording, and that the counter is never announced? [Clarity, Spec §FR-012, FR-017]
+- [ ] CHK041 - Is the reduced-motion rule (static bar, counter alone) stated as a requirement in the spec, or only in SC-004 and contracts — and does it also apply on Desktop? [Completeness, Spec §SC-004, FR-017] — open: the reduced-motion rule is only in SC-004 and contracts; FR-017 does not state it, and whether it applies on Desktop too is not explicit
+- [ ] CHK042 - Are the elapsed-counter rules (shown from the 2nd second, reset on step change, not announced by screen readers) captured in the spec / contracts, not only in tasks.md? [Traceability, Gap] — open: the counter rules (from the 2nd second, reset per step, tabular figures, not announced) are only in T060 — copy them into contracts/import-ui.md
+- [ ] CHK043 - Is the screen-reader behaviour fully specified: which events are announced (step change, result), in what wording, and that the counter is never announced? [Clarity, Spec §FR-012, FR-017] — open: the announcements are named (step change, result) but their wording is not given; the counter-not-announced rule is only in T060 / T079
 - [x] CHK044 - Are the pill's visibility rules (shown while running / waiting, result pill after, auto-hide after 10 s without failures, kept with failures / interruptions, nothing when the queue is empty) traceable to a spec requirement (FR-009 / FR-011a)? [Traceability, Gap] — reviewer 2026-11-21: contract-level rule, no spec change
-- [ ] CHK045 - Is it defined what the result pill does when the reader is in the Reader (does it cover the page-turn zone, is the 10 s auto-hide paused while it has focus or is hovered)? [Edge Case, Gap]
+- [ ] CHK045 - Is it defined what the result pill does when the reader is in the Reader (does it cover the page-turn zone, is the 10 s auto-hide paused while it has focus or is hovered)? [Edge Case, Gap] — open: the placement rule keeps the pill off the page-turn zone, but whether the 10 s auto-hide pauses while the pill has focus or is hovered is not defined
 - [ ] CHK046 - Is it defined how the result pill and the success toast (FR-012 "Open") relate, so the same result is not shown twice in two places? [Consistency, Gap, Spec §FR-012] — 2026-11-21: rule added to contracts/import-ui.md ("Toast vs result pill"), awaiting reviewer
-- [ ] CHK047 - Is the pill's behaviour defined when a new import starts while a result pill is still shown (replaced, or combined with the earlier batch)? [Edge Case, Gap, Spec §FR-011a]
-- [ ] CHK048 - Is FR-007's "same cover" quantified for generated covers (pixel dimensions + ≤ 1 % pixel difference) in the spec, not only in tasks T021 / T042? [Measurability, Spec §FR-007]
-- [ ] CHK049 - Is the baseline for FR-007 / SC-002 (the rows captured from today's pipeline before story 2) named as a requirement or assumption in the spec? [Assumption, Spec §SC-002, Assumptions]
+- [ ] CHK047 - Is the pill's behaviour defined when a new import starts while a result pill is still shown (replaced, or combined with the earlier batch)? [Edge Case, Gap, Spec §FR-011a] — open: not defined what the pill shows when a new import starts while a result pill is still shown
+- [ ] CHK048 - Is FR-007's "same cover" quantified for generated covers (pixel dimensions + ≤ 1 % pixel difference) in the spec, not only in tasks T021 / T042? [Measurability, Spec §FR-007] — open: "same cover" for generated covers (dimensions + ≤ 1 % pixel difference) is only in T021 / T042, not in FR-007
+- [ ] CHK049 - Is the baseline for FR-007 / SC-002 (the rows captured from today's pipeline before story 2) named as a requirement or assumption in the spec? [Assumption, Spec §SC-002, Assumptions] — open: the baseline rows captured before story 2 are not named in the spec (SC-002 / Assumptions)
 
 ## Notes
 

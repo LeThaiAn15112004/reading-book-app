@@ -319,9 +319,11 @@ page appears is not longer than the baseline, and background work on that book s
 
 - **Import job**: one requested import — its source (the reader's file, a URL, a cloud file), file name shown to the
   reader, state (waiting, running, done, duplicate, failed, cancelled, interrupted), current step, progress (bytes done / total
-  when known), the resulting book (on success) or the cause (on failure). On Desktop session-only: never stored across
-  launches. On the phone, unfinished jobs (shown name, source, state, order — never file bytes) are kept across launches
-  until they end or are dismissed (FR-013b).
+  when known), the resulting book (on success) or the cause (on failure). On Desktop the job lives for the session only (while the app runs,
+  also with the window hidden by Run in Background) and is never stored across launches. On the phone a minimal list of
+  unfinished jobs is kept across launches — shown name, source, state and order only, never file bytes — so that after a
+  relaunch the job that was running can be shown as "Interrupted" and the waiting jobs can continue; an entry leaves the
+  list when its job ends or is dismissed (FR-013b).
 - **Import queue**: the ordered list of import jobs (this session's, plus on the phone the unfinished ones kept from the
   last launch); one runs at a time. A pick of several files adds
   one job per file and forms a batch whose summary is shown when its last job ends.
