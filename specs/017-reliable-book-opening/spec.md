@@ -1,4 +1,4 @@
-# Feature Specification: Reliable, clear book opening
+# Feature Specification: Reliable, clear book opening (and import without false failures)
 
 **Feature Branch**: `017-reliable-book-opening`
 
@@ -6,7 +6,7 @@
 
 **Status**: Draft
 
-**Input**: User description: the book opening flow is not good enough yet. Light and heavy books alike sometimes fail
+**Input**: User description (+ US4 from the 2026-11-22 clarification): the book opening flow is not good enough yet. Light and heavy books alike sometimes fail
 with "cannot open this book"; a heavy book shows the loading indicator for a very long time, until the whole book has
 been opened; the app may read / fingerprint the file several times; and the opening screens are not designed well
 (Vietnamese description, summarised from the UI/UX review of the opening flow of 2026-11-21).
@@ -36,6 +36,12 @@ A reader taps a book in the Library (grid, list, Continue Reading or the book me
   whole. After the first page, an EPUB is opened a second time in the background to count its pages, which can make
   the first page turns stutter.
 
+- **Imports that fail at random** (found while reading how feature 016's queue works, not measured): on the computer
+  a picked file is kept for the queue for 30 minutes only, so the last files of a long queue can fail with "could not
+  read the selected file"; the check that a file did not change during its import compares the exact modification
+  time, which a sync program (OneDrive, Google Drive, Dropbox) can touch without changing the content; on the phone,
+  read access to picked files can be withdrawn when the app is closed with imports still waiting.
+
 **Not in this feature**: opening a large book progressively (reading only the parts of the file the current page
 needs). It is planned as its own feature; here a large book still reads its file before the first page, but with the
 waiting screen, time limits and Back of this feature.
@@ -51,6 +57,9 @@ wait for the first page of the book being opened. This feature builds on that.
   reading the whole book first)? → A: No. This feature covers reliability, the waiting screen and removing repeated
   work; progressive opening is planned as its own feature (it changes how a PDF's annotations are kept in step with its
   file).
+- Q: Are the imports that fail for valid books at random (a pick that expires while it waits in the queue, the
+  "file changed" check tripped by a sync program, read access lost on the phone) part of this feature? → A: Yes, as
+  User Story 4: valid books must import without false failures.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -152,6 +161,35 @@ and after; turn ten pages right after the first page of a large EPUB and note an
 
 ---
 
+### User Story 4 - A valid book imports every time (Priority: P2)
+
+A reader adds several books at once, some of them from a folder kept in sync with a cloud drive. Every valid book is
+added, however long the queue takes and wherever the file lives; a book fails only when something is really wrong
+with it, and then the message says what.
+
+**Why this priority**: the same kind of fault as US1 (a good book refused) on the way in; the fixes are small and the
+same sample set tests them.
+
+**Independent Test**: Pick 50 valid books (every format, small and large), part of them in a folder synced by a cloud
+drive client; let the queue run more than 30 minutes; on the phone, pick books, close the app before the queue ends
+and reopen it. Check the batch summary and the Library.
+
+**Acceptance Scenarios**:
+
+1. **Given** a long queue that takes more than 30 minutes, **When** the last waiting files reach their turn, **Then**
+   they import like the first ones (no "could not read the selected file" because of the wait).
+2. **Given** a file in a folder synced by a cloud drive client whose modification time is touched during the import
+   but whose content is unchanged, **When** it is saved, **Then** it is added normally.
+3. **Given** a file whose content really changes during its import, **When** it would be saved, **Then** it is not
+   added and the message says the file changed while it was being imported, with Try again.
+4. **Given** the phone app was closed with imports waiting, **When** it is opened again and a waiting file can no
+   longer be read, **Then** that file shows "Interrupted — pick the file again" with Try again opening the picker, and
+   the files that can still be read continue.
+5. **Given** an import fails, **When** the reason is shown (in the card, the batch summary or a message), **Then** it
+   is in the interface language and names the cause, on both the computer and the phone.
+
+---
+
 ### Edge Cases
 
 - The reader presses Back, then opens the same book again before the first opening has stopped: the second opening
@@ -169,6 +207,9 @@ and after; turn ten pages right after the first page of a large EPUB and note an
   apply to their opening screen too.
 - Opening while an import of the same book is still saving: the book opens only once its entry is complete.
 - The reader taps a book twice quickly: one opening, not two.
+- A waiting import is cancelled, or the app quits: the file it had picked is released then (not kept forever).
+- A synced file that is still being downloaded by the cloud client when its import starts: it imports once complete,
+  or fails with "the file is not available offline yet", never as "damaged".
 
 ## Requirements *(mandatory)*
 
@@ -234,6 +275,18 @@ and after; turn ten pages right after the first page of a large EPUB and note an
   restoring the position) by format and size only, and the outcome (opened, left by the reader, failed with its
   cause), so the targets below can be measured.
 
+**Import without false failures (US4)**
+
+- **FR-020**: A file picked for import MUST stay available to its queued job for as long as that job waits or runs
+  (no time-based expiry while queued); it is released when the job ends, is cancelled or dismissed, or the app quits.
+- **FR-021**: The "file changed during import" check MUST report a change only when the file's content differs from
+  what was fingerprinted; a changed modification time alone (for example touched by a sync program) MUST NOT fail the
+  import.
+- **FR-022**: On the phone, a waiting file that can no longer be read after a relaunch MUST end as "Interrupted —
+  pick the file again" (Try again opens the picker); it MUST NOT be reported as damaged or as a save failure.
+- **FR-023**: Every import failure message MUST be shown in the interface language with its cause, on both hosts
+  (the phone's messages are English-only today).
+
 ### Key Entities
 
 - **Opening**: one attempt to show a book — which book, where the reader came from, its current step, when that step
@@ -256,7 +309,10 @@ and after; turn ten pages right after the first page of a large EPUB and note an
 - **SC-005**: Time from tap to first page goes down by at least 30 % for books larger than 50 MB, and does not go up
   for any book (baseline measured before the change with the developer timing, the same method as feature 016).
 - **SC-006**: In the first 10 s after the first page of a large EPUB, none of 10 page turns takes longer than 300 ms.
-- **SC-007**: In an internal check, 3 people who did not work on this feature open 5 books each, including a slow one
+- **SC-007**: A batch of 50 valid books (every format, part of them in a cloud-synced folder), with the queue running
+  longer than 30 minutes, imports 50 of 50 on the computer; on the phone, 50 of 50 or the unreadable ones marked
+  "Interrupted" after a relaunch — 0 false "could not read" / "file changed" / "damaged" results.
+- **SC-008**: In an internal check, 3 people who did not work on this feature open 5 books each, including a slow one
   and a missing one, and can say which book is opening and how to leave in every case without help.
 
 ## Assumptions
