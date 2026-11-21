@@ -38,4 +38,5 @@ SC-005 are not marked pass.
 
 ## Quickstart acceptance (T082)
 
-_pending_
+Import flow (Add file, background queue, pill / card, cancel, batch summary) **accepted by the user on the real
+machine** (2026-11-21). Per-step figures and the SC-007 three-person check are not recorded.
