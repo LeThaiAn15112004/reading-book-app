@@ -20,6 +20,13 @@ Pill visibility:
   click / tap opens the batch summary. With no `failed` / `interrupted` job it hides by itself after 10 s; with one it
   stays until the reader opens the summary or presses Dismiss (so "Try again" is never missed).
 - No job in the queue → nothing floats on screen.
+- The 10 s auto-hide counts only while the window is shown and focused: an import that ends while the window is
+  hidden (Run in Background) keeps its result pill until the window is shown again, then the 10 s start. The count
+  pauses while the pill has keyboard focus or the pointer is over it, and starts again when they leave.
+- A new import started while a result pill is shown turns the pill back into the importing state; the earlier results
+  stay in the list (and an earlier batch summary there) until Dismiss / "Clear finished".
+- The phone keeps at most 200 unfinished jobs: files that would go beyond are not added and the reader gets the toast
+  `queue.queueFull` ("The import queue is full. Add more when some imports have finished."). Desktop has no limit.
 
 ## Placement
 
@@ -38,6 +45,15 @@ Pill visibility:
 - Toast vs result pill: a toast is shown **only for a single-file import** (a job without `batchId`: one picked file,
   URL, cloud, ZIP). A batch (multi-file pick) shows **no per-file toast**: its results reach the reader only through the
   result pill and the batch summary (FR-011a), so the same result is never shown twice.
+- Elapsed counter (step without a percentage, spec SC-004): computed from `job.stepStartedAt`, shown from the 2nd second
+  of the step, reset on every step change, `font-variant-numeric: tabular-nums` (also for the percentage), its 1 s timer
+  runs only while the step has no percentage and the card or pill is shown; it is OUTSIDE the live region and never
+  announced.
+- Screen-reader announcements (one `aria-live="polite"` region, full sentences, keys `queue.announce.*`): step change
+  "{step}: {name}"; success "{title} was added"; duplicate "{name} is already in the library"; failure "{name} could
+  not be imported: {cause}"; batch end = the result pill's sentence. Nothing else is announced.
+- "Open existing" on a `duplicate` job re-checks that the book still exists; if it was removed meanwhile, the action
+  becomes "Import again" (`queue.importAgain`), which queues a new job with the same source.
 - Placeholders appear on the "All books" view only and disappear on done (replaced by the real book via
   `libraryBooksStore.upsertBook`), failure or cancel.
 - Theme tokens only (`--lib-*`), text ≥ 4.5 : 1, `motion-safe` for the bar animation (reduced motion: static bar with

@@ -254,7 +254,9 @@ page appears is not longer than the baseline, and background work on that book s
 - **FR-006**: Drawing the cover of a book without a cover image MUST NOT send the whole book to the screen, and MUST
   update only that book's entry in the Library instead of reloading the whole list.
 - **FR-007**: The result of an import MUST be unchanged by FR-003…FR-006: same title, author, format, size, page count,
-  description, genres, cover and duplicate detection as before this feature, for every supported format.
+  description, genres, cover and duplicate detection as before this feature, for every supported format. For a cover
+  drawn by the app (the file has no cover image), "same cover" means the same pixel dimensions and at most 1 % of
+  pixels different.
 
 **Background import with progress (step 2)**
 
@@ -302,7 +304,8 @@ page appears is not longer than the baseline, and background work on that book s
 **Opening without competition**
 
 - **FR-015**: While a book is being opened and its first page is not shown yet, the app MUST NOT start search indexing,
-  word count or a signature check on that book; they start after the first page is shown.
+  word count or a signature check on that book, and MUST hold back cover drawing and the next step of a background
+  import; they start after the first page is shown, or after 10 s at most.
 
 **Quality**
 
@@ -310,7 +313,8 @@ page appears is not longer than the baseline, and background work on that book s
   translated.
 - **FR-017**: The progress card and placeholder MUST follow the current theme, be readable (text ≥ 4.5 : 1), be usable
   with the keyboard, and on the phone have targets of at least 44 × 44 px and stay clear of the bottom navigation and
-  the system gesture area.
+  the system gesture area. When the reader asked for reduced motion, the progress bar is static on both hosts and the
+  elapsed-seconds counter alone shows that the import is running.
 - **FR-018**: Background import, progress card, queue, placeholder and the batch summary MUST work the same on Desktop
   and on the phone (one shared interface); host-specific differences are limited to where the card sits and to the
   phone's copy step.
@@ -353,8 +357,8 @@ page appears is not longer than the baseline, and background work on that book s
   more than 5 % later than the baseline.
 - **SC-006**: In 20 cancelled or failed imports (including quitting the app mid-import), 0 library entries, 0 app-owned
   copies and 0 covers are left behind, and the reader's files are unchanged (same fingerprint).
-- **SC-007**: In a check of 10 users importing a large book, every user finds the import's progress and can open the new
-  book when it ends without help.
+- **SC-007**: In an internal check, 3 people who did not work on this feature each import a large book (quickstart §3
+  steps 1–4) without guidance; every one of them finds the import's progress and opens the new book when it ends.
 - **SC-008**: Picking 20 books at once adds them all in one action (no further step per book), and the summary's
   counts match the library exactly and add up to the 20 files picked; the same holds on the phone.
 - **SC-009**: On the phone, importing each large sample book takes at least 30 % less time than its baseline (the copy
@@ -377,4 +381,7 @@ page appears is not longer than the baseline, and background work on that book s
   how annotations are written back into PDFs.
 - Reading position, annotations, collections and every other per-book data are unaffected.
 - On the phone, picking several files uses the system file picker's multi-selection; URL and cloud imports stay one
-  book per action (they join the same queue).
+  book per action (they join the same queue). This is checked on a device in story 1; when a picker returns a single
+  file although several may be picked, that one file is imported normally and no error is shown.
+- Before story 2 changes anything, the library entries and covers that today's import produces for the sample set are
+  recorded; FR-007 and SC-002 are checked against that record.
