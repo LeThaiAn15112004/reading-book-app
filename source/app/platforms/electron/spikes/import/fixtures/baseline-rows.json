@@ -1,0 +1,100 @@
+{
+  "version": 1,
+  "sampleSet": "synthetic",
+  "capturedAt": {
+    "commit": "6013b6d4cfacb61b9ac51f495f41b78b0f915610"
+  },
+  "rows": {
+    "epub-1798": {
+      "title": "Sample Book With Cover",
+      "authors": [
+        "Ada Sample",
+        "Ben Example"
+      ],
+      "format": "epub",
+      "genres": [
+        "Fiction",
+        "Testing"
+      ],
+      "sha256": "8c6e002dc1d3ebf2765d199619b5a130568da8a4af793ded94e2ed49876c5060",
+      "readingStatus": "not-started",
+      "metadata": {
+        "description": "A deterministic sample used by spec 016 parity checks.",
+        "fileSizeBytes": 1798,
+        "pageCount": 2,
+        "signatureCheckedSha256": "8c6e002dc1d3ebf2765d199619b5a130568da8a4af793ded94e2ed49876c5060",
+        "signatureStatus": "unsupported"
+      },
+      "coverStoredInFile": true,
+      "coverSha256": "d20f6ffd523b78a86cd2f916fa34af5d1918d75f7b142237c752ad6b254213ab"
+    },
+    "epub-1606": {
+      "title": "Sample Book Without Cover",
+      "authors": [
+        "Ada Sample",
+        "Ben Example"
+      ],
+      "format": "epub",
+      "genres": [
+        "Fiction",
+        "Testing"
+      ],
+      "sha256": "eb1f2e63128a8ce199d2fa26076ce8ed4699c5745b3575ea28818269847cccfc",
+      "readingStatus": "not-started",
+      "metadata": {
+        "description": "A deterministic sample used by spec 016 parity checks.",
+        "fileSizeBytes": 1606,
+        "pageCount": 2,
+        "signatureCheckedSha256": "eb1f2e63128a8ce199d2fa26076ce8ed4699c5745b3575ea28818269847cccfc",
+        "signatureStatus": "unsupported"
+      },
+      "coverStoredInFile": false,
+      "coverSha256": null
+    },
+    "pdf-689": {
+      "title": "Sample Paper",
+      "authors": [],
+      "format": "pdf",
+      "genres": [],
+      "sha256": "a375fc59c634ccc27bccd78be390785b33db8a301e25f6aa10e5c26266d63736",
+      "readingStatus": "not-started",
+      "metadata": {
+        "fileSizeBytes": 689,
+        "signatureCheckedSha256": "a375fc59c634ccc27bccd78be390785b33db8a301e25f6aa10e5c26266d63736",
+        "signatureStatus": "unsigned"
+      },
+      "coverStoredInFile": false,
+      "coverSha256": null
+    },
+    "txt-110000": {
+      "title": "Sample Notes",
+      "authors": [],
+      "format": "txt",
+      "genres": [],
+      "sha256": "6de5e4c73c3e7ebe53dd90a9f02a87a289e5fb2fd758bf15282e324e8c819754",
+      "readingStatus": "not-started",
+      "metadata": {
+        "fileSizeBytes": 110000,
+        "signatureCheckedSha256": "6de5e4c73c3e7ebe53dd90a9f02a87a289e5fb2fd758bf15282e324e8c819754",
+        "signatureStatus": "unsupported"
+      },
+      "coverStoredInFile": false,
+      "coverSha256": null
+    },
+    "md-82000": {
+      "title": "Sample Readme",
+      "authors": [],
+      "format": "md",
+      "genres": [],
+      "sha256": "24fdc52158a26aaf98e9f59fde4403948c6290c2bfdccaa3d74b272b46494301",
+      "readingStatus": "not-started",
+      "metadata": {
+        "fileSizeBytes": 82000,
+        "signatureCheckedSha256": "24fdc52158a26aaf98e9f59fde4403948c6290c2bfdccaa3d74b272b46494301",
+        "signatureStatus": "unsupported"
+      },
+      "coverStoredInFile": false,
+      "coverSha256": null
+    }
+  }
+}

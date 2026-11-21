@@ -165,3 +165,6 @@ expo-env.d.ts
 .readmate-signing/
 source/app/platforms/electron/build-resources/
 source/app/platforms/electron/store/.cache/
+
+# spec 016: local spike outputs (timing summaries)
+source/app/platforms/electron/spikes/import/out/
