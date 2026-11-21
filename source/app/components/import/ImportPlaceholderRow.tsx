@@ -2,12 +2,19 @@ import type { ImportPlaceholder } from '@core'
 import { useT } from '../../i18n'
 import { placeholderStatus } from './importQueueText'
 
-/** Spec 016 (FR-010): a coming book in the Library list — same rules as `ImportPlaceholderTile` (not a book). */
-export function ImportPlaceholderRow({ placeholder }: { placeholder: ImportPlaceholder }) {
+/** Columns of the Desktop Library table (`LibraryBookTable`): a placeholder row spans them all. */
+const TABLE_COLUMNS = 8
+
+/**
+ * Spec 016 (FR-010): a coming book in the Library list — same rules as `ImportPlaceholderTile` (not a book). Drawn as
+ * a list item of the phone list (`li`) or a row of the Desktop table (`tr`).
+ */
+export function ImportPlaceholderRow({ placeholder, as }: { placeholder: ImportPlaceholder; as: 'li' | 'tr' }) {
   const t = useT()
   const status = placeholderStatus(t, placeholder)
-  return (
-    <div className="import-placeholder-row" role="listitem" aria-disabled="true" aria-label={t('import.queue.placeholder.label', { name: placeholder.name })}>
+  const label = t('import.queue.placeholder.label', { name: placeholder.name })
+  const content = (
+    <div className="import-placeholder-row">
       <div className="import-placeholder-cover import-placeholder-cover--small" aria-hidden>
         {placeholder.state === 'running' ? <span className="import-queue-spinner" /> : null}
       </div>
@@ -18,5 +25,19 @@ export function ImportPlaceholderRow({ placeholder }: { placeholder: ImportPlace
         {status}
       </span>
     </div>
+  )
+  if (as === 'tr') {
+    return (
+      <tr aria-disabled="true" aria-label={label}>
+        <td colSpan={TABLE_COLUMNS} className="p-0">
+          {content}
+        </td>
+      </tr>
+    )
+  }
+  return (
+    <li className="list-none" aria-disabled="true" aria-label={label}>
+      {content}
+    </li>
   )
 }

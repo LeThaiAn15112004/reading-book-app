@@ -1,3 +1,4 @@
+import { Fragment, type ReactNode } from 'react'
 import { listRowProgress, type LibraryBook } from '@core'
 import { useT } from '../../../i18n'
 import { withLongPress } from '../../../platforms/longPress'
@@ -7,6 +8,9 @@ export type MobileBookListProps = {
   books: LibraryBook[]
   onOpen: (bookId: string) => void
   onBookMenu: (bookId: string, point: BookMenuPoint) => void
+  /** Spec 016: list items drawn after the first `leadCount` books (the import placeholders). */
+  inserted?: ReactNode
+  leadCount?: number
 }
 
 /**
@@ -14,16 +18,17 @@ export type MobileBookListProps = {
  * a thin progress bar under the author line once the book has been opened (inside the same height), the format badge
  * and ⋮. A tap opens the book; ⋮ or a long press opens the bottom sheet.
  */
-export function MobileBookList({ books, onOpen, onBookMenu }: MobileBookListProps) {
+export function MobileBookList({ books, onOpen, onBookMenu, inserted, leadCount = 0 }: MobileBookListProps) {
   const t = useT()
   return (
     <ul className="m-0 flex list-none flex-col gap-2 p-0" aria-label={t('library.books')}>
-      {books.map((book) => {
+      {leadCount === 0 ? inserted : null}
+      {books.map((book, index) => {
         const progress = listRowProgress(book)
         return (
+          <Fragment key={book.id}>
           <li
-            key={book.id}
-            className="phone-row flex h-20 items-center gap-3 rounded-xl border border-lib-border-soft bg-lib-surface pr-1 pl-2"
+            className={`phone-row${index < leadCount ? ' import-arrived' : ''} flex h-20 items-center gap-3 rounded-xl border border-lib-border-soft bg-lib-surface pr-1 pl-2`}
             {...withLongPress((event) => {
               event.preventDefault()
               onBookMenu(book.id, { x: event.clientX, y: event.clientY })
@@ -62,6 +67,8 @@ export function MobileBookList({ books, onOpen, onBookMenu }: MobileBookListProp
             </span>
             <BookMenuButton title={book.title} className="!size-11" onOpen={(point) => onBookMenu(book.id, point)} />
           </li>
+          {leadCount > 0 && index === leadCount - 1 ? inserted : null}
+          </Fragment>
         )
       })}
     </ul>

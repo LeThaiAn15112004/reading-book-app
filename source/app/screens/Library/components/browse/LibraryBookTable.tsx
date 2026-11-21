@@ -1,4 +1,4 @@
-import { useRef, type KeyboardEvent } from 'react'
+import { Fragment, useRef, type KeyboardEvent, type ReactNode } from 'react'
 import { formatRelativeLastRead, type LibraryBook } from '@core'
 import { useFormat, useT, useUiLanguage, type BoundFormat } from '../../../../i18n'
 import { BookCover, BookMenuButton, type BookMenuPoint } from '../book'
@@ -11,6 +11,9 @@ export type LibraryBookTableProps = {
   onSelect: (bookId: string) => void
   onOpen: (bookId: string) => void
   onBookMenu: (bookId: string, point: BookMenuPoint) => void
+  /** Spec 016: rows drawn after the first `leadCount` books, in the same table (the import placeholders). */
+  inserted?: ReactNode
+  leadCount?: number
 }
 
 function formatAdded(format: BoundFormat, iso?: string): string {
@@ -60,6 +63,8 @@ export function LibraryBookTable({
   onSelect,
   onOpen,
   onBookMenu,
+  inserted,
+  leadCount = 0,
 }: LibraryBookTableProps) {
   const t = useT()
   const format = useFormat()
@@ -110,11 +115,12 @@ export function LibraryBookTable({
           </tr>
         </thead>
         <tbody>
+          {leadCount === 0 ? inserted : null}
           {books.map((book, index) => {
             const selected = book.id === selectedBookId
             return (
+              <Fragment key={book.id}>
               <tr
-                key={book.id}
                 ref={(el) => {
                   if (el) rowRefs.current.set(book.id, el)
                   else rowRefs.current.delete(book.id)
@@ -124,7 +130,7 @@ export function LibraryBookTable({
                 aria-current={selected ? 'true' : undefined}
                 className={`group cursor-pointer outline-none transition-colors focus-visible:bg-lib-surface-hover ${
                   selected ? 'bg-lib-accent-soft' : 'hover:bg-lib-surface-hover'
-                }`}
+                }${index < leadCount ? ' import-arrived' : ''}`}
                 onClick={() => onSelect(book.id)}
                 onDoubleClick={() => onOpen(book.id)}
                 onKeyDown={(e) => onRowKeyDown(e, index, book)}
@@ -185,6 +191,8 @@ export function LibraryBookTable({
                   />
                 </td>
               </tr>
+              {leadCount > 0 && index === leadCount - 1 ? inserted : null}
+              </Fragment>
             )
           })}
         </tbody>

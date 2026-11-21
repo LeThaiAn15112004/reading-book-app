@@ -1,28 +1,25 @@
-import { placeholdersOf } from '@core'
-import { useImportQueueStore } from '../../hooks/library/importQueueStore'
+import type { ImportPlaceholder } from '@core'
+import { useT } from '../../i18n'
+import type { ImportSlot } from './useImportSlot'
 import { ImportPlaceholderRow } from './ImportPlaceholderRow'
 import { ImportPlaceholderTile } from './ImportPlaceholderTile'
 
-/**
- * Spec 016 (FR-010, research R8): the coming books, first in the Library's "All books" view only (Grid or List, both
- * hosts) — never in Collections, other filters or search results. Derived from the queue; never a library row.
- */
-export function LibraryImportPlaceholders({ layout, visible }: { layout: 'grid' | 'table' | string; visible: boolean }) {
-  const queue = useImportQueueStore((s) => s.queue)
-  if (!visible) return null
-  const placeholders = placeholdersOf(queue)
-  if (placeholders.length === 0) return null
-  return layout === 'table' ? (
-    <div role="list" className="mb-2 flex flex-col">
-      {placeholders.map((p) => (
-        <ImportPlaceholderRow key={p.jobId} placeholder={p} />
-      ))}
-    </div>
-  ) : (
-    <div role="list" className="mb-4 grid grid-cols-[repeat(auto-fill,minmax(130px,1fr))] gap-4">
-      {placeholders.map((p) => (
-        <ImportPlaceholderTile key={p.jobId} placeholder={p} />
-      ))}
-    </div>
+/** The placeholders as items of a container: grid tiles, phone list items or table rows. */
+export function ImportPlaceholderItems({ placeholders, as }: { placeholders: ImportPlaceholder[]; as: 'tile' | 'li' | 'tr' }) {
+  return (
+    <>
+      {placeholders.map((p) =>
+        as === 'tile' ? <ImportPlaceholderTile key={p.jobId} placeholder={p} /> : <ImportPlaceholderRow key={p.jobId} placeholder={p} as={as} />,
+      )}
+    </>
+  )
+}
+
+/** "3 books added to the Library" — only when this run's books are sorted elsewhere in the list. */
+export function ImportAddedNote({ slot }: { slot: ImportSlot }) {
+  const t = useT()
+  if (slot.addedElsewhere === 0) return null
+  return (
+    <p className="mt-0 mb-2 text-xs text-lib-muted">{t('import.queue.placeholder.added', { count: slot.addedElsewhere })}</p>
   )
 }

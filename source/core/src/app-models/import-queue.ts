@@ -353,6 +353,31 @@ export function placeholdersOf(queue: ImportQueue): ImportPlaceholder[] {
   }))
 }
 
+/**
+ * Books added by the imports still on screen (finished jobs, and batch outcomes kept after a job was dismissed).
+ * The Library shows them before the placeholders so each book appears as soon as its import ends.
+ */
+export function importedBookIdsOf(queue: ImportQueue): Set<string> {
+  const ids = new Set<string>()
+  for (const j of queue.jobs) if (j.state === 'done' && j.bookId) ids.add(j.bookId)
+  for (const batch of Object.values(queue.batches)) {
+    for (const o of Object.values(batch.outcomes)) if (o.state === 'done' && o.bookId) ids.add(o.bookId)
+  }
+  return ids
+}
+
+/**
+ * How many of the first visible books go BEFORE the placeholders: the run's imported books at the top of a
+ * "recently added" list (newest first), so the order is already the final one when the queue drains. Any other
+ * sort puts those books where they belong and the placeholders stay first (0).
+ */
+export function importedLeadCount(visibleBookIds: readonly string[], imported: ReadonlySet<string>, sort: string): number {
+  if (sort !== 'recently-added' || imported.size === 0) return 0
+  let n = 0
+  while (n < visibleBookIds.length && imported.has(visibleBookIds[n]!)) n += 1
+  return n
+}
+
 /** FR-013a: what the quit guard asks about. */
 export function activityOf(queue: ImportQueue): { running: number; waiting: number } {
   let running = 0

@@ -1,7 +1,9 @@
+import { useMemo } from 'react'
 import type { LibraryBook } from '@core'
 import { useSearchHistoryStore } from '../../hooks/library/index.js'
 import { useT } from '../../i18n'
-import { LibraryImportPlaceholders } from '../../components/import/LibraryImportPlaceholders'
+import { ImportAddedNote, ImportPlaceholderItems } from '../../components/import/LibraryImportPlaceholders'
+import { useImportSlot } from '../../components/import/useImportSlot'
 import {
   BootErrorBanner,
   ContinueReading,
@@ -55,6 +57,9 @@ export function LibraryHub({
   const { filter, sort, layout, searchActive, counts, visibleBooks, continueBooks, selectedBook } =
     useLibraryBrowse(bookList, searchQuery)
   const t = useT()
+  // Spec 016 (FR-010): coming books in the same grid / table as the books, "All books" only.
+  const visibleIds = useMemo(() => visibleBooks.map((b) => b.id), [visibleBooks])
+  const slot = useImportSlot(visibleIds, sort, filter === 'all' && !searchActive)
   const setFilter = useLibraryBrowseStore((s) => s.setFilter)
   const setSort = useLibraryBrowseStore((s) => s.setSort)
   const setLayout = useLibraryBrowseStore((s) => s.setLayout)
@@ -104,10 +109,9 @@ export function LibraryHub({
                     onLayoutChange={setLayout}
                   />
 
-                  {/* Spec 016 (FR-010): coming books first, in "All books" only. */}
-                  <LibraryImportPlaceholders layout={layout} visible={filter === 'all' && !searchActive} />
+                  <ImportAddedNote slot={slot} />
 
-                  {visibleBooks.length === 0 ? (
+                  {visibleBooks.length === 0 && slot.placeholders.length === 0 ? (
                     <p className="mt-10 text-center text-sm text-lib-faint" role="status">
                       {searchActive ? t('library.filterEmpty.noMatch') : t(LIBRARY_FILTER_EMPTY[filter])}
                     </p>
@@ -118,9 +122,17 @@ export function LibraryHub({
                       onSelect={selectBook}
                       onOpen={onOpenBook}
                       onBookMenu={onBookMenu}
+                      leadCount={slot.leadCount}
+                      inserted={<ImportPlaceholderItems placeholders={slot.placeholders} as="tr" />}
                     />
                   ) : (
-                    <LibraryBookGrid books={visibleBooks} onOpen={onOpenBook} onBookMenu={onBookMenu} />
+                    <LibraryBookGrid
+                      books={visibleBooks}
+                      onOpen={onOpenBook}
+                      onBookMenu={onBookMenu}
+                      leadCount={slot.leadCount}
+                      inserted={<ImportPlaceholderItems placeholders={slot.placeholders} as="tile" />}
+                    />
                   )}
                 </>
               ) : null}

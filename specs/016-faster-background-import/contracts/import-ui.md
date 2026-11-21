@@ -55,7 +55,12 @@ Pill visibility:
 - "Open existing" on a `duplicate` job re-checks that the book still exists; if it was removed meanwhile, the action
   becomes "Import again" (`queue.importAgain`), which queues a new job with the same source.
 - Placeholders appear on the "All books" view only and disappear on done (replaced by the real book via
-  `libraryBooksStore.upsertBook`), failure or cancel.
+  `libraryBooksStore.upsertBook`), failure or cancel. They sit in the SAME grid / list as the books (one keyed list,
+  so no card is re-created when they go away): with the "Recently added" sort, the books this run imported come
+  first (newest first, already their final order), then the running and waiting placeholders, then the rest
+  (core `importedBookIdsOf` / `importedLeadCount`); with any other sort the placeholders come first and the imported
+  books are in their sorted place, with a line "{count} books added to the Library" (`queue.placeholder.added`)
+  above the list. A book that just arrived fades in (opacity only, 200 ms, none under reduced motion).
 - Theme tokens only (`--lib-*`), text ≥ 4.5 : 1, `motion-safe` for the bar animation (reduced motion: static bar with
   the number), keyboard: Tab reaches pill → card actions; Esc collapses the card.
 

@@ -7,6 +7,8 @@ import {
   enqueueJobs,
   finishJob,
   fromQueueSnapshot,
+  importedBookIdsOf,
+  importedLeadCount,
   isRetryableImportError,
   nextToRun,
   placeholdersOf,
@@ -196,6 +198,24 @@ describe('placeholders and activity (FR-010, FR-013a)', () => {
     expect(activityOf(q)).toEqual({ running: 1, waiting: 1 })
     q = finishJob(q, 'a', { kind: 'done', bookId: 'x' }, 3)
     expect(placeholdersOf(q).map((p) => p.jobId)).toEqual(['b'])
+  })
+})
+
+describe('imported books before the placeholders', () => {
+  it('collects done books of jobs and of dismissed batch members, never duplicates / failures', () => {
+    let q = enqueueJobs(emptyImportQueue(), [pick('a'), pick('b'), pick('c')], { now: 0, batchId: 'B' })
+    q = finishJob(startJob(q, 'a', 1), 'a', { kind: 'done', bookId: 'x' }, 2)
+    q = finishJob(startJob(q, 'b', 3), 'b', { kind: 'duplicate', bookId: 'old' }, 4)
+    q = dismissJob(q, 'a')
+    expect([...importedBookIdsOf(q)]).toEqual(['x'])
+  })
+
+  it('lead = imported books at the top of a recently-added list; other sorts keep placeholders first', () => {
+    const imported = new Set(['n2', 'n1'])
+    expect(importedLeadCount(['n2', 'n1', 'old'], imported, 'recently-added')).toBe(2)
+    expect(importedLeadCount(['old', 'n2', 'n1'], imported, 'recently-added')).toBe(0)
+    expect(importedLeadCount(['n2', 'n1', 'old'], imported, 'title')).toBe(0)
+    expect(importedLeadCount(['n2', 'n1'], new Set(), 'recently-added')).toBe(0)
   })
 })
 

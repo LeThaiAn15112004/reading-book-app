@@ -1,6 +1,7 @@
-import type { ReactNode } from 'react'
+import { useMemo, type ReactNode } from 'react'
 import { useT } from '../../../i18n'
-import { LibraryImportPlaceholders } from '../../../components/import/LibraryImportPlaceholders'
+import { ImportAddedNote, ImportPlaceholderItems } from '../../../components/import/LibraryImportPlaceholders'
+import { useImportSlot } from '../../../components/import/useImportSlot'
 import { BootErrorBanner, LibraryBookGrid } from '../components'
 import type { LibraryHubProps } from '../LibraryHub'
 import { LIBRARY_FILTER_EMPTY, useLibraryBrowse, useLibraryBrowseStore } from '../logic'
@@ -52,10 +53,13 @@ export default function MobileLibraryHub({
     setFilter('all')
   }
 
+  // Spec 016 (FR-010): coming books in the same grid / list as the books, "All books" only.
+  const visibleIds = useMemo(() => visibleBooks.map((b) => b.id), [visibleBooks])
+  const slot = useImportSlot(visibleIds, sort, filter === 'all' && !searchActive)
   let collection: ReactNode = null
   if (books !== null && !isEmpty) {
     collection =
-      visibleBooks.length === 0 ? (
+      visibleBooks.length === 0 && slot.placeholders.length === 0 ? (
         // Books exist but the chip / search match none: a small message with a way out, never the first-launch
         // empty state (FR-009).
         <div className="mt-12 flex flex-col items-center gap-4 text-center" role="status">
@@ -75,14 +79,26 @@ export default function MobileLibraryHub({
       ) : layout === 'table' ? (
         // The stored `table` layout is the phone List; the desktop table and its detail panel never render here (FR-013).
         <>
-          <LibraryImportPlaceholders layout="table" visible={filter === 'all' && !searchActive} />
-          <MobileBookList books={visibleBooks} onOpen={onOpenBook} onBookMenu={onBookMenu} />
+          <ImportAddedNote slot={slot} />
+          <MobileBookList
+            books={visibleBooks}
+            onOpen={onOpenBook}
+            onBookMenu={onBookMenu}
+            leadCount={slot.leadCount}
+            inserted={<ImportPlaceholderItems placeholders={slot.placeholders} as="li" />}
+          />
         </>
       ) : (
         <>
-          {/* Spec 016 (FR-010): coming books first, in "All books" only. */}
-          <LibraryImportPlaceholders layout="grid" visible={filter === 'all' && !searchActive} />
-          <LibraryBookGrid books={visibleBooks} onOpen={onOpenBook} onBookMenu={onBookMenu} className="phone-grid" />
+          <ImportAddedNote slot={slot} />
+          <LibraryBookGrid
+            books={visibleBooks}
+            onOpen={onOpenBook}
+            onBookMenu={onBookMenu}
+            className="phone-grid"
+            leadCount={slot.leadCount}
+            inserted={<ImportPlaceholderItems placeholders={slot.placeholders} as="tile" />}
+          />
         </>
       )
   }

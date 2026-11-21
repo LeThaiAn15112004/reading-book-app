@@ -166,6 +166,7 @@ export const en = {
       importingNoPercent: 'Importing…',
       waiting: 'Waiting',
       label: 'Importing {name}',
+      added: { one: '{count} book added to the Library', other: '{count} books added to the Library' },
     },
     state: {
       running: 'Importing',

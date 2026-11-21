@@ -164,6 +164,7 @@ export const vi = {
       importingNoPercent: 'Đang nhập…',
       waiting: 'Đang chờ',
       label: 'Đang nhập {name}',
+      added: { other: 'Đã thêm {count} sách vào Thư viện' },
     },
     state: {
       running: 'Đang nhập',

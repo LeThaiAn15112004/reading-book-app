@@ -219,3 +219,21 @@
     transition: none;
   }
 }
+
+/* Spec 016: a book whose import just finished fades in where its placeholder was (opacity only, no layout change). */
+.import-arrived {
+  animation: import-arrive 200ms ease-out;
+}
+@keyframes import-arrive {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .import-arrived {
+    animation: none;
+  }
+}
