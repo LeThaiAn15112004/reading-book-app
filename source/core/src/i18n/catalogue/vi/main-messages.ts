@@ -24,6 +24,13 @@ export const vi = {
     outsideDataFolder: 'Chọn một tệp sách nằm ngoài thư mục dữ liệu riêng của ứng dụng.',
     downloadFileFailed: 'Không tải được tệp xuống.',
     fileChanged: 'Tệp đã thay đổi hoặc không còn ở đó.',
+    busy: 'Một lượt nhập khác vẫn đang chạy.',
+    quitConfirm: {
+      title: 'Vẫn đang nhập sách',
+      message: { other: 'Còn {count} lượt nhập đang chạy hoặc đang chờ. Thoát và hủy các lượt nhập này?' },
+      quit: 'Thoát',
+      cancel: 'Hủy',
+    },
   },
   annotations: {
     none: 'Sách này không có chú thích nào để xuất.',

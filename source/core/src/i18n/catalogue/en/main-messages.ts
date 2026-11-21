@@ -21,6 +21,13 @@ export const en = {
     outsideDataFolder: 'Choose a book file outside the app’s own data folder.',
     downloadFileFailed: 'Could not download the file.',
     fileChanged: 'The file changed or is no longer there.',
+    busy: 'Another import is still running.',
+    quitConfirm: {
+      title: 'Imports are still running',
+      message: { one: '{count} import is still running or waiting. Quit and cancel it?', other: '{count} imports are still running or waiting. Quit and cancel them?' },
+      quit: 'Quit',
+      cancel: 'Cancel',
+    },
   },
   annotations: {
     none: 'This book has no annotations to export.',
