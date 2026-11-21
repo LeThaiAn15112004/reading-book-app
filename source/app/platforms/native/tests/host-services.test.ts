@@ -133,6 +133,9 @@ class NativeMemoryFs extends MemoryFs {
   digests = 0
   chunkedReads = 0
   refuseCopy = false
+  /** A provider that `File.copy()` cannot read with some other error (seen on Xiaomi file managers). */
+  failCopy = false
+  failDigest = false
   /** Resolves the pending native copy (lets a test cancel while it runs). */
   private releaseCopy: (() => void) | null = null
   holdCopy = false
@@ -143,6 +146,7 @@ class NativeMemoryFs extends MemoryFs {
       const { NativeCopyRefusedError } = await import('../host/file-service')
       throw new NativeCopyRefusedError('InvalidPermissionException: cannot copy this content:// URI')
     }
+    if (this.failCopy) throw new Error('UnableToCopyException: source file does not exist')
     const reader = super.openReadUri(uri)
     const parts: Uint8Array[] = []
     for (let c = reader.read(1 << 20); c.length; c = reader.read(1 << 20)) parts.push(c)
@@ -154,6 +158,7 @@ class NativeMemoryFs extends MemoryFs {
   }
   async digest(rel: string) {
     this.digests++
+    if (this.failDigest) throw new Error('digest failed')
     return createHash('sha256').update(this.files.get(rel)!).digest('hex').toUpperCase() // host lower-cases it
   }
   override openReadUri(uri: string) {
@@ -193,6 +198,20 @@ describe('files.stage / files.hashStaged on the native path (spec 016)', () => {
     expect(result).toEqual({ size: 2048, fallback: true })
     expect(fs.chunkedReads).toBe(1)
     expect(Buffer.from(fs.files.get(`staging/${stagingId}/file`) ?? new Uint8Array())).toEqual(bytes)
+  })
+
+  it('falls back to the chunked copy and hash on ANY native failure (not only a permission refusal)', async () => {
+    const fs = new NativeMemoryFs()
+    fs.failCopy = true
+    fs.failDigest = true
+    const bytes = randomBytes(45 * 1024)
+    const { files, picked, stagingId } = await staged(fs, bytes)
+    const result = (await files.stage!({ pickId: picked.pickId, stagingId })) as { size: number; fallback: boolean }
+    expect(result).toEqual({ size: bytes.length, fallback: true })
+    const hashed = (await files.hashStaged!({ stagingId })) as { sha256: string; size: number }
+    expect(hashed).toEqual({ sha256: createHash('sha256').update(bytes).digest('hex'), size: bytes.length })
+    // The job is released: the same staging id can be hashed again.
+    await expect(files.hashStaged!({ stagingId }) as Promise<unknown>).resolves.toMatchObject({ size: bytes.length })
   })
 
   it('honours a cancel once the native copy resolves: CANCELLED and the staging folder removed', async () => {

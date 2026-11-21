@@ -273,11 +273,11 @@ export function createFileService(options: FileServiceOptions) {
           options.emitProgress?.({ stagingId, step: 'copying', doneBytes: size, totalBytes: size })
           return { size, fallback }
         } catch (error) {
-          if (!(error instanceof NativeCopyRefusedError)) {
-            if (error instanceof HostServiceError) throw error
-            if (isNoSpace(error)) throw new HostServiceError('NO_SPACE', 'The device ran out of space while copying the book')
-            throw new HostServiceError('READ_FAILED', `The picked file could not be copied: ${detail(error)}`)
-          }
+          if (error instanceof HostServiceError) throw error
+          if (isNoSpace(error)) throw new HostServiceError('NO_SPACE', 'The device ran out of space while copying the book')
+          // Any other refusal (a `content://` provider that `File.copy()` cannot read — seen on some Android file
+          // managers, e.g. Xiaomi's): copy this file with the chunked loop below, as before spec 016.
+          if (!(error instanceof NativeCopyRefusedError)) console.warn('[files] native copy failed; copying in chunks', detail(error))
           fs.remove(target)
           fallback = true
         }
@@ -337,20 +337,32 @@ export function createFileService(options: FileServiceOptions) {
     if (size === undefined) throw new HostServiceError('NOT_FOUND', 'Nothing is staged under this id')
     const job = startJob(stagingId)
     // Spec 016 (FR-003): native digest by path — one read of the copy, in parts, outside JS; no intermediate progress.
+    // A digest that fails falls back to the chunked hash below.
     if (fs.digest) {
       try {
         options.emitProgress?.({ stagingId, step: 'hashing', doneBytes: 0, totalBytes: null })
         const sha256 = (await fs.digest(file)).toLowerCase()
         if (job.cancelled) throw new HostServiceError('CANCELLED', 'Import cancelled')
-        return { sha256, size }
+        if (/^[0-9a-f]{64}$/.test(sha256)) {
+          jobs.delete(stagingId)
+          return { sha256, size }
+        }
+        console.warn('[files] native digest returned an unexpected value; hashing in chunks')
       } catch (error) {
-        if (error instanceof HostServiceError) throw error
-        throw new HostServiceError('READ_FAILED', 'The staged book could not be read')
-      } finally {
-        jobs.delete(stagingId)
+        if (error instanceof HostServiceError) {
+          jobs.delete(stagingId)
+          throw error
+        }
+        console.warn('[files] native digest failed; hashing in chunks', detail(error))
       }
     }
-    const reader = fs.openRead(file)
+    let reader: ByteReader
+    try {
+      reader = fs.openRead(file)
+    } catch (error) {
+      jobs.delete(stagingId)
+      throw error
+    }
     try {
       const hash = new Sha256()
       let done = 0
