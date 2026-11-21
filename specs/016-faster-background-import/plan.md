@@ -118,6 +118,8 @@ source/app/
 ├── hooks/library/useLibraryImport.ts    # EDIT: enqueue instead of blocking
 ├── hooks/library/zipImportStore.ts      # EDIT: confirm → enqueue a zip job
 ├── hooks/reader/readerOpeningStore.ts   # NEW (US4)
+├── hooks/reader/firstPageSignal.ts      # NEW: markFirstPageDrawn(bookId) — US1 timing, US4 gate
+├── hooks/app/stepTimer.ts               # NEW: renderer step timer (US1)
 ├── components/import/ImportQueueCard.tsx, ImportQueueList.tsx, ImportBatchSummary.tsx,
 │   ImportPlaceholderTile.tsx, ImportPlaceholderRow.tsx   # NEW
 ├── components/import/ImportProgressDialog.tsx            # REMOVED
@@ -135,6 +137,7 @@ source/app/
     ├── electron/signature/signature-queue.ts             # NEW
     ├── electron/background/quit-guard.ts                 # NEW; main.ts EDIT
     ├── electron/perf/timing-log.ts                       # NEW
+    ├── electron/perf/reader-opening-gate.ts              # NEW: Main mirror of the opening gate (US4)
     ├── electron/spikes/import-{parity,timing,cleanup,queue}.ts   # NEW
     ├── native/host/{file-service,expo-host-fs,import-queue-file}.ts   # EDIT / NEW
     └── native/bridge/{import,library,import-queue}.ts    # EDIT / NEW
