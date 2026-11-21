@@ -3,6 +3,7 @@ import type { LibraryBook } from '@core'
 import { useT } from '../../../../i18n'
 import type { BookMenuPoint } from '../book'
 import { ShelfRailCard } from '../shelves/ShelfRailCard'
+import type { BookSelection } from './bookSelection'
 
 export type LibraryBookGridProps = {
   books: LibraryBook[]
@@ -13,13 +14,15 @@ export type LibraryBookGridProps = {
   /** Spec 016: drawn after the first `leadCount` books, in the same grid (the import placeholders). */
   inserted?: ReactNode
   leadCount?: number
+  /** Phone select mode (see `BookSelection`). */
+  selection?: BookSelection
 }
 
 /**
  * Main Library grid: every book in the current filter, wrapping into as many columns as fit
  * (no horizontal rail, vertical scroll only).
  */
-export function LibraryBookGrid({ books, onOpen, onBookMenu, className, inserted, leadCount = 0 }: LibraryBookGridProps) {
+export function LibraryBookGrid({ books, onOpen, onBookMenu, className, inserted, leadCount = 0, selection }: LibraryBookGridProps) {
   const t = useT()
   // One keyed array, so a book keeps its card (and cover) when the placeholders move or go away.
   const slot = inserted ? <Fragment key="import-placeholders">{inserted}</Fragment> : null
@@ -33,6 +36,7 @@ export function LibraryBookGrid({ books, onOpen, onBookMenu, className, inserted
         onOpen={onOpen}
         onBookMenu={onBookMenu}
         className={index < leadCount ? 'w-full import-arrived' : 'w-full'}
+        selection={selection}
       />,
     )
   })

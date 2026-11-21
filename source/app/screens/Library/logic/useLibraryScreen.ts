@@ -8,7 +8,15 @@ import {
   useLibraryView,
   useZipImportStore,
 } from '../../../hooks/library/index.js'
-import { bulkAddSummary, type LibraryBook, type MessageRef } from '@core'
+import {
+  bulkAddSummary,
+  bulkFavoriteTarget,
+  bulkResult,
+  favoriteChanges,
+  removalKindOf,
+  type LibraryBook,
+  type MessageRef,
+} from '@core'
 import { importApi, libraryApi } from '../../../bridge'
 import { useAppNav, useOpenReading, type AppStubNavId } from '../../../components/chrome'
 import type { BootLocationState } from '../../boot'
@@ -23,6 +31,7 @@ import { sortLibraryBooks } from './libraryBrowse'
 import { toShelfDetailItem } from './toShelfDetailItem'
 import { canGenerateCover, generateBookCover, markCoverAttempted } from './generateBookCover'
 import { useLibraryBrowseStore } from './libraryBrowseStore'
+import { useLibrarySelectionStore } from './librarySelectionStore'
 import { useCloudSources } from './useCloudSources'
 
 type LibraryLocationState = BootLocationState & {
@@ -55,6 +64,8 @@ export function useLibraryScreen() {
   } | null>(null)
   const [pendingRemoval, setPendingRemoval] =
     useState<PendingBookRemoval | null>(null)
+  /** Phone select mode: the books waiting for the "Remove" confirmation. */
+  const [pendingBulkRemoval, setPendingBulkRemoval] = useState<string[] | null>(null)
   const [editingCollectionId, setEditingCollectionId] = useState<string | null>(
     null,
   )
@@ -481,6 +492,66 @@ export function useLibraryScreen() {
     void handleFromDevice()
   }
 
+  /** The toast after a bulk action (phone select mode). */
+  function showBulkToast(
+    done: number,
+    failed: number,
+    doneKey: 'library.selection.favoriteAdded' | 'library.selection.favoriteRemoved' | 'library.selection.removed',
+  ) {
+    const result = bulkResult(done, failed)
+    if (result.kind === 'failed') showToast({ key: 'library.toast.actionFailed' }, 'error')
+    else if (result.kind === 'partial')
+      showToast({ key: 'library.selection.partial', params: { done: result.done, failed: result.failed } }, 'info')
+    else showToast({ key: doneKey, params: { count: result.count } }, 'success')
+  }
+
+  /** Favourite for the selection: all become favourites unless every one already is (then all are removed). */
+  async function handleBulkFavorite(ids: string[]) {
+    const target = bulkFavoriteTarget(bookList, ids)
+    const changes = favoriteChanges(bookList, ids, target)
+    let done = 0
+    for (const id of changes) {
+      try {
+        if ((await libraryApi.setFavorite(id, target)).ok) done += 1
+      } catch {
+        // counted as failed
+      }
+    }
+    await refreshLibrary().catch(() => {})
+    showBulkToast(done, changes.length - done, target ? 'library.selection.favoriteAdded' : 'library.selection.favoriteRemoved')
+    if (done > 0) useLibrarySelectionStore.getState().clear()
+  }
+
+  /** "Add to collection" for the selection: one call, one transaction (same rules and toast as the picker). */
+  async function handleBulkAddToCollection(collectionId: string, ids: string[]): Promise<boolean> {
+    const added = await handleAddBooksToCollection(collectionId, ids)
+    if (added) useLibrarySelectionStore.getState().clear()
+    return added
+  }
+
+  /** "Remove" for the selection, after its confirmation: one book at a time, the list reloaded once at the end. */
+  async function confirmBulkRemoval() {
+    const ids = pendingBulkRemoval
+    if (!ids) return
+    let done = 0
+    for (const id of ids) {
+      const book = bookList.find((b) => b.id === id)
+      if (!book) continue
+      try {
+        const result =
+          removalKindOf(book) === 'remove-audiobook' ? await libraryApi.removeAudiobook(id) : await libraryApi.removeBook(id)
+        if (result.ok) done += 1
+      } catch {
+        // counted as failed
+      }
+    }
+    await refreshLibrary().catch(() => {})
+    await refreshCollections().catch(() => {})
+    setPendingBulkRemoval(null)
+    showBulkToast(done, ids.length - done, 'library.selection.removed')
+    useLibrarySelectionStore.getState().clear()
+  }
+
   async function confirmPendingRemoval() {
     if (!pendingRemoval) return
     const action = pendingRemoval
@@ -581,6 +652,11 @@ export function useLibraryScreen() {
     pendingRemovalBook,
     setPendingRemoval,
     confirmPendingRemoval,
+    pendingBulkRemoval,
+    setPendingBulkRemoval,
+    confirmBulkRemoval,
+    handleBulkFavorite,
+    handleBulkAddToCollection,
     handleToggleFavorite,
     handleMarkCompleted,
     handleReadAgain,

@@ -27,7 +27,8 @@ covered (FR-024).
 |---|---|
 | Tap card / "Resume" | `openReader(id)` |
 | Tap "Read again" | close the book's Reading tab if open → `library.restartBook(id)` → refresh → `openReader(id)`; failure → toast `library.toast.actionFailed`, Reader not opened |
-| Tap ⋮ / long press (card, grid cover, list row) | existing `BookItemMenu` bottom sheet (`phone-sheet`) |
+| Tap ⋮ (card, grid cover, list row) / long press (Continue Reading card) | existing `BookItemMenu` bottom sheet (`phone-sheet`) |
+| Long press a grid cover or list row | **select mode** (`librarySelectionStore`, core `library-selection.ts`): the header becomes `PhoneSelectionBar` (✕, "{count} selected" in a polite live region, Select all / Deselect all); a tap toggles a book (`aria-pressed`, tick mark, ⋮ hidden but keeps its space); the banner slot becomes `PhoneSelectionActions` (Favorite / Unfavorite, Collection → `PhoneCollectionChooser`, Remove → confirmation, then one call per book and one list reload). Back or ✕ leaves; unpicking the last book leaves; a filter / search change keeps only the books still shown. Desktop is unchanged (long press / right click = the book menu). |
 | Tap chip | `setFilter(id)` |
 | Tap Grid / List | `setLayout('grid' \| 'table')` |
 | Tap "+" / "Import book" | `handleFromDevice()` |

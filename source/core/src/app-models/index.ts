@@ -251,3 +251,4 @@ export {
 } from './menu-placement.js'
 // Spec 016: the import queue shared by both hosts
 export * from './import-queue.js'
+export * from './library-selection.js'

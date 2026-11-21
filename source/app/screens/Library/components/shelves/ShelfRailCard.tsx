@@ -2,6 +2,8 @@ import type { LibraryBook } from '@core'
 import { useT } from '../../../../i18n'
 import { BookCover, BookMenuButton, type BookMenuPoint } from '../book'
 import { withLongPress } from '../../../../platforms/longPress'
+import { SelectionMark } from '../book/LibraryIcons'
+import type { BookSelection } from '../browse/bookSelection'
 
 const PROVIDER_LABEL: Record<'google_drive' | 'dropbox' | 'onedrive', string> = {
   google_drive: 'Google Drive',
@@ -44,6 +46,8 @@ export type ShelfRailCardProps = {
   onBookMenu: (bookId: string, point: BookMenuPoint) => void
   /** Width classes; default fixed 132px (collection grid). Library grid passes `w-full`. */
   className?: string
+  /** Phone select mode (Library grid only): long press picks, tap toggles while selecting. */
+  selection?: BookSelection
 }
 
 /** One cover card — Library grid cell and collection grid. */
@@ -52,8 +56,11 @@ export function ShelfRailCard({
   onOpen,
   onBookMenu,
   className = 'w-[132px] shrink-0',
+  selection,
 }: ShelfRailCardProps) {
   const t = useT()
+  const selecting = selection?.active ?? false
+  const selected = selection?.isSelected(book.id) ?? false
   const progress =
     book.status === 'reading' && book.progressPercent != null
       ? Math.round(book.progressPercent)
@@ -69,21 +76,26 @@ export function ShelfRailCard({
       className={`group relative flex min-w-0 flex-col gap-2 ${className}`}
       {...withLongPress((event) => {
         event.preventDefault()
-        onBookMenu(book.id, { x: event.clientX, y: event.clientY })
+        if (selection) selection.onPress(book.id)
+        else onBookMenu(book.id, { x: event.clientX, y: event.clientY })
       })}
     >
       <button
         type="button"
-        className="flex cursor-pointer flex-col gap-2 border-none bg-transparent p-0 rounded-md text-left font-[inherit] text-inherit focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-lib-accent"
-        onClick={() => onOpen(book.id)}
-        aria-label={t('library.card.openAria', { title: book.title })}
+        className="relative flex cursor-pointer flex-col gap-2 border-none bg-transparent p-0 rounded-md text-left font-[inherit] text-inherit focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-lib-accent"
+        onClick={() => (selecting ? selection!.onToggle(book.id) : onOpen(book.id))}
+        aria-label={
+          selecting ? t('library.selection.selectBook', { title: book.title }) : t('library.card.openAria', { title: book.title })
+        }
+        aria-pressed={selecting ? selected : undefined}
       >
+        {selecting ? <SelectionMark selected={selected} className="absolute top-2 left-2 z-[1]" /> : null}
         <BookCover
           bookId={book.id}
           title={book.title}
           coverUrl={book.coverUrl}
           isFavorite={book.isFavorite}
-          className="aspect-[2/3] h-auto w-full rounded-md shadow-[0_10px_28px_rgba(0,0,0,0.35)] transition-[border-color,transform] motion-safe:group-hover:-translate-y-0.5 group-hover:border-lib-accent-ring motion-safe:group-focus-visible:-translate-y-0.5 group-focus-visible:border-lib-accent-ring"
+          className={`aspect-[2/3] h-auto w-full rounded-md shadow-[0_10px_28px_rgba(0,0,0,0.35)]${selected ? ' outline-2 outline-offset-2 outline-lib-accent' : ''} transition-[border-color,transform] motion-safe:group-hover:-translate-y-0.5 group-hover:border-lib-accent-ring motion-safe:group-focus-visible:-translate-y-0.5 group-focus-visible:border-lib-accent-ring`}
         />
         <div className="min-w-0 px-0.5">
           <p className="m-0 truncate text-[13px] font-semibold text-lib-text-strong">
@@ -124,7 +136,7 @@ export function ShelfRailCard({
         </span>
         <BookMenuButton
           title={book.title}
-          className="book-card-menu shrink-0"
+          className={`book-card-menu shrink-0${selecting ? ' invisible' : ''}`}
           onOpen={(point) => onBookMenu(book.id, point)}
         />
       </div>

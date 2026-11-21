@@ -304,6 +304,27 @@ export const en = {
   relative: {
     justNow: 'just now',
   },
+  selection: {
+    count: { one: '{count} selected', other: '{count} selected' },
+    close: 'Exit selection',
+    selectAll: 'Select all',
+    deselectAll: 'Deselect all',
+    selectBook: 'Select “{title}”',
+    actions: 'Actions for the selected books',
+    favorite: 'Favorite',
+    unfavorite: 'Unfavorite',
+    addToCollection: 'Collection',
+    remove: 'Remove',
+    chooseCollection: { one: 'Add {count} book to a collection', other: 'Add {count} books to a collection' },
+    noCollections: 'No collections yet. Create one in Collections.',
+    removeTitle: { one: 'Remove {count} book from the library?', other: 'Remove {count} books from the library?' },
+    removeBody:
+      'Their highlights, notes, bookmarks and reading progress are removed too, and so are the copies of the files the app keeps.',
+    favoriteAdded: { one: '{count} book added to favorites.', other: '{count} books added to favorites.' },
+    favoriteRemoved: { one: '{count} book removed from favorites.', other: '{count} books removed from favorites.' },
+    removed: { one: '{count} book removed from the library.', other: '{count} books removed from the library.' },
+    partial: '{done} done, {failed} could not be changed.',
+  },
   phone: {
     chips: {
       aria: 'Filter books',

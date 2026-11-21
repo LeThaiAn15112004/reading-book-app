@@ -31,7 +31,7 @@ import { useLibraryImportStore } from '../../hooks/library'
 import { annotationExportMessage } from '../../utils/annotationTransferMessages'
 import { useShortcutAction } from '../../shortcuts'
 import { uiText, useT } from '../../i18n'
-import { Suspense, lazy, useMemo } from 'react'
+import { Suspense, lazy, useMemo, type ComponentProps } from 'react'
 import { isMobileHost } from '../../platforms/host'
 import { LibraryHub, type LibraryHubProps } from './LibraryHub'
 import { useLibraryScreen } from './logic'
@@ -43,11 +43,27 @@ import { useLibraryScreen } from './logic'
 const MobileLibraryHub = lazy(() => import('./phone/MobileLibraryHub'))
 
 /** Desktop hub, or the phone hub on the Mobile host — same props (FR-029: one Library, two presentations). */
-function LibraryHome({ onReadAgain, ...props }: LibraryHubProps & { onReadAgain: (bookId: string) => void }) {
+type PhoneOnlyProps = Omit<ComponentProps<typeof MobileLibraryHub>, keyof LibraryHubProps>
+
+function LibraryHome({
+  onReadAgain,
+  collections,
+  onBulkFavorite,
+  onBulkAddToCollection,
+  onBulkRemove,
+  ...props
+}: LibraryHubProps & PhoneOnlyProps) {
   if (!isMobileHost()) return <LibraryHub {...props} />
   return (
     <Suspense fallback={<div className="flex-1" aria-busy="true" />}>
-      <MobileLibraryHub {...props} onReadAgain={onReadAgain} />
+      <MobileLibraryHub
+        {...props}
+        onReadAgain={onReadAgain}
+        collections={collections}
+        onBulkFavorite={onBulkFavorite}
+        onBulkAddToCollection={onBulkAddToCollection}
+        onBulkRemove={onBulkRemove}
+      />
     </Suspense>
   )
 }
@@ -78,6 +94,11 @@ export function LibraryScreen() {
     pendingRemovalBook,
     setPendingRemoval,
     confirmPendingRemoval,
+    pendingBulkRemoval,
+    setPendingBulkRemoval,
+    confirmBulkRemoval,
+    handleBulkFavorite,
+    handleBulkAddToCollection,
     handleToggleFavorite,
     handleMarkCompleted,
     handleReadAgain,
@@ -242,6 +263,10 @@ export function LibraryScreen() {
             onReadAgain={(bookId) => void handleReadAgain(bookId)}
             onBookMenu={handleOpenBookMenu}
             onToggleFavorite={handleToggleFavorite}
+            collections={collections}
+            onBulkFavorite={handleBulkFavorite}
+            onBulkAddToCollection={handleBulkAddToCollection}
+            onBulkRemove={setPendingBulkRemoval}
           />
         )}
       </main>
@@ -410,6 +435,17 @@ export function LibraryScreen() {
           destructive={pendingRemoval.kind !== 'remove'}
           onCancel={() => setPendingRemoval(null)}
           onConfirm={confirmPendingRemoval}
+        />
+      ) : null}
+
+      {pendingBulkRemoval ? (
+        <ConfirmBookActionDialog
+          title={t('library.selection.removeTitle', { count: pendingBulkRemoval.length })}
+          message={t('library.selection.removeBody')}
+          confirmLabel={t('library.confirm.remove')}
+          destructive
+          onCancel={() => setPendingBulkRemoval(null)}
+          onConfirm={confirmBulkRemoval}
         />
       ) : null}
 

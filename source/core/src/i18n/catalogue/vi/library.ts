@@ -307,6 +307,27 @@ export const vi = {
   relative: {
     justNow: 'vừa xong',
   },
+  selection: {
+    count: { other: 'Đã chọn {count}' },
+    close: 'Thoát chọn',
+    selectAll: 'Chọn tất cả',
+    deselectAll: 'Bỏ chọn tất cả',
+    selectBook: 'Chọn “{title}”',
+    actions: 'Thao tác cho các sách đã chọn',
+    favorite: 'Yêu thích',
+    unfavorite: 'Bỏ yêu thích',
+    addToCollection: 'Bộ sưu tập',
+    remove: 'Gỡ',
+    chooseCollection: { other: 'Thêm {count} sách vào bộ sưu tập' },
+    noCollections: 'Chưa có bộ sưu tập nào. Tạo bộ sưu tập trong mục Bộ sưu tập.',
+    removeTitle: { other: 'Gỡ {count} sách khỏi thư viện?' },
+    removeBody:
+      'Các đoạn tô sáng, ghi chú, dấu trang và tiến độ đọc của những sách này cũng bị xóa, cùng bản sao tệp mà ứng dụng lưu giữ.',
+    favoriteAdded: { other: 'Đã thêm {count} sách vào yêu thích.' },
+    favoriteRemoved: { other: 'Đã gỡ {count} sách khỏi yêu thích.' },
+    removed: { other: 'Đã gỡ {count} sách khỏi thư viện.' },
+    partial: 'Xong {done} sách, {failed} sách không thực hiện được.',
+  },
   phone: {
     chips: {
       aria: 'Lọc sách',
