@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { bookIndexApi } from '../../../../bridge'
 import { useBookIndexStore } from '../bookIndex/bookIndexStore'
+import { useReaderOpeningStore } from '../../../../hooks/reader/readerOpeningStore'
 
 /** Let the first page paint and settle before Main is asked to do any extra work. */
 const IDLE_TIMEOUT_MS = 2000
@@ -20,6 +21,9 @@ export function useBookIndexing({ bookId, ready }: UseBookIndexingOptions): bool
   const begin = useBookIndexStore((s) => s.begin)
   const finish = useBookIndexStore((s) => s.finish)
   const indicatorVisible = useBookIndexStore((s) => (bookId ? s.visible[bookId] === true : false))
+  // Spec 016 (FR-015): chunking / word count of this book start only after its first page is drawn (≤ 10 s).
+  const opening = useReaderOpeningStore((s) => s.opening)
+  const firstPageDrawn = Boolean(bookId) && opening !== bookId
 
   useEffect(() => {
     return bookIndexApi.onStatus((status) => {
@@ -29,7 +33,7 @@ export function useBookIndexing({ bookId, ready }: UseBookIndexingOptions): bool
   }, [begin, finish])
 
   useEffect(() => {
-    if (!bookId || !ready) return
+    if (!bookId || !ready || !firstPageDrawn) return
 
     let cancelled = false
     const run = (): void => {
@@ -56,7 +60,7 @@ export function useBookIndexing({ bookId, ready }: UseBookIndexingOptions): bool
       cancelled = true
       window.clearTimeout(handle)
     }
-  }, [bookId, ready, begin])
+  }, [bookId, ready, firstPageDrawn, begin])
 
   return indicatorVisible
 }

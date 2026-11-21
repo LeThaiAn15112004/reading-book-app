@@ -115,7 +115,7 @@
     "source/app/platforms/electron/i18n/main-i18n.ts": "spec 012 T040: tMain moved to main-translate.ts (no electron import) so services and their spikes can use it",
     "source/app/platforms/electron/ipc/search.ipc.ts": "spec 012 T040: user-visible messages returned to the renderer built with tMain (Main interface language)",
     "source/app/platforms/electron/ipc/txt.ipc.ts": "spec 012 T040: user-visible messages returned to the renderer built with tMain (Main interface language)",
-    "source/app/platforms/electron/ipc/word-count.ipc.ts": "spec 012 T040: user-visible messages returned to the renderer built with tMain (Main interface language)",
+    "source/app/platforms/electron/ipc/word-count.ipc.ts": "spec 012 T040: user-visible messages returned to the renderer built with tMain (Main interface language) | spec 016: wordCount:getStats waits for the opening book's first page (≤ 10 s)",
     "source/app/platforms/electron/transcription/transcript-export-file.ts": "spec 012 T040: user-visible messages returned to the renderer built with tMain (Main interface language)",
     "source/app/platforms/electron/background/background-mode.ts": "spec 012 T046: tray tooltip + menu labels from tMain, rebuilt on a Main interface language change (trayMenuTemplate exported for spike:i18n:main) | spec 016: cancelQuitting() — a quit the reader cancelled (imports still running) keeps hiding on close",
     "source/app/platforms/electron/ipc/annotation-transfer.ipc.ts": "spec 012 T048: save / open dialog titles and filter names from tMain",
@@ -130,6 +130,7 @@
     "source/app/platforms/electron/perf/timing-log.ts": "spec 016: new — developer timing (READMATE_TIMING=1) to {userData}/logs/timing.jsonl",
     "source/app/platforms/electron/perf/reader-opening-gate.ts": "spec 016: new — background work waits for the first page",
     "source/app/platforms/electron/spikes/import/": "spec 016: new — spike:import:timing|parity|queue|cleanup",
-    "source/app/platforms/electron/files/cover-source.ts": "spec 016: new — getCoverSource / readBookRange (generated covers without the whole book)"
+    "source/app/platforms/electron/files/cover-source.ts": "spec 016: new — getCoverSource / readBookRange (generated covers without the whole book)",
+    "source/app/platforms/electron/ipc/book-index.ipc.ts": "spec 016: bookIndex:ensure waits for the opening book's first page (≤ 10 s)"
   }
 }

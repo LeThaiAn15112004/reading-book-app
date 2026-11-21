@@ -28,6 +28,8 @@ export const AppChannels = {
   getTimingEnabled: 'app:getTimingEnabled',
   /** Spec 016: renderer → Main, one step timing line appended to `{userData}/logs/timing.jsonl` (ignored when off). */
   recordTiming: 'app:recordTiming',
+  /** Spec 016 (FR-015): renderer → Main, the book being opened (first page not drawn yet), or null. */
+  setReaderOpening: 'app:setReaderOpening',
 } as const
 
 export const LibraryChannels = {

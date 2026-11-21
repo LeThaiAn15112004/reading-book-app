@@ -26,6 +26,7 @@ type AppMethods = Pick<
   | 'openExternalLink'
   | 'getTimingEnabled'
   | 'recordTiming'
+  | 'setReaderOpening'
 >
 
 /** Spec 016: the last timing lines kept for the WebView devtools (development builds only). */
@@ -107,6 +108,8 @@ export function createAppGroup(ctx: BridgeContext): AppMethods {
       return () => flushHandlers.delete(handler)
     },
     captureSnapshot: notAvailable('captureSnapshot'),
+    // Spec 016: the phone's gate is renderer-only (readerOpeningStore); the host has no background work to hold.
+    setReaderOpening: async () => ({ ok: true }),
     getTimingEnabled: async () => phoneTimingEnabled(),
     // Logged for `adb logcat | grep '\[timing\]'`; the line carries format, size and duration only (core step-timing).
     async recordTiming(line) {

@@ -38,6 +38,14 @@ export const appApi = {
       return false
     }
   },
+  /** Spec 016 (FR-015): tell the host which book is opening (null once its first page is drawn). Never throws. */
+  setReaderOpening: async (bookId: string | null): Promise<void> => {
+    try {
+      await api.setReaderOpening({ bookId })
+    } catch {
+      // best effort
+    }
+  },
   /** Spec 016: one step timing line → Main / the phone log. Never throws. */
   recordTiming: async (line: Parameters<typeof api.recordTiming>[0]): Promise<void> => {
     try {

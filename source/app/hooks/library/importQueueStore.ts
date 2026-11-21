@@ -34,6 +34,7 @@ import { importApi } from '../../bridge/import'
 import { libraryApi } from '../../bridge/library'
 import { api } from '../../platforms/api'
 import { useLibraryBooksStore } from './libraryBooksStore.js'
+import { waitUntilOpened } from '../reader/readerOpeningStore'
 
 /** Result shape of the host import calls (`ImportResult`). */
 type HostImportResult = { ok: boolean; bookId: string | null; errorCode?: string; errorMessage?: string }
@@ -131,9 +132,17 @@ function afterChange(queue: ImportQueue): void {
 
 async function pump(): Promise<void> {
   if (running) return
-  const next = nextToRun(useImportQueueStore.getState().queue)
-  if (!next) return
-  running = next.id
+  const candidate = nextToRun(useImportQueueStore.getState().queue)
+  if (!candidate) return
+  running = candidate.id
+  // Spec 016 (FR-015): the next job waits while a book's first page is being prepared (≤ 10 s).
+  await waitUntilOpened()
+  const next = useImportQueueStore.getState().queue.jobs.find((j) => j.id === candidate.id && j.state === 'waiting')
+  if (!next) {
+    running = null
+    void pump()
+    return
+  }
   useImportQueueStore.setState((s) => ({ queue: startJob(s.queue, next.id, Date.now()) }))
   afterChange(useImportQueueStore.getState().queue)
   const outcome = await runOne(next)

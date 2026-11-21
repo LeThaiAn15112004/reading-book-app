@@ -74,6 +74,7 @@ const api: DesktopApi = {
   openExternalLink: (url) => ipcRenderer.invoke(AppChannels.openExternalLink, url),
   getTimingEnabled: () => ipcRenderer.invoke(AppChannels.getTimingEnabled),
   recordTiming: (line) => ipcRenderer.invoke(AppChannels.recordTiming, line),
+  setReaderOpening: (input) => ipcRenderer.invoke(AppChannels.setReaderOpening, input),
   library: {
     listBooks: () => ipcRenderer.invoke(LibraryChannels.listBooks),
     getBook: (id) => ipcRenderer.invoke(LibraryChannels.getBook, id),

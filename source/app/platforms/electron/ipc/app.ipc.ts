@@ -12,6 +12,7 @@ import { loadGoogleOAuthClientConfig } from '../config/google-oauth-config'
 import { isTranscriptionPlatformSupported } from '../transcription/ffmpeg-artifacts'
 import { handleSetUiLanguage } from '../i18n/main-i18n'
 import { isTimingEnabled, recordRendererTiming } from '../perf/timing-log'
+import { setReaderOpening } from '../perf/reader-opening-gate'
 
 function windowFromEvent(event: Electron.IpcMainInvokeEvent): BrowserWindow | null {
   return BrowserWindow.fromWebContents(event.sender)
@@ -124,6 +125,10 @@ export function registerAppIpc(): void {
 
   ipcMain.removeHandler(AppChannels.recordTiming)
   ipcMain.handle(AppChannels.recordTiming, (_event, line: unknown): OkResult => ({ ok: recordRendererTiming(line) }))
+
+  // Spec 016 (FR-015): background work in Main waits for the opening book's first page (≤ 10 s).
+  ipcMain.removeHandler(AppChannels.setReaderOpening)
+  ipcMain.handle(AppChannels.setReaderOpening, (_event, input: unknown): OkResult => ({ ok: setReaderOpening(input) }))
 
   ipcMain.removeHandler(AppChannels.captureSnapshot)
   ipcMain.handle(

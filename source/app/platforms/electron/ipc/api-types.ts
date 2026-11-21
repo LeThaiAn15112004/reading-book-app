@@ -1124,6 +1124,8 @@ export interface DesktopApi {
   getTimingEnabled(): Promise<boolean>
   /** Spec 016: records one renderer step timing line; `ok: false` when timing is off or the line is invalid. */
   recordTiming(line: StepTimingDto): Promise<OkResult>
+  /** Spec 016 (FR-015): the book being opened (first page not drawn yet), or null; background work waits for it. */
+  setReaderOpening(input: { bookId: string | null }): Promise<OkResult>
   library: {
     listBooks(): Promise<BookSummaryDto[]>
     getBook(id: string): Promise<BookSummaryDto | null>

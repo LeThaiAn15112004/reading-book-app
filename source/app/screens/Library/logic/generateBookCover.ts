@@ -1,6 +1,7 @@
 import { libraryApi } from '../../../bridge'
 import { startStep } from '../../../hooks/app/stepTimer'
 import { useLibraryBooksStore } from '../../../hooks/library/libraryBooksStore'
+import { waitUntilOpened } from '../../../hooks/reader/readerOpeningStore'
 
 /** Spec 016 (FR-006): pdf.js asks for ranges; each call to Main / the local server reads at most 1 MiB. */
 const RANGE_MAX_BYTES = 1024 * 1024
@@ -173,6 +174,8 @@ function withTimeout<T>(work: Promise<T>, ms: number): Promise<T> {
 
 /** Render the book's first page and store it as its cover. Resolves true when a cover was saved. */
 export async function generateBookCover(bookId: string, format: string): Promise<boolean> {
+  // Spec 016 (FR-015): cover drawing waits while a book's first page is being prepared (≤ 10 s).
+  await waitUntilOpened()
   // Spec 016: `cover` step timing (size unknown here: 0).
   const mark = startStep('import', 'cover', { format: format.toLowerCase(), sizeBytes: 0 })
   try {

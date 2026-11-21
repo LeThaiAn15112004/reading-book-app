@@ -1,3 +1,4 @@
+import { waitUntilOpened } from '../perf/reader-opening-gate'
 import { ipcMain } from 'electron'
 import { getWordCountStats } from '../wordcount/word-count-service'
 import type { WordCountStatsDto } from './api-types'
@@ -8,6 +9,8 @@ export function registerWordCountIpc(): void {
   ipcMain.handle(
     WordCountChannels.getStats,
     async (_event, bookId: unknown): Promise<WordCountStatsDto> => {
+      // Spec 016 (FR-015): word count waits for the opening book's first page (≤ 10 s).
+      await waitUntilOpened()
       if (typeof bookId !== 'string' || !bookId.trim()) {
         return { state: 'error', message: tMain('main.messages.common.invalidBookId') }
       }

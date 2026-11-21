@@ -45,6 +45,7 @@ import { beginCancellable, cancelInFlight, endCancellable } from './import-cance
 import { holdPickedFile, takePickedFile } from './picked-files'
 import { HashCancelledError } from '../files/file-hash'
 import { setImportActivity } from '../background/quit-guard'
+import { yieldWhileOpening } from '../perf/reader-opening-gate'
 import { tMain } from '../i18n/main-translate'
 
 /** Cancel key of the (single) in-flight import:fromUrl download. */
@@ -469,7 +470,8 @@ async function importPickedPath(
         tMain('main.messages.import.outsideDataFolder'),
       )
     }
-    const checked = await fingerprintAndCheck(sourcePath, timing, { signal: control.signal, onProgress: control.onBytes })
+    // Spec 016 (FR-015 / R9): the fingerprint read yields one turn per 1 MiB chunk while a book is opening.
+    const checked = await fingerprintAndCheck(sourcePath, timing, { signal: control.signal, onProgress: control.onBytes, pause: yieldWhileOpening })
     if ('conflict' in checked) return checked.conflict
     fingerprint = checked.fingerprint
   } catch (err) {
