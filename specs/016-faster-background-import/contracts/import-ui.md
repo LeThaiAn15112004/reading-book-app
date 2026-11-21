@@ -13,6 +13,14 @@
 Collapsed state: a 44 px pill ("Importing 2 of 5 · 42 %") — one click / tap opens the card (FR-009 "reachable in one
 action"). It stays mounted in `App.tsx` above every route (Library, Reader, Collections, Settings).
 
+Pill visibility:
+
+- A job `running` or `waiting` → the pill is always shown.
+- Everything finished → the pill shows the result (`queue.pillDone`, e.g. "4 added · 1 failed", groups at 0 left out);
+  click / tap opens the batch summary. With no `failed` / `interrupted` job it hides by itself after 10 s; with one it
+  stays until the reader opens the summary or presses Dismiss (so "Try again" is never missed).
+- No job in the queue → nothing floats on screen.
+
 ## Placement
 
 - **Desktop**: bottom-right, 16 px from the window edges, above the reader's bottom chrome, `z-index` below dialogs;
@@ -37,6 +45,6 @@ action"). It stays mounted in `App.tsx` above every route (Library, Reader, Coll
 `queue.step.{downloading,copying,checking,reading,saving}`, `queue.waiting` ({count}), `queue.cancel`,
 `queue.finishing`, `queue.open`, `queue.openExisting`, `queue.tryAgain`, `queue.dismiss`, `queue.clearFinished`,
 `queue.summary.{added,already,failed,cancelled,interrupted}` (plurals), `queue.tooMany` ({count}), `queue.zipAlone`,
-`queue.placeholder.{importing,waiting}`, `queue.pill` ({current},{total},{percent}), `queue.pillElapsed` ({current},{total},{elapsed}), `queue.elapsed` ({seconds}), `queue.interrupted`,
+`queue.placeholder.{importing,waiting}`, `queue.pill` ({current},{total},{percent}), `queue.pillElapsed` ({current},{total},{elapsed}), `queue.pillDone` ({added},{failed},…), `queue.elapsed` ({seconds}), `queue.interrupted`,
 `main.messages.import.{fileChanged,quitConfirm.*}` (Main, `tMain`). File names / titles are params, never translated.
 Vietnamese per `specs/012-app-ui-i18n/contracts/glossary.md`.
