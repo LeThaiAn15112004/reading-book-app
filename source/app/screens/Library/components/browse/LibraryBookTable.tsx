@@ -4,6 +4,7 @@ import { useFormat, useT, useUiLanguage, type BoundFormat } from '../../../../i1
 import { BookCover, BookMenuButton, type BookMenuPoint } from '../book'
 import { StarIcon } from '../book/LibraryIcons'
 import { withLongPress } from '../../../../platforms/longPress'
+import type { BookSelection } from './bookSelection'
 
 export type LibraryBookTableProps = {
   books: LibraryBook[]
@@ -14,6 +15,8 @@ export type LibraryBookTableProps = {
   /** Spec 016: rows drawn after the first `leadCount` books, in the same table (the import placeholders). */
   inserted?: ReactNode
   leadCount?: number
+  /** Desktop select mode: a click / Space / Enter toggles the row (checkbox in the first column). */
+  selection?: BookSelection
 }
 
 function formatAdded(format: BoundFormat, iso?: string): string {
@@ -65,7 +68,9 @@ export function LibraryBookTable({
   onBookMenu,
   inserted,
   leadCount = 0,
+  selection,
 }: LibraryBookTableProps) {
+  const selecting = selection?.active ?? false
   const t = useT()
   const format = useFormat()
   const language = useUiLanguage()
@@ -80,7 +85,10 @@ export function LibraryBookTable({
 
   function onRowKeyDown(event: KeyboardEvent<HTMLTableRowElement>, index: number, book: LibraryBook) {
     if (event.target !== event.currentTarget) return
-    if (event.key === 'Enter') {
+    if (selecting && (event.key === 'Enter' || event.key === ' ')) {
+      event.preventDefault()
+      selection!.onToggle(book.id)
+    } else if (event.key === 'Enter') {
       event.preventDefault()
       onOpen(book.id)
     } else if (event.key === ' ') {
@@ -100,7 +108,7 @@ export function LibraryBookTable({
       <table className="w-full border-collapse text-[13px]" aria-label={t('library.books')}>
         <thead>
           <tr>
-            <th className={`${th} w-[52px]`}>
+            <th className={`${th} ${selecting ? 'w-[80px]' : 'w-[52px]'}`}>
               <span className="sr-only">{t('library.table.cover')}</span>
             </th>
             <th className={th}>{t('library.table.title')}</th>
@@ -117,7 +125,8 @@ export function LibraryBookTable({
         <tbody>
           {leadCount === 0 ? inserted : null}
           {books.map((book, index) => {
-            const selected = book.id === selectedBookId
+            const picked = selection?.isSelected(book.id) ?? false
+            const selected = selecting ? picked : book.id === selectedBookId
             return (
               <Fragment key={book.id}>
               <tr
@@ -131,16 +140,31 @@ export function LibraryBookTable({
                 className={`group cursor-pointer outline-none transition-colors focus-visible:bg-lib-surface-hover ${
                   selected ? 'bg-lib-accent-soft' : 'hover:bg-lib-surface-hover'
                 }${index < leadCount ? ' import-arrived' : ''}`}
-                onClick={() => onSelect(book.id)}
-                onDoubleClick={() => onOpen(book.id)}
+                onClick={() => (selecting ? selection!.onToggle(book.id) : onSelect(book.id))}
+                onDoubleClick={() => (selecting ? undefined : onOpen(book.id))}
                 onKeyDown={(e) => onRowKeyDown(e, index, book)}
                 {...withLongPress((event) => {
                   event.preventDefault()
+                  if (selecting) {
+                    selection!.onToggle(book.id)
+                    return
+                  }
                   onSelect(book.id)
                   onBookMenu(book.id, { x: event.clientX, y: event.clientY })
                 })}
               >
                 <td className={`${td} py-1.5`}>
+                  <div className="flex items-center gap-2">
+                  {selecting ? (
+                    <input
+                      type="checkbox"
+                      className="size-4 shrink-0 cursor-pointer accent-[var(--lib-accent)]"
+                      checked={picked}
+                      aria-label={t('library.selection.selectBook', { title: book.title })}
+                      onClick={(e) => e.stopPropagation()}
+                      onChange={() => selection!.onToggle(book.id)}
+                    />
+                  ) : null}
                   <BookCover
                     bookId={book.id}
                     title={book.title}
@@ -149,6 +173,7 @@ export function LibraryBookTable({
                     className="h-[44px] w-[30px] rounded-[3px]"
                     titleClassName="hidden"
                   />
+                  </div>
                 </td>
                 <td className={`${td} max-w-0`}>
                   <div className="flex min-w-0 items-center gap-1.5">
@@ -183,7 +208,7 @@ export function LibraryBookTable({
                 <td className={`${td} px-1`}>
                   <BookMenuButton
                     title={book.title}
-                    className="shrink-0"
+                    className={`shrink-0${selecting ? ' invisible' : ''}`}
                     onOpen={(point) => {
                       onSelect(book.id)
                       onBookMenu(book.id, point)

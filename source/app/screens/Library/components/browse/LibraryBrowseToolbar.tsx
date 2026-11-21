@@ -13,6 +13,8 @@ export type LibraryBrowseToolbarProps = {
   onSortChange: (sort: LibrarySortId) => void
   layout: LibraryLayout
   onLayoutChange: (layout: LibraryLayout) => void
+  /** "Select": enter select mode (absent when there is nothing to select). */
+  onStartSelect?: () => void
 }
 
 function GridIcon() {
@@ -44,6 +46,7 @@ export function LibraryBrowseToolbar({
   onSortChange,
   layout,
   onLayoutChange,
+  onStartSelect,
 }: LibraryBrowseToolbarProps) {
   const t = useT()
   return (
@@ -56,6 +59,17 @@ export function LibraryBrowseToolbar({
           {t('library.bookCount', { count })}
         </span>
       </div>
+
+      {onStartSelect ? (
+        <button
+          type="button"
+          className="h-8 cursor-pointer rounded-lg border border-lib-border bg-transparent px-3 text-[13px] font-medium text-lib-text-strong hover:bg-lib-surface-hover focus-visible:outline-2 focus-visible:outline-lib-accent"
+          title={t('library.selection.startHint')}
+          onClick={onStartSelect}
+        >
+          {t('library.selection.start')}
+        </button>
+      ) : null}
 
       <label className="flex items-center gap-2 text-[12px] text-lib-muted">
         <span>{t('library.sorts.label')}</span>

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
-import { allSelected, bulkFavoriteTarget, pruneSelection, type CollectionSummary } from '@core'
+import { allSelected, bulkFavoriteTarget, pruneSelection } from '@core'
 import { useBackClose } from '../../../hooks/app/useBackClose'
 import { useT } from '../../../i18n'
 import { ImportAddedNote, ImportPlaceholderItems } from '../../../components/import/LibraryImportPlaceholders'
@@ -8,8 +8,7 @@ import { BootErrorBanner, LibraryBookGrid } from '../components'
 import type { LibraryHubProps } from '../LibraryHub'
 import { LIBRARY_FILTER_EMPTY, useLibraryBrowse, useLibraryBrowseStore } from '../logic'
 import { useLibrarySelectionStore } from '../logic/librarySelectionStore'
-import type { BookSelection } from '../components'
-import { PhoneCollectionChooser } from './PhoneCollectionChooser'
+import { BulkCollectionChooser, type BookSelection } from '../components'
 import { PhoneSelectionActions } from './PhoneSelectionActions'
 import { PhoneSelectionBar } from './PhoneSelectionBar'
 import { MobileLibraryEmptyState } from './MobileLibraryEmptyState'
@@ -23,12 +22,6 @@ import { AdSlot } from './AdSlot'
 export type MobileLibraryHubProps = LibraryHubProps & {
   /** "Read again" on a finished book (spec 013 US1): restart it at the beginning, then open it. */
   onReadAgain: (bookId: string) => void
-  /** Select mode (long press a book): the collections to add to, and the bulk actions. */
-  collections: CollectionSummary[]
-  onBulkFavorite: (ids: string[]) => Promise<void>
-  onBulkAddToCollection: (collectionId: string, ids: string[]) => Promise<boolean>
-  /** Opens the removal confirmation for these books. */
-  onBulkRemove: (ids: string[]) => void
 }
 
 /**
@@ -75,7 +68,7 @@ export default function MobileLibraryHub({
   const slot = useImportSlot(visibleIds, sort, filter === 'all' && !searchActive)
   // Select mode (long press a book): picked ids, kept to the books shown (a filter change or a removal drops the rest).
   const selectedIds = useLibrarySelectionStore((s) => s.ids)
-  const selecting = selectedIds.length > 0
+  const selecting = useLibrarySelectionStore((s) => s.active)
   const [chooserOpen, setChooserOpen] = useState(false)
   const [bulkBusy, setBulkBusy] = useState(false)
   const clearSelection = useLibrarySelectionStore((s) => s.clear)
@@ -89,8 +82,8 @@ export default function MobileLibraryHub({
   const selection = useMemo<BookSelection>(() => {
     const picked = new Set(selectedIds)
     const store = useLibrarySelectionStore.getState()
-    return { active: picked.size > 0, isSelected: (id) => picked.has(id), onPress: store.press, onToggle: store.toggle }
-  }, [selectedIds])
+    return { active: selecting, isSelected: (id) => picked.has(id), onPress: store.press, onToggle: store.toggle }
+  }, [selectedIds, selecting])
   const everySelected = allSelected(selectedIds, visibleIds)
 
   async function runBulk(task: () => Promise<unknown>) {
@@ -215,7 +208,8 @@ export default function MobileLibraryHub({
         <AdSlot />
       )}
       {chooserOpen && selecting ? (
-        <PhoneCollectionChooser
+        <BulkCollectionChooser
+          layout="sheet"
           collections={collections}
           count={selectedIds.length}
           onClose={() => setChooserOpen(false)}

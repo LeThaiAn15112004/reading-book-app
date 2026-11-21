@@ -307,6 +307,10 @@ export const en = {
   selection: {
     count: { one: '{count} selected', other: '{count} selected' },
     close: 'Exit selection',
+    start: 'Select',
+    startHint: 'Select several books',
+    done: 'Done',
+    removeBodyDesktop: 'They will disappear from the library. The book files are not deleted.',
     selectAll: 'Select all',
     deselectAll: 'Deselect all',
     selectBook: 'Select “{title}”',

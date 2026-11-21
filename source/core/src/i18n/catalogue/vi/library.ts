@@ -310,6 +310,10 @@ export const vi = {
   selection: {
     count: { other: 'Đã chọn {count}' },
     close: 'Thoát chọn',
+    start: 'Chọn',
+    startHint: 'Chọn nhiều sách',
+    done: 'Xong',
+    removeBodyDesktop: 'Các sách này sẽ biến mất khỏi thư viện. Tệp sách không bị xóa.',
     selectAll: 'Chọn tất cả',
     deselectAll: 'Bỏ chọn tất cả',
     selectBook: 'Chọn “{title}”',

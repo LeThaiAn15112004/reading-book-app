@@ -31,7 +31,7 @@ import { useLibraryImportStore } from '../../hooks/library'
 import { annotationExportMessage } from '../../utils/annotationTransferMessages'
 import { useShortcutAction } from '../../shortcuts'
 import { uiText, useT } from '../../i18n'
-import { Suspense, lazy, useMemo, type ComponentProps } from 'react'
+import { Suspense, lazy, useMemo } from 'react'
 import { isMobileHost } from '../../platforms/host'
 import { LibraryHub, type LibraryHubProps } from './LibraryHub'
 import { useLibraryScreen } from './logic'
@@ -43,27 +43,11 @@ import { useLibraryScreen } from './logic'
 const MobileLibraryHub = lazy(() => import('./phone/MobileLibraryHub'))
 
 /** Desktop hub, or the phone hub on the Mobile host — same props (FR-029: one Library, two presentations). */
-type PhoneOnlyProps = Omit<ComponentProps<typeof MobileLibraryHub>, keyof LibraryHubProps>
-
-function LibraryHome({
-  onReadAgain,
-  collections,
-  onBulkFavorite,
-  onBulkAddToCollection,
-  onBulkRemove,
-  ...props
-}: LibraryHubProps & PhoneOnlyProps) {
+function LibraryHome({ onReadAgain, ...props }: LibraryHubProps & { onReadAgain: (bookId: string) => void }) {
   if (!isMobileHost()) return <LibraryHub {...props} />
   return (
     <Suspense fallback={<div className="flex-1" aria-busy="true" />}>
-      <MobileLibraryHub
-        {...props}
-        onReadAgain={onReadAgain}
-        collections={collections}
-        onBulkFavorite={onBulkFavorite}
-        onBulkAddToCollection={onBulkAddToCollection}
-        onBulkRemove={onBulkRemove}
-      />
+      <MobileLibraryHub {...props} onReadAgain={onReadAgain} />
     </Suspense>
   )
 }
@@ -441,7 +425,7 @@ export function LibraryScreen() {
       {pendingBulkRemoval ? (
         <ConfirmBookActionDialog
           title={t('library.selection.removeTitle', { count: pendingBulkRemoval.length })}
-          message={t('library.selection.removeBody')}
+          message={isMobileHost() ? t('library.selection.removeBody') : t('library.selection.removeBodyDesktop')}
           confirmLabel={t('library.confirm.remove')}
           destructive
           onCancel={() => setPendingBulkRemoval(null)}
