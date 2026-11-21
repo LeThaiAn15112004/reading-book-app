@@ -35,6 +35,9 @@ Pill visibility:
   toast "Pick an audiobook ZIP on its own to see its preview."
 - Finishing: success → toast "{title} was added" + Open; duplicate → toast + "Open existing"; failure → toast with
   the cause. Toasts and step changes are announced in an `aria-live="polite"` region; focus never moves (FR-012).
+- Toast vs result pill: a toast is shown **only for a single-file import** (a job without `batchId`: one picked file,
+  URL, cloud, ZIP). A batch (multi-file pick) shows **no per-file toast**: its results reach the reader only through the
+  result pill and the batch summary (FR-011a), so the same result is never shown twice.
 - Placeholders appear on the "All books" view only and disappear on done (replaced by the real book via
   `libraryBooksStore.upsertBook`), failure or cancel.
 - Theme tokens only (`--lib-*`), text ≥ 4.5 : 1, `motion-safe` for the bar animation (reduced motion: static bar with
