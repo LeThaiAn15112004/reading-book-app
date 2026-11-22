@@ -10,7 +10,8 @@ an approval line in `source/scripts/desktop-main-changes.json`.
 type OpenBookContentResult =
   | { ok: true; bookId; format; data: ArrayBuffer; byteLength }
   | { ok: false; bookId; errorCode: OpenBookErrorCode; errorMessage: string; retryable?: boolean }
-// OpenBookErrorCode gains: 'protected' | 'not_available_offline'
+// OpenBookErrorCode gains: 'not_available_offline' | 'file_changed'
+// ('protected' is NOT an IPC code: it is detected in the renderer — pdf.js PasswordException, EPUB encryption.xml)
 ```
 
 - Hashes the bytes (`servedSha256`) **only for PDF** (R6).
