@@ -8,6 +8,8 @@
  *    folders go; referenced folders / covers, `.partial` ZIP folders, recent temp folders and non-UUID names stay.
  * 2. 20 real `import:runJob` runs that are cancelled while fingerprinting or fail (damaged EPUB, unsupported,
  *    changed file): 0 rows, 0 sandbox copies, 0 covers, and every source file's SHA-256 unchanged.
+ * 3. Spec 017 (FR-021): a file whose modified time alone changes during the import (a sync program touching it) is
+ *    still added; only a content change is "file changed".
  */
 import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
@@ -119,21 +121,25 @@ try {
         assert.equal(result.errorCode, 'cancelled')
         cancelled += 1
       } else {
-        const file = i % 4 === 1 ? damaged : epubWithCover
+        const changing = i % 4 !== 1
+        // Spec 017 (FR-021): "changed" is judged by content, so the changed case works on its own copy of the book
+        // (the sample files keep their fingerprint).
+        const file = changing ? path.join(work, `changing-${i}.epub`) : damaged
+        if (changing) fs.copyFileSync(epubWithCover, file)
         const pickId = holdPickedFile(file)
-        if (file === epubWithCover) {
-          // Changed while importing: touched when Main reports "reading" — after the fingerprint, before the
+        if (changing) {
+          // Changed while importing: rewritten when Main reports "reading" — after the fingerprint, before the
           // "file changed?" check — so the import must answer file_changed and remove the cover it extracted.
-          const touching = {
+          const rewriting = {
             isDestroyed: () => false,
             send: (_channel, payload) => {
               if (payload?.step !== 'reading') return
-              const t = new Date(Date.now() + 5000 + i * 1000)
-              fs.utimesSync(file, t, t)
+              fs.appendFileSync(file, Buffer.from('changed'))
             },
           }
-          const result = await runJob({ sender: touching }, { jobId, pickId })
+          const result = await runJob({ sender: rewriting }, { jobId, pickId })
           assert.equal(result.errorCode, 'file_changed')
+          fs.rmSync(file, { force: true })
         } else {
           const result = await runJob({ sender }, { jobId, pickId })
           assert.equal(result.ok, true, 'a damaged EPUB falls back to its file name (today’s behaviour)')
@@ -151,6 +157,30 @@ try {
     assert.deepEqual({ rows, copies, covers }, { rows: 0, copies: 0, covers: 0 })
     for (const f of sources) assert.equal(sha(f), before[f], `${path.basename(f)} unchanged`)
     console.log(`    (${cancelled} cancelled while fingerprinting, ${failed} failed / changed)`)
+  })
+
+  await check('spec 017: a modified time touched during the import (same content) is still added', async () => {
+    const db = getDatabase()
+    const runJob = handlers.get(ImportChannels.runJob)
+    const samples = path.join(work, 'samples-touched')
+    fs.mkdirSync(samples, { recursive: true })
+    const [epubWithCover] = buildSyntheticSamples(samples)
+    const file = path.join(work, 'touched.epub')
+    fs.copyFileSync(epubWithCover, file)
+    const touching = {
+      isDestroyed: () => false,
+      send: (_channel, payload) => {
+        if (payload?.step !== 'reading') return
+        const t = new Date(Date.now() + 60_000)
+        fs.utimesSync(file, t, t)
+      },
+    }
+    const result = await runJob({ sender: touching }, { jobId: 'touched-job', pickId: holdPickedFile(file) })
+    assert.equal(result.ok, true, `added, not ${result.errorCode}`)
+    db.prepare('DELETE FROM books WHERE id = ?').run(result.bookId)
+    for (const name of fs.existsSync(getCoversPath()) ? fs.readdirSync(getCoversPath()) : []) {
+      fs.rmSync(path.join(getCoversPath(), name), { force: true })
+    }
   })
 
   console.log(`spike:import:cleanup — ${passed} checks passed`)

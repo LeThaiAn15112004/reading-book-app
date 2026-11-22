@@ -141,6 +141,7 @@ const api: DesktopApi = {
     pickFiles: () => ipcRenderer.invoke(ImportChannels.pickFiles),
     runJob: (input) => ipcRenderer.invoke(ImportChannels.runJob, input),
     cancelJob: (input) => ipcRenderer.invoke(ImportChannels.cancelJob, input),
+    releasePicks: (input) => ipcRenderer.invoke(ImportChannels.releasePicks, input),
     reportActivity: (input) => ipcRenderer.invoke(ImportChannels.reportActivity, input),
     onCancelAll: (handler) => {
       const listener = (): void => handler()

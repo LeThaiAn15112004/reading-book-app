@@ -82,6 +82,8 @@ export const ImportChannels = {
   runJob: 'import:runJob',
   /** Spec 016: cancel the running queue job (refused while "Saving"). */
   cancelJob: 'import:cancelJob',
+  /** Spec 017 (US4): forget picks whose waiting jobs were cancelled, dismissed or cleared (no time limit any more). */
+  releasePicks: 'import:releasePicks',
   /** Spec 016: renderer → Main, how many imports run / wait (quit confirmation). */
   reportActivity: 'import:reportActivity',
   /** Spec 016: Main → renderer, a confirmed quit: cancel every import now. */

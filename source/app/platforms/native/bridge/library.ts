@@ -7,6 +7,7 @@
  *     the original the user picked was never referenced. A file left behind is caught by the startup sweep.
  * Every write runs through the single write queue.
  */
+import { getT } from '@app/i18n'
 import { checkMdFileSize, describeMdTooLarge } from '@core'
 import { bytesToBase64 } from '../host/encoding'
 import type { BookListItem } from '../stores/library-store'
@@ -70,9 +71,9 @@ export function createLibraryGroup(ctx: BridgeContext): Library {
 
     async openBookContent(id) {
       const bookId = idOf(id)
-      if (!bookId) return fail('', 'not_found', 'Book not found.')
+      if (!bookId) return fail('', 'not_found', getT()('main.messages.common.bookNotFound'))
       const book = await library.findById(bookId)
-      if (!book) return fail(bookId, 'not_found', 'Book not found.')
+      if (!book) return fail(bookId, 'not_found', getT()('main.messages.common.bookNotFound'))
       // TXT is read through txt.open; nothing is sent here, as on Desktop.
       if (book.format === 'txt') return { ok: true, bookId, format: 'txt', data: new ArrayBuffer(0), byteLength: 0 }
       if (book.format === 'md' && book.fileSizeBytes != null && !checkMdFileSize(book.fileSizeBytes).ok) return fail(bookId, 'too_large', describeMdTooLarge())
@@ -81,11 +82,11 @@ export function createLibraryGroup(ctx: BridgeContext): Library {
         data = await ctx.content.read(bookId)
       } catch (error) {
         const code = error instanceof HostCallError ? error.code : ''
-        if (code === 'NOT_FOUND') return fail(bookId, 'missing_file', 'The book file could not be found. It may have been moved, renamed, or deleted.')
-        if (code === 'BOOK_TOO_LARGE_FOR_DEV') return fail(bookId, 'too_large', 'Books larger than 20 MB open only in the installed app, not in Expo Go.')
+        if (code === 'NOT_FOUND') return fail(bookId, 'missing_file', getT()('main.messages.common.bookFileMissing'))
+        if (code === 'BOOK_TOO_LARGE_FOR_DEV') return fail(bookId, 'too_large', getT()('main.messages.import.tooLargeForDev'))
         // Spec 017 (R3): the local server can be briefly unreachable right after the app returns to the foreground —
         // a thrown fetch / 5xx / interrupted chunk read is passing, the Reader retries it once.
-        return { ...fail(bookId, 'read_failed', 'Could not read the book file.'), retryable: code === 'READ_FAILED' }
+        return { ...fail(bookId, 'read_failed', getT()('main.messages.common.readFailed')), retryable: code === 'READ_FAILED' }
       }
       if (book.format === 'md' && !checkMdFileSize(data.byteLength).ok) return fail(bookId, 'too_large', describeMdTooLarge())
       return { ok: true, bookId, format: book.format as OpenBookContentResult['format'], data, byteLength: data.byteLength }

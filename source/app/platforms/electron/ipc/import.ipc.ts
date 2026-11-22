@@ -42,8 +42,9 @@ import type {
 } from './api-types'
 import { ImportChannels } from './channels'
 import { beginCancellable, cancelInFlight, endCancellable } from './import-cancel'
-import { holdPickedFile, takePickedFile } from './picked-files'
+import { holdPickedFile, releasePicks, takePickedFile } from './picked-files'
 import { HashCancelledError } from '../files/file-hash'
+import { isCloudPlaceholderError } from '../files/read-book-bytes'
 import { setImportActivity } from '../background/quit-guard'
 import { yieldWhileOpening } from '../perf/reader-opening-gate'
 import { tMain } from '../i18n/main-translate'
@@ -120,6 +121,8 @@ function errnoCode(err: unknown): string | undefined {
  * null when `err` is not one of those.
  */
 export function fileAccessFailure(err: unknown): ImportResult | null {
+  // Spec 017 (US4, FR-021): an "online-only" cloud file is not damaged — it is just not on this computer yet.
+  if (isCloudPlaceholderError(err)) return notAvailableOfflineResult()
   const code = errnoCode(err)
   if (code === 'ENOENT' || code === 'ENOTDIR') {
     return importFailure(
@@ -202,14 +205,37 @@ export async function fingerprintAndCheck(
   return { fingerprint: { known: { sha256, fileSizeBytes }, onDisk: { size: before.size, mtimeMs: before.mtimeMs } } }
 }
 
-/** `true` when the file is no longer the one that was fingerprinted (moved, removed, resized or rewritten). */
-async function fileChangedSince(filePath: string, fingerprint: ImportFingerprint): Promise<boolean> {
+/**
+ * Whether the file is still the one that was fingerprinted. Spec 017 (US4, R9, FR-021): judged by CONTENT, not by the
+ * modified time — a sync program (OneDrive, Google Drive, Dropbox) touches files it did not change.
+ * - size differs (or the file vanished) ⇒ `changed`;
+ * - same size, different mtime ⇒ hashed again (with the job's signal) and compared with the fingerprint;
+ * - a cloud placeholder that cannot be read now ⇒ `offline`.
+ */
+async function fileChangedSince(
+  filePath: string,
+  fingerprint: ImportFingerprint,
+  signal?: AbortSignal,
+): Promise<'same' | 'changed' | 'offline'> {
+  let now: Awaited<ReturnType<typeof fsp.stat>>
   try {
-    const now = await fsp.stat(filePath)
-    return now.size !== fingerprint.onDisk.size || now.mtimeMs !== fingerprint.onDisk.mtimeMs
-  } catch {
-    return true
+    now = await fsp.stat(filePath)
+  } catch (error) {
+    return isCloudPlaceholderError(error) ? 'offline' : 'changed'
   }
+  if (now.size !== fingerprint.onDisk.size) return 'changed'
+  if (now.mtimeMs === fingerprint.onDisk.mtimeMs) return 'same'
+  try {
+    const again = await hashFile(filePath, { signal })
+    return again.sha256 === fingerprint.known.sha256 ? 'same' : 'changed'
+  } catch (error) {
+    if (error instanceof HashCancelledError) throw error
+    return isCloudPlaceholderError(error) ? 'offline' : 'changed'
+  }
+}
+
+export function notAvailableOfflineResult(): ImportResult {
+  return importFailure('not_available_offline', tMain('main.messages.import.notOffline'))
 }
 
 export function fileChangedResult(): ImportResult {
@@ -318,9 +344,18 @@ async function finishImport(
 
   // Spec 016 (FR-003 / edge case): a referenced file that changed or vanished since it was fingerprinted is not
   // added — its hash would not describe it any more.
-  if (fingerprint && !ownsFile && (await fileChangedSince(filePath, fingerprint))) {
-    await discardImportArtifacts()
-    return fileChangedResult()
+  if (fingerprint && !ownsFile) {
+    let state: 'same' | 'changed' | 'offline'
+    try {
+      state = await fileChangedSince(filePath, fingerprint, control.signal)
+    } catch {
+      await discardImportArtifacts()
+      return cancelledResult()
+    }
+    if (state !== 'same') {
+      await discardImportArtifacts()
+      return state === 'offline' ? notAvailableOfflineResult() : fileChangedResult()
+    }
   }
 
   // Spec 016 (FR-005): a format whose signature needs the file's content (PDF) is checked AFTER saving, in the
@@ -659,6 +694,12 @@ export function registerImportIpc(): void {
 
   ipcMain.removeHandler(ImportChannels.cancelJob)
   ipcMain.handle(ImportChannels.cancelJob, (_event, input: unknown) => cancelJob(input))
+
+  ipcMain.removeHandler(ImportChannels.releasePicks)
+  ipcMain.handle(ImportChannels.releasePicks, (_event, input: unknown) => ({
+    ok: true as const,
+    released: releasePicks((input as { pickIds?: unknown } | null)?.pickIds),
+  }))
 
   ipcMain.removeHandler(ImportChannels.reportActivity)
   ipcMain.handle(ImportChannels.reportActivity, (_event, input: unknown): OkResult => ({ ok: setImportActivity(input) }))

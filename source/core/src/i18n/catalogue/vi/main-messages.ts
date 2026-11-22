@@ -25,6 +25,10 @@ export const vi = {
     downloadFileFailed: 'Không tải được tệp xuống.',
     fileChanged: 'Tệp đã thay đổi hoặc không còn ở đó.',
     busy: 'Một lượt nhập khác vẫn đang chạy.',
+    notOffline: 'Tệp chưa có sẵn ngoại tuyến. Hãy tải tệp về thiết bị này rồi thử lại.',
+    noSpace: 'Thiết bị không đủ dung lượng trống cho sách này. Chưa có gì được thêm.',
+    unsupportedHere: '“{name}” không phải định dạng sách Readmate mở được ở đây (EPUB, PDF, TXT hoặc Markdown).',
+    tooLargeForDev: 'Sách lớn hơn 20 MB chỉ mở được trong ứng dụng đã cài, không mở được trong Expo Go.',
     quitConfirm: {
       title: 'Vẫn đang nhập sách',
       message: { other: 'Còn {count} lượt nhập đang chạy hoặc đang chờ. Thoát và hủy các lượt nhập này?' },

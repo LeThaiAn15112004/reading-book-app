@@ -22,6 +22,14 @@ export const en = {
     downloadFileFailed: 'Could not download the file.',
     fileChanged: 'The file changed or is no longer there.',
     busy: 'Another import is still running.',
+    /** Spec 017 (US4): a cloud-drive "online-only" file. */
+    notOffline: 'The file is not available offline yet. Make it available on this device, then try again.',
+    /** Spec 017 (US4): the phone ran out of space while copying. */
+    noSpace: 'There is not enough free space on this device for this book. Nothing was added.',
+    /** Spec 017 (US4): the phone picked a file of another format. `name` = the file name. */
+    unsupportedHere: '“{name}” is not a book format Readmate can open here (EPUB, PDF, TXT or Markdown).',
+    /** Spec 017 (US4): Expo Go (development only) opens books up to 20 MB. */
+    tooLargeForDev: 'Books larger than 20 MB open only in the installed app, not in Expo Go.',
     quitConfirm: {
       title: 'Imports are still running',
       message: { one: '{count} import is still running or waiting. Quit and cancel it?', other: '{count} imports are still running or waiting. Quit and cancel them?' },

@@ -89,7 +89,9 @@ function outcomeOf(result: HostImportResult, jobId: string): ImportJobOutcome {
   if (result.errorCode === 'duplicate' && result.bookId) return { kind: 'duplicate', bookId: result.bookId }
   if (result.errorCode === 'cancelled') return { kind: 'cancelled' }
   if (restored.has(jobId) && (result.errorCode === 'missing_file' || result.errorCode === 'access_denied')) {
-    return { kind: 'interrupted', error: { code: 'interrupted', message: { key: 'import.queue.interrupted' } } }
+    // Spec 017 (US4, FR-022): the phone may lose read access to a pick after a relaunch — not damaged, not a save
+    // failure: "Interrupted — pick the file again" (Try again opens the picker).
+    return { kind: 'interrupted', error: { code: 'interrupted', message: { key: 'import.queue.pickAgain' } } }
   }
   return {
     kind: 'failed',
@@ -163,6 +165,21 @@ async function pump(): Promise<void> {
   void pump()
 }
 
+/**
+ * Spec 017 (US4, R8): a pick is held by the host for as long as its job may still use it (no time limit), so the
+ * picks of jobs that leave the queue without running are released. An id the host already used is ignored there.
+ */
+function releasePicksOf(jobs: readonly ImportJob[]): void {
+  const pickIds = jobs.flatMap((j) => (j.source.kind === 'pick' && j.source.pickId ? [j.source.pickId] : []))
+  if (pickIds.length) void importApi.releasePicks(pickIds)
+}
+
+/** The jobs of `before` that are not in `after` (removed by dismiss / clear finished). */
+function removedJobs(before: ImportQueue, after: ImportQueue): ImportJob[] {
+  const kept = new Set(after.jobs.map((j) => j.id))
+  return before.jobs.filter((j) => !kept.has(j.id))
+}
+
 function enqueue(items: NewImportJob[], batch?: { batchId: string; notAdded: number }): void {
   useImportQueueStore.setState((s) => ({
     queue: enqueueJobs(s.queue, items, { now: Date.now(), batchId: batch?.batchId, notAdded: batch?.notAdded }),
@@ -203,6 +220,8 @@ export const useImportQueueStore = create<ImportQueueState>((set, get) => ({
     const { queue, accepted } = requestCancel(get().queue, jobId)
     if (!accepted || !job) return
     set({ queue })
+    // A waiting job never took its pick: give it back now.
+    if (job.state === 'waiting') releasePicksOf([job])
     if (job.state === 'running') {
       if (job.source.kind === 'pick') void importApi.cancelJob(jobId).catch(() => {})
       else if (job.source.kind === 'url') void importApi.cancel().catch(() => {})
@@ -220,6 +239,7 @@ export const useImportQueueStore = create<ImportQueueState>((set, get) => ({
     if (!job) return
     if (job.source.kind === 'pick' && (job.state === 'interrupted' || !job.source.pickId)) {
       // A lost pick cannot be read again: Try again opens the picker (FR-013b); the old entry goes.
+      releasePicksOf([job])
       set((s) => ({ queue: dismissQueueJob(s.queue, jobId) }))
       void pickAndQueue()
       return
@@ -230,12 +250,16 @@ export const useImportQueueStore = create<ImportQueueState>((set, get) => ({
   },
 
   dismiss: (jobId) => {
+    const before = get().queue
     set((s) => ({ queue: dismissQueueJob(s.queue, jobId) }))
+    releasePicksOf(removedJobs(before, get().queue))
     afterChange(get().queue)
   },
 
   clearFinished: () => {
+    const before = get().queue
     set((s) => ({ queue: clearFinishedJobs(s.queue), notice: null }))
+    releasePicksOf(removedJobs(before, get().queue))
     afterChange(get().queue)
   },
 

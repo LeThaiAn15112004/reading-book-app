@@ -444,6 +444,8 @@ export type ImportErrorCode =
   | 'file_changed'
   /** Spec 016: the phone app was stopped by the system while this import ran (shown after a relaunch). Retryable. */
   | 'interrupted'
+  /** Spec 017 (US4): a cloud-drive placeholder ("online-only") that cannot be read now. Retryable once it is synced. */
+  | 'not_available_offline'
 
 /** Main → renderer: which step a Library import is on (sent only after a file was picked). */
 export interface ImportProgressDto {
@@ -1204,6 +1206,8 @@ export interface DesktopApi {
     runJob(input: { jobId: string; pickId: string }): Promise<ImportResult>
     /** Spec 016: cancel the running queue job; refused (`saving`) while it saves. */
     cancelJob(input: { jobId: string }): Promise<CancelImportJobResultDto>
+    /** Spec 017 (US4): forget picks of waiting jobs that were cancelled / dismissed / cleared (unknown ids ignored). */
+    releasePicks(input: { pickIds: string[] }): Promise<{ ok: true; released: number }>
     /** Spec 016: running / waiting counts for the quit confirmation (Desktop; the phone ignores it). */
     reportActivity(input: { running: number; waiting: number }): Promise<OkResult>
     /** Spec 016: Main asks the renderer to cancel every import before a confirmed quit. Returns unsubscribe. */

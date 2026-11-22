@@ -213,3 +213,41 @@ describe('startup sweep', () => {
     expect(fs.fileSize(`staging/${stagingId}/file`)).toBe(3 * 1024 * 1024)
   })
 })
+
+describe('spec 017 (US4): picks and messages', () => {
+  it('a pick the host can no longer read ends the job as missing_file — the queue shows "pick the file again"', async () => {
+    host = await createFakeHost()
+    const result = await host.api.import.runJob({ jobId: 'j1', pickId: 'lost-after-relaunch' })
+    expect(result).toMatchObject({ ok: false, errorCode: 'missing_file' })
+    expect(result.errorCode).not.toBe('corrupted')
+    expect(result.errorCode).not.toBe('save_failed')
+  })
+
+  it('releasePicks forgets picks no job will use', async () => {
+    host = await createFakeHost()
+    host.fs.queuePick('Book.pdf', 'pdf')
+    const picked = await host.api.import.pickFiles()
+    expect(picked.status).toBe('picked')
+    const pickId = picked.status === 'picked' ? picked.items[0]!.pickId : ''
+    expect(await host.api.import.releasePicks({ pickIds: [pickId, 'unknown'] })).toEqual({ ok: true, released: 1 })
+    expect(await host.ctx.client.call('files', 'checkPick', { pickId })).toEqual({ readable: false })
+  })
+
+  it('every message comes from the interface language (Vietnamese with the UI in Vietnamese)', async () => {
+    const { useUiLanguageStore } = await import('../../../i18n/uiLanguageStore')
+    const before = useUiLanguageStore.getState().language
+    try {
+      useUiLanguageStore.setState({ language: 'vi' })
+      host = await createFakeHost()
+      host.fs.queuePick('song.mp3', 'ID3')
+      const unsupported = await host.api.import.fromFile()
+      expect(unsupported.errorMessage).toContain('không phải định dạng sách')
+      expect(unsupported.errorMessage).toContain('song.mp3')
+      const lost = await host.api.library.openBookContent('not-a-book')
+      expect(lost.ok).toBe(false)
+      if (!lost.ok) expect(lost.errorMessage).toBe('Không tìm thấy sách.')
+    } finally {
+      useUiLanguageStore.setState({ language: before })
+    }
+  })
+})

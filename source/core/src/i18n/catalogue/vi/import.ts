@@ -176,6 +176,7 @@ export const vi = {
       interrupted: 'Bị gián đoạn',
     },
     interrupted: 'Lượt nhập bị gián đoạn. Thử lại để nhập tệp này.',
+    pickAgain: 'Bị gián đoạn — chọn lại tệp.',
     added: 'Đã thêm {title}',
     announce: {
       step: '{step}: {name}',

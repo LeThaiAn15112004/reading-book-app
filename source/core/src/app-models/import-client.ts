@@ -28,6 +28,8 @@ export type ImportErrorCode =
   | 'file_changed'
   /** Spec 016: the phone app was stopped by the system while this import ran (shown after a relaunch). Retryable. */
   | 'interrupted'
+  /** Spec 017 (US4): a cloud-drive placeholder ("online-only") that cannot be read now. Retryable once it is synced. */
+  | 'not_available_offline'
 
 /** Platform-agnostic import outcome for Library import UX hook. */
 export type ImportClientResult = {

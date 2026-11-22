@@ -178,6 +178,8 @@ export const en = {
       interrupted: 'Interrupted',
     },
     interrupted: 'The import was interrupted. Try again to import this file.',
+    /** Spec 017 (US4, FR-022): after a relaunch the phone may no longer read a waiting pick — Try again opens the picker. */
+    pickAgain: 'Interrupted — pick the file again.',
     added: '{title} was added',
     announce: {
       step: '{step}: {name}',

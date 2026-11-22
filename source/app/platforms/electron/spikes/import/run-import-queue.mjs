@@ -7,6 +7,8 @@
  * cannot be cancelled; a second import waits; two jobs of the same file → the second is a duplicate; batch summary
  * counts; a ZIP job runs in the same queue; cancel-all (quit); the phone snapshot restores a running job as
  * "Interrupted" and lets the waiting ones run. The 20-file and hidden-window checks are manual (quickstart §3, 8–9).
+ * Spec 017 (US4, T045): picks of waiting jobs that are cancelled / dismissed / cleared are released; Main's
+ * `picked-files.ts` keeps a pick with no time limit and releases the oldest beyond 500.
  */
 import assert from 'node:assert/strict'
 
@@ -53,6 +55,10 @@ const fakeApi = {
       calls.push(['cancelJob', jobId])
       pending.get(jobId)?.resolve({ ok: false, bookId: null, errorCode: 'cancelled' })
       return { ok: true }
+    },
+    releasePicks: async ({ pickIds }) => {
+      calls.push(['releasePicks', [...pickIds]])
+      return { ok: true, released: pickIds.length }
     },
     reportActivity: async (a) => {
       activity.push(a)
@@ -238,6 +244,45 @@ await check('phone relaunch: the running job comes back "Interrupted", waiting j
   assert.ok(savedSnapshots.length > 0)
   assert.ok(savedSnapshots.at(-1).jobs.every((j) => !('progress' in j) && !('bookId' in j)))
   delete fakeApi.importQueue
+})
+
+await check('spec 017: cancel / dismiss / Clear finished of a waiting pick job releases its pick', async () => {
+  state().addPicked([book('p1', 'a.pdf'), book('p2', 'b.pdf'), book('p3', 'c.pdf')], 0, 'x')
+  await tick()
+  state().cancel(byName('b.pdf').id)
+  await tick()
+  assert.deepEqual(calls.find((c) => c[0] === 'releasePicks'), ['releasePicks', ['p2']], 'cancel releases the waiting pick')
+  calls.length = 0
+  state().dismiss(byName('b.pdf').id)
+  await tick()
+  assert.deepEqual(calls.filter((c) => c[0] === 'releasePicks').map((c) => c[1]), [['p2']], 'dismiss releases (ignored when used)')
+  state().cancel(byName('c.pdf').id)
+  calls.length = 0
+  state().clearFinished()
+  await tick()
+  const released = calls.filter((c) => c[0] === 'releasePicks').flatMap((c) => c[1])
+  assert.ok(released.includes('p3'), 'clear finished releases the cleared jobs')
+  await finishRunning({ ok: true, bookId: 'A' })
+})
+
+await check('spec 017: Main holds a pick with no time limit; beyond 500 the oldest is released', async () => {
+  const picks = await import('../../ipc/picked-files.ts')
+  const realNow = Date.now
+  try {
+    const first = picks.holdPickedFile('C:/books/first.pdf')
+    Date.now = () => realNow() + 31 * 60 * 1000 // 31 minutes later
+    assert.equal(picks.takePickedFile(first), 'C:/books/first.pdf', 'still taken after 30 min')
+    const ids = []
+    for (let i = 0; i < picks.MAX_HELD_PICKS + 1; i++) ids.push(picks.holdPickedFile(`C:/books/${i}.pdf`))
+    assert.equal(picks.heldPickCount(), picks.MAX_HELD_PICKS)
+    assert.equal(picks.takePickedFile(ids[0]), null, 'the oldest was released: its job fails as "pick the file again"')
+    assert.equal(picks.releasePicks([ids[1], ids[2], 'unknown', 42]), 2)
+    assert.equal(picks.takePickedFile(ids[1]), null)
+    assert.equal(picks.takePickedFile(ids.at(-1)), `C:/books/${picks.MAX_HELD_PICKS}.pdf`)
+    picks.releasePicks(ids)
+  } finally {
+    Date.now = realNow
+  }
 })
 
 console.log(`spike:import:queue — ${passed} checks passed`)

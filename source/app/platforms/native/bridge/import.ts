@@ -10,6 +10,7 @@
  * Covers are not made here: the Library renders one for each book that has none (`generateBookCover.ts`).
  */
 import { Book, parseDocumentFormat, readEpubImportMetadata, type DocumentFormat } from '@core'
+import { getT } from '@app/i18n'
 import { phoneStepTimer } from './app'
 import { openBookZip } from './ranged-book'
 import type { ImportableExtension, MultiPickResult, PickResult } from '../host/file-service'
@@ -25,6 +26,7 @@ type ImportProgressDto = Parameters<Parameters<ImportGroup['onProgress']>[0]>[0]
 
 export const MOBILE_IMPORT_EXTENSIONS = ['epub', 'pdf', 'txt', 'md'] as const
 
+// Spec 017 (US4, R10, FR-023): messages in the interface language, from the same keys Main uses (`tMain`).
 const failure = (errorCode: NonNullable<ImportResult['errorCode']>, errorMessage: string, bookId: string | null = null): ImportResult => ({
   ok: false,
   bookId,
@@ -103,15 +105,15 @@ export function createImportGroup(ctx: BridgeContext): ImportGroup {
   }
 
   async function fromFile(): Promise<ImportResult> {
-    if (running) return failure('save_failed', 'Another import is still running.')
+    if (running) return failure('save_failed', getT()('main.messages.import.busy'))
     let picked: PickResult
     try {
       picked = await ctx.client.call<PickResult>('files', 'pick', { extensions: MOBILE_IMPORT_EXTENSIONS }, { timeoutMs: 0 })
     } catch {
-      return { ok: false, bookId: null, errorMessage: 'Could not open the file picker.' }
+      return { ok: false, bookId: null, errorMessage: getT()('main.messages.import.pickerFailed') }
     }
-    if (picked.status === 'cancelled') return failure('cancelled', 'Import cancelled.')
-    if (picked.status === 'unsupported') return failure('unsupported_format', `“${picked.name}” is not a book format Readmate can open here (EPUB, PDF, TXT or Markdown).`)
+    if (picked.status === 'cancelled') return failure('cancelled', getT()('main.messages.import.cancelled'))
+    if (picked.status === 'unsupported') return failure('unsupported_format', getT()('main.messages.import.unsupportedHere', { name: picked.name }))
     return runPicked(picked)
   }
 
@@ -120,7 +122,7 @@ export function createImportGroup(ctx: BridgeContext): ImportGroup {
     picked: { pickId: string; name: string; size: number; extension: ImportableExtension },
     jobId?: string,
   ): Promise<ImportResult> {
-    if (running) return failure('save_failed', 'Another import is still running.')
+    if (running) return failure('save_failed', getT()('main.messages.import.busy'))
     const stagingId = ctx.newId()
     const job = { stagingId, filename: picked.name, cancelled: false, committed: false, jobId }
     running = job
@@ -137,10 +139,10 @@ export function createImportGroup(ctx: BridgeContext): ImportGroup {
       } catch (error) {
         const code = error instanceof HostCallError ? error.code : ''
         console.warn('[bridge] import: copying the picked file failed', code, error instanceof Error ? error.message : error)
-        if (code === 'CANCELLED' || job.cancelled) return failure('cancelled', 'Import cancelled.')
-        if (code === 'NO_SPACE') return failure('save_failed', 'There is not enough free space on this device for this book. Nothing was added.')
-        if (code === 'READ_FAILED') return failure('access_denied', 'Could not read the selected file.')
-        return failure('save_failed', 'Could not save the book to the library.')
+        if (code === 'CANCELLED' || job.cancelled) return failure('cancelled', getT()('main.messages.import.cancelled'))
+        if (code === 'NO_SPACE') return failure('save_failed', getT()('main.messages.import.noSpace'))
+        if (code === 'READ_FAILED') return failure('access_denied', getT()('main.messages.import.selectedUnreadable'))
+        return failure('save_failed', getT()('main.messages.import.saveFailed'))
       }
       // hashing
       let sha256: string
@@ -151,12 +153,12 @@ export function createImportGroup(ctx: BridgeContext): ImportGroup {
         hashMark.end()
       } catch (error) {
         await discard(stagingId)
-        if ((error instanceof HostCallError && error.code === 'CANCELLED') || job.cancelled) return failure('cancelled', 'Import cancelled.')
-        return failure('save_failed', 'Could not save the book to the library.')
+        if ((error instanceof HostCallError && error.code === 'CANCELLED') || job.cancelled) return failure('cancelled', getT()('main.messages.import.cancelled'))
+        return failure('save_failed', getT()('main.messages.import.saveFailed'))
       }
       if (job.cancelled) {
         await discard(stagingId)
-        return failure('cancelled', 'Import cancelled.')
+        return failure('cancelled', getT()('main.messages.import.cancelled'))
       }
 
       // checking + storing, in the write queue: no other write can slip between the duplicate check and the row.
@@ -166,15 +168,15 @@ export function createImportGroup(ctx: BridgeContext): ImportGroup {
         dupMark.end()
         if (existing) {
           await discard(stagingId)
-          return failure('duplicate', 'This book is already in your local library. Open the existing copy?', existing.id)
+          return failure('duplicate', getT()('main.messages.import.duplicate'), existing.id)
         }
         const bookId = ctx.newId()
         try {
           await ctx.client.call('files', 'commitStaged', { stagingId, bookId })
         } catch (error) {
           await discard(stagingId)
-          if (error instanceof HostCallError && error.code === 'NO_SPACE') return failure('save_failed', 'There is not enough free space on this device for this book. Nothing was added.')
-          return failure('save_failed', 'Could not save the book to the library.')
+          if (error instanceof HostCallError && error.code === 'NO_SPACE') return failure('save_failed', getT()('main.messages.import.noSpace'))
+          return failure('save_failed', getT()('main.messages.import.saveFailed'))
         }
         job.committed = true
         const format = parseDocumentFormat(picked.extension)
@@ -208,9 +210,9 @@ export function createImportGroup(ctx: BridgeContext): ImportGroup {
           }
           if (isUniqueViolation(error)) {
             const other = await ctx.library.findBySha256(sha256)
-            if (other) return failure('duplicate', 'This book is already in your local library. Open the existing copy?', other.id)
+            if (other) return failure('duplicate', getT()('main.messages.import.duplicate'), other.id)
           }
-          return failure('save_failed', 'Could not save the book to the library.')
+          return failure('save_failed', getT()('main.messages.import.saveFailed'))
         }
         return { ok: true, bookId }
       })
@@ -225,7 +227,7 @@ export function createImportGroup(ctx: BridgeContext): ImportGroup {
     try {
       picked = await ctx.client.call<MultiPickResult>('files', 'pick', { extensions: MOBILE_IMPORT_EXTENSIONS, multiple: true }, { timeoutMs: 0 })
     } catch {
-      return { status: 'failed', errorMessage: 'Could not open the file picker.' }
+      return { status: 'failed', errorMessage: getT()('main.messages.import.pickerFailed') }
     }
     if (picked.status === 'cancelled') return { status: 'cancelled' }
     return {
@@ -242,7 +244,7 @@ export function createImportGroup(ctx: BridgeContext): ImportGroup {
   /** Spec 016: one queue job. The pick is looked up in the host (it may be from before a relaunch). */
   async function runJob(input: { jobId: string; pickId: string }): Promise<ImportResult> {
     const { jobId, pickId } = (input ?? {}) as { jobId?: unknown; pickId?: unknown }
-    if (typeof jobId !== 'string' || typeof pickId !== 'string') return failure('save_failed', 'Could not save the book to the library.')
+    if (typeof jobId !== 'string' || typeof pickId !== 'string') return failure('save_failed', getT()('main.messages.import.saveFailed'))
     let info: { readable: boolean; name?: string; size?: number; extension?: string }
     try {
       info = await ctx.client.call('files', 'checkPick', { pickId })
@@ -250,7 +252,7 @@ export function createImportGroup(ctx: BridgeContext): ImportGroup {
       info = { readable: false }
     }
     if (!info.readable || !info.name || !(MOBILE_IMPORT_EXTENSIONS as readonly string[]).includes(info.extension ?? '')) {
-      return failure('missing_file', 'Could not read the selected file.')
+      return failure('missing_file', getT()('main.messages.import.selectedUnreadable'))
     }
     return runPicked({ pickId, name: info.name, size: info.size ?? 0, extension: info.extension as ImportableExtension }, jobId)
   }
@@ -259,6 +261,17 @@ export function createImportGroup(ctx: BridgeContext): ImportGroup {
     fromFile,
     pickFiles,
     runJob,
+    /** Spec 017 (US4): the host forgets these picks (`import-picks.json`). */
+    async releasePicks(input) {
+      const pickIds = Array.isArray(input?.pickIds) ? input.pickIds.filter((id): id is string => typeof id === 'string') : []
+      if (pickIds.length === 0) return { ok: true, released: 0 }
+      try {
+        const result = await ctx.client.call<{ released: number }>('files', 'releasePicks', { pickIds })
+        return { ok: true, released: result?.released ?? 0 }
+      } catch {
+        return { ok: true, released: 0 }
+      }
+    },
     /** Refused while saving (the file is already in the library); otherwise stops copying / hashing. */
     async cancelJob(input) {
       const job = running

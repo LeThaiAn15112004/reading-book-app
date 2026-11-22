@@ -13,6 +13,15 @@ export const importApi = {
   runJob: (jobId: string, pickId: string) => api.import.runJob({ jobId, pickId }),
   /** Spec 016: cancel the running queue job (refused while saving). */
   cancelJob: (jobId: string) => api.import.cancelJob({ jobId }),
+  /** Spec 017 (US4): forget picks no job will use any more; never throws. */
+  releasePicks: async (pickIds: string[]) => {
+    if (pickIds.length === 0) return
+    try {
+      await api.import.releasePicks({ pickIds })
+    } catch {
+      // A pick left behind is only memory (Desktop) or one line in import-picks.json (phone).
+    }
+  },
   /** Spec 016: queue size for the Desktop quit confirmation; never throws. */
   reportActivity: async (running: number, waiting: number) => {
     try {
