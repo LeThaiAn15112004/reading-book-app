@@ -40,6 +40,11 @@ plain `<p>` with `reader.pdf.renderer.loading`. `animate-spin` is not `motion-sa
 - **Alternatives**: one global limit (does not say which step hung); a Main-side cancel channel (adds IPC for little:
   the bytes are dropped either way).
 
+- **Updated after analyze**: the foreground clock is the sum of foreground intervals on a monotonic clock, fed by an
+  injected source — Desktop `visibilitychange`, phone the host's `app.foregroundChanged` event (AppState), because
+  `visibilitychange` may not fire inside the Android WebView; never a tick count (a timer burst after return is not
+  counted). The store does not touch `document` at module load, so spikes run it in Node with fakes.
+
 ### R3 — Retry once only for passing read failures
 
 - **Decision**: phone `READ_FAILED` from the local server (fetch threw, 5xx) and Desktop `read_failed` with
@@ -56,6 +61,9 @@ plain `<p>` with `reader.pdf.renderer.loading`. `animate-spin` is not `motion-sa
   (`reader.opening.positionLost`). Nothing is written until the reader moves (the session bridge already saves only
   on relocation).
 - **Rationale**: FR-005; "sometimes instant, sometimes long" matches read vs. unread books.
+
+- **Updated after analyze**: steps run in the fixed order `content → prepare → position → firstPage`; `position` has its
+  own 3 s limit and past it ends in `positionDone(false)` (chapter start + note), never an error, then `firstPage`.
 
 ### R5 — One waiting screen; renderers stop drawing their own
 

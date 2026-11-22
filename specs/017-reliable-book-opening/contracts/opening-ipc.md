@@ -44,6 +44,10 @@ releasePicks(input: { pickIds: string[] }): Promise<{ ok: true; released: number
 ```
 
 - Sent by `bridge/app.ts` `setReaderOpening` (today a no-op).
+- Host → WebView event `app.foregroundChanged { active: boolean }`: sent on every React Native AppState change
+  (`active` ⇔ AppState `active`) and once when the WebView is ready; `bridge/app.ts` feeds it to
+  `readerOpeningStore.setForegroundSource` (opening time limits count foreground time only). Counted in
+  `window.__readmateBridgeLog`; `tests/fake-host.ts` can emit it.
 - `file-service.ts` chunk loops (`stage` fallback, `hashStaged` fallback) await `whenNotOpening()` between chunks,
   bounded at 10 s like the 016 gate.
 

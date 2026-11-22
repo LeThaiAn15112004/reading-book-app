@@ -45,17 +45,16 @@ Derived: `showIndicator = outcome==='pending' && foregroundElapsed >= 300`, `sho
 | `cause` | When | Actions |
 |---|---|---|
 | `missing_file` | file moved / deleted | Locate file (Desktop) · "import it again" text (phone) · Back |
-| `unreadable` | read failed twice / not retryable | Try again · Back |
+| `unreadable` | read failed twice / not retryable | Try again · Open from the beginning (if `usesSavedPosition`) · Back |
 | `damaged` | format engine refused the file | Try again · Open from the beginning (if `usesSavedPosition`) · Back |
 | `protected` | DRM / encrypted, detected in the renderer (both hosts): EPUB `META-INF/encryption.xml` with an entry whose algorithm is not font obfuscation (`http://www.idpf.org/2008/embedding`, `http://ns.adobe.com/pdf/enc#RC`); PDF `PasswordException` from pdf.js | Back |
 | `too_large` | MD limit, Expo Go 20 MB | Back |
 | `took_too_long` | step limit | Try again · Open from the beginning (if `usesSavedPosition`) · Back |
-| `not_available_offline` | cloud placeholder not downloaded (Desktop) | Try again · Back |
-| `file_changed` | Desktop: the SIZE differs between the `stat` before and after `readFile` (retryable: the automatic retry reads the new version); an mtime difference alone is never an error (FR-021 — sync programs touch it): at most one silent re-read; phone: not applicable (app-owned copy) | Try again · Back |
+| `not_available_offline` | cloud placeholder not downloaded (Desktop) | Try again · Open from the beginning (if `usesSavedPosition`) · Back |
+| `file_changed` | Desktop: the SIZE differs between the `stat` before and after `readFile` (retryable: the automatic retry reads the new version); an mtime difference alone is never an error (FR-021 — sync programs touch it): at most one silent re-read; phone: not applicable (app-owned copy) | Try again · Open from the beginning (if `usesSavedPosition`) · Back |
 
 Rules: Back is always offered; Try again never for `missing_file` / `protected` / `too_large`; Open from the beginning
-for `unreadable` / `damaged` / `took_too_long` / `file_changed` / `not_available_offline` whenever `usesSavedPosition`
-(the table lists the common cases). `step` of the error is kept for the message ("while preparing the first page").
+for `unreadable` / `damaged` / `took_too_long` / `file_changed` / `not_available_offline` whenever `usesSavedPosition`. `step` of the error is kept for the message ("while preparing the first page").
 
 ## Import (US4) — changes to 016 entities
 
