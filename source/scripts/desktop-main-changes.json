@@ -1,7 +1,7 @@
 {
   "_doc": "Spec 009: Main-process files that may differ from the spec 008 base (8130c17), each with its reason. check-desktop-baseline fails on any other change under electron/.",
   "files": {
-    "source/app/platforms/electron/chunking/book-chunk-service.ts": "T011: @types/node types a Worker 'error' as unknown; message read the same way for an Error (type-only) | spec 016: waits for the first page of the opening book",
+    "source/app/platforms/electron/chunking/book-chunk-service.ts": "T011: @types/node types a Worker 'error' as unknown; message read the same way for an Error (type-only) | spec 016: waits for the first page of the opening book | spec 017 US3: tells the chunk worker when a book is opening",
     "source/app/platforms/electron/ipc/overlay.ipc.ts": "T011: same, the worker error is passed on as an Error (type-only)",
     "source/app/platforms/electron/translation/translation-service.ts": "T011: same (type-only) | spec 012 T040: user-visible messages returned to the renderer built with tMain (Main interface language)",
     "source/app/platforms/electron/config/cloud-oauth-config.ts": "T022: the config folder moved to source/core/src/config (path of cloud-oauth-secrets.json / client_secret_*.json only) | spec 010 KL-1: packaged build falls back to the embedded PUBLIC Dropbox app key / Entra ID client ID (app.asar package.json readmateCloudOAuth, no secret); getCloudProviderAvailability() | KL-1 2026-11-09: loadGoogleDriveOAuthCredentials() falls back to the embedded Google Desktop-app client ID + secret; Google Drive offered when configured",
@@ -35,11 +35,11 @@
     "source/app/platforms/electron/audio/audio-lookup.ts": "T049: import name @reading-book/* replaced by @core/* (import specifier only)",
     "source/app/platforms/electron/audio/audio-stream-handler.ts": "T049: import name @reading-book/* replaced by @core/* (import specifier only)",
     "source/app/platforms/electron/chunking/book-chunk-writer.ts": "T049: import name @reading-book/* replaced by @core/* (import specifier only)",
-    "source/app/platforms/electron/chunking/book-chunk.worker.ts": "T049: import name @reading-book/* replaced by @core/* (import specifier only)",
+    "source/app/platforms/electron/chunking/book-chunk.worker.ts": "T049: import name @reading-book/* replaced by @core/* (import specifier only) | spec 017 US3: extraction pauses between paragraphs while a book is opening (≤ 10 s per pause)",
     "source/app/platforms/electron/chunking/extract-book-text.ts": "T049: import name @reading-book/* replaced by @core/* (import specifier only)",
     "source/app/platforms/electron/chunking/pdf-text.ts": "T049: import name @reading-book/* replaced by @core/* (import specifier only)",
     "source/app/platforms/electron/files/format-guard.ts": "T049: import name @reading-book/* replaced by @core/* (import specifier only)",
-    "source/app/platforms/electron/files/open-book-content.ts": "T049: import name @reading-book/* replaced by @core/* (import specifier only) | spec 012 T040: user-visible messages returned to the renderer built with tMain (Main interface language) | spec 016: open-read step timing | spec 017: retryable flag for passing read errors, not_available_offline (cloud placeholder), file_changed when the size changes during the read, stat before the read",
+    "source/app/platforms/electron/files/open-book-content.ts": "T049: import name @reading-book/* replaced by @core/* (import specifier only) | spec 012 T040: user-visible messages returned to the renderer built with tMain (Main interface language) | spec 016: open-read step timing | spec 017: retryable flag for passing read errors, not_available_offline (cloud placeholder), file_changed when the size changes during the read, stat before the read | spec 017 US3: the read moved to read-book-bytes.ts (PDF-only fingerprint, the Buffer's own ArrayBuffer)",
     "source/app/platforms/electron/files/relink-book.ts": "T049: import name @reading-book/* replaced by @core/* (import specifier only) | spec 012 T040: user-visible messages returned to the renderer built with tMain (Main interface language)",
     "source/app/platforms/electron/files/sandbox.ts": "T049: import name @reading-book/* replaced by @core/* (import specifier only)",
     "source/app/platforms/electron/ipc/api-types.ts": "T049: import name @reading-book/* replaced by @core/* (import specifier only) | spec 010 T032–T033: StartAtLoginDto.state (Store build only) + background.openStartupSettings | spec 010 KL-1: CloudProviderAvailabilityDto + cloud.getProviderAvailability | spec 011: translation.getSourceLanguage / setSourceLanguage + TranslationSource*Dto | spec 012: UiLanguagePreferenceDto, SetUiLanguageResultDto, DesktopApi.setUiLanguage | spec 013 R8: library:restartBook (status reading + reading_state lastReadLocation 'Started', percent 0, one transaction) | spec 015: library:addBooksToCollection (one transaction, added / skipped) + addBookToCollection with optional sortOrder / removeBookFromCollection returns sortOrder (Undo restores the position) | spec 016: import job / timing / cover-source DTOs, error codes file_changed + interrupted | spec 017: OpenBookErrorCode not_available_offline / file_changed, OpenBookContentResult.retryable",
@@ -128,9 +128,11 @@
     "source/app/platforms/electron/signature/signature-queue.ts": "spec 016: new — PDF signature check after saving, one at a time",
     "source/app/platforms/electron/background/quit-guard.ts": "spec 016: new — confirmation before quitting with imports pending",
     "source/app/platforms/electron/perf/timing-log.ts": "spec 016: new — developer timing (READMATE_TIMING=1) to {userData}/logs/timing.jsonl",
-    "source/app/platforms/electron/perf/reader-opening-gate.ts": "spec 016: new — background work waits for the first page",
+    "source/app/platforms/electron/perf/reader-opening-gate.ts": "spec 016: new — background work waits for the first page | spec 017 US3: onReaderOpeningChange (passes the gate on to the chunk worker)",
     "source/app/platforms/electron/spikes/import/": "spec 016: new — spike:import:timing|parity|queue|cleanup",
     "source/app/platforms/electron/files/cover-source.ts": "spec 016: new — getCoverSource / readBookRange (generated covers without the whole book)",
-    "source/app/platforms/electron/ipc/book-index.ipc.ts": "spec 016: bookIndex:ensure waits for the opening book's first page (≤ 10 s)"
+    "source/app/platforms/electron/ipc/book-index.ipc.ts": "spec 016: bookIndex:ensure waits for the opening book's first page (≤ 10 s)",
+    "source/app/platforms/electron/files/read-book-bytes.ts": "spec 017 US3: new — one read of a book for the Reader: SHA-256 for PDF only (live sync), no extra copy, file_changed by size only, retryable / cloud-placeholder codes",
+    "source/app/platforms/electron/chunking/book-chunk-job.ts": "spec 017 US3: BookChunkControlMessage (Main → worker opening flag)"
   }
 }

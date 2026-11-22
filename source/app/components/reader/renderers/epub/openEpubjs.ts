@@ -132,6 +132,17 @@ async function throwIfProtected(book: Book): Promise<void> {
   if (bookOpening.isProtectedEpubEncryption(xml)) throw new ProtectedBookError()
 }
 
+/** Aborted as soon as either signal is. */
+function anySignal(a: AbortSignal | undefined, b: AbortSignal): AbortSignal {
+  if (!a) return b
+  const both = new AbortController()
+  const abort = () => both.abort()
+  if (a.aborted || b.aborted) both.abort()
+  a.addEventListener('abort', abort, { once: true })
+  b.addEventListener('abort', abort, { once: true })
+  return both.signal
+}
+
 export async function openEpubjs(
   buffer: ArrayBuffer | ArrayBufferView,
   host: HTMLElement,
@@ -188,12 +199,82 @@ export async function openEpubjs(
   let resumeCfi: string | undefined
   let resumeSpineIndex: number | undefined
 
+  // Spec 017 (US3, R7, FR-017): work that is not needed for the first page (hidden pagination, section character
+  // counts) waits until the first page is drawn and the reader has not turned a page for 1 s, then starts from
+  // `requestIdleCallback` (fallback `setTimeout`). A page turn aborts it and it starts again on the next idle.
+  type IdleJob = (jobSignal: AbortSignal) => Promise<unknown> | void
+  const idleQueue = new Map<string, IdleJob>()
+  const idleRunning = new Map<string, { job: IdleJob; controller: AbortController }>()
+  let idleReady = false
+  let idleTimer: ReturnType<typeof setTimeout> | null = null
+  let idleCallback: number | null = null
+  const IDLE_AFTER_MS = 1_000
+  const cancelIdleWait = () => {
+    if (idleTimer) clearTimeout(idleTimer)
+    idleTimer = null
+    if (idleCallback !== null) {
+      if (typeof cancelIdleCallback === 'function') cancelIdleCallback(idleCallback)
+      else clearTimeout(idleCallback)
+    }
+    idleCallback = null
+  }
+  const runIdleJobs = () => {
+    idleCallback = null
+    if (destroyed || signal?.aborted) return
+    const jobs = [...idleQueue.entries()]
+    idleQueue.clear()
+    for (const [key, job] of jobs) {
+      const controller = new AbortController()
+      idleRunning.set(key, { job, controller })
+      const done = () => {
+        if (idleRunning.get(key)?.controller === controller) idleRunning.delete(key)
+      }
+      try {
+        void Promise.resolve(job(controller.signal)).then(done, done)
+      } catch {
+        done()
+      }
+    }
+  }
+  const armIdle = () => {
+    cancelIdleWait()
+    if (!idleReady || destroyed || signal?.aborted || idleQueue.size === 0) return
+    idleTimer = setTimeout(() => {
+      idleTimer = null
+      idleCallback =
+        typeof requestIdleCallback === 'function'
+          ? requestIdleCallback(runIdleJobs, { timeout: 5_000 })
+          : (setTimeout(runIdleJobs, 0) as unknown as number)
+    }, IDLE_AFTER_MS)
+  }
+  const whenReaderIdle = (key: string, job: IdleJob) => {
+    idleQueue.set(key, job)
+    armIdle()
+  }
+  /** A page turn: running idle work stops and waits for the next idle moment. */
+  const noteReaderActivity = () => {
+    for (const [key, { job, controller }] of idleRunning) {
+      controller.abort()
+      idleQueue.set(key, job)
+    }
+    idleRunning.clear()
+    armIdle()
+  }
+  const stopIdleWork = () => {
+    cancelIdleWait()
+    idleQueue.clear()
+    for (const { controller } of idleRunning.values()) controller.abort()
+    idleRunning.clear()
+  }
+
   const notifyFirstRender = () => {
     if (firstRenderNotified || destroyed) return
     if (host.dataset.epubOpen !== openToken) return
     if (!host.querySelector('iframe')) return
     firstRenderNotified = true
     onFirstRender?.()
+    idleReady = true
+    armIdle()
   }
 
   const updateStatus = (next: 'opening' | 'rendering' | 'ready') => {
@@ -206,6 +287,7 @@ export async function openEpubjs(
   const destroyBook = () => {
     if (destroyed) return
     destroyed = true
+    stopIdleWork()
     // Stop queued start/display before tearing down — see stopRenditionQueue.
     stopRenditionQueue(rendition)
     try {
@@ -393,7 +475,7 @@ export async function openEpubjs(
     const onParentAbort = () => localAbort.abort()
     signal?.addEventListener('abort', onParentAbort, { once: true })
 
-    void (async () => {
+    return (async () => {
       try {
         const hit = await hydrateFromCache()
         if (hit || destroyed || signal?.aborted || token !== paginationMeasureToken) {
@@ -449,13 +531,21 @@ export async function openEpubjs(
   // Prefer cached totals immediately; measure in a hidden rendition on miss.
   void hydrateFromCache().then((hit) => {
     if (destroyed || signal?.aborted) return
-    if (!hit) startHiddenPaginationMeasure()
+    if (!hit) {
+      whenReaderIdle('pagination', (jobSignal) => {
+        const run = startHiddenPaginationMeasure()
+        const measuring = paginationAbort
+        jobSignal.addEventListener('abort', () => measuring?.abort(), { once: true })
+        return run
+      })
+    }
   })
 
   // Scan section text lengths in the background to seed character counts & page estimates
-  void scanSpineCharCounts(book, signal)
+  whenReaderIdle('charCounts', (jobSignal) =>
+    scanSpineCharCounts(book, anySignal(signal, jobSignal))
     .then((charCounts) => {
-      if (destroyed || signal?.aborted) return
+      if (destroyed || signal?.aborted || jobSignal.aborted) return
       paginationTracker.initCharCounts(charCounts)
       if (!paginationTracker.isFullyMeasured()) {
         publishLocationsReady()
@@ -463,7 +553,8 @@ export async function openEpubjs(
     })
     .catch(() => {
       /* ignore */
-    })
+    }),
+  )
 
   const activeRendition = rendition
   if (!activeRendition) {
@@ -1235,6 +1326,7 @@ export async function openEpubjs(
   }
 
   const nextPage = async () => {
+    noteReaderActivity()
     cancelResizeAnchor()
     const beforeLocation = currentLocationSignature()
     const beforeSpine = currentSpineIndex()
@@ -1270,6 +1362,7 @@ export async function openEpubjs(
     }
   }
   const prevPage = async () => {
+    noteReaderActivity()
     cancelResizeAnchor()
     const beforeLocation = currentLocationSignature()
     const beforeSpine = currentSpineIndex()
@@ -1352,6 +1445,7 @@ export async function openEpubjs(
     rendition: activeRendition,
     hasSpineCover,
     destroy: () => {
+      stopIdleWork()
       paginationAbort?.abort()
       paginationAbort = null
       spineExcerptCache.dispose()

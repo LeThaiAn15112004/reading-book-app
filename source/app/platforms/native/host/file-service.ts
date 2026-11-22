@@ -84,6 +84,8 @@ export interface FileServiceOptions {
   emitProgress?: (payload: ImportProgressPayload) => void
   /** Lets cancel requests through between chunks. */
   yieldToEvents?: () => Promise<void>
+  /** Spec 017 (US3, FR-018): waits while a book opens in the WebView (≤ 10 s); undefined = nothing to wait for. */
+  whenNotOpening?: () => Promise<void> | undefined
   newPickId?: () => string
   /** Spec 016 (FR-013b): keeps the pick map across launches (`import-picks.json`, host only). */
   pickStore?: { load(): Map<string, PickedDocument>; save(map: Map<string, PickedDocument>): void }
@@ -217,6 +219,22 @@ export function createFileService(options: FileServiceOptions) {
     return { status: 'picked', pickId, name, size: picked.size, extension: extension as ImportableExtension }
   }
 
+  /** Spec 017 (US4): forgets picks no job will use (cancelled / dismissed / cleared). Unknown ids are ignored. */
+  function releasePicks(raw: unknown): { released: number } {
+    const ids = argsObject(raw).pickIds
+    if (!Array.isArray(ids)) throw new HostServiceError('INVALID_ARGUMENT', 'pickIds must be a list')
+    let released = 0
+    for (const id of ids.slice(0, 500)) {
+      const doc = typeof id === 'string' ? picks.get(id) : undefined
+      if (!doc) continue
+      picks.delete(id as string)
+      fs.discardUri(doc.uri)
+      released++
+    }
+    if (released) savePicks()
+    return { released }
+  }
+
   /** Spec 016 (FR-013b): is this pick still known and readable? (Used after a relaunch.) Never throws. */
   function checkPick(raw: unknown): { readable: boolean; name?: string; size?: number; extension?: string } {
     const pickId = argsObject(raw).pickId
@@ -312,6 +330,7 @@ export function createFileService(options: FileServiceOptions) {
           options.emitProgress?.({ stagingId, step: 'copying', doneBytes: done, totalBytes: picked.size })
         }
         await yieldToEvents()
+        await options.whenNotOpening?.()
       }
       writer.close()
       writer = undefined
@@ -378,6 +397,7 @@ export function createFileService(options: FileServiceOptions) {
           options.emitProgress?.({ stagingId, step: 'hashing', doneBytes: done, totalBytes: size })
         }
         await yieldToEvents()
+        await options.whenNotOpening?.()
       }
       return { sha256: hash.digestHex(), size: done }
     } catch (error) {
@@ -517,6 +537,7 @@ export function createFileService(options: FileServiceOptions) {
   const methods: Record<string, (args: unknown) => unknown> = {
     pick,
     checkPick,
+    releasePicks,
     stage,
     hashStaged,
     commitStaged,

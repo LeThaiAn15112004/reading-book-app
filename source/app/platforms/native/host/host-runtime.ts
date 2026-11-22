@@ -9,6 +9,7 @@ import { createAppService, type SystemBarColors } from './app-service'
 import { createExpoHostFs } from './expo-host-fs'
 import { openExpoSqliteEngine } from './expo-sqlite-engine'
 import { createFileService } from './file-service'
+import { createReaderOpeningGate } from './reader-opening-gate'
 import { createImportQueueService, createPickStore, snapshotPickIds } from './import-queue-file'
 import { RPC_VERSION, type BootValues, type HostEvent, type HostEventName, type RpcResponse } from './protocol'
 import { createRpcDispatcher, type ServiceTable } from './rpc'
@@ -69,6 +70,7 @@ export function createHostRuntime(
     save: pickStore.save,
   }
   const importQueue = createImportQueueService(hostFs)
+  const openingGate = createReaderOpeningGate()
 
   const services: ServiceTable = {
     sql: createSqlService(lazySql),
@@ -79,12 +81,14 @@ export function createHostRuntime(
       devChunks,
       emitProgress: (payload) => send('importProgress', payload),
       yieldToEvents: nextTick,
+      whenNotOpening: () => openingGate.whenNotOpening(),
     }),
     app: {
       ...createAppService({
         info: { version: boot.appVersion, platform, osVersion: boot.osVersion },
         openUrl: (url) => Linking.openURL(url),
         onSystemBars,
+        onReaderOpening: (opening) => openingGate.set(opening),
       }),
       /** Android fallback when the injected boot object did not arrive (`contracts/host-services.md`). */
       boot: () => boot,

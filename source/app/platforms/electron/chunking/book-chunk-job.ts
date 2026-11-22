@@ -10,6 +10,9 @@ export interface BookChunkJob {
   dbPath: string
 }
 
+/** Main → worker (spec 017 US3): a book is opening (pause between paragraphs) or its first page is drawn. */
+export type BookChunkControlMessage = { type: 'opening'; opening: boolean }
+
 export type BookChunkWorkerMessage =
   | { type: 'done'; chunkCount: number }
   | { type: 'error'; message: string }

@@ -96,6 +96,7 @@
     "spike:audio:main": "cd source/app/platforms/electron && node --experimental-transform-types --import ./spikes/pdf-annotations/register-alias.mjs spikes/audio/run-audio-main.mjs",
     "spike:audio:zip": "cd source/app/platforms/electron && node --experimental-transform-types --import ./spikes/pdf-annotations/register-alias.mjs spikes/audio/run-audio-zip.mjs",
     "spike:open:limits": "cd source/app/platforms/electron && node --experimental-transform-types --import ./spikes/pdf-annotations/register-alias.mjs spikes/open/run-open-limits.mjs",
+    "spike:open:content": "cd source/app/platforms/electron && node --experimental-transform-types --import ./spikes/pdf-annotations/register-alias.mjs spikes/open/run-open-content.mjs",
     "spike:import:timing": "cd source/app/platforms/electron && node --experimental-transform-types --import ./spikes/pdf-annotations/register-alias.mjs spikes/import/run-import-timing.mjs",
     "spike:import:parity": "cd source/app/platforms/electron && node --experimental-transform-types --import ./spikes/pdf-annotations/register-alias.mjs spikes/import/run-import-parity.mjs",
     "spike:import:queue": "cd source/app/platforms/electron && node --experimental-transform-types --import ./spikes/pdf-annotations/register-alias.mjs spikes/import/run-import-queue.mjs",

@@ -10,6 +10,13 @@ export const OPENING_MAX_MS = 10_000
 let opening: string | null = null
 let timer: ReturnType<typeof setTimeout> | null = null
 const waiters = new Set<() => void>()
+const changeListeners = new Set<(opening: boolean) => void>()
+
+/** Spec 017 (US3): told every time the gate opens or closes (e.g. to pass it on to a worker thread). */
+export function onReaderOpeningChange(listener: (opening: boolean) => void): () => void {
+  changeListeners.add(listener)
+  return () => changeListeners.delete(listener)
+}
 
 function release(): void {
   for (const resolve of [...waiters]) resolve()
@@ -22,9 +29,19 @@ export function setReaderOpening(input: unknown): boolean {
   if (bookId !== null && (typeof bookId !== 'string' || !bookId.trim())) return false
   if (timer) clearTimeout(timer)
   timer = null
+  const was = opening !== null
   opening = bookId
   if (opening === null) release()
   else timer = setTimeout(() => setReaderOpening({ bookId: null }), OPENING_MAX_MS)
+  if (was !== (opening !== null)) {
+    for (const listener of [...changeListeners]) {
+      try {
+        listener(opening !== null)
+      } catch {
+        // a listener never breaks the gate
+      }
+    }
+  }
   return true
 }
 

@@ -81,12 +81,14 @@ function defaultParseResumeLocation(raw: string | undefined): CfiLocation | unde
 }
 
 function toArrayBuffer(data: ArrayBuffer | ArrayBufferView): ArrayBuffer {
-  if (data instanceof ArrayBuffer) {
-    const copy = new Uint8Array(data.byteLength)
-    copy.set(new Uint8Array(data))
-    return copy.buffer
-  }
+  // Spec 017 (US3, FR-016): no second copy of the book. An ArrayBuffer is used as is (epub.js / JSZip only read it;
+  // pdf.js gets its own slice in PdfRenderer); a view that spans its whole buffer gives that buffer; any other view is
+  // copied once.
+  if (data instanceof ArrayBuffer) return data
   const view = data as ArrayBufferView
+  if (view.buffer instanceof ArrayBuffer && view.byteOffset === 0 && view.byteLength === view.buffer.byteLength) {
+    return view.buffer
+  }
   const copy = new Uint8Array(view.byteLength)
   copy.set(new Uint8Array(view.buffer, view.byteOffset, view.byteLength))
   return copy.buffer
@@ -257,7 +259,7 @@ export function useReaderBookOpen({
         if (result.ok && result.data) {
           setOpeningFile(bookId, result.format, result.data.byteLength)
           reportContentReady(token, result.format, result.data.byteLength)
-          // Normalize payload (ArrayBuffer or typed array) into a fresh buffer.
+          // Normalize the payload (ArrayBuffer or typed array) into an ArrayBuffer without copying it again.
           setBookBytes(toArrayBuffer(result.data))
           setBookFormat(result.format ?? null)
           setContentStatus('ready')

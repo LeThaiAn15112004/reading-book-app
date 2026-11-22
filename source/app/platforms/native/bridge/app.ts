@@ -117,8 +117,17 @@ export function createAppGroup(ctx: BridgeContext): AppMethods {
       return () => flushHandlers.delete(handler)
     },
     captureSnapshot: notAvailable('captureSnapshot'),
-    // Spec 016: the phone's gate is renderer-only (readerOpeningStore); the host has no background work to hold.
-    setReaderOpening: async () => ({ ok: true }),
+    // Spec 017 (US3): the host's import chunk loops (copy / hash fallbacks) wait while a book opens; the WebView's own
+    // gate (readerOpeningStore) holds the renderer's work. A host that cannot be told never blocks the Reader.
+    async setReaderOpening(input) {
+      const opening = input?.bookId != null
+      try {
+        await ctx.client.call('app', 'setReaderOpening', { opening })
+      } catch {
+        // best effort
+      }
+      return { ok: true }
+    },
     getTimingEnabled: async () => phoneTimingEnabled(),
     // Logged for `adb logcat | grep '\[timing\]'`; the line carries format, size and duration only (core step-timing).
     async recordTiming(line) {

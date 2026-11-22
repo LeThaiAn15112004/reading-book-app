@@ -4,6 +4,7 @@
  * that crosses the same JSON boundary as `postMessage` / `injectJavaScript`. Only the device parts are fakes: the
  * picker (a queue of files), the disk (a map, with injectable failures), the opener and the local server.
  */
+import { createReaderOpeningGate, type ReaderOpeningGate } from '../host/reader-opening-gate'
 import { DatabaseSync } from 'node:sqlite'
 import { createAppService } from '../host/app-service'
 import { createFileService, type ByteReader, type HostFs, type PickedDocument } from '../host/file-service'
@@ -196,6 +197,8 @@ export interface FakeHost {
   emit(event: HostEvent['event'], payload: unknown): void
   /** Lets every queued message cross the boundary. */
   settle(): Promise<void>
+  /** Spec 017 (US3): the host's reader-opening gate (`app.setReaderOpening`). */
+  gate: ReaderOpeningGate
 }
 
 let uuidCounter = 0
@@ -211,6 +214,7 @@ export async function createFakeHost(options: FakeHostOptions = {}): Promise<Fak
   const sql = createNodeSqlEngine()
   sql.db.exec('PRAGMA foreign_keys = ON')
   const requests: string[] = []
+  const gate = createReaderOpeningGate()
   let receive: (json: string) => void = () => {}
   const deliver = (message: unknown) => {
     const json = JSON.stringify(message)
@@ -225,8 +229,13 @@ export async function createFakeHost(options: FakeHostOptions = {}): Promise<Fak
         devChunks,
         emitProgress: (payload: ImportProgressPayload) => deliver({ v: RPC_VERSION, event: 'importProgress', payload }),
         yieldToEvents: () => new Promise((resolve) => setTimeout(resolve, 0)),
+        whenNotOpening: () => gate.whenNotOpening(),
       }),
-      app: createAppService({ info: { version: '1.0.0', platform: 'android', osVersion: '15' }, openUrl: async () => {} }),
+      app: createAppService({
+        info: { version: '1.0.0', platform: 'android', osVersion: '15' },
+        openUrl: async () => {},
+        onReaderOpening: (opening) => gate.set(opening),
+      }),
     },
   })
   const transport: HostTransport = {
@@ -254,6 +263,7 @@ export async function createFakeHost(options: FakeHostOptions = {}): Promise<Fak
     requests,
     emit: (event, payload) => deliver({ v: RPC_VERSION, event, payload }),
     settle: () => new Promise((resolve) => setTimeout(resolve, 5)),
+    gate,
   }
 }
 

@@ -26,6 +26,8 @@ export interface AppServiceOptions {
   onSystemBars?: (colors: SystemBarColors) => void
   /** Extra rule on top of the built-in checks; true = allowed. Default: any public https host. */
   isAllowedHost?: (host: string) => boolean
+  /** Spec 017 (US3): the host's gate that the file service's chunk loops wait on. */
+  onReaderOpening?: (opening: boolean) => void
 }
 
 const MAX_URL_CHARS = 2048
@@ -55,6 +57,13 @@ export function createAppService(options: AppServiceOptions) {
       }
       options.onSystemBars?.({ top: top.toLowerCase(), bottom: bottom.toLowerCase() })
       return { applied: true }
+    },
+    /** Spec 017 (US3, contracts/opening-ipc.md): `app.setReaderOpening { opening: boolean } → { ok: true }`. */
+    setReaderOpening(raw: unknown): { ok: true } {
+      const { opening } = argsObject(raw)
+      if (typeof opening !== 'boolean') throw new HostServiceError('INVALID_ARGUMENT', 'opening must be a boolean')
+      options.onReaderOpening?.(opening)
+      return { ok: true }
     },
     async openExternal(raw: unknown): Promise<{ opened: true }> {
       const url = argsObject(raw).url

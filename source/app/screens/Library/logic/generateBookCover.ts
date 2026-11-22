@@ -2,6 +2,10 @@ import { libraryApi } from '../../../bridge'
 import { startStep } from '../../../hooks/app/stepTimer'
 import { useLibraryBooksStore } from '../../../hooks/library/libraryBooksStore'
 import { waitUntilOpened } from '../../../hooks/reader/readerOpeningStore'
+import { onOpeningChange } from '../../../hooks/reader/firstPageSignal'
+
+/** Spec 017 (US3, FR-018): a page render interrupted by an opening book is redone at most this many times. */
+const MAX_RENDER_ATTEMPTS = 3
 
 /** Spec 016 (FR-006): pdf.js asks for ranges; each call to Main / the local server reads at most 1 MiB. */
 const RANGE_MAX_BYTES = 1024 * 1024
@@ -68,8 +72,11 @@ async function renderPdfFirstPage(bookId: string, sizeBytes: number): Promise<HT
   }
   const task = getDocument({ range: transport, length: sizeBytes, disableAutoFetch: true, disableStream: true })
   try {
+    // Spec 017 (US3, FR-018): between its steps the cover waits while a book opens (each wait ≤ 10 s).
     const pdf = await task.promise
+    await waitUntilOpened()
     const page = await pdf.getPage(1)
+    await waitUntilOpened()
     const base = page.getViewport({ scale: 1 })
     const scale = Math.min(COVER_W / base.width, COVER_H / base.height) * 2
     const viewport = page.getViewport({ scale })
@@ -78,10 +85,25 @@ async function renderPdfFirstPage(bookId: string, sizeBytes: number): Promise<HT
     canvas.height = Math.ceil(viewport.height)
     const ctx = canvas.getContext('2d')
     if (!ctx) throw new Error('canvas unavailable')
-    ctx.fillStyle = '#ffffff'
-    ctx.fillRect(0, 0, canvas.width, canvas.height)
-    await page.render({ canvasContext: ctx, canvas, viewport }).promise
-    return canvas
+    // A book that starts opening cancels the running render; it is redone once the first page is drawn.
+    for (let attempt = 0; attempt < MAX_RENDER_ATTEMPTS; attempt++) {
+      await waitUntilOpened()
+      ctx.fillStyle = '#ffffff'
+      ctx.fillRect(0, 0, canvas.width, canvas.height)
+      const render = page.render({ canvasContext: ctx, canvas, viewport })
+      const stop = onOpeningChange((event) => {
+        if (event.kind === 'begin') render.cancel()
+      })
+      try {
+        await render.promise
+        return canvas
+      } catch (err) {
+        if ((err as { name?: string } | null)?.name !== 'RenderingCancelledException') throw err
+      } finally {
+        stop()
+      }
+    }
+    throw new Error('cover render kept being interrupted by opening books')
   } finally {
     await task.destroy()
   }
@@ -145,6 +167,8 @@ async function renderCover(bookId: string, format: string): Promise<HTMLCanvasEl
   // Spec 016 (FR-006): never the whole book — the host sends only what the first page needs.
   const source = await libraryApi.getCoverSource(bookId)
   if (!source.ok) return null
+  // Spec 017 (US3, FR-018): a book that started opening meanwhile goes first.
+  await waitUntilOpened()
   if (source.kind === 'pdf') return format === 'pdf' ? renderPdfFirstPage(bookId, source.sizeBytes) : null
   if (source.kind === 'html') {
     const text = epubFirstText(source.documents).slice(0, 4000)

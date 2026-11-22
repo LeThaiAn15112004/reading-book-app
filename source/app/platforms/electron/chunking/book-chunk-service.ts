@@ -9,7 +9,8 @@ import { getDatabase } from '../persistence/db'
 import { getLibraryStore } from '../persistence/sqlite-library-store'
 import { currentTxtIndexSource } from '../txt/txt-storage'
 import { hasBookChunks } from './book-chunk-writer'
-import type { BookChunkJob, BookChunkWorkerMessage } from './book-chunk-job'
+import type { BookChunkControlMessage, BookChunkJob, BookChunkWorkerMessage } from './book-chunk-job'
+import { isOpening, onReaderOpeningChange } from '../perf/reader-opening-gate'
 import { isChunkableFormat } from './extract-book-text'
 
 /** Emitted next to main.js by the extra bundle entry in vite.config.ts. */
@@ -54,10 +55,21 @@ function spawnWorker(job: BookChunkJob): boolean {
   }
 
   running.set(bookId, worker)
+  // Spec 017 (US3, FR-018): the worker pauses between paragraphs while a book is opening.
+  const tellOpening = (opening: boolean) => {
+    try {
+      worker.postMessage({ type: 'opening', opening } satisfies BookChunkControlMessage)
+    } catch {
+      // the worker is gone
+    }
+  }
+  tellOpening(isOpening())
+  const stopTelling = onReaderOpeningChange(tellOpening)
   let settled = false
   const settle = (status: BookIndexStatusDto): void => {
     if (settled) return
     settled = true
+    stopTelling()
     running.delete(bookId)
     broadcast(status)
   }

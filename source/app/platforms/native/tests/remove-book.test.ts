@@ -100,6 +100,6 @@ describe('only app-private paths', () => {
 
   it('has no route that writes into an imported book', () => {
     const files = service(new MemoryFs())
-    expect(Object.keys(files).sort()).toEqual(['cancel', 'checkPick', 'commitStaged', 'discardStaged', 'hashStaged', 'pick', 'readChunk', 'readCover', 'removeBook', 'stage', 'sweep', 'writeCover'])
+    expect(Object.keys(files).sort()).toEqual(['cancel', 'checkPick', 'commitStaged', 'discardStaged', 'hashStaged', 'pick', 'readChunk', 'readCover', 'releasePicks', 'removeBook', 'stage', 'sweep', 'writeCover'])
   })
 })
