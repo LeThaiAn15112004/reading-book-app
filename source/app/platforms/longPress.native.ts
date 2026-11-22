@@ -5,8 +5,8 @@
  *   - Desktop's `longPress.electron.ts` returns `{ onContextMenu }` and nothing else.
  *   - Here it adds touch pointer handlers: a 500 ms press that moves less than 10 px calls the same
  *     handler with a synthetic event at the press point, and the click that ends the press is swallowed.
- *     Android WebView may also fire a native `contextmenu` for the same press (risk R1): that one is dropped, so the
- *     menu opens once.
+ *     Android WebView may also fire a native `contextmenu` for the same press (risk R1), before or after the timer:
+ *     whichever comes first is the press and the other is dropped, so the handler runs once.
  */
 import type { MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent } from 'react'
 
@@ -59,6 +59,13 @@ export function withLongPress<E extends Element>(onContextMenu: ContextMenuHandl
       if (justFired()) {
         event.preventDefault()
         return
+      }
+      // Android WebView's own long press can come BEFORE the 500 ms timer (~400 ms on some devices): it IS this press,
+      // so the timer must not fire it a second time (that toggled the book back and closed select mode at once).
+      if (timer) {
+        clearTimeout(timer)
+        timer = undefined
+        firedAt = Date.now()
       }
       onContextMenu(event)
     },
