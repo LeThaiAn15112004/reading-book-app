@@ -113,7 +113,8 @@ import type {
 /** Spec 017: thrown when the EPUB is DRM-protected / encrypted (`META-INF/encryption.xml`, not font obfuscation). */
 export class ProtectedBookError extends Error {
   constructor() {
-    super('This book is protected and cannot be opened.')
+    // Never shown: the opening screen names the cause (`protected`) in the interface language.
+    super('EPUB_PROTECTED')
     this.name = 'ProtectedBookError'
   }
 }

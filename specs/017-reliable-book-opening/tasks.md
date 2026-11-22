@@ -181,12 +181,12 @@ added; change content → "changed while it was being imported"; phone force-sto
 
 ## Phase 7: Polish & Cross-Cutting Concerns
 
-- [ ] T055 [P] Write `docs/implementation_plan/reliable_book_opening.md` (map of the feature: state machine, store, screen, IPC changes, gate, import fixes, checks) and add a short 017 paragraph to `CLAUDE.md` (Persistence / Architecture section, next to "Background import (spec 016)")
-- [ ] T056 [P] Add the new spikes `spike:open:limits` / `spike:open:content` to the spike list in `CLAUDE.md`
-- [ ] T057 Check the edge cases of spec.md by hand: Back then reopen the same book, A → Back → B quickly (B never shows A), phone background during opening (background time not counted), file replaced while opening, no cover / no title (generated cover + file name), MD over the limit (immediate size error), DRM / password book ("protected", not "damaged"), opening while its import is still saving, double tap (one opening)
-- [ ] T058 Run `npm run i18n:inventory` and `sdk:test` (release gate `source/core/tests/i18n/i18n-release-gate.test.ts`, glossary anchors) — no pending literals left from 017
-- [ ] T059 Run the full gate `npm run check` (typecheck, lint, core + mobile tests, boundaries, platform-adapters, builds, build-split, `check:desktop-baseline` with every new approval line) and fix anything red
-- [ ] T060 Run the full quickstart (`specs/017-reliable-book-opening/quickstart.md` §2–§5) on both hosts and record SC-001 … SC-008 results in `specs/017-reliable-book-opening/timing-baseline.md` (format + size only)
+- [X] T055 [P] Write `docs/implementation_plan/reliable_book_opening.md` (map of the feature: state machine, store, screen, IPC changes, gate, import fixes, checks) and add a short 017 paragraph to `CLAUDE.md` (Persistence / Architecture section, next to "Background import (spec 016)")
+- [X] T056 [P] Add the new spikes `spike:open:limits` / `spike:open:content` to the spike list in `CLAUDE.md`
+- [ ] T057 Check the edge cases of spec.md by hand: Back then reopen the same book, A → Back → B quickly (B never shows A), phone background during opening (background time not counted), file replaced while opening, no cover / no title (generated cover + file name), MD over the limit (immediate size error), DRM / password book ("protected", not "damaged"), opening while its import is still saving, double tap (one opening) — NOT DONE (manual, needs the app on both hosts)
+- [X] T058 Run `npm run i18n:inventory` and `sdk:test` (release gate `source/core/tests/i18n/i18n-release-gate.test.ts`, glossary anchors) — no pending literals left from 017 — done: `i18n:inventory` 0 candidates (the internal `ProtectedBookError` message is now a code, never shown); sdk:test incl. the release gate and glossary anchors green
+- [X] T059 Run the full gate `npm run check` (typecheck, lint, core + mobile tests, boundaries, platform-adapters, builds, build-split, `check:desktop-baseline` with every new approval line) and fix anything red — done: `npm run check` green (typecheck, lint, core 1273 + mobile 150 tests, boundaries, platform-adapters, builds, build-split); `check:desktop-baseline` 25 / 25 with the new approval lines
+- [ ] T060 Run the full quickstart (`specs/017-reliable-book-opening/quickstart.md` §2–§5) on both hosts and record SC-001 … SC-008 results in `specs/017-reliable-book-opening/timing-baseline.md` (format + size only) — NOT DONE (manual; record together with the T003 baseline — measure it on commit 2a98be1, the last one before any code change, then the after figures on this branch)
 
 ---
 
