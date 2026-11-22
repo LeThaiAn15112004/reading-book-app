@@ -43,6 +43,11 @@ export default function ReaderHost() {
   // Edge-to-edge: the status and navigation bars are transparent, so the app paints the areas behind them in the
   // colours at the top and bottom edge of the page (`app.setSystemBars`), instead of the system's own colour.
   const [bars, setBars] = useState<SystemBarColors>(DEFAULT_BARS)
+  // React Native 0.88 (new architecture) runs a view command such as `injectJavaScript` only at the next UI commit.
+  // With nothing else re-rendering the host, every reply and event waited 1–15 s in that queue (SQL looked "slow").
+  // One state bump per burst of messages makes the commit happen now; see `docs/implementation_plan/mobile_webview.md`.
+  const [, setDeliveryFlush] = useState(0)
+  const flushQueued = useRef(false)
   const insets = useSafeAreaInsets()
 
   useEffect(() => {
@@ -52,6 +57,12 @@ export default function ReaderHost() {
 
   const post = useCallback((message: unknown) => {
     webView.current?.injectJavaScript(deliveryScript(WEBVIEW_RECEIVER, message))
+    if (flushQueued.current) return
+    flushQueued.current = true
+    queueMicrotask(() => {
+      flushQueued.current = false
+      setDeliveryFlush((n) => (n + 1) % 1_000_000)
+    })
   }, [])
 
   useEffect(() => {

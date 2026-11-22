@@ -38,6 +38,15 @@ repository root.
 
 Below, `native/` = `source/app/platforms/native/`, `app/` = `source/app/`, `core/` = `source/core/`.
 
+**Replies need a UI commit.** Host → WebView messages (RPC replies and events) are delivered with
+`injectJavaScript`, a view command. On React Native 0.88 (new architecture) a view command runs only at the next UI
+commit, so with nothing else re-rendering the host every reply waited 1–15 s: a `SELECT 1` round trip took 7–15 s
+while the SQL itself took ~15 ms, an import's save 40 s, a 165 KB EPUB's content 10 s. `post()` in
+`native/routes/index.tsx` therefore bumps one state value per burst of messages (microtask-coalesced) to force that
+commit; round trips are then 30–120 ms. Do not remove it without re-measuring on a device (WebView devtools: time
+`ReactNativeWebView.postMessage` → `window.__readmateHostReceive` for `sql.query SELECT 1`). No unit-test seam exists:
+the delay lives in Fabric's command queue on a real device.
+
 ## Feature map
 
 | Feature | Where (Mobile-specific part) | Shared with Desktop | Contract / record |
