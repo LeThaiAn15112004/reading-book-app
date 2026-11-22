@@ -417,6 +417,7 @@ export function LibraryScreen() {
                 : t('library.confirm.deleteFile')
           }
           destructive={pendingRemoval.kind !== 'remove'}
+          busyLabel={pendingRemoval.kind === 'delete-file' ? t('library.confirm.deleting') : t('library.confirm.removing')}
           onCancel={() => setPendingRemoval(null)}
           onConfirm={confirmPendingRemoval}
         />
@@ -428,6 +429,7 @@ export function LibraryScreen() {
           message={isMobileHost() ? t('library.selection.removeBody') : t('library.selection.removeBodyDesktop')}
           confirmLabel={t('library.confirm.remove')}
           destructive
+          busyLabel={t('library.confirm.removing')}
           onCancel={() => setPendingBulkRemoval(null)}
           onConfirm={confirmBulkRemoval}
         />
@@ -438,6 +440,7 @@ export function LibraryScreen() {
           title={t('library.confirm.deleteCollectionTitle')}
           message={t('library.confirm.deleteCollectionBody', { name: pendingCollectionDelete.name })}
           confirmLabel={t('library.confirm.deleteCollection')}
+          busyLabel={t('library.confirm.deleting')}
           destructive
           onCancel={() => setPendingCollectionDeleteId(null)}
           onConfirm={confirmCollectionDelete}

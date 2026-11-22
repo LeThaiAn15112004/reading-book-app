@@ -176,6 +176,10 @@ export const en = {
     deleteCollectionTitle: 'Delete collection?',
     deleteCollectionBody: '“{name}” will be deleted. Books in it will remain in the library.',
     deleteCollection: 'Delete collection',
+    /** The confirm button while its action runs (the dialog cannot be closed meanwhile). */
+    working: 'Working…',
+    removing: 'Removing…',
+    deleting: 'Deleting…',
   },
   collections: {
     title: 'Collections',

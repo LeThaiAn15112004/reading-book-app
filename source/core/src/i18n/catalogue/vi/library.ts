@@ -179,6 +179,9 @@ export const vi = {
     deleteCollectionTitle: 'Xóa bộ sưu tập?',
     deleteCollectionBody: '“{name}” sẽ bị xóa. Sách trong đó vẫn ở lại thư viện.',
     deleteCollection: 'Xóa bộ sưu tập',
+    working: 'Đang xử lý…',
+    removing: 'Đang gỡ…',
+    deleting: 'Đang xóa…',
   },
   collections: {
     title: 'Bộ sưu tập',
