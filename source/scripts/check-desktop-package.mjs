@@ -11,6 +11,8 @@
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { collectPackagedTree, resolvePackaged } from './desktop-package-deps.mjs'
+import { checkPackagedRuntime } from './check-packaged-runtime.mjs'
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..')
 const RELEASE_DIR = path.join(repoRoot, 'source/app/platforms/electron/release')
@@ -46,8 +48,21 @@ export function forbiddenReason(file) {
   return null
 }
 
-/** Checks a list of packaged paths: forbidden entries and missing required ones. */
-export function checkPackagedPaths(paths) {
+/**
+ * Every node_modules folder of Main's externals that electron-builder collects here, as a path INSIDE the package
+ * (`desktop-package-deps.mjs`: its collector re-hoists the tree, so this is not the disk layout). Other platforms'
+ * optional packages are not collected, so not required.
+ */
+export async function installedRuntimePackages() {
+  return resolvePackaged(await collectPackagedTree()).installed
+}
+
+/**
+ * Checks a list of packaged paths: forbidden entries and missing required ones. `packages` = node_modules folders whose
+ * `package.json` must be packaged (a nested one such as node_modules/sharp/node_modules/semver is not shipped through
+ * its parent's pattern, and a build run from inside the repo hides the gap by resolving the repo's node_modules).
+ */
+export function checkPackagedPaths(paths, packages = []) {
   const set = new Set(paths.map((p) => p.replaceAll('\\', '/').replace(/^\/+/, '')))
   const forbidden = []
   for (const p of set) {
@@ -55,6 +70,9 @@ export function checkPackagedPaths(paths) {
     if (reason) forbidden.push({ path: p, reason })
   }
   const missing = REQUIRED.filter((p) => !set.has(p))
+  for (const folder of packages) {
+    if (!set.has(`${folder}/package.json`)) missing.push(`${folder}/package.json (runtime dependency of Main's externals)`)
+  }
   // The renderer's Typewriter fonts are an import.meta.glob: a stale path builds fine and ships no font.
   const rendererFont = new RegExp(`^${HOST}/dist/assets/NotoSans-Regular-[^/]+\\.ttf$`)
   if (![...set].some((p) => rendererFont.test(p))) missing.push(`${HOST}/dist/assets/NotoSans-Regular-*.ttf (renderer Typewriter fonts)`)
@@ -114,12 +132,12 @@ function findAsars() {
   return found
 }
 
-function checkAsar(asar) {
+function checkAsar(asar, packages) {
   const files = [...listAsar(asar), ...listDir(`${asar}.unpacked`)]
   // Anything else in resources/ (FFmpeg, …) is checked for Mobile code too.
   const resources = path.dirname(asar)
   const extra = listDir(resources).filter((p) => !p.startsWith('app.asar')).map((p) => `../${p}`)
-  const result = checkPackagedPaths(files)
+  const result = checkPackagedPaths(files, packages)
   for (const p of extra) {
     const reason = forbiddenReason(p)
     if (reason) result.forbidden.push({ path: p, reason })
@@ -127,19 +145,31 @@ function checkAsar(asar) {
   return result
 }
 
-function main() {
+async function main() {
   const arg = process.argv[2]
   const asars = arg ? [path.resolve(arg)] : findAsars()
   if (asars.length === 0) {
     console.error(`check-desktop-package: no app.asar found under ${path.relative(repoRoot, RELEASE_DIR)} — run electron-builder first`)
     process.exit(1)
   }
+  const packages = await installedRuntimePackages()
   let failed = false
   for (const asar of asars) {
-    const { forbidden, missing, count } = checkAsar(asar)
+    const { forbidden, missing, count } = checkAsar(asar, packages)
     const label = path.relative(repoRoot, asar)
     if (forbidden.length === 0 && missing.length === 0) {
       console.log(`✓ ${label}: ${count} files, no Mobile code, Main's entry and externals present`)
+      // Load Main's externals with the packaged Electron from a copy OUTSIDE the repo (no repo node_modules to fall back on).
+      const runtime = checkPackagedRuntime(asar)
+      if (runtime.skipped) {
+        console.log(`  (runtime check skipped: ${runtime.skipped})`)
+      } else if (runtime.ok) {
+        console.log(`✓ ${label}: Main's externals load in the packaged runtime outside the repo (${runtime.loaded.join(', ')})`)
+      } else {
+        failed = true
+        console.error(`✗ ${label}: Main's externals do not load in the packaged runtime outside the repo`)
+        for (const line of runtime.errors) console.error(`  ${line}`)
+      }
       continue
     }
     failed = true
@@ -151,4 +181,9 @@ function main() {
   if (failed) process.exit(1)
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) main()
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  main().catch((error) => {
+    console.error(error instanceof Error ? error.message : error)
+    process.exit(1)
+  })
+}
