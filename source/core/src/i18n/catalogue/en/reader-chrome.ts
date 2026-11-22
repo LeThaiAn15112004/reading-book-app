@@ -94,13 +94,7 @@ export const en = {
     group: 'Export and import annotations',
   },
   openStatus: {
-    failedTitle: 'Could not open this book',
-    opening: 'Opening book…',
     failedBody: 'The file may be missing, damaged, or not readable. Try again or re-import the book.',
-    preparing: 'Preparing the reader and loading the local file.',
-    checkingFile: 'Checking file…',
-    locateFile: 'Locate file…',
-    tryAgain: 'Try again',
     backToLibrary: 'Back to Library',
   },
   /** Spec 017: the one opening screen (every format, both hosts). Book titles / file names are params, never translated. */

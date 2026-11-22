@@ -97,13 +97,7 @@ export const vi = {
     group: 'Xuất và nhập chú thích',
   },
   openStatus: {
-    failedTitle: 'Không mở được sách này',
-    opening: 'Đang mở sách…',
     failedBody: 'Tệp có thể bị thiếu, hỏng hoặc không đọc được. Thử lại hoặc nhập lại sách.',
-    preparing: 'Đang chuẩn bị trình đọc và tải tệp trên máy.',
-    checkingFile: 'Đang kiểm tra tệp…',
-    locateFile: 'Tìm tệp…',
-    tryAgain: 'Thử lại',
     backToLibrary: 'Quay lại Thư viện',
   },
   /** Spec 017: màn hình mở sách duy nhất (mọi định dạng, cả hai nền tảng). Tên sách / tên tệp là tham số. */

@@ -61,7 +61,6 @@ import {
   NoteTextboxPopup,
   ReaderFooter,
   ReplacePreviewTooltip,
-  ReaderOpenStatus,
   ReaderRightSidebar,
   ReaderSearchPanel,
   ReadAloudMenu,
@@ -128,6 +127,7 @@ import { PdfInkPanel } from './components/chrome/PdfInkPanel'
 import { PdfInkQuickToolbar } from './components/chrome/PdfInkQuickToolbar'
 import { MD_INSERT_CARET_COLOR } from './logic/mdHighlights/mdHighlightsStore'
 import { getT, useT, useUiLanguage } from '../../i18n'
+import { ReaderOpeningScreen } from '../../components/reader/ReaderOpeningScreen'
 
 /** Stand-in row for the Inserted Text editor while the caret is only a draft (nothing saved yet). */
 const PENDING_INSERT_DRAFT = {
@@ -326,6 +326,21 @@ export function ReaderScreen() {
     void session.leaveToLibrary()
   }
   useOpeningPositionNote(book.opening, chrome.setToast)
+  // Spec 017 (US2): what the opening screen shows, and when the renderer may mount beneath it.
+  const openingFailed = book.opening?.outcome === 'failed'
+  const legacyOpenError = !openingFailed && (book.contentStatus === 'error' || txtLoadFailed)
+  const rendererWaiting =
+    book.contentStatus === 'loading' ||
+    book.contentStatus === 'idle' ||
+    book.isEpubSessionLoading ||
+    isPdfSessionLoading ||
+    isMdLoading ||
+    isTxtLoading
+  const rendererMountable = !openingFailed && !legacyOpenError && !rendererWaiting
+  // Formats whose renderer reports its first page (the fallback canvas does not): the screen stays until then.
+  const marksFirstPage = ['epub', 'pdf', 'md', 'txt'].includes(book.bookFormat ?? '')
+  const showOpeningScreen =
+    !rendererMountable || (marksFirstPage && book.opening?.outcome === 'pending')
 
   // Silent background chunking for search — starts only after the book is already on screen.
   const searchIndexing = useBookIndexing({
@@ -1618,42 +1633,30 @@ export function ReaderScreen() {
         </>
       }
     >
-      {book.opening?.outcome === 'failed' ? (
-        // Spec 017 (FR-006): every failed opening (content, engine, time limit) ends here with its cause and actions.
-        <ReaderOpenStatus
-          status="error"
+      {
+        // Spec 017 (US2): the one opening screen covers the renderer host until the first page is drawn; the renderer
+        // mounts underneath as soon as its bytes and saved position are known.
+        <ReaderOpeningScreen
+          visible={showOpeningScreen}
+          status={openingFailed || legacyOpenError ? 'error' : 'loading'}
+          bookId={bookId ?? ''}
+          title={book.bookTitle}
+          coverUrl={book.coverUrl}
           opening={book.opening}
-          onRetry={() => {
-            book.retryOpen()
-            if (txtLoadFailed && bookId) txt.retryLoad(bookId)
-          }}
+          message={legacyOpenError ? (txtLoadFailed ? txt.errorMessage : book.openErrorMessage) : null}
+          onRetry={
+            openingFailed
+              ? () => {
+                  book.retryOpen()
+                  if (txtLoadFailed && bookId) txt.retryLoad(bookId)
+                }
+              : txtLoadFailed && bookId
+                ? () => txt.retryLoad(bookId)
+                : book.retryOpen
+          }
           onFromBeginning={book.openFromBeginning}
-          onLocate={() => {
-            void relink.locateFile()
-          }}
-          locating={relink.locating}
-          locateMessage={relink.message}
-          onBack={leaveWhileOpening}
-        />
-      ) : book.contentStatus === 'loading' ||
-      book.contentStatus === 'idle' ||
-      book.isEpubSessionLoading ||
-      isPdfSessionLoading ||
-      isMdLoading ||
-      isTxtLoading ? (
-        <ReaderOpenStatus
-          status={book.contentStatus === 'ready' ? 'loading' : book.contentStatus}
-          opening={book.opening}
-          onRetry={book.retryOpen}
-          onBack={leaveWhileOpening}
-        />
-      ) : book.contentStatus === 'error' || txtLoadFailed ? (
-        <ReaderOpenStatus
-          status="error"
-          message={txtLoadFailed ? txt.errorMessage : book.openErrorMessage}
-          onRetry={txtLoadFailed && bookId ? () => txt.retryLoad(bookId) : book.retryOpen}
           onLocate={
-            (txtLoadFailed ? txt.errorCode : book.openErrorCode) === 'missing_file'
+            openingFailed || (txtLoadFailed ? txt.errorCode : book.openErrorCode) === 'missing_file'
               ? () => {
                   void relink.locateFile()
                 }
@@ -1661,11 +1664,10 @@ export function ReaderScreen() {
           }
           locating={relink.locating}
           locateMessage={relink.message}
-          onBack={() => {
-            void session.leaveToLibrary()
-          }}
+          onBack={leaveWhileOpening}
         />
-      ) : (
+      }
+      {!rendererMountable ? null : (
         <ReaderZoomViewport
           ref={zoom.zoomViewportRef}
           zoom={zoom.viewZoom}

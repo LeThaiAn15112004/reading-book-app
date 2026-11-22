@@ -1449,22 +1449,7 @@ export function EpubRenderer({
       data-epub-layout={layout}
       data-epub-page-mode={viewMode === 'scroll' ? 'scroll' : 'paginated'}
     >
-      {(status === 'opening' || status === 'rendering') && (
-        <div className="pointer-events-none absolute inset-0 z-10 flex flex-col items-center justify-center gap-4 bg-lib-surface-strong/80 backdrop-blur-sm">
-          <div className="flex w-48 flex-col gap-3">
-            <div className="flex items-center justify-between text-sm font-medium text-lib-text-strong">
-              <span>
-                {status === 'opening'
-                  ? t('reader.text.epub.opening')
-                  : t('reader.text.epub.preparing')}
-              </span>
-            </div>
-            <div className="h-1.5 w-full overflow-hidden rounded-full bg-lib-border-soft">
-              <div className="h-full w-1/3 animate-import-indeterminate rounded-full bg-lib-accent" />
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Spec 017 (US2): the opening / rendering wait is the Reader's opening screen; `data-epub-status` stays for E2E. */}
       {status === 'error' && (
         <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-4 bg-lib-surface-strong px-6 text-center">
           <div className="text-base font-medium text-rose-500">

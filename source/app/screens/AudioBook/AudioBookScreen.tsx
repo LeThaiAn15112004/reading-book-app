@@ -5,7 +5,7 @@ import { appApi } from '../../bridge'
 import { chapterIndexAt, timelineView, trackEyebrow } from '@core'
 import { useOpenReading } from '../../components/chrome'
 import { BookCover } from '../Library/components/book'
-import { ReaderOpenStatus } from '../Reader/components/chrome'
+import { ReaderOpeningScreen } from '../../components/reader/ReaderOpeningScreen'
 import { SidebarEdgeRail, useSidebarPanelResize, type SidebarTab } from '../Reader/components/sidebar'
 import { SIDEBAR_TABS, sidebarContentInsetLeft } from '../Reader/components/sidebar/sidebarTabs'
 import { useBookRelinkStore } from '../Reader/logic/bookRelink/bookRelinkStore'
@@ -297,28 +297,33 @@ export function AudioBookScreen({ bookId }: { bookId: string }) {
   }, [dispose, navigate])
   const retry = useCallback(() => void load(bookId), [load, bookId])
 
-  if (status === 'idle' || status === 'loading') {
-    return <ReaderOpenStatus status="loading" onRetry={retry} onBack={() => void leave()} />
-  }
-  if (status === 'error') {
+  // Spec 017 (US2): the preflight wait and its error use the one opening screen (the player itself is unchanged).
+  if (status === 'idle' || status === 'loading' || status === 'error') {
+    const isError = status === 'error'
     return (
-      <ReaderOpenStatus
-        status="error"
-        message={errorMessage ? uiText(t, errorMessage) : undefined}
-        onRetry={retry}
-        onBack={() => void leave()}
-        onLocate={
-          errorCode === 'missing_file'
-            ? () => {
-                void relink.locate(bookId).then((linked) => {
-                  if (linked) retry()
-                })
-              }
-            : undefined
-        }
-        locating={relink.locating}
-        locateMessage={relink.notice?.bookId === bookId ? uiText(t, relink.notice.text) : null}
-      />
+      <div className="relative flex h-full min-h-0 flex-1 text-lib-text" data-audio-screen>
+        <ReaderOpeningScreen
+          visible
+          status={isError ? 'error' : 'loading'}
+          bookId={bookId}
+          title={title}
+          coverUrl={coverUrl}
+          message={isError && errorMessage ? uiText(t, errorMessage) : null}
+          onRetry={retry}
+          onBack={() => void leave()}
+          onLocate={
+            isError && errorCode === 'missing_file'
+              ? () => {
+                  void relink.locate(bookId).then((linked) => {
+                    if (linked) retry()
+                  })
+                }
+              : undefined
+          }
+          locating={relink.locating}
+          locateMessage={relink.notice?.bookId === bookId ? uiText(t, relink.notice.text) : null}
+        />
+      </div>
     )
   }
 

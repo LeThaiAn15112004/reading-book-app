@@ -30,7 +30,7 @@ import { EpubRenderer, type EpubRendererApi, type EpubTocItem } from '../../../c
 import { PdfRenderer, type PdfRendererApi } from '../../../components/reader/renderers/pdf'
 import { TxtRenderer, type TxtRendererApi } from '../../../components/reader/renderers/txt'
 import { MdRenderer, type MdRendererApi, type MdSelectionInfo } from '../../../components/reader/renderers/md'
-import { ReaderOpenStatus } from '../components/chrome/ReaderOpenStatus'
+import { ReaderOpeningScreen } from '../../../components/reader/ReaderOpeningScreen'
 import { ReaderZoomViewport } from '../components/chrome/ReaderZoomViewport'
 import { AaSettingsPanel } from '../components/settings/AaSettingsPanel'
 import { FAKE_CHAPTERS } from '../logic/demo/fakeReaderContent'
@@ -293,37 +293,40 @@ export default function MobileReaderScreen() {
     isMdLoading ||
     isTxtLoading
   const openingFailed = book.opening?.outcome === 'failed'
-  const failed = book.contentStatus === 'error' || txtLoadFailed
+  const failed = !openingFailed && (book.contentStatus === 'error' || txtLoadFailed)
+  const rendererMountable = !openingFailed && !failed && !loading
+  // Spec 017 (US2): formats whose renderer reports its first page keep the opening screen until then.
+  const marksFirstPage = ['epub', 'pdf', 'md', 'txt'].includes(book.bookFormat ?? '')
+  // Spec 017 (US2, FR-006): the one opening screen — still frame, step line, slow note, error with its actions.
+  // "Locate file…" is a computer's file system action; on the phone a missing book is imported again.
+  const openingScreen = (
+    <ReaderOpeningScreen
+      visible={!rendererMountable || (marksFirstPage && book.opening?.outcome === 'pending')}
+      status={openingFailed || failed ? 'error' : 'loading'}
+      bookId={bookId ?? ''}
+      title={book.bookTitle}
+      coverUrl={book.coverUrl}
+      opening={book.opening}
+      message={failed ? (txtLoadFailed ? txt.errorMessage : book.openErrorMessage) : null}
+      onRetry={
+        openingFailed
+          ? () => {
+              book.retryOpen()
+              if (txtLoadFailed && bookId) txt.retryLoad(bookId)
+            }
+          : txtLoadFailed && bookId
+            ? () => txt.retryLoad(bookId)
+            : book.retryOpen
+      }
+      onFromBeginning={book.openFromBeginning}
+      onBack={leave}
+    />
+  )
 
-  // Spec 017 (FR-006): every failed opening (content, engine, time limit) shows its cause and the actions that help.
-  if (openingFailed) {
+  if (!rendererMountable) {
     return (
-      <div className="flex h-full flex-col bg-lib-bg-deep text-lib-text" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
-        <ReaderOpenStatus
-          status="error"
-          opening={book.opening}
-          onRetry={() => {
-            book.retryOpen()
-            if (txtLoadFailed && bookId) txt.retryLoad(bookId)
-          }}
-          onFromBeginning={book.openFromBeginning}
-          onBack={leave}
-        />
-      </div>
-    )
-  }
-
-  if (loading || failed) {
-    return (
-      <div className="flex h-full flex-col bg-lib-bg-deep text-lib-text" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
-        <ReaderOpenStatus
-          status={failed ? 'error' : book.contentStatus === 'ready' ? 'loading' : book.contentStatus === 'error' ? 'error' : book.contentStatus}
-          message={failed ? (txtLoadFailed ? txt.errorMessage : book.openErrorMessage) : undefined}
-          opening={failed ? null : book.opening}
-          onRetry={txtLoadFailed && bookId ? () => txt.retryLoad(bookId) : book.retryOpen}
-          // "Locate file…" is a computer's file system action; on the phone a missing book is imported again.
-          onBack={leave}
-        />
+      <div className="relative h-full overflow-hidden bg-lib-bg-deep text-lib-text" data-mobile-reader="">
+        {openingScreen}
       </div>
     )
   }
@@ -503,10 +506,14 @@ export default function MobileReaderScreen() {
               apiRef={txtApiRef}
             />
           ) : (
-            <ReaderOpenStatus status="error" message={t('reader.phone.screen.formatUnsupported')} onRetry={book.retryOpen} onBack={leave} />
+            <p className="m-0 px-6 py-10 text-center text-sm text-lib-muted" role="alert">
+              {t('reader.phone.screen.formatUnsupported')}
+            </p>
           )}
         </ReaderZoomViewport>
       </div>
+
+      {openingScreen}
 
       {/* Edge tap zones: previous / next page. Narrow, so a long press on most of the text is never caught. */}
       {!selectionMenu && !liveSelection ? (

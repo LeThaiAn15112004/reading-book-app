@@ -99,7 +99,7 @@ import { PAD_PX, PAGE_GAP_PX, PDF_TO_CSS, type PdfPageCssSize } from './pdfLayou
 import { isTypingTarget } from '../../../../shortcuts/iframeKeydown'
 // `?url` makes Vite emit the worker as a local asset in dist/ — never loaded from a CDN.
 import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
-import { getT, useT } from '../../../../i18n'
+import { getT } from '../../../../i18n'
 import { markFirstPageDrawn } from '../../../../hooks/reader/firstPageSignal'
 import {
   reportPositionDone,
@@ -489,7 +489,6 @@ export function PdfRenderer({
   eraserMode = 'stroke',
   onInkPartialErase,
 }: PdfRendererProps) {
-  const t = useT()
   const [doc, setDoc] = useState<PDFDocumentProxy | null>(null)
   const [sizes, setSizes] = useState<PageSize[]>([])
   const [status, setStatus] = useState<Status>({ kind: 'loading' })
@@ -2832,7 +2831,7 @@ export function PdfRenderer({
         if (!gestureRef.current) dwellRef.current?.update(false)
       }}
     >
-      {status.kind === 'loading' ? <p className="mt-6 text-sm">{t('reader.pdf.renderer.loading')}</p> : null}
+      {/* Spec 017 (US2): the loading wait is the Reader's opening screen. */}
       {paged ? (
         <div className="grid" style={{ perspective: '2400px' }}>
           {pageRows}

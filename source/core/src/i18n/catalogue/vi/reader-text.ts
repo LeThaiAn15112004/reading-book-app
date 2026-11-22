@@ -6,8 +6,6 @@ export const vi = {
   epub: {
     cover: 'Bìa',
     openFailed: 'Không mở được EPUB này.',
-    opening: 'Đang mở sách…',
-    preparing: 'Đang chuẩn bị sách…',
     unableToOpen: 'Không mở được sách này',
     tryAgain: 'Thử lại',
     coverAlt: 'Ảnh bìa sách',

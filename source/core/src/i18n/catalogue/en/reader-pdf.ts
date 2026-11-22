@@ -1,7 +1,6 @@
 /** English texts of area `reader.pdf` (spec 012): PDF renderer, typewriter, attachments and the PDF stores' messages. */
 export const en = {
   renderer: {
-    loading: 'Loading PDF…',
     openFailed: 'Could not open this PDF.',
     attachedFile: 'Attached file: {name}',
   },

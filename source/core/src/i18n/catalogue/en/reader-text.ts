@@ -3,8 +3,6 @@ export const en = {
   epub: {
     cover: 'Cover',
     openFailed: 'Could not open this EPUB.',
-    opening: 'Opening book…',
-    preparing: 'Preparing the book…',
     unableToOpen: 'Unable to open this book',
     tryAgain: 'Try again',
     coverAlt: 'Book cover',

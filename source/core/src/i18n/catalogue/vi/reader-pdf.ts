@@ -4,7 +4,6 @@ import type { en } from '../en/reader-pdf.js'
 /** Area `reader.pdf` in Vietnamese (glossary: specs/012-app-ui-i18n/contracts/glossary.md). */
 export const vi = {
   renderer: {
-    loading: 'Đang tải PDF…',
     openFailed: 'Không mở được PDF này.',
     attachedFile: 'Tệp đính kèm: {name}',
   },

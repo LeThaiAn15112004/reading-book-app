@@ -1,7 +1,6 @@
 export { ChromeRevealButton } from './ChromeRevealButton'
 export { MoreMenu } from './MoreMenu'
 export { ReaderFooter } from './ReaderFooter'
-export { ReaderOpenStatus } from './ReaderOpenStatus'
 export { ReaderSearchPanel } from './ReaderSearchPanel'
 export { ReadAloudMenu } from './ReadAloudMenu'
 export { ReaderTopbar } from './ReaderTopbar'

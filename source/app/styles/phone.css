@@ -311,3 +311,15 @@
   --ui-density-content-x: 0px;
   --ui-density-content-y: 1rem;
 }
+
+/* Spec 017 (US2): the opening screen covers the phone Reader's tap zones and bars; it keeps clear of the notch / home bar. */
+[data-mobile-host] .reader-opening-screen {
+  z-index: 260;
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+[data-mobile-host] .reader-opening-back {
+  min-width: 44px;
+  min-height: 44px;
+}
