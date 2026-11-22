@@ -1,5 +1,6 @@
 import type { Book, Rendition } from 'epubjs'
 import {
+  bookOpening,
   CfiLocation,
   type ReaderTheme,
   type TextMatcher,
@@ -44,6 +45,7 @@ import {
 import { toOuterRect } from './epubjs/annotation-marks'
 import {
   displayCfiSafely,
+  settlesWithin,
   displayCfiTrusted,
   ensureInitialPaint,
   spineIndexFromCfi,
@@ -108,6 +110,28 @@ import type {
  * Open an EPUB from ArrayBuffer into `host`.
  * Spine order is preserved — cover (or any first item) is a normal page.
  */
+/** Spec 017: thrown when the EPUB is DRM-protected / encrypted (`META-INF/encryption.xml`, not font obfuscation). */
+export class ProtectedBookError extends Error {
+  constructor() {
+    super('This book is protected and cannot be opened.')
+    this.name = 'ProtectedBookError'
+  }
+}
+
+async function throwIfProtected(book: Book): Promise<void> {
+  const zip = (book as unknown as { archive?: { zip?: { file(name: string): { async(type: 'string'): Promise<string> } | null } } })
+    .archive?.zip
+  const entry = zip?.file('META-INF/encryption.xml')
+  if (!entry) return
+  let xml = ''
+  try {
+    xml = await entry.async('string')
+  } catch {
+    return
+  }
+  if (bookOpening.isProtectedEpubEncryption(xml)) throw new ProtectedBookError()
+}
+
 export async function openEpubjs(
   buffer: ArrayBuffer | ArrayBufferView,
   host: HTMLElement,
@@ -136,6 +160,8 @@ export async function openEpubjs(
   const onFirstRender = options.onFirstRender
   const onStatusChange = options.onStatusChange
   const onLocationsReady = options.onLocationsReady
+  const onPositionStarted = options.onPositionStarted
+  const onPositionDone = options.onPositionDone
 
   if (typeof ePub !== 'function') {
     throw new Error('epubjs failed to load (default export is not a function)')
@@ -212,6 +238,9 @@ export async function openEpubjs(
   try {
     await book.ready
     throwIfAborted(signal)
+    // Spec 017 (FR-006): a DRM-protected / encrypted book is "protected", never "damaged".
+    await throwIfProtected(book)
+    throwIfAborted(signal)
 
     const size = await waitForHostSize(host, signal)
     throwIfAborted(signal)
@@ -242,20 +271,39 @@ export async function openEpubjs(
 
     // Resume at CFI when provided (T4.1); otherwise first spine item.
     fallbackSpine = 0
+    let positionRestored = true
     if (initialLocation) {
+      // Spec 017 (R4, FR-005): ONE bounded attempt (3 s in all); when the saved position does not fit the book or
+      // takes too long, open at the start of its chapter (else of the book) and say so — never an error.
+      onPositionStarted?.()
+      let restored = false
       try {
         const decoded = cfiCodec.decode(initialLocation) as EpubCfiDecodeResult
         resumeCfi = decoded.cfi
         resumeSpineIndex = spineIndexFromCfi(book, decoded.cfi, fallbackSpine)
-        await displayCfiSafely(book, rendition, decoded.cfi, resumeSpineIndex)
+        let exact = false
+        const attempt = displayCfiSafely(book, rendition, decoded.cfi, resumeSpineIndex).then((ok) => {
+          exact = ok
+        })
+        restored = (await settlesWithin(attempt, bookOpening.POSITION_LIMIT_MS)) && exact
       } catch {
+        restored = false
+      }
+      throwIfAborted(signal)
+      if (!restored) {
         const idx =
           resumeSpineIndex ??
           (resumeCfi
             ? spineIndexFromCfi(book, resumeCfi, fallbackSpine)
             : fallbackSpine)
-        await rendition.display(idx)
+        try {
+          await rendition.display(idx)
+        } catch {
+          await rendition.display(fallbackSpine)
+        }
       }
+      positionRestored = restored
+      onPositionDone?.(restored)
     } else {
       await rendition.display(fallbackSpine)
     }
@@ -268,8 +316,9 @@ export async function openEpubjs(
       openToken,
       {
         resume: Boolean(initialLocation),
+        // Spec 017: no second attempt at a position that already failed (the chapter start is shown instead).
         resumeRetry:
-          resumeCfi && resumeSpineIndex != null
+          positionRestored && resumeCfi && resumeSpineIndex != null
             ? { book, cfi: resumeCfi, spineIndex: resumeSpineIndex }
             : undefined,
       },

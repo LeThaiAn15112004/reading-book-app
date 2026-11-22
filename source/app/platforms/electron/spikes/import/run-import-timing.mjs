@@ -1,7 +1,7 @@
 /**
  * Spec 016 (US1, T019): reads the developer timing log and prints a table per flow / format / size bucket / step.
  *
- *   npm run spike:import:timing [-- --file <timing.jsonl>] [--label <name>] [--since <ISO time>] [--self-test]
+ *   npm run spike:import:timing [-- --file <timing.jsonl>] [--label <name>] [--compare <label>] [--since <ISO time>] [--self-test]
  *
  * - Default file: `{appData}/reading-book-desktop/logs/timing.jsonl` (the dev userData), written when the app runs with
  *   `READMATE_TIMING=1`.
@@ -9,6 +9,11 @@
  *   `baseline` and an `after` summary exist, the change per row is printed too (SC-002 / SC-009 / SC-005).
  * - FAILS (exit 1) when any line has a key outside the StepTiming fields or a bad value (FR-001: no title, file name
  *   or path may ever appear). Offending lines are reported by number only, never by content.
+ * - `--compare <label>` compares with `out/timing-<label>.json` instead of `baseline` (spec 017: `--label open-after
+ *   --compare open-baseline`).
+ * - Spec 017 (FR-019, SC-005): the `open` flow also gets a summary per format / size bucket — tap → first page
+ *   (`open-first-page`) and how openings ended (opened / left / failed:<cause>, from the `open-left` /
+ *   `open-failed-<cause>` steps).
  * - `--self-test` checks the parser and the summary on built-in lines (no file needed).
  */
 import fs from 'node:fs'
@@ -102,6 +107,49 @@ function printTable(rows, compareTo) {
   for (const row of body) console.log(line(row))
 }
 
+/** Spec 017: per format / size bucket of the `open` flow — n opened, median tap → first page, and the outcomes. */
+export function summarizeOpenings(lines) {
+  const groups = new Map()
+  for (const t of lines) {
+    if (t.flow !== 'open') continue
+    const outcome =
+      t.step === 'open-first-page' ? 'opened' : t.step === 'open-left' ? 'left' : t.step.startsWith('open-failed-') ? `failed:${t.step.slice(12)}` : null
+    if (!outcome) continue
+    const key = [t.host, t.format, sizeBucket(t.sizeBytes)].join('|')
+    const g = groups.get(key) ?? { firstPageMs: [], outcomes: {} }
+    if (outcome === 'opened') g.firstPageMs.push(t.ms)
+    g.outcomes[outcome] = (g.outcomes[outcome] ?? 0) + 1
+    groups.set(key, g)
+  }
+  return [...groups.entries()]
+    .map(([key, g]) => {
+      const [host, format, size] = key.split('|')
+      return {
+        host,
+        format,
+        size,
+        opened: g.firstPageMs.length,
+        medianFirstPageMs: g.firstPageMs.length ? Math.round(median(g.firstPageMs)) : null,
+        outcomes: Object.entries(g.outcomes)
+          .map(([k, v]) => `${k} ${v}`)
+          .join(', '),
+      }
+    })
+    .sort((a, b) => (a.host + a.format + a.size).localeCompare(b.host + b.format + b.size))
+}
+
+function printOpenings(rows) {
+  if (!rows.length) return
+  console.log('\nopen — tap → first page and outcomes')
+  const head = ['host', 'format', 'size', 'opened', 'median first page ms', 'outcomes']
+  const body = rows.map((r) => [r.host, r.format, r.size, String(r.opened), r.medianFirstPageMs == null ? '—' : String(r.medianFirstPageMs), r.outcomes])
+  const widths = head.map((h, i) => Math.max(h.length, ...body.map((row) => row[i].length)))
+  const line = (cells) => '| ' + cells.map((c, i) => c.padEnd(widths[i])).join(' | ') + ' |'
+  console.log(line(head))
+  console.log('|' + widths.map((w) => '-'.repeat(w + 2)).join('|') + '|')
+  for (const row of body) console.log(line(row))
+}
+
 function selfTest() {
   const ok = JSON.stringify({ flow: 'import', step: 'fingerprint', format: 'pdf', sizeBytes: 200 * 1024 * 1024, ms: 900, host: 'desktop', at: '2026-11-21T00:00:00.000Z' })
   const ok2 = JSON.stringify({ flow: 'import', step: 'fingerprint', format: 'pdf', sizeBytes: 150 * 1024 * 1024, ms: 1100, host: 'desktop', at: '2026-11-21T00:00:01.000Z' })
@@ -111,7 +159,12 @@ function selfTest() {
   const rows = summarize(valid)
   if (rows.length !== 1 || rows[0].medianMs !== 1000 || rows[0].size !== '≥ 100 MB') throw new Error('self-test: summary')
   if (sizeBucket(500) !== '< 1 MB' || sizeBucket(5 * 1024 * 1024) !== '1–10 MB') throw new Error('self-test: buckets')
-  console.log('spike:import:timing self-test passed (parse, refusal of extra keys, buckets, median)')
+  const open = (step, ms) => ({ flow: 'open', step, format: 'epub', sizeBytes: 60 * 1024 * 1024, ms, host: 'desktop', at: '2026-11-22T00:00:00.000Z' })
+  const openRows = summarizeOpenings([open('open-first-page', 800), open('open-first-page', 1200), open('open-left', 300), open('open-failed-took_too_long', 20001), open('open-content', 10)])
+  if (openRows.length !== 1 || openRows[0].opened !== 2 || openRows[0].medianFirstPageMs !== 1000 || openRows[0].outcomes !== 'opened 2, left 1, failed:took_too_long 1') {
+    throw new Error('self-test: open summary ' + JSON.stringify(openRows))
+  }
+  console.log('spike:import:timing self-test passed (parse, refusal of extra keys, buckets, median, open outcomes)')
 }
 
 if (args.includes('--self-test')) {
@@ -134,10 +187,12 @@ if (args.includes('--self-test')) {
   let compareTo
   if (label) {
     fs.mkdirSync(outDir, { recursive: true })
-    fs.writeFileSync(path.join(outDir, `timing-${label}.json`), JSON.stringify({ label, file: 'timing.jsonl', rows }, null, 2))
-    const baselineFile = path.join(outDir, 'timing-baseline.json')
-    if (label !== 'baseline' && fs.existsSync(baselineFile)) compareTo = JSON.parse(fs.readFileSync(baselineFile, 'utf8')).rows
+    fs.writeFileSync(path.join(outDir, `timing-${label}.json`), JSON.stringify({ label, file: 'timing.jsonl', rows, openings: summarizeOpenings(valid) }, null, 2))
   }
+  const compareLabel = arg('--compare') ?? (label && label !== 'baseline' ? 'baseline' : undefined)
+  const compareFile = compareLabel ? path.join(outDir, `timing-${compareLabel}.json`) : null
+  if (compareFile && compareLabel !== label && fs.existsSync(compareFile)) compareTo = JSON.parse(fs.readFileSync(compareFile, 'utf8')).rows
   console.log(`${valid.length} timing line(s)${label ? ` — label "${label}"` : ''}`)
   printTable(rows, compareTo)
+  printOpenings(summarizeOpenings(valid))
 }

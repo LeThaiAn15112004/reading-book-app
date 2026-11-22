@@ -15,6 +15,7 @@ import {
 } from './theme/appAppearance'
 import { applyTheme } from './theme/applyTheme'
 import { startWindowSync } from './platforms/window'
+import { installOpeningStoreDomSources } from './hooks/reader/readerOpeningStore'
 
 /** Boot theme / accent / density from stored prefs before React mounts (avoid flash). */
 try {
@@ -29,6 +30,8 @@ try {
   applyTheme(DEFAULT_GLOBAL_READING_PREFS.theme)
 }
 startWindowSync()
+// Spec 017: opening time limits count foreground time only (visibility + the phone host's AppState).
+installOpeningStoreDomSources()
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>

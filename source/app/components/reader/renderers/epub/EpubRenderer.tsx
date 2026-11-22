@@ -14,6 +14,7 @@ import type {
 } from '@core'
 import {
   openEpubjs,
+  ProtectedBookError,
 } from './openEpubjs'
 
 import type {
@@ -43,6 +44,11 @@ import {
 } from '../../interaction'
 import { getT, useT } from '../../../../i18n'
 import { markFirstPageDrawn } from '../../../../hooks/reader/firstPageSignal'
+import {
+  reportPositionDone,
+  reportPositionStarted,
+  reportPrepareFailed,
+} from '../../../../hooks/reader/readerOpeningStore'
 /** Imperative nav for parent footer scrub / section jump. */
 export type EpubRendererApi = Pick<
   EpubjsHandle,
@@ -823,6 +829,13 @@ export function EpubRenderer({
         const readNav = adjustedNavRef.current
         if (readNav) onNavStateRef.current?.(readNav())
       },
+      // Spec 017 (FR-005): the saved position is its own bounded step of the opening.
+      onPositionStarted: () => {
+        if (!ac.signal.aborted) reportPositionStarted()
+      },
+      onPositionDone: (restored) => {
+        if (!ac.signal.aborted) reportPositionDone(restored)
+      },
     })
       .then((handle) => {
         if (ac.signal.aborted) {
@@ -1271,6 +1284,8 @@ export function EpubRenderer({
         setErrorMessage(
           err instanceof Error ? err.message : getT()('reader.text.epub.openFailed'),
         )
+        // Spec 017 (FR-006): the opening ends with its cause; the opening screen shows it with its actions.
+        reportPrepareFailed(err instanceof ProtectedBookError ? 'protected' : 'damaged')
       })
 
     return () => {

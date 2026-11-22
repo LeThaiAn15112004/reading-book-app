@@ -29,6 +29,9 @@ type AppMethods = Pick<
   | 'setReaderOpening'
 >
 
+/** Spec 017: DOM event carrying the host's AppState to the Reader's opening store (`{ active: boolean }`). */
+export const FOREGROUND_EVENT = 'readmate:foreground'
+
 /** Spec 016: the last timing lines kept for the WebView devtools (development builds only). */
 const TIMING_KEEP = 500
 
@@ -69,7 +72,13 @@ declare global {
 export function createAppGroup(ctx: BridgeContext): AppMethods {
   const flushHandlers = new Set<() => void | Promise<void>>()
   ctx.client.onEvent('lifecycle', (payload) => {
-    if ((payload as LifecyclePayload | null)?.state !== 'background') return
+    const state = (payload as LifecyclePayload | null)?.state
+    // Spec 017 (FR-003): the opening store counts foreground time only; `visibilitychange` may not fire inside the
+    // Android WebView, so the host's AppState is passed on as a DOM event the store listens to.
+    if ((state === 'active' || state === 'background') && typeof window !== 'undefined' && typeof window.dispatchEvent === 'function') {
+      window.dispatchEvent(new CustomEvent(FOREGROUND_EVENT, { detail: { active: state === 'active' } }))
+    }
+    if (state !== 'background') return
     for (const handler of flushHandlers) {
       void Promise.resolve()
         .then(handler)

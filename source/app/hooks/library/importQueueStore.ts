@@ -297,3 +297,28 @@ export function resetImportQueueForTests(): void {
   restored.clear()
   useImportQueueStore.setState({ queue: emptyImportQueue(), expanded: false, notice: null })
 }
+
+/** True while an import is in its "Saving" step (its book row is being written). */
+export function isImportSaving(): boolean {
+  return useImportQueueStore.getState().queue.jobs.some((j) => j.state === 'running' && j.step === 'saving')
+}
+
+/**
+ * Spec 017 (edge case "opening while an import of the same book is still saving"): resolves once no import is in its
+ * "Saving" step, or when `signal` aborts. A saving job's placeholder has no `bookId` yet, so the Library cannot open
+ * it; this covers the Reader asking for a book whose row is being written (a stale link, a fast tap on the result).
+ */
+export function whenNoImportSaving(signal?: AbortSignal): Promise<void> {
+  if (!isImportSaving() || signal?.aborted) return Promise.resolve()
+  return new Promise((resolve) => {
+    const done = () => {
+      unsubscribe()
+      signal?.removeEventListener('abort', done)
+      resolve()
+    }
+    const unsubscribe = useImportQueueStore.subscribe(() => {
+      if (!isImportSaving()) done()
+    })
+    signal?.addEventListener('abort', done)
+  })
+}

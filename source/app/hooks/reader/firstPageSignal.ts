@@ -17,7 +17,7 @@ type Opening = {
   sizeBytes: number
 }
 
-export type OpeningEvent = { kind: 'begin' | 'drawn'; bookId: string }
+export type OpeningEvent = { kind: 'begin' | 'drawn' | 'ended'; bookId: string }
 
 let current: Opening | null = null
 const listeners = new Set<(event: OpeningEvent) => void>()
@@ -56,6 +56,22 @@ export function markFirstPageDrawn(): void {
     Date.now() - opening.startedAt,
   )
   emit({ kind: 'drawn', bookId: opening.bookId })
+}
+
+/**
+ * Spec 017: the current opening ended WITHOUT a first page (the reader left, or it failed). Releases the 016 gate at
+ * once instead of after its 10 s limit; nothing is timed here (the opening store records the outcome).
+ */
+export function endOpening(): void {
+  const opening = current
+  if (!opening) return
+  current = null
+  emit({ kind: 'ended', bookId: opening.bookId })
+}
+
+/** Format + size of the current opening (timing context), or null. */
+export function openingFile(): { format: string; sizeBytes: number } | null {
+  return current ? { format: current.format, sizeBytes: current.sizeBytes } : null
 }
 
 /** The book being opened whose first page is not drawn yet, or null. */

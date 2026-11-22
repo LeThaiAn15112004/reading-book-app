@@ -83,7 +83,9 @@ export function createLibraryGroup(ctx: BridgeContext): Library {
         const code = error instanceof HostCallError ? error.code : ''
         if (code === 'NOT_FOUND') return fail(bookId, 'missing_file', 'The book file could not be found. It may have been moved, renamed, or deleted.')
         if (code === 'BOOK_TOO_LARGE_FOR_DEV') return fail(bookId, 'too_large', 'Books larger than 20 MB open only in the installed app, not in Expo Go.')
-        return fail(bookId, 'read_failed', 'Could not read the book file.')
+        // Spec 017 (R3): the local server can be briefly unreachable right after the app returns to the foreground —
+        // a thrown fetch / 5xx / interrupted chunk read is passing, the Reader retries it once.
+        return { ...fail(bookId, 'read_failed', 'Could not read the book file.'), retryable: code === 'READ_FAILED' }
       }
       if (book.format === 'md' && !checkMdFileSize(data.byteLength).ok) return fail(bookId, 'too_large', describeMdTooLarge())
       return { ok: true, bookId, format: book.format as OpenBookContentResult['format'], data, byteLength: data.byteLength }

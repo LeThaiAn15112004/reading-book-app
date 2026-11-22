@@ -57,6 +57,8 @@ export function useReaderBookOpen({
     isEpubSurface,
     isEpubSessionLoading,
     retryOpen,
+    openFromBeginning,
+    opening,
     refreshBookBytes,
   } = useSharedReaderBookOpen({
     bookId,
@@ -99,6 +101,10 @@ export function useReaderBookOpen({
     isEpubSurface,
     isEpubSessionLoading,
     retryOpen,
+    /** Spec 017: Try again without the saved position. */
+    openFromBeginning,
+    /** Spec 017: the current opening (step, outcome, error) from `readerOpeningStore`. */
+    opening,
     refreshBookBytes,
   }
 }

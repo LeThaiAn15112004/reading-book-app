@@ -252,3 +252,15 @@ export {
 // Spec 016: the import queue shared by both hosts
 export * from './import-queue.js'
 export * from './library-selection.js'
+// Spec 017: the book-opening state machine (namespaced: its transitions have short generic names)
+export * as bookOpening from './book-opening.js'
+export type {
+  Opening,
+  OpeningAction,
+  OpeningCause,
+  OpeningError,
+  OpeningFormat,
+  OpeningHost,
+  OpeningOutcome,
+  OpeningStep,
+} from './book-opening.js'

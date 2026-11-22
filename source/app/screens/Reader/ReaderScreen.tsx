@@ -14,6 +14,9 @@ import {
 } from '@core'
 
 import { MD_HEADING_HREF, mdInitialPointFor, mdSourceFor, mdTocFromHeadings, txtInitialOffsetFor } from './logic/reader-core/derivations'
+import { useTxtOpeningReport } from './logic/reader-core/useTxtOpeningReport'
+import { useOpeningPositionNote } from './logic/reader-core/useOpeningPositionNote'
+import { leaveBookOpening } from '../../hooks/reader/readerOpeningStore'
 import { readingStyleFor } from './logic/reader-core/reading-style'
 import { useReaderCore } from './logic/reader-core/useReaderCore'
 import { useReaderAnnotations } from './logic/reader-core/useReaderAnnotations'
@@ -259,6 +262,15 @@ export function ReaderScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [book.resumeLocation, txtReady],
   )
+  useTxtOpeningReport({
+    isTxtSurface,
+    txtReady,
+    sessionReady: book.sessionLoadStatus === 'ready',
+    txtLoadFailed,
+    txtErrorCode: txt.errorCode,
+    resumeLocation: book.resumeLocation,
+    textLength: txt.getTextLength,
+  })
   // Markdown opens where it was left, like TXT: the saved text point, read once when it mounts.
   const mdInitialPoint = useMemo(
     () => mdInitialPointFor(book.resumeLocation),
@@ -308,6 +320,12 @@ export function ReaderScreen() {
 
   // "Locate file…" when the book's file was moved or deleted (verified by SHA-256 in Main).
   const relink = useBookRelink({ bookId, onRelinked: book.retryOpen })
+  // Spec 017 (FR-001 / FR-002): Back while opening stops the opening at once, then leaves (nothing was read to save).
+  const leaveWhileOpening = () => {
+    leaveBookOpening()
+    void session.leaveToLibrary()
+  }
+  useOpeningPositionNote(book.opening, chrome.setToast)
 
   // Silent background chunking for search — starts only after the book is already on screen.
   const searchIndexing = useBookIndexing({
@@ -1600,7 +1618,24 @@ export function ReaderScreen() {
         </>
       }
     >
-      {book.contentStatus === 'loading' ||
+      {book.opening?.outcome === 'failed' ? (
+        // Spec 017 (FR-006): every failed opening (content, engine, time limit) ends here with its cause and actions.
+        <ReaderOpenStatus
+          status="error"
+          opening={book.opening}
+          onRetry={() => {
+            book.retryOpen()
+            if (txtLoadFailed && bookId) txt.retryLoad(bookId)
+          }}
+          onFromBeginning={book.openFromBeginning}
+          onLocate={() => {
+            void relink.locateFile()
+          }}
+          locating={relink.locating}
+          locateMessage={relink.message}
+          onBack={leaveWhileOpening}
+        />
+      ) : book.contentStatus === 'loading' ||
       book.contentStatus === 'idle' ||
       book.isEpubSessionLoading ||
       isPdfSessionLoading ||
@@ -1608,10 +1643,9 @@ export function ReaderScreen() {
       isTxtLoading ? (
         <ReaderOpenStatus
           status={book.contentStatus === 'ready' ? 'loading' : book.contentStatus}
+          opening={book.opening}
           onRetry={book.retryOpen}
-          onBack={() => {
-            void session.leaveToLibrary()
-          }}
+          onBack={leaveWhileOpening}
         />
       ) : book.contentStatus === 'error' || txtLoadFailed ? (
         <ReaderOpenStatus

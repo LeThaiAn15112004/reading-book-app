@@ -101,6 +101,11 @@ import { isTypingTarget } from '../../../../shortcuts/iframeKeydown'
 import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
 import { getT, useT } from '../../../../i18n'
 import { markFirstPageDrawn } from '../../../../hooks/reader/firstPageSignal'
+import {
+  reportPositionDone,
+  reportPositionStarted,
+  reportPrepareFailed,
+} from '../../../../hooks/reader/readerOpeningStore'
 import 'pdfjs-dist/web/pdf_viewer.css'
 
 GlobalWorkerOptions.workerSrc = pdfWorkerUrl
@@ -1281,6 +1286,8 @@ export function PdfRenderer({
       } catch (err) {
         if (cancelled || isCancelled(err)) return
         setStatus({ kind: 'error', message: err instanceof Error ? err.message : getT()('reader.pdf.renderer.openFailed') })
+        // Spec 017 (FR-006): a password-protected PDF is "protected", anything else pdf.js refuses is "damaged".
+        reportPrepareFailed((err as { name?: unknown } | null)?.name === 'PasswordException' ? 'protected' : 'damaged')
       }
     })()
 
@@ -1314,6 +1321,11 @@ export function PdfRenderer({
     if (!restoredRef.current) {
       restoredRef.current = true
       const start = Math.min(Math.max(initialPageRef.current, 1), sizes.length) - 1
+      // Spec 017 (FR-005): a saved page past the end (the file changed) opens the last page, with the note.
+      if (initialPageRef.current > 1) {
+        reportPositionStarted()
+        reportPositionDone(initialPageRef.current <= sizes.length)
+      }
       if (pagedRef.current) goToSpread(Math.floor(start / perViewRef.current), false, start)
       else if (start > 0) scrollToIndex(start)
       else reportCurrent(0)

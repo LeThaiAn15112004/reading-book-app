@@ -366,6 +366,10 @@ export type OpenBookErrorCode =
   | 'read_failed'
   /** Markdown file above `MD_MAX_FILE_BYTES`. */
   | 'too_large'
+  /** Spec 017: a cloud-drive placeholder whose content is not downloaded yet (Desktop). */
+  | 'not_available_offline'
+  /** Spec 017: the file's size changed while it was read (Desktop); retryable — the retry reads the new version. */
+  | 'file_changed'
 
 /**
  * Book file bytes for the renderer. Never includes a filesystem path —
@@ -381,6 +385,8 @@ export interface OpenBookContentResult {
   errorCode?: OpenBookErrorCode
   /** Short user-facing message when ok is false. */
   errorMessage?: string
+  /** Spec 017 (R3): the failure may pass (busy / interrupted read); the Reader retries it once by itself. */
+  retryable?: boolean
 }
 
 /** Stable codes for library.relinkBook outcomes other than success. */

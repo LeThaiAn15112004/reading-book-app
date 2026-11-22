@@ -304,4 +304,10 @@ export type OpenEpubjsOptions = {
    * from the section counter to the book-wide page counter.
    */
   onLocationsReady?: () => void
+  /**
+   * Spec 017 (FR-005): the saved position is being restored (`initialLocation`), then whether it was (`true`) or the
+   * book opened at the start of that chapter / the book instead (`false`). Bounded at 3 s.
+   */
+  onPositionStarted?: () => void
+  onPositionDone?: (restored: boolean) => void
 }

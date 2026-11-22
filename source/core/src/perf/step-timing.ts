@@ -23,6 +23,20 @@ export const TIMING_STEPS = [
   'cover',
   'open-read',
   'open-first-page',
+  // Spec 017 (FR-019, research R11): each opening step, and how an opening ended. `open-first-page` is "opened";
+  // the outcome of the others is in the step name, so a line keeps exactly the StepTiming keys (no free text).
+  'open-content',
+  'open-prepare',
+  'open-position',
+  'open-left',
+  'open-failed-missing_file',
+  'open-failed-unreadable',
+  'open-failed-damaged',
+  'open-failed-protected',
+  'open-failed-too_large',
+  'open-failed-took_too_long',
+  'open-failed-not_available_offline',
+  'open-failed-file_changed',
 ] as const
 
 export type TimingStep = (typeof TIMING_STEPS)[number]

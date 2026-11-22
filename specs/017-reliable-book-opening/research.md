@@ -41,7 +41,7 @@ plain `<p>` with `reader.pdf.renderer.loading`. `animate-spin` is not `motion-sa
   the bytes are dropped either way).
 
 - **Updated after analyze**: the foreground clock is the sum of foreground intervals on a monotonic clock, fed by an
-  injected source — Desktop `visibilitychange`, phone the host's `app.foregroundChanged` event (AppState), because
+  injected source — Desktop `visibilitychange`, phone the host's existing `lifecycle` event (AppState, re-dispatched by the bridge as `readmate:foreground`), because
   `visibilitychange` may not fire inside the Android WebView; never a tick count (a timer burst after return is not
   counted). The store does not touch `document` at module load, so spikes run it in Node with fakes.
 

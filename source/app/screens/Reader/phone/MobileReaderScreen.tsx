@@ -39,6 +39,9 @@ import { usePdfSelectionMenu } from '../logic/hooks/usePdfSelectionMenu'
 import { useReaderTxt } from '../logic/hooks/useReaderTxt'
 import { useReaderZoomControls } from '../logic/hooks/useReaderZoomControls'
 import { MD_HEADING_HREF, mdInitialPointFor, mdSourceFor, mdTocFromHeadings, txtInitialOffsetFor } from '../logic/reader-core/derivations'
+import { useTxtOpeningReport } from '../logic/reader-core/useTxtOpeningReport'
+import { useOpeningPositionNote } from '../logic/reader-core/useOpeningPositionNote'
+import { leaveBookOpening } from '../../../hooks/reader/readerOpeningStore'
 import { readingStyleFor } from '../logic/reader-core/reading-style'
 import { useReaderAnnotations } from '../logic/reader-core/useReaderAnnotations'
 import { useReaderCore } from '../logic/reader-core/useReaderCore'
@@ -138,6 +141,15 @@ export default function MobileReaderScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [book.resumeLocation, txtReady],
   )
+  useTxtOpeningReport({
+    isTxtSurface,
+    txtReady,
+    sessionReady: book.sessionLoadStatus === 'ready',
+    txtLoadFailed,
+    txtErrorCode: txt.errorCode,
+    resumeLocation: book.resumeLocation,
+    textLength: txt.getTextLength,
+  })
   const mdInitialPoint = useMemo(
     () => mdInitialPointFor(book.resumeLocation),
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -266,8 +278,11 @@ export default function MobileReaderScreen() {
   }
 
   const leave = () => {
+    // Spec 017 (FR-001 / FR-002): an opening still running stops at once (system Back unmounts the route the same way).
+    leaveBookOpening()
     void session.leaveToLibrary()
   }
+  useOpeningPositionNote(book.opening, setToast)
 
   // ── Loading / error ──────────────────────────────────────────────────────────────────────────────────────────
   const loading =
@@ -277,7 +292,26 @@ export default function MobileReaderScreen() {
     isPdfSessionLoading ||
     isMdLoading ||
     isTxtLoading
+  const openingFailed = book.opening?.outcome === 'failed'
   const failed = book.contentStatus === 'error' || txtLoadFailed
+
+  // Spec 017 (FR-006): every failed opening (content, engine, time limit) shows its cause and the actions that help.
+  if (openingFailed) {
+    return (
+      <div className="flex h-full flex-col bg-lib-bg-deep text-lib-text" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
+        <ReaderOpenStatus
+          status="error"
+          opening={book.opening}
+          onRetry={() => {
+            book.retryOpen()
+            if (txtLoadFailed && bookId) txt.retryLoad(bookId)
+          }}
+          onFromBeginning={book.openFromBeginning}
+          onBack={leave}
+        />
+      </div>
+    )
+  }
 
   if (loading || failed) {
     return (
@@ -285,6 +319,7 @@ export default function MobileReaderScreen() {
         <ReaderOpenStatus
           status={failed ? 'error' : book.contentStatus === 'ready' ? 'loading' : book.contentStatus === 'error' ? 'error' : book.contentStatus}
           message={failed ? (txtLoadFailed ? txt.errorMessage : book.openErrorMessage) : undefined}
+          opening={failed ? null : book.opening}
           onRetry={txtLoadFailed && bookId ? () => txt.retryLoad(bookId) : book.retryOpen}
           // "Locate file…" is a computer's file system action; on the phone a missing book is imported again.
           onBack={leave}

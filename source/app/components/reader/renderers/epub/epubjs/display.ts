@@ -72,33 +72,53 @@ export async function displayCfiSafely(
   rendition: Rendition,
   cfi: string,
   fallbackIndex: number,
-): Promise<void> {
+): Promise<boolean> {
   const displayCfi = toEpubjsDisplayCfi(cfi)
   if (!displayCfi) {
     console.log('[jump-debug][displayCfiSafely] toEpubjsDisplayCfi returned null for', cfi, '-> fallback spine', fallbackIndex)
     await rendition.display(fallbackIndex)
-    return
+    return false
   }
   const index = spineIndexFromCfi(book, displayCfi, fallbackIndex)
   if (isTrivialSectionStartCfi(displayCfi)) {
     console.log('[jump-debug][displayCfiSafely] isTrivialSectionStartCfi -> fallback spine', index, 'for', displayCfi)
     await rendition.display(index)
-    return
+    // A section-start CFI IS that position: opening the section is restoring it.
+    return true
   }
   if (!(await canDisplayCfi(book, displayCfi))) {
     console.log('[jump-debug][displayCfiSafely] canDisplayCfi=false -> fallback spine', index, 'for', displayCfi)
     await rendition.display(index)
-    return
+    return false
   }
   try {
     console.log('[jump-debug][displayCfiSafely] canDisplayCfi=true -> display(cfi)', displayCfi)
     await withEpubjsStartContainerLogMutedAsync(() =>
       rendition.display(displayCfi),
     )
+    return true
   } catch (err) {
     console.log('[jump-debug][displayCfiSafely] display(cfi) threw -> fallback spine', index, err)
     await rendition.display(index)
+    return false
   }
+}
+
+/** Spec 017 (FR-005): resolves `true` if `work` settles within `ms`, `false` (and lets it run on) otherwise. */
+export function settlesWithin(work: Promise<unknown>, ms: number): Promise<boolean> {
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => resolve(false), ms)
+    work.then(
+      () => {
+        clearTimeout(timer)
+        resolve(true)
+      },
+      () => {
+        clearTimeout(timer)
+        resolve(false)
+      },
+    )
+  })
 }
 
 /**
