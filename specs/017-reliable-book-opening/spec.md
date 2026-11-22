@@ -224,7 +224,8 @@ and reopen it. Check the batch summary and the Library.
   saved reading position, status and settings of the book are unchanged.
 - **FR-003**: Each step of the opening (getting the book's content, preparing it, showing the first page) MUST have a
   time limit; default 20 s per step, counted only while the app is in the foreground. When a limit passes, the opening
-  stops and the error of FR-006 is shown with the cause "took too long".
+  stops and the error of FR-006 is shown with the cause "took too long". Returning to the saved reading position is its
+  own step, limited to 3 s and ending in a fallback, not an error (FR-005).
 - **FR-004**: A failure to read the book's content that may be passing (the content source is briefly unavailable, a
   read was interrupted) MUST be retried once automatically before an error is shown. A missing file, a refused file
   or a file that is too large MUST NOT be retried.
@@ -232,11 +233,13 @@ and reopen it. Check the batch summary and the Library.
   passes 3 s), the book MUST open at the start of the chapter that position belongs to, or at the start of the book,
   and show a short note that the previous position could not be restored. The saved position is replaced only once
   the reader moves on.
-- **FR-006**: An opening error MUST state its cause in plain words and offer only actions that can help: Try again
-  (always), Open from the beginning (when a saved position was used), Locate file (computer, missing file), an
-  explanation to import the book again (phone, missing file), and Back to Library (always). Causes at least: file
-  missing or moved, cannot be read, damaged or not a valid book of its format, protected, too large for this device,
-  took too long.
+- **FR-006**: An opening error MUST state its cause in plain words and offer only actions that can help for that cause
+  (table in data-model.md): Back to Library (always); Try again for causes that may pass (cannot be read, took too
+  long, not available offline, file changed, damaged); Open from the beginning whenever a saved position was used and
+  the cause is not missing / protected / too large; Locate file (computer, missing file); an explanation to import the
+  book again (phone, missing file). Try again is NOT offered for a missing, protected or too-large file (it would only
+  show the same error). Causes at least: file missing or moved, cannot be read, damaged or not a valid book of its
+  format, protected, too large for this device, took too long, file changed while opening, not available offline.
 - **FR-007**: Checks that can fail at once (file missing, refused, too large) MUST be done first, so their error
   appears within 2 s.
 - **FR-008**: Opening the same book twice quickly, or another book while one is opening, MUST leave exactly one
