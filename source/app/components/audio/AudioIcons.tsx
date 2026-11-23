@@ -106,6 +106,14 @@ export function ReturnIcon({ className = 'size-4' }: IconProps) {
   )
 }
 
+export function MinimizeIcon({ className = 'size-4' }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} aria-hidden>
+      <path {...stroke} d="M5.5 17.5h13" />
+    </svg>
+  )
+}
+
 export function CloseIcon({ className = 'size-4' }: IconProps) {
   return (
     <svg viewBox="0 0 24 24" className={className} aria-hidden>

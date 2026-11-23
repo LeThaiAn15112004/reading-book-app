@@ -6,6 +6,7 @@ import { miniPlayerWindowHost } from '../../platforms/miniPlayerWindow'
 import { useT, useUiLanguageStore } from '../../i18n'
 import {
   CloseIcon,
+  MinimizeIcon,
   NextIcon,
   PauseIcon,
   PlayIcon,
@@ -53,6 +54,10 @@ export function MiniPlayerWindow() {
   if (!state) return <div className="h-screen w-screen bg-lib-bg-deep [-webkit-app-region:drag]" aria-busy="true" />
 
   const failed = state.status === 'trackFailed'
+  const openFullPlayer = () => {
+    send({ type: 'openPlayer' })
+    miniPlayerWindowHost.returnToApp()
+  }
   const duration = state.durationSeconds
   const shown = dragValue ?? state.positionSeconds
   const commitSeek = () => {
@@ -79,6 +84,13 @@ export function MiniPlayerWindow() {
       onKeyDown={onKeyDown}
     >
       <div className="flex min-w-0 items-center gap-2.5">
+        {/* Double-click the book (cover / title) to open the full player in the main window. Not a drag region: a
+            drag region swallows the double-click. */}
+        <div
+          className="flex min-w-0 flex-1 cursor-pointer items-center gap-2.5 [-webkit-app-region:no-drag]"
+          title={t('chrome.miniPlayer.openPlayerHint', { title: state.title })}
+          onDoubleClick={openFullPlayer}
+        >
         {state.coverUrl ? (
           <img src={state.coverUrl} alt="" className="size-11 shrink-0 rounded-md object-cover" />
         ) : (
@@ -99,6 +111,16 @@ export function MiniPlayerWindow() {
             </p>
           ) : null}
         </div>
+        </div>
+        <button
+          type="button"
+          className={ICON_BUTTON}
+          aria-label={t('chrome.miniPlayer.minimize')}
+          title={t('chrome.miniPlayer.minimize')}
+          onClick={() => miniPlayerWindowHost.minimize()}
+        >
+          <MinimizeIcon />
+        </button>
         <button
           type="button"
           className={ICON_BUTTON}

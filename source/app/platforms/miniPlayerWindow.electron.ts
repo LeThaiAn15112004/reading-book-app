@@ -32,4 +32,7 @@ export const miniPlayerWindowHost = {
   close(): void {
     window.miniPlayerWindow?.close()
   },
+  minimize(): void {
+    window.miniPlayerWindow?.minimize()
+  },
 }

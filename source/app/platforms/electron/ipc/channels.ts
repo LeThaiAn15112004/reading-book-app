@@ -337,4 +337,6 @@ export const MiniPlayerChannels = {
   returnToApp: 'miniPlayer:returnToApp',
   /** Floating window → main: end the session, then close. */
   closeWindow: 'miniPlayer:closeWindow',
+  /** Floating window → main: minimise it to the taskbar (it is shown there only while minimised). */
+  minimizeWindow: 'miniPlayer:minimizeWindow',
 } as const

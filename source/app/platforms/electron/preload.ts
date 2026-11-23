@@ -404,6 +404,7 @@ const miniPlayerWindow: MiniPlayerWindowApi = {
   command: (command) => ipcRenderer.send(MiniPlayerChannels.windowCommand, command),
   returnToApp: () => ipcRenderer.send(MiniPlayerChannels.returnToApp),
   close: () => ipcRenderer.send(MiniPlayerChannels.closeWindow),
+  minimize: () => ipcRenderer.send(MiniPlayerChannels.minimizeWindow),
 }
 
 if (process.argv.includes(MINI_PLAYER_WINDOW_ARG)) {

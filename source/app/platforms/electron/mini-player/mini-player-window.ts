@@ -41,7 +41,8 @@ function workAreas() {
 export function openMiniPlayerWindow(): boolean {
   const existing = miniPlayerWindow()
   if (existing) {
-    existing.showInactive()
+    if (existing.isMinimized()) existing.restore()
+    else existing.showInactive()
     return true
   }
   if (!host) return false
@@ -54,7 +55,8 @@ export function openMiniPlayerWindow(): boolean {
     frame: false,
     resizable: false,
     maximizable: false,
-    minimizable: false,
+    minimizable: true,
+    title: 'Readmate',
     fullscreenable: false,
     skipTaskbar: true,
     alwaysOnTop: true,
@@ -85,6 +87,10 @@ export function openMiniPlayerWindow(): boolean {
       }
     }, 500)
   })
+  // Minimised it shows in the taskbar (the only way back to it); restored it leaves the taskbar again.
+  created.on('restore', () => {
+    if (!created.isDestroyed()) created.setSkipTaskbar(true)
+  })
   created.on('closed', () => {
     if (win === created) win = null
     host?.onClosed()
@@ -92,6 +98,14 @@ export function openMiniPlayerWindow(): boolean {
   win = created
   host.load(created)
   return true
+}
+
+/** The window's minimise button: into the taskbar, from where it is restored like any window. */
+export function minimizeMiniPlayerWindow(): void {
+  const open = miniPlayerWindow()
+  if (!open) return
+  open.setSkipTaskbar(false)
+  open.minimize()
 }
 
 export function closeMiniPlayerWindow(): void {

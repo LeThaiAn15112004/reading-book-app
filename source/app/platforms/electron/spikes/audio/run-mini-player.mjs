@@ -138,7 +138,7 @@ await check('wiring (static): preload, IPC sender checks, main window hooks, qui
   assert.match(preload, /process\.argv\.includes\(MINI_PLAYER_WINDOW_ARG\)/)
   assert.match(preload, /exposeInMainWorld\('miniPlayerWindow', miniPlayerWindow\)\n\} else \{\n {2}contextBridge\.exposeInMainWorld\('api', api\)/)
   const ipc = read('ipc/mini-player.ipc.ts')
-  for (const channel of ['windowCommand', 'returnToApp', 'closeWindow']) {
+  for (const channel of ['windowCommand', 'returnToApp', 'closeWindow', 'minimizeWindow']) {
     assert.match(ipc, new RegExp(`MiniPlayerChannels\\.${channel}, \\(event[^)]*\\) => \\{\\n {4}if \\(!?fromFloatingWindow\\(event\\.sender\\)\\)`), channel)
   }
   assert.match(ipc, /publishState, \(event, input: unknown\) => \{\n {4}if \(fromFloatingWindow\(event\.sender\)\) return/)

@@ -15,4 +15,5 @@ export const miniPlayerWindowHost = {
   command(_command: MiniPlayerCommandDto): void {},
   returnToApp(): void {},
   close(): void {},
+  minimize(): void {},
 }

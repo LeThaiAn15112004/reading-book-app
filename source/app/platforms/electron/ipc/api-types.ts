@@ -1136,6 +1136,7 @@ export interface MiniPlayerWindowApi {
   command(command: MiniPlayerCommandDto): void
   returnToApp(): void
   close(): void
+  minimize(): void
 }
 
 export interface DesktopApi {

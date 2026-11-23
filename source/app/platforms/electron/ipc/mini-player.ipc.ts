@@ -11,7 +11,7 @@ import {
   receiveState,
   returnToApp,
 } from '../mini-player/mini-player-relay'
-import { miniPlayerWindow } from '../mini-player/mini-player-window'
+import { minimizeMiniPlayerWindow, miniPlayerWindow } from '../mini-player/mini-player-window'
 
 function prefsDto(): MiniPlayerPrefsDto {
   return { autoOpen: loadMiniPlayerPrefs().autoOpen }
@@ -28,7 +28,13 @@ export function registerMiniPlayerIpc(): void {
   for (const channel of [MiniPlayerChannels.open, MiniPlayerChannels.getPrefs, MiniPlayerChannels.setPrefs, MiniPlayerChannels.getState]) {
     ipcMain.removeHandler(channel)
   }
-  for (const channel of [MiniPlayerChannels.publishState, MiniPlayerChannels.windowCommand, MiniPlayerChannels.returnToApp, MiniPlayerChannels.closeWindow]) {
+  for (const channel of [
+    MiniPlayerChannels.publishState,
+    MiniPlayerChannels.windowCommand,
+    MiniPlayerChannels.returnToApp,
+    MiniPlayerChannels.closeWindow,
+    MiniPlayerChannels.minimizeWindow,
+  ]) {
     ipcMain.removeAllListeners(channel)
   }
 
@@ -65,5 +71,8 @@ export function registerMiniPlayerIpc(): void {
   })
   ipcMain.on(MiniPlayerChannels.closeWindow, (event) => {
     if (fromFloatingWindow(event.sender)) closeByUser()
+  })
+  ipcMain.on(MiniPlayerChannels.minimizeWindow, (event) => {
+    if (fromFloatingWindow(event.sender)) minimizeMiniPlayerWindow()
   })
 }

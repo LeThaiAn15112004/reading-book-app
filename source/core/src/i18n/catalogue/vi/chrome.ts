@@ -33,6 +33,8 @@ export const vi = {
     close: 'Dừng và đóng trình phát thu nhỏ',
     closeWindow: 'Dừng và đóng',
     returnToApp: 'Về ứng dụng',
+    minimize: 'Thu nhỏ',
+    openPlayerHint: '{title} — bấm đúp để mở trình phát',
     play: 'Phát',
     pause: 'Tạm dừng',
     skipBack: 'Lùi {seconds} giây',

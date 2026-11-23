@@ -31,6 +31,8 @@ export const en = {
     close: 'Stop and close the mini player',
     closeWindow: 'Stop and close',
     returnToApp: 'Return to app',
+    minimize: 'Minimize',
+    openPlayerHint: '{title} — double-click to open the player',
     play: 'Play',
     pause: 'Pause',
     skipBack: 'Back {seconds} seconds',
