@@ -34,6 +34,23 @@ review found:
 - **Note markers overlap the seek handle**: a marker sits on the upper half of the timeline's handle, so pressing the
   handle where a Note is can open the Note's menu instead of seeking; markers are 16 px targets.
 - **Translated text is changed after translation**: one timeline label is lower-cased in code after it was translated.
+- **Listening stops when the player is left**: going to the Library or another tab ends playback; there is no way
+  to keep listening while browsing the app, and nothing on screen to control the audiobook while working in
+  another application.
+
+## Clarifications
+
+### Session 2026-11-23
+
+- Q: When the listener leaves the player, what form should the "floating" player take? → A: Both — an in-app mini
+  player bar on every other screen, plus a "Pop out" action that detaches it into a small always-on-top window for
+  use while working in other applications.
+- Q: What happens to a playing audiobook when the listener opens a text book (EPUB / PDF / TXT / Markdown)? → A: It
+  keeps playing; the mini bar is shown in the text reader just above its footer; starting Read Aloud pauses the
+  audiobook so two voices never play at once.
+- Q: What happens to a playing audiobook when the main window is minimised or hidden to the system tray? → A: It
+  keeps playing; the floating window opens by itself when the main window is minimised or hidden; the tray menu gets
+  an audiobook Play / Pause item.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -113,8 +130,50 @@ cover and the play / pause and next / previous buttons; press the keyboard media
 3. **Given** the panel or a media key, **When** the listener presses play / pause / next / previous, **Then** the
    player does the same as its own buttons (next / previous change chapter or track; unavailable when the book has
    no chapters, as for the player's own buttons).
-4. **Given** the listener leaves the player (Library, another book), **When** playback stops, **Then** the system
-   panel no longer shows the audiobook.
+4. **Given** the listening session ends (the listener closes the mini player / floating window, or opens another
+   audiobook), **When** the panel is shown, **Then** it no longer shows the previous audiobook; while the mini player or
+   floating window keeps the audiobook playing, the panel keeps showing it.
+
+---
+
+### User Story 5 - Keep listening outside the player (Priority: P2)
+
+A listener starts an audiobook, then goes to the Library, Collections or Settings: the audiobook keeps playing and a
+mini player bar stays at the bottom of every screen with the cover, title, current chapter / track, play / pause,
+−15 / +30 and a progress line; pressing it reopens the full player at the same position. When the listener wants to
+work in another application, a "Pop out" action detaches the mini player into a small window that stays on top of
+other windows, with the same controls; it can be moved, and closed or returned into the app.
+
+**Why this priority**: listening while doing something else is the main way audiobooks are used; today the only way
+to keep listening is to stay on the player screen.
+
+**Independent Test**: start playback, go to the Library and check the mini bar and its controls; pop it out, switch to
+another application and control playback from the floating window; return it; close it.
+
+**Acceptance Scenarios**:
+
+1. **Given** an audiobook is playing, **When** the listener goes to any other screen of the app, **Then** playback
+   continues without a gap and the mini player bar is shown with the current state.
+2. **Given** the mini player bar, **When** the listener presses its play / pause or −15 / +30, **Then** the player acts
+   exactly as its own buttons; **When** they press the bar itself, **Then** the full player opens at the same
+   position and state (speed, sleep timer, scope).
+3. **Given** the mini player bar, **When** the listener presses "Pop out", **Then** a small window with the same
+   controls appears on top of other applications' windows and the in-app bar is hidden while it is open.
+4. **Given** the floating window, **When** the listener uses another application, **Then** the floating window stays
+   visible on top and its controls keep working; position and progress shown follow the playback.
+5. **Given** the floating window, **When** the listener presses "Return to app", **Then** the window closes, the app
+   comes to the front and the mini bar (or the full player) is shown again; **When** they close the floating window,
+   **Then** playback stops, progress is saved and the listening session ends.
+6. **Given** the mini player bar, **When** the listener presses its close control, **Then** playback stops, progress
+   is saved and the bar disappears.
+7. **Given** an audiobook is playing, **When** the listener opens a text book, **Then** playback continues and the
+   mini bar sits just above the text reader's footer without covering the text; **When** the listener starts Read
+   Aloud there, **Then** the audiobook pauses (it is not resumed automatically).
+8. **Given** an audiobook is playing, **When** the listener minimises the main window or closes it to the system
+   tray (Run in Background on), **Then** playback continues and the floating window opens by itself; **When** the
+   main window is shown again, **Then** the floating window closes and the mini bar / full player is shown again.
+9. **Given** the main window is hidden in the tray and an audiobook session is active, **When** the listener opens
+   the tray menu, **Then** it offers Play / Pause of the audiobook (with the book's title).
 
 ---
 
@@ -158,6 +217,14 @@ skip buttons, the volume control and the note markers with the acceptance scenar
 - Two Notes very close together: each marker stays pressable; overlapping markers do not hide the handle.
 - The interface language changes while the player is open: shortcut names, tooltips and the system panel's texts
   that the app provides follow it; book / chapter titles are never translated.
+- The listener opens a second audiobook while one is playing: the first is stopped and saved, and the new one becomes
+  the session (one audiobook at a time).
+- The audiobook's file disappears or a track fails while the player screen is not shown: the mini bar / floating
+  window shows the same "cannot play" state and actions as the player, never a silent stop.
+- The floating window's saved position is off-screen (a monitor was disconnected): it opens on the visible screen.
+- The listener removes the playing audiobook from the Library: the session ends first, then the book is removed.
+- The sleep timer ends while the player screen is not shown: playback pauses and the mini bar / floating window show
+  it paused.
 
 ## Requirements *(mandatory)*
 
@@ -193,7 +260,35 @@ skip buttons, the volume control and the note markers with the acceptance scenar
   actions; previous / next MUST be unavailable exactly when the player's buttons are.
 - **FR-010**: Where the system offers seek / skip controls, they MUST map to the player's seek and −15 / +30 actions;
   the system MUST be told the playback position, duration and speed so its progress display is correct.
-- **FR-011**: Leaving the player MUST remove the audiobook from the system's media controls.
+- **FR-011**: Ending the listening session (closing the mini player or floating window, or opening another
+  audiobook) MUST remove the audiobook from the system's media controls; leaving the player screen alone MUST NOT.
+
+**Listening outside the player (Story 5)**
+
+- **FR-019**: Leaving the player screen for another screen of the app MUST NOT stop or interrupt playback; listening
+  progress MUST keep being saved as it is on the player screen.
+- **FR-020**: While an audiobook session is active and the full player is not shown, every other screen MUST show a
+  mini player bar with cover, title, current chapter / track, play / pause, −15 / +30, a progress line, "Pop out" and
+  close; pressing the bar opens the full player in the same state. The bar MUST NOT cover screen content (content is
+  laid out above it).
+- **FR-021**: "Pop out" MUST open one small floating window that stays above other applications' windows, with the
+  mini player's controls plus "Return to app" and close; it can be moved, and its last position is reused next time.
+- **FR-022**: The full player, the mini bar, the floating window, the system media controls and the keyboard
+  shortcuts MUST all control the SAME playback and always show the same state; at most one audiobook plays at a time.
+- **FR-023**: Closing the mini bar or the floating window MUST stop playback, save progress and end the session;
+  "Return to app" MUST NOT stop playback.
+- **FR-024**: In the text reader the mini bar MUST be placed just above the reader's footer and the reading area MUST
+  be laid out so that no text is hidden behind it (paginated and scroll views); when the reader's footer is hidden
+  (immersive mode) the bar stays at the bottom edge. Starting Read Aloud MUST pause the audiobook; the audiobook is not
+  resumed automatically when Read Aloud ends.
+- **FR-025**: Minimising the main window or hiding it to the tray MUST NOT pause playback. While a session is active,
+  either MUST open the floating window by itself (unless the listener closed the floating window during this session,
+  or turned the automatic opening off in Settings — on by default); showing the main window again MUST close a floating
+  window that was opened automatically. Quitting the app MUST stop playback and save progress, as every quit path does.
+- **FR-026**: While an audiobook session is active, the tray menu MUST offer "Play" / "Pause" for it, labelled with
+  the book's title, in the interface language.
+- **FR-027**: The mini bar and floating window MUST meet the same readability, focus and translation rules as the
+  player (FR-001–FR-003, FR-018).
 
 **Layout and consistency (Story 4)**
 
@@ -218,6 +313,11 @@ skip buttons, the volume control and the note markers with the acceptance scenar
   Speed keeps its current behaviour.
 - **Now-playing information**: book title, chapter / track title, author, cover, position, duration, speed — what
   the system media controls show.
+- **Listening session**: the one audiobook currently loaded for playback, from its start until the listener closes
+  it, opens another audiobook or quits; shared by the full player, mini bar, floating window, tray and system media
+  controls.
+- **Floating window preferences**: last position, and whether it opens by itself when the main window is minimised
+  or hidden (on by default).
 
 ## Success Criteria *(mandatory)*
 
@@ -236,17 +336,26 @@ skip buttons, the volume control and the note markers with the acceptance scenar
 - **SC-006**: No emoji remains as an icon in the player or the text reader's rail.
 - **SC-007**: Pressing the timeline handle seeks in 100 % of attempts, including when a Note sits at the handle's
   position.
+- **SC-008**: Moving from the player to any other screen (Library, Collections, Settings, a text book) produces no
+  audible gap or restart, and the mini bar appears with the right state within 1 second.
+- **SC-009**: With another application in front, the listener can pause, resume and skip from the floating window in
+  100 % of attempts; minimising or hiding the main window opens it within 1 second.
+- **SC-010**: In the text reader, no line of text is hidden behind the mini bar in paginated or scroll view.
 
 ## Assumptions
 
 - Scope is the **Desktop** player of single-file and multi-track audiobooks; the phone player is not changed (it has
   its own layout; the rail icons it does not use).
-- A mini-player / playback that continues after leaving the player is **out of scope** (a separate product decision);
-  this feature keeps "leaving the player stops playback".
+- Playback continues after leaving the player screen (Story 5, Clarification 2026-11-23): an in-app mini player bar
+  plus an optional floating always-on-top window.
 - Whole-book progress and totals for multi-track books stay out of scope (planned separately, "Stage C").
 - The system media controls are those Chromium provides inside the Desktop app on Windows; macOS / Linux behave
   according to what their systems show, and nothing fails where there is no media panel.
 - The default keys of FR-004 follow common desktop players; where one collides with an existing app shortcut while
   the player is open, the player's key applies only on the player screen.
 - The rail icons change in the text reader too, because the rail is shared; no other part of the reader changes.
-- No new stored data beyond the muted state / previous level; no change to how listening progress or Notes are saved.
+- No new stored data beyond the muted state / previous level and the floating window preferences; no change to how
+  listening progress or Notes are saved.
+- The player's keyboard shortcuts (FR-004) apply on the player screen only; outside it the listener uses the mini
+  bar, the floating window, the tray or the media keys.
+- Read Aloud pausing the audiobook does not resume it afterwards; the listener resumes it from the mini bar.
