@@ -74,6 +74,9 @@ function openDialogFilters(): Electron.FileFilter[] {
       extensions: descriptor.extensions.map(extensionWithoutDot),
     })),
     ...(zip ? [{ name: tMain('main.shell.dialogs.audiobookZip'), extensions: ['zip'] }] : []),
+    // Any file can be picked (books often arrive as a ZIP or with an odd extension); what cannot be imported is
+    // refused afterwards by the format checks (`assertSupportedExtension` → "unsupported", ZIP inspection).
+    { name: tMain('main.shell.dialogs.allFiles'), extensions: ['*'] },
   ]
 }
 
