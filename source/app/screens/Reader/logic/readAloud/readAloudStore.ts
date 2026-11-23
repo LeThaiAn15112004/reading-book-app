@@ -3,6 +3,16 @@ import { create } from 'zustand'
 import type { EpubRendererApi, ReadAloudSection } from '../../../../components/reader/renderers/epub'
 import { createWebSpeechEngine } from '../../../../components/reader/tts/webSpeechEngine'
 import { getT } from '../../../../i18n'
+import { useAudioPlayerStore } from '../../../AudioBook/logic/audioPlayerStore'
+
+/**
+ * Spec 018 (FR-024): Read Aloud and a playing audiobook never speak at once — starting or resuming Read Aloud pauses the
+ * audiobook. It is not resumed afterwards (the listener does that from the mini player).
+ */
+function pausePlayingAudiobook(): void {
+  const audio = useAudioPlayerStore.getState()
+  if (audio.playing) audio.pause()
+}
 
 export type ReadAloudStatus = 'idle' | 'loading' | 'playing' | 'paused'
 export const READ_ALOUD_RATES = [0.75, 1, 1.25, 1.5, 2] as const
@@ -197,6 +207,7 @@ export const useReadAloudStore = create<ReadAloudState>()((set, get) => {
   }
 
   const start = async (kind: 'viewport' | 'fromPosition') => {
+    pausePlayingAudiobook()
     const renderer = api()
     set({ menuOpen: false })
     if (!renderer || !get().isEpubSurface) {
@@ -272,6 +283,7 @@ export const useReadAloudStore = create<ReadAloudState>()((set, get) => {
         engine.pause()
         set({ status: 'paused' })
       } else if (status === 'paused') {
+        pausePlayingAudiobook()
         set({ status: 'playing' })
         if (queue?.spoken) engine.resume()
         else void speakCurrent(session)

@@ -64,7 +64,7 @@ type PlayerStatus = 'idle' | 'loading' | 'ready' | 'error'
 export type SleepOption = { kind: 'off' } | { kind: 'minutes'; minutes: number } | { kind: 'chapter' }
 export const SLEEP_MINUTES: readonly number[] = [15, 30, 45, 60]
 
-type AudioPlayerState = {
+export type AudioPlayerState = {
   bookId: string | null
   status: PlayerStatus
   errorCode: string | null
@@ -222,6 +222,17 @@ export function selectCanAddNote(
   if (s.tracks.length === 0) return true
   const track = s.tracks[s.trackIndex]
   return !s.switching && !!track && !s.trackErrors.has(track.id) && !s.notesUnavailable
+}
+
+/** Same rule as the ⏮ / ⏭ buttons: chapters (single file) or tracks (multi-track); "next" stops at the last track. */
+export function selectCanChangeChapter(
+  s: Pick<AudioPlayerState, 'tracks' | 'trackIndex' | 'chapterStatus'>,
+  direction: 1 | -1,
+): boolean {
+  const multiTrack = s.tracks.length > 0
+  if (!multiTrack && s.chapterStatus !== 'ok') return false
+  if (direction > 0 && multiTrack && s.trackIndex >= s.tracks.length - 1) return false
+  return true
 }
 
 const NOTE_LIMIT_NOTICE: UiText = { key: 'audiobook.player.store.noteLimit', params: { max: MAX_AUDIO_BOOKMARKS } }
@@ -1003,3 +1014,17 @@ export const useAudioPlayerStore = create<AudioPlayerState>()((set, get) => {
     },
   }
 })
+
+/**
+ * Spec 018 (FR-023, research R1): end the listening session — the mini player's / floating window's close, removing the
+ * playing book, closing its open-book tab. Saves progress first (same path as every other end); safe without a session.
+ */
+export function endAudioSession(): Promise<void> {
+  return useAudioPlayerStore.getState().dispose()
+}
+
+/** The book of the current listening session, or `null`. */
+export function audioSessionBookId(): string | null {
+  const { bookId, status } = useAudioPlayerStore.getState()
+  return bookId && status !== 'idle' ? bookId : null
+}

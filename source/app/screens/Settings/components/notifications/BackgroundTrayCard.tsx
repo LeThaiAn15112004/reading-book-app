@@ -2,6 +2,8 @@ import type { MessageKey } from '@core'
 import { useT } from '../../../../i18n'
 import { useEffect, type ReactNode } from 'react'
 import { canChangeStartAtLogin, useBackgroundStore } from '../../logic/backgroundStore'
+import { useMiniPlayerPrefsStore } from '../../logic/miniPlayerPrefsStore'
+import { isFeatureAvailable } from '../../../../platforms/host'
 import { SettingsCard } from '../layout/SettingsCard'
 import { SettingsSwitch } from '../layout/SettingsSwitch'
 
@@ -82,9 +84,17 @@ export function BackgroundTrayCard() {
   const refreshStartAtLogin = useBackgroundStore((s) => s.refreshStartAtLogin)
   const openStartupSettings = useBackgroundStore((s) => s.openStartupSettings)
 
+  const floatingAutoOpen = useMiniPlayerPrefsStore((s) => s.autoOpen)
+  const floatingSaving = useMiniPlayerPrefsStore((s) => s.saving)
+  const floatingFailed = useMiniPlayerPrefsStore((s) => s.failed)
+  const loadFloating = useMiniPlayerPrefsStore((s) => s.load)
+  const setFloatingAutoOpen = useMiniPlayerPrefsStore((s) => s.setAutoOpen)
+  const hasMiniPlayer = isFeatureAvailable('miniPlayer')
+
   useEffect(() => {
     void load()
-  }, [load])
+    if (hasMiniPlayer) void loadFloating()
+  }, [load, loadFloating, hasMiniPlayer])
 
   // Start at Login can be changed outside the app (Windows Settings → Startup, the login items): read it again when
   // the window comes back to the front.
@@ -171,6 +181,28 @@ export function BackgroundTrayCard() {
             />
           }
         />
+
+        {hasMiniPlayer && floatingAutoOpen !== null ? (
+          <Row
+            labelId="background-floating-label"
+            descId="background-floating-desc"
+            label={t('settings.notifications.background.floatingPlayer')}
+            description={
+              floatingFailed
+                ? t('settings.saveFailed')
+                : t('settings.notifications.background.floatingPlayerDescription')
+            }
+            control={
+              <SettingsSwitch
+                checked={floatingAutoOpen}
+                onChange={(next) => void setFloatingAutoOpen(next)}
+                labelledBy="background-floating-label"
+                describedBy="background-floating-desc"
+                disabled={floatingSaving}
+              />
+            }
+          />
+        ) : null}
 
         <Row
           labelId="background-login-label"

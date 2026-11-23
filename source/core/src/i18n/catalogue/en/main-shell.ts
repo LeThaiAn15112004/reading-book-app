@@ -4,6 +4,8 @@ export const en = {
     tooltip: 'Readmate Reader',
     open: 'Open {app}',
     quit: 'Quit {app}',
+    audiobookPlay: '▶  Play “{title}”',
+    audiobookPause: '⏸  Pause “{title}”',
   },
   dialogs: {
     exportReadable: 'Export readable copy',

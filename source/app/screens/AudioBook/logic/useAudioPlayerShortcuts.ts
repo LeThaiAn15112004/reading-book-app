@@ -1,22 +1,14 @@
 import { useShortcutAction } from '../../../shortcuts'
 import { useNoteMenuStore } from './audioNoteMenuStore'
-import { selectCanAddNote, useAudioPlayerStore } from './audioPlayerStore'
-
-/** Until the listener can choose them (spec 018 FR-028, T053), the player's fixed skip lengths. */
-const SKIP_BACK_SECONDS = 15
-const SKIP_FORWARD_SECONDS = 30
+import { selectCanAddNote, selectCanChangeChapter, useAudioPlayerStore } from './audioPlayerStore'
+import { currentSkipLengths } from './skipLengths'
 
 function ready(): boolean {
   return useAudioPlayerStore.getState().status === 'ready'
 }
 
-/** Same rule as the ⏮ / ⏭ buttons: chapters (single file) or tracks (multi-track). */
 function canChangeChapter(direction: 1 | -1): boolean {
-  const s = useAudioPlayerStore.getState()
-  const multiTrack = s.tracks.length > 0
-  if (!multiTrack && s.chapterStatus !== 'ok') return false
-  if (direction > 0 && multiTrack && s.trackIndex >= s.tracks.length - 1) return false
-  return true
+  return selectCanChangeChapter(useAudioPlayerStore.getState(), direction)
 }
 
 /**
@@ -34,12 +26,12 @@ export function useAudioPlayerShortcuts(): void {
   })
   useShortcutAction('audiobook.skipBack', () => {
     if (!ready()) return false
-    store().skipBy(-SKIP_BACK_SECONDS)
+    store().skipBy(-currentSkipLengths().back)
     return true
   })
   useShortcutAction('audiobook.skipForward', () => {
     if (!ready()) return false
-    store().skipBy(SKIP_FORWARD_SECONDS)
+    store().skipBy(currentSkipLengths().forward)
     return true
   })
   useShortcutAction('audiobook.previousChapter', () => {

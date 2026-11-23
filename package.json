@@ -101,6 +101,7 @@
     "spike:import:parity": "cd source/app/platforms/electron && node --experimental-transform-types --import ./spikes/pdf-annotations/register-alias.mjs spikes/import/run-import-parity.mjs",
     "spike:import:queue": "cd source/app/platforms/electron && node --experimental-transform-types --import ./spikes/pdf-annotations/register-alias.mjs spikes/import/run-import-queue.mjs",
     "spike:import:cleanup": "cd source/app/platforms/electron && node --experimental-transform-types --import ./spikes/pdf-annotations/register-alias.mjs spikes/import/run-import-cleanup.mjs",
+    "spike:audio:mini-player": "cd source/app/platforms/electron && node --experimental-strip-types spikes/audio/run-mini-player.mjs",
     "spike:audio:store": "cd source/app/platforms/electron && node --experimental-transform-types --import ./spikes/txt/register-alias.mjs spikes/audio/run-audio-store.mjs",
     "spike:audio:zip-import": "cd source/app/platforms/electron && node --experimental-transform-types --import ./spikes/pdf-annotations/register-alias.mjs spikes/audio/run-audio-zip-import.mjs",
     "spike:annotations:main": "cd source/app/platforms/electron && node --experimental-transform-types --import ./spikes/pdf-annotations/register-alias.mjs spikes/annotations/run-annotations-main.mjs",

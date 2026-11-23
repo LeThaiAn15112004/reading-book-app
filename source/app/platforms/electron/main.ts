@@ -36,6 +36,9 @@ import { installFullscreenShortcuts } from './ipc/app.ipc'
 import { AppChannels, NotificationChannels } from './ipc/channels'
 import type { ReminderOpenBookDto } from './ipc/api-types'
 import { initNotificationSettings } from './notifications/notification-settings'
+import { initMiniPlayerRelay, onMainWindowHidden, onMainWindowShown, onWindowClosed, toggleFromTray } from './mini-player/mini-player-relay'
+import { closeMiniPlayerWindow, initMiniPlayerWindow } from './mini-player/mini-player-window'
+import { setTrayAudiobookEntry, setTrayAudiobookToggle } from './background/background-mode'
 import type { BookInProgress } from './reminders/reading-activity'
 import { startReadingReminders, stopReadingReminders } from './reminders/reading-reminders'
 import { handleOAuthCallbackUrl } from './ipc/cloud.ipc'
@@ -369,7 +372,16 @@ function createWindow({ showOnReady = true }: { showOnReady?: boolean } = {}) {
 
   win.on('closed', () => {
     if (win === null || win.isDestroyed()) win = null
+    // Spec 018: the floating mini player never outlives the main window (it would keep the app from quitting).
+    closeMiniPlayerWindow()
   })
+
+  // Spec 018 (FR-025): minimising or hiding to the tray keeps the audiobook playing and may open the floating window;
+  // showing the window again closes a floating window that opened by itself.
+  win.on('minimize', () => onMainWindowHidden())
+  win.on('hide', () => onMainWindowHidden())
+  win.on('restore', () => onMainWindowShown())
+  win.on('show', () => onMainWindowShown())
 
   win.once('ready-to-show', () => {
     if (!showOnReady) {
@@ -446,12 +458,13 @@ app.on('before-quit', (event) => {
   if (shouldAskBeforeQuit()) {
     event.preventDefault()
     cancelQuitting()
-    void confirmQuitWithImports(BrowserWindow.getAllWindows()[0]).then((quit) => {
+    void confirmQuitWithImports(win ?? BrowserWindow.getAllWindows()[0]).then((quit) => {
       if (quit) app.quit()
     })
     return
   }
   markQuitting()
+  closeMiniPlayerWindow()
 })
 
 // Close DB after flush handshake / window close (not before — T4.2).
@@ -499,6 +512,22 @@ app.whenReady().then(async () => {
   // Tray + Run in Background prefs (Main-owned) before the window, so its close button knows them.
   initBackgroundMode({ showWindow: showMainWindow, publicDir: process.env.VITE_PUBLIC })
   initNotificationSettings()
+  // Spec 018: the audiobook mini player — floating window + relay + the tray's Play / Pause entry.
+  initMiniPlayerWindow({
+    preloadPath: path.join(__dirname, 'preload.mjs'),
+    backgroundColor: DEFAULT_OVERLAY.color,
+    load: (target) => {
+      if (VITE_DEV_SERVER_URL) void target.loadURL(`${VITE_DEV_SERVER_URL}?window=mini-player`)
+      else void target.loadFile(path.join(RENDERER_DIST, 'index.html'), { search: 'window=mini-player' })
+    },
+    onClosed: () => onWindowClosed(),
+  })
+  initMiniPlayerRelay({
+    mainWindow: () => (win && !win.isDestroyed() ? win : null),
+    showMainWindow,
+    onTrayEntry: (entry) => setTrayAudiobookEntry(entry),
+  })
+  setTrayAudiobookToggle(toggleFromTray)
   // macOS / Linux shutdown or reboot: quit instead of hiding.
   powerMonitor.on('shutdown', () => {
     markShuttingDown()

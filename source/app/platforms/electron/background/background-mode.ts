@@ -103,9 +103,39 @@ function trayIcon(): Electron.NativeImage {
   return image
 }
 
+/** Spec 018 (FR-026): the listening session's Play / Pause entry, or `null` without a session. */
+let audiobookEntry: { title: string; playing: boolean } | null = null
+let toggleAudiobook: () => void = () => {}
+
+/** Set by the mini player relay when the session's title / play state changes (never per position tick). */
+export function setTrayAudiobookEntry(entry: { title: string; playing: boolean } | null): void {
+  audiobookEntry = entry
+  if (tray) applyTrayTexts(tray)
+}
+
+/** The tray's Play / Pause item runs this (the relay forwards `toggle` to the main renderer). */
+export function setTrayAudiobookToggle(run: () => void): void {
+  toggleAudiobook = run
+}
+
+function audiobookMenuItems(): Electron.MenuItemConstructorOptions[] {
+  if (!audiobookEntry) return []
+  const title = audiobookEntry.title
+  return [
+    {
+      label: audiobookEntry.playing
+        ? tMain('main.shell.tray.audiobookPause', { title })
+        : tMain('main.shell.tray.audiobookPlay', { title }),
+      click: () => toggleAudiobook(),
+    },
+    { type: 'separator' },
+  ]
+}
+
 /** The tray menu in Main's current interface language (spec 012); rebuilt when the language changes. */
 export function trayMenuTemplate(): Electron.MenuItemConstructorOptions[] {
   return [
+    ...audiobookMenuItems(),
     { label: tMain('main.shell.tray.open', { app: APP_SHORT_NAME }), click: () => showMainWindow() },
     { type: 'separator' },
     { label: tMain('main.shell.tray.quit', { app: APP_SHORT_NAME }), click: () => quitApp() },

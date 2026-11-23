@@ -218,6 +218,9 @@ export const vi = {
       loginNoTray:
         'Tự động chạy ứng dụng ngầm khi bật máy tính để các tính năng nhắc nhở hoạt động chính xác. Không có biểu tượng ở {tray} thì cửa sổ sẽ mở khi đăng nhập thay vì ẩn.',
       openStartup: 'Mở cài đặt Startup',
+      floatingPlayer: 'Cửa sổ nổi cho sách nói',
+      floatingPlayerDescription:
+        'Khi sách nói đang phát mà cửa sổ này bị thu nhỏ hoặc ẩn, một trình phát nhỏ vẫn nằm trên các ứng dụng khác.',
       quit: 'Thoát từ khay',
       quitDescription:
         'Thoát Readmate trong menu ở {tray} sẽ đóng hẳn ứng dụng, kể cả khi đang chạy nền. Vị trí đọc được lưu trước. Cũng có thể thoát ngay tại đây.',

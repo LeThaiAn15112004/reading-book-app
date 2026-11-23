@@ -1,6 +1,9 @@
-import { HashRouter, Navigate, Route, Routes } from 'react-router-dom'
+import { HashRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import { useEffect, type ReactNode } from 'react'
 import { ImportQueueCard } from './components/import/ImportQueueCard'
+import { MiniPlayerBar } from './components/audio/MiniPlayerBar'
+import { startMiniPlayerSync } from './screens/AudioBook/logic/miniPlayerSync'
+import { miniPlayerReservedHeight, useMiniPlayerUiStore } from './screens/AudioBook/logic/miniPlayerUiStore'
 import { startImportQueue } from './hooks/library/importQueueStore'
 import {
   AppAppearanceBridge,
@@ -31,6 +34,13 @@ function AppChromeFrame({ children }: { children: ReactNode }) {
   useEffect(() => {
     void startImportQueue()
   }, [])
+  // Spec 018: the listening session reaches Main (floating window, tray) for the whole app session — Desktop only.
+  useEffect(() => startMiniPlayerSync(), [])
+  // FR-020: the mini player bar never covers content. The text reader keeps its own text clear of the bar (above its
+  // footer); every other screen is laid out above it here.
+  const { pathname } = useLocation()
+  const reserved = useMiniPlayerUiStore(miniPlayerReservedHeight)
+  const padBottom = pathname.startsWith('/reader/') ? 0 : reserved
 
   return (
     <div
@@ -53,8 +63,12 @@ function AppChromeFrame({ children }: { children: ReactNode }) {
           </>
         ) : null}
       </div>
-      <div className="relative min-h-0 flex-1 overflow-hidden">
+      <div
+        className="relative min-h-0 flex-1 overflow-hidden"
+        style={{ paddingBottom: padBottom, ['--mini-player-height' as string]: `${reserved}px` }}
+      >
         {children}
+        <MiniPlayerBar />
         {/* Spec 016: background import progress — above every route, inside the content area (clear of PhoneNav). */}
         <ImportQueueCard />
       </div>

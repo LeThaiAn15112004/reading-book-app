@@ -33,6 +33,7 @@ import { canGenerateCover, generateBookCover, markCoverAttempted } from './gener
 import { useLibraryBrowseStore } from './libraryBrowseStore'
 import { useLibrarySelectionStore } from './librarySelectionStore'
 import { useCloudSources } from './useCloudSources'
+import { audioSessionBookId, endAudioSession } from '../../AudioBook/logic/audioPlayerStore'
 
 type LibraryLocationState = BootLocationState & {
   openNav?: AppStubNavId
@@ -538,6 +539,8 @@ export function useLibraryScreen() {
       const book = bookList.find((b) => b.id === id)
       if (!book) continue
       try {
+        // Spec 018 (edge case): the playing audiobook's session ends (progress saved) before the book goes.
+        if (audioSessionBookId() === id) await endAudioSession()
         const result =
           removalKindOf(book) === 'remove-audiobook' ? await libraryApi.removeAudiobook(id) : await libraryApi.removeBook(id)
         if (result.ok) done += 1
@@ -555,6 +558,8 @@ export function useLibraryScreen() {
   async function confirmPendingRemoval() {
     if (!pendingRemoval) return
     const action = pendingRemoval
+    // Spec 018 (edge case): end the listening session of the book first, so nothing keeps playing a removed file.
+    if (audioSessionBookId() === action.bookId) await endAudioSession()
     const removed = await runBookMutation(
       () =>
         action.kind === 'remove'

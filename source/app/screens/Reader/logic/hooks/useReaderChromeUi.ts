@@ -1,3 +1,4 @@
+import { useMiniPlayerUiStore } from '../../../AudioBook/logic/miniPlayerUiStore'
 import {
   useCallback,
   useEffect,
@@ -177,6 +178,9 @@ export function useReaderChromeUi({
     useReadAloudStore.getState().closeMenu()
   }, [chromeHidden])
 
+  // Spec 018 (FR-024): the audiobook mini player appearing / leaving changes the reading area's height too.
+  const miniPlayerVisible = useMiniPlayerUiStore((s) => s.barVisible)
+
   // After tools/sidebar/immersive layout animates, refresh EPUB metrics and clear stuck hover.
   useEffect(() => {
     clearStuckChromeHover()
@@ -184,7 +188,7 @@ export function useReaderChromeUi({
       epubApiRef,
       escapeUiRef.current.isEpubSurface,
     )
-  }, [chromeHidden, sidebarOpen, rightPanel, immersive, epubApiRef, escapeUiRef])
+  }, [chromeHidden, sidebarOpen, rightPanel, immersive, miniPlayerVisible, epubApiRef, escapeUiRef])
 
   /**
    * Left/right sidebar and immersive toggles resize the EPUB host's *width*

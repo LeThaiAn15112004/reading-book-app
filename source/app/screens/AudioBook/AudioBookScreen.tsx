@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { features } from '@core/config'
+import { isFeatureAvailable } from '../../platforms/host'
 import { appApi } from '../../bridge'
 import { chapterIndexAt, timelineView, trackEyebrow } from '@core'
 import { useOpenReading } from '../../components/chrome'
@@ -274,7 +275,12 @@ export function AudioBookScreen({ bookId }: { bookId: string }) {
 
   useEffect(() => {
     ensureTab(bookId)
-    void load(bookId)
+    // Spec 018 (FR-019, research R1): the player store IS the listening session. Coming back to the book that is
+    // already loaded keeps it as it is (position, play state, speed, sleep timer); another book replaces it.
+    const current = useAudioPlayerStore.getState()
+    if (current.bookId !== bookId || current.status === 'idle' || current.status === 'error') void load(bookId)
+    // Leaving the player keeps playing (the mini player takes over) where the host has one; elsewhere it ends here.
+    if (isFeatureAvailable('miniPlayer')) return undefined
     return () => {
       void dispose()
     }

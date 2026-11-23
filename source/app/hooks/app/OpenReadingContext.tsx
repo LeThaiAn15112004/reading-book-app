@@ -6,6 +6,7 @@ import {
   useState,
   type ReactNode,
 } from 'react'
+import { audioSessionBookId, endAudioSession } from '../../screens/AudioBook/logic/audioPlayerStore'
 
 export type OpenReadingTab = {
   bookId: string
@@ -95,6 +96,9 @@ export function OpenReadingProvider({
 
   const closeBook = useCallback(
     (bookId: string) => {
+      // Spec 018 (edge case): closing the audiobook's tab ends its listening session (progress saved), like the mini
+      // player's close.
+      if (audioSessionBookId() === bookId) void endAudioSession()
       setTabs((prev) => {
         const idx = prev.findIndex((t) => t.bookId === bookId)
         if (idx < 0) return prev

@@ -22,4 +22,25 @@ export const en = {
   splash: {
     loading: 'Loading',
   },
+  /** Spec 018: the audiobook mini player bar and the floating window. */
+  miniPlayer: {
+    region: 'Mini player',
+    openPlayer: 'Open the player: {title}',
+    popOut: 'Pop out',
+    popOutTitle: 'Open the floating window, above other apps',
+    close: 'Stop and close the mini player',
+    closeWindow: 'Stop and close',
+    returnToApp: 'Return to app',
+    play: 'Play',
+    pause: 'Pause',
+    skipBack: 'Back {seconds} seconds',
+    skipForward: 'Forward {seconds} seconds',
+    skipBackShort: '{seconds}',
+    skipForwardShort: '{seconds}',
+    seek: 'Position in the audiobook',
+    trackFailed: 'This track could not be played.',
+    tryAgain: 'Try again',
+    skipNext: 'Skip to next track',
+    windowTitle: 'Readmate — mini player',
+  },
 } as const

@@ -7,6 +7,8 @@ export const vi = {
     tooltip: 'Readmate Reader',
     open: 'Mở {app}',
     quit: 'Thoát {app}',
+    audiobookPlay: '▶  Phát “{title}”',
+    audiobookPause: '⏸  Tạm dừng “{title}”',
   },
   dialogs: {
     exportReadable: 'Xuất bản đọc được',

@@ -217,6 +217,9 @@ export const en = {
       loginNoTray:
         'Starts the app in the background when the computer turns on, so reminders work on time. Without the {tray} icon the window opens at login instead of staying hidden.',
       openStartup: 'Open Startup settings',
+      floatingPlayer: 'Floating Audiobook Player',
+      floatingPlayerDescription:
+        'When an audiobook is playing and this window is minimised or hidden, a small player stays above other apps.',
       quit: 'Quit from Tray',
       quitDescription:
         'Quit Readmate in the {tray} menu closes the app completely, even while it runs in the background. The reading position is saved first. The app can also be quit right here.',

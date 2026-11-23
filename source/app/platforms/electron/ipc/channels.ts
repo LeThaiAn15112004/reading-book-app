@@ -310,3 +310,31 @@ export const AnnotationTransferChannels = {
   /** Main → renderer: reading / planning / committing progress of an import. */
   progress: 'annotationTransfer:progress',
 } as const
+
+/**
+ * Spec 018 (contracts/mini-player-ipc.md): the audiobook mini player. The main window's renderer owns playback and
+ * publishes a plain state snapshot; Main relays it to the floating always-on-top window and the tray, and relays their
+ * commands back. No path or book data beyond titles / author / the opaque cover URL crosses.
+ */
+export const MiniPlayerChannels = {
+  /** Main renderer → main: the session's state (`null` = no session). Throttled by the sender. */
+  publishState: 'miniPlayer:publishState',
+  /** Main renderer → main: "Pop out" from the in-app bar. */
+  open: 'miniPlayer:open',
+  getPrefs: 'miniPlayer:getPrefs',
+  setPrefs: 'miniPlayer:setPrefs',
+  /** Main → main renderer: a command from the floating window or the tray. */
+  command: 'miniPlayer:command',
+  /** Main → main renderer: the floating window opened / closed (the in-app bar hides while it is open). */
+  windowChanged: 'miniPlayer:windowChanged',
+  /** Main → floating window: the last state. */
+  state: 'miniPlayer:state',
+  /** Floating window → main: ask for the last state (on load). */
+  getState: 'miniPlayer:getState',
+  /** Floating window → main: a command for the main renderer. */
+  windowCommand: 'miniPlayer:windowCommand',
+  /** Floating window → main: close it and bring the main window back; playback continues. */
+  returnToApp: 'miniPlayer:returnToApp',
+  /** Floating window → main: end the session, then close. */
+  closeWindow: 'miniPlayer:closeWindow',
+} as const

@@ -8,6 +8,7 @@ import { registerCloudIpc } from './cloud.ipc'
 import { registerGraphicsIpc } from './graphics.ipc'
 import { registerImportIpc } from './import.ipc'
 import { registerLibraryIpc } from './library.ipc'
+import { registerMiniPlayerIpc } from './mini-player.ipc'
 import { registerNotificationsIpc } from './notifications.ipc'
 import { registerOverlayIpc } from './overlay.ipc'
 import { registerSearchIpc } from './search.ipc'
@@ -40,5 +41,6 @@ export function registerAllIpcHandlers(): void {
   registerStorageIpc()
   registerUpdatesIpc()
   registerNotificationsIpc()
+  registerMiniPlayerIpc()
   registerBackgroundIpc()
 }

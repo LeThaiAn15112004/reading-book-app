@@ -28,6 +28,8 @@ import {
   useReaderChromeMenu,
 } from '../../components/chrome'
 import { ReaderShell, readerChromeTopInset, readerChromeBottomInset } from '../../components/reader'
+import { READER_FOOTER_HEIGHT_PX } from '../../components/reader/chrome/readerChromeLayout'
+import { miniPlayerReservedHeight, useMiniPlayerUiStore } from '../AudioBook/logic/miniPlayerUiStore'
 import { usePdfViewStore } from './logic/pdfView/pdfViewStore'
 import { usePdfExportStore } from './logic/pdfExport/pdfExportStore'
 import { createAnnotationReloader } from './logic/annotationReload'
@@ -425,6 +427,13 @@ export function ReaderScreen() {
     ? !immersiveReveal.reveal.top
     : chrome.chromeHidden
   const footerImmersiveHidden = immersive && !immersiveReveal.reveal.bottom
+  // Spec 018 (FR-024): the audiobook mini player sits just above this footer (at the bottom edge while it is hidden).
+  const miniPlayerHeight = useMiniPlayerUiStore(miniPlayerReservedHeight)
+  const setMiniPlayerOffset = useMiniPlayerUiStore((s) => s.setReaderBottomOffset)
+  useEffect(() => {
+    setMiniPlayerOffset(footerImmersiveHidden ? 0 : READER_FOOTER_HEIGHT_PX)
+  }, [footerImmersiveHidden, setMiniPlayerOffset])
+  useEffect(() => () => setMiniPlayerOffset(null), [setMiniPlayerOffset])
   const contentInsetLeft = immersive
     ? 0
     : sidebarContentInsetLeft(chrome.sidebarOpen, sidebarResize.panelWidth)
@@ -977,6 +986,7 @@ export function ReaderScreen() {
       contentInsetBottom={readerChromeBottomInset(
         isPdfSurface || isTextSurface ? 'scroll' : book.prefs.viewMode,
         footerImmersiveHidden,
+        miniPlayerHeight,
       )}
       contentInsetResizing={sidebarResize.isResizing}
       dataAttrs={{

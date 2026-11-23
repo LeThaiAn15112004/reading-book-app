@@ -62,6 +62,7 @@ export function createMobileApi(options: MobileApiOptions): { api: DesktopApi; c
     cloud: unavailableGroup<DesktopApi['cloud']>('cloud'),
     notifications: unavailableGroup<DesktopApi['notifications']>('notifications'),
     background: unavailableGroup<DesktopApi['background']>('background'),
+    miniPlayer: unavailableGroup<DesktopApi['miniPlayer']>('miniPlayer'),
     updates: unavailableGroup<DesktopApi['updates']>('updates'),
     storage: unavailableGroup<DesktopApi['storage']>('storage'),
     translation: unavailableGroup<DesktopApi['translation']>('translation'),

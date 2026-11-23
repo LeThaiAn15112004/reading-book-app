@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron'
-import type { DesktopApi } from './ipc/api-types'
+import type { DesktopApi, MiniPlayerWindowApi } from './ipc/api-types'
 import {
   AnnotationTransferChannels,
   AppChannels,
@@ -8,6 +8,7 @@ import {
   CloudChannels,
   ImportChannels,
   LibraryChannels,
+  MiniPlayerChannels,
   NotificationChannels,
   AttachmentChannels,
   GraphicsChannels,
@@ -304,6 +305,14 @@ const api: DesktopApi = {
       }
     },
   },
+  miniPlayer: {
+    publishState: (state) => ipcRenderer.send(MiniPlayerChannels.publishState, state),
+    open: () => ipcRenderer.invoke(MiniPlayerChannels.open),
+    getPrefs: () => ipcRenderer.invoke(MiniPlayerChannels.getPrefs),
+    setPrefs: (patch) => ipcRenderer.invoke(MiniPlayerChannels.setPrefs, patch),
+    onCommand: (handler) => subscribe(MiniPlayerChannels.command, handler),
+    onWindowChanged: (handler) => subscribe(MiniPlayerChannels.windowChanged, handler),
+  },
   background: {
     getPrefs: () => ipcRenderer.invoke(BackgroundChannels.getPrefs),
     setPrefs: (patch) => ipcRenderer.invoke(BackgroundChannels.setPrefs, patch),
@@ -380,4 +389,25 @@ const api: DesktopApi = {
   },
 }
 
-contextBridge.exposeInMainWorld('api', api)
+/**
+ * Spec 018 (research R4): the floating mini player window loads the same preload with this argument and gets ONLY
+ * `window.miniPlayerWindow` — no `window.api`, so nothing of the main window's API is reachable from it.
+ */
+const MINI_PLAYER_WINDOW_ARG = '--readmate-window=mini-player'
+
+const miniPlayerWindow: MiniPlayerWindowApi = {
+  onState: (handler) => {
+    const unsubscribe = subscribe(MiniPlayerChannels.state, handler)
+    void ipcRenderer.invoke(MiniPlayerChannels.getState).then(handler)
+    return unsubscribe
+  },
+  command: (command) => ipcRenderer.send(MiniPlayerChannels.windowCommand, command),
+  returnToApp: () => ipcRenderer.send(MiniPlayerChannels.returnToApp),
+  close: () => ipcRenderer.send(MiniPlayerChannels.closeWindow),
+}
+
+if (process.argv.includes(MINI_PLAYER_WINDOW_ARG)) {
+  contextBridge.exposeInMainWorld('miniPlayerWindow', miniPlayerWindow)
+} else {
+  contextBridge.exposeInMainWorld('api', api)
+}

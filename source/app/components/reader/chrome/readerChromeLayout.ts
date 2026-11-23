@@ -40,7 +40,16 @@ export function readerChromeTopInset(chromeHidden: boolean): string | number {
 export function readerChromeBottomInset(
   viewMode: ReadingViewMode,
   footerHidden: boolean,
+  /**
+   * Spec 018 (FR-024): the audiobook mini player bar sits just above the footer (or at the bottom edge while the footer
+   * is hidden). Unlike the footer it is reserved in paginated view too — columns would otherwise be drawn under it.
+   */
+  miniPlayerHeight = 0,
 ): number {
-  if (viewMode !== 'scroll' || footerHidden) return 0
-  return READER_FOOTER_HEIGHT_PX + READER_FOOTER_CONTENT_GAP_PX
+  if (footerHidden) return miniPlayerHeight
+  if (viewMode !== 'scroll') {
+    // The bar is stacked on the footer, so the text must stop above both.
+    return miniPlayerHeight > 0 ? READER_FOOTER_HEIGHT_PX + miniPlayerHeight : 0
+  }
+  return READER_FOOTER_HEIGHT_PX + READER_FOOTER_CONTENT_GAP_PX + miniPlayerHeight
 }

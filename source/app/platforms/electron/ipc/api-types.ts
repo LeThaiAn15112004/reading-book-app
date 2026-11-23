@@ -1087,6 +1087,57 @@ export type SetUiLanguageResultDto =
   | { ok: true; effective: 'vi' | 'en' }
   | { ok: false; code: 'INVALID_ARGUMENT' | 'WRITE_FAILED' }
 
+/** Spec 018 (contracts/mini-player-ipc.md): what the floating window and the tray show. Plain data only. */
+export type MiniPlayerStateDto = {
+  bookId: string
+  /** Book title. */
+  title: string
+  /** Current chapter / track title. */
+  subtitle: string | null
+  author: string | null
+  /** The `rb-cover://` URL the renderer already has. */
+  coverUrl: string | null
+  playing: boolean
+  status: 'ready' | 'switching' | 'trackFailed'
+  /** Seconds in the shown span: the current track for multi-track books, else the whole file. */
+  positionSeconds: number
+  durationSeconds: number | null
+  skipBackSeconds: number
+  skipForwardSeconds: number
+  canPrevious: boolean
+  canNext: boolean
+  theme: 'night' | 'sepia' | 'paper'
+  uiLanguage: 'en' | 'vi'
+}
+
+export type MiniPlayerCommandDto =
+  | { type: 'toggle' }
+  | { type: 'play' }
+  | { type: 'pause' }
+  | { type: 'skipBack' }
+  | { type: 'skipForward' }
+  | { type: 'previous' }
+  | { type: 'next' }
+  | { type: 'seek'; positionSeconds: number }
+  | { type: 'retryTrack' }
+  | { type: 'openPlayer' }
+  | { type: 'endSession' }
+
+export type MiniPlayerPrefsDto = {
+  /** Open the floating window by itself when the main window is minimised or hidden (default on). */
+  autoOpen: boolean
+}
+
+export type MiniPlayerOpenResult = { ok: true } | { ok: false; code: 'no_session' }
+
+/** The floating window's own preload API (`window.miniPlayerWindow`); it has no `window.api`. */
+export interface MiniPlayerWindowApi {
+  onState(handler: (state: MiniPlayerStateDto | null) => void): () => void
+  command(command: MiniPlayerCommandDto): void
+  returnToApp(): void
+  close(): void
+}
+
 export interface DesktopApi {
   /**
    * Spec 016 (FR-013b): the phone keeps its unfinished import jobs across launches; Desktop has no such group
@@ -1372,6 +1423,15 @@ export interface DesktopApi {
     sendTestReminder(): Promise<TestReminderResult>
     /** Subscribe to reminder-notification clicks. Returns unsubscribe. */
     onOpenBook(handler: (target: ReminderOpenBookDto) => void): () => void
+  }
+  /** Spec 018: the audiobook mini player (floating window, tray entry). */
+  miniPlayer: {
+    publishState(state: MiniPlayerStateDto | null): void
+    open(): Promise<MiniPlayerOpenResult>
+    getPrefs(): Promise<MiniPlayerPrefsDto>
+    setPrefs(patch: Partial<MiniPlayerPrefsDto>): Promise<MiniPlayerPrefsDto>
+    onCommand(handler: (command: MiniPlayerCommandDto) => void): () => void
+    onWindowChanged(handler: (change: { open: boolean }) => void): () => void
   }
   background: {
     getPrefs(): Promise<BackgroundPrefsDto>
