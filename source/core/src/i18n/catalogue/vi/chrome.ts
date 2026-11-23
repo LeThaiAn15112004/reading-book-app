@@ -9,7 +9,7 @@ export const vi = {
     cloudSources: 'Nguồn đám mây',
     reading: 'Đang đọc',
     settings: 'Khác',
-    tools: 'Công cụ',
+    tools: 'Tiện ích',
     mainNavigation: 'Điều hướng chính',
     cloudProviders: 'Các nguồn đám mây',
     providerUnavailable: '{provider} — {reason}',

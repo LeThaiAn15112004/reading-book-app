@@ -27,6 +27,7 @@ Whisper, FFmpeg, Foxit, Acrobat, Windows, CFI (not shown to users).
 | Folder | Thư mục |
 | Settings | Cài đặt |
 | More (navigation entry that opens Settings) | Khác |
+| Utilities (menubar entry that shows / hides the Reader toolbar) | Tiện ích |
 | Appearance | Giao diện |
 | Theme | Chủ đề |
 | Language | Ngôn ngữ |

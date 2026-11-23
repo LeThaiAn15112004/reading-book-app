@@ -96,9 +96,9 @@ export async function scrollToOffset(page: Page, offset: number): Promise<void> 
   }, box.y)
 }
 
-/** The reader toolbar starts hidden; the menubar's "Tools" item shows it. */
+/** The reader toolbar starts hidden; the menubar's "Utilities" item shows it. */
 export async function showToolbar(page: Page): Promise<void> {
-  const tools = page.getByRole('navigation', { name: 'Main navigation' }).getByRole('button', { name: 'Tools', exact: true })
+  const tools = page.getByRole('navigation', { name: 'Main navigation' }).getByRole('button', { name: 'Utilities', exact: true })
   if ((await tools.getAttribute('aria-expanded')) !== 'true') await tools.click()
   await expect(tools).toHaveAttribute('aria-expanded', 'true')
 }

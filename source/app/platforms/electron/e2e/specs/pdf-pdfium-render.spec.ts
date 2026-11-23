@@ -85,7 +85,7 @@ test('annotations written by Readmate are rendered by PDFium (Chromium / Edge en
   await expect(pdfPage(page, 1).locator('.rb-pdf-annot')).toHaveCount(3)
 
   // Recolor the underline blue and the strikethrough… keep defaults simple: export as is.
-  const tools = page.getByRole('navigation', { name: 'Main navigation' }).getByRole('button', { name: 'Tools', exact: true })
+  const tools = page.getByRole('navigation', { name: 'Main navigation' }).getByRole('button', { name: 'Utilities', exact: true })
   if ((await tools.getAttribute('aria-expanded')) !== 'true') await tools.click()
   await page.getByRole('button', { name: 'Export PDF with annotations', exact: true }).click()
   await expect(page.getByText(/Exported “pdfium-exported\.pdf”/)).toBeVisible({ timeout: 20_000 })

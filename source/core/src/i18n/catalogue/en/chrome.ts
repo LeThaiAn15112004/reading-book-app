@@ -6,7 +6,7 @@ export const en = {
     cloudSources: 'Cloud Sources',
     reading: 'Reading',
     settings: 'More',
-    tools: 'Tools',
+    tools: 'Utilities',
     mainNavigation: 'Main navigation',
     cloudProviders: 'Cloud Sources providers',
     providerUnavailable: '{provider} — {reason}',

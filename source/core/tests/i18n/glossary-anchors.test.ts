@@ -10,6 +10,7 @@ import { isPluralMessage, translate, type AnyMessageKey } from '../../src/i18n/t
 
 const ANCHORS: ReadonlyArray<[AnyMessageKey, string]> = [
   ['chrome.nav.library', 'Thư viện'],
+  ['chrome.nav.tools', 'Tiện ích'],
   ['library.sidebar.heading', 'Thư viện'],
   ['common.actions.delete', 'Xóa'],
   ['common.actions.remove', 'Gỡ'],

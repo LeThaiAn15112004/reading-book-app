@@ -10,7 +10,7 @@ import { openBook, pdfPage } from '../support/reader'
  */
 
 async function showToolbar(page: Page) {
-  const tools = page.getByRole('navigation', { name: 'Main navigation' }).getByRole('button', { name: 'Tools', exact: true })
+  const tools = page.getByRole('navigation', { name: 'Main navigation' }).getByRole('button', { name: 'Utilities', exact: true })
   if ((await tools.getAttribute('aria-expanded')) !== 'true') await tools.click()
   await expect(tools).toHaveAttribute('aria-expanded', 'true')
 }

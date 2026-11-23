@@ -308,7 +308,7 @@ test('F: there is no Hand tool, and text can be selected by dragging', async ({ 
   await page.getByRole('button', { name: 'Open', exact: true }).click()
   await expect(surface(page)).toBeVisible({ timeout: 20_000 })
 
-  const tools = page.getByRole('navigation', { name: 'Main navigation' }).getByRole('button', { name: 'Tools', exact: true })
+  const tools = page.getByRole('navigation', { name: 'Main navigation' }).getByRole('button', { name: 'Utilities', exact: true })
   if ((await tools.getAttribute('aria-expanded')) !== 'true') await tools.click()
   await expect(page.getByRole('button', { name: 'Select', exact: true })).toHaveAttribute('aria-pressed', 'true')
   await expect(page.getByRole('button', { name: 'Hand', exact: true })).toHaveCount(0)

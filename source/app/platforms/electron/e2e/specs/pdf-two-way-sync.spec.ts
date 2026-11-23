@@ -59,7 +59,7 @@ async function highlightLine(page: Page, n: number, line: number) {
 }
 
 async function openMore(page: Page) {
-  const tools = page.getByRole('navigation', { name: 'Main navigation' }).getByRole('button', { name: 'Tools', exact: true })
+  const tools = page.getByRole('navigation', { name: 'Main navigation' }).getByRole('button', { name: 'Utilities', exact: true })
   if ((await tools.getAttribute('aria-expanded')) !== 'true') await tools.click()
   await page.getByRole('button', { name: 'More options' }).click()
 }

@@ -71,9 +71,9 @@ test('export saves a new PDF holding the annotations (the book file is kept in s
   await expect.poll(async () => (await annotationsOf(file)).filter((a) => a.subtype === 'Highlight').length, { timeout: 15_000, intervals: [100] }).toBe(1)
 
   async function exportNow() {
-    // The reader toolbar starts hidden; the menubar's "Tools" item shows it. Export is a toolbar button (it used to
+    // The reader toolbar starts hidden; the menubar's "Utilities" item shows it. Export is a toolbar button (it used to
     // be in the More menu).
-    const tools = page.getByRole('navigation', { name: 'Main navigation' }).getByRole('button', { name: 'Tools', exact: true })
+    const tools = page.getByRole('navigation', { name: 'Main navigation' }).getByRole('button', { name: 'Utilities', exact: true })
     if ((await tools.getAttribute('aria-expanded')) !== 'true') await tools.click()
     await page.getByRole('button', { name: 'Export PDF with annotations', exact: true }).click()
     await expect(page.getByText(/Exported “exported\.pdf”/)).toBeVisible({ timeout: 20_000 })
