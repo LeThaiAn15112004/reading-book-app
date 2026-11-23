@@ -51,6 +51,15 @@ review found:
 - Q: What happens to a playing audiobook when the main window is minimised or hidden to the system tray? → A: It
   keeps playing; the floating window opens by itself when the main window is minimised or hidden; the tray menu gets
   an audiobook Play / Pause item.
+- Q: Should the listener be able to choose the skip lengths (today fixed −15 / +30) and should playback rewind a few
+  seconds when resumed after a pause? → A: Both — skip back / forward lengths are chosen from 5 / 10 / 15 / 30 / 60 s
+  (default 15 / 30); resuming after a pause longer than 1 minute rewinds 3–10 s depending on how long it was paused;
+  the automatic rewind can be turned off.
+- Q: How should the player be laid out in a wide window? → A: Two columns from 1024 px of player width — a large
+  cover on the left, chapter / title, timeline and controls on the right; one column below that.
+- Q: Should the audiobook's Notes get more in this feature (search, export…)? → A: Add a search box (Note text and
+  chapter title) and a chapter filter / grouping in the Notes tab; exporting Notes to a file is left to a separate
+  feature.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -82,7 +91,7 @@ button contrast, then Tab through every control of the player and check each sho
 
 ### User Story 2 - Control playback from the keyboard (Priority: P1)
 
-A listener with the player open controls it without the mouse: play / pause, skip back 15 s, skip forward 30 s,
+A listener with the player open controls it without the mouse: play / pause, skip back / forward (by the chosen lengths),
 previous / next chapter (or track), volume up / down, mute, speed down / up, add a Note. The keys are listed in
 Settings → Keyboard Shortcuts, in the interface language, and can be changed there like the reader's shortcuts.
 
@@ -97,7 +106,7 @@ action; change one key in Settings and check the new key works and the old one n
 1. **Given** the player and no text field focused, **When** the listener presses Space, **Then** playback toggles
    (unchanged behaviour), and the shortcut now appears in Settings → Keyboard Shortcuts.
 2. **Given** the player, **When** the listener presses the skip-back / skip-forward keys, **Then** the position moves
-   by −15 s / +30 s, clamped to the start / end.
+   back / forward by the chosen skip lengths (15 s / 30 s by default), clamped to the start / end.
 3. **Given** the player, **When** the listener presses the volume keys, **Then** volume changes by 5 % steps between
    0 and 100 %; the mute key mutes, and pressing it again restores the previous level.
 4. **Given** the player, **When** the listener presses the speed keys, **Then** speed moves to the next lower / higher
@@ -140,7 +149,7 @@ cover and the play / pause and next / previous buttons; press the keyboard media
 
 A listener starts an audiobook, then goes to the Library, Collections or Settings: the audiobook keeps playing and a
 mini player bar stays at the bottom of every screen with the cover, title, current chapter / track, play / pause,
-−15 / +30 and a progress line; pressing it reopens the full player at the same position. When the listener wants to
+skip back / forward and a progress line; pressing it reopens the full player at the same position. When the listener wants to
 work in another application, a "Pop out" action detaches the mini player into a small window that stays on top of
 other windows, with the same controls; it can be moved, and closed or returned into the app.
 
@@ -154,7 +163,7 @@ another application and control playback from the floating window; return it; cl
 
 1. **Given** an audiobook is playing, **When** the listener goes to any other screen of the app, **Then** playback
    continues without a gap and the mini player bar is shown with the current state.
-2. **Given** the mini player bar, **When** the listener presses its play / pause or −15 / +30, **Then** the player acts
+2. **Given** the mini player bar, **When** the listener presses its play / pause or skip back / forward, **Then** the player acts
    exactly as its own buttons; **When** they press the bar itself, **Then** the full player opens at the same
    position and state (speed, sleep timer, scope).
 3. **Given** the mini player bar, **When** the listener presses "Pop out", **Then** a small window with the same
@@ -203,6 +212,21 @@ skip buttons, the volume control and the note markers with the acceptance scenar
    24 × 24 px.
 6. **Given** reduced motion is requested by the system, **When** the sidebar opens / closes or a button is pressed,
    **Then** no sliding or scaling animation is played.
+7. **Given** the listener sets skip back to 10 s and skip forward to 60 s, **When** they press the skip buttons or keys
+   (in any audiobook, also after restarting the app), **Then** the position moves by 10 s / 60 s and the buttons read
+   "10" / "60".
+8. **Given** a pause of 20 minutes in the middle of a chapter, **When** the listener resumes, **Then** playback restarts
+   5 s earlier; **Given** a pause of 30 seconds, **Then** it restarts exactly where it stopped; **Given** automatic
+   rewind is off, **Then** it always restarts where it stopped.
+9. **Given** the keyboard, **When** the listener focuses the sidebar's resize handle and presses ← / →, **Then** the
+   sidebar narrows / widens and the new width is kept like a dragged one.
+10. **Given** the player area is at least 1024 px wide, **When** shown, **Then** the cover is on the left and the
+   title, timeline and controls on the right, both vertically centred; **Given** it is narrower (also when the sidebar
+   opens and takes width), **Then** the single centred column is used.
+11. **Given** a single-file audiobook with chapters and many Notes, **When** the listener types in the Notes tab's
+   search box, **Then** only Notes whose text or chapter title contains the words are listed (case and accents
+   ignored), with the match count; **When** they pick a chapter in the filter, **Then** only that chapter's Notes are
+   listed; clearing both shows every Note again.
 
 ### Edge Cases
 
@@ -223,6 +247,11 @@ skip buttons, the volume control and the note markers with the acceptance scenar
   window shows the same "cannot play" state and actions as the player, never a silent stop.
 - The floating window's saved position is off-screen (a monitor was disconnected): it opens on the visible screen.
 - The listener removes the playing audiobook from the Library: the session ends first, then the book is removed.
+- Resuming after a long pause right at the start of a track or chapter: the rewind stops at that start; it never
+  jumps into the previous track or chapter.
+- The listener pauses and seeks before resuming: the seek's position is used as is, no rewind is applied on top.
+- A Note is added, edited or deleted while a search or filter is active: the list updates at once; a new Note that
+  does not match stays hidden and the "Note added" feedback says so, with a "Show" action that clears the search.
 - The sleep timer ends while the player screen is not shown: playback pauses and the mini bar / floating window show
   it paused.
 
@@ -242,8 +271,8 @@ skip buttons, the volume control and the note markers with the acceptance scenar
 
 **Keyboard (Story 2)**
 
-- **FR-004**: The player MUST offer these actions as shortcuts with defaults: play / pause (Space), skip back 15 s
-  (←), skip forward 30 s (→), previous / next chapter or track (Shift+← / Shift+→), volume up / down 5 % (↑ / ↓),
+- **FR-004**: The player MUST offer these actions as shortcuts with defaults: play / pause (Space), skip back by the chosen
+  length (←), skip forward by the chosen length (→), previous / next chapter or track (Shift+← / Shift+→), volume up / down 5 % (↑ / ↓),
   mute toggle (M), speed down / up ([ / ]), add a Note (B).
 - **FR-005**: These shortcuts MUST be listed in Settings → Keyboard Shortcuts in their own group, translated into
   every interface language, changeable and resettable like the existing shortcuts.
@@ -258,7 +287,7 @@ skip buttons, the volume control and the note markers with the acceptance scenar
   change.
 - **FR-009**: The system's play, pause, previous and next controls (and media keys) MUST perform the player's own
   actions; previous / next MUST be unavailable exactly when the player's buttons are.
-- **FR-010**: Where the system offers seek / skip controls, they MUST map to the player's seek and −15 / +30 actions;
+- **FR-010**: Where the system offers seek / skip controls, they MUST map to the player's seek and skip back / forward actions;
   the system MUST be told the playback position, duration and speed so its progress display is correct.
 - **FR-011**: Ending the listening session (closing the mini player or floating window, or opening another
   audiobook) MUST remove the audiobook from the system's media controls; leaving the player screen alone MUST NOT.
@@ -268,7 +297,7 @@ skip buttons, the volume control and the note markers with the acceptance scenar
 - **FR-019**: Leaving the player screen for another screen of the app MUST NOT stop or interrupt playback; listening
   progress MUST keep being saved as it is on the player screen.
 - **FR-020**: While an audiobook session is active and the full player is not shown, every other screen MUST show a
-  mini player bar with cover, title, current chapter / track, play / pause, −15 / +30, a progress line, "Pop out" and
+  mini player bar with cover, title, current chapter / track, play / pause, skip back / forward, a progress line, "Pop out" and
   close; pressing the bar opens the full player in the same state. The bar MUST NOT cover screen content (content is
   laid out above it).
 - **FR-021**: "Pop out" MUST open one small floating window that stays above other applications' windows, with the
@@ -296,13 +325,37 @@ skip buttons, the volume control and the note markers with the acceptance scenar
   shown only in Chapter scope. The "x % · time left" summary stays visible in both scopes for single-file books.
 - **FR-013**: The left rail's tabs (shared by the player and the text reader) MUST use vector icons in the app's icon
   style that follow the theme's colours; emoji MUST NOT be used as icons.
-- **FR-014**: The skip buttons MUST show a skip-back / skip-forward symbol plus their number of seconds.
+- **FR-014**: The skip buttons MUST show a skip-back / skip-forward symbol plus their CURRENT number of seconds
+  (the chosen lengths of FR-028); their tooltips and accessible names say the same length.
 - **FR-015**: The volume control MUST have a speaker symbol that toggles mute and shows the muted state; the
   abbreviation "Vol" MUST be replaced. The muted state and the level before muting MUST be kept with the other
   player preferences.
 - **FR-016**: Note markers MUST not overlap the timeline's handle and MUST have a press area of at least 24 × 24 px;
   pressing the handle MUST always seek.
 - **FR-017**: The player's sidebar and button animations MUST be turned off when the system asks for reduced motion.
+- **FR-028**: The listener MUST be able to choose the skip-back and the skip-forward length independently from
+  5 / 10 / 15 / 30 / 60 seconds (defaults 15 / 30), from the player; the choice applies to the buttons, the shortcuts,
+  the mini bar, the floating window and the system media controls, and is kept for all audiobooks on this computer.
+- **FR-029**: When playback is resumed after a pause, the position MUST first move back by: nothing for a pause under
+  1 minute, 3 s for 1–10 minutes, 5 s for 10–60 minutes, 10 s for longer — never before the start of the current
+  track (and, with chapters, never before the start of the current chapter). It applies to every way of resuming
+  (button, Space, mini bar, floating window, tray, media keys), not to seeking or to a Note jump, and can be turned
+  off in the player (on by default). A pause caused by the sleep timer counts as a pause.
+- **FR-030**: The sidebar's resize handle MUST be operable from the keyboard (focusable, ←/→ change the width in
+  steps, Home / End to the minimum / maximum) and announce its current width.
+- **FR-031**: Text in the player's sidebar (Contents, Notes) and its badges MUST be at least 12 px.
+- **FR-032**: When the area left for the player (window width minus the open sidebar) is at least 1024 px, the player
+  MUST use two columns: the cover on the left (at least 320 px wide, keeping its proportions, at most the column's
+  width) and the now-playing block, progress, timeline, notices and controls on the right. Below 1024 px it MUST use
+  one centred column with the cover at least 180 px wide. Switching between the two layouts MUST NOT interrupt
+  playback, move focus or reset a drag of the timeline. At no width may controls overlap or the page scroll
+  sideways.
+- **FR-033**: The Notes tab MUST offer a search box matching the Note text and its chapter / track title (case-
+  and accent-insensitive, as the reader's search treats Vietnamese) and, for single-file audiobooks with chapters, a
+  chapter filter plus a "group by chapter" view (multi-track books keep their per-track groups, which the search then
+  narrows). The search shows the number of matching Notes, an empty state with a "Clear" action when none match, and
+  never changes, reorders or deletes Notes; the timeline markers keep showing every Note. Search text and filter are
+  kept while the sidebar is closed and reopened during the session, and cleared when another audiobook is opened.
 - **FR-018**: No interface text MAY be altered after translation (e.g. upper- or lower-cased in code); each wording
   needed MUST have its own translated message in every interface language, following the Vietnamese glossary.
 
@@ -310,12 +363,14 @@ skip buttons, the volume control and the note markers with the acceptance scenar
 
 - **Player shortcut**: an action of the player, its default key, the key the listener chose, its translated name.
 - **Player preferences**: volume (already kept on this computer), plus muted state and the level before muting.
-  Speed keeps its current behaviour.
+  Speed is already kept per book and keeps that behaviour.
 - **Now-playing information**: book title, chapter / track title, author, cover, position, duration, speed — what
   the system media controls show.
 - **Listening session**: the one audiobook currently loaded for playback, from its start until the listener closes
   it, opens another audiobook or quits; shared by the full player, mini bar, floating window, tray and system media
   controls.
+- **Listening preferences**: skip-back and skip-forward lengths, automatic rewind on resume (on / off) — kept for
+  all audiobooks on this computer; playback speed stays per book as today.
 - **Floating window preferences**: last position, and whether it opens by itself when the main window is minimised
   or hidden (on by default).
 
@@ -341,6 +396,8 @@ skip buttons, the volume control and the note markers with the acceptance scenar
 - **SC-009**: With another application in front, the listener can pause, resume and skip from the floating window in
   100 % of attempts; minimising or hiding the main window opens it within 1 second.
 - **SC-010**: In the text reader, no line of text is hidden behind the mini bar in paginated or scroll view.
+- **SC-011**: At player widths of 800, 1024, 1280, 1440 and 1920 px, the layout is the one FR-032 prescribes, with no
+  overlapping control and no sideways scroll.
 
 ## Assumptions
 
@@ -348,13 +405,16 @@ skip buttons, the volume control and the note markers with the acceptance scenar
   its own layout; the rail icons it does not use).
 - Playback continues after leaving the player screen (Story 5, Clarification 2026-11-23): an in-app mini player bar
   plus an optional floating always-on-top window.
+- Exporting audiobook Notes to a file (and importing them) is out of scope; it belongs with the annotation
+  import / export feature in a separate spec.
 - Whole-book progress and totals for multi-track books stay out of scope (planned separately, "Stage C").
 - The system media controls are those Chromium provides inside the Desktop app on Windows; macOS / Linux behave
   according to what their systems show, and nothing fails where there is no media panel.
 - The default keys of FR-004 follow common desktop players; where one collides with an existing app shortcut while
   the player is open, the player's key applies only on the player screen.
 - The rail icons change in the text reader too, because the rail is shared; no other part of the reader changes.
-- No new stored data beyond the muted state / previous level and the floating window preferences; no change to how
+- No new stored data beyond the muted state / previous level, the listening preferences and the floating window
+  preferences; no change to how
   listening progress or Notes are saved.
 - The player's keyboard shortcuts (FR-004) apply on the player screen only; outside it the listener uses the mini
   bar, the floating window, the tray or the media keys.
