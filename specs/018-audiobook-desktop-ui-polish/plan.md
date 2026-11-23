@@ -89,10 +89,12 @@ source/core/src/
 source/core/tests/audio/listening-prefs.test.ts, app-models/audio-note-filter.test.ts   # NEW
 
 source/app/
-├── App.tsx                                  # mount MiniPlayerBar; #/mini-player route
+├── App.tsx                                  # mount MiniPlayerBar
+├── main.tsx                                 # ?window=mini-player -> mount MiniPlayerWindowRoot instead of App
+├── platforms/miniPlayerWindow.{electron,native}.ts   # NEW adapter for window.miniPlayerWindow
 ├── index.css, styles/theme.css              # warning tokens, focus-ring utility, --mini-player-height
 ├── components/audio/MiniPlayerBar.tsx       # NEW
-├── screens/MiniPlayerWindow/MiniPlayerWindow.tsx   # NEW (floating window UI)
+├── screens/MiniPlayerWindow/{MiniPlayerWindowRoot,MiniPlayerWindow}.tsx   # NEW (floating window, own root)
 ├── screens/ReaderRoute.tsx                  # sets shortcutScreenStore.readerKind
 ├── screens/AudioBook/
 │   ├── AudioBookScreen.tsx                  # no dispose on unmount; @container layout; Space listener removed

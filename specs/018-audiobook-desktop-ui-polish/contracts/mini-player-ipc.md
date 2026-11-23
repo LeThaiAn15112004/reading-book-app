@@ -12,6 +12,7 @@ New channel group `MiniPlayerChannels` in `platforms/electron/ipc/channels.ts`, 
 | `miniPlayer:publishState` | `MiniPlayerStateDto \| null` | `void` | `null` = no session (ends tray entry, closes the floating window). Throttled by the sender to ≤ 4/s while playing, immediate on any non-position change. Main validates shape and lengths (title ≤ 500 chars) and drops invalid payloads. |
 | `miniPlayer:open` | `{}` | `{ ok: true } \| { ok: false, code: 'no_session' }` | "Pop out" from the in-app bar. Marks `openedAutomatically = false`. |
 | `miniPlayer:getPrefs` | `{}` | `MiniPlayerPrefsDto` | for Settings |
+| `miniPlayer:mediaArtwork` | `{ bookId: string }` | `{ url: string \| null }` | ONLY if the R7 data-URL artwork fails on Windows: Main writes the cover as a 256 px PNG to `{temp}/readmate-media/<bookId>.png` and returns its `file://` URL (`null` without a cover); removed on session end |
 | `miniPlayer:setPrefs` | `Partial<MiniPlayerPrefsDto>` | `MiniPlayerPrefsDto` | only `autoOpen` is settable from the renderer |
 
 ## Main → main renderer
@@ -57,6 +58,7 @@ type MiniPlayerCommandDto =
   | { type: 'skipBack' } | { type: 'skipForward' }
   | { type: 'previous' } | { type: 'next' }
   | { type: 'seek'; positionSeconds: number }   // clamped by the store
+  | { type: 'retryTrack' }                       // same as the player's "Try again"
   | { type: 'openPlayer' }                       // navigate to /reader/<bookId>
   | { type: 'endSession' }                       // dispose()
 

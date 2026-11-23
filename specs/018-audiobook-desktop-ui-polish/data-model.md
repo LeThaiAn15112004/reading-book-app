@@ -10,7 +10,7 @@ Existing state, unchanged meaning; new lifecycle (research R1):
 | State | Enters on | Leaves on |
 |---|---|---|
 | none (`bookId = null`) | app start, `dispose()` | `load(bookId)` |
-| active | `load(bookId)` resolves `ready` | `dispose()`: mini bar ✕, floating ✕, `load(otherId)`, book removed, its open-book tab closed, quit flush |
+| active | `load(bookId)` resolves `ready` | `dispose()`: mini bar ✕, floating ✕, `load(otherId)`, book removed, its open-book tab closed (spec edge case), quit flush |
 
 Rules: at most one session; leaving the player route does NOT leave `active`; `dispose()` always persists progress
 first (`persist(true)`), then clears the media session and tells Main `sessionActive = false`.
@@ -46,7 +46,7 @@ floor = current chapter start (validated chapters), else 0 (current track for mu
 | Field | Type | Default | Rule |
 |---|---|---|---|
 | `x`, `y` | `number \| null` | `null` (bottom-right of the primary work area, 24 px margin) | moved onto a visible display if outside every work area |
-| `autoOpen` | `boolean` | `true` | Settings → General → Background ("Show the floating player when the window is minimised or hidden") |
+| `autoOpen` | `boolean` | `true` | Settings → Notifications, "Background / System Tray" card (`BackgroundTrayCard.tsx`): "Show the floating player when the window is minimised or hidden" |
 
 Main session-only flags (not stored): `sessionActive`, `openedAutomatically`, `closedByUserThisSession` (reset when
 a new session starts).

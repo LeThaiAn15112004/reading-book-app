@@ -247,6 +247,8 @@ skip buttons, the volume control and the note markers with the acceptance scenar
   window shows the same "cannot play" state and actions as the player, never a silent stop.
 - The floating window's saved position is off-screen (a monitor was disconnected): it opens on the visible screen.
 - The listener removes the playing audiobook from the Library: the session ends first, then the book is removed.
+- The listener closes the audiobook's tab in the open-books strip of the menu bar: playback stops, progress is saved and
+  the session ends (like the mini bar's close).
 - Resuming after a long pause right at the start of a track or chapter: the rewind stops at that start; it never
   jumps into the previous track or chapter.
 - The listener pauses and seeks before resuming: the seek's position is used as is, no rewind is applied on top.
@@ -362,7 +364,8 @@ skip buttons, the volume control and the note markers with the acceptance scenar
 ### Key Entities
 
 - **Player shortcut**: an action of the player, its default key, the key the listener chose, its translated name.
-- **Player preferences**: volume (already kept on this computer), plus muted state and the level before muting.
+- **Listening preferences**: volume (already kept on this computer), plus muted state and the level before muting,
+  the skip-back / skip-forward lengths and automatic rewind on resume.
   Speed is already kept per book and keeps that behaviour.
 - **Now-playing information**: book title, chapter / track title, author, cover, position, duration, speed — what
   the system media controls show.

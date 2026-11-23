@@ -41,8 +41,12 @@ spike / manual check before the dependent task is closed; each names its fallbac
 - **Decision**: a second `BrowserWindow` created by Main (`platforms/electron/mini-player/`): ~360 × 132 px, frameless,
   `alwaysOnTop: true` (level `floating`), not resizable, `skipTaskbar: true`, same `sandbox` / `contextIsolation`
   settings, its own small preload (`mini-player-preload.ts`) exposing only `miniPlayerWindow.*`. It loads the SAME
-  renderer bundle at `#/mini-player` (route rendered without menubar / tabs) so components, i18n catalogue, theme
-  tokens and icons are shared. It does NOT play audio: it is a remote control.
+  renderer bundle with the query `?window=mini-player`; `main.tsx` checks it BEFORE mounting `App` and mounts only
+  `MiniPlayerWindowRoot` (no `App`, no providers, no `ShortcutsBridge` / `SessionFlushBridge` / import queue /
+  `miniPlayerSync`), so components, the i18n catalogue, theme tokens and icons are shared but nothing of the main
+  window runs twice. The floating window has no `window.api`; its UI reaches `window.miniPlayerWindow` only through
+  the platform adapter `platforms/miniPlayerWindow.electron.ts` (`.native.ts` = inert stub), like `api.*` (R9 / R12).
+  It does NOT play audio: it is a remote control.
 - **State relay** (contract `contracts/mini-player-ipc.md`): the main renderer publishes a `MiniPlayerStateDto` to Main
   on every relevant change, throttled to ≤ 4 per second while playing; Main keeps the last one and forwards it to the
   floating window (and uses it for the tray, R6). Commands from the floating window go Main → main renderer, which
@@ -85,8 +89,13 @@ spike / manual check before the dependent task is closed; each names its fallbac
   when the player's buttons are disabled), `seekbackward` / `seekforward` (chosen skip lengths), `seekto`;
   `setPositionState` on load, seek, rate change and chapter change (not every tick). Cleared (`metadata = null`,
   handlers `null`) on `dispose()`. Electron on Windows maps this to SMTC.
-- **Artwork**: SMTC fetches artwork outside the page, so a custom-scheme URL may not load. The bridge draws the
-  cover into a 256 px canvas once per book and passes a `data:` URL. **verify** on Windows; fallback: no artwork.
+- **Artwork**: SMTC fetches artwork outside the page, so a custom-scheme URL may not load. The bridge loads the
+  cover with `crossOrigin = 'anonymous'` (the `rb-cover` scheme is registered `corsEnabled`; its handler in
+  `files/cover-protocol.ts` must answer `Access-Control-Allow-Origin: *`, else the canvas is tainted and
+  `toDataURL` throws), draws it into a 256 px canvas once per book and passes a `data:` URL. **verify** on Windows;
+  fallback (FR-008 still requires the cover): Main writes the 256 px PNG to `{temp}/readmate-media/<bookId>.png`
+  (channel `miniPlayer:mediaArtwork { bookId } -> { url: 'file:///...' } | { url: null }`, overwritten per book,
+  removed on session end) and the bridge passes that `file://` URL. Only a book without a cover has no artwork.
 - **Alternatives**: Electron `globalShortcut` for media keys (duplicates Chromium's own media-key handling, no panel).
 
 ## R8 — Player keyboard shortcuts

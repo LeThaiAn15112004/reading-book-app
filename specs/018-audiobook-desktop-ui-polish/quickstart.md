@@ -24,7 +24,8 @@ npm run check:desktop-baseline      # Main changes approved
 | 3 | Press Space, ←, →, Shift+→, ↑, ↓, M, [, ], B | each action; focus the timeline then ← moves the slider only | US2, FR-006 |
 | 4 | Settings → Keyboard Shortcuts: rebind skip forward to `L` | `L` works at once, `→` no longer; tooltip shows `L` | SC-003 |
 | 5 | Play, open the Windows media flyout; change chapter | title / chapter / author / cover within 2 s; ⏯ ⏭ work | US3, SC-004 |
-| 6 | Go to Library, Settings, then open an EPUB | no gap; mini bar within 1 s; EPUB text not under the bar (paged + scroll) | US5, SC-008, SC-010 |
+| 6 | Go to Library, Settings, then open an EPUB, a PDF, a TXT and a Markdown book | no gap; mini bar within 1 s; in each format no text under the bar, paginated AND scroll view | US5, SC-008, SC-010 |
+| 6b | Multi-track book, damaged track, leave the player; pop out | mini bar and floating window show the failure with Try again / Skip to next track | Edge (track fails off-screen) |
 | 7 | In the EPUB start Read Aloud | audiobook pauses, stays paused | FR-024 |
 | 8 | Pop out; switch to another app; use ↺ ⏯ ↻; drag it; Return to app | stays on top; controls work; position remembered | SC-009 |
 | 9 | Minimise the main window; restore it | floating window opens / closes by itself | FR-025 |
