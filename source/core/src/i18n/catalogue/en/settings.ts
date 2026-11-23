@@ -355,6 +355,7 @@ export const en = {
       notifications: 'Notifications',
       background: 'Background & System Tray',
       keyboard: 'Keyboard Shortcuts',
+      audiobook: 'Audiobook listening (skip lengths, rewind, mute)',
     },
   },
   about: {

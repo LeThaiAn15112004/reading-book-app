@@ -356,6 +356,7 @@ export const vi = {
       notifications: 'Thông báo',
       background: 'Chạy nền và khay hệ thống',
       keyboard: 'Phím tắt',
+      audiobook: 'Nghe sách nói (độ dài tua, tự lùi, tắt tiếng)',
     },
   },
   about: {

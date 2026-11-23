@@ -4,6 +4,7 @@ import {
   canAddAnotherNote,
   chapterIndexAt,
   chapterStart,
+  applyResumeRewind,
   clampPlaybackRate,
   PLAYBACK_RATES,
   clampSeekPosition,
@@ -33,6 +34,7 @@ import {
 } from '@core'
 import { audioApi, libraryApi, overlayApi } from '../../../bridge'
 import { registerSessionFlushHandler } from '../../Reader/logic/session/sessionFlushRegistry'
+import { useListeningPrefsStore } from './listeningPrefsStore'
 import { getUiLanguage, type UiText } from '../../../i18n'
 
 /**
@@ -265,6 +267,11 @@ let trackSwitch = 0
  */
 let pendingJump: { token: number; originIndex: number; originSeconds: number } | null = null
 let markedReading = false
+/**
+ * Spec 018 FR-029: when playback was last paused (ms epoch), for the rewind on resume. Cleared by any seek, Note jump or
+ * track switch (those choose the position themselves) and once used.
+ */
+let pausedAt: number | null = null
 
 export const useAudioPlayerStore = create<AudioPlayerState>()((set, get) => {
   /** The chapter id to store with the progress: a string inside a chapter, null when chapters exist but none applies, absent when unknown. */
@@ -447,6 +454,7 @@ export const useAudioPlayerStore = create<AudioPlayerState>()((set, get) => {
     saveOnReady = false,
     options: { exact?: boolean; origin?: { index: number; seconds: number } | null } = {},
   ) => {
+    pausedAt = null
     const { bookId, tracks, trackErrors } = get()
     const track = tracks[index]
     if (!bookId || !track) return
@@ -536,6 +544,7 @@ export const useAudioPlayerStore = create<AudioPlayerState>()((set, get) => {
         startSaveTimer()
       }),
       on('pause', () => {
+        if (!el.ended) pausedAt = Date.now()
         set({ playing: false })
         stopSaveTimer()
         void persist(true)
@@ -596,7 +605,7 @@ export const useAudioPlayerStore = create<AudioPlayerState>()((set, get) => {
   return {
     ...INITIAL,
     volume: readVolume(),
-    muted: false,
+    muted: useListeningPrefsStore.getState().muted,
 
     load: async (bookId) => {
       const myGeneration = ++generation
@@ -721,6 +730,7 @@ export const useAudioPlayerStore = create<AudioPlayerState>()((set, get) => {
             startSaveTimer()
           }),
           on('pause', () => {
+            if (!el.ended) pausedAt = Date.now()
             set({ playing: false })
             stopSaveTimer()
             void persist(true)
@@ -753,6 +763,20 @@ export const useAudioPlayerStore = create<AudioPlayerState>()((set, get) => {
       const el = audio
       if (!el || get().status !== 'ready') return
       if (el.ended) el.currentTime = 0
+      else if (pausedAt !== null && useListeningPrefsStore.getState().autoRewind) {
+        // FR-029: go back a little after a pause — never before the start of the chapter (or of the track / file).
+        const state = get()
+        const floor =
+          state.tracks.length === 0 && state.chapterStatus === 'ok'
+            ? (state.chapters[chapterIndexAt(state.chapters, el.currentTime)]?.startSeconds ?? 0)
+            : 0
+        const resumeAt = applyResumeRewind(el.currentTime, Date.now() - pausedAt, floor)
+        if (resumeAt !== el.currentTime) {
+          el.currentTime = resumeAt
+          set({ positionSeconds: resumeAt })
+        }
+      }
+      pausedAt = null
       if (!markedReading && get().bookId) {
         markedReading = true
         void libraryApi.markAsReading(get().bookId as string)
@@ -777,6 +801,7 @@ export const useAudioPlayerStore = create<AudioPlayerState>()((set, get) => {
       const el = audio
       if (!el || get().status !== 'ready') return
       const target = clampSeekPosition(seconds, el.duration)
+      pausedAt = null // the listener chose this position: no rewind on top of it
       el.currentTime = target
       set({ positionSeconds: target, ended: false })
     },
@@ -808,6 +833,7 @@ export const useAudioPlayerStore = create<AudioPlayerState>()((set, get) => {
       }
       set({ volume: v, muted: false })
       writeVolume(v)
+      if (useListeningPrefsStore.getState().muted) useListeningPrefsStore.getState().set({ muted: false })
     },
 
     volumeStep: (direction) => {
@@ -819,6 +845,7 @@ export const useAudioPlayerStore = create<AudioPlayerState>()((set, get) => {
       const muted = !get().muted
       if (audio) audio.muted = muted
       set({ muted })
+      useListeningPrefsStore.getState().set({ muted, volumeBeforeMute: get().volume })
     },
 
     speedStep: (direction) => {

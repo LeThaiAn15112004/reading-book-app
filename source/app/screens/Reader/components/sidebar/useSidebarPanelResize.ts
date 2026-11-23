@@ -1,4 +1,10 @@
-import { useCallback, useEffect, useState, type PointerEvent as ReactPointerEvent } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useState,
+  type KeyboardEvent as ReactKeyboardEvent,
+  type PointerEvent as ReactPointerEvent,
+} from 'react'
 import {
   SIDEBAR_PANEL_WIDTH_PX,
   clampSidebarPanelWidth,
@@ -114,9 +120,32 @@ export function useSidebarPanelResize(edge: SidebarResizeEdge = 'left') {
     [edge, panelWidth],
   )
 
+  /**
+   * Spec 018 FR-030: the resize handle from the keyboard — ← / → narrow / widen by 16 px (mirrored for a right-edge
+   * panel), Home / End go to the narrowest / widest width. The width is kept like a dragged one.
+   */
+  const onResizeKeyDown = useCallback(
+    (event: ReactKeyboardEvent<HTMLElement>) => {
+      const grow = edge === 'left' ? 1 : -1
+      let next: number | null = null
+      if (event.key === 'ArrowRight') next = panelWidth + 16 * grow
+      else if (event.key === 'ArrowLeft') next = panelWidth - 16 * grow
+      else if (event.key === 'Home') next = 0
+      else if (event.key === 'End') next = Number.MAX_SAFE_INTEGER
+      if (next === null) return
+      event.preventDefault()
+      setPanelWidth(clampSidebarPanelWidth(next))
+    },
+    [edge, panelWidth],
+  )
+
   return {
     panelWidth,
     isResizing,
     onResizePointerDown,
+    onResizeKeyDown,
+    /** Narrowest / widest width for this window (for `aria-valuemin` / `aria-valuemax`). */
+    minWidth: clampSidebarPanelWidth(0),
+    maxWidth: clampSidebarPanelWidth(Number.MAX_SAFE_INTEGER),
   }
 }

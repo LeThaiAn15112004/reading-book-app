@@ -189,7 +189,7 @@ await check('defaults: single source of truth holds the documented values', asyn
     themeMode: 'dark', accent: 'orange', customAccent: '#ec4899', density: 'balanced', language: 'system',
   })
   assert.deepEqual(DEFAULT_LIBRARY_BROWSE_PREFS, { sort: 'recently-added', layout: 'grid', collectionView: 'grid' })
-  assert.deepEqual(APP_SETTINGS_RESETTERS.map((r) => r.id), ['appearance', 'library', 'pdf-view', 'pdf-ink', 'pdf-shape', 'pdf-typewriter', 'notifications', 'background', 'keyboard-shortcuts'])
+  assert.deepEqual(APP_SETTINGS_RESETTERS.map((r) => r.id), ['appearance', 'library', 'pdf-view', 'pdf-ink', 'pdf-shape', 'pdf-typewriter', 'notifications', 'background', 'audiobook-listening', 'keyboard-shortcuts'])
 })
 
 await check('stores loaded the persisted non-default values', async () => {
@@ -302,7 +302,7 @@ await check('per-book + global reading settings, history and layout keys are unt
   await resetAppSettings()
   assertOutOfScopeUntouched()
   const keys = [...storage.keys()].sort()
-  assert.deepEqual(keys, [...Object.keys(OUT_OF_SCOPE), KEYS.appearance, KEYS.library, 'readmate.pdfView.v1', 'readmate.pdfInkPrefs.v1', 'readmate.pdfShapePrefs.v1', 'readmate.pdfTypewriterPrefs.v1'].sort())
+  assert.deepEqual(keys, [...Object.keys(OUT_OF_SCOPE), KEYS.appearance, KEYS.library, 'readmate.pdfView.v1', 'readmate.pdfInkPrefs.v1', 'readmate.pdfShapePrefs.v1', 'readmate.pdfTypewriterPrefs.v1', 'readmate.audioListeningPrefs.v1'].sort())
 })
 
 // 6. Errors ---------------------------------------------------------------
@@ -313,7 +313,7 @@ await check('storage write failure: groups reported, in-memory state still reset
   failWrites = true
   try {
     const { failed } = await resetAppSettings()
-    assert.deepEqual(failed.map((r) => r.id), ['appearance', 'library', 'pdf-view', 'pdf-ink', 'pdf-shape', 'pdf-typewriter'], 'Main-owned prefs are unaffected by localStorage')
+    assert.deepEqual(failed.map((r) => r.id), ['appearance', 'library', 'pdf-view', 'pdf-ink', 'pdf-shape', 'pdf-typewriter', 'audiobook-listening'], 'Main-owned prefs are unaffected by localStorage')
   } finally {
     failWrites = false
   }

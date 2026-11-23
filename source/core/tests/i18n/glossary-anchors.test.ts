@@ -11,6 +11,10 @@ import { isPluralMessage, translate, type AnyMessageKey } from '../../src/i18n/t
 const ANCHORS: ReadonlyArray<[AnyMessageKey, string]> = [
   ['chrome.nav.library', 'Thư viện'],
   ['chrome.nav.tools', 'Tiện ích'],
+  ['chrome.miniPlayer.region', 'Trình phát thu nhỏ'],
+  ['chrome.miniPlayer.popOut', 'Mở cửa sổ nổi'],
+  ['chrome.miniPlayer.returnToApp', 'Về ứng dụng'],
+  ['audiobook.player.controls.rewindOnResume', 'Tự lùi khi phát tiếp'],
   ['library.sidebar.heading', 'Thư viện'],
   ['common.actions.delete', 'Xóa'],
   ['common.actions.remove', 'Gỡ'],

@@ -200,24 +200,39 @@ function NoteNotice() {
   )
 }
 
-/** Whole-book progress, always shown (independent of the timeline scope). */
-function BookProgress() {
-  const t = useT()
+/** Whole-book progress of a single-file audiobook (multi-track books have none here: one track's numbers only). */
+function useBookProgressView() {
   const position = useAudioPlayerStore((s) => s.positionSeconds)
   const duration = useAudioPlayerStore((s) => s.durationSeconds)
-  // A multi-track audiobook has no whole-book progress here: position and duration are those of one track.
   const multiTrack = useAudioPlayerStore((s) => s.tracks.length > 0)
   const view = useMemo(() => timelineView('book', position, duration, []), [position, duration])
-  if (multiTrack || !view) return null
-  const pct = Math.round(view.fraction * 100)
+  return multiTrack ? null : view
+}
+
+/** "34 % · 4h 11m left" — shown in both scopes (spec 018 FR-012). */
+function BookProgressSummary() {
+  const t = useT()
+  const view = useBookProgressView()
+  if (!view) return null
   return (
-    <div className="mt-3 flex items-center gap-3">
-      <div className="h-1 flex-1 overflow-hidden rounded-sm bg-lib-border" aria-hidden>
-        <div className="h-full bg-lib-faint" style={{ width: `${view.fraction * 100}%` }} />
-      </div>
-      <span className="text-xs whitespace-nowrap text-lib-muted">
-        {t('audiobook.player.screen.progress', { percent: pct, left: formatLeft(view.remainingSeconds) })}
-      </span>
+    <span className="text-xs whitespace-nowrap text-lib-muted">
+      {t('audiobook.player.screen.progress', { percent: Math.round(view.fraction * 100), left: formatLeft(view.remainingSeconds) })}
+    </span>
+  )
+}
+
+/**
+ * The separate whole-book line, only in Chapter scope (spec 018 FR-012): in Book scope the timeline already IS the
+ * whole-book progress, so it would show the same thing twice.
+ */
+function BookProgressLine() {
+  const scope = useAudioPlayerStore((s) => s.scope)
+  const chapterStatus = useAudioPlayerStore((s) => s.chapterStatus)
+  const view = useBookProgressView()
+  if (!view || scope !== 'chapter' || chapterStatus !== 'ok') return null
+  return (
+    <div className="mt-3 h-1 w-full overflow-hidden rounded-sm bg-lib-border" aria-hidden>
+      <div className="h-full bg-lib-faint" style={{ width: `${view.fraction * 100}%` }} />
     </div>
   )
 }
@@ -363,49 +378,62 @@ export function AudioBookScreen({ bookId }: { bookId: string }) {
         isResizing={sidebarResize.isResizing}
         onClose={() => setOpen(false)}
         onResizePointerDown={sidebarResize.onResizePointerDown}
+        onResizeKeyDown={sidebarResize.onResizeKeyDown}
+        minWidth={sidebarResize.minWidth}
+        maxWidth={sidebarResize.maxWidth}
       />
 
       <main
         className={`flex min-h-0 min-w-0 flex-1 flex-col overflow-auto px-6 py-4 ${
-          sidebarResize.isResizing ? '' : 'transition-[padding] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]'
+          sidebarResize.isResizing
+            ? ''
+            : 'transition-[padding] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-none'
         }`}
         style={{ paddingLeft: sidebarContentInsetLeft(open, sidebarResize.panelWidth) + 24 }}
       >
-        <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col items-center justify-center gap-7 py-4">
-          <div className="flex w-full flex-wrap items-center justify-center gap-6">
+        {/*
+          Spec 018 FR-032: the area left for the player decides the layout (a container query, so opening the sidebar
+          falls back to one column with no measuring): two columns from 1024 px — a large cover | everything else.
+        */}
+        <div className="@container flex w-full flex-1 flex-col justify-center py-4">
+          <div className="mx-auto grid w-full max-w-2xl grid-cols-1 items-center justify-items-center gap-7 @min-[1024px]:max-w-6xl @min-[1024px]:grid-cols-[minmax(320px,440px)_minmax(0,1fr)] @min-[1024px]:gap-12">
             <BookCover
               bookId={bookId}
               title={title}
               coverUrl={coverUrl}
-              className="h-60 w-[180px] shrink-0 rounded-xl shadow-xl"
+              className="h-60 w-[180px] shrink-0 rounded-xl shadow-xl @min-[1024px]:aspect-[3/4] @min-[1024px]:h-auto @min-[1024px]:w-full"
               titleClassName="line-clamp-6 text-base leading-snug font-semibold text-white [text-shadow:0_2px_4px_rgba(0,0,0,0.5)]"
             />
-            <div className="min-w-60 flex-1">
-              <NowPlaying />
-              <BookProgress />
+
+            <div className="flex w-full min-w-0 flex-col items-stretch gap-7">
+              <div className="text-center @min-[1024px]:text-left">
+                <NowPlaying />
+                <BookProgressLine />
+              </div>
+
+              <div className="flex w-full flex-col gap-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <BookProgressSummary />
+                  {multiTrack ? null : <ProgressScopeSelector />}
+                </div>
+                <AudioTimeline />
+              </div>
+
+              <TrackErrorNotice />
+              <NoteNotice />
+              <AudioControls />
+              {transcriptionEnabled ? (
+                <div className="flex justify-center">
+                  <TranscribeEntry
+                    onOpen={() => {
+                      setTab('transcript')
+                      setOpen(true)
+                    }}
+                  />
+                </div>
+              ) : null}
             </div>
           </div>
-
-          <div className="flex w-full flex-col gap-3">
-            {multiTrack ? null : (
-              <div className="flex justify-end">
-                <ProgressScopeSelector />
-              </div>
-            )}
-            <AudioTimeline />
-          </div>
-
-          <TrackErrorNotice />
-          <NoteNotice />
-          <AudioControls />
-          {transcriptionEnabled ? (
-            <TranscribeEntry
-              onOpen={() => {
-                setTab('transcript')
-                setOpen(true)
-              }}
-            />
-          ) : null}
         </div>
       </main>
       <AudioNoteMenu />

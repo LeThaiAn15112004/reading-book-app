@@ -1,8 +1,18 @@
-import { useEffect, useMemo, useRef, type CSSProperties, type PointerEvent as ReactPointerEvent } from 'react'
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  type CSSProperties,
+  type KeyboardEvent as ReactKeyboardEvent,
+  type PointerEvent as ReactPointerEvent,
+} from 'react'
 import {
   chapterIndexAt,
+  filterAudioNotes,
   formatPlaybackTime,
+  groupNotesByChapter,
   groupNotesByTrack,
+  isAudioNoteFilterActive,
   resolveBookmarkTarget,
   trackDurationLabel,
   trackNumberLabel,
@@ -13,6 +23,7 @@ import type { SidebarTab } from '../../Reader/components/sidebar'
 import { SIDEBAR_RAIL_WIDTH_PX, SIDEBAR_TAB_LABEL } from '../../Reader/components/sidebar/sidebarTabs'
 import { selectNoteGroupOpen, useNoteGroupsStore } from '../logic/audioNoteGroupsStore'
 import { useNoteMenuStore } from '../logic/audioNoteMenuStore'
+import { noteChapterOf, useAudioNoteFilterStore } from '../logic/audioNoteFilterStore'
 import { selectCanAddNote, useAudioPlayerStore } from '../logic/audioPlayerStore'
 import { TranscriptPanel } from './TranscriptPanel'
 import { useFormat, useT } from '../../../i18n'
@@ -186,12 +197,12 @@ function NoteCard({ note: n, at, chapterTitle }: { note: AudioBookmark; at: numb
         onClick={() => goToNote(n.id)}
       >
         <span className="flex min-w-0 items-center gap-1.5">
-          <span className="inline-flex shrink-0 items-center rounded-full bg-lib-accent/15 px-2 py-0.5 text-[11px] font-bold tabular-nums text-lib-accent">
+          <span className="inline-flex shrink-0 items-center rounded-full bg-lib-accent/15 px-2 py-0.5 text-xs font-bold tabular-nums text-lib-accent">
             {time}
           </span>
-          {chapterTitle ? <span className="truncate text-[11px] font-medium text-lib-muted">{chapterTitle}</span> : null}
+          {chapterTitle ? <span className="truncate text-xs font-medium text-lib-muted">{chapterTitle}</span> : null}
           {isHere ? (
-            <span className="ml-auto inline-flex shrink-0 items-center rounded-full bg-lib-accent/15 px-1.5 py-0.5 text-[10px] font-bold tracking-wide text-lib-accent uppercase">
+            <span className="ml-auto inline-flex shrink-0 items-center rounded-full bg-lib-accent/15 px-1.5 py-0.5 text-xs font-bold tracking-wide text-lib-accent uppercase">
               {t('audiobook.player.sidebar.here')}
             </span>
           ) : null}
@@ -200,7 +211,7 @@ function NoteCard({ note: n, at, chapterTitle }: { note: AudioBookmark; at: numb
           {n.note ?? t('audiobook.player.sidebar.noText')}
         </span>
         {created && !Number.isNaN(created.getTime()) ? (
-          <span className="mt-1 block text-[11px] text-lib-faint">{format.dateTime(created)}</span>
+          <span className="mt-1 block text-xs text-lib-faint">{format.dateTime(created)}</span>
         ) : null}
       </button>
       <button
@@ -247,11 +258,11 @@ function TrackNoteGroupRow({ group, playing }: { group: TrackNoteGroup; playing:
         <span className={`w-6 shrink-0 text-xs tabular-nums ${playing ? 'text-lib-accent' : 'text-lib-faint'}`}>{trackNumberLabel(group.index)}</span>
         <span className={`min-w-0 flex-1 truncate text-sm ${playing ? 'font-semibold text-lib-text-strong' : 'text-lib-text'}`}>{group.track.title}</span>
         {playing ? (
-          <span className="inline-flex shrink-0 items-center rounded-full bg-lib-accent/15 px-1.5 py-0.5 text-[10px] font-bold tracking-wide text-lib-accent uppercase">
+          <span className="inline-flex shrink-0 items-center rounded-full bg-lib-accent/15 px-1.5 py-0.5 text-xs font-bold tracking-wide text-lib-accent uppercase">
             {t('audiobook.player.sidebar.playing')}
           </span>
         ) : null}
-        <span className="inline-flex shrink-0 items-center rounded-full bg-lib-accent/15 px-2 py-0.5 text-[11px] font-bold tabular-nums text-lib-accent">
+        <span className="inline-flex shrink-0 items-center rounded-full bg-lib-accent/15 px-2 py-0.5 text-xs font-bold tabular-nums text-lib-accent">
           {group.count}
         </span>
       </button>
@@ -281,10 +292,32 @@ function NotesTab() {
   const addNote = useAudioPlayerStore((s) => s.addNote)
   const ensureSeeded = useNoteGroupsStore((s) => s.ensureSeeded)
   const openFor = useNoteMenuStore((s) => s.openFor)
-  const known = status === 'ok' ? chapters : []
+  const known = useMemo(() => (status === 'ok' ? chapters : []), [status, chapters])
   const multiTrack = tracks.length > 0
+  // Spec 018 FR-033: search + chapter filter (+ "group by chapter"). Never changes the Notes or the timeline markers.
+  const query = useAudioNoteFilterStore((s) => s.query)
+  const chapterId = useAudioNoteFilterStore((s) => s.chapterId)
+  const groupByChapter = useAudioNoteFilterStore((s) => s.groupByChapter)
+  const hiddenNoteId = useAudioNoteFilterStore((s) => s.hiddenNoteId)
+  const filterStore = useAudioNoteFilterStore.getState
+  const filterActive = isAudioNoteFilterActive({ query, chapterId })
+  const chapterOf = useMemo(() => noteChapterOf(known, duration), [known, duration])
+  const shown = useMemo(
+    () => filterAudioNotes(notes, { query, chapterId }, known, tracks, chapterOf),
+    [notes, query, chapterId, known, tracks, chapterOf],
+  )
   // Multi-track only: one group per track that has Notes (a single-file audiobook keeps its flat list).
-  const groups = useMemo(() => (multiTrack ? groupNotesByTrack(notes, tracks) : []), [multiTrack, notes, tracks])
+  const groups = useMemo(() => (multiTrack ? groupNotesByTrack(shown, tracks) : []), [multiTrack, shown, tracks])
+  const chapterGroups = useMemo(
+    () => (!multiTrack && groupByChapter && known.length > 0 ? groupNotesByChapter(shown, known, chapterOf) : null),
+    [multiTrack, groupByChapter, known, shown, chapterOf],
+  )
+  const card = (n: AudioBookmark) => {
+    const at = resolveBookmarkTarget(n, known, duration)
+    const chapter = known[chapterIndexAt(known, at)]
+    return <NoteCard key={n.id} note={n} at={at} chapterTitle={chapter?.title} />
+  }
+  const noChapterLabel = t('audiobook.player.sidebar.noChapter')
 
   // The first time this tab is shown for an audiobook, the playing track's row is open; the store ignores later calls.
   useEffect(() => {
@@ -314,19 +347,104 @@ function NotesTab() {
             ? t('audiobook.player.sidebar.emptyMulti')
             : t('audiobook.player.sidebar.empty')}
         </p>
+      ) : null}
+      {notes.length > 0 && !(multiTrack && notesUnavailable) ? (
+        <div className="flex flex-col gap-2">
+          <label className="sr-only" htmlFor="audio-notes-search">
+            {t('audiobook.player.sidebar.searchLabel')}
+          </label>
+          <input
+            id="audio-notes-search"
+            type="search"
+            className="focus-ring h-9 w-full rounded-lg border border-lib-border bg-lib-input px-3 text-sm text-lib-text placeholder:text-lib-faint"
+            placeholder={t('audiobook.player.sidebar.searchPlaceholder')}
+            value={query}
+            onChange={(e) => filterStore().setQuery(e.target.value)}
+          />
+          {!multiTrack && known.length > 0 ? (
+            <div className="flex items-center gap-2">
+              <label className="sr-only" htmlFor="audio-notes-chapter">
+                {t('audiobook.player.sidebar.chapterFilter')}
+              </label>
+              <select
+                id="audio-notes-chapter"
+                className="focus-ring h-8 min-w-0 flex-1 cursor-pointer rounded-lg border border-lib-border bg-lib-input px-2 text-xs text-lib-text"
+                value={chapterId ?? ''}
+                onChange={(e) => filterStore().setChapterId(e.target.value || null)}
+              >
+                <option value="">{t('audiobook.player.sidebar.allChapters')}</option>
+                {known.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.title}
+                  </option>
+                ))}
+              </select>
+              <button
+                type="button"
+                aria-pressed={groupByChapter}
+                className={`focus-ring h-8 shrink-0 cursor-pointer rounded-lg border px-2.5 text-xs font-semibold ${
+                  groupByChapter
+                    ? 'border-lib-accent-ring bg-lib-accent-soft text-lib-accent'
+                    : 'border-lib-border bg-transparent text-lib-muted hover:text-lib-text-strong'
+                }`}
+                onClick={() => filterStore().setGroupByChapter(!groupByChapter)}
+              >
+                {t('audiobook.player.sidebar.groupByChapter')}
+              </button>
+            </div>
+          ) : null}
+          <p role="status" className="m-0 flex min-h-5 items-center justify-between gap-2 text-xs text-lib-muted">
+            {filterActive ? (
+              <>
+                <span>{t('audiobook.player.sidebar.matchCount', { count: shown.length, total: notes.length })}</span>
+                <button
+                  type="button"
+                  className="focus-ring cursor-pointer rounded border-none bg-transparent p-0 text-xs font-semibold text-lib-accent underline"
+                  onClick={() => filterStore().clear()}
+                >
+                  {t('audiobook.player.sidebar.clearFilter')}
+                </button>
+              </>
+            ) : null}
+          </p>
+          {hiddenNoteId && filterActive ? (
+            <p className="m-0 flex items-center justify-between gap-2 rounded-lg border border-lib-border px-2.5 py-1.5 text-xs text-lib-text">
+              <span>{t('audiobook.player.sidebar.hiddenNew')}</span>
+              <button
+                type="button"
+                className="focus-ring cursor-pointer rounded border-none bg-transparent p-0 text-xs font-semibold text-lib-accent underline"
+                onClick={() => filterStore().clear()}
+              >
+                {t('audiobook.player.sidebar.showHidden')}
+              </button>
+            </p>
+          ) : null}
+        </div>
+      ) : null}
+      {notes.length === 0 || (multiTrack && notesUnavailable) ? null : shown.length === 0 ? (
+        <p className={EMPTY}>{t('audiobook.player.sidebar.noMatch')}</p>
       ) : multiTrack ? (
         <ul className="m-0 flex list-none flex-col gap-2 p-0" aria-label={t('audiobook.player.sidebar.tracksWithNotes')}>
           {groups.map((g) => (
             <TrackNoteGroupRow key={g.trackId} group={g} playing={g.trackId === currentTrackId} />
           ))}
         </ul>
+      ) : chapterGroups ? (
+        <div className="flex flex-col gap-3">
+          {chapterGroups.map((g) => (
+            <section key={g.chapter?.id ?? '-'} className="flex flex-col gap-2">
+              <h3 className="m-0 truncate px-1 text-xs font-bold tracking-wide text-lib-faint uppercase">
+                {g.chapter?.title ?? noChapterLabel}
+              </h3>
+              <ul className="m-0 flex list-none flex-col gap-2 p-0" aria-label={g.chapter?.title ?? noChapterLabel}>
+                {g.notes.map(card)}
+              </ul>
+            </section>
+          ))}
+        </div>
       ) : (
         <ul className="m-0 flex list-none flex-col gap-2 p-0" aria-label={t('audiobook.player.sidebar.notes')}>
-          {notes.map((n) => {
-            const at = resolveBookmarkTarget(n, known, duration)
-            const chapter = known[chapterIndexAt(known, at)]
-            return <NoteCard key={n.id} note={n} at={at} chapterTitle={chapter?.title} />
-          })}
+          {shown.map(card)}
         </ul>
       )}
     </div>
@@ -355,6 +473,9 @@ export function AudioSidebarPanel({
   isResizing,
   onClose,
   onResizePointerDown,
+  onResizeKeyDown,
+  minWidth,
+  maxWidth,
 }: {
   bookId: string
   tab: SidebarTab
@@ -363,6 +484,9 @@ export function AudioSidebarPanel({
   isResizing: boolean
   onClose: () => void
   onResizePointerDown: (event: ReactPointerEvent<HTMLDivElement>) => void
+  onResizeKeyDown: (event: ReactKeyboardEvent<HTMLElement>) => void
+  minWidth: number
+  maxWidth: number
 }) {
   const t = useT()
   if (!open) return null
@@ -391,8 +515,14 @@ export function AudioSidebarPanel({
         role="separator"
         aria-orientation="vertical"
         aria-label={t('audiobook.player.sidebar.resize')}
-        className="absolute top-0 -right-1 bottom-0 z-[165] w-2 cursor-col-resize touch-none"
+        aria-valuenow={Math.round(panelWidth)}
+        aria-valuemin={minWidth}
+        aria-valuemax={maxWidth}
+        aria-valuetext={t('audiobook.player.sidebar.resizeValue', { width: Math.round(panelWidth) })}
+        tabIndex={0}
+        className="focus-ring absolute top-0 -right-1 bottom-0 z-[165] w-2 cursor-col-resize touch-none"
         onPointerDown={onResizePointerDown}
+        onKeyDown={onResizeKeyDown}
       >
         <span className={`absolute inset-y-0 right-1 w-px ${isResizing ? 'bg-lib-accent' : 'bg-lib-border-soft/80'}`} aria-hidden />
       </div>

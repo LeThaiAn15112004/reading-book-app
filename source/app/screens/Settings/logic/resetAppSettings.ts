@@ -9,6 +9,7 @@ import { usePdfShapePrefsStore } from '../../Reader/logic/pdfShapes/pdfShapePref
 import { usePdfTypewriterPrefsStore } from '../../Reader/logic/pdfTypewriter/pdfTypewriterPrefsStore'
 import { useBackgroundStore } from './backgroundStore'
 import { useNotificationsStore } from './notificationsStore'
+import { useListeningPrefsStore } from '../../AudioBook/logic/listeningPrefsStore'
 
 /**
  * One group of application-level preferences that Reset App Settings restores. Each group's store
@@ -54,6 +55,12 @@ export const APP_SETTINGS_RESETTERS: readonly AppSettingsResetter[] = [
     labelKey: 'settings.advanced.groups.background',
     reset: () => useBackgroundStore.getState().reset(),
     feature: 'notificationSettings',
+  },
+  {
+    id: 'audiobook-listening',
+    labelKey: 'settings.advanced.groups.audiobook',
+    reset: () => useListeningPrefsStore.getState().reset(),
+    feature: 'audiobooks',
   },
   {
     id: 'keyboard-shortcuts',

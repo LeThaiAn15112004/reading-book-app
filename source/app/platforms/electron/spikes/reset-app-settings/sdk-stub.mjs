@@ -26,3 +26,5 @@ export * from '../../../../../core/src/typewriter/index.ts'
 
 // App Language resolution (spec 012): the real, import-free i18n module of the core.
 export * from '../../../../../core/src/i18n/index.ts'
+// Spec 018: the audiobook listening preferences group (Reset App Settings).
+export * from '../../../../../core/src/audio/listening-prefs.ts'

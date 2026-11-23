@@ -5,6 +5,9 @@ import { AudioSelect, type AudioSelectOption } from './AudioSelect'
 import { SLEEP_MINUTES, selectCanAddNote, useAudioPlayerStore, type SleepOption } from '../logic/audioPlayerStore'
 import { useT } from '../../../i18n'
 import { useShortcutLabel } from '../../../shortcuts'
+import { useListeningPrefsStore } from '../logic/listeningPrefsStore'
+import { ListeningMenu } from './ListeningMenu'
+import { NextIcon, PauseIcon, PlayIcon, PreviousIcon, SkipBackIcon, SkipForwardIcon, SpeakerIcon } from '../../../components/audio/AudioIcons'
 
 const ROUND =
   'focus-ring inline-flex cursor-pointer items-center justify-center rounded-full border border-lib-border bg-lib-surface text-sm font-semibold text-lib-text hover:bg-lib-surface-hover disabled:cursor-not-allowed disabled:opacity-40'
@@ -62,6 +65,11 @@ export function AudioControls() {
   const playing = useAudioPlayerStore((s) => s.playing)
   const rate = useAudioPlayerStore((s) => s.playbackRate)
   const volume = useAudioPlayerStore((s) => s.volume)
+  const muted = useAudioPlayerStore((s) => s.muted)
+  const toggleMute = useAudioPlayerStore((s) => s.toggleMute)
+  // Spec 018 FR-014 / FR-028: the listener's skip lengths, on the buttons and in their names.
+  const skipBack = useListeningPrefsStore((s) => s.skipBackSeconds)
+  const skipForward = useListeningPrefsStore((s) => s.skipForwardSeconds)
   // Multi-track audiobooks: the two outer buttons switch TRACK (previous restarts the track when more than 3 s in).
   const multiTrack = useAudioPlayerStore((s) => s.tracks.length > 0)
   const onLastTrack = useAudioPlayerStore((s) => s.tracks.length > 0 && s.trackIndex >= s.tracks.length - 1)
@@ -86,6 +94,7 @@ export function AudioControls() {
     previous: useShortcutLabel('audiobook.previousChapter'),
     next: useShortcutLabel('audiobook.nextChapter'),
     addNote: useShortcutLabel('audiobook.addNote'),
+    mute: useShortcutLabel('audiobook.mute'),
   }
   const withKey = (text: string, shortcut: string) => t('audiobook.player.controls.withShortcut', { text, shortcut })
   const previousLabel = multiTrack ? t('audiobook.player.controls.previousTrack') : t('audiobook.player.controls.previousChapter')
@@ -95,10 +104,10 @@ export function AudioControls() {
     <div className="flex flex-col items-center gap-4">
       <div className="flex items-center justify-center gap-3">
         <button type="button" className={`${ROUND} size-11 border-transparent bg-transparent`} aria-label={previousLabel} title={noChapters ?? withKey(previousLabel, keys.previous)} disabled={!hasChapters && !multiTrack} onClick={previousChapter}>
-          <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden><rect x="2" y="2" width="2" height="12" fill="currentColor" /><path d="M14 2 L5 8 L14 14 Z" fill="currentColor" /></svg>
+          <PreviousIcon />
         </button>
-        <button type="button" className={`${ROUND} size-14`} aria-label={t('audiobook.player.controls.back15')} title={withKey(t('audiobook.player.controls.back15'), keys.skipBack)} onClick={() => skipBy(-15)}>
-          {t('audiobook.player.controls.back15Short')}
+        <button type="button" className={`${ROUND} size-14`} aria-label={t('audiobook.player.controls.skipBack', { seconds: skipBack })} title={withKey(t('audiobook.player.controls.skipBack', { seconds: skipBack }), keys.skipBack)} onClick={() => skipBy(-skipBack)}>
+          <SkipBackIcon seconds={skipBack} />
         </button>
         <button
           type="button"
@@ -107,17 +116,13 @@ export function AudioControls() {
           title={withKey(playing ? t('audiobook.player.controls.pause') : t('audiobook.player.controls.play'), keys.playPause)}
           onClick={toggle}
         >
-          {playing ? (
-            <svg width="22" height="22" viewBox="0 0 22 22" aria-hidden><rect x="4" y="3" width="5" height="16" rx="1" fill="currentColor" /><rect x="13" y="3" width="5" height="16" rx="1" fill="currentColor" /></svg>
-          ) : (
-            <svg width="22" height="22" viewBox="0 0 22 22" aria-hidden><path d="M6 3 L19 11 L6 19 Z" fill="currentColor" /></svg>
-          )}
+          {playing ? <PauseIcon className="size-6" /> : <PlayIcon className="size-6" />}
         </button>
-        <button type="button" className={`${ROUND} size-14`} aria-label={t('audiobook.player.controls.forward30')} title={withKey(t('audiobook.player.controls.forward30'), keys.skipForward)} onClick={() => skipBy(30)}>
-          {t('audiobook.player.controls.forward30Short')}
+        <button type="button" className={`${ROUND} size-14`} aria-label={t('audiobook.player.controls.skipForward', { seconds: skipForward })} title={withKey(t('audiobook.player.controls.skipForward', { seconds: skipForward }), keys.skipForward)} onClick={() => skipBy(skipForward)}>
+          <SkipForwardIcon seconds={skipForward} />
         </button>
         <button type="button" className={`${ROUND} size-11 border-transparent bg-transparent`} aria-label={nextLabel} title={noChapters ?? withKey(nextLabel, keys.next)} disabled={(!hasChapters && !multiTrack) || onLastTrack} onClick={nextChapter}>
-          <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden><rect x="12" y="2" width="2" height="12" fill="currentColor" /><path d="M2 2 L11 8 L2 14 Z" fill="currentColor" /></svg>
+          <NextIcon />
         </button>
       </div>
 
@@ -144,8 +149,17 @@ export function AudioControls() {
         >
           {t('audiobook.player.controls.addNote')}
         </button>
-        <label className={PILL}>
-          <span>{t('audiobook.player.controls.vol')}</span>
+        <span className={PILL}>
+          <button
+            type="button"
+            className="focus-ring -ml-1.5 inline-flex size-7 cursor-pointer items-center justify-center rounded-full border-none bg-transparent text-lib-text hover:bg-lib-surface-hover hover:text-lib-text-strong"
+            aria-label={muted ? t('audiobook.player.controls.unmute') : t('audiobook.player.controls.mute')}
+            aria-pressed={muted}
+            title={withKey(muted ? t('audiobook.player.controls.unmute') : t('audiobook.player.controls.mute'), keys.mute)}
+            onClick={toggleMute}
+          >
+            <SpeakerIcon muted={muted} />
+          </button>
           <input
             type="range"
             aria-label={t('audiobook.player.controls.volume')}
@@ -156,7 +170,8 @@ export function AudioControls() {
             value={volume}
             onChange={(e) => setVolume(Number(e.target.value))}
           />
-        </label>
+        </span>
+        <ListeningMenu />
       </div>
     </div>
   )

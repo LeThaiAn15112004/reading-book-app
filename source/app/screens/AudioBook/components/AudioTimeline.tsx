@@ -150,7 +150,8 @@ export function AudioTimeline() {
 
   return (
     <div className="flex w-full flex-col gap-2">
-      <div className="relative flex h-6 items-center">
+      {/* Spec 018 FR-016: Note markers live in a strip ABOVE the track (24 px press areas), never over the handle. */}
+      <div className="relative flex h-6 items-center" style={{ marginTop: markers.length > 0 ? 18 : 0 }}>
         {ticks.map((t) => (
           <span
             key={t.id}
@@ -163,7 +164,7 @@ export function AudioTimeline() {
         <input
           type="range"
           data-audio-seek
-          aria-label={t('audiobook.player.timeline.seek', { label: label.toLowerCase() })}
+          aria-label={t('audiobook.player.timeline.seek', { label })}
           aria-valuetext={t('audiobook.player.timeline.valueText', { shown: formatPlaybackTime(shown), total: formatPlaybackTime(view.durationSeconds) })}
           className="focus-ring relative w-full cursor-pointer rounded accent-[var(--lib-accent,currentColor)]"
           min={0}
@@ -183,7 +184,7 @@ export function AudioTimeline() {
             aria-label={note.note ? t('audiobook.player.timeline.noteAtWithText', { time: formatPlaybackTime(at), text: note.note }) : t('audiobook.player.timeline.noteAt', { time: formatPlaybackTime(at) })}
             aria-haspopup="menu"
             title={note.note ? t('audiobook.player.timeline.noteTitle', { time: formatPlaybackTime(at), text: note.note }) : t('audiobook.player.timeline.noteAt', { time: formatPlaybackTime(at) })}
-            className="group absolute -top-1 z-[2] flex size-4 -translate-x-1/2 cursor-pointer items-center justify-center border-none bg-transparent p-0 hover:z-[3] focus-visible:z-[3] focus-ring rounded-sm"
+            className="group absolute -top-[22px] z-[2] flex size-6 -translate-x-1/2 cursor-pointer items-center justify-center rounded-sm border-none bg-transparent p-0 hover:z-[3] focus-visible:z-[3] focus-ring"
             // The native thumb's travel is inset by half its width at both ends; the marker uses the same inset.
             style={{ left: `calc(8px + (100% - 16px) * ${fraction})` }}
             onPointerDown={(e) => e.stopPropagation()}
@@ -192,7 +193,7 @@ export function AudioTimeline() {
               openNoteMenu(note.id, e.currentTarget)
             }}
           >
-            <span className="block size-2.5 rotate-45 rounded-[2px] border-2 border-lib-bg-mid bg-lib-text-strong shadow group-hover:scale-125 group-focus-visible:ring-2 group-focus-visible:ring-lib-accent" aria-hidden />
+            <span className="block size-2.5 rotate-45 rounded-[2px] border-2 border-lib-bg-mid bg-lib-text-strong shadow group-hover:scale-125 motion-reduce:group-hover:scale-100 group-focus-visible:ring-2 group-focus-visible:ring-lib-accent" aria-hidden />
           </button>
         ))}
       </div>

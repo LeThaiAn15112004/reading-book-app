@@ -264,3 +264,12 @@ export type {
   OpeningOutcome,
   OpeningStep,
 } from './book-opening.js'
+export {
+  EMPTY_AUDIO_NOTE_FILTER,
+  filterAudioNotes,
+  groupNotesByChapter,
+  isAudioNoteFilterActive,
+  type AudioNoteFilter,
+  type ChapterNoteGroup,
+  type ChapterOf,
+} from './audio-note-filter.js'
