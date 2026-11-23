@@ -108,13 +108,18 @@ const RESERVED = new Set(
   ].map(shortcutKeysId),
 )
 
-/** Main keys that stay usable without Ctrl/Alt for actions that opt in (`allowBare`). */
+/** Navigation keys: they type nothing, so Shift + one of them is not typing either (spec 018: ⇧← / ⇧→). */
+function isNavigationKey(main: string): boolean {
+  return main.startsWith('Arrow') || ['Home', 'End', 'PageUp', 'PageDown'].includes(main)
+}
+
+/**
+ * Main keys that stay usable without Ctrl/Alt for actions that opt in (`allowBare`). Space and [ / ] are the audiobook
+ * player's play / speed keys (spec 018); the bridge already leaves Space to a focused button and every plain key to a
+ * text field.
+ */
 function isBareCapableKey(main: string): boolean {
-  return (
-    /^[A-Z0-9]$/.test(main) ||
-    main.startsWith('Arrow') ||
-    ['Home', 'End', 'PageUp', 'PageDown'].includes(main)
-  )
+  return /^[A-Z0-9]$/.test(main) || isNavigationKey(main) || ['Space', '[', ']'].includes(main)
 }
 
 export type ValidateShortcutOptions = {
@@ -147,7 +152,8 @@ export function validateShortcutKeys(
     if (!options.allowBare) return { key: 'settings.keyboard.errors.plainKey', params: modifiers }
     if (!isBareCapableKey(main)) return { key: 'settings.keyboard.errors.notAlone', params: modifiers }
   }
-  if (normalized.length === 2 && normalized[0] === 'Shift' && !isFunctionKey) {
+  const shiftNavigation = options.allowBare === true && isNavigationKey(main)
+  if (normalized.length === 2 && normalized[0] === 'Shift' && !isFunctionKey && !shiftNavigation) {
     return { key: 'settings.keyboard.errors.shiftOnly' }
   }
   if (RESERVED.has(shortcutKeysId(normalized))) return { key: 'settings.keyboard.errors.reserved' }

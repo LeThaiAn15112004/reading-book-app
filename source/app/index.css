@@ -35,6 +35,9 @@
   --color-lib-hint: var(--lib-hint);
   --color-lib-chip: var(--lib-chip);
   --color-lib-danger: var(--lib-danger);
+  --color-lib-warning-bg: var(--lib-warning-bg);
+  --color-lib-warning-border: var(--lib-warning-border);
+  --color-lib-warning-text: var(--lib-warning-text);
 
   /* SCR-00 Splash brand motion */
   --animate-splash-pulse: splash-pulse 2.5s ease-in-out infinite;
@@ -1014,4 +1017,16 @@ a[ref='epubjs-mk'].rb-hl-focused {
   margin-top: 0.75rem;
   padding-top: 2rem;
   border-top: 1px dashed color-mix(in srgb, var(--lib-text) 18%, transparent);
+}
+
+/*
+ * Spec 018 FR-003: one keyboard focus indicator for the audiobook player, its sidebar, the mini player and the
+ * floating window (and the shared rail). Keyboard focus only (`:focus-visible`), so a mouse click leaves no ring.
+ * The accent outline is checked against every theme's page in `spike:theme:contrast` (≥ 3:1).
+ */
+@utility focus-ring {
+  &:focus-visible {
+    outline: 2px solid var(--lib-accent);
+    outline-offset: 2px;
+  }
 }

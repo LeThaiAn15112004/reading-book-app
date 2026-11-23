@@ -62,7 +62,7 @@ export function AudioSelect({
         aria-haspopup="listbox"
         aria-expanded={open}
         aria-controls={open ? listId : undefined}
-        className="inline-flex h-9 cursor-pointer items-center gap-2 rounded-full border border-lib-border bg-lib-surface px-3 text-xs font-semibold text-lib-muted transition-colors hover:border-lib-accent-ring hover:bg-lib-surface-hover aria-expanded:border-lib-accent-ring"
+        className="focus-ring inline-flex h-9 cursor-pointer items-center gap-2 rounded-full border border-lib-border bg-lib-surface px-3 text-xs font-semibold text-lib-muted transition-colors hover:border-lib-accent-ring hover:bg-lib-surface-hover aria-expanded:border-lib-accent-ring"
         onClick={() => setOpen((v) => !v)}
         onKeyDown={(e) => {
           if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
@@ -176,7 +176,7 @@ function AudioSelectMenu({
       tabIndex={-1}
       aria-label={ariaLabel}
       aria-activedescendant={`${id}-${active}`}
-      className="fixed z-[400] overflow-y-auto rounded-xl border border-lib-border bg-lib-surface-strong p-1.5 shadow-xl backdrop-blur-md outline-none"
+      className="fixed z-[400] overflow-y-auto rounded-xl border border-lib-border bg-lib-surface-strong p-1.5 shadow-xl backdrop-blur-md focus-ring"
       style={{ left: pos.left, top: pos.top, bottom: pos.bottom, minWidth: Math.max(pos.minWidth, 160), maxHeight: pos.maxHeight }}
       onKeyDown={onKeyDown}
       onClick={(e) => e.stopPropagation()}

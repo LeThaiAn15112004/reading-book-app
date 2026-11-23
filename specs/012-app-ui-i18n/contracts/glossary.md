@@ -28,6 +28,12 @@ Whisper, FFmpeg, Foxit, Acrobat, Windows, CFI (not shown to users).
 | Settings | Cài đặt |
 | More (navigation entry that opens Settings) | Khác |
 | Utilities (menubar entry that shows / hides the Reader toolbar) | Tiện ích |
+| Mini player (audiobook bar outside the player) | Trình phát thu nhỏ |
+| Floating window (audiobook player above other apps) | Cửa sổ nổi |
+| Pop out (open the floating window) | Mở cửa sổ nổi |
+| Return to app | Về ứng dụng |
+| Skip back / forward length | Độ dài tua lùi / tới |
+| Rewind on resume | Tự lùi khi phát tiếp |
 | Appearance | Giao diện |
 | Theme | Chủ đề |
 | Language | Ngôn ngữ |

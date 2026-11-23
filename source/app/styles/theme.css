@@ -29,6 +29,10 @@
   --lib-on-accent: #0f172a;
   /* Destructive text / border at rest (spec 014 FR-014): ≥ 4.5:1 on this theme's page. */
   --lib-danger: #f87171;
+  /* Warning notices (spec 018 FR-001/FR-002): text on bg ≥ 4.5:1, border ≥ 3:1 on this theme's page. */
+  --lib-warning-bg: rgb(245 158 11 / 0.12);
+  --lib-warning-border: rgb(251 191 36 / 0.6);
+  --lib-warning-text: #fcd34d;
   --lib-input: rgb(15 23 42 / 0.45);
   --lib-topbar: rgb(15 23 42 / 0.35);
   --lib-hint: rgb(15 23 42 / 0.28);
@@ -76,6 +80,10 @@
   --lib-on-accent: #0f172a;
   /* Destructive text / border at rest (spec 014 FR-014): ≥ 4.5:1 on this theme's page. */
   --lib-danger: #f87171;
+  /* Warning notices (spec 018 FR-001/FR-002): text on bg ≥ 4.5:1, border ≥ 3:1 on this theme's page. */
+  --lib-warning-bg: rgb(245 158 11 / 0.12);
+  --lib-warning-border: rgb(251 191 36 / 0.6);
+  --lib-warning-text: #fcd34d;
   --lib-input: rgb(22 18 14 / 0.55);
   --lib-topbar: rgb(22 18 14 / 0.45);
   --lib-hint: rgb(37 31 25 / 0.4);
@@ -124,6 +132,10 @@
   --lib-on-accent: #0f172a;
   /* Destructive text / border at rest (spec 014 FR-014): ≥ 4.5:1 on this theme's page. */
   --lib-danger: #b91c1c;
+  /* Warning notices (spec 018 FR-001/FR-002): text on bg ≥ 4.5:1, border ≥ 3:1 on this theme's page. */
+  --lib-warning-bg: #fef3c7;
+  --lib-warning-border: #b45309;
+  --lib-warning-text: #78350f;
   --lib-input: rgb(255 255 255 / 0.85);
   --lib-topbar: rgb(255 255 255 / 0.65);
   --lib-hint: rgb(241 245 249 / 0.8);

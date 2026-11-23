@@ -6,6 +6,7 @@ import {
   type SidebarTabDef,
 } from './sidebarTabs'
 import { readerChromeTopInset } from '../../../../components/reader/chrome'
+import { SidebarTabIcon } from './SidebarTabIcon'
 import { useT } from '../../../../i18n'
 
 type SidebarEdgeRailProps = {
@@ -46,7 +47,7 @@ export function SidebarEdgeRail({
   const chromeTopInset = readerChromeTopInset(chromeHidden)
   const edgeTransition = isResizing
     ? ''
-    : 'transition-[top,left,color,border-color,opacity,transform] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]'
+    : 'transition-[top,left,color,border-color,opacity,transform] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-none'
 
   // Hard-hide in immersive mode: translate alone leaves the chevron handle
   // peeking (it only shifts by its own width, not the rail offset).
@@ -78,7 +79,7 @@ export function SidebarEdgeRail({
           return (
             <button
               key={tab.id}
-              className={`relative mx-0.5 flex h-8 cursor-pointer items-center justify-center border-none text-[15px] leading-none transition-[color,background,box-shadow,opacity] ${
+              className={`focus-ring relative mx-0.5 flex h-8 cursor-pointer items-center justify-center border-none leading-none transition-[color,background,box-shadow,opacity] motion-reduce:transition-none ${
                 merged
                   ? 'z-[1] rounded-l-md rounded-r-none border-l-[3px] border-l-lib-accent bg-lib-surface-strong text-lib-accent shadow-[1px_0_0_0_var(--lib-surface-strong)] ring-1 ring-inset ring-lib-accent/35'
                   : isActive
@@ -97,7 +98,7 @@ export function SidebarEdgeRail({
                 onOpenTab(tab.id)
               }}
             >
-              <span aria-hidden>{tab.icon}</span>
+              <SidebarTabIcon tab={tab.id} />
             </button>
           )
         })}
@@ -105,7 +106,7 @@ export function SidebarEdgeRail({
 
       <button
         data-immersive-chrome=""
-        className={`absolute z-[175] flex w-5 cursor-pointer items-center justify-center rounded-r-md border border-l-0 border-lib-border-soft bg-lib-surface-strong text-lib-muted shadow-md hover:border-lib-accent-ring hover:text-lib-accent ${edgeTransition}`}
+        className={`focus-ring absolute z-[175] flex w-5 cursor-pointer items-center justify-center rounded-r-md border border-l-0 border-lib-border-soft bg-lib-surface-strong text-lib-muted shadow-md hover:border-lib-accent-ring hover:text-lib-accent ${edgeTransition}`}
         style={{
           left: handleLeft,
           top: chromeTopInset,

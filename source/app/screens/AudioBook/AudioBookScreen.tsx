@@ -14,6 +14,7 @@ import { AudioNoteMenu } from './components/AudioNoteMenu'
 import { AudioSidebarPanel } from './components/AudioSidebar'
 import { AudioTimeline, ProgressScopeSelector } from './components/AudioTimeline'
 import { useAudioPlayerStore } from './logic/audioPlayerStore'
+import { useAudioPlayerShortcuts } from './logic/useAudioPlayerShortcuts'
 import { isActiveJob, useTranscriptStore } from './logic/transcriptStore'
 import { TranscribeDialog } from './components/TranscribeDialog'
 import { resolveAppLanguage } from '../../theme/appAppearance'
@@ -29,10 +30,19 @@ const AUDIO_SIDEBAR_TABS_ALL = SIDEBAR_TABS.filter((t) => t.id !== 'layout' && t
  */
 const AUDIO_SIDEBAR_TABS_NO_TRANSCRIPT = AUDIO_SIDEBAR_TABS_ALL.filter((t) => t.id !== 'transcript')
 
-function isTypingTarget(target: EventTarget | null): boolean {
-  if (!(target instanceof HTMLElement)) return false
-  return target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT', 'BUTTON'].includes(target.tagName)
+/** Leading symbol of the player's warning notices (spec 018 FR-001): decorative, the text says what happened. */
+function WarningIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="size-4 shrink-0" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M12 9v3.75m0 3.75h.008v.008H12v-.008Z" />
+      <path d="M10.34 3.94 2.6 17.25A1.95 1.95 0 0 0 4.27 20.2h15.46a1.95 1.95 0 0 0 1.67-2.95L13.66 3.94a1.92 1.92 0 0 0-3.32 0Z" />
+    </svg>
+  )
 }
+
+/** Buttons inside a warning notice: theme warning colours (readable in Night, Sepia and Paper). */
+const WARNING_BUTTON =
+  'focus-ring inline-flex h-8 cursor-pointer items-center rounded-lg border border-lib-warning-border bg-transparent px-3 text-[13px] font-medium text-lib-warning-text hover:bg-lib-warning-bg'
 
 function readOpen(): boolean {
   try {
@@ -56,7 +66,7 @@ function TranscribeEntry({ onOpen }: { onOpen: () => void }) {
     <button
       type="button"
       data-transcribe-entry
-      className="inline-flex h-8 cursor-pointer items-center rounded-full border border-lib-border bg-transparent px-3.5 text-[13px] font-medium text-lib-muted transition-colors hover:text-lib-text-strong"
+      className="focus-ring inline-flex h-8 cursor-pointer items-center rounded-full border border-lib-border bg-transparent px-3.5 text-[13px] font-medium text-lib-muted transition-colors hover:text-lib-text-strong"
       onClick={() => {
         onOpen()
         if (!running && !hasTranscript) openDialog()
@@ -136,14 +146,14 @@ function TrackErrorNotice() {
   const goToTrack = useAudioPlayerStore((s) => s.goToTrack)
   const nextChapter = useAudioPlayerStore((s) => s.nextChapter)
   if (!failed || !track) return null
-  const button =
-    'inline-flex h-8 cursor-pointer items-center rounded-lg border border-amber-300/50 bg-transparent px-3 text-[13px] font-medium text-amber-100 hover:bg-amber-300/15'
+  const button = WARNING_BUTTON
   return (
     <div
       role="alert"
-      className="flex w-full flex-col items-center gap-2 rounded-lg border border-amber-300/40 bg-amber-300/10 px-4 py-3 text-center text-sm text-amber-100"
+      className="flex w-full flex-col items-center gap-2 rounded-lg border border-lib-warning-border bg-lib-warning-bg px-4 py-3 text-center text-sm text-lib-warning-text"
     >
-      <p className="m-0">
+      <p className="m-0 inline-flex items-center gap-2">
+        <WarningIcon />
         {t('audiobook.player.screen.trackFailed', { title: track.title })}
       </p>
       <div className="flex gap-2">
@@ -172,12 +182,15 @@ function NoteNotice() {
   return (
     <div
       role="status"
-      className="flex w-full items-center justify-between gap-3 rounded-lg border border-amber-300/40 bg-amber-300/10 px-4 py-2 text-sm text-amber-100"
+      className="flex w-full items-center justify-between gap-3 rounded-lg border border-lib-warning-border bg-lib-warning-bg px-4 py-2 text-sm text-lib-warning-text"
     >
-      <span>{uiText(t, notice)}</span>
+      <span className="inline-flex items-center gap-2">
+        <WarningIcon />
+        {uiText(t, notice)}
+      </span>
       <button
         type="button"
-        className="inline-flex h-7 cursor-pointer items-center rounded-lg border border-amber-300/50 bg-transparent px-2 text-[13px] font-medium text-amber-100 hover:bg-amber-300/15"
+        className={WARNING_BUTTON}
         onClick={dismiss}
       >
         {t('audiobook.player.screen.dismiss')}
@@ -225,7 +238,6 @@ export function AudioBookScreen({ bookId }: { bookId: string }) {
   const errorCode = useAudioPlayerStore((s) => s.errorCode)
   const load = useAudioPlayerStore((s) => s.load)
   const dispose = useAudioPlayerStore((s) => s.dispose)
-  const toggle = useAudioPlayerStore((s) => s.toggle)
   const relink = useBookRelinkStore()
   const sidebarResize = useSidebarPanelResize('left')
   const multiTrack = useAudioPlayerStore((s) => s.tracks.length > 0)
@@ -280,16 +292,8 @@ export function AudioBookScreen({ bookId }: { bookId: string }) {
     if (status === 'ready' && title) updateBookTitle(bookId, title)
   }, [bookId, status, title, updateBookTitle])
 
-  useEffect(() => {
-    const onKeyDown = (event: globalThis.KeyboardEvent) => {
-      if (event.code !== 'Space' || event.ctrlKey || event.metaKey || event.altKey) return
-      if (isTypingTarget(event.target)) return
-      event.preventDefault()
-      toggle()
-    }
-    window.addEventListener('keydown', onKeyDown)
-    return () => window.removeEventListener('keydown', onKeyDown)
-  }, [toggle])
+  // Spec 018 US2: Space / ← / → / ⇧← / ⇧→ / ↑ / ↓ / M / [ / ] / B — listed and rebindable in Settings → Keyboard Shortcuts.
+  useAudioPlayerShortcuts()
 
   const leave = useCallback(async () => {
     await dispose()

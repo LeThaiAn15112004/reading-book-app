@@ -6,7 +6,7 @@ import path from 'node:path'
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const presetsPath = path.resolve(
   __dirname,
-  '../../../../packages/shared/models/reading-prefs.ts',
+  '../../../../../core/src/app-models/reading-prefs.ts',
 )
 const source = await readFile(presetsPath, 'utf8')
 
@@ -40,3 +40,55 @@ for (const id of ['night', 'sepia', 'paper']) {
   assert.ok(ratio >= 4.5, `${id} contrast ${ratio.toFixed(2)} is below 4.5:1`)
   console.log(`ok ${id} body contrast ${ratio.toFixed(2)}:1`)
 }
+
+// Spec 018 (FR-001 – FR-003, SC-001): the app-chrome warning notice and the keyboard focus ring, per theme.
+// Tokens are read from styles/theme.css; translucent colours are composited over the theme's page colour.
+const themeCss = await readFile(path.resolve(__dirname, '../../../../styles/theme.css'), 'utf8')
+
+function themeBlock(selector) {
+  const start = themeCss.indexOf(selector)
+  assert.ok(start >= 0, `Missing ${selector} in theme.css`)
+  return themeCss.slice(start, themeCss.indexOf('\n}', start))
+}
+
+function token(block, name) {
+  const value = block.match(new RegExp(`--${name}:\\s*([^;]+);`))?.[1]?.trim()
+  assert.ok(value, `Missing --${name}`)
+  return value
+}
+
+function toRgba(value) {
+  const hex = value.match(/^#([0-9a-f]{6})$/i)
+  if (hex) return [...hex[1].match(/.{2}/g).map((c) => Number.parseInt(c, 16)), 1]
+  const rgb = value.match(/^rgb\(\s*(\d+)\s+(\d+)\s+(\d+)\s*(?:\/\s*([\d.]+))?\s*\)$/)
+  assert.ok(rgb, `Unsupported colour ${value}`)
+  return [Number(rgb[1]), Number(rgb[2]), Number(rgb[3]), rgb[4] === undefined ? 1 : Number(rgb[4])]
+}
+
+/** `value` (possibly translucent) painted over the opaque `backgroundHex`, as #rrggbb. */
+function over(value, backgroundHex) {
+  const [r, g, b, a] = toRgba(value)
+  const [br, bg, bb] = toRgba(backgroundHex)
+  const mix = (f, k) => Math.round(f * a + k * (1 - a))
+  return `#${[mix(r, br), mix(g, bg), mix(b, bb)].map((c) => c.toString(16).padStart(2, '0')).join('')}`
+}
+
+for (const [id, selector] of [
+  ['night', "[data-theme='night']"],
+  ['sepia', "[data-theme='sepia']"],
+  ['paper', "[data-theme='paper']"],
+]) {
+  const block = themeBlock(selector)
+  const page = token(block, 'lib-bg-deep')
+  const warningBg = over(token(block, 'lib-warning-bg'), page)
+  const text = contrastRatio(over(token(block, 'lib-warning-text'), warningBg), warningBg)
+  assert.ok(text >= 4.5, `${id} warning text ${text.toFixed(2)} is below 4.5:1`)
+  const border = contrastRatio(over(token(block, 'lib-warning-border'), page), page)
+  assert.ok(border >= 3, `${id} warning border ${border.toFixed(2)} is below 3:1`)
+  const focus = contrastRatio(over(token(block, 'lib-accent'), page), page)
+  assert.ok(focus >= 3, `${id} focus ring ${focus.toFixed(2)} is below 3:1`)
+  console.log(
+    `ok ${id} warning text ${text.toFixed(2)}:1, border ${border.toFixed(2)}:1, focus ring ${focus.toFixed(2)}:1`,
+  )
+}
+

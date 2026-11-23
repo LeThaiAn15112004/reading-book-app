@@ -6,18 +6,17 @@ export type SidebarTabDef = {
   id: SidebarTab
   /** Catalogue key (spec 012), translated where shown. */
   labelKey: MessageKey
-  icon: string
   /** Shown / openable only when the open book's surface has this capability. */
   requires?: ReaderCapability
 }
 
 export const SIDEBAR_TABS: SidebarTabDef[] = [
-  { id: 'chapters', labelKey: 'reader.sidebar.tabs.chapters', icon: '📑' },
-  { id: 'bookmarks', labelKey: 'reader.sidebar.tabs.bookmarks', icon: '🔖' },
-  { id: 'highlights', labelKey: 'reader.sidebar.tabs.highlights', icon: '🖍️' },
-  { id: 'layout', labelKey: 'reader.sidebar.tabs.layout', icon: '📄', requires: 'pageLayout' },
-  { id: 'attachments', labelKey: 'reader.sidebar.tabs.attachments', icon: '📎', requires: 'attachments' },
-  { id: 'transcript', labelKey: 'reader.sidebar.tabs.transcript', icon: '📝', requires: 'transcript' },
+  { id: 'chapters', labelKey: 'reader.sidebar.tabs.chapters' },
+  { id: 'bookmarks', labelKey: 'reader.sidebar.tabs.bookmarks' },
+  { id: 'highlights', labelKey: 'reader.sidebar.tabs.highlights' },
+  { id: 'layout', labelKey: 'reader.sidebar.tabs.layout', requires: 'pageLayout' },
+  { id: 'attachments', labelKey: 'reader.sidebar.tabs.attachments', requires: 'attachments' },
+  { id: 'transcript', labelKey: 'reader.sidebar.tabs.transcript', requires: 'transcript' },
 ]
 
 /** True when `tab` can be shown for a surface with `capabilities`. */

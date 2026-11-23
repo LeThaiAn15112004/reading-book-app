@@ -11,9 +11,9 @@ const MARGIN = 8
 const GAP = 6
 
 const itemClass =
-  'flex min-h-9 w-full cursor-pointer items-center gap-2 rounded-lg border-none bg-transparent px-3 py-1.5 text-left text-sm font-medium text-lib-text transition-colors hover:bg-lib-surface-hover hover:text-lib-text-strong focus-visible:bg-lib-surface-hover focus-visible:outline-none'
+  'flex min-h-9 w-full cursor-pointer items-center gap-2 rounded-lg border-none bg-transparent px-3 py-1.5 text-left text-sm font-medium text-lib-text transition-colors hover:bg-lib-surface-hover hover:text-lib-text-strong focus-visible:bg-lib-surface-hover focus-ring'
 const buttonClass =
-  'inline-flex h-8 cursor-pointer items-center justify-center rounded-lg border border-lib-border px-3 text-xs font-semibold text-lib-text hover:bg-lib-surface-hover'
+  'focus-ring inline-flex h-8 cursor-pointer items-center justify-center rounded-lg border border-lib-border px-3 text-xs font-semibold text-lib-text hover:bg-lib-surface-hover'
 
 /**
  * The one popover for a note — opened from a sidebar ⋮ button or a timeline marker alike (see

@@ -22,3 +22,5 @@ export type AppFeature =
   | 'fileSystemActions'
   /** Desktop's title bar and menu bar (window chrome). */
   | 'desktopChrome'
+  /** Spec 018: audiobook mini player bar, floating window, tray entry and system media controls. */
+  | 'miniPlayer'

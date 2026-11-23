@@ -18,6 +18,7 @@ const MOBILE_UNAVAILABLE: ReadonlySet<AppFeature> = new Set<AppFeature>([
   'uiDensity',
   'fileSystemActions',
   'desktopChrome',
+  'miniPlayer',
 ])
 
 export function isMobileHost(): boolean {

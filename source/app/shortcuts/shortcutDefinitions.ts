@@ -9,14 +9,14 @@
 
 import type { MessageKey } from '@core'
 
-export type ShortcutGroupId = 'general' | 'navigation' | 'search' | 'view'
+export type ShortcutGroupId = 'general' | 'navigation' | 'search' | 'view' | 'audiobook'
 
 /**
  * Screens a shortcut can be active on. They are routes, so exactly one is current at a time: two
  * actions can only fire on the same key press when their contexts share a screen (see
  * `shortcutConflicts.ts`).
  */
-export type ShortcutContext = 'library' | 'reader' | 'settings'
+export type ShortcutContext = 'library' | 'reader' | 'settings' | 'audiobook'
 
 export type ShortcutId =
   | 'general.openBook'
@@ -38,6 +38,17 @@ export type ShortcutId =
   | 'view.zoomOut'
   | 'view.resetZoom'
   | 'view.toggleFullscreen'
+  | 'audiobook.playPause'
+  | 'audiobook.skipBack'
+  | 'audiobook.skipForward'
+  | 'audiobook.previousChapter'
+  | 'audiobook.nextChapter'
+  | 'audiobook.volumeUp'
+  | 'audiobook.volumeDown'
+  | 'audiobook.mute'
+  | 'audiobook.speedDown'
+  | 'audiobook.speedUp'
+  | 'audiobook.addNote'
 
 /**
  * Platform-neutral key tokens pressed together: `Mod` (Ctrl on Windows/Linux, ⌘ on macOS), `Alt`
@@ -77,6 +88,7 @@ export const SHORTCUT_GROUPS: readonly { id: ShortcutGroupId; labelKey: MessageK
   { id: 'navigation', labelKey: 'settings.keyboard.groups.navigation' },
   { id: 'search', labelKey: 'settings.keyboard.groups.search' },
   { id: 'view', labelKey: 'settings.keyboard.groups.view' },
+  { id: 'audiobook', labelKey: 'settings.keyboard.groups.audiobook' },
 ]
 
 export const SHORTCUTS: readonly ShortcutDefinition[] = [
@@ -84,21 +96,21 @@ export const SHORTCUTS: readonly ShortcutDefinition[] = [
     id: 'general.openBook',
     group: 'general',
     labelKey: 'settings.keyboard.items.openBook',
-    contexts: ['library', 'reader', 'settings'],
+    contexts: ['library', 'reader', 'audiobook', 'settings'],
     defaultKeys: ['Mod', 'O'],
   },
   {
     id: 'general.openSettings',
     group: 'general',
     labelKey: 'settings.keyboard.items.openSettings',
-    contexts: ['library', 'reader'],
+    contexts: ['library', 'reader', 'audiobook'],
     defaultKeys: ['Mod', ','],
   },
   {
     id: 'general.backToLibrary',
     group: 'general',
     labelKey: 'settings.keyboard.items.backToLibrary',
-    contexts: ['reader', 'settings'],
+    contexts: ['reader', 'audiobook', 'settings'],
     defaultKeys: ['Alt', 'ArrowLeft'],
   },
   {
@@ -230,10 +242,39 @@ export const SHORTCUTS: readonly ShortcutDefinition[] = [
     group: 'view',
     labelKey: 'settings.keyboard.items.toggleFullscreen',
     // Window-level, so it works on every screen (it used to be handled by the Main process).
-    contexts: ['library', 'reader', 'settings'],
+    contexts: ['library', 'reader', 'audiobook', 'settings'],
     defaultKeys: ['F11'],
   },
+  // Spec 018 (FR-004 – FR-006, contracts/player-shortcuts.md): the audiobook player. Context `audiobook` is the
+  // reader route while it shows an audiobook (`shortcutScreenStore`), so ← / → skip here and turn pages in a book.
+  ...audiobookShortcuts([
+    ['audiobook.playPause', 'audiobookPlayPause', ['Space'], false],
+    ['audiobook.skipBack', 'audiobookSkipBack', ['ArrowLeft'], true],
+    ['audiobook.skipForward', 'audiobookSkipForward', ['ArrowRight'], true],
+    ['audiobook.previousChapter', 'audiobookPreviousChapter', ['Shift', 'ArrowLeft'], false],
+    ['audiobook.nextChapter', 'audiobookNextChapter', ['Shift', 'ArrowRight'], false],
+    ['audiobook.volumeUp', 'audiobookVolumeUp', ['ArrowUp'], true],
+    ['audiobook.volumeDown', 'audiobookVolumeDown', ['ArrowDown'], true],
+    ['audiobook.mute', 'audiobookMute', ['M'], false],
+    ['audiobook.speedDown', 'audiobookSpeedDown', ['['], false],
+    ['audiobook.speedUp', 'audiobookSpeedUp', [']'], false],
+    ['audiobook.addNote', 'audiobookAddNote', ['B'], false],
+  ]),
 ]
+
+function audiobookShortcuts(
+  rows: readonly (readonly [ShortcutId, string, ShortcutKeys, boolean])[],
+): ShortcutDefinition[] {
+  return rows.map(([id, item, defaultKeys, allowRepeat]) => ({
+    id,
+    group: 'audiobook',
+    labelKey: `settings.keyboard.items.${item}` as MessageKey,
+    contexts: ['audiobook'],
+    defaultKeys,
+    allowBare: true,
+    ...(allowRepeat ? { allowRepeat: true } : {}),
+  }))
+}
 
 export function getShortcut(id: ShortcutId): ShortcutDefinition {
   const def = SHORTCUTS.find((s) => s.id === id)

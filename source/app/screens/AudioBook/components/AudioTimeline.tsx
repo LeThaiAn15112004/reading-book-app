@@ -61,7 +61,7 @@ export function ProgressScopeSelector() {
             aria-disabled={disabled || undefined}
             tabIndex={checked ? 0 : -1}
             title={disabled ? (unavailable ?? undefined) : t(SCOPE_SHOW[value])}
-            className={`h-7 min-w-16 rounded-full px-3 ${
+            className={`focus-ring h-7 min-w-16 rounded-full px-3 ${
               checked ? 'bg-lib-accent text-lib-on-accent' : 'text-lib-muted hover:text-lib-text'
             } ${disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`}
             onClick={() => {
@@ -165,7 +165,7 @@ export function AudioTimeline() {
           data-audio-seek
           aria-label={t('audiobook.player.timeline.seek', { label: label.toLowerCase() })}
           aria-valuetext={t('audiobook.player.timeline.valueText', { shown: formatPlaybackTime(shown), total: formatPlaybackTime(view.durationSeconds) })}
-          className="relative w-full cursor-pointer accent-[var(--lib-accent,currentColor)]"
+          className="focus-ring relative w-full cursor-pointer rounded accent-[var(--lib-accent,currentColor)]"
           min={0}
           max={view.durationSeconds}
           step={1}
@@ -183,7 +183,7 @@ export function AudioTimeline() {
             aria-label={note.note ? t('audiobook.player.timeline.noteAtWithText', { time: formatPlaybackTime(at), text: note.note }) : t('audiobook.player.timeline.noteAt', { time: formatPlaybackTime(at) })}
             aria-haspopup="menu"
             title={note.note ? t('audiobook.player.timeline.noteTitle', { time: formatPlaybackTime(at), text: note.note }) : t('audiobook.player.timeline.noteAt', { time: formatPlaybackTime(at) })}
-            className="group absolute -top-1 z-[2] flex size-4 -translate-x-1/2 cursor-pointer items-center justify-center border-none bg-transparent p-0 hover:z-[3] focus-visible:z-[3] focus-visible:outline-none"
+            className="group absolute -top-1 z-[2] flex size-4 -translate-x-1/2 cursor-pointer items-center justify-center border-none bg-transparent p-0 hover:z-[3] focus-visible:z-[3] focus-ring rounded-sm"
             // The native thumb's travel is inset by half its width at both ends; the marker uses the same inset.
             style={{ left: `calc(8px + (100% - 16px) * ${fraction})` }}
             onPointerDown={(e) => e.stopPropagation()}

@@ -231,7 +231,10 @@ await check('a plain key is accepted only for actions that opt in (allowBare)', 
   assert.ok(keys.validateShortcutKeys(['T'], false)) // General actions: still rejected
   assert.equal(keys.validateShortcutKeys(['T'], false, { allowBare: true }), null)
   assert.equal(keys.validateShortcutKeys(['End'], false, { allowBare: true }), null)
-  for (const unsafe of [['Enter'], ['Space'], ['Backspace'], ['Delete'], ['Tab'], ['Shift', 'T'], [',']]) {
+  // Space and [ / ] became bare-capable for the audiobook player (spec 018); the bridge leaves Space to a focused button.
+  assert.equal(keys.validateShortcutKeys(['Space'], false, { allowBare: true }), null)
+  assert.ok(keys.validateShortcutKeys(['Space'], false)) // still not for actions without allowBare
+  for (const unsafe of [['Enter'], ['Backspace'], ['Delete'], ['Tab'], ['Shift', 'T'], [',']]) {
     assert.ok(keys.validateShortcutKeys(unsafe, false, { allowBare: true }), unsafe.join('+'))
   }
   assert.deepEqual(store().tryAssign('navigation.toggleToc', ['G']), { ok: true })
@@ -366,7 +369,7 @@ await check('View group lists the four actions with their default shortcuts', ()
   assert.deepEqual(d['view.zoomOut'], ['Mod', '-'])
   assert.deepEqual(d['view.resetZoom'], ['Mod', '0'])
   assert.deepEqual(d['view.toggleFullscreen'], ['F11'])
-  assert.deepEqual(defs.getShortcut('view.toggleFullscreen').contexts, ['library', 'reader', 'settings'])
+  assert.deepEqual(defs.getShortcut('view.toggleFullscreen').contexts, ['library', 'reader', 'audiobook', 'settings'])
   for (const id of ['view.zoomIn', 'view.zoomOut', 'view.resetZoom']) {
     assert.deepEqual(defs.getShortcut(id).contexts, ['reader'], id)
     assert.equal(defs.getShortcut(id).ignoreInTextFields, true, id)
@@ -475,6 +478,58 @@ await check('each View key has exactly one dispatcher: no legacy listener, one r
   assert.match(read('components/chrome/ImmersiveReadingContext.tsx'), /useShortcutAction\('view\.toggleFullscreen', toggleFullscreen\)/)
   // The bridge keeps zoom keys out of text fields, as the legacy listener did.
   assert.match(read('shortcuts/ShortcutsBridge.tsx'), /s\.ignoreInTextFields && isTypingTarget/)
+})
+
+// 10. Spec 018 (US2, contracts/player-shortcuts.md): the audiobook player's keys.
+await check('audiobook player keys: own group + context, defaults, no conflict with the text reader', () => {
+  const d = effectiveShortcutKeys({})
+  const ids = defs.SHORTCUTS.filter((s) => s.group === 'audiobook').map((s) => s.id)
+  assert.equal(ids.length, 11)
+  assert.ok(defs.SHORTCUT_GROUPS.some((g) => g.id === 'audiobook'))
+  for (const id of ids) {
+    assert.deepEqual(defs.getShortcut(id).contexts, ['audiobook'], id)
+    assert.equal(defs.getShortcut(id).allowBare, true, id)
+  }
+  assert.deepEqual(d['audiobook.playPause'], ['Space'])
+  assert.deepEqual(d['audiobook.skipBack'], ['ArrowLeft'])
+  assert.deepEqual(d['audiobook.nextChapter'], ['Shift', 'ArrowRight'])
+  assert.deepEqual(d['audiobook.mute'], ['M'])
+  assert.deepEqual(d['audiobook.speedUp'], [']'])
+  // ← is "skip back" in the player and "previous page" in a book: never both on one screen.
+  assert.deepEqual(d['audiobook.skipBack'], d['navigation.previousPage'])
+  assert.equal(conflicts.contextsOverlap('audiobook.skipBack', 'navigation.previousPage'), false)
+  assert.equal(conflicts.findShortcutConflict('audiobook.skipBack', ['ArrowLeft'], d), null)
+  // Keys that make sense on the player screen stay there.
+  for (const id of ['general.openBook', 'general.openSettings', 'general.backToLibrary', 'view.toggleFullscreen']) {
+    assert.ok(defs.getShortcut(id).contexts.includes('audiobook'), id)
+  }
+  assert.equal(conflicts.findShortcutConflict('audiobook.mute', ['Alt', 'ArrowLeft'], d), 'general.backToLibrary')
+  // Shift + a navigation key is not typing, so ⇧← / ⇧→ are allowed for bare-capable actions only.
+  assert.equal(keys.validateShortcutKeys(['Shift', 'ArrowLeft'], false, { allowBare: true }), null)
+  assert.notEqual(keys.validateShortcutKeys(['Shift', 'A'], false, { allowBare: true }), null)
+  assert.notEqual(keys.validateShortcutKeys(['Shift', 'ArrowLeft'], false), null)
+})
+
+await check('audiobook player keys: a rebind applies; two player actions cannot share a key', () => {
+  assert.deepEqual(store().tryAssign('audiobook.skipForward', ['L']), { ok: true })
+  assert.deepEqual(current()['audiobook.skipForward'], ['L'])
+  const clash = store().tryAssign('audiobook.mute', ['L'])
+  assert.equal(clash.ok, false)
+  assert.equal(clash.conflictWith, 'audiobook.skipForward')
+})
+
+await check('audiobook player keys: wiring (static) — screen context, arrow-key guard, one registration each', () => {
+  const bridge = read('shortcuts/ShortcutsBridge.tsx')
+  assert.match(bridge, /readerKind === 'audio' \? 'audiobook' : 'reader'/)
+  assert.match(bridge, /NAVIGATION_KEYS\.has\(main\) && ownsNavigationKeys\(event\.target\)/)
+  assert.match(bridge, /role="slider"/)
+  assert.match(read('screens/ReaderRoute.tsx'), /setReaderKind\(readerKind\)/)
+  const hook = read('screens/AudioBook/logic/useAudioPlayerShortcuts.ts')
+  for (const id of defs.SHORTCUTS.filter((s) => s.group === 'audiobook').map((s) => s.id)) {
+    assert.equal(hook.split(`useShortcutAction('${id}'`).length - 1, 1, id)
+  }
+  // The old hand-written Space listener is gone (one dispatcher per key).
+  assert.doesNotMatch(read('screens/AudioBook/AudioBookScreen.tsx'), /event\.code !== 'Space'/)
 })
 
 if (failures > 0) {

@@ -4,9 +4,10 @@ import { useNoteMenuStore } from '../logic/audioNoteMenuStore'
 import { AudioSelect, type AudioSelectOption } from './AudioSelect'
 import { SLEEP_MINUTES, selectCanAddNote, useAudioPlayerStore, type SleepOption } from '../logic/audioPlayerStore'
 import { useT } from '../../../i18n'
+import { useShortcutLabel } from '../../../shortcuts'
 
 const ROUND =
-  'inline-flex cursor-pointer items-center justify-center rounded-full border border-lib-border bg-lib-surface text-sm font-semibold text-lib-text hover:bg-lib-surface-hover disabled:cursor-not-allowed disabled:opacity-40'
+  'focus-ring inline-flex cursor-pointer items-center justify-center rounded-full border border-lib-border bg-lib-surface text-sm font-semibold text-lib-text hover:bg-lib-surface-hover disabled:cursor-not-allowed disabled:opacity-40'
 const PILL =
   'inline-flex h-9 items-center gap-2 rounded-full border border-lib-border bg-lib-surface px-3 text-xs font-semibold text-lib-muted'
 
@@ -77,23 +78,33 @@ export function AudioControls() {
   const canAddNote = useAudioPlayerStore(selectCanAddNote)
   const openNoteMenu = useNoteMenuStore((s) => s.openFor)
   const noChapters = hasChapters || multiTrack ? undefined : t('audiobook.player.controls.noChapters')
+  // Spec 018 FR-007: tooltips name the shortcut's CURRENT key (Settings → Keyboard Shortcuts can change it).
+  const keys = {
+    playPause: useShortcutLabel('audiobook.playPause'),
+    skipBack: useShortcutLabel('audiobook.skipBack'),
+    skipForward: useShortcutLabel('audiobook.skipForward'),
+    previous: useShortcutLabel('audiobook.previousChapter'),
+    next: useShortcutLabel('audiobook.nextChapter'),
+    addNote: useShortcutLabel('audiobook.addNote'),
+  }
+  const withKey = (text: string, shortcut: string) => t('audiobook.player.controls.withShortcut', { text, shortcut })
   const previousLabel = multiTrack ? t('audiobook.player.controls.previousTrack') : t('audiobook.player.controls.previousChapter')
   const nextLabel = multiTrack ? t('audiobook.player.controls.nextTrack') : t('audiobook.player.controls.nextChapter')
 
   return (
     <div className="flex flex-col items-center gap-4">
       <div className="flex items-center justify-center gap-3">
-        <button type="button" className={`${ROUND} size-11 border-transparent bg-transparent`} aria-label={previousLabel} title={noChapters ?? previousLabel} disabled={!hasChapters && !multiTrack} onClick={previousChapter}>
+        <button type="button" className={`${ROUND} size-11 border-transparent bg-transparent`} aria-label={previousLabel} title={noChapters ?? withKey(previousLabel, keys.previous)} disabled={!hasChapters && !multiTrack} onClick={previousChapter}>
           <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden><rect x="2" y="2" width="2" height="12" fill="currentColor" /><path d="M14 2 L5 8 L14 14 Z" fill="currentColor" /></svg>
         </button>
-        <button type="button" className={`${ROUND} size-14`} aria-label={t('audiobook.player.controls.back15')} title={t('audiobook.player.controls.back15')} onClick={() => skipBy(-15)}>
+        <button type="button" className={`${ROUND} size-14`} aria-label={t('audiobook.player.controls.back15')} title={withKey(t('audiobook.player.controls.back15'), keys.skipBack)} onClick={() => skipBy(-15)}>
           {t('audiobook.player.controls.back15Short')}
         </button>
         <button
           type="button"
-          className="inline-flex size-[72px] cursor-pointer items-center justify-center rounded-full bg-lib-accent text-lib-on-accent shadow-lg hover:bg-lib-accent-hover active:scale-95"
+          className="focus-ring inline-flex size-[72px] cursor-pointer items-center justify-center rounded-full bg-lib-accent text-lib-on-accent shadow-lg hover:bg-lib-accent-hover active:scale-95 motion-reduce:active:scale-100"
           aria-label={playing ? t('audiobook.player.controls.pause') : t('audiobook.player.controls.play')}
-          title={playing ? t('audiobook.player.controls.pauseSpace') : t('audiobook.player.controls.playSpace')}
+          title={withKey(playing ? t('audiobook.player.controls.pause') : t('audiobook.player.controls.play'), keys.playPause)}
           onClick={toggle}
         >
           {playing ? (
@@ -102,10 +113,10 @@ export function AudioControls() {
             <svg width="22" height="22" viewBox="0 0 22 22" aria-hidden><path d="M6 3 L19 11 L6 19 Z" fill="currentColor" /></svg>
           )}
         </button>
-        <button type="button" className={`${ROUND} size-14`} aria-label={t('audiobook.player.controls.forward30')} title={t('audiobook.player.controls.forward30')} onClick={() => skipBy(30)}>
+        <button type="button" className={`${ROUND} size-14`} aria-label={t('audiobook.player.controls.forward30')} title={withKey(t('audiobook.player.controls.forward30'), keys.skipForward)} onClick={() => skipBy(30)}>
           {t('audiobook.player.controls.forward30Short')}
         </button>
-        <button type="button" className={`${ROUND} size-11 border-transparent bg-transparent`} aria-label={nextLabel} title={noChapters ?? nextLabel} disabled={(!hasChapters && !multiTrack) || onLastTrack} onClick={nextChapter}>
+        <button type="button" className={`${ROUND} size-11 border-transparent bg-transparent`} aria-label={nextLabel} title={noChapters ?? withKey(nextLabel, keys.next)} disabled={(!hasChapters && !multiTrack) || onLastTrack} onClick={nextChapter}>
           <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden><rect x="12" y="2" width="2" height="12" fill="currentColor" /><path d="M2 2 L11 8 L2 14 Z" fill="currentColor" /></svg>
         </button>
       </div>
@@ -122,8 +133,9 @@ export function AudioControls() {
         <SleepTimer />
         <button
           type="button"
-          className={`${PILL} cursor-pointer hover:bg-lib-surface-hover disabled:cursor-not-allowed disabled:opacity-40`}
-          title={canAddNote ? t('audiobook.player.controls.markNote') : t('audiobook.player.controls.noteNotReady')}
+          className={`${PILL} focus-ring cursor-pointer hover:bg-lib-surface-hover disabled:cursor-not-allowed disabled:opacity-40`}
+          data-audio-add-note
+          title={canAddNote ? withKey(t('audiobook.player.controls.markNote'), keys.addNote) : t('audiobook.player.controls.noteNotReady')}
           disabled={!canAddNote}
           onClick={(e) => {
             const id = addNote()
@@ -137,7 +149,7 @@ export function AudioControls() {
           <input
             type="range"
             aria-label={t('audiobook.player.controls.volume')}
-            className="w-24 cursor-pointer accent-[var(--lib-accent,currentColor)]"
+            className="focus-ring w-24 cursor-pointer rounded accent-[var(--lib-accent,currentColor)]"
             min={0}
             max={1}
             step={0.05}

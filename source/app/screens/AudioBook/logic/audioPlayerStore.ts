@@ -5,6 +5,7 @@ import {
   chapterIndexAt,
   chapterStart,
   clampPlaybackRate,
+  PLAYBACK_RATES,
   clampSeekPosition,
   createAudioBookmark,
   isProgressScope,
@@ -81,6 +82,8 @@ type AudioPlayerState = {
   durationSeconds: number | null
   playbackRate: number
   volume: number
+  /** Spec 018 FR-015: muted by the speaker button / M key; the volume level itself is kept. */
+  muted: boolean
   /** The timeline the user chose; Chapter falls back to Book wherever no chapter applies. */
   scope: ProgressScope
   chapters: AudioChapter[]
@@ -119,6 +122,11 @@ type AudioPlayerState = {
   skipBy: (deltaSeconds: number) => void
   setRate: (rate: number) => void
   setVolume: (volume: number) => void
+  /** Volume ± 5 % (spec 018 FR-004); lifts mute. */
+  volumeStep: (direction: 1 | -1) => void
+  toggleMute: () => void
+  /** Next lower / higher entry of `PLAYBACK_RATES` (spec 018 FR-004). */
+  speedStep: (direction: 1 | -1) => void
   setScope: (scope: ProgressScope) => void
   previousChapter: () => void
   nextChapter: () => void
@@ -445,6 +453,7 @@ export const useAudioPlayerStore = create<AudioPlayerState>()((set, get) => {
     el.defaultPlaybackRate = rate
     el.playbackRate = rate
     el.volume = get().volume
+    el.muted = get().muted
     const retry = new Set(trackErrors)
     retry.delete(track.id)
     // `trackIndex`, `switching` and the new element are replaced in ONE synchronous step; `status` is not touched.
@@ -576,13 +585,14 @@ export const useAudioPlayerStore = create<AudioPlayerState>()((set, get) => {
   return {
     ...INITIAL,
     volume: readVolume(),
+    muted: false,
 
     load: async (bookId) => {
       const myGeneration = ++generation
       await get().dispose()
       if (myGeneration !== generation) return
       markedReading = false
-      set({ ...INITIAL, volume: get().volume, bookId, status: 'loading' })
+      set({ ...INITIAL, volume: get().volume, muted: get().muted, bookId, status: 'loading' })
 
       try {
         // Preflight in Main: a moved / unreadable file gets a specific error here, because the media
@@ -654,6 +664,7 @@ export const useAudioPlayerStore = create<AudioPlayerState>()((set, get) => {
         el.defaultPlaybackRate = rate
         el.playbackRate = rate
         el.volume = get().volume
+        el.muted = get().muted
         set({ playbackRate: rate })
 
         let restored = false
@@ -780,9 +791,31 @@ export const useAudioPlayerStore = create<AudioPlayerState>()((set, get) => {
 
     setVolume: (volume) => {
       const v = Number.isFinite(volume) ? Math.min(1, Math.max(0, volume)) : 1
-      if (audio) audio.volume = v
-      set({ volume: v })
+      if (audio) {
+        audio.volume = v
+        audio.muted = false
+      }
+      set({ volume: v, muted: false })
       writeVolume(v)
+    },
+
+    volumeStep: (direction) => {
+      // Rounded to the 5 % grid so repeated steps never drift (0.1 + 0.05 …).
+      get().setVolume(Math.round((get().volume + direction * 0.05) * 20) / 20)
+    },
+
+    toggleMute: () => {
+      const muted = !get().muted
+      if (audio) audio.muted = muted
+      set({ muted })
+    },
+
+    speedStep: (direction) => {
+      const rates = [...PLAYBACK_RATES].sort((a, b) => a - b)
+      const current = get().playbackRate
+      const next =
+        direction > 0 ? rates.find((r) => r > current + 1e-6) : [...rates].reverse().find((r) => r < current - 1e-6)
+      if (next !== undefined) get().setRate(next)
     },
 
     setScope: (scope) => {
@@ -966,7 +999,7 @@ export const useAudioPlayerStore = create<AudioPlayerState>()((set, get) => {
       await persist(true)
       await bookmarkChain
       teardown()
-      set({ ...INITIAL, volume: get().volume })
+      set({ ...INITIAL, volume: get().volume, muted: get().muted })
     },
   }
 })

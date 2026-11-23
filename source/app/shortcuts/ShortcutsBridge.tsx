@@ -7,12 +7,25 @@ import { shortcutComboIds } from './shortcutConflicts'
 import { isInteractiveTarget, isTypingTarget, listenKeydownInIframes } from './iframeKeydown'
 import { isPlainShortcut, shortcutKeysFromEvent, shortcutKeysId } from './shortcutKeys'
 import { effectiveShortcutKeys, useShortcutsStore } from './shortcutsStore'
+import { useShortcutScreenStore, type ReaderKind } from './shortcutScreenStore'
 
-function contextOf(pathname: string): ShortcutContext | null {
+function contextOf(pathname: string, readerKind: ReaderKind | null): ShortcutContext | null {
   if (pathname.startsWith('/library')) return 'library'
-  if (pathname.startsWith('/reader')) return 'reader'
+  if (pathname.startsWith('/reader')) return readerKind === 'audio' ? 'audiobook' : 'reader'
   if (pathname.startsWith('/settings')) return 'settings'
   return null
+}
+
+const NAVIGATION_KEYS = new Set(['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End', 'PageUp', 'PageDown'])
+const ARROW_KEY_CONTROLS = '[role="slider"], [role="radiogroup"], [role="radio"], [role="listbox"], [role="menu"], [role="separator"]'
+
+/**
+ * Spec 018 FR-006: a focused control that moves with the arrow / Home / End keys itself (a slider, a radio group, an
+ * open list or menu, the sidebar's resize handle) keeps them; `input[type=range]` is already a typing target.
+ */
+function ownsNavigationKeys(target: EventTarget | null): boolean {
+  const el = target as Element | null
+  return typeof el?.closest === 'function' && el.closest(ARROW_KEY_CONTROLS) !== null
 }
 
 /** A modal dialog is open — plain keys belong to it, not to the reader behind it. */
@@ -35,14 +48,15 @@ function hasOpenModal(): boolean {
 export function ShortcutsBridge() {
   const navigate = useNavigate()
   const { pathname } = useLocation()
+  const readerKind = useShortcutScreenStore((s) => s.readerKind)
 
   useEffect(() => {
-    const context = contextOf(pathname)
+    const context = contextOf(pathname, readerKind)
     if (!context) return
 
     function leaveReaderThen(run: () => void) {
       void (async () => {
-        if (context === 'reader') await flushRegisteredSession()
+        if (context === 'reader' || context === 'audiobook') await flushRegisteredSession()
         run()
       })()
     }
@@ -75,6 +89,7 @@ export function ShortcutsBridge() {
         if (isTypingTarget(event.target) || hasOpenModal()) return
         const main = pressed[pressed.length - 1]
         if ((main === 'Enter' || main === 'Space') && isInteractiveTarget(event.target)) return
+        if (NAVIGATION_KEYS.has(main) && ownsNavigationKeys(event.target)) return
       }
       const combo = shortcutKeysId(pressed)
       const keys = effectiveShortcutKeys(state.overrides)
@@ -98,7 +113,7 @@ export function ShortcutsBridge() {
     if (context === 'reader') return listenKeydownInIframes(onKeyDown)
     window.addEventListener('keydown', onKeyDown, true)
     return () => window.removeEventListener('keydown', onKeyDown, true)
-  }, [navigate, pathname])
+  }, [navigate, pathname, readerKind])
 
   return null
 }

@@ -27,8 +27,8 @@ the repository root. Every Main-process file change needs an approval line in
 
 **Purpose**: glossary and feature flag every story relies on.
 
-- [ ] T001 Add the rows "Mini player → Trình phát thu nhỏ", "Pop out → Mở cửa sổ nổi", "Return to app → Về ứng dụng", "Floating window → Cửa sổ nổi", "Skip back / forward length → Độ dài tua lùi / tới", "Rewind on resume → Tự lùi khi phát tiếp" to `specs/012-app-ui-i18n/contracts/glossary.md` (Core terms table, appended after the "Utilities" row)
-- [ ] T002 [P] Add `'miniPlayer'` to `AppFeature` in `source/app/platforms/host-types.ts`; return `true` for it in `source/app/platforms/host.electron.ts` and `false` in `source/app/platforms/host.native.ts`
+- [X] T001 Add the rows "Mini player → Trình phát thu nhỏ", "Pop out → Mở cửa sổ nổi", "Return to app → Về ứng dụng", "Floating window → Cửa sổ nổi", "Skip back / forward length → Độ dài tua lùi / tới", "Rewind on resume → Tự lùi khi phát tiếp" to `specs/012-app-ui-i18n/contracts/glossary.md` (Core terms table, appended after the "Utilities" row)
+- [X] T002 [P] Add `'miniPlayer'` to `AppFeature` in `source/app/platforms/host-types.ts`; return `true` for it in `source/app/platforms/host.electron.ts` and `false` in `source/app/platforms/host.native.ts`
 
 ---
 
@@ -36,10 +36,10 @@ the repository root. Every Main-process file change needs an approval line in
 
 **Purpose**: shared visual primitives and the shared rail icon used by US1, US4 and the mini player surfaces.
 
-- [ ] T003 Add warning tokens `--lib-warning-bg`, `--lib-warning-border`, `--lib-warning-text` for Night, Sepia and Paper in `source/app/styles/theme.css` (text on bg ≥ 4.5:1 in each theme, border ≥ 3:1 against the page background) and map them as `--color-lib-warning-bg|border|text` in the `@theme` block of `source/app/index.css`
-- [ ] T004 Add a `focus-ring` utility in `source/app/index.css` (`@utility focus-ring { &:focus-visible { outline: 2px solid var(--lib-accent); outline-offset: 2px } }`), shown for keyboard focus only (research R12)
-- [ ] T005 Extend `source/app/platforms/electron/spikes/theme-presets/run-contrast.mjs` to assert, for Night / Sepia / Paper: warning text on warning bg ≥ 4.5:1, accent focus outline vs page background ≥ 3:1 (SC-001, FR-003)
-- [ ] T006 [P] Create `source/app/screens/Reader/components/sidebar/SidebarTabIcon.tsx`: inline SVG icons (24 viewBox, `stroke="currentColor"`, strokeWidth 1.8, `aria-hidden`) for ids `chapters`, `bookmarks`, `highlights`, `layout`, `attachments`, `transcript`, `notes`
+- [X] T003 Add warning tokens `--lib-warning-bg`, `--lib-warning-border`, `--lib-warning-text` for Night, Sepia and Paper in `source/app/styles/theme.css` (text on bg ≥ 4.5:1 in each theme, border ≥ 3:1 against the page background) and map them as `--color-lib-warning-bg|border|text` in the `@theme` block of `source/app/index.css`
+- [X] T004 Add a `focus-ring` utility in `source/app/index.css` (`@utility focus-ring { &:focus-visible { outline: 2px solid var(--lib-accent); outline-offset: 2px } }`), shown for keyboard focus only (research R12)
+- [X] T005 Extend `source/app/platforms/electron/spikes/theme-presets/run-contrast.mjs` to assert, for Night / Sepia / Paper: warning text on warning bg ≥ 4.5:1, accent focus outline vs page background ≥ 3:1 (SC-001, FR-003)
+- [X] T006 [P] Create `source/app/screens/Reader/components/sidebar/SidebarTabIcon.tsx`: inline SVG icons (24 viewBox, `stroke="currentColor"`, strokeWidth 1.8, `aria-hidden`) for ids `chapters`, `bookmarks`, `highlights`, `layout`, `attachments`, `transcript`, `notes`
 
 **Checkpoint**: tokens, focus ring and icons exist; nothing visible changed yet.
 
@@ -51,11 +51,11 @@ the repository root. Every Main-process file change needs an approval line in
 
 **Independent Test**: quickstart rows 1–2 — damaged track in Paper / Sepia / Night; Tab through player + sidebar.
 
-- [ ] T007 [P] [US1] Replace the fixed `amber-*` classes of `TrackErrorNotice` and `NoteNotice` (and their buttons) with `bg-lib-warning-bg border-lib-warning-border text-lib-warning-text` plus a leading warning icon (`aria-hidden`) in `source/app/screens/AudioBook/AudioBookScreen.tsx`
-- [ ] T008 [P] [US1] Replace `text-amber-300` of the "can't play" label with `text-lib-warning-text` in `source/app/screens/AudioBook/components/AudioSidebar.tsx`
-- [ ] T009 [US1] Add `focus-ring` to every interactive element of `source/app/screens/AudioBook/components/AudioControls.tsx` (transport, speed / sleep triggers, Add note, volume), `AudioTimeline.tsx` (scope radios, slider, note markers — replace their `focus-visible:outline-none`), `AudioSelect.tsx` (trigger + options), `AudioNoteMenu.tsx`, `AudioSidebar.tsx` (rows, note cards, group rows, close) and the Transcribe entry in `AudioBookScreen.tsx`
-- [ ] T010 [US1] Add `focus-ring` to the rail buttons and the open/close edge button in `source/app/screens/Reader/components/sidebar/SidebarEdgeRail.tsx` (shared with the text reader)
-- [ ] T011 [US1] Run `npm run spike:theme:contrast` and fix any failing pair in `source/app/styles/theme.css`
+- [X] T007 [P] [US1] Replace the fixed `amber-*` classes of `TrackErrorNotice` and `NoteNotice` (and their buttons) with `bg-lib-warning-bg border-lib-warning-border text-lib-warning-text` plus a leading warning icon (`aria-hidden`) in `source/app/screens/AudioBook/AudioBookScreen.tsx`
+- [X] T008 [P] [US1] Replace `text-amber-300` of the "can't play" label with `text-lib-warning-text` in `source/app/screens/AudioBook/components/AudioSidebar.tsx`
+- [X] T009 [US1] Add `focus-ring` to every interactive element of `source/app/screens/AudioBook/components/AudioControls.tsx` (transport, speed / sleep triggers, Add note, volume), `AudioTimeline.tsx` (scope radios, slider, note markers — replace their `focus-visible:outline-none`), `AudioSelect.tsx` (trigger + options), `AudioNoteMenu.tsx`, `AudioSidebar.tsx` (rows, note cards, group rows, close) and the Transcribe entry in `AudioBookScreen.tsx`
+- [X] T010 [US1] Add `focus-ring` to the rail buttons and the open/close edge button in `source/app/screens/Reader/components/sidebar/SidebarEdgeRail.tsx` (shared with the text reader)
+- [X] T011 [US1] Run `npm run spike:theme:contrast` and fix any failing pair in `source/app/styles/theme.css`
 
 **Checkpoint**: US1 independently testable.
 
@@ -67,15 +67,15 @@ the repository root. Every Main-process file change needs an approval line in
 
 **Independent Test**: quickstart rows 3–4.
 
-- [ ] T012 [P] [US2] Create `source/app/shortcuts/shortcutScreenStore.ts` (zustand vanilla-compatible store `{ readerKind: 'text' | 'audio' | null, setReaderKind }`) and export it from `source/app/shortcuts/index.ts`
-- [ ] T013 [US2] In `source/app/shortcuts/shortcutDefinitions.ts` add `ShortcutGroupId` `'audiobook'`, `ShortcutContext` `'audiobook'`, the group entry (label `settings.keyboard.groups.audiobook`) and the 11 definitions of `contracts/player-shortcuts.md` (ids, defaults `Space`, `ArrowLeft`, `ArrowRight`, `Shift ArrowLeft`, `Shift ArrowRight`, `ArrowUp`, `ArrowDown`, `M`, `[`, `]`, `B`; all `allowBare: true`; `allowRepeat: true` for skipBack / skipForward / volumeUp / volumeDown) — use the key tokens of `shortcutKeys.ts`
-- [ ] T014 [US2] In `source/app/shortcuts/ShortcutsBridge.tsx`: `contextOf` returns `'audiobook'` for `/reader…` when `shortcutScreenStore.readerKind === 'audio'`; add rule 3 of the contract (ArrowLeft/Right/Up/Down, Home, End, PageUp/PageDown never fire when the target is inside `input[type=range]`, `[role=slider]`, `[role=radiogroup]`, `[role=listbox]`, `[role=menu]` or `[role=separator]`)
-- [ ] T015 [US2] Set `readerKind` in `source/app/screens/ReaderRoute.tsx` (`'audio'` when it mounts `AudioBookScreen`, `'text'` for `ReaderScreen`, `null` on unmount)
-- [ ] T016 [US2] Add the en + vi texts `settings.keyboard.groups.audiobook` and `settings.keyboard.items.audiobookPlayPause|SkipBack|SkipForward|PreviousChapter|NextChapter|VolumeUp|VolumeDown|Mute|SpeedDown|SpeedUp|AddNote` in `source/core/src/i18n/catalogue/en/settings.ts` and `vi/settings.ts`
-- [ ] T017 [US2] Add store actions `toggleMute()`, `speedStep(direction: 1 | -1)` (next / previous `PLAYBACK_RATES` entry) and `volumeStep(direction)` (±0.05, clamp 0–1, lifts mute) to `source/app/screens/AudioBook/logic/audioPlayerStore.ts` (mute is persisted by T053 in US4; here keep it in memory)
-- [ ] T018 [US2] Register the 11 handlers with `useShortcutAction` in `source/app/screens/AudioBook/AudioBookScreen.tsx` (each returns `false` when its button would be disabled; until T053 lands, skip back / forward use the fixed 15 s / 30 s the player uses today, then switch to the chosen lengths) and delete the hand-written Space `keydown` listener and `isTypingTarget`
-- [ ] T019 [US2] Use `useShortcutLabel` for the tooltips of play / skip / previous / next / Add note / mute in `source/app/screens/AudioBook/components/AudioControls.tsx` (FR-007)
-- [ ] T020 [US2] Extend `source/app/platforms/electron/spikes/shortcuts/run-shortcuts.mjs` (`npm run spike:settings:shortcuts`): audiobook context has no conflict with reader page keys; a rebind applies; arrows on a focused slider do not fire
+- [X] T012 [P] [US2] Create `source/app/shortcuts/shortcutScreenStore.ts` (zustand vanilla-compatible store `{ readerKind: 'text' | 'audio' | null, setReaderKind }`) and export it from `source/app/shortcuts/index.ts`
+- [X] T013 [US2] In `source/app/shortcuts/shortcutDefinitions.ts` add `ShortcutGroupId` `'audiobook'`, `ShortcutContext` `'audiobook'`, the group entry (label `settings.keyboard.groups.audiobook`) and the 11 definitions of `contracts/player-shortcuts.md` (ids, defaults `Space`, `ArrowLeft`, `ArrowRight`, `Shift ArrowLeft`, `Shift ArrowRight`, `ArrowUp`, `ArrowDown`, `M`, `[`, `]`, `B`; all `allowBare: true`; `allowRepeat: true` for skipBack / skipForward / volumeUp / volumeDown) — use the key tokens of `shortcutKeys.ts`
+- [X] T014 [US2] In `source/app/shortcuts/ShortcutsBridge.tsx`: `contextOf` returns `'audiobook'` for `/reader…` when `shortcutScreenStore.readerKind === 'audio'`; add rule 3 of the contract (ArrowLeft/Right/Up/Down, Home, End, PageUp/PageDown never fire when the target is inside `input[type=range]`, `[role=slider]`, `[role=radiogroup]`, `[role=listbox]`, `[role=menu]` or `[role=separator]`)
+- [X] T015 [US2] Set `readerKind` in `source/app/screens/ReaderRoute.tsx` (`'audio'` when it mounts `AudioBookScreen`, `'text'` for `ReaderScreen`, `null` on unmount)
+- [X] T016 [US2] Add the en + vi texts `settings.keyboard.groups.audiobook` and `settings.keyboard.items.audiobookPlayPause|SkipBack|SkipForward|PreviousChapter|NextChapter|VolumeUp|VolumeDown|Mute|SpeedDown|SpeedUp|AddNote` in `source/core/src/i18n/catalogue/en/settings.ts` and `vi/settings.ts`
+- [X] T017 [US2] Add store actions `toggleMute()`, `speedStep(direction: 1 | -1)` (next / previous `PLAYBACK_RATES` entry) and `volumeStep(direction)` (±0.05, clamp 0–1, lifts mute) to `source/app/screens/AudioBook/logic/audioPlayerStore.ts` (mute is persisted by T053 in US4; here keep it in memory)
+- [X] T018 [US2] Register the 11 handlers with `useShortcutAction` in `source/app/screens/AudioBook/AudioBookScreen.tsx` (each returns `false` when its button would be disabled; until T053 lands, skip back / forward use the fixed 15 s / 30 s the player uses today, then switch to the chosen lengths) and delete the hand-written Space `keydown` listener and `isTypingTarget`
+- [X] T019 [US2] Use `useShortcutLabel` for the tooltips of play / skip / previous / next / Add note / mute in `source/app/screens/AudioBook/components/AudioControls.tsx` (FR-007)
+- [X] T020 [US2] Extend `source/app/platforms/electron/spikes/shortcuts/run-shortcuts.mjs` (`npm run spike:settings:shortcuts`): audiobook context has no conflict with reader page keys; a rebind applies; arrows on a focused slider do not fire
 
 **Checkpoint**: US1 + US2 = MVP (accessibility defects fixed).
 
@@ -167,7 +167,7 @@ motion, rewind on resume, keyboard resize, 12 px text, two columns, Notes search
 - [ ] T055 [US4] In `source/app/screens/AudioBook/components/AudioTimeline.tsx`: draw note markers in a 10 px strip above the slider track (never over the thumb) with 24 × 24 px hit areas; replace `label.toLowerCase()` with dedicated messages `audiobook.player.timeline.seekWholeBook|seekChapter|seekTrack` (en + vi) (FR-016, FR-018)
 - [ ] T056 [US4] In `source/app/screens/AudioBook/AudioBookScreen.tsx`: render `BookProgress` only when `scope === 'chapter'` and move the "x % · time left" text next to `ProgressScopeSelector` in Book scope (single-file only) (FR-012)
 - [ ] T057 [US4] In `source/app/screens/AudioBook/AudioBookScreen.tsx`: make `<main>` a container (`@container`) and lay out per FR-032 — `@min-[1024px]:` two columns (cover `w-[clamp(320px,32cqw,440px)]` keeping proportions | now-playing, progress summary, scope, timeline, notices, transport, secondary row), one centred column with a 180 px cover below; no JS measurement
-- [ ] T058 [US4] Switch `source/app/screens/Reader/components/sidebar/sidebarTabs.ts` from emoji strings to icon ids and render `SidebarTabIcon` in `source/app/screens/Reader/components/sidebar/SidebarEdgeRail.tsx` (text reader + player)
+- [X] T058 [US4] Switch `source/app/screens/Reader/components/sidebar/sidebarTabs.ts` from emoji strings to icon ids and render `SidebarTabIcon` in `source/app/screens/Reader/components/sidebar/SidebarEdgeRail.tsx` (text reader + player)
 - [ ] T059 [US4] Make the resize handle in `source/app/screens/AudioBook/components/AudioSidebar.tsx` keyboard-operable: `tabIndex={0}`, `aria-valuenow/min/max` in px, ← / → ±16 px, Home / End to min / max, `focus-ring`, width kept like a drag (via `useSidebarPanelResize` in its current file)
 - [ ] T060 [US4] Raise every `text-[10px]` / `text-[11px]` in `source/app/screens/AudioBook/components/AudioSidebar.tsx` (note cards, badges, dates, group rows) to at least `text-xs` (12 px)
 - [ ] T061 [US4] Create `source/app/screens/AudioBook/logic/audioNoteFilterStore.ts` (`{ bookId, query, chapterId, groupByChapter }`, session-only, cleared when the player's `bookId` changes) and add to the Notes tab in `source/app/screens/AudioBook/components/AudioSidebar.tsx`: `type="search"` field with a screen-reader label, chapter filter (single-file with chapters), "Group by chapter" toggle (`aria-pressed`), `role="status"` count, empty state with "Clear"; multi-track keeps its track groups narrowed by the search; markers unaffected; a new Note hidden by the filter → feedback with "Show" that clears it; texts `audiobook.player.sidebar.search*` en + vi

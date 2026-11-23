@@ -70,7 +70,7 @@ function ChaptersTab() {
               ref={current ? currentRef : undefined}
               type="button"
               aria-current={current ? 'true' : undefined}
-              className={`flex w-full cursor-pointer items-start gap-3 rounded-lg border-none bg-transparent px-2.5 py-2 text-left hover:bg-lib-surface-hover ${
+              className={`focus-ring flex w-full cursor-pointer items-start gap-3 rounded-lg border-none bg-transparent px-2.5 py-2 text-left hover:bg-lib-surface-hover ${
                 current ? '!bg-lib-accent-soft' : ''
               }`}
               onClick={() => goToChapter(c.id)}
@@ -126,7 +126,7 @@ function TracksTab() {
                 type="button"
                 aria-current={current ? 'true' : undefined}
                 title={track.title}
-                className={`flex w-full cursor-pointer items-start gap-3 rounded-lg border-none bg-transparent px-2.5 py-2 text-left hover:bg-lib-surface-hover ${
+                className={`focus-ring flex w-full cursor-pointer items-start gap-3 rounded-lg border-none bg-transparent px-2.5 py-2 text-left hover:bg-lib-surface-hover ${
                   current ? '!bg-lib-accent-soft' : ''
                 }`}
                 onClick={() => goToTrack(i)}
@@ -139,7 +139,7 @@ function TracksTab() {
                   {current && !failed && duration ? <CurrentChapterBar start={0} end={duration} /> : null}
                 </span>
                 {failed ? (
-                  <span className="shrink-0 pt-0.5 text-xs text-amber-300">{t('audiobook.player.sidebar.cantPlay')}</span>
+                  <span className="shrink-0 pt-0.5 text-xs font-medium text-lib-warning-text">{t('audiobook.player.sidebar.cantPlay')}</span>
                 ) : (
                   <span className="shrink-0 pt-0.5 text-xs tabular-nums text-lib-muted">{trackDurationLabel(duration)}</span>
                 )}
@@ -181,7 +181,7 @@ function NoteCard({ note: n, at, chapterTitle }: { note: AudioBookmark; at: numb
     >
       <button
         type="button"
-        className="min-w-0 flex-1 cursor-pointer border-none bg-transparent p-0 text-left outline-none focus-visible:outline-none"
+        className="focus-ring min-w-0 flex-1 cursor-pointer rounded-md border-none bg-transparent p-0 text-left"
         aria-label={t('audiobook.player.sidebar.seekToNote', { time })}
         onClick={() => goToNote(n.id)}
       >
@@ -205,7 +205,7 @@ function NoteCard({ note: n, at, chapterTitle }: { note: AudioBookmark; at: numb
       </button>
       <button
         type="button"
-        className="inline-flex size-7 shrink-0 cursor-pointer items-center justify-center rounded-full border-none bg-transparent text-base leading-none text-lib-muted hover:bg-lib-surface-hover hover:text-lib-text-strong"
+        className="focus-ring inline-flex size-7 shrink-0 cursor-pointer items-center justify-center rounded-full border-none bg-transparent text-base leading-none text-lib-muted hover:bg-lib-surface-hover hover:text-lib-text-strong"
         aria-label={t('audiobook.player.sidebar.noteActionsFor', { time })}
         aria-haspopup="menu"
         title={t('audiobook.player.sidebar.noteActions')}
@@ -236,7 +236,7 @@ function TrackNoteGroupRow({ group, playing }: { group: TrackNoteGroup; playing:
         aria-current={playing ? 'true' : undefined}
         aria-label={t('audiobook.player.sidebar.groupAria', { track: group.index + 1, title: group.track.title, count: group.count })}
         title={group.track.title}
-        className={`flex w-full cursor-pointer items-center gap-2 rounded-lg border px-2.5 py-2 text-left hover:bg-lib-surface-hover ${
+        className={`focus-ring flex w-full cursor-pointer items-center gap-2 rounded-lg border px-2.5 py-2 text-left hover:bg-lib-surface-hover ${
           playing ? 'border-lib-accent bg-lib-accent-soft' : 'border-lib-border-soft bg-lib-surface'
         }`}
         onClick={() => toggle(group.trackId)}
@@ -298,7 +298,7 @@ function NotesTab() {
         type="button"
         disabled={!canAddNote}
         title={canAddNote ? undefined : t('audiobook.player.controls.noteNotReady')}
-        className="h-9 w-full cursor-pointer rounded-lg border border-lib-accent-ring bg-lib-accent-soft text-sm font-semibold text-lib-accent hover:bg-lib-surface-hover disabled:cursor-not-allowed disabled:opacity-40"
+        className="focus-ring h-9 w-full cursor-pointer rounded-lg border border-lib-accent-ring bg-lib-accent-soft text-sm font-semibold text-lib-accent hover:bg-lib-surface-hover disabled:cursor-not-allowed disabled:opacity-40"
         onClick={(e) => {
           const id = addNote()
           if (id) openFor(id, e.currentTarget, 'edit')
@@ -376,7 +376,7 @@ export function AudioSidebarPanel({
       <div className="flex items-center justify-between gap-2 border-b border-lib-border-soft px-3 py-2.5">
         <h2 className="m-0 min-w-0 flex-1 truncate text-[15px] font-semibold text-lib-text-strong">{t(SIDEBAR_TAB_LABEL[tab])}</h2>
         <button
-          className="inline-flex size-8 cursor-pointer items-center justify-center rounded-md border-none bg-transparent text-base text-lib-muted hover:bg-lib-surface-hover hover:text-lib-text-strong"
+          className="focus-ring inline-flex size-8 cursor-pointer items-center justify-center rounded-md border-none bg-transparent text-base text-lib-muted hover:bg-lib-surface-hover hover:text-lib-text-strong"
           type="button"
           aria-label={t('audiobook.player.sidebar.close')}
           onClick={onClose}

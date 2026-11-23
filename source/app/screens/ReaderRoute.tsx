@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom'
 import { isAudioFormat } from '@core'
 import { libraryApi } from '../bridge'
 import { isMobileHost } from '../platforms/host'
+import { useShortcutScreenStore } from '../shortcuts/shortcutScreenStore'
 import { AudioBookScreen } from './AudioBook/AudioBookScreen'
 import { ReaderScreen } from './Reader/ReaderScreen'
 
@@ -26,6 +27,13 @@ export function ReaderRoute() {
   const { bookId } = useParams<{ bookId: string }>()
   const [, setLookedUp] = useState(0)
   const cached = bookId ? formatByBookId.get(bookId) : undefined
+  const setReaderKind = useShortcutScreenStore((s) => s.setReaderKind)
+  // Spec 018 (R8): the keyboard shortcuts' context — `audiobook` while this route shows the player.
+  const readerKind = cached === undefined ? null : isAudioFormat(cached) ? 'audio' : 'text'
+  useEffect(() => {
+    setReaderKind(readerKind)
+  }, [readerKind, setReaderKind])
+  useEffect(() => () => setReaderKind(null), [setReaderKind])
 
   useEffect(() => {
     if (!bookId || formatByBookId.has(bookId)) return
