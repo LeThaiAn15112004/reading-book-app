@@ -86,7 +86,6 @@ export const vi = {
     chapters: 'Chương',
     tracks: 'Bản âm thanh',
     trackCount: { other: '{count} bản âm thanh' },
-    noAttachments: 'Sách nói không có tệp đính kèm.',
     cantPlay: '⚠ Không phát được',
     seekToNote: 'Tua đến ghi chú lúc {time}',
     here: 'Tại đây',

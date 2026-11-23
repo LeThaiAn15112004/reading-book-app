@@ -83,7 +83,6 @@ export const en = {
     chapters: 'Chapters',
     tracks: 'Tracks',
     trackCount: { one: '{count} track', other: '{count} tracks' },
-    noAttachments: 'Attachments are not available for audiobooks.',
     cantPlay: '⚠ Can’t play',
     seekToNote: 'Seek to note at {time}',
     here: 'Here',

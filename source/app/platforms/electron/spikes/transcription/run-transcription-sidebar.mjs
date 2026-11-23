@@ -23,11 +23,11 @@ const { getReaderCapabilities, readerSurfaceForFormat } = await import('../../..
 
 /** The text reader's tabs before the Transcript tab existed. */
 const BEFORE = [
-  { id: 'chapters', labelKey: 'reader.sidebar.tabs.chapters', icon: '📑' },
-  { id: 'bookmarks', labelKey: 'reader.sidebar.tabs.bookmarks', icon: '🔖' },
-  { id: 'highlights', labelKey: 'reader.sidebar.tabs.highlights', icon: '🖍️' },
-  { id: 'layout', labelKey: 'reader.sidebar.tabs.layout', icon: '📄', requires: 'pageLayout' },
-  { id: 'attachments', labelKey: 'reader.sidebar.tabs.attachments', icon: '📎', requires: 'attachments' },
+  { id: 'chapters', labelKey: 'reader.sidebar.tabs.chapters' },
+  { id: 'bookmarks', labelKey: 'reader.sidebar.tabs.bookmarks' },
+  { id: 'highlights', labelKey: 'reader.sidebar.tabs.highlights' },
+  { id: 'layout', labelKey: 'reader.sidebar.tabs.layout', requires: 'pageLayout' },
+  { id: 'attachments', labelKey: 'reader.sidebar.tabs.attachments', requires: 'attachments' },
 ]
 const FORMATS = ['epub', 'pdf', 'txt', 'md', 'mobi', 'docx', 'fb2', '', null, undefined]
 
@@ -50,23 +50,23 @@ check('the Transcript tab is unavailable to a text book, and a leftover selectio
   }
 })
 
-check('the existing tab definitions (id, label, icon, requirement, order) are unchanged; Transcript is appended last and labelled', () => {
+check('the existing tab definitions (id, label, requirement, order) are unchanged; Transcript is appended last and labelled', () => {
   assert.deepEqual(SIDEBAR_TABS.slice(0, BEFORE.length), BEFORE)
   assert.equal(SIDEBAR_TABS.length, BEFORE.length + 1)
-  assert.deepEqual(SIDEBAR_TABS.at(-1), { id: 'transcript', labelKey: 'reader.sidebar.tabs.transcript', icon: '📝', requires: 'transcript' })
+  assert.deepEqual(SIDEBAR_TABS.at(-1), { id: 'transcript', labelKey: 'reader.sidebar.tabs.transcript', requires: 'transcript' })
   for (const t of BEFORE) assert.equal(SIDEBAR_TAB_LABEL[t.id], t.labelKey)
   assert.equal(SIDEBAR_TAB_LABEL.transcript, 'reader.sidebar.tabs.transcript')
 })
 
-check('the audiobook rail (the filter AudioBookScreen applies: no Page layout, no Bookmark) is Contents, Notes, Attachment, Transcript', () => {
-  const audioRail = SIDEBAR_TABS.filter((t) => t.id !== 'layout' && t.id !== 'bookmarks').map((t) => t.id)
-  assert.deepEqual(audioRail, ['chapters', 'highlights', 'attachments', 'transcript'])
+check('the audiobook rail (the filter AudioBookScreen applies: no Page layout, no Bookmark, no Attachments) is Contents, Notes, Transcript', () => {
+  const audioRail = SIDEBAR_TABS.filter((t) => t.id !== 'layout' && t.id !== 'bookmarks' && t.id !== 'attachments').map((t) => t.id)
+  assert.deepEqual(audioRail, ['chapters', 'highlights', 'transcript'])
 })
 
-check('T033: with audiobookTranscriptionEnabled OFF (the default) the audiobook rail has no Transcript tab — Contents, Notes, Attachment', () => {
+check('T033: with audiobookTranscriptionEnabled OFF (the default) the audiobook rail has no Transcript tab — Contents, Notes', () => {
   // Mirrors AUDIO_SIDEBAR_TABS_NO_TRANSCRIPT in AudioBookScreen.tsx (the screen picks it when the flag is off).
-  const rail = SIDEBAR_TABS.filter((t) => t.id !== 'layout' && t.id !== 'bookmarks' && t.id !== 'transcript').map((t) => t.id)
-  assert.deepEqual(rail, ['chapters', 'highlights', 'attachments'])
+  const rail = SIDEBAR_TABS.filter((t) => t.id !== 'layout' && t.id !== 'bookmarks' && t.id !== 'attachments' && t.id !== 'transcript').map((t) => t.id)
+  assert.deepEqual(rail, ['chapters', 'highlights'])
 })
 
 console.log(`\n${passed} checks passed`)

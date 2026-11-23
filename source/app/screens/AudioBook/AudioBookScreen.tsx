@@ -23,8 +23,11 @@ import { useAppAppearanceStore } from '../../theme/appAppearanceStore'
 import { getT, uiText, useT, useUiLanguage } from '../../i18n'
 
 const SIDEBAR_OPEN_KEY = 'readmate.audioSidebarOpen.v1'
-/** The text reader's rail, minus Page layout (no pages) and Bookmark (audio's marked positions are its Notes). */
-const AUDIO_SIDEBAR_TABS_ALL = SIDEBAR_TABS.filter((t) => t.id !== 'layout' && t.id !== 'bookmarks')
+/**
+ * The text reader's rail, minus Page layout (no pages), Bookmark (audio's marked positions are its Notes) and Attachments
+ * (an audiobook has none: the tab could only say so).
+ */
+const AUDIO_SIDEBAR_TABS_ALL = SIDEBAR_TABS.filter((t) => t.id !== 'layout' && t.id !== 'bookmarks' && t.id !== 'attachments')
 /**
  * Without the Transcript tab: the rail while `features.audiobookTranscriptionEnabled` is off (it stays off until the own-build
  * FFmpeg decoder is integrated and verified — spec 004, task T033).

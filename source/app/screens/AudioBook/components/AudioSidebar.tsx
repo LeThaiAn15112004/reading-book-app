@@ -452,12 +452,12 @@ function NotesTab() {
 }
 
 function PanelBody({ tab, bookId }: { tab: SidebarTab; bookId: string }) {
-  const t = useT()
   const multiTrack = useAudioPlayerStore((s) => s.tracks.length > 0)
   if (tab === 'chapters') return multiTrack ? <TracksTab /> : <ChaptersTab />
   if (tab === 'highlights') return <NotesTab />
   if (tab === 'transcript') return <TranscriptPanel bookId={bookId} />
-  return <p className={EMPTY}>{t('audiobook.player.sidebar.noAttachments')}</p>
+  // The player's rail offers no other tab; a stale selection shows Contents.
+  return multiTrack ? <TracksTab /> : <ChaptersTab />
 }
 
 /**
