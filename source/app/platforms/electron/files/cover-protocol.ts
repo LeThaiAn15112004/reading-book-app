@@ -79,6 +79,9 @@ export function registerCoverProtocol(): void {
       const headers = new Headers(fileResponse.headers)
       headers.set('Content-Type', mime)
       headers.set('Cache-Control', 'no-cache')
+      // Spec 018 (research R7): the renderer draws a cover into a canvas for the system media controls; without this the
+      // canvas is tainted. Covers are not secret (the renderer already shows them) and only this app loads the scheme.
+      headers.set('Access-Control-Allow-Origin', '*')
       return new Response(fileResponse.body, {
         status: fileResponse.status,
         statusText: fileResponse.statusText,

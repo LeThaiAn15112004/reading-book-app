@@ -3,6 +3,7 @@ import { useEffect, type ReactNode } from 'react'
 import { ImportQueueCard } from './components/import/ImportQueueCard'
 import { MiniPlayerBar } from './components/audio/MiniPlayerBar'
 import { startMiniPlayerSync } from './screens/AudioBook/logic/miniPlayerSync'
+import { startMediaSessionBridge } from './screens/AudioBook/logic/mediaSessionBridge'
 import { miniPlayerReservedHeight, useMiniPlayerUiStore } from './screens/AudioBook/logic/miniPlayerUiStore'
 import { startImportQueue } from './hooks/library/importQueueStore'
 import {
@@ -36,6 +37,8 @@ function AppChromeFrame({ children }: { children: ReactNode }) {
   }, [])
   // Spec 018: the listening session reaches Main (floating window, tray) for the whole app session — Desktop only.
   useEffect(() => startMiniPlayerSync(), [])
+  // Spec 018 US3: the same session in the system's media controls (media flyout, media keys).
+  useEffect(() => startMediaSessionBridge(), [])
   // FR-020: the mini player bar never covers content. The text reader keeps its own text clear of the bar (above its
   // footer); every other screen is laid out above it here.
   const { pathname } = useLocation()

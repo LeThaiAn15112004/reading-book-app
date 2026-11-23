@@ -136,6 +136,7 @@
     "source/app/platforms/electron/chunking/book-chunk-job.ts": "spec 017 US3: BookChunkControlMessage (Main → worker opening flag)",
     "source/app/platforms/electron/ipc/index.ts": "spec 018: registerMiniPlayerIpc",
     "source/app/platforms/electron/ipc/mini-player.ipc.ts": "spec 018: new, miniPlayer:* handlers (validated state / commands, floating-window channels refused from other senders)",
-    "source/app/platforms/electron/mini-player/": "spec 018: new folder — pure rules (validation, auto-open / close, visible position, tray entry), Main-owned prefs file, the floating BrowserWindow, the relay"
+    "source/app/platforms/electron/mini-player/": "spec 018: new folder — pure rules (validation, auto-open / close, visible position, tray entry), Main-owned prefs file, the floating BrowserWindow, the relay",
+    "source/app/platforms/electron/files/cover-protocol.ts": "spec 018 R7: cover responses carry Access-Control-Allow-Origin: * so the renderer can draw a cover into a canvas (system media controls artwork)"
   }
 }
