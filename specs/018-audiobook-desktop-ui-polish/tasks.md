@@ -180,8 +180,8 @@ motion, rewind on resume, keyboard resize, 12 px text, two columns, Notes search
 ## Phase 8: Polish & cross-cutting
 
 - [X] T063 [P] Add glossary anchors for "Trình phát thu nhỏ" and "Mở cửa sổ nổi" to `source/core/tests/i18n/glossary-anchors.test.ts`
-- [ ] T064 [P] Update `CLAUDE.md` (Audiobooks paragraph: listening session lifetime, mini bar, floating window + `MiniPlayerChannels`, tray entry, media session, `audiobook` shortcut context, listening prefs key, new spikes) and add `docs/implementation_plan/audiobook_desktop_player.md` mapping spec 018 to files
-- [ ] T065 Run `npm run check` (typecheck, lint, tests, boundaries, platform adapters, build-split) and `npm run check:desktop-baseline`; fix failures
+- [X] T064 [P] Update `CLAUDE.md` (Audiobooks paragraph: listening session lifetime, mini bar, floating window + `MiniPlayerChannels`, tray entry, media session, `audiobook` shortcut context, listening prefs key, new spikes) and add `docs/implementation_plan/audiobook_desktop_player.md` mapping spec 018 to files
+- [X] T065 Run `npm run check` (typecheck, lint, tests, boundaries, platform adapters, build-split) and `npm run check:desktop-baseline`; fix failures
 - [ ] T066 Run the spikes `spike:theme:contrast`, `spike:settings:shortcuts`, `spike:audio:store`, `spike:audio:mini-player`, `spike:settings:reset` and walk quickstart rows 1–17 on Windows; record R4 / R5 / R7 **verify** outcomes in `specs/018-audiobook-desktop-ui-polish/research.md`
 
 ---
