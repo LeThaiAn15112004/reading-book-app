@@ -3,6 +3,7 @@ import { trackDurationLabel } from '@core'
 import { uiText, useT } from '../../i18n'
 import { useZipImportStore, zipJobDetail, type ZipImportJob } from '../../hooks/library'
 import { SpinnerIcon } from './SpinnerIcon'
+import { useAutoHide } from '../../hooks/app/useAutoHide'
 
 const GHOST_BTN =
   'inline-flex h-8 cursor-pointer items-center rounded-lg border border-lib-border bg-transparent px-3 text-[13px] font-medium text-lib-muted transition-colors hover:text-lib-text-strong disabled:cursor-not-allowed disabled:opacity-50'
@@ -32,6 +33,9 @@ export function AudiobookZipJobPanel({ onOpenBook }: { onOpenBook: (bookId: stri
   const inspecting = useZipImportStore((s) => s.phase === 'inspecting')
   const archiveName = useZipImportStore((s) => s.archiveName)
   const labelId = useId()
+  // A finished import's list hides by itself after 10 s without interaction (a failure stays: it offers Retry).
+  const dismissJob = useZipImportStore((s) => s.dismissJob)
+  const holdHandlers = useAutoHide('zip-import-job', job !== null && open && job.status === 'done', dismissJob)
   const store = useZipImportStore.getState
 
   // Reading the archive (before the selection dialog opens): the card behind the spinner, with a way to stop.
@@ -79,6 +83,7 @@ export function AudiobookZipJobPanel({ onOpenBook }: { onOpenBook: (bookId: stri
 
   return (
     <section
+      {...holdHandlers}
       role="dialog"
       aria-labelledby={labelId}
       aria-live="polite"

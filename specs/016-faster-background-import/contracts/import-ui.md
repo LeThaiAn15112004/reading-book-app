@@ -17,8 +17,10 @@ Pill visibility:
 
 - A job `running` or `waiting` → the pill is always shown.
 - Everything finished → the pill shows the result (`queue.pillDone`, e.g. "4 added · 1 failed", groups at 0 left out);
-  click / tap opens the batch summary. With no `failed` / `interrupted` job it hides by itself after 10 s; with one it
-  stays until the reader opens the summary or presses Dismiss (so "Try again" is never missed).
+  click / tap opens the batch summary. With no `failed` / `interrupted` job it hides by itself after 10 s without
+  interaction — also while the summary is open, which then collapses (2026-11-23); with one it stays until the reader
+  opens the summary or presses Dismiss (so "Try again" is never missed). The audiobook ZIP job panel follows the same
+  rule for a finished import (`hooks/app/useAutoHide.ts`).
 - No job in the queue → nothing floats on screen.
 - The 10 s auto-hide counts only while the window is shown and focused: an import that ends while the window is
   hidden (Run in Background) keeps its result pill until the window is shown again, then the 10 s start. The count

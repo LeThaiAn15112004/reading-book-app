@@ -11,11 +11,12 @@
  * - Screen readers: one polite live region announces step changes and results as full sentences; the elapsed
  *   counter is outside it and never read out.
  */
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { activityOf, progressPercent, type ImportJob } from '@core'
 import { useFormat, useT } from '../../i18n'
 import { useOpenReading } from '../../hooks/app/OpenReadingContext'
 import { useBackClose } from '../../hooks/app/useBackClose'
+import { useAutoHide } from '../../hooks/app/useAutoHide'
 import { useImportQueueStore } from '../../hooks/library/importQueueStore'
 import { useLibraryBooksStore } from '../../hooks/library/libraryBooksStore'
 import { libraryApi } from '../../bridge/library'
@@ -25,6 +26,12 @@ import { batchSummaryLine, messageText, stepLabel } from './importQueueText'
 
 /** Result pill without failures hides after this long (contracts/import-ui.md). */
 export const RESULT_PILL_MS = 10_000
+
+/** One countdown per result shown (a new result starts a fresh 10 s). */
+function noticeKey(notice: { kind: 'single'; jobId: string; at: number } | { kind: 'batch'; batchId: string; at: number } | null): string {
+  if (!notice) return 'none'
+  return `${notice.kind === 'single' ? notice.jobId : notice.batchId}:${notice.at}`
+}
 /** The elapsed counter appears from the 2nd second of a step (no flash on short steps). */
 const ELAPSED_FROM_MS = 2000
 
@@ -90,26 +97,14 @@ export function ImportQueueCard() {
       : noticeJob?.state === 'failed' || noticeJob?.state === 'interrupted'
   const showResult = live === 0 && notice !== null && (notice.kind === 'batch' || noticeJob !== null)
 
-  // ---- result pill auto-hide (10 s, only while the window is shown + focused, paused on hover / focus) ----------
-  const [held, setHeld] = useState(false)
-  const [visibleTick, setVisibleTick] = useState(0)
-  useEffect(() => {
-    const bump = () => setVisibleTick((n) => n + 1)
-    document.addEventListener('visibilitychange', bump)
-    window.addEventListener('focus', bump)
-    window.addEventListener('blur', bump)
-    return () => {
-      document.removeEventListener('visibilitychange', bump)
-      window.removeEventListener('focus', bump)
-      window.removeEventListener('blur', bump)
-    }
-  }, [])
-  useEffect(() => {
-    if (!showResult || noticeHasProblem || held || expanded) return
-    if (document.visibilityState !== 'visible' || !document.hasFocus()) return
-    const timer = window.setTimeout(() => store().dismissNotice(), RESULT_PILL_MS)
-    return () => window.clearTimeout(timer)
-  }, [showResult, noticeHasProblem, held, expanded, visibleTick, notice, store])
+  // ---- result auto-hide (10 s without interaction, only while the window is shown + focused, paused on hover /
+  // focus). A success result hides even when the summary is open (it collapses too); a result with a failed /
+  // interrupted job stays until the reader acts on it, so "Try again" is never missed (spec 016).
+  const hideResult = useCallback(() => {
+    store().setExpanded(false)
+    store().dismissNotice()
+  }, [store])
+  const holdHandlers = useAutoHide(`import-queue:${noticeKey(notice)}`, showResult && !noticeHasProblem, hideResult, RESULT_PILL_MS)
 
   // ---- screen-reader announcements (one polite region; full sentences; never the counter) ---------------------
   const [announcement, setAnnouncement] = useState('')
@@ -185,10 +180,7 @@ export function ImportQueueCard() {
   return (
     <div
       className="import-queue"
-      onMouseEnter={() => setHeld(true)}
-      onMouseLeave={() => setHeld(false)}
-      onFocus={() => setHeld(true)}
-      onBlur={() => setHeld(false)}
+      {...holdHandlers}
       onKeyDown={(e) => {
         if (e.key === 'Escape' && expanded) {
           e.stopPropagation()
