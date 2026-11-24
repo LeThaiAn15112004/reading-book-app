@@ -47,8 +47,8 @@ solid, the screen around it was built as a minimum. The review found:
 ### Session 2026-11-24
 
 - Q: What does the Appearance panel show for a PDF, whose font, size and spacing cannot change? → A: Only Theme + Zoom
-  (fit width, −, +); zoom leaves the top bar.
-- Q: In scrolling books (PDF, Markdown, TXT, EPUB scroll view), what does a tap near the left / right edge do? → A: No
+  (fit width, −, +) — plus the PDF view (Page / Scroll), see Session 2026-11-25; zoom leaves the top bar.
+- Q: In scrolling books (PDF scroll view, Markdown, TXT, EPUB scroll view), what does a tap near the left / right edge do? → A: No
   edge zones there; a tap anywhere not on a link or mark shows / hides the bars; reading moves only by scrolling.
 - Q: What may a TXT book do on the phone after the fix — marking, bookmarks? → A: Marking in one step like the other
   formats (colour, underline, strike, note); no text editing; no bookmark button.
@@ -58,19 +58,27 @@ solid, the screen around it was built as a minimum. The review found:
   (% while still counting); PDF: outline entry (if any) · "page x/y"; Markdown: current heading (if any) · %; TXT: book
   title · %. No "time left".
 
+### Session 2026-11-25
+
+- Q: How does a PDF read on the phone? → A: Two views, like EPUB: "Page" (one page per screen, swipe left / right turns
+  the page) and "Scroll" (continuous vertical scroll); EPUB "Page" also turns with left / right swipes.
+- Q: Which view does a PDF open in when the book has no saved view yet? → A: "Page" (same as EPUB).
+- Q: In PDF "Page" view with the page zoomed in, what does a horizontal swipe do? → A: It pans first; only a new swipe
+  made once the page edge is reached turns the page; the new page opens fitted to the screen.
+
 The reading screen after this feature, per format (summary of the requirements below; the requirements govern):
 
-| | EPUB — Page (default) | EPUB — Scroll | PDF | Markdown | TXT |
-|---|---|---|---|---|---|
-| Opens | text, bars hidden | text, bars hidden | page, bars hidden | text, bars hidden | text, bars hidden |
-| Move on | swipe; tap edge strip of the page | scroll | scroll; pinch zoom | scroll | scroll |
-| Bars toggle | tap middle third | tap anywhere | tap anywhere | tap anywhere | tap anywhere |
-| Top bar | Back · title · bookmark | Back · title · bookmark | Back · title · bookmark | Back · title · bookmark | Back · title |
-| Bottom bar place | chapter · page x/y in chapter | chapter · % | outline entry · page x/y | heading · % | title · % |
-| Contents | book contents | book contents | outline (if any) | headings | — (button hidden) |
-| Aa panel | theme, size, font, spacing, margins, Page/Scroll | same | theme, zoom | theme, size, font, spacing, margins | theme, size, font, spacing, margins |
-| Marking | one step | one step | one step (text) | one step | one step (no editing) |
-| Back | closes the top layer, then leaves the book | same | same | same | same |
+| | EPUB — Page (default) | EPUB — Scroll | PDF — Page (default) | PDF — Scroll | Markdown | TXT |
+|---|---|---|---|---|---|---|
+| Opens | text, bars hidden | text, bars hidden | page, bars hidden | page, bars hidden | text, bars hidden | text, bars hidden |
+| Move on | swipe; tap edge strip of the page | scroll | swipe; tap edge strip; pinch zoom | scroll; pinch zoom | scroll | scroll |
+| Bars toggle | tap middle third | tap anywhere | tap middle third | tap anywhere | tap anywhere | tap anywhere |
+| Top bar | Back · title · bookmark | Back · title · bookmark | Back · title · bookmark | Back · title · bookmark | Back · title · bookmark | Back · title |
+| Bottom bar place | chapter · page x/y in chapter | chapter · % | outline entry · page x/y | outline entry · page x/y | heading · % | title · % |
+| Contents | book contents | book contents | outline (if any) | outline (if any) | headings | — (button hidden) |
+| Aa panel | theme, size, font, spacing, margins, Page/Scroll | same | theme, zoom, Page/Scroll | same | theme, size, font, spacing, margins | theme, size, font, spacing, margins |
+| Marking | one step | one step | one step (text) | one step (text) | one step | one step (no editing) |
+| Back | closes the top layer, then leaves the book | same | same | same | same | same |
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -100,22 +108,24 @@ again; the Library appears.
 
 ### User Story 2 - Turn pages by swiping (Priority: P1)
 
-In a paginated book (EPUB in page view) the reader swipes left / right to go to the next / previous page; the page
+In a paginated book (EPUB or PDF in page view) the reader swipes left / right to go to the next / previous page; the page
 follows the finger and settles. Taps near the edges still turn pages, but never steal a long press meant for text
-selection. Books read by scrolling (PDF, Markdown, TXT, EPUB in scroll view) keep vertical scrolling.
+selection. Books read by scrolling (PDF in scroll view, Markdown, TXT, EPUB in scroll view) keep vertical scrolling.
 
 **Why this priority**: swiping is the default way to read on a phone; without it the reader feels unfinished.
 
-**Independent Test**: open an EPUB in page view, swipe through 20 pages both ways, select text near both edges, open a
-PDF and zoom / pan near the edges.
+**Independent Test**: open an EPUB and a PDF in page view, swipe through 20 pages both ways, select text near both edges;
+zoom a PDF page and pan near the edges.
 
 **Acceptance Scenarios**:
 
-1. **Given** a paginated EPUB, **When** the reader swipes left past a small threshold, **Then** the next page appears;
+1. **Given** a paginated EPUB or PDF, **When** the reader swipes left past a small threshold, **Then** the next page appears;
    a short or mostly vertical move does not turn the page.
 2. **Given** the reader long-presses a word near the left or right edge, **When** the press is held, **Then** text is
    selected and no page turn happens.
-3. **Given** a zoomed PDF, **When** the reader drags near an edge, **Then** the page pans; nothing turns.
+3. **Given** a zoomed PDF page in Page view, **When** the reader swipes sideways, **Then** the page pans; **When** the
+   page's edge is already reached and the reader swipes again in that direction, **Then** the page turns and the new
+   page is shown fitted to the screen. In Scroll view a zoomed PDF only pans.
 4. **Given** the first / last page, **When** the reader swipes past it, **Then** the page springs back and nothing else
    happens.
 5. **Given** the system asks for reduced motion, **When** a page is turned, **Then** it changes without a sliding
@@ -220,6 +230,7 @@ chapter's title. Open a book with no contents; the bookmark is labelled by its p
 
 - A swipe that starts as a text selection (long press) never turns the page; a swipe that starts on a mark opens nothing.
 - A swipe while a panel or the selection bar is open closes / ignores — it never turns a page under a panel.
+- A zoomed PDF page in Page view: a swipe that reaches the page edge stops there; only the next swipe turns (FR-013b).
 - Back while the opening screen is shown leaves the book (spec 017 behaviour unchanged).
 - Back while a dialog of a panel is open (e.g. the confirmation to delete a mark) closes that dialog first.
 - A book without chapters: the bottom bar shows the book's progress instead of a chapter name.
@@ -242,14 +253,14 @@ chapter's title. Open a book with no contents; the bookmark is labelled by its p
 
 **Page turns (Story 2)**
 
-- **FR-003**: In a paginated EPUB a horizontal swipe longer than a threshold (and more horizontal than vertical) MUST
+- **FR-003**: In a paginated EPUB or a paginated PDF (Page view, one page per screen) a horizontal swipe longer than a threshold (and more horizontal than vertical) MUST
   turn to the next / previous page, the page following the finger during the swipe and settling after it; past the
   first / last page it springs back.
 - **FR-004**: A long press (text selection) or a touch that starts on a mark or link MUST NOT turn a page; swipes MUST be
   ignored while a panel, the selection bar or the opening screen is shown.
 - **FR-005**: Edge taps MUST keep turning pages in paginated books, through tap handling on the page itself (not
   elements laid over the text), so long presses near the edges select text and a zoomed PDF pans.
-- **FR-006**: Scrolling books (PDF, Markdown, TXT, EPUB scroll view) MUST keep vertical scrolling; swipes do not turn
+- **FR-006**: Scrolling books (PDF scroll view, Markdown, TXT, EPUB scroll view) MUST keep vertical scrolling; swipes do not turn
   pages there, and they have NO edge tap zones: a tap anywhere that is not on a link or a mark shows / hides the bars
   (FR-008); the progress slider and Contents remain the jump controls.
 - **FR-007**: With reduced motion requested, page turns MUST change without sliding.
@@ -277,10 +288,17 @@ chapter's title. Open a book with no contents; the bookmark is labelled by its p
 
 - **FR-013**: The phone Appearance panel MUST offer theme (Night / Sepia / Paper — the app's one theme setting), font
   size, font family, line spacing and margins; it MUST NOT show keyboard hints or the 1 / 2-page layout. It shows only
-  controls that take effect in the open format: for a **PDF** it shows Theme and Zoom (fit width, −, +) only, and the
-  PDF zoom control is removed from the top bar. For an **EPUB** it also offers the view: "Page" (paginated, swipe
+  controls that take effect in the open format: for a **PDF** it shows Theme, Zoom (fit width, −, +) and the view
+  ("Page" / "Scroll", FR-013a) only, and the PDF zoom control is removed from the top bar. For an **EPUB** it also offers
+  the view: "Page" (paginated, swipe
   turns, FR-003) — the default for a book with no saved choice — or "Scroll" (FR-006); the choice is stored per book
   like the other reading settings and switching keeps the reading position.
+- **FR-013a**: A PDF MUST offer two views: "Page" — one page per screen, fitted to the screen, turned by a left / right
+  swipe (FR-003) or an edge tap (FR-005) — the default for a PDF with no saved choice — and "Scroll" — pages one under
+  another, scrolled vertically (FR-006). The choice is stored per book; switching keeps the current page.
+- **FR-013b**: In PDF "Page" view with the page zoomed in, a horizontal swipe MUST pan the page; it turns the page only
+  when it starts with the page's edge already reached in the swipe's direction (a swipe that reaches the edge mid-way
+  stops there and does not turn). The turned-to page opens fitted to the screen.
 - **FR-014**: Every control in the panel MUST be at least 48 dp tall, labels at least 12 px; changes apply live and keep
   the reading position.
 
@@ -335,7 +353,7 @@ chapter's title. Open a book with no contents; the bookmark is labelled by its p
 ### Measurable Outcomes
 
 - **SC-001**: With any panel or the selection bar open, Back closes it in 100 % of tries and never leaves the book.
-- **SC-002**: In a paginated EPUB, 20 swipes in a row turn exactly 20 pages; 20 long presses near the edges select text
+- **SC-002**: In a paginated EPUB and a paginated PDF, 20 swipes in a row turn exactly 20 pages; 20 long presses near the edges select text
   and turn no page.
 - **SC-003**: On opening a book, 0 lines of the first page are covered by a bar.
 - **SC-004**: With the bars shown, the bottom bar takes at most 64 dp plus the system gesture area (today about 110 dp).
@@ -351,7 +369,7 @@ chapter's title. Open a book with no contents; the bookmark is labelled by its p
 
 - Scope: the **phone** reader (Mobile host, `MobileReaderScreen` and its components); the computer's reader is not
   changed, except shared pieces a fix needs (e.g. the selection bar's timing) when Desktop behaviour stays the same.
-- Swipe page turns are for paginated EPUB only; PDF stays one continuous vertical scroll on the phone (as today).
+- Swipe page turns are for the Page view of EPUB and PDF; Scroll views (and Markdown, TXT) scroll vertically.
   Whether a swipe can be told from a selection on real WebViews (risk R2 of spec 008) is verified on a device first.
 - The theme in the reader's Appearance panel is the app's single theme setting (Settings → Appearance), not a per-book
   one.
