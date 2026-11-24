@@ -42,6 +42,36 @@ solid, the screen around it was built as a minimum. The review found:
   mark's panel by handing it a fake on-screen position, and keeps the bars / panels / toast as unrelated local states,
   so there is no single place where Back, auto-hide or the layer order can be decided.
 
+## Clarifications
+
+### Session 2026-11-24
+
+- Q: What does the Appearance panel show for a PDF, whose font, size and spacing cannot change? → A: Only Theme + Zoom
+  (fit width, −, +); zoom leaves the top bar.
+- Q: In scrolling books (PDF, Markdown, TXT, EPUB scroll view), what does a tap near the left / right edge do? → A: No
+  edge zones there; a tap anywhere not on a link or mark shows / hides the bars; reading moves only by scrolling.
+- Q: What may a TXT book do on the phone after the fix — marking, bookmarks? → A: Marking in one step like the other
+  formats (colour, underline, strike, note); no text editing; no bookmark button.
+- Q: Does the phone Appearance panel offer EPUB "Page" vs "Scroll", and which is the default? → A: Yes; "Page" (swipe)
+  is the default, "Scroll" is the alternative; the choice is per book, as today.
+- Q: What does the bottom bar show next to the slider in each format? → A: EPUB: chapter name · "page x/y in chapter"
+  (% while still counting); PDF: outline entry (if any) · "page x/y"; Markdown: current heading (if any) · %; TXT: book
+  title · %. No "time left".
+
+The reading screen after this feature, per format (summary of the requirements below; the requirements govern):
+
+| | EPUB — Page (default) | EPUB — Scroll | PDF | Markdown | TXT |
+|---|---|---|---|---|---|
+| Opens | text, bars hidden | text, bars hidden | page, bars hidden | text, bars hidden | text, bars hidden |
+| Move on | swipe; tap edge strip of the page | scroll | scroll; pinch zoom | scroll | scroll |
+| Bars toggle | tap middle third | tap anywhere | tap anywhere | tap anywhere | tap anywhere |
+| Top bar | Back · title · bookmark | Back · title · bookmark | Back · title · bookmark | Back · title · bookmark | Back · title |
+| Bottom bar place | chapter · page x/y in chapter | chapter · % | outline entry · page x/y | heading · % | title · % |
+| Contents | book contents | book contents | outline (if any) | headings | — (button hidden) |
+| Aa panel | theme, size, font, spacing, margins, Page/Scroll | same | theme, zoom | theme, size, font, spacing, margins | theme, size, font, spacing, margins |
+| Marking | one step | one step | one step (text) | one step | one step (no editing) |
+| Back | closes the top layer, then leaves the book | same | same | same | same |
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Back always does the expected thing (Priority: P1)
@@ -97,7 +127,7 @@ PDF and zoom / pan near the edges.
 
 The book opens straight to the text with the bars hidden. A tap in the middle of the page shows them with a short fade;
 another tap, a page turn or a few seconds without interaction hides them. The bottom bar is one slim row: the chapter
-name with "page x of y" / "n min left in chapter", the progress slider, and three icon buttons (Contents, Notes,
+name (or heading) and the place in it, the progress slider, and three icon buttons (Contents, Notes,
 Appearance). The text is never under a bar the reader did not ask for.
 
 **Why this priority**: the reading area is the product; today a fifth of the screen is chrome when the bars show.
@@ -113,7 +143,7 @@ check that the bottom bar is one row and shows the chapter and place.
 3. **Given** the bars are shown and nothing is touched for 4 seconds, **When** no panel or selection is open, **Then**
    they fade out.
 4. **Given** the bars are shown, **When** the reader looks at the bottom bar, **Then** it shows the current chapter name,
-   the place in it (page x of y, or time left when pages are not known) and the progress slider in one row, plus three
+   the place in it (as FR-010a gives per format) and the progress slider in one row, plus three
    icon buttons with their names for screen readers.
 5. **Given** a Markdown / TXT book scrolled with the bars hidden, **When** the reader taps anywhere on the text that is
    not a link or mark, **Then** the bars show (not only on the margin).
@@ -151,7 +181,7 @@ uses vector icons from one icon style.
 
 **Why this priority**: polish that makes the reader feel finished; the functions already exist.
 
-**Independent Test**: select text in EPUB, PDF and Markdown and mark it with one tap; check every bar / panel control
+**Independent Test**: select text in EPUB, PDF, Markdown and TXT and mark it with one tap; check every bar / panel control
 for vector icons.
 
 **Acceptance Scenarios**:
@@ -193,7 +223,7 @@ chapter's title. Open a book with no contents; the bookmark is labelled by its p
 - Back while the opening screen is shown leaves the book (spec 017 behaviour unchanged).
 - Back while a dialog of a panel is open (e.g. the confirmation to delete a mark) closes that dialog first.
 - A book without chapters: the bottom bar shows the book's progress instead of a chapter name.
-- Pages not known yet (still counting): the bottom bar shows the time left / percentage until they are, never "page 0".
+- Pages not known yet (still counting): the bottom bar shows the percentage until they are, never "page 0".
 - Landscape phone and small phones (360 px wide): the single-row bottom bar keeps every control ≥ 44 dp; the chapter name
   truncates with an ellipsis.
 - Theme changed in the reader while another screen is open in the background: every screen follows (one setting).
@@ -220,19 +250,24 @@ chapter's title. Open a book with no contents; the bookmark is labelled by its p
 - **FR-005**: Edge taps MUST keep turning pages in paginated books, through tap handling on the page itself (not
   elements laid over the text), so long presses near the edges select text and a zoomed PDF pans.
 - **FR-006**: Scrolling books (PDF, Markdown, TXT, EPUB scroll view) MUST keep vertical scrolling; swipes do not turn
-  pages there.
+  pages there, and they have NO edge tap zones: a tap anywhere that is not on a link or a mark shows / hides the bars
+  (FR-008); the progress slider and Contents remain the jump controls.
 - **FR-007**: With reduced motion requested, page turns MUST change without sliding.
 
 **Bars (Story 3)**
 
 - **FR-008**: A book MUST open with the bars hidden; a tap in the middle third of a paginated page (anywhere on plain
   text in a scrolling book) toggles them; a page turn, a scroll in a scrolling book, or 4 s without interaction (no
-  panel or selection open) hides them.
+  panel or selection open) hides them. In a scrolling book (FR-006) a tap anywhere on the page that is not a link or a
+  mark toggles them.
 - **FR-009**: Showing / hiding the bars MUST use a fade of at most 200 ms (none with reduced motion) and MUST NOT move or
   re-lay out the text.
-- **FR-010**: The bottom bar MUST be one row: chapter name, place in the chapter (page x of y, else time left, else
-  percentage) and the progress slider, with Contents, Notes and Appearance as icon buttons (≥ 44 dp, accessible names).
-  The top bar keeps Back, the book title and the bookmark (and PDF zoom).
+- **FR-010**: The bottom bar MUST be one row: chapter name, place in it (per format, FR-010a) and the progress slider, with Contents, Notes and Appearance as icon buttons (≥ 44 dp, accessible names).
+  The top bar keeps Back, the book title and the bookmark (PDF zoom moves to Appearance, FR-013).
+- **FR-010a**: The place shown next to the slider MUST be, per format: **EPUB** — the chapter name (FR-018) and "page
+  x / y in chapter" (the book percentage while pages are still being counted); **PDF** — the outline entry of the current
+  page when the PDF has an outline, and "page x / y" of the book; **Markdown** — the current heading when there is one,
+  and the book percentage; **TXT** — the book title and the book percentage. No "time left" is shown in this release.
 - **FR-011**: The progress slider MUST go to the released place exactly once, wherever the finger is lifted; keyboard
   changes go to the place after the key is released, not on every repeat.
 - **FR-012**: Toasts MUST be placed below the top bar's actual height (or the top of the safe area when the bars are
@@ -241,14 +276,21 @@ chapter's title. Open a book with no contents; the bookmark is labelled by its p
 **Appearance (Story 4)**
 
 - **FR-013**: The phone Appearance panel MUST offer theme (Night / Sepia / Paper — the app's one theme setting), font
-  size, font family, line spacing and margins; it MUST NOT show keyboard hints or the 1 / 2-page layout.
+  size, font family, line spacing and margins; it MUST NOT show keyboard hints or the 1 / 2-page layout. It shows only
+  controls that take effect in the open format: for a **PDF** it shows Theme and Zoom (fit width, −, +) only, and the
+  PDF zoom control is removed from the top bar. For an **EPUB** it also offers the view: "Page" (paginated, swipe
+  turns, FR-003) — the default for a book with no saved choice — or "Scroll" (FR-006); the choice is stored per book
+  like the other reading settings and switching keeps the reading position.
 - **FR-014**: Every control in the panel MUST be at least 48 dp tall, labels at least 12 px; changes apply live and keep
   the reading position.
 
 **Marking and look (Story 5)**
 
 - **FR-015**: When a text selection ends (finger lifted, selection stable), the colour bar MUST appear directly, without
-  a separate "Mark" step.
+  a separate "Mark" step, in EPUB, PDF, Markdown and TXT.
+- **FR-015a**: A TXT book on the phone MUST allow marking (highlight colour, underline, strike, note), opening a mark's
+  panel, changing and deleting a mark, stored as on the computer (the same TXT mark rows, saved with the book's text
+  revision). The text itself stays read-only (no editing, undo / redo) and TXT has no bookmark button.
 - **FR-016**: Every control of the phone reader's bars, panels and selection bar MUST use vector icons of the app's icon
   style with accessible names; no text glyph is used as an icon.
 
@@ -282,8 +324,8 @@ chapter's title. Open a book with no contents; the bookmark is labelled by its p
 
 - **Reader chrome state**: bars shown / hidden, the open layer stack (panel, mark panel, selection bar), the inactivity
   timer — session-only, per open book.
-- **Place in chapter**: chapter name, page x of y in the chapter (when pages are known), time left in the chapter (from
-  the reading speed already measured for word counts, else none), book percentage. The chapter name comes from the
+- **Place in chapter**: chapter name, page x of y (when pages are known), book percentage — per format as FR-010a; no time
+  left in this release. The chapter name comes from the
   book's own contents (FR-018).
 - **Reading surface**: the open book's format-specific answers — marks, place / progress, jump to a mark, open a mark,
   selection — given once for EPUB, PDF, Markdown and TXT (FR-020).
@@ -313,9 +355,10 @@ chapter's title. Open a book with no contents; the bookmark is labelled by its p
   Whether a swipe can be told from a selection on real WebViews (risk R2 of spec 008) is verified on a device first.
 - The theme in the reader's Appearance panel is the app's single theme setting (Settings → Appearance), not a per-book
   one.
-- "Time left in chapter" uses the existing word counts and a default reading speed; when unavailable only page or
-  percentage is shown.
-- Search, read aloud, translation and annotation tools stay out of the phone reader (spec 008 first-release scope).
+- "Time left" is not in this release (FR-010a): it would rest on a default reading speed; a later feature may add it.
+- Search, read aloud, translation and annotation tools stay out of the phone reader (spec 008 first-release scope),
+  except TXT text marking (FR-015a), which this feature adds: the phone's TXT bridge today only opens text read-only, so
+  saving TXT marks needs the phone side of the TXT save (marks only, no text revision change).
 - The 4 s auto-hide and the 200 ms fade are defaults that may be tuned during the plan.
 - Story 6 and FR-022 are the scope exceptions on the computer's side: the chapter-name lookup is shared, so the
   computer's bookmarks also get the book's own chapter names; making stand-in actions optional must leave the
