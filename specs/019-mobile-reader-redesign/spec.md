@@ -65,6 +65,7 @@ solid, the screen around it was built as a minimum. The review found:
 - Q: Which view does a PDF open in when the book has no saved view yet? → A: "Page" (same as EPUB).
 - Q: In PDF "Page" view with the page zoomed in, what does a horizontal swipe do? → A: It pans first; only a new swipe
   made once the page edge is reached turns the page; the new page opens fitted to the screen.
+- Q: Are audiobooks on the phone part of this feature? → A: No — out of scope, decided later (no spec planned yet).
 
 The reading screen after this feature, per format (summary of the requirements below; the requirements govern):
 
@@ -374,6 +375,8 @@ chapter's title. Open a book with no contents; the bookmark is labelled by its p
 - The theme in the reader's Appearance panel is the app's single theme setting (Settings → Appearance), not a per-book
   one.
 - "Time left" is not in this release (FR-010a): it would rest on a default reading speed; a later feature may add it.
+- Audiobooks stay unavailable on the phone (as today: no audio import, no player); they are out of scope here and
+  will be decided later in a separate feature.
 - Search, read aloud, translation and annotation tools stay out of the phone reader (spec 008 first-release scope),
   except TXT text marking (FR-015a), which this feature adds: the phone's TXT bridge today only opens text read-only, so
   saving TXT marks needs the phone side of the TXT save (marks only, no text revision change).
