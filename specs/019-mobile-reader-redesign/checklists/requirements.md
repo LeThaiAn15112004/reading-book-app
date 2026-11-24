@@ -33,5 +33,9 @@
 
 - Validated in one pass. The Context names the current screen's parts (tap strips, 14 %, 110 px) only to describe the
   problem; requirements are stated as behaviour.
+- Updated 2026-11-24 after the code review: Story 6 (book's own chapter names — a data defect shared with the computer)
+  and FR-020 – FR-023 / SC-009 (one reading surface, one chrome state, no stand-in actions). These structure
+  requirements are a deliberate exception to "no implementation details": they name no language, framework or API,
+  only what must be decided in one place, because Stories 1–3 cannot be met reliably without them.
 - Defaults chosen instead of questions (Assumptions): swipe only for paginated EPUB, theme = the app's one setting,
   4 s auto-hide / 200 ms fade, time left from existing word counts.

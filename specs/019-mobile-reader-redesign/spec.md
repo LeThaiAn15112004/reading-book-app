@@ -33,6 +33,14 @@ solid, the screen around it was built as a minimum. The review found:
   page or time left in the chapter.
 - **Small defects**: releasing the progress slider outside it loses the jump; arrow keys on the slider jump on every
   press; the toast is placed at a fixed 64 px.
+- **Placeholder chapter names in real books**: the "current chapter" of an EPUB is taken from the reader's demo content
+  ("Dynamic Systems", …) instead of the book's own contents, so a bookmark can be saved under a chapter name the book
+  does not have. The computer's reader shares the same lookup.
+- **The screen is the computer's reader with features switched off** (code review, 2026-11-24): one 670-line screen
+  passes empty actions to the computer's editing / undo / translation hooks, repeats a per-format choice (EPUB / PDF /
+  Markdown / TXT) in at least seven places (progress, place label, marks list, jump, open a mark, selection), opens a
+  mark's panel by handing it a fake on-screen position, and keeps the bars / panels / toast as unrelated local states,
+  so there is no single place where Back, auto-hide or the layer order can be decided.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -153,6 +161,31 @@ for vector icons.
 2. **Given** any bar or panel of the reader, **When** it is shown, **Then** its controls use vector icons of the app's
    icon style (no ‹ › − + "Aa" characters), each with an accessible name.
 
+---
+
+### User Story 6 - The chapter shown is the book's own chapter (Priority: P1)
+
+Wherever the reader names "the current chapter" — the bottom bar, a new bookmark's label, the Contents panel's current
+entry — the name comes from the book's own contents (EPUB table of contents / section, PDF outline, Markdown heading).
+A book without such a name shows its progress instead; a made-up name is never shown or saved.
+
+**Why this priority**: today a bookmark can be stored with a wrong chapter name; it is wrong data, not only wrong
+display, and Story 3's chapter name in the bottom bar depends on it.
+
+**Independent Test**: open an EPUB with a table of contents, go to its third chapter, add a bookmark; its label is that
+chapter's title. Open a book with no contents; the bookmark is labelled by its place (page / percentage).
+
+**Acceptance Scenarios**:
+
+1. **Given** an EPUB whose table of contents names the current section, **When** the reader adds a bookmark, **Then**
+   the bookmark's label is that section's title, on the phone and on the computer.
+2. **Given** a part of an EPUB that no contents entry names (e.g. the cover), **When** the reader adds a bookmark,
+   **Then** the nearest preceding contents entry is used, else the book's place (percentage).
+3. **Given** a PDF with an outline, **When** the bottom bar shows, **Then** it names the outline entry of the current
+   page; without an outline it shows "page x of y".
+4. **Given** bookmarks already saved with a placeholder chapter name, **When** they are listed, **Then** they still open
+   at their place (their label is not rewritten silently).
+
 ### Edge Cases
 
 - A swipe that starts as a text selection (long press) never turns the page; a swipe that starts on a mark opens nothing.
@@ -219,6 +252,27 @@ for vector icons.
 - **FR-016**: Every control of the phone reader's bars, panels and selection bar MUST use vector icons of the app's icon
   style with accessible names; no text glyph is used as an icon.
 
+**Chapter names (Story 6)**
+
+- **FR-018**: The current chapter's name MUST come from the open book's own contents (EPUB contents / section, PDF
+  outline, Markdown heading), falling back to the place (page x of y, else percentage); the reader's demo content MUST
+  NOT be used for any real book, on the phone or the computer.
+- **FR-019**: New bookmarks MUST be labelled with that name; existing bookmarks keep their stored label and place.
+
+**One reading screen for the phone (structure, all stories)**
+
+- **FR-020**: The phone reader MUST describe the open book's surface (EPUB / PDF / Markdown / TXT) in ONE place that
+  answers, for the open format: its marks and their store, the place and progress, how to jump to a mark, how to open a
+  mark's panel and the current selection. Screen code MUST NOT repeat a per-format choice for these.
+- **FR-021**: The phone reader's chrome state (bars shown / hidden, the open layer stack, the inactivity timer, the
+  toast) MUST live in one session-only state holder per open book, which Back (FR-001), auto-hide (FR-008) and swipes
+  (FR-004) all consult. It is reset when another book is opened.
+- **FR-022**: The phone reader MUST NOT pass empty stand-in actions for features it does not offer (editing, undo / redo,
+  translation, insert point, keyboard shortcuts); the shared reading engine MUST let those be absent, with the
+  computer's reader unchanged.
+- **FR-023**: A mark's panel MUST be opened by the mark's identity alone, the same way for every format; no fake
+  on-screen position is passed to place a phone panel.
+
 **Accessibility (all stories)**
 
 - **FR-017**: While the bars are hidden, a screen-reader user MUST be able to reach a "Show reading controls" control as
@@ -229,7 +283,10 @@ for vector icons.
 - **Reader chrome state**: bars shown / hidden, the open layer stack (panel, mark panel, selection bar), the inactivity
   timer — session-only, per open book.
 - **Place in chapter**: chapter name, page x of y in the chapter (when pages are known), time left in the chapter (from
-  the reading speed already measured for word counts, else none), book percentage.
+  the reading speed already measured for word counts, else none), book percentage. The chapter name comes from the
+  book's own contents (FR-018).
+- **Reading surface**: the open book's format-specific answers — marks, place / progress, jump to a mark, open a mark,
+  selection — given once for EPUB, PDF, Markdown and TXT (FR-020).
 
 ## Success Criteria *(mandatory)*
 
@@ -243,6 +300,10 @@ for vector icons.
 - **SC-005**: Changing the theme takes 2 taps from the page (Appearance → theme), without leaving the book.
 - **SC-006**: Marking a selected passage takes 1 tap after the selection (today 2).
 - **SC-007**: No text glyph is used as an icon in the phone reader; every control is ≥ 44 dp (panel controls ≥ 48 dp).
+- **SC-008**: 0 bookmarks created after this feature carry a chapter name the book does not contain (checked on 5 EPUBs
+  and 3 PDFs with contents / outlines).
+- **SC-009**: The phone reader screen makes the per-format choice in exactly one place (the reading surface), and passes
+  0 empty stand-in actions to the shared engine.
 
 ## Assumptions
 
@@ -256,3 +317,8 @@ for vector icons.
   percentage is shown.
 - Search, read aloud, translation and annotation tools stay out of the phone reader (spec 008 first-release scope).
 - The 4 s auto-hide and the 200 ms fade are defaults that may be tuned during the plan.
+- Story 6 and FR-022 are the scope exceptions on the computer's side: the chapter-name lookup is shared, so the
+  computer's bookmarks also get the book's own chapter names; making stand-in actions optional must leave the
+  computer's reader behaving exactly as today.
+- The structure requirements (FR-020 – FR-023) come first in the plan: Back, auto-hide and swipes (Stories 1–3) are
+  built on the one chrome state holder and the one reading surface, not added to the current screen.
