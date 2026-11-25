@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Linking, StyleSheet, Text, View } from 'react-native'
 import { NavigationBar } from 'expo-navigation-bar'
+import * as SplashScreen from 'expo-splash-screen'
 import { StatusBar } from 'expo-status-bar'
 import * as SystemUI from 'expo-system-ui'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -17,6 +18,21 @@ const FEASIBILITY = process.env.EXPO_PUBLIC_FEASIBILITY === '1'
 // M2 only (T017, native build): load through file:// instead of the local server, to record whether modules and workers run.
 const FILE_ROUTE = FEASIBILITY && process.env.EXPO_PUBLIC_UI_ROUTE === 'file'
 const FILE_SOURCE: UiSource = { url: 'file:///android_asset/web-ui/index.html', origin: 'file://', baseUrl: null, token: null }
+
+/**
+ * The system splash (navy + the book, `app.json`) stays up until the UI reports its first real screen
+ * (`app.uiReady`, sent after the Library has painted), so a launch never shows a blank page or a second splash.
+ * A fallback hides it anyway if the UI never reports (a failed load, the feasibility file route).
+ */
+const SPLASH_FALLBACK_MS = 12_000
+void SplashScreen.preventAutoHideAsync().catch(() => {})
+SplashScreen.setOptions({ duration: 200, fade: true })
+let splashHidden = false
+function hideSplash() {
+  if (splashHidden) return
+  splashHidden = true
+  void SplashScreen.hideAsync().catch(() => {})
+}
 
 /** Night, the UI's default theme (`--lib-bg-deep`), until the page reports its own edge colours. */
 const DEFAULT_BARS: SystemBarColors = { top: '#0f172a', bottom: '#0f172a' }
@@ -75,13 +91,19 @@ export default function ReaderHost() {
               resolved,
               (event: HostEvent) => post(event),
               (next) => setBars((current) => (current.top === next.top && current.bottom === next.bottom ? current : next)),
+              hideSplash,
             ),
           )
         },
-        (cause) => setError(String(cause)),
+        (cause) => {
+          setError(String(cause))
+          hideSplash()
+        },
       )
     }
+    const fallback = setTimeout(hideSplash, SPLASH_FALLBACK_MS)
     if (FEASIBILITY) void checkSqlite().then(setSqlite)
+    return () => clearTimeout(fallback)
   }, [post])
 
   const send = useCallback((event: HostEventName, payload: unknown) => post({ v: RPC_VERSION, event, payload }), [post])

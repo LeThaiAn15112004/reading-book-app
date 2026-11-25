@@ -6,6 +6,7 @@
 import type { LifecyclePayload } from '../host/protocol'
 import type { BridgeContext } from './context'
 import { startSystemBarSync } from '@app/platforms/window-system-bars'
+import { UI_READY_EVENT } from '@app/platforms/ui-ready'
 import { noEvents, notAvailable } from './unavailable'
 import { createStepTimer, parseTimingLine, type StepTimer, type StepTiming } from '@core'
 
@@ -89,6 +90,10 @@ export function createAppGroup(ctx: BridgeContext): AppMethods {
   // Status / navigation bar colours follow the page (no DOM in the Node test suite, so nothing to follow there).
   const refreshSystemBars =
     typeof document !== 'undefined' && typeof requestAnimationFrame === 'function' ? startSystemBarSync(ctx.client) : () => {}
+  // The shared UI announces its first real screen (`UI_READY_EVENT`); the host then hides the system splash screen.
+  if (typeof window !== 'undefined') {
+    window.addEventListener(UI_READY_EVENT, () => void ctx.client.call('app', 'uiReady', {}).catch(() => {}), { once: true })
+  }
 
   return {
     ping: async () => 'pong',

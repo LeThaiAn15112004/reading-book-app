@@ -22,6 +22,7 @@ import {
   useImmersiveReading,
 } from './components/chrome'
 import { isFeatureAvailable } from './platforms/host'
+import { announceUiReady } from './platforms/ui-ready'
 import { LibraryScreen } from './screens/Library/LibraryScreen'
 import { ReaderRoute } from './screens/ReaderRoute'
 import { SettingsScreen } from './screens/Settings/SettingsScreen'
@@ -81,6 +82,15 @@ function AppChromeFrame({ children }: { children: ReactNode }) {
   )
 }
 
+/** Once the first route after the boot splash is on screen, the phone host may hide its system splash. */
+function UiReadyBridge() {
+  const { pathname } = useLocation()
+  useEffect(() => {
+    if (pathname !== '/') announceUiReady()
+  }, [pathname])
+  return null
+}
+
 function App() {
   return (
     <HashRouter>
@@ -91,6 +101,7 @@ function App() {
             <OpenReadingProvider>
               <ReaderChromeMenuProvider>
                 <ImmersiveReadingProvider>
+                  <UiReadyBridge />
                   <SessionFlushBridge />
                   <ReminderNavigationBridge />
                   <ShortcutsBridge />

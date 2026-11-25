@@ -27,6 +27,7 @@ export function createHostRuntime(
   source: UiSource,
   emit: (event: HostEvent) => void,
   onSystemBars?: (colors: SystemBarColors) => void,
+  onUiReady?: () => void,
 ): HostRuntime {
   const devChunks = source.baseUrl === null
   const platform: BootValues['platform'] = Platform.OS === 'ios' ? 'ios' : 'android'
@@ -89,6 +90,7 @@ export function createHostRuntime(
         openUrl: (url) => Linking.openURL(url),
         onSystemBars,
         onReaderOpening: (opening) => openingGate.set(opening),
+        onUiReady,
       }),
       /** Android fallback when the injected boot object did not arrive (`contracts/host-services.md`). */
       boot: () => boot,

@@ -28,6 +28,8 @@ export interface AppServiceOptions {
   isAllowedHost?: (host: string) => boolean
   /** Spec 017 (US3): the host's gate that the file service's chunk loops wait on. */
   onReaderOpening?: (opening: boolean) => void
+  /** The UI has drawn its first real screen: the host hides the system splash screen. */
+  onUiReady?: () => void
 }
 
 const MAX_URL_CHARS = 2048
@@ -63,6 +65,11 @@ export function createAppService(options: AppServiceOptions) {
       const { opening } = argsObject(raw)
       if (typeof opening !== 'boolean') throw new HostServiceError('INVALID_ARGUMENT', 'opening must be a boolean')
       options.onReaderOpening?.(opening)
+      return { ok: true }
+    },
+    /** `app.uiReady {} → { ok: true }`: the first real screen is on the display (the system splash can go). */
+    uiReady(): { ok: true } {
+      options.onUiReady?.()
       return { ok: true }
     },
     async openExternal(raw: unknown): Promise<{ opened: true }> {

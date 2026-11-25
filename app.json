@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "reading-book-mobile",
+    "name": "Readmate",
     "slug": "reading-book-mobile",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -20,7 +20,7 @@
     "android": {
       "package": "com.anle.readmate",
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
+        "backgroundColor": "#18345E",
         "foregroundImage": "./source/app/platforms/native/assets/images/android-icon-foreground.png",
         "backgroundImage": "./source/app/platforms/native/assets/images/android-icon-background.png",
         "monochromeImage": "./source/app/platforms/native/assets/images/android-icon-monochrome.png"
@@ -36,9 +36,9 @@
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#208AEF",
+          "backgroundColor": "#0F172A",
           "image": "./source/app/platforms/native/assets/images/splash-icon.png",
-          "imageWidth": 76
+          "imageWidth": 96
         }
       ],
       "expo-sqlite",

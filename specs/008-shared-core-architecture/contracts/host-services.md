@@ -30,6 +30,7 @@ The host accepts messages only from the bundled origin, and rejects unknown serv
 | `files.sweep` | Known book ids | Removed count | Clears staging (except running jobs) and orphan book folders and covers |
 | `app.info` | None | Version, platform, OS version | |
 | `app.setSystemBars` | `top`, `bottom` as `#rrggbb` | Done | The bars are transparent (edge-to-edge): the host paints the areas behind the status bar and the navigation bar with these colours, and picks light or dark status bar icons by luminance. The bridge reads them from the page's top and bottom edge (`web/src/bridge/system-bars.ts`) on theme change, navigation, resize and once a second; only changes are sent (added 2026-11-05) |
+| `app.uiReady` | none | Done | The UI drew its first real screen (after the boot splash): the host hides the system splash screen, which it keeps up from launch (`preventAutoHideAsync`, 12 s fallback). Sent once by the bridge on the shared UI's `readmate:ui-ready` window event (`source/app/platforms/ui-ready.ts`) (added 2026-11-25) |
 | `app.boot` | None | Boot values | Fallback when the injected boot object did not arrive (added at M4) |
 | `app.openExternal` | `url` | Done | `https` only, public host name (no IP, `localhost`, `.local` or credentials) |
 
