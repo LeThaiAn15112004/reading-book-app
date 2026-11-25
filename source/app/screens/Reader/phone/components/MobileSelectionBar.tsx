@@ -1,71 +1,102 @@
 import type { PointerEvent as ReactPointerEvent } from 'react'
+import { HIGHLIGHT_COLOR_PRESETS } from '@core'
+import { useBackClose } from '../../../../hooks/app/useBackClose'
 import { useT } from '../../../../i18n'
-
-export type SelectionMarkKind = 'highlight' | 'underline' | 'strikethrough' | 'textbox'
+import type { SurfaceSelection } from '../logic/readingSurface'
+import { MobileReaderIcon } from './MobileReaderIcons'
 
 /** Keeps the native selection alive: a tap on a button must not collapse it before the action reads it. */
 const keepSelection = (event: ReactPointerEvent) => event.preventDefault()
 
-const button =
-  'min-h-[44px] min-w-[44px] flex-1 rounded-lg px-2 text-[13px] font-semibold text-lib-text-strong active:bg-lib-hint'
+const iconButton =
+  'focus-ring flex min-h-[44px] min-w-[44px] shrink-0 items-center justify-center rounded-lg text-lib-text-strong active:bg-lib-hint'
+
+/** The swatches: the last used colour first, then the other presets. */
+function swatches(lastColorHex: string) {
+  const last = HIGHLIGHT_COLOR_PRESETS.find((p) => p.hex.toLowerCase() === lastColorHex.toLowerCase())
+  return last ? [last, ...HIGHLIGHT_COLOR_PRESETS.filter((p) => p !== last)] : [...HIGHLIGHT_COLOR_PRESETS]
+}
 
 /**
- * The action bar for selected text (spec 008, T103; `contracts/phone-ui.md`, Layout). It sits at the bottom, above the
- * safe area, so it never covers the OS selection callout, which Android and iOS draw next to the selection.
- *
- * Two states: `pending` (a native selection exists, the renderer has not reported it yet: one "Mark" button asks it,
- * see `useLiveSelection`) and `ready` (the renderer's selection menu is open: the marking actions).
+ * The selection bar, ONE step (spec 019, FR-015, SC-006): shown as soon as a selection is finished — colour swatches
+ * (a tap marks at once), underline, strike, note, copy. It sits at the bottom, away from the OS selection callout.
+ * Back clears the selection (FR-001).
  */
 export function MobileSelectionBar({
-  state,
-  colorHex,
-  onRequest,
-  onMark,
+  selection,
+  lastColorHex,
   onCopy,
-  onDismiss,
 }: {
-  state: 'pending' | 'ready'
-  colorHex: string
-  onRequest: () => void
-  onMark: (kind: SelectionMarkKind) => void
-  onCopy: () => void
-  onDismiss: () => void
+  selection: SurfaceSelection
+  lastColorHex: string
+  onCopy: (text: string) => void
 }) {
   const t = useT()
+  useBackClose(true, selection.close)
+  const colours = swatches(lastColorHex)
   return (
-    <div
-      className="fixed inset-x-0 bottom-0 z-[350] px-3"
-      style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 12px)' }}
-    >
+    <div className="fixed inset-x-0 bottom-0 z-[350] px-2" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 12px)' }}>
       <div
         role="toolbar"
         aria-label={t('reader.phone.selection.aria')}
-        className="mx-auto flex max-w-[520px] items-center gap-1 rounded-2xl border border-lib-border bg-lib-surface-strong p-1.5 shadow-2xl"
+        className="mx-auto flex max-w-[560px] items-center gap-0.5 overflow-x-auto rounded-2xl border border-lib-border bg-lib-surface-strong p-1 shadow-2xl"
       >
-        {state === 'pending' ? (
-          <button type="button" className={button} onPointerDown={keepSelection} onClick={onRequest}>
-            <span aria-hidden className="mr-2 inline-block h-3 w-3 rounded-full align-middle" style={{ background: colorHex }} />
-            {t('reader.phone.selection.mark')}
+        {colours.map((preset) => (
+          <button
+            key={preset.id}
+            type="button"
+            className={iconButton}
+            onPointerDown={keepSelection}
+            onClick={() => selection.mark('highlight', preset.hex)}
+            aria-label={t('reader.phone.selection.color', {
+              color: t(`reader.annotations.colors.${preset.id as 'yellow'}`) || preset.label,
+            })}
+          >
+            <span aria-hidden className="block h-6 w-6 rounded-full border border-black/10" style={{ background: preset.hex }} />
           </button>
-        ) : (
-          <>
-            <button type="button" className={button} onPointerDown={keepSelection} onClick={() => onMark('highlight')}>
-              <span aria-hidden className="mr-1.5 inline-block h-3 w-3 rounded-full align-middle" style={{ background: colorHex }} />
-              {t('reader.annotations.selection.highlight')}
-            </button>
-            <button type="button" className={button} onPointerDown={keepSelection} onClick={() => onMark('underline')}>
-              {t('reader.annotations.selection.underline')}
-            </button>
-            <button type="button" className={button} onPointerDown={keepSelection} onClick={() => onMark('textbox')}>
-              {t('reader.phone.mark.note')}
-            </button>
-            <button type="button" className={button} onPointerDown={keepSelection} onClick={onCopy}>
-              {t('reader.annotations.selection.copy')}
-            </button>
-          </>
-        )}
-        <button type="button" aria-label={t('common.actions.cancel')} className="min-h-[44px] min-w-[44px] rounded-lg text-[18px] text-lib-muted" onClick={onDismiss}>
-          ×
+        ))}
+        <span aria-hidden className="mx-0.5 h-6 w-px shrink-0 bg-lib-border" />
+        <button
+          type="button"
+          className={iconButton}
+          onPointerDown={keepSelection}
+          onClick={() => selection.mark('underline', lastColorHex)}
+          aria-label={t('reader.phone.selection.underline')}
+        >
+          <MobileReaderIcon name="underline" />
+        </button>
+        <button
+          type="button"
+          className={iconButton}
+          onPointerDown={keepSelection}
+          onClick={() => selection.mark('strikethrough', lastColorHex)}
+          aria-label={t('reader.phone.selection.strike')}
+        >
+          <MobileReaderIcon name="strike" />
+        </button>
+        <button
+          type="button"
+          className={iconButton}
+          onPointerDown={keepSelection}
+          onClick={() => selection.note(lastColorHex)}
+          aria-label={t('reader.phone.selection.note')}
+        >
+          <MobileReaderIcon name="note" />
+        </button>
+        <button
+          type="button"
+          className={iconButton}
+          onPointerDown={keepSelection}
+          onClick={() => {
+            onCopy(selection.text)
+            selection.close()
+          }}
+          aria-label={t('reader.phone.selection.copy')}
+        >
+          <MobileReaderIcon name="copy" />
+        </button>
+        <button type="button" className={`${iconButton} text-lib-muted`} onClick={selection.close} aria-label={t('reader.phone.selection.close')}>
+          <MobileReaderIcon name="close" />
         </button>
       </div>
     </div>

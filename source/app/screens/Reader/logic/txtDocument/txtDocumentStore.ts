@@ -54,6 +54,9 @@ const RETRY_MAX_MS = 30_000
  */
 export type TxtSaveStatus = 'saved' | 'dirty' | 'saving' | 'error'
 
+/** Anchor of a mark opened by its identity alone (spec 019 FR-023): a phone sheet is never placed by a rect. */
+const UNPLACED_ANCHOR: ClientBox = { top: 0, left: 0, right: 0, bottom: 0, width: 0, height: 0 }
+
 export type ActiveTxtHighlight = { highlight: TxtReaderHighlight; rect: ClientBox }
 
 export type TxtSelectionMenu = { selection: TxtSelectionInfo; point: { x: number; y: number } }
@@ -112,7 +115,8 @@ type TxtDocumentStoreState = TxtContext & {
 
   createFromSelection: (selection: TxtSelectionInfo, styleKind: HighlightStyleKind, anchor?: ClientBox) => TxtReaderHighlight | null
   commitMarkupSelection: (selection: TxtSelectionInfo, tool: TxtMarkupTool) => void
-  openHighlight: (id: string, rect: ClientBox) => void
+  /** `rect` absent = opened by identity only (spec 019 FR-023, the phone's mark sheet). */
+  openHighlight: (id: string, rect?: ClientBox) => void
   closeEditPopup: () => void
   dismissAnnotationUi: () => void
   updateHighlightColor: (id: string, colorHex: string) => void
@@ -481,7 +485,7 @@ export const useTxtDocumentStore = create<TxtDocumentStoreState>()((set, get) =>
     openHighlight: (id, rect) => {
       const found = get().doc?.highlights.find((h) => h.id === id)
       if (!found) return
-      set({ focusedHighlightId: id, activeHighlight: { highlight: found, rect }, selectionMenu: null })
+      set({ focusedHighlightId: id, activeHighlight: { highlight: found, rect: rect ?? UNPLACED_ANCHOR }, selectionMenu: null })
     },
 
     closeEditPopup: () => set({ activeHighlight: null, focusedHighlightId: null }),

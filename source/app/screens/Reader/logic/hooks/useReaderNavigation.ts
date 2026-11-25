@@ -44,7 +44,7 @@ function pdfOutlineToTocItems(items: PdfOutlineItem[]): EpubTocItem[] {
 }
 
 /** Destination page of a PDF TOC entry; null for entries without an in-document destination. */
-function pdfTocItemPage(item: EpubTocItem): number | null {
+export function pdfTocItemPage(item: EpubTocItem): number | null {
   if (!item.href.startsWith(PDF_PAGE_HREF)) return null
   const page = Number(item.href.slice(PDF_PAGE_HREF.length))
   return Number.isInteger(page) && page >= 1 ? page : null
@@ -62,7 +62,8 @@ type UseReaderNavigationOptions = {
   isTxtSurface: boolean
   txtApiRef: MutableRefObject<TextSurfaceApi | null>
   closeFloating: () => void
-  highlightShortcutsRef: MutableRefObject<HighlightShortcuts>
+  /** Highlight undo / redo / delete keys; absent on a Reader without keyboard shortcuts (the phone, spec 019 FR-022). */
+  highlightShortcutsRef?: MutableRefObject<HighlightShortcuts>
 }
 
 export function useReaderNavigation({
@@ -303,7 +304,8 @@ export function useReaderNavigation({
   // Escape / highlight undo-redo / delete-highlight (window + EPUB iframes). Page turning, Home/End
   // and the rest of the reading keys are registry shortcuts now (see `useReaderShortcuts`).
   useEffect(() => {
-    if (contentStatus !== 'ready') return
+    if (contentStatus !== 'ready' || !highlightShortcutsRef) return
+    const shortcuts = highlightShortcutsRef
 
     function onKeyDown(e: KeyboardEvent) {
       if (isTypingTarget(e.target)) return
@@ -317,7 +319,7 @@ export function useReaderNavigation({
         // The Freehand settings popover closes itself on Escape (one level per keypress): while it is open the
         // key must not also disarm the tool, wherever the focus is (this listener runs before the popover's own).
         if (document.querySelector('[data-pdf-ink-panel=""]')) return
-        if (highlightShortcutsRef.current.cancelAnnotationTool()) {
+        if (shortcuts.current.cancelAnnotationTool()) {
           e.preventDefault()
           e.stopPropagation()
         }
@@ -330,14 +332,14 @@ export function useReaderNavigation({
         if (key === 'z') {
           e.preventDefault()
           e.stopPropagation()
-          if (e.shiftKey) highlightShortcutsRef.current.redo()
-          else highlightShortcutsRef.current.undo()
+          if (e.shiftKey) shortcuts.current.redo()
+          else shortcuts.current.undo()
           return
         }
         if (key === 'y') {
           e.preventDefault()
           e.stopPropagation()
-          highlightShortcutsRef.current.redo()
+          shortcuts.current.redo()
           return
         }
       }
@@ -347,11 +349,11 @@ export function useReaderNavigation({
         (e.key === 'Delete' || e.key === 'Backspace') &&
         !e.ctrlKey &&
         !e.metaKey &&
-        highlightShortcutsRef.current.hasFocusedHighlight()
+        shortcuts.current.hasFocusedHighlight()
       ) {
         e.preventDefault()
         e.stopPropagation()
-        highlightShortcutsRef.current.deleteFocused()
+        shortcuts.current.deleteFocused()
         return
       }
     }

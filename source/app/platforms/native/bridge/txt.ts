@@ -1,16 +1,86 @@
 /**
- * `txt.open`, always read-only (spec 008, T061): the first release does not edit TXT books, so there are no text
- * revisions and `editable` is always false. The text is decoded exactly as Desktop's Main does (`txt-codec.ts`, which
+ * The phone's TXT group (spec 008 T061; spec 019 FR-015a).
+ *
+ * `txt.open` is always read-only: the phone does not edit TXT books, so there are no text revisions (`revision` is
+ * always 0) and `editable` is always false. The text is decoded exactly as Desktop's Main does (`txt-codec.ts`, which
  * lives in Electron Main and cannot be imported: R7); highlights are the book's stored rows.
+ *
+ * `txt.commit` writes MARKS only (`specs/019-mobile-reader-redesign/contracts/mobile-txt-commit.md`): a `text`
+ * refuses, a revision other than 0 conflicts, every row is checked against the book's decoded text with the same core
+ * checks as Main (`parseTxtAnnotationRef`, `isConsistentTxtHighlight`, `isValidTxtRange`, `quoteMatchesText`), and the
+ * rows are written in ONE host transaction — all or nothing.
  */
-import { TXT_MAX_FILE_BYTES, detectTxtBom, normalizeTxtText } from '@core'
+import {
+  TXT_MAX_FILE_BYTES,
+  detectTxtBom,
+  isConsistentTxtHighlight,
+  isValidTxtRange,
+  normalizeTxtText,
+  parseTxtAnnotationRef,
+  quoteMatchesText,
+  type SaveHighlightInput,
+} from '@core'
+import { MOBILE_WRITABLE_STYLE_KINDS, OverlayValidationError } from '../stores/overlay-store'
 import { idOf, type BridgeContext } from './context'
-import { toHighlightDto } from './dto'
+import { parseLocatorRef, parseSelectionTextRef, toHighlightDto } from './dto'
 import { HostCallError } from './host-client'
-import { notAvailableResult } from './unavailable'
 
 type Txt = Window['api']['txt']
 type TxtOpenResult = Awaited<ReturnType<Txt['open']>>
+type TxtCommitInput = Parameters<Txt['commit']>[0]
+type TxtCommitResult = Awaited<ReturnType<Txt['commit']>>
+type UpsertDto = TxtCommitInput['upserts'][number]
+
+/** Desktop Main's limits for one commit (`txt-document-service.ts`). */
+const MAX_UPSERTS = 20_000
+const MAX_DELETES = 20_000
+const MAX_ID_LENGTH = 128
+const ID_RE = /^[A-Za-z0-9_-]+$/
+const MAX_NOTE_LENGTH = 10_000
+const MAX_TAGS = 100
+
+const commitFailure = (errorCode: NonNullable<TxtCommitResult['errorCode']>, errorMessage: string): TxtCommitResult => ({
+  ok: false,
+  errorCode,
+  errorMessage,
+})
+
+const validId = (id: unknown): id is string => typeof id === 'string' && !!id && id.length <= MAX_ID_LENGTH && ID_RE.test(id)
+
+/** One mark of a commit against the text it belongs to, in the store's shape; null when anything about it is off. */
+function validateUpsert(bookId: string, raw: unknown, text: string): SaveHighlightInput | null {
+  if (!raw || typeof raw !== 'object') return null
+  const row = raw as Partial<UpsertDto>
+  if (!validId(row.id)) return null
+  if (typeof row.styleKind !== 'string' || !MOBILE_WRITABLE_STYLE_KINDS.includes(row.styleKind)) return null
+  if (typeof row.colorHex !== 'string' || !row.colorHex.trim() || row.colorHex.length > 32) return null
+  if (row.note !== undefined && (typeof row.note !== 'string' || row.note.length > MAX_NOTE_LENGTH)) return null
+  if (row.tags !== undefined) {
+    if (!Array.isArray(row.tags) || row.tags.length > MAX_TAGS) return null
+    if (row.tags.some((tag) => typeof tag !== 'string' || tag.length > 200)) return null
+  }
+  if (row.createdAt !== undefined && typeof row.createdAt !== 'string') return null
+  const annotation = parseTxtAnnotationRef(row.txtAnnotationRef)
+  if (!annotation) return null
+  const locator = parseLocatorRef(row.locatorRef)
+  if (!locator || !isConsistentTxtHighlight(locator, annotation)) return null
+  if (!isValidTxtRange(annotation.startOffset, annotation.endOffset, text)) return null
+  const selectionText = parseSelectionTextRef(row.selectionTextRef)
+  if (row.selectionTextRef !== undefined && !selectionText) return null
+  if (!quoteMatchesText(text, { id: row.id, ...annotation }, selectionText?.highlight)) return null
+  return {
+    id: row.id,
+    bookId,
+    locator,
+    styleKind: row.styleKind,
+    colorHex: row.colorHex.trim(),
+    note: row.note?.trim() || undefined,
+    tags: row.tags,
+    selectionText,
+    txtAnnotation: annotation,
+    createdAt: row.createdAt?.trim() || undefined,
+  }
+}
 
 export interface DecodedTxt {
   text: string
@@ -80,6 +150,43 @@ export function createTxtGroup(ctx: BridgeContext): Txt {
         highlights,
       }
     },
-    commit: notAvailableResult('txt.commit'),
+    commit: (inputRaw) =>
+      ctx.writes.run(async (): Promise<TxtCommitResult> => {
+        if (!inputRaw || typeof inputRaw !== 'object') return commitFailure('invalid', 'Invalid commit.')
+        const input = inputRaw as Partial<TxtCommitInput>
+        const bookId = idOf(input.bookId)
+        if (!bookId) return commitFailure('invalid', 'Invalid book.')
+        // The phone never edits the text (FR-015a): a commit carrying text is refused before anything else.
+        if (input.text !== undefined) return commitFailure('invalid', 'The text of a TXT book cannot be changed on the phone.')
+        if (typeof input.baseRevision !== 'number' || !Number.isInteger(input.baseRevision)) return commitFailure('invalid', 'Invalid revision.')
+        if (!Array.isArray(input.upserts) || input.upserts.length > MAX_UPSERTS) return commitFailure('invalid', 'Invalid annotations.')
+        if (!Array.isArray(input.deletedIds) || input.deletedIds.length > MAX_DELETES || !input.deletedIds.every(validId)) {
+          return commitFailure('invalid', 'Invalid annotations.')
+        }
+        if (input.baseRevision !== 0) return commitFailure('conflict', 'The text changed since it was opened.')
+
+        const book = await ctx.library.findById(bookId)
+        if (!book || book.format !== 'txt') return commitFailure('not_found', 'Book not found.')
+        // The offsets are checked against the text: an unreadable file writes nothing.
+        let text: string
+        try {
+          text = decodeTxtBytes(new Uint8Array(await ctx.content.read(bookId))).text
+        } catch {
+          return commitFailure('not_found', 'The book file could not be read.')
+        }
+        const upserts: SaveHighlightInput[] = []
+        for (const raw of input.upserts) {
+          const row = validateUpsert(bookId, raw, text)
+          if (!row) return commitFailure('invalid', 'Invalid annotation.')
+          upserts.push(row)
+        }
+        try {
+          await ctx.overlay.commitTxtAnnotations(bookId, upserts, input.deletedIds)
+        } catch (error) {
+          if (error instanceof OverlayValidationError) return commitFailure('invalid', 'Invalid annotation.')
+          return commitFailure('db_failed', 'The annotations could not be saved.')
+        }
+        return { ok: true, revision: 0 }
+      }),
   }
 }

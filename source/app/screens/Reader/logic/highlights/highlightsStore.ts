@@ -28,6 +28,9 @@ import type {
 } from '../../../../components/reader/renderers/epub'
 import { getT } from '../../../../i18n'
 
+/** Anchor of a mark opened by its identity alone (spec 019 FR-023): a phone sheet is never placed by a rect. */
+const UNPLACED_RECT: ViewportRectLike = { top: 0, left: 0, right: 0, bottom: 0, width: 0, height: 0 }
+
 export type ActiveHighlight = { highlight: ReaderHighlight; rect: ViewportRectLike }
 
 /** The right-click context menu for a fresh (not-yet-highlighted) selection, if open. */
@@ -130,6 +133,8 @@ type HighlightsStoreState = HighlightsContext & {
   focusHighlightFromClick: (info: EpubHighlightClickInfo) => void
   /** Right-click on a highlight/underline mark — opens its floating menu and focuses it. */
   openHighlightContextMenu: (info: EpubHighlightClickInfo) => void
+  /** Opens a mark's menu by its identity alone, with no on-screen anchor (spec 019 FR-023, the phone's mark sheet). */
+  openHighlightById: (id: string) => void
   closeSelectionMenu: () => void
   /** Reads the *current* live selection and opens the menu there — no-op if the selection was
    *  cleared a frame before the right-click landed. */
@@ -269,6 +274,13 @@ export const useHighlightsStore = create<HighlightsStoreState>()((set, get) => (
     if (!found) return
     get().focusHighlight(info.id)
     set({ activeHighlight: { highlight: found, rect: info.rect }, pendingSelection: null })
+  },
+
+  openHighlightById: (id) => {
+    const found = get().highlights.find((h) => h.id === id)
+    if (!found) return
+    get().focusHighlight(id)
+    set({ activeHighlight: { highlight: found, rect: UNPLACED_RECT }, pendingSelection: null })
   },
 
   closeSelectionMenu: () => set({ selectionMenu: null }),

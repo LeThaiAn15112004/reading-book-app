@@ -233,6 +233,47 @@ export class MobileOverlayStore implements OverlayStore {
     return result.changes > 0
   }
 
+  /**
+   * TXT marks of one book, written all or nothing (spec 019 FR-015a; `contracts/mobile-txt-commit.md`): every upsert
+   * (insert or rewrite) and every delete in ONE host transaction. The caller (`txt.commit`) has validated the rows
+   * against the book's text; here every id must be new or already a TXT mark of THIS book, else nothing is written.
+   */
+  async commitTxtAnnotations(bookId: string, upserts: readonly SaveHighlightInput[], deletedIds: readonly string[]): Promise<void> {
+    const book = bookId.trim()
+    if (!book) throw new OverlayValidationError('commitTxtAnnotations requires a bookId')
+    for (const id of [...upserts.map((u) => u.id?.trim() ?? ''), ...deletedIds.map((d) => d.trim())]) {
+      if (!id) throw new OverlayValidationError('every TXT mark needs an id')
+      const row = await queryOne<{ book_id: string; is_txt: number | null }>(this.db, {
+        sql: "SELECT book_id, json_extract(note_json, '$.txtAnnotation') IS NOT NULL AS is_txt FROM notes WHERE id = ?",
+        params: [id],
+      })
+      if (row && (row.book_id !== book || !row.is_txt)) throw new OverlayValidationError(`note ${id} is not a TXT mark of this book`)
+    }
+    const now = nowIso()
+    const statements: SqlStatement[] = []
+    for (const input of upserts) {
+      validateHighlightInput({ ...input, bookId: book })
+      if (!input.txtAnnotation) throw new OverlayValidationError('a TXT mark needs its range')
+      const id = input.id!.trim()
+      const createdAt = input.createdAt?.trim() || (await this.createdAtOf(id, book)) || now
+      const noteJson = overlayCodec.buildHighlightNoteJson({
+        locator: input.locator,
+        styleKind: input.styleKind,
+        colorHex: input.colorHex.trim(),
+        note: input.note?.trim() || undefined,
+        tags: input.tags,
+        selectionText: input.selectionText,
+        txtAnnotation: input.txtAnnotation,
+        createdAt,
+        modifiedAt: now,
+      })
+      statements.push(q.upsertHighlight(id, book, noteJson, createdAt, now))
+    }
+    for (const id of deletedIds) statements.push(q.deleteHighlight(id.trim(), book))
+    if (statements.length === 0) return
+    await this.db.transaction(statements)
+  }
+
   /** An update keeps the row's first creation time; only an insert dates it. */
   private async createdAtOf(id: string, bookId: string): Promise<string | undefined> {
     return (await queryOne<{ created_at: string }>(this.db, q.selectNoteCreatedAt(id, bookId)))?.created_at

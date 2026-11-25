@@ -154,6 +154,7 @@ export function useReaderHighlights({
     openSelectionMenuAtPoint: useHighlightsStore((s) => s.openSelectionMenuAtPoint),
     focusHighlightFromClick: useHighlightsStore((s) => s.focusHighlightFromClick),
     openHighlightContextMenu: useHighlightsStore((s) => s.openHighlightContextMenu),
+    openHighlightById: useHighlightsStore((s) => s.openHighlightById),
     closeEditPopup: useHighlightsStore((s) => s.closeEditPopup),
     dismissAnnotationUi: useHighlightsStore((s) => s.dismissAnnotationUi),
     undo: useHighlightsStore((s) => s.undo),

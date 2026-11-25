@@ -50,7 +50,6 @@ describe('not available on this platform', () => {
     host = await createFakeHost()
     expect(await host.api.library.relinkBook('x')).toMatchObject({ ok: false, errorCode: 'not_available' })
     expect(await host.api.import.fromUrl('https://example.com/a.epub')).toMatchObject({ ok: false, bookId: null, errorCode: 'not_available' })
-    expect(await host.api.txt.commit({ bookId: 'x', baseRevision: 0, upserts: [], deletedIds: [] })).toMatchObject({ ok: false, errorCode: 'not_available' })
   })
 })
 

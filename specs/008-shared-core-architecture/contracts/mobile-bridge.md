@@ -35,7 +35,7 @@ Every other method resolves with the method's existing failure shape where it ha
 class NotAvailableOnPlatformError extends Error { code = 'NOT_AVAILABLE_ON_PLATFORM'; method: string }
 ```
 
-Includes: `cloud`, `translation`, `transcription`, `zipImport`, `audio`, `attachments`, `graphics`, `annotationTransfer`, `notifications`, `background`, `updates`, `storage`, `bookIndex`, `search`, `wordCount`, `txt.commit`, `import.fromUrl`, `library.showInFolder`, `copyFilePath`, `relinkBook`, `checkSignature`, `removeAudiobook`, `deleteBookFile`, `overlay.saveInk`, `exportAnnotatedPdf`.
+Includes: `cloud`, `translation`, `transcription`, `zipImport`, `audio`, `attachments`, `graphics`, `annotationTransfer`, `notifications`, `background`, `updates`, `storage`, `bookIndex`, `search`, `wordCount`, `import.fromUrl`, `library.showInFolder`, `copyFilePath`, `relinkBook`, `checkSignature`, `removeAudiobook`, `deleteBookFile`, `overlay.saveInk`, `exportAnnotatedPdf`.
 
 The UI must not reach these in normal use ([phone-ui.md](./phone-ui.md)). Reaching one in the journey is a bug.
 
@@ -54,6 +54,7 @@ The UI must not reach these in normal use ([phone-ui.md](./phone-ui.md)). Reachi
 | `overlay.saveHighlight` | Creates `highlight`, `underline`, `strikethrough`, `squiggly` only; TXT rows refused (`null`), as on Desktop |
 | `import.fromFile` | No space answers `save_failed` with "There is not enough free space on this device for this book. Nothing was added." (Desktop has no no-space code) |
 | `txt.open` | `revision` 0, `editable` false, `edited` false |
+| `txt.commit` | marks only (spec 019 FR-015a, `specs/019-mobile-reader-redesign/contracts/mobile-txt-commit.md`): `text` → `invalid`, `baseRevision` ≠ 0 → `conflict`, rows checked against the decoded text, one host transaction; `{ ok: true, revision: 0 }` |
 
 At start-up the bridge migrates the database, then calls `files.sweep` with the ids of every book, before `window.api` exists.
 

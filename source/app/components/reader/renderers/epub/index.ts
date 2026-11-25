@@ -1,4 +1,4 @@
-export { EpubRenderer, type EpubRendererApi } from './EpubRenderer'
+export { EpubRenderer, type EpubPagePointerEvent, type EpubRendererApi } from './EpubRenderer'
 export {
   CfiCodec,
   cfiCodec,

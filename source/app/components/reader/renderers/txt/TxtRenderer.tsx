@@ -84,12 +84,21 @@ export type TxtRendererProps = {
   margin: MarginMode
   chromeHidden: boolean
   initialOffset: number
-  caretRequest: TxtCaretRequest | null
-  /** One user edit (already derived from the input event). */
-  onEdit: (edit: TextEdit, selectionBefore: TxtSelection, selectionAfter: TxtSelection) => void
-  onUndo: () => void
-  onRedo: () => void
-  onSaveShortcut: () => void
+  /** Undo / redo caret placement; absent on a host that never edits the text (spec 019 FR-022). */
+  caretRequest?: TxtCaretRequest | null
+  /**
+   * One user edit (already derived from the input event). The editing callbacks are optional: a host that never
+   * edits (the phone, spec 019 FR-022) leaves them out and the box stays a reading surface.
+   */
+  onEdit?: (edit: TextEdit, selectionBefore: TxtSelection, selectionAfter: TxtSelection) => void
+  onUndo?: () => void
+  onRedo?: () => void
+  onSaveShortcut?: () => void
+  /**
+   * The text selection changed (null = none). The phone uses it for one-step marking (spec 019 FR-015): a textarea's
+   * selection is not visible through `document.getSelection()`.
+   */
+  onSelectionChange?: (selection: TxtSelectionInfo | null) => void
   onSelectionContextMenu: (selection: TxtSelectionInfo, x: number, y: number) => void
   onMarkupSelection: (selection: TxtSelectionInfo, tool: TxtMarkupTool) => void
   onHighlightClick: (hit: TxtHighlightHit) => void
@@ -338,19 +347,19 @@ export function TxtRenderer(props: TxtRendererProps) {
       modelTextRef.current = after
       if (!edit) return
       const selectionBefore = hint ? { start: hint.selectionStart, end: hint.selectionEnd } : { start: edit.start, end: edit.start + edit.deleteLength }
-      propsRef.current.onEdit(edit, selectionBefore, selectionOf())
+      propsRef.current.onEdit?.(edit, selectionBefore, selectionOf())
     }
 
     const onBeforeInput = (event: InputEvent) => {
       if (event.inputType === 'historyUndo') {
         event.preventDefault()
         // Translate mode never changes the text (spec 011 FR-005); a markup tool still undoes its marks.
-        if (!propsRef.current.translateModeActive) propsRef.current.onUndo()
+        if (!propsRef.current.translateModeActive) propsRef.current.onUndo?.()
         return
       }
       if (event.inputType === 'historyRedo') {
         event.preventDefault()
-        if (!propsRef.current.translateModeActive) propsRef.current.onRedo()
+        if (!propsRef.current.translateModeActive) propsRef.current.onRedo?.()
         return
       }
       hintRef.current = {
@@ -390,16 +399,16 @@ export function TxtRenderer(props: TxtRendererProps) {
         event.preventDefault()
         event.stopPropagation()
         if (propsRef.current.translateModeActive) return
-        if (event.shiftKey) propsRef.current.onRedo()
-        else propsRef.current.onUndo()
+        if (event.shiftKey) propsRef.current.onRedo?.()
+        else propsRef.current.onUndo?.()
       } else if (key === 'y') {
         event.preventDefault()
         event.stopPropagation()
         if (propsRef.current.translateModeActive) return
-        propsRef.current.onRedo()
+        propsRef.current.onRedo?.()
       } else if (key === 's') {
         event.preventDefault()
-        propsRef.current.onSaveShortcut()
+        propsRef.current.onSaveShortcut?.()
       }
     }
 
@@ -427,6 +436,29 @@ export function TxtRenderer(props: TxtRendererProps) {
     const m = measure()
     return { start, end, text: current.slice(start, end), box: m ? boxForOffsets(m.backdrop, start, end, current) : null }
   }, [measure])
+
+  // Optional selection report (spec 019 FR-015): only listened to when the host asks for it.
+  const wantsSelectionReport = Boolean(props.onSelectionChange)
+  useEffect(() => {
+    const input = inputRef.current
+    if (!input || !wantsSelectionReport) return
+    let last = ''
+    const report = () => {
+      const selection = document.activeElement === input ? readSelection() : null
+      const key = selection ? `${selection.start}:${selection.end}` : ''
+      if (key === last) return
+      last = key
+      propsRef.current.onSelectionChange?.(selection)
+    }
+    document.addEventListener('selectionchange', report)
+    input.addEventListener('select', report)
+    input.addEventListener('blur', report)
+    return () => {
+      document.removeEventListener('selectionchange', report)
+      input.removeEventListener('select', report)
+      input.removeEventListener('blur', report)
+    }
+  }, [wantsSelectionReport, readSelection])
 
   /** The annotation under `offset`, anchored at its character — or at the pointer while the backdrop trails. */
   const hitAt = useCallback(

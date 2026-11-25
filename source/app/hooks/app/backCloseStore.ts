@@ -27,6 +27,11 @@ function currentEntryId(): unknown {
 }
 
 let listening = false
+/**
+ * History entries of layers that closed while another layer's entry was on top (a panel closed together with the
+ * panels above it, spec 019 FR-001): they can only be popped later, so Back skips over them instead of doing nothing.
+ */
+const staleEntries = new Set<string>()
 
 export const useBackCloseStore = create<BackCloseState>()((set, get) => ({
   stack: [],
@@ -45,7 +50,9 @@ export const useBackCloseStore = create<BackCloseState>()((set, get) => ({
     if (!layer) return
     window.clearTimeout(layer.timer)
     set({ stack: get().stack.filter((entry) => entry.id !== id) })
-    if (layer.pushed && currentEntryId() === id) window.history.back()
+    if (!layer.pushed) return
+    if (currentEntryId() === id) window.history.back()
+    else staleEntries.add(id)
   },
 }))
 
@@ -53,6 +60,13 @@ function ensureListening() {
   if (listening) return
   listening = true
   window.addEventListener('popstate', () => {
+    const landed = currentEntryId()
+    if (typeof landed === 'string' && staleEntries.has(landed)) {
+      // Landed on the entry of a layer that is already closed: step over it.
+      staleEntries.delete(landed)
+      window.history.back()
+      return
+    }
     const { stack } = useBackCloseStore.getState()
     const top = stack[stack.length - 1]
     if (!top || !top.pushed || currentEntryId() === top.id) return

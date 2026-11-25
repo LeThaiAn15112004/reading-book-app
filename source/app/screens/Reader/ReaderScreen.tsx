@@ -14,6 +14,7 @@ import {
 } from '@core'
 
 import { MD_HEADING_HREF, mdInitialPointFor, mdSourceFor, mdTocFromHeadings, txtInitialOffsetFor } from './logic/reader-core/derivations'
+import { currentChapterName } from './logic/readerPlace'
 import { useTxtOpeningReport } from './logic/reader-core/useTxtOpeningReport'
 import { useOpeningPositionNote } from './logic/reader-core/useOpeningPositionNote'
 import { leaveBookOpening } from '../../hooks/reader/readerOpeningStore'
@@ -445,14 +446,36 @@ export function ReaderScreen() {
     ? 0
     : rightSidebarContentInset(rightPanel !== null, rightSidebarDocked)
 
+  // The Reader's demo content (no real book open) only; a real book is never named from it (spec 019 FR-018).
   const chapter = FAKE_CHAPTERS[nav.chapterIndex] ?? FAKE_CHAPTERS[0]
   const pdfPageCurrent = nav.pdfNav?.pageCurrent ?? 0
   const pdfPageTotal = nav.pdfNav?.pageTotal ?? 0
-  const chapterLabel = isPdfSurface
-    ? t('reader.logic.page', { page: pdfPageCurrent })
-    : isTextSurface
-      ? `${txtPercent}%`
-      : chapter.title
+  // Spine hrefs are fixed for a book's lifetime; read once its contents are known.
+  const epubSpineHrefs = useMemo(
+    () => (book.isEpubSurface ? (epubApiRef.current?.getSpineHrefs() ?? []) : []),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [book.isEpubSurface, nav.epubToc],
+  )
+  // New bookmarks are labelled with the book's own chapter name, else the place (spec 019 Story 6, FR-019).
+  const chapterName = currentChapterName({
+    format: book.isEpubSurface ? 'epub' : isPdfSurface ? 'pdf' : isMdSurface ? 'md' : null,
+    epubToc: nav.epubToc,
+    epubSpineHrefs,
+    epubSpineIndex: nav.epubNav ? nav.epubNav.spineIndex : null,
+    pdfToc: nav.pdfToc,
+    pdfPage: pdfPageCurrent,
+    mdHeadings,
+    mdActiveHeading,
+  })
+  const chapterLabel =
+    chapterName ??
+    (isPdfSurface
+      ? t('reader.logic.page', { page: pdfPageCurrent })
+      : isTextSurface
+        ? `${txtPercent}%`
+        : book.isEpubSurface
+          ? `${Math.round((nav.epubNav?.progress ?? 0) * 100)}%`
+          : chapter.title)
   // PDF: real page numbers. EPUB: reference pages / spine sections. Otherwise the placeholder.
   // TXT is one continuous text: a single "section", progress is the share scrolled.
   const pageCurrent = book.isEpubSurface
@@ -1198,7 +1221,7 @@ export function ReaderScreen() {
             isResizing={sidebarResize.isResizing}
             chromeHidden={toolsHidden}
             onResizePointerDown={sidebarResize.onResizePointerDown}
-            chapters={isPdfSurface || isTextSurface ? [] : FAKE_CHAPTERS}
+            chapters={book.isEpubSurface || isPdfSurface || isTextSurface ? [] : FAKE_CHAPTERS}
             chapterIndex={nav.chapterIndex}
             tocItems={
               book.isEpubSurface

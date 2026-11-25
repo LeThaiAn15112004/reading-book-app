@@ -138,8 +138,16 @@ E2E is run only if the user agrees.
 
 ### Mobile-only state
 
-None so far. A store may be added here only with: what it holds, why the existing stores cannot hold it, and why
-component state is not enough.
+A store may be added here only with: what it holds, why the existing stores cannot hold it, and why component state
+is not enough.
+
+- **`screens/Reader/phone/logic/phoneReaderChromeStore.ts`** (spec 019, FR-021). Holds the phone reader's chrome for
+  the open book: bars shown / hidden, the ordered stack of open layers (selection bar, Contents, Notes, Appearance,
+  mark panel, confirm dialog), the inactivity timer, the slider-dragging flag, the toast and the measured top inset.
+  Session-only, reset when another book opens. The existing stores hold book data (highlights, TXT document, session),
+  not chrome; component state was the defect spec 019 names: Back (`useBackClose`), auto-hide and swipe page turns
+  must all consult the SAME layer stack, from different components. Its rules are the pure core reducer
+  `app-models/phone-reader-chrome.ts`.
 
 ### Risks to verify before building the Mobile Reader
 

@@ -195,7 +195,8 @@ export function useReaderBookmarks({
       id: crypto.randomUUID(),
       locatorRef: packBookmarkLocator(location, chapterIndexAt),
       chapterIndex: chapterIndexAt,
-      label: labelOverride || epubNav?.label?.trim() || chapterLabel.trim() || 'Bookmark',
+      // The caller's label comes from the book's own contents (spec 019 FR-018); `epubNav.label` can be a file name.
+      label: labelOverride || chapterLabel.trim() || epubNav?.label?.trim() || 'Bookmark',
       // Only the EPUB surface can read text at the current position today.
       excerpt: isEpubSurface
         ? epubApiRef.current?.getCurrentExcerpt()

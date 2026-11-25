@@ -1,8 +1,9 @@
 import { useState } from 'react'
-import type { ReaderBookmark, ReaderHighlightBase } from '@core'
-import { MobileSheet, MobileSheetRow } from './MobileSheet'
+import type { MessageKey, ReaderHighlightBase } from '@core'
 import { useT } from '../../../../i18n'
-import type { MessageKey } from '@core'
+import type { SurfaceBookmarks } from '../logic/readingSurface'
+import { MobileReaderIcon } from './MobileReaderIcons'
+import { MobileSheet, MobileSheetRow } from './MobileSheet'
 
 type Tab = 'bookmarks' | 'notes'
 
@@ -16,43 +17,36 @@ const KIND_LABEL: Partial<Record<ReaderHighlightBase['styleKind'], MessageKey>> 
   insert: 'reader.sidebar.notes.types.insert',
 }
 
+const trailingButton =
+  'focus-ring flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg text-lib-muted active:bg-lib-hint'
+
 /**
- * Bookmarks and notes as one bottom sheet with two tabs (spec 008, T103). The lists and every action come from the
- * same stores as Desktop's sidebar (`useReaderBookmarks`, the open surface's highlights store); nothing is copied.
+ * Bookmarks and notes as one bottom sheet (spec 008 T103; spec 019). Everything comes from the reading surface; a
+ * book without bookmarks (TXT) shows its notes only. Opening a note's panel keeps this sheet under it, so Back closes
+ * the mark panel first, then this sheet (Story 1, scenario 2).
  */
 export function MobileMarksSheet({
-  initialTab,
   bookmarks,
-  currentPlaceBookmarked,
-  onToggleBookmark,
-  onJumpBookmark,
-  onDeleteBookmark,
-  highlights,
-  onJumpHighlight,
-  onOpenHighlight,
+  marks,
+  onJumpMark,
+  onOpenMark,
   onClose,
 }: {
-  initialTab: Tab
-  bookmarks: readonly ReaderBookmark[]
-  currentPlaceBookmarked: boolean
-  onToggleBookmark: () => void
-  onJumpBookmark: (bookmark: ReaderBookmark) => void
-  onDeleteBookmark: (id: string) => void
-  highlights: readonly ReaderHighlightBase[]
-  onJumpHighlight: (highlight: ReaderHighlightBase) => void
-  /** Opens the mark's own sheet (colour, note, delete); absent when marks are read-only (TXT on Mobile). */
-  onOpenHighlight?: (highlight: ReaderHighlightBase) => void
+  bookmarks?: SurfaceBookmarks
+  marks: readonly ReaderHighlightBase[]
+  onJumpMark: (id: string) => void
+  onOpenMark: (id: string) => void
   onClose: () => void
 }) {
   const t = useT()
-  const [tab, setTab] = useState<Tab>(initialTab)
+  const [tab, setTab] = useState<Tab>(bookmarks ? 'bookmarks' : 'notes')
   const tabButton = (id: Tab, label: string, count: number) => (
     <button
       type="button"
       role="tab"
       aria-selected={tab === id}
       onClick={() => setTab(id)}
-      className={`min-h-[44px] flex-1 rounded-lg text-[14px] font-semibold ${tab === id ? 'bg-lib-surface text-lib-text-strong' : 'text-lib-muted'}`}
+      className={`focus-ring min-h-[44px] flex-1 rounded-lg text-[14px] font-semibold ${tab === id ? 'bg-lib-surface text-lib-text-strong' : 'text-lib-muted'}`}
     >
       {count > 0 ? t('reader.phone.marks.tabLabel', { label, count }) : label}
     </button>
@@ -60,40 +54,43 @@ export function MobileMarksSheet({
 
   return (
     <MobileSheet title={tab === 'bookmarks' ? t('reader.phone.marks.bookmarks') : t('reader.phone.marks.notes')} onClose={onClose}>
-      <div role="tablist" className="m-3 flex gap-1 rounded-xl bg-lib-hint p-1">
-        {tabButton('bookmarks', t('reader.phone.marks.bookmarks'), bookmarks.length)}
-        {tabButton('notes', t('reader.phone.marks.notes'), highlights.length)}
-      </div>
+      {bookmarks ? (
+        <div role="tablist" className="m-3 flex gap-1 rounded-xl bg-lib-hint p-1">
+          {tabButton('bookmarks', t('reader.phone.marks.bookmarks'), bookmarks.list.length)}
+          {tabButton('notes', t('reader.phone.marks.notes'), marks.length)}
+        </div>
+      ) : null}
 
-      {tab === 'bookmarks' ? (
+      {tab === 'bookmarks' && bookmarks ? (
         <>
           <div className="px-3 pb-2">
             <button
               type="button"
-              onClick={onToggleBookmark}
-              className="min-h-[44px] w-full rounded-xl border border-lib-border text-[14px] font-semibold text-lib-text-strong"
+              onClick={bookmarks.toggle}
+              className="focus-ring flex min-h-[48px] w-full items-center justify-center gap-2 rounded-xl border border-lib-border text-[14px] font-semibold text-lib-text-strong"
             >
-              {currentPlaceBookmarked ? t('reader.phone.marks.removeHere') : t('reader.phone.marks.addHere')}
+              <MobileReaderIcon name={bookmarks.isHere ? 'bookmarkFilled' : 'bookmark'} size={20} />
+              {bookmarks.isHere ? t('reader.phone.marks.removeHere') : t('reader.phone.marks.addHere')}
             </button>
           </div>
-          {bookmarks.length === 0 ? (
+          {bookmarks.list.length === 0 ? (
             <p className="px-4 py-6 text-[14px] text-lib-muted">{t('reader.phone.marks.noBookmarks')}</p>
           ) : (
-            bookmarks.map((bookmark) => (
+            bookmarks.list.map((bookmark) => (
               <MobileSheetRow
                 key={bookmark.id}
                 onSelect={() => {
-                  onJumpBookmark(bookmark)
+                  bookmarks.jump(bookmark)
                   onClose()
                 }}
                 trailing={
                   <button
                     type="button"
                     aria-label={t('reader.phone.marks.removeBookmark', { label: bookmark.label })}
-                    onClick={() => onDeleteBookmark(bookmark.id)}
-                    className="min-h-[44px] min-w-[44px] px-3 text-[13px] font-semibold text-lib-muted"
+                    onClick={() => bookmarks.remove(bookmark.id)}
+                    className={trailingButton}
                   >
-                    {t('reader.phone.marks.remove')}
+                    <MobileReaderIcon name="delete" size={20} />
                   </button>
                 }
               >
@@ -103,32 +100,27 @@ export function MobileMarksSheet({
             ))
           )}
         </>
-      ) : highlights.length === 0 ? (
+      ) : marks.length === 0 ? (
         <p className="px-4 py-6 text-[14px] text-lib-muted">{t('reader.phone.marks.noNotes')}</p>
       ) : (
-        highlights.map((highlight) => (
+        marks.map((highlight) => (
           <MobileSheetRow
             key={highlight.id}
             onSelect={() => {
-              onJumpHighlight(highlight)
+              onJumpMark(highlight.id)
               onClose()
             }}
             trailing={
-              onOpenHighlight ? (
-                <button
-                  type="button"
-                  aria-label={t('reader.phone.marks.edit')}
-                  onClick={() => onOpenHighlight(highlight)}
-                  className="min-h-[44px] min-w-[44px] px-3 text-[13px] font-semibold text-lib-muted"
-                >
-                  {t('reader.phone.marks.edit')}
-                </button>
-              ) : undefined
+              <button type="button" aria-label={t('reader.phone.marks.edit')} onClick={() => onOpenMark(highlight.id)} className={trailingButton}>
+                <MobileReaderIcon name="edit" size={20} />
+              </button>
             }
           >
             <span className="flex items-center gap-2">
               <span aria-hidden className="inline-block h-3 w-3 shrink-0 rounded-full" style={{ background: highlight.colorHex || 'transparent' }} />
-              <span className="text-[12px] font-semibold text-lib-faint uppercase">{KIND_LABEL[highlight.styleKind] ?? highlight.styleKind}</span>
+              <span className="text-[12px] font-semibold text-lib-faint uppercase">
+                {KIND_LABEL[highlight.styleKind] ? t(KIND_LABEL[highlight.styleKind]!) : highlight.styleKind}
+              </span>
             </span>
             {highlight.selectionText?.highlight ? (
               <span className="mt-0.5 line-clamp-2 block text-[14px] text-lib-text">{highlight.selectionText.highlight}</span>

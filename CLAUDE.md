@@ -452,6 +452,15 @@ imports the shared UI's `@app/main` unchanged. **No Desktop file is copied into 
   `screens/Reader/phone/MobileReaderScreen.tsx` on the Mobile host only, which runs the same core hooks as Desktop
   (`screens/Reader/logic/reader-core/`: `useReaderCore`, `useReaderAnnotations`, pure derivations) — never copy logic
   into it, and add no Mobile-only store without writing the reason in `contracts/phone-ui.md`.
+- **Phone reader (spec 019, `specs/019-mobile-reader-redesign/`, map in `docs/implementation_plan/phone_reader.md`)**:
+  `MobileReaderScreen` only composes ONE reading surface (`phone/logic/useReadingSurface.tsx` — the only per-format
+  branch in `screens/Reader/phone/**`) and ONE chrome store (`phone/logic/phoneReaderChromeStore.ts`, rules in core
+  `app-models/phone-reader-chrome.ts`). Every layer registers `useBackClose` (Back closes the innermost first); bars
+  open hidden, fade, auto-hide after 4 s; Page view EPUB / PDF turn by swipe / edge tap through core
+  `app-models/reader-gesture.ts` (EPUB frames forward pointers via `EpubRenderer.onPagePointer`, PDF `tapZones={false}`);
+  PDF has Page / Scroll per book (`book.prefs.viewMode`); chapter names come from the book (`logic/readerPlace.ts`, also
+  Desktop bookmark labels; `FAKE_CHAPTERS` is demo-only); one-step marking; TXT marks saved through the phone
+  `txt.commit` (marks only, one host transaction). Never pass stand-in callbacks to the shared renderers.
 - **Mobile Library (spec 013, `specs/013-mobile-library-screen/`)**: on the Mobile host `LibraryScreen` lazy-loads
   `screens/Library/phone/MobileLibraryHub.tsx` instead of `LibraryHub` (same props, stores and hooks): search header
   with a "+" (Add file), filter chips incl. `recent` (opened books, most recently read first; rules in core

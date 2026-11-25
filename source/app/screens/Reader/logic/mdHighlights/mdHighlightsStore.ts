@@ -35,6 +35,9 @@ export type MdAnnotationAnchor = {
   height: number
 }
 
+/** Anchor of a mark opened by its identity alone (spec 019 FR-023): a phone sheet is never placed by a rect. */
+const UNPLACED_ANCHOR: MdAnnotationAnchor = { top: 0, left: 0, right: 0, bottom: 0, width: 0, height: 0 }
+
 export type ActiveMdHighlight = { highlight: MdReaderHighlight; rect: MdAnnotationAnchor }
 
 export type MdMarkupTool = MarkupInteractionTool
@@ -98,7 +101,8 @@ type MdHighlightsStoreState = MdHighlightsContext & {
   commitInsert: (text: string) => void
   cancelInsert: () => void
   /** Click / right-click on a mark — focus it and open its menu (note: its popup). */
-  openHighlight: (id: string, rect: MdAnnotationAnchor) => void
+  /** `rect` absent = opened by identity only (spec 019 FR-023, the phone's mark sheet). */
+  openHighlight: (id: string, rect?: MdAnnotationAnchor) => void
   closeEditPopup: () => void
   /** A click on blank text: close the menu, drop the outline. */
   dismissAnnotationUi: () => void
@@ -241,7 +245,7 @@ export const useMdHighlightsStore = create<MdHighlightsStoreState>()((set, get) 
   openHighlight: (id, rect) => {
     const found = get().highlights.find((h) => h.id === id)
     if (!found) return
-    set({ focusedHighlightId: id, activeHighlight: { highlight: found, rect } })
+    set({ focusedHighlightId: id, activeHighlight: { highlight: found, rect: rect ?? UNPLACED_ANCHOR } })
   },
 
   closeEditPopup: () => set({ activeHighlight: null, focusedHighlightId: null }),

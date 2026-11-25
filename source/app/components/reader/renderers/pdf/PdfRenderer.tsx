@@ -212,6 +212,11 @@ export interface PdfRendererProps {
   /** A plain click (no drag, no selection) in the middle half of the page area. */
   onCenterTap?: () => void
   /**
+   * False: a blank click only reports `onBlankClick` — no centre tap, no edge-quarter page turn. The phone classifies
+   * taps itself (spec 019 FR-005, research R2). Default true (Desktop, unchanged).
+   */
+  tapZones?: boolean
+  /**
    * Right-click inside a live text selection on the text layer, at client (`x`, `y`) — the
    * Reader's own window coordinates (no iframe / transform on the PDF surface). The native context
    * menu is always suppressed on the pages; a right-click anywhere else fires nothing.
@@ -429,6 +434,7 @@ export function PdfRenderer({
   interactionTool = 'select',
   onHandPanBy,
   onCenterTap,
+  tapZones = true,
   onSelectionContextMenu,
   annotations,
   focusedAnnotationId = null,
@@ -503,6 +509,8 @@ export function PdfRenderer({
   onHandPanByRef.current = onHandPanBy
   const onCenterTapRef = useRef(onCenterTap)
   onCenterTapRef.current = onCenterTap
+  const tapZonesRef = useRef(tapZones)
+  tapZonesRef.current = tapZones
   const onSelectionContextMenuRef = useRef(onSelectionContextMenu)
   onSelectionContextMenuRef.current = onSelectionContextMenu
   const pen = interactionTool === 'pen'
@@ -2560,6 +2568,7 @@ export function PdfRenderer({
     }
     selectTarget(null)
     onBlankClickRef.current?.()
+    if (!tapZonesRef.current) return
     const root = getScrollRootRef.current()
     if (!root) return
     const rect = root.getBoundingClientRect()

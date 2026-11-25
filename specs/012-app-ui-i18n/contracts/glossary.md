@@ -77,6 +77,12 @@ Whisper, FFmpeg, Foxit, Acrobat, Windows, CFI (not shown to users).
 | Retry | Thử lại |
 | Open | Mở |
 | Quit | Thoát |
+| Page (reading view) | Trang |
+| Scroll (reading view) | Cuộn |
+| Show reading controls | Hiện thanh điều khiển |
+| Page {page} of {total} in chapter | Trang {page}/{total} trong chương |
+| Fit page | Vừa trang |
+| Paper / Sepia / Night (reader theme) | Giấy / Nâu đọc sách / Đêm |
 
 Notes
 

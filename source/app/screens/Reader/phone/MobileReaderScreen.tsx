@@ -1,658 +1,263 @@
 /**
- * The Mobile Reader (spec 008, T102 + T103, FR-012a / FR-012c; `contracts/phone-ui.md`, "Mobile Reader UI").
+ * The phone reader (spec 008 T102 / T103; rebuilt by spec 019 — `specs/019-mobile-reader-redesign/`).
  *
  * Chosen by `ReaderRoute` only when `isMobileHost()` is true and loaded with `React.lazy`, so Electron never loads
- * this file. It runs the SAME core hooks as Desktop's `ReaderScreen` (`useReaderCore`, `useReaderAnnotations`,
- * `useReaderTxt`, `usePdfSelectionMenu`, `useReaderZoomControls`), the same renderers and the same stores; only the
- * chrome is its own: a full-screen page, bars that a tap in the middle shows or hides, bottom sheets for Contents,
- * Bookmarks / Notes and Appearance, an action bar for selected text and a sheet for a mark.
+ * this file. Everything format-specific comes from ONE reading surface (`useReadingSurface`: the same core hooks,
+ * stores and renderers as Desktop's `ReaderScreen`); everything about the chrome — bars, the stack of open layers, the
+ * idle timer, the toast — lives in ONE store (`phoneReaderChromeStore`, rules in core `reduceChrome`). This screen only
+ * composes them:
  *
- * Not here (first-release scope, hidden on Mobile): TXT editing and markup, ink, shapes, typewriter, attachments,
- * search, read aloud, translation, snapshot, word count, export, annotation transfer, relink, keyboard shortcuts.
+ *   - Back closes the innermost layer first (each layer registers `useBackClose`), then leaves the book (FR-001).
+ *   - The book opens with the bars hidden; a tap in the middle (anywhere in a scrolling book) toggles them; a page turn,
+ *     a scroll or 4 s without interaction hides them (FR-008). They fade and never move the text (FR-009).
+ *   - Page view (EPUB / PDF): swipes and edge taps turn pages through the core gesture classifier (FR-003 – FR-005).
+ *   - A finished selection shows the colour bar at once (FR-015).
  *
- * Mobile-only state: none. Which sheet is open, whether the bars show and the toast are component state.
- *
- * Page turns: the edge tap zones and the bottom bar's previous / next. Swipe is NOT built: whether a swipe can be told
- * apart from a text selection and PDF scrolling is risk R2, which T095 checks on the device first.
+ * Not here (first-release scope): TXT editing, ink, shapes, typewriter, attachments, search, read aloud, translation,
+ * snapshot, word count, export, annotation transfer, relink, keyboard shortcuts, audiobooks.
  */
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useParams } from 'react-router-dom'
-import {
-  CfiLocation,
-  PageRectLocation,
-  isShapeStyleKind,
-  type InteractionTool,
-  type MdHeadingInfo,
-  type ReaderHighlightBase,
-} from '@core'
-import { useAppTitle, useGlobalReadingPrefs, useOpenReading } from '../../../components/chrome'
-import { EpubRenderer, type EpubRendererApi, type EpubTocItem } from '../../../components/reader/renderers/epub'
-import { PdfRenderer, type PdfRendererApi } from '../../../components/reader/renderers/pdf'
-import { TxtRenderer, type TxtRendererApi } from '../../../components/reader/renderers/txt'
-import { MdRenderer, type MdRendererApi, type MdSelectionInfo } from '../../../components/reader/renderers/md'
+import { useCallback, useEffect, useMemo, useRef } from 'react'
 import { ReaderOpeningScreen } from '../../../components/reader/ReaderOpeningScreen'
-import { ReaderZoomViewport } from '../components/chrome/ReaderZoomViewport'
-import { AaSettingsPanel } from '../components/settings/AaSettingsPanel'
-import { FAKE_CHAPTERS } from '../logic/demo/fakeReaderContent'
-import type { HighlightShortcuts } from '../logic/hooks/useReaderHighlights'
-import { usePdfSelectionMenu } from '../logic/hooks/usePdfSelectionMenu'
-import { useReaderTxt } from '../logic/hooks/useReaderTxt'
-import { useReaderZoomControls } from '../logic/hooks/useReaderZoomControls'
-import { MD_HEADING_HREF, mdInitialPointFor, mdSourceFor, mdTocFromHeadings, txtInitialOffsetFor } from '../logic/reader-core/derivations'
-import { useTxtOpeningReport } from '../logic/reader-core/useTxtOpeningReport'
-import { useOpeningPositionNote } from '../logic/reader-core/useOpeningPositionNote'
-import { leaveBookOpening } from '../../../hooks/reader/readerOpeningStore'
-import { readingStyleFor } from '../logic/reader-core/reading-style'
-import { useReaderAnnotations } from '../logic/reader-core/useReaderAnnotations'
-import { useReaderCore } from '../logic/reader-core/useReaderCore'
+import { useT } from '../../../i18n'
+import { MobileAppearanceSheet } from './components/MobileAppearanceSheet'
 import { MobileMarkSheet } from './components/MobileMarkSheet'
 import { MobileMarksSheet } from './components/MobileMarksSheet'
 import { MobileReaderBottomBar, MobileReaderTopBar } from './components/MobileReaderBars'
-import { MobileSelectionBar, type SelectionMarkKind } from './components/MobileSelectionBar'
-import { MobileSheet } from './components/MobileSheet'
+import { MobileSelectionBar } from './components/MobileSelectionBar'
 import { MobileTocSheet } from './components/MobileTocSheet'
-import { requestSelectionMenu, useLiveSelection } from './components/useLiveSelection'
-import { useT } from '../../../i18n'
+import { phoneChrome, usePhoneReaderChromeStore } from './logic/phoneReaderChromeStore'
+import { usePhonePageGestures } from './logic/usePhonePageGestures'
+import { useReadingSurface, type SurfacePageEvents } from './logic/useReadingSurface'
+import type { ReadingSurface, SurfaceView } from './logic/readingSurface'
 
-type SheetId = 'toc' | 'bookmarks' | 'notes' | 'appearance'
-
-const NO_SHORTCUTS: HighlightShortcuts = {
-  undo: () => {},
-  redo: () => {},
-  deleteFocused: () => {},
-  hasFocusedHighlight: () => false,
-  cancelAnnotationTool: () => false,
-}
-
-/** The phone has no Hand tool: the page scrolls and selects natively. */
-const TOOL: InteractionTool = 'select'
-const TOAST_MS = 2400
-/** Width of each edge tap zone, as a share of the screen. */
-const EDGE_ZONE = '14%'
+/** A scroll this soon after the slider let go is the jump, not reading on. */
+const SLIDER_SCROLL_GRACE_MS = 800
 
 export default function MobileReaderScreen() {
   const t = useT()
-  const { bookId } = useParams<{ bookId: string }>()
-  const { setDocumentSubtitle } = useAppTitle()
-  const { ensureTab, updateBookTitle } = useOpenReading()
-  const { prefs: globalPrefs } = useGlobalReadingPrefs()
-  const globalPrefsRef = useRef(globalPrefs)
-  globalPrefsRef.current = globalPrefs
-
-  const epubApiRef = useRef<EpubRendererApi | null>(null)
-  const pdfApiRef = useRef<PdfRendererApi | null>(null)
-  const txtApiRef = useRef<TxtRendererApi | null>(null)
-  const mdApiRef = useRef<MdRendererApi | null>(null)
-  const highlightShortcutsRef = useRef<HighlightShortcuts>(NO_SHORTCUTS)
-  const activeToolRef = useRef<InteractionTool>(TOOL)
   const surfaceRef = useRef<HTMLDivElement | null>(null)
+  const moverRef = useRef<HTMLDivElement | null>(null)
 
-  const [barsVisible, setBarsVisible] = useState(true)
-  const [sheet, setSheet] = useState<SheetId | null>(null)
-  const [toast, setToastState] = useState<string | null>(null)
+  const barsVisible = usePhoneReaderChromeStore((s) => s.barsVisible)
+  const layers = usePhoneReaderChromeStore((s) => s.layers)
+  const toast = usePhoneReaderChromeStore((s) => s.toast)
+  const topInsetPx = usePhoneReaderChromeStore((s) => s.topInsetPx)
+  const sliderDragging = usePhoneReaderChromeStore((s) => s.sliderDragging)
+  const dispatch = usePhoneReaderChromeStore((s) => s.dispatch)
+  const openLayer = usePhoneReaderChromeStore((s) => s.openLayer)
+  const closeLayer = usePhoneReaderChromeStore((s) => s.closeLayer)
+  const showToast = usePhoneReaderChromeStore((s) => s.showToast)
+  const resetFor = usePhoneReaderChromeStore((s) => s.resetFor)
+  const poke = usePhoneReaderChromeStore((s) => s.poke)
+
+  // The page's events reach the gestures and the chrome through refs, so the surface gets one stable object.
+  const surfaceNowRef = useRef<ReadingSurface | null>(null)
+  const viewRef = useRef<SurfaceView>('scroll')
+  const gesturesRef = useRef<ReturnType<typeof usePhonePageGestures> | null>(null)
+  const sliderReleasedAtRef = useRef(0)
+  const handleScrolled = useCallback(() => {
+    if (phoneChrome.get().sliderDragging) return
+    if (performance.now() - sliderReleasedAtRef.current < SLIDER_SCROLL_GRACE_MS) return
+    dispatch({ type: 'scrolled' })
+  }, [dispatch])
+  const events = useMemo<SurfacePageEvents>(
+    () => ({
+      onBlankTap: () => {
+        // A tap beside a selection only drops it.
+        if (surfaceNowRef.current?.selection) {
+          surfaceNowRef.current.clearSelection()
+          return
+        }
+        if (viewRef.current === 'page') gesturesRef.current?.consumeTap()
+        else dispatch({ type: 'tap-middle' })
+      },
+      onScrolled: handleScrolled,
+      onEpubPointer: (event) => gesturesRef.current?.onEpubPointer(event),
+      onChromeHidden: (hidden) => dispatch(hidden ? { type: 'page-turned' } : { type: 'show-bars' }),
+    }),
+    [dispatch, handleScrolled],
+  )
+
+  const reader = useReadingSurface({ events, surfaceRef, layersOpen: layers.length > 0 })
+  const { surface, opening } = reader
+  surfaceNowRef.current = surface
+  const view: SurfaceView = surface?.view ?? 'scroll'
+  viewRef.current = view
+
+  // A new book: chrome back to its opening state (bars hidden, nothing open).
   useEffect(() => {
-    if (!toast) return
-    const id = window.setTimeout(() => setToastState(null), TOAST_MS)
-    return () => window.clearTimeout(id)
-  }, [toast])
-  const setToast = useCallback((message: string | null) => setToastState(message), [])
-  const setChromeHidden = useCallback((hidden: boolean) => setBarsVisible(!hidden), [])
-  const closeFloating = useCallback(() => setSheet(null), [])
+    resetFor(reader.bookId ?? null)
+    return () => resetFor(null)
+  }, [reader.bookId, resetFor])
 
-  // Book open + session + navigation: the same hook, with the same order, as Desktop (FR-012c step 3).
-  const { book, session, nav, isPdfSurface, isTxtSurface, isMdSurface, isTextSurface } = useReaderCore({
-    bookId,
-    ensureTab,
-    updateBookTitle,
-    setDocumentSubtitle,
-    globalPrefsRef,
-    epubApiRef,
-    pdfApiRef,
-    txtApiRef,
-    mdApiRef,
-    closeFloating,
-    highlightShortcutsRef,
-  })
-
-  // TXT text comes from `txt:open`; on Mobile it is read-only (`editable: false`, no markup).
-  const txt = useReaderTxt({ bookId, active: isTxtSurface, txtApiRef, setToast, setChromeHidden })
-  const zoom = useReaderZoomControls({ bookId, activeToolRef })
-
-  const mdSource = useMemo(() => mdSourceFor(isMdSurface, book.bookBytes), [isMdSurface, book.bookBytes])
-  const [mdHeadings, setMdHeadings] = useState<MdHeadingInfo[]>([])
-  const [mdActiveHeading, setMdActiveHeading] = useState<number | null>(null)
-  const [mdSelectionMenu, setMdSelectionMenu] = useState<{ selection: MdSelectionInfo; point: { x: number; y: number } } | null>(null)
-  const [textPercent, setTextPercent] = useState(0)
+  // Any touch / click anywhere restarts the bars' idle countdown.
   useEffect(() => {
-    setMdHeadings([])
-    setMdActiveHeading(null)
-    setMdSelectionMenu(null)
-    setTextPercent(0)
-    setSheet(null)
-  }, [bookId])
-  const mdToc = useMemo<EpubTocItem[]>(() => mdTocFromHeadings(mdHeadings), [mdHeadings])
+    const onActivity = () => poke()
+    window.addEventListener('pointerdown', onActivity, true)
+    return () => window.removeEventListener('pointerdown', onActivity, true)
+  }, [poke])
 
-  const txtReady = isTxtSurface && txt.loadStatus === 'ready'
-  const txtLoadFailed = isTxtSurface && txt.loadStatus === 'error'
-  const isTxtLoading = isTxtSurface && !txtLoadFailed && (!txtReady || book.sessionLoadStatus === 'loading')
-  const txtInitialOffset = useMemo(
-    () => txtInitialOffsetFor(book.resumeLocation, txt.getTextLength()),
-    // Read once when the renderer mounts, like Desktop.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [book.resumeLocation, txtReady],
+  useEffect(() => {
+    if (!sliderDragging) sliderReleasedAtRef.current = performance.now()
+  }, [sliderDragging])
+
+  const turnPage = useCallback(
+    (direction: 'next' | 'prev'): boolean => {
+      const turned = surfaceNowRef.current?.turn?.(direction) ?? false
+      if (turned) dispatch({ type: 'page-turned' })
+      return turned
+    },
+    [dispatch],
   )
-  useTxtOpeningReport({
-    isTxtSurface,
-    txtReady,
-    sessionReady: book.sessionLoadStatus === 'ready',
-    txtLoadFailed,
-    txtErrorCode: txt.errorCode,
-    resumeLocation: book.resumeLocation,
-    textLength: txt.getTextLength,
+
+  const gestures = usePhonePageGestures({
+    view,
+    allowed: () => phoneChrome.swipesAllowed() && !opening.visible,
+    moverRef,
+    pageRef: surfaceRef,
+    turn: turnPage,
+    zoomEdge: surface?.zoomEdge,
+    isMarkAt: surface?.isMarkAt,
+    onTap: (kind) => {
+      if (kind === 'tap-middle') dispatch({ type: 'tap-middle' })
+      else turnPage(kind === 'tap-next' ? 'next' : 'prev')
+    },
   })
-  const mdInitialPoint = useMemo(
-    () => mdInitialPointFor(book.resumeLocation),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [book.resumeLocation, isMdSurface],
-  )
-  const isPdfSessionLoading = isPdfSurface && book.sessionLoadStatus === 'loading'
-  const isMdLoading = isMdSurface && book.sessionLoadStatus === 'loading'
+  gesturesRef.current = gestures
 
-  // Progress and the place label, computed as Desktop's footer does.
-  const pdfPageCurrent = nav.pdfNav?.pageCurrent ?? 0
-  const pdfPageTotal = nav.pdfNav?.pageTotal ?? 0
-  const chapterLabel = isPdfSurface
-    ? t('reader.phone.screen.page', { page: pdfPageCurrent })
-    : isTextSurface
-      ? `${textPercent}%`
-      : (FAKE_CHAPTERS[nav.chapterIndex] ?? FAKE_CHAPTERS[0])!.title
-  const progress = book.isEpubSurface
-    ? (nav.epubNav?.progress ?? 0)
-    : isPdfSurface && pdfPageTotal > 0
-      ? pdfPageCurrent / pdfPageTotal
-      : isTextSurface
-        ? textPercent / 100
-        : 0
-  const progressLabel = isPdfSurface
-    ? pdfPageTotal > 0
-      ? `${pdfPageCurrent}/${pdfPageTotal}`
-      : ''
-    : `${Math.round(progress * 100)}%`
+  // Main-document touches on the page (PDF, the EPUB cover) feed the gestures in Page view.
+  const mountable = opening.mountable
+  useEffect(() => {
+    gestures.bindRoot(view === 'page' && mountable ? surfaceRef.current : null)
+    return () => gestures.bindRoot(null)
+  }, [gestures, view, mountable])
 
-  // Bookmarks + EPUB / PDF-text / Markdown highlights (FR-012c step 4). No markup tool is ever armed on the phone.
-  const { bookmarks, highlights, pdfHighlights, mdHighlights } = useReaderAnnotations({
-    bookId,
-    isEpubSurface: book.isEpubSurface,
-    isPdfSurface,
-    isMdSurface,
-    epubApiRef,
-    pdfApiRef,
-    mdApiRef,
-    epubNav: nav.epubNav ?? null,
-    pdfPage: pdfPageCurrent,
-    chapterIndex: nav.chapterIndex,
-    chapterLabel,
-    goChapter: nav.goChapter,
-    zoom: zoom.viewZoom,
-    setToast,
-    setChromeHidden,
-    activeAnnotationTool: null,
-  })
-  const pdfSelectionMenu = usePdfSelectionMenu({
-    bookId,
-    isPdfSurface,
-    getScrollRoot: () => zoom.zoomViewportRef.current?.getElement() ?? null,
-    zoom: zoom.viewZoom,
-  })
+  // Any scroll inside the page (every format, every view) is "reading on".
+  useEffect(() => {
+    const el = surfaceRef.current
+    if (!el || !mountable) return
+    el.addEventListener('scroll', handleScrolled, { capture: true, passive: true })
+    return () => el.removeEventListener('scroll', handleScrolled, { capture: true })
+  }, [mountable, handleScrolled])
 
-  /** The open surface's annotation store, as Desktop's `markup` (TXT is read-only here, so it has none). */
-  const markup = isPdfSurface ? pdfHighlights : isMdSurface ? mdHighlights : book.isEpubSurface ? highlights : null
-  /** PDF: only text markup is listed and painted; shapes, typewriter notes and attachments are not in this release. */
-  const pdfTextHighlights = useMemo(
-    () => pdfHighlights.highlights.filter((h) => !isShapeStyleKind(h.styleKind) && h.styleKind !== 'typewriter' && h.styleKind !== 'attachment'),
-    [pdfHighlights.highlights],
-  )
-  const listedHighlights: readonly ReaderHighlightBase[] = isPdfSurface
-    ? pdfTextHighlights
-    : isMdSurface
-      ? mdHighlights.highlights
-      : isTxtSurface
-        ? txt.highlights
-        : highlights.highlights
+  // The selection bar and a mark's panel are layers too: they follow the surface.
+  const hasSelection = Boolean(surface?.selection)
+  useEffect(() => {
+    if (hasSelection) openLayer('selection')
+    else closeLayer('selection')
+  }, [hasSelection, openLayer, closeLayer])
+  const activeMark = surface?.activeMark ?? null
+  const markOpen = activeMark !== null
+  useEffect(() => {
+    if (markOpen) openLayer('mark')
+    else closeLayer('mark')
+  }, [markOpen, openLayer, closeLayer])
 
-  const readingStyle = useMemo(
-    () =>
-      readingStyleFor({
-        fontSize: book.prefs.fontSize,
-        lineHeight: book.prefs.lineHeight,
-        fontWeight: book.prefs.fontWeight,
-        fontFamily: book.prefs.fontFamily,
-        textAlign: book.prefs.textAlign,
-      }),
-    [book.prefs.fontSize, book.prefs.lineHeight, book.prefs.fontWeight, book.prefs.fontFamily, book.prefs.textAlign],
-  )
-  const effectiveMargin = book.prefs.marginEnabled ? book.prefs.margin : 'off'
-
-  const toggleBars = useCallback(() => setBarsVisible((v) => !v), [])
   const copyText = (text: string | undefined) => {
     if (!text) return
     void navigator.clipboard?.writeText(text).then(
-      () => setToast(t('reader.phone.screen.copied')),
-      () => setToast(t('reader.phone.screen.copyFailed')),
+      () => showToast(t('reader.phone.screen.copied')),
+      () => showToast(t('reader.phone.screen.copyFailed')),
     )
   }
 
-  // ── Selected text ────────────────────────────────────────────────────────────────────────────────────────────
-  const selectionMenu = isPdfSurface && pdfSelectionMenu.menu
-    ? {
-        text: pdfSelectionMenu.menu.selection.text,
-        mark: (kind: SelectionMarkKind) => {
-          const menu = pdfSelectionMenu.menu
-          if (!menu) return
-          pdfHighlights.createFromSelection(menu.selection, kind, new DOMRect(menu.point.x, menu.point.y, 0, 0))
-          pdfSelectionMenu.close()
-        },
-        close: pdfSelectionMenu.close,
-      }
-    : isMdSurface && mdSelectionMenu
-      ? {
-          text: mdSelectionMenu.selection.text,
-          mark: (kind: SelectionMarkKind) => {
-            setMdSelectionMenu(null)
-            mdHighlights.createFromSelection(mdSelectionMenu.selection, kind, new DOMRect(mdSelectionMenu.point.x, mdSelectionMenu.point.y, 0, 0))
-          },
-          close: () => setMdSelectionMenu(null),
-        }
-      : book.isEpubSurface && highlights.selectionMenu
-        ? {
-            text: highlights.selectionMenu.selection.text,
-            mark: (kind: SelectionMarkKind) => highlights.createHighlight(highlights.lastUsedColorHex, kind),
-            close: highlights.closeSelectionMenu,
-          }
-        : null
-  const markable = book.contentStatus === 'ready' && (book.isEpubSurface || isPdfSurface || isMdSurface)
-  const liveSelection = useLiveSelection(surfaceRef, markable && sheet === null && !markup?.activeHighlight)
-  const clearNativeSelection = () => {
-    if (liveSelection) liveSelection.doc.getSelection()?.removeAllRanges()
-    else window.getSelection()?.removeAllRanges()
-  }
-
-  const leave = () => {
-    // Spec 017 (FR-001 / FR-002): an opening still running stops at once (system Back unmounts the route the same way).
-    leaveBookOpening()
-    void session.leaveToLibrary()
-  }
-  useOpeningPositionNote(book.opening, setToast)
-
-  // ── Loading / error ──────────────────────────────────────────────────────────────────────────────────────────
-  const loading =
-    book.contentStatus === 'loading' ||
-    book.contentStatus === 'idle' ||
-    book.isEpubSessionLoading ||
-    isPdfSessionLoading ||
-    isMdLoading ||
-    isTxtLoading
-  const openingFailed = book.opening?.outcome === 'failed'
-  const failed = !openingFailed && (book.contentStatus === 'error' || txtLoadFailed)
-  const rendererMountable = !openingFailed && !failed && !loading
-  // Spec 017 (US2): formats whose renderer reports its first page keep the opening screen until then.
-  const marksFirstPage = ['epub', 'pdf', 'md', 'txt'].includes(book.bookFormat ?? '')
-  // Spec 017 (US2, FR-006): the one opening screen — still frame, step line, slow note, error with its actions.
-  // "Locate file…" is a computer's file system action; on the phone a missing book is imported again.
   const openingScreen = (
     <ReaderOpeningScreen
-      visible={!rendererMountable || (marksFirstPage && book.opening?.outcome === 'pending')}
-      status={openingFailed || failed ? 'error' : 'loading'}
-      bookId={bookId ?? ''}
-      title={book.bookTitle}
-      coverUrl={book.coverUrl}
-      opening={book.opening}
-      message={failed ? (txtLoadFailed ? txt.errorMessage : book.openErrorMessage) : null}
-      onRetry={
-        openingFailed
-          ? () => {
-              book.retryOpen()
-              if (txtLoadFailed && bookId) txt.retryLoad(bookId)
-            }
-          : txtLoadFailed && bookId
-            ? () => txt.retryLoad(bookId)
-            : book.retryOpen
-      }
-      onFromBeginning={book.openFromBeginning}
-      onBack={leave}
+      visible={opening.visible}
+      status={opening.status}
+      bookId={reader.bookId ?? ''}
+      title={opening.title}
+      coverUrl={opening.coverUrl}
+      opening={opening.opening}
+      message={opening.message}
+      onRetry={opening.retry}
+      onFromBeginning={opening.fromBeginning}
+      onBack={reader.leave}
     />
   )
 
-  if (!rendererMountable) {
+  if (!mountable || !surface) {
     return (
       <div className="relative h-full overflow-hidden bg-lib-bg-deep text-lib-text" data-mobile-reader="">
+        {reader.page ? (
+          <>
+            {/* A format the phone does not open: its message, and a way back. */}
+            <div className="absolute inset-0 pt-16">{reader.page}</div>
+            <MobileReaderTopBar visible title={reader.title} onBack={reader.leave} />
+          </>
+        ) : null}
         {openingScreen}
       </div>
     )
   }
 
-  const active = markup?.activeHighlight ?? null
+  const has = (layer: (typeof layers)[number]) => layers.includes(layer)
 
   return (
     <div
       className="relative h-full overflow-hidden bg-lib-bg-deep text-lib-text [--reader-text:var(--lib-text)]"
-      style={readingStyle}
+      style={{ ...reader.readingStyle, ['--phone-reader-top-inset' as string]: `${barsVisible ? topInsetPx : 0}px` }}
       data-mobile-reader=""
     >
-      <div ref={surfaceRef} className="absolute inset-0" style={{ paddingTop: 'env(safe-area-inset-top)', paddingBottom: 'env(safe-area-inset-bottom)' }}>
-        <ReaderZoomViewport
-          ref={zoom.zoomViewportRef}
-          zoom={zoom.viewZoom}
-          onZoomChange={zoom.setViewZoom}
-          focusZoomEnabled={isPdfSurface}
-          mode={isPdfSurface ? 'native' : 'transform'}
-        >
-          {book.bookFormat === 'epub' && book.bookBytes ? (
-            <EpubRenderer
-              key={bookId}
-              data={book.bookBytes}
-              coverUrl={book.coverUrl}
-              theme={globalPrefs.theme}
-              layout={book.prefs.layout}
-              viewMode={book.prefs.viewMode}
-              fontSize={book.prefs.fontSize}
-              fontFamily={book.prefs.fontFamily}
-              fontWeight={book.prefs.fontWeight}
-              lineHeight={book.prefs.lineHeight}
-              textAlign={book.prefs.textAlign}
-              marginsEnabled={book.prefs.marginEnabled}
-              marginPreset={book.prefs.margin}
-              chromeHidden={!barsVisible}
-              initialLocation={book.resumeLocation instanceof CfiLocation ? book.resumeLocation : undefined}
-              onCenterTap={() => {
-                toggleBars()
-                highlights.dismissAnnotationUi()
-              }}
-              onSelectionContextMenu={(x, y) => highlights.openSelectionMenuAtPoint(x, y)}
-              onAnnotationDragEnd={(info) => highlights.commitDraggedMark(info)}
-              translateModeActive={false}
-              onTranslateDragEnd={() => {}}
-              // A tap or long press on a mark opens its sheet (Desktop: a click focuses, a right-click opens the menu).
-              onHighlightContextMenu={(info) => highlights.openHighlightContextMenu(info)}
-              onHighlightClick={(info) => highlights.openHighlightContextMenu(info)}
-              onSurfaceClick={() => highlights.dismissAnnotationUi()}
-              interactionTool={TOOL}
-              onFocusZoomWheel={zoom.handleFocusZoomWheel}
-              apiRef={epubApiRef}
-              onNavState={nav.setEpubNav}
-              onLocationChange={session.handleEpubLocationChange}
-              onToc={nav.setEpubToc}
-              onSections={nav.setEpubSections}
-            />
-          ) : book.bookFormat === 'pdf' && book.bookBytes ? (
-            <PdfRenderer
-              key={bookId}
-              data={book.bookBytes}
-              zoom={zoom.viewZoom}
-              getScrollRoot={() => zoom.zoomViewportRef.current?.getElement() ?? null}
-              initialPage={book.resumeLocation instanceof PageRectLocation ? book.resumeLocation.page : 1}
-              interactionTool={TOOL}
-              pagesPerView={1}
-              flow="scroll"
-              onHandPanBy={zoom.handleHandPanBy}
-              onCenterTap={toggleBars}
-              onSelectionContextMenu={(selection, x, y) => {
-                pdfHighlights.dismissAnnotationUi()
-                pdfSelectionMenu.open(selection, x, y)
-              }}
-              annotations={pdfTextHighlights}
-              focusedAnnotationId={pdfHighlights.focusedHighlightId}
-              onAnnotationClick={(hit) => {
-                pdfSelectionMenu.close()
-                pdfHighlights.openHighlight(hit.id, hit.rect)
-              }}
-              onAnnotationContextMenu={(hit) => {
-                pdfSelectionMenu.close()
-                pdfHighlights.openHighlight(hit.id, hit.rect)
-              }}
-              onBlankClick={pdfHighlights.dismissAnnotationUi}
-              onMarkupSelection={(selection, tool) => {
-                pdfSelectionMenu.close()
-                pdfHighlights.commitMarkupSelection(selection, tool)
-              }}
-              hiddenEmbeddedAnnotationIds={pdfHighlights.hiddenEmbeddedObjectIds}
-              apiRef={pdfApiRef}
-              onNavState={(state) => {
-                nav.setPdfNav(state)
-                session.handlePdfNavState(state)
-              }}
-              onOutline={nav.setPdfOutline}
-            />
-          ) : book.bookFormat === 'md' && bookId && mdSource ? (
-            <MdRenderer
-              key={bookId}
-              bookId={bookId}
-              source={mdSource.text}
-              lossy={mdSource.lossy}
-              margin={effectiveMargin}
-              chromeHidden={!barsVisible}
-              onMarginClick={toggleBars}
-              onProgress={(fraction) => setTextPercent(Math.round(fraction * 100))}
-              initialPoint={mdInitialPoint}
-              onLocation={session.handleMdLocation}
-              onHeadings={setMdHeadings}
-              onActiveHeading={setMdActiveHeading}
-              onAnchorNotFound={() => setToast(t('reader.phone.screen.anchorNotFound'))}
-              onOpenExternal={() => setToast(t('reader.phone.screen.externalLink'))}
-              annotations={mdHighlights.highlights}
-              draftCaret={null}
-              focusedAnnotationId={mdHighlights.focusedHighlightId}
-              markupTool={null}
-              onMarkupSelection={(selection, tool) => {
-                setMdSelectionMenu(null)
-                mdHighlights.commitMarkupSelection(selection, tool)
-              }}
-              onInsertPoint={() => {}}
-              onSelectionContextMenu={(selection, x, y) => {
-                mdHighlights.dismissAnnotationUi()
-                setMdSelectionMenu({ selection, point: { x, y } })
-              }}
-              onAnnotationClick={(hit) => {
-                setMdSelectionMenu(null)
-                mdHighlights.openHighlight(hit.id, hit.rect)
-              }}
-              onAnnotationContextMenu={(hit) => {
-                setMdSelectionMenu(null)
-                mdHighlights.openHighlight(hit.id, hit.rect)
-              }}
-              onAnnotationHover={() => {}}
-              onBlankClick={() => {
-                setMdSelectionMenu(null)
-                mdHighlights.dismissAnnotationUi()
-              }}
-              onScrolled={() => {
-                setMdSelectionMenu(null)
-                // A text that scrolls (Markdown, TXT) has few margins to tap: reading on hides the bars.
-                setBarsVisible(false)
-              }}
-              apiRef={mdApiRef}
-            />
-          ) : book.bookFormat === 'txt' ? (
-            <TxtRenderer
-              key={bookId}
-              text={txt.text}
-              highlights={txt.highlights}
-              focusedHighlightId={txt.focusedHighlightId}
-              editable={false}
-              markupTool={null}
-              margin={effectiveMargin}
-              chromeHidden={!barsVisible}
-              initialOffset={txtInitialOffset}
-              caretRequest={txt.caretRequest}
-              onEdit={txt.applyEdit}
-              onUndo={txt.undo}
-              onRedo={txt.redo}
-              onSaveShortcut={txt.saveNow}
-              onSelectionContextMenu={() => {}}
-              onMarkupSelection={() => {}}
-              onHighlightClick={() => {}}
-              onHighlightContextMenu={() => {}}
-              onReplaceHover={() => {}}
-              onBlankClick={() => txt.dismissAnnotationUi()}
-              onMarginClick={toggleBars}
-              onScrolled={() => setBarsVisible(false)}
-              onLocation={(offset) => {
-                const length = txt.getTextLength()
-                if (length === 0) return
-                setTextPercent(Math.round((txtApiRef.current?.getProgress() ?? 0) * 100))
-                txt.setReadingOffset(offset)
-                session.handleTxtLocation(offset, length)
-              }}
-              apiRef={txtApiRef}
-            />
-          ) : (
-            <p className="m-0 px-6 py-10 text-center text-sm text-lib-muted" role="alert">
-              {t('reader.phone.screen.formatUnsupported')}
-            </p>
-          )}
-        </ReaderZoomViewport>
+      {/* FR-017: first in the reading order while the bars are hidden. */}
+      {!barsVisible ? (
+        <button type="button" className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-[700]" onClick={() => dispatch({ type: 'show-bars' })}>
+          {t('reader.phone.bars.showControls')}
+        </button>
+      ) : null}
+
+      <div
+        ref={surfaceRef}
+        className="absolute inset-0"
+        style={{ paddingTop: 'env(safe-area-inset-top)', paddingBottom: 'env(safe-area-inset-bottom)' }}
+      >
+        <div ref={moverRef} className="h-full will-change-transform">
+          {reader.page}
+        </div>
       </div>
 
       {openingScreen}
 
-      {/* Edge tap zones: previous / next page. Narrow, so a long press on most of the text is never caught. */}
-      {!selectionMenu && !liveSelection ? (
-        <>
-          <button type="button" aria-label={t('reader.chrome.footer.previousPage')} className="absolute top-[18%] bottom-[18%] left-0 z-[200]" style={{ width: EDGE_ZONE }} onClick={() => nav.switchPage(false)} />
-          <button type="button" aria-label={t('reader.chrome.footer.nextPage')} className="absolute top-[18%] right-0 bottom-[18%] z-[200]" style={{ width: EDGE_ZONE }} onClick={() => nav.switchPage(true)} />
-        </>
+      <MobileReaderTopBar visible={barsVisible} title={reader.title} onBack={reader.leave} bookmarks={surface.bookmarks} />
+      <MobileReaderBottomBar visible={barsVisible && !hasSelection} surface={surface} onOpen={openLayer} />
+
+      {surface.selection ? (
+        <MobileSelectionBar selection={surface.selection} lastColorHex={surface.lastColorHex} onCopy={copyText} />
       ) : null}
 
-      {barsVisible ? (
-        <>
-          <MobileReaderTopBar
-            title={book.bookTitle || t('common.untitled')}
-            onBack={leave}
-            bookmarked={bookmarks.isCurrentPlaceBookmarked}
-            onToggleBookmark={isTxtSurface ? undefined : bookmarks.toggleBookmark}
-            zoom={isPdfSurface ? { percent: Math.round(zoom.viewZoom * 100), onStep: zoom.handleZoomStep } : undefined}
-          />
-          {!selectionMenu && !liveSelection ? (
-            <MobileReaderBottomBar
-              progress={progress}
-              progressLabel={progressLabel}
-              onGoToProgress={nav.goToProgress}
-              onPrev={() => nav.switchPage(false)}
-              onNext={() => nav.switchPage(true)}
-              tocAvailable={(book.isEpubSurface ? nav.epubToc : isPdfSurface ? nav.pdfToc : isMdSurface ? mdToc : []).length > 0}
-              onOpenToc={() => setSheet('toc')}
-              onOpenMarks={() => setSheet(isTxtSurface ? 'notes' : 'bookmarks')}
-              onOpenAppearance={() => setSheet('appearance')}
-            />
-          ) : null}
-        </>
-      ) : null}
-
-      {selectionMenu || liveSelection ? (
-        <MobileSelectionBar
-          state={selectionMenu ? 'ready' : 'pending'}
-          colorHex={markup?.lastUsedColorHex ?? '#FFEB3B'}
-          onRequest={() => {
-            if (liveSelection) requestSelectionMenu(liveSelection)
-          }}
-          onMark={(kind) => {
-            selectionMenu?.mark(kind)
-            clearNativeSelection()
-          }}
-          onCopy={() => {
-            copyText(selectionMenu?.text ?? liveSelection?.doc.getSelection()?.toString())
-            selectionMenu?.close()
-            clearNativeSelection()
-          }}
-          onDismiss={() => {
-            selectionMenu?.close()
-            clearNativeSelection()
-          }}
-        />
-      ) : null}
-
-      {sheet === 'toc' ? (
+      {has('toc') ? (
         <MobileTocSheet
-          items={book.isEpubSurface ? nav.epubToc : isPdfSurface ? nav.pdfToc : isMdSurface ? mdToc : []}
-          activeHref={book.isEpubSurface ? nav.epubNav?.href : undefined}
-          activeId={isPdfSurface ? (nav.pdfActiveTocId ?? null) : isMdSurface && mdActiveHeading !== null ? `md-h-${mdActiveHeading}` : null}
-          onSelect={(item) => {
-            if (item.href.startsWith(MD_HEADING_HREF)) {
-              mdApiRef.current?.scrollToHeading(Number(item.href.slice(MD_HEADING_HREF.length)))
-              return
-            }
-            nav.handleSelectTocItem(item)
-          }}
-          onClose={() => setSheet(null)}
+          items={surface.toc}
+          activeHref={surface.activeTocHref}
+          activeId={surface.activeTocId}
+          onSelect={surface.goToToc}
+          onClose={() => closeLayer('toc')}
         />
       ) : null}
 
-      {sheet === 'bookmarks' || sheet === 'notes' ? (
+      {has('marks') ? (
         <MobileMarksSheet
-          initialTab={sheet}
-          bookmarks={bookmarks.bookmarks}
-          currentPlaceBookmarked={bookmarks.isCurrentPlaceBookmarked}
-          onToggleBookmark={bookmarks.toggleBookmark}
-          onJumpBookmark={(bookmark) => void bookmarks.jumpToBookmark(bookmark)}
-          onDeleteBookmark={bookmarks.deleteBookmarkById}
-          highlights={listedHighlights}
-          onJumpHighlight={(highlight) => {
-            if (isMdSurface) {
-              const row = mdHighlights.highlights.find((h) => h.id === highlight.id)
-              if (row) mdHighlights.jumpToHighlight(row)
-            } else if (isTxtSurface) {
-              const row = txt.highlights.find((h) => h.id === highlight.id)
-              if (row) txt.jumpToHighlight(row)
-            } else if (isPdfSurface) {
-              const row = pdfHighlights.highlights.find((h) => h.id === highlight.id)
-              if (row) pdfHighlights.jumpToHighlight(row)
-            } else {
-              const row = highlights.highlights.find((h) => h.id === highlight.id)
-              if (row) void highlights.jumpToHighlight(row)
-            }
-          }}
-          onOpenHighlight={
-            markup
-              ? (highlight) => {
-                  setSheet(null)
-                  // The mark's own sheet, anchored nowhere in particular (a sheet is not placed by a rect).
-                  if (isPdfSurface) pdfHighlights.openHighlight(highlight.id, new DOMRect(0, 0, 0, 0))
-                  else if (isMdSurface) mdHighlights.openHighlight(highlight.id, new DOMRect(0, 0, 0, 0))
-                  else {
-                    const row = highlights.highlights.find((h) => h.id === highlight.id)
-                    if (row) highlights.openHighlightContextMenu({ id: row.id, cfiRange: row.cfiRange, rect: new DOMRect(0, 0, 0, 0) })
-                  }
-                }
-              : undefined
-          }
-          onClose={() => setSheet(null)}
+          bookmarks={surface.bookmarks}
+          marks={surface.marks}
+          onJumpMark={surface.jumpToMark}
+          onOpenMark={surface.openMark}
+          onClose={() => closeLayer('marks')}
         />
       ) : null}
 
-      {sheet === 'appearance' ? (
-        <MobileSheet title={t('reader.phone.sheet.appearance')} onClose={() => setSheet(null)}>
-          <div className="p-4">
-            <AaSettingsPanel
-              prefs={book.prefs}
-              onChange={(patch) => {
-                book.prefsDirtyRef.current = true
-                book.setPrefs((p) => ({ ...p, ...patch }))
-              }}
-            />
-          </div>
-        </MobileSheet>
+      {has('appearance') ? (
+        <MobileAppearanceSheet surface={surface} prefs={reader.prefs} onChange={reader.setPrefs} onClose={() => closeLayer('appearance')} />
       ) : null}
 
-      {markup && active ? (
+      {activeMark ? (
         <MobileMarkSheet
-          key={active.highlight.id}
-          highlight={active.highlight}
-          onChangeColor={(hex) => markup.updateHighlightColor(active.highlight.id, hex)}
-          onChangeStyle={(kind) => markup.updateHighlightStyleKind(active.highlight.id, kind as 'highlight' | 'underline' | 'strikethrough')}
-          onChangeNote={(note) => markup.updateHighlightNote(active.highlight.id, note)}
-          onCopy={() => copyText(active.highlight.selectionText?.highlight)}
-          onDelete={() => markup.deleteHighlight(active.highlight.id)}
-          onClose={markup.closeEditPopup}
+          key={activeMark.highlight.id}
+          mark={activeMark}
+          confirmOpen={has('confirm')}
+          onOpenConfirm={() => openLayer('confirm')}
+          onCloseConfirm={() => closeLayer('confirm')}
+          onCopy={copyText}
+          onClose={activeMark.close}
         />
       ) : null}
 
@@ -660,9 +265,11 @@ export default function MobileReaderScreen() {
         <div
           role="status"
           className="pointer-events-none fixed left-1/2 z-[999] -translate-x-1/2 rounded-full border border-lib-border bg-lib-surface-strong px-[18px] py-2.5 text-[13px] font-semibold text-lib-text-strong shadow-xl"
-          style={{ top: 'calc(env(safe-area-inset-top) + 64px)' }}
+          style={{
+            top: barsVisible ? 'calc(var(--phone-reader-top-inset) + 8px)' : 'calc(env(safe-area-inset-top) + 8px)',
+          }}
         >
-          {toast}
+          {toast.text}
         </div>
       ) : null}
     </div>

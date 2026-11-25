@@ -42,7 +42,7 @@ export interface UseReaderCoreOptions {
   txtApiRef: MutableRefObject<TxtRendererApi | null>
   mdApiRef: MutableRefObject<MdRendererApi | null>
   closeFloating: NavigationOptions['closeFloating']
-  highlightShortcutsRef: NavigationOptions['highlightShortcutsRef']
+  highlightShortcutsRef?: NavigationOptions['highlightShortcutsRef']
 }
 
 export function useReaderCore(options: UseReaderCoreOptions) {

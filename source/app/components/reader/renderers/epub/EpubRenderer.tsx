@@ -95,6 +95,12 @@ export type EpubRendererApi = Pick<
    * knows nothing of the synthetic cover that shifts `getSectionLabels()` by one.
    */
   getSpineSectionLabels: () => string[]
+  /**
+   * The href of every spine section, index-aligned with `getSectionLabels()` / `EpubNavState.spineIndex` (the
+   * synthetic cover is an empty href at 0). Lets the Reader name the current chapter from the book's own contents
+   * (spec 019 FR-018).
+   */
+  getSpineHrefs: () => string[]
 }
 
 type EpubRendererProps = {
@@ -168,6 +174,12 @@ type EpubRendererProps = {
    * focus outline — see `onHighlightClick` above for the "landed on a mark" case instead.
    */
   onSurfaceClick?: () => void
+  /**
+   * Phone swipe paging (spec 019 FR-003, research R3): every pointer event inside a section frame, in OUTER
+   * (renderer host) coordinates. When set, each frame's root also gets `touch-action: pan-y pinch-zoom` so the WebView
+   * never claims a horizontal move itself. Absent on Desktop (unchanged).
+   */
+  onPagePointer?: (event: EpubPagePointerEvent) => void
   onNavState?: (state: EpubNavState) => void
   /** Stable CFI after relocated — for persist flush (T4.2). */
   onLocationChange?: (location: CfiLocation) => void
@@ -253,6 +265,19 @@ type SyntheticCoverNavigation = {
   show: () => Promise<void>
   hide: () => void
   navState: () => EpubNavState
+}
+
+/** One pointer event of a section frame, forwarded to the host (`onPagePointer`, spec 019). */
+export type EpubPagePointerEvent = {
+  phase: 'down' | 'move' | 'up' | 'cancel'
+  /** Renderer host (outer document) coordinates. */
+  x: number
+  y: number
+  /** `performance.now()` of the top window. */
+  t: number
+  target: EventTarget | null
+  /** The section's document (its own selection, its own links). */
+  doc: Document
 }
 
 /** The synthetic cover is one extra page in front of the epub.js locations. */
@@ -408,6 +433,13 @@ function toApi(
       return handle.goToSearchMatch(target)
     },
     getSpineSectionLabels: () => handle.getSectionLabels(),
+    getSpineHrefs: () => {
+      const hrefs = Array.from(
+        { length: handle.getSpineLength() },
+        (_, index) => handle.book.spine.get(index)?.href ?? '',
+      )
+      return cover.isAvailable() ? ['', ...hrefs] : hrefs
+    },
     onTextSelected: (cb) => handle.onTextSelected(cb),
     getCurrentSelectionInfo: () => handle.getCurrentSelectionInfo(),
     getReadAloudSegments: (mode) => {
@@ -491,6 +523,7 @@ export function EpubRenderer({
   onHighlightClick,
   onHighlightHover,
   onSurfaceClick,
+  onPagePointer,
   onNavState,
   onLocationChange,
   onToc,
@@ -675,6 +708,8 @@ export function EpubRenderer({
   onHighlightHoverRef.current = onHighlightHover
   const onSurfaceClickRef = useRef(onSurfaceClick)
   onSurfaceClickRef.current = onSurfaceClick
+  const onPagePointerRef = useRef(onPagePointer)
+  onPagePointerRef.current = onPagePointer
   const coverUrlRef = useRef(coverUrl)
   coverUrlRef.current = coverUrl
   const initialLocationRef = useRef(initialLocation)
@@ -1192,7 +1227,29 @@ export function EpubRenderer({
             }
           }
 
+          // Phone swipe paging: forward the raw pointer stream (outer coordinates, the top window's clock).
+          const forwardPointer = (phase: EpubPagePointerEvent['phase']) => (event: PointerEvent) => {
+            const forward = onPagePointerRef.current
+            if (!forward) return
+            const win = doc.defaultView
+            const frameEl = win?.frameElement as HTMLIFrameElement | null
+            const point =
+              frameEl && win
+                ? toOuterPoint(event.clientX, event.clientY, frameEl, win)
+                : { x: event.clientX, y: event.clientY }
+            forward({ phase, x: point.x, y: point.y, t: performance.now(), target: event.target, doc })
+          }
+          const onForwardDown = forwardPointer('down')
+          const onForwardMove = forwardPointer('move')
+          const onForwardUp = forwardPointer('up')
+          const onForwardCancel = forwardPointer('cancel')
+          if (onPagePointerRef.current) doc.documentElement.style.touchAction = 'pan-y pinch-zoom'
+
           doc.addEventListener('contextmenu', onContextMenu)
+          doc.addEventListener('pointerdown', onForwardDown, { capture: true })
+          doc.addEventListener('pointermove', onForwardMove, { capture: true })
+          doc.addEventListener('pointerup', onForwardUp, { capture: true })
+          doc.addEventListener('pointercancel', onForwardCancel, { capture: true })
           doc.addEventListener('pointerdown', onPointerDown, { capture: true })
           doc.addEventListener('pointermove', onPointerHoverMove, { capture: true })
           doc.addEventListener('pointermove', onPointerMove, { capture: true })
@@ -1204,6 +1261,10 @@ export function EpubRenderer({
           doc.addEventListener('wheel', onWheel, { capture: true, passive: false })
           frameCleanups.set(doc, () => {
             doc.removeEventListener('contextmenu', onContextMenu)
+            doc.removeEventListener('pointerdown', onForwardDown, true)
+            doc.removeEventListener('pointermove', onForwardMove, true)
+            doc.removeEventListener('pointerup', onForwardUp, true)
+            doc.removeEventListener('pointercancel', onForwardCancel, true)
             doc.removeEventListener('pointerdown', onPointerDown, true)
             doc.removeEventListener('pointermove', onPointerHoverMove, true)
             doc.removeEventListener('pointermove', onPointerMove, true)
