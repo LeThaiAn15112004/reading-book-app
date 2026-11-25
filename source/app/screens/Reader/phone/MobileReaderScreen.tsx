@@ -209,7 +209,7 @@ export default function MobileReaderScreen() {
       <div
         ref={surfaceRef}
         className="absolute inset-0"
-        style={{ paddingTop: 'env(safe-area-inset-top)', paddingBottom: 'env(safe-area-inset-bottom)' }}
+        style={{ paddingTop: 'var(--app-safe-top, env(safe-area-inset-top))', paddingBottom: 'var(--app-safe-bottom, env(safe-area-inset-bottom))' }}
       >
         <div ref={moverRef} className="h-full will-change-transform">
           {reader.page}
@@ -266,7 +266,7 @@ export default function MobileReaderScreen() {
           role="status"
           className="pointer-events-none fixed left-1/2 z-[999] -translate-x-1/2 rounded-full border border-lib-border bg-lib-surface-strong px-[18px] py-2.5 text-[13px] font-semibold text-lib-text-strong shadow-xl"
           style={{
-            top: barsVisible ? 'calc(var(--phone-reader-top-inset) + 8px)' : 'calc(env(safe-area-inset-top) + 8px)',
+            top: barsVisible ? 'calc(var(--phone-reader-top-inset) + 8px)' : 'calc(var(--app-safe-top, env(safe-area-inset-top)) + 8px)',
           }}
         >
           {toast.text}

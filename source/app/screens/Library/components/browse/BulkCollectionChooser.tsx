@@ -58,7 +58,7 @@ export function BulkCollectionChooser({ layout, collections, count, onClose, onC
         aria-labelledby="phone-collection-chooser-title"
         className={
           layout === 'sheet'
-            ? 'phone-sheet absolute inset-x-0 bottom-0 max-h-[70vh] overflow-y-auto rounded-t-2xl border border-lib-border bg-lib-surface-strong px-2 pt-3 pb-[max(12px,env(safe-area-inset-bottom))] shadow-[var(--lib-overlay-shadow)]'
+            ? 'phone-sheet absolute inset-x-0 bottom-0 max-h-[70vh] overflow-y-auto rounded-t-2xl border border-lib-border bg-lib-surface-strong px-2 pt-3 pb-[max(12px,var(--app-safe-bottom,env(safe-area-inset-bottom)))] shadow-[var(--lib-overlay-shadow)]'
             : 'absolute top-1/2 left-1/2 max-h-[70vh] w-[min(420px,calc(100vw-32px))] -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-xl border border-lib-border bg-lib-surface-strong p-2 pt-4 shadow-[var(--lib-overlay-shadow)]'
         }
       >

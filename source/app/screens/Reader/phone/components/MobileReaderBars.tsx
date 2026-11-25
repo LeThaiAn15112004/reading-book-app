@@ -47,7 +47,7 @@ export function MobileReaderTopBar({
       ref={ref}
       aria-hidden={!visible}
       className={`fixed inset-x-0 top-0 z-[300] border-b border-lib-border bg-lib-topbar/95 backdrop-blur ${fade} ${fadeState(visible)}`}
-      style={{ paddingTop: 'env(safe-area-inset-top)' }}
+      style={{ paddingTop: 'var(--app-safe-top, env(safe-area-inset-top))' }}
     >
       <div className="flex min-h-[52px] items-center gap-1 px-1">
         <button type="button" className={iconButton} onClick={onBack} aria-label={t('reader.phone.bars.back')}>
@@ -180,7 +180,7 @@ export function MobileReaderBottomBar({
     <footer
       aria-hidden={!visible}
       className={`fixed inset-x-0 bottom-0 z-[300] border-t border-lib-border bg-lib-topbar/95 backdrop-blur ${fade} ${fadeState(visible)}`}
-      style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
+      style={{ paddingBottom: 'var(--app-safe-bottom, env(safe-area-inset-bottom))' }}
     >
       {turn ? (
         <>

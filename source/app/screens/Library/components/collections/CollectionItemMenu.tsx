@@ -167,7 +167,7 @@ function PhoneCollectionSheet({ collection, onEdit, onDelete, onClose }: Collect
         ref={sheetRef}
         role="menu"
         aria-label={t('library.collections.moreActionsAria', { name: collection.name })}
-        className="phone-sheet absolute inset-x-0 bottom-0 rounded-t-2xl border border-lib-border bg-lib-surface-strong px-2 pt-2 pb-[calc(8px+env(safe-area-inset-bottom))] shadow-[var(--lib-overlay-shadow)]"
+        className="phone-sheet absolute inset-x-0 bottom-0 rounded-t-2xl border border-lib-border bg-lib-surface-strong px-2 pt-2 pb-[calc(8px+var(--app-safe-bottom,env(safe-area-inset-bottom)))] shadow-[var(--lib-overlay-shadow)]"
         onKeyDown={moveFocus}
         onContextMenu={(event) => event.preventDefault()}
       >

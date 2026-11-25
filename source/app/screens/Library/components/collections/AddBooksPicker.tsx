@@ -148,7 +148,7 @@ export function AddBooksPicker({ books, collection, onConfirm, onImportBooks }: 
   const footer = (
     <div
       className={`shrink-0 border-t border-lib-border-soft bg-lib-surface-strong px-4 pt-3 ${
-        phone ? 'pb-[calc(12px+env(safe-area-inset-bottom))]' : 'pb-3'
+        phone ? 'pb-[calc(12px+var(--app-safe-bottom,env(safe-area-inset-bottom)))]' : 'pb-3'
       }`}
     >
       {error ? (
@@ -207,7 +207,7 @@ export function AddBooksPicker({ books, collection, onConfirm, onImportBooks }: 
         <span id={includedHintId} hidden>
           {t('library.picker.inCollection')}
         </span>
-        <header className="flex shrink-0 items-center gap-2 px-1 pt-[env(safe-area-inset-top)] pb-2">
+        <header className="flex shrink-0 items-center gap-2 px-1 pt-[var(--app-safe-top,env(safe-area-inset-top))] pb-2">
           <button type="button" className={iconButton} aria-label={t('common.actions.close')} onClick={close}>
             <BackArrowIcon className="size-6" />
           </button>

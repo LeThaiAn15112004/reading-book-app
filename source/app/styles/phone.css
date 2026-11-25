@@ -51,9 +51,21 @@
   opacity: 1 !important;
 }
 
+/*
+ * System bars: the Expo host already keeps the WebView clear of the status bar and the navigation / gesture bar (it
+ * draws one spacer of `insets.top` above the WebView and one of `insets.bottom` below it, `native/routes/index.tsx`).
+ * Android's edge-to-edge WebView still reports those bars through `env(safe-area-inset-*)`, so UI that added
+ * `env()` again was pushed one whole bar further in (a doubled gap above the reader's top bar and below its bottom
+ * bar). Phone UI reads `--app-safe-top` / `--app-safe-bottom` (falling back to `env()` elsewhere): zero here.
+ */
+:root[data-mobile-host] {
+  --app-safe-top: 0px;
+  --app-safe-bottom: 0px;
+}
+
 /* T073: the book menu as a bottom sheet clears the home indicator. */
 :root[data-mobile-host] .phone-sheet {
-  padding-bottom: calc(0.5rem + env(safe-area-inset-bottom));
+  padding-bottom: calc(0.5rem + var(--app-safe-bottom, env(safe-area-inset-bottom)));
 }
 
 @media (max-width: 899.98px) {
@@ -315,8 +327,8 @@
 /* Spec 017 (US2): the opening screen covers the phone Reader's tap zones and bars; it keeps clear of the notch / home bar. */
 [data-mobile-host] .reader-opening-screen {
   z-index: 260;
-  padding-top: env(safe-area-inset-top);
-  padding-bottom: env(safe-area-inset-bottom);
+  padding-top: var(--app-safe-top, env(safe-area-inset-top));
+  padding-bottom: var(--app-safe-bottom, env(safe-area-inset-bottom));
 }
 
 [data-mobile-host] .reader-opening-back {

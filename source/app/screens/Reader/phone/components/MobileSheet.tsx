@@ -40,7 +40,7 @@ export function MobileSheet({
         aria-modal="true"
         aria-label={title}
         className="phone-reader-sheet relative flex flex-col rounded-t-2xl border-t border-lib-border bg-lib-surface-strong text-lib-text shadow-2xl"
-        style={{ paddingBottom: 'env(safe-area-inset-bottom)', maxHeight }}
+        style={{ paddingBottom: 'var(--app-safe-bottom, env(safe-area-inset-bottom))', maxHeight }}
       >
         <header className="flex min-h-[52px] items-center gap-2 border-b border-lib-border pr-1 pl-4">
           <h2 className="min-w-0 flex-1 truncate text-[15px] font-semibold text-lib-text-strong">{title}</h2>
