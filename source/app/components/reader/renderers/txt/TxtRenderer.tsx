@@ -501,11 +501,31 @@ export function TxtRenderer(props: TxtRendererProps) {
     else propsRef.current.onBlankClick()
   }
 
-  // Listening on the window, not the box: a drag that ends over the margin must still count.
+  // Listening on the window, not the box: a drag that ends over the margin must still count. Exactly one press is
+  // pending at a time: a press the browser took over (a scroll → `pointercancel`, no `pointerup`) is dropped, so its
+  // stale listener can never answer the NEXT tap as well (one tap would then switch the chrome twice).
+  const pendingPressRef = useRef<(() => void) | null>(null)
+  useEffect(() => () => pendingPressRef.current?.(), [])
   const onPointerDown = (event: ReactPointerEvent<HTMLTextAreaElement>) => {
     if (event.button !== 0) return
-    const press = { x: event.clientX, y: event.clientY }
-    window.addEventListener('pointerup', (up) => finishPress(press, up), { once: true })
+    pendingPressRef.current?.()
+    const press = { x: event.clientX, y: event.clientY, pointerId: event.pointerId }
+    const onUp = (up: PointerEvent) => {
+      if (up.pointerId !== press.pointerId) return
+      release()
+      finishPress(press, up)
+    }
+    const onCancel = (cancel: PointerEvent) => {
+      if (cancel.pointerId === press.pointerId) release()
+    }
+    const release = () => {
+      window.removeEventListener('pointerup', onUp)
+      window.removeEventListener('pointercancel', onCancel)
+      if (pendingPressRef.current === release) pendingPressRef.current = null
+    }
+    window.addEventListener('pointerup', onUp)
+    window.addEventListener('pointercancel', onCancel)
+    pendingPressRef.current = release
   }
 
   /** Hover preview: the Replace mark whose painted text is under the pointer (a textarea hides the backdrop from hit-testing). */

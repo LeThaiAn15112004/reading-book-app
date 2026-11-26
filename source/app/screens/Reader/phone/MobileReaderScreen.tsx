@@ -119,16 +119,22 @@ export default function MobileReaderScreen() {
     zoomEdge: surface?.zoomEdge,
     isMarkAt: surface?.isMarkAt,
     onTap: (kind) => {
+      // A tap beside a selection only drops it (the same rule as a renderer's blank tap).
+      if (surfaceNowRef.current?.selection) {
+        surfaceNowRef.current.clearSelection()
+        return
+      }
       if (kind === 'tap-middle') dispatch({ type: 'tap-middle' })
       else turnPage(kind === 'tap-next' ? 'next' : 'prev')
     },
   })
   gesturesRef.current = gestures
 
-  // Main-document touches on the page (PDF, the EPUB cover) feed the gestures in Page view.
+  // Main-document touches on the page feed the gestures in every view: Page view swipes / edge taps, and in both views
+  // the taps no renderer reports (safe-area bands, the EPUB cover, the space around a page).
   const mountable = opening.mountable
   useEffect(() => {
-    gestures.bindRoot(view === 'page' && mountable ? surfaceRef.current : null)
+    gestures.bindRoot(mountable ? surfaceRef.current : null)
     return () => gestures.bindRoot(null)
   }, [gestures, view, mountable])
 

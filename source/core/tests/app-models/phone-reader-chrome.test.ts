@@ -7,6 +7,8 @@ import {
   topLayer,
   type ChromeEvent,
   type ChromeState,
+  TAP_DEDUPE_MS,
+  TAP_SCROLL_GRACE_MS,
 } from '../../src/app-models/phone-reader-chrome.js'
 
 const run = (state: ChromeState, ...events: ChromeEvent[]) => events.reduce(reduceChrome, state)
@@ -21,9 +23,37 @@ describe('reduceChrome (spec 019 FR-008 / FR-021)', () => {
       sliderDragging: true,
       toast: { id: 3, text: 'x' },
       topInsetPx: 52,
+      lastTapAt: 1000,
     }
     const next = reduceChrome(busy, { type: 'open-book', bookId: 'b2' })
-    expect(next).toEqual({ bookId: 'b2', barsVisible: false, layers: [], sliderDragging: false, toast: null, topInsetPx: 52 })
+    expect(next).toEqual({
+      bookId: 'b2',
+      barsVisible: false,
+      layers: [],
+      sliderDragging: false,
+      toast: null,
+      topInsetPx: 52,
+      lastTapAt: null,
+    })
+  })
+
+  it('one physical tap seen twice switches the bars once; a later tap switches them back', () => {
+    const s0 = initialChromeState('b1')
+    const once = run(s0, { type: 'tap-middle', at: 1000 }, { type: 'tap-middle', at: 1000 + TAP_DEDUPE_MS - 1 })
+    expect(once.barsVisible).toBe(true)
+    expect(run(once, { type: 'tap-middle', at: 1000 + TAP_DEDUPE_MS + 50 }).barsVisible).toBe(false)
+  })
+
+  it('a duplicate tap does not also close a layer', () => {
+    const s = run(shown(), { type: 'layer-open', layer: 'marks' }, { type: 'layer-open', layer: 'mark' })
+    const next = run(s, { type: 'tap-middle', at: 5000 }, { type: 'tap-middle', at: 5100 })
+    expect(next.layers).toEqual(['marks'])
+  })
+
+  it('a scroll right after the tap that showed the bars keeps them; a later scroll hides them', () => {
+    const s = reduceChrome(initialChromeState('b1'), { type: 'tap-middle', at: 2000 })
+    expect(reduceChrome(s, { type: 'scrolled', at: 2000 + TAP_SCROLL_GRACE_MS - 1 }).barsVisible).toBe(true)
+    expect(reduceChrome(s, { type: 'scrolled', at: 2000 + TAP_SCROLL_GRACE_MS }).barsVisible).toBe(false)
   })
 
   it('tap-middle toggles the bars only when no layer is open', () => {

@@ -276,6 +276,8 @@ export {
 export {
   CHROME_IDLE_MS,
   CHROME_TOAST_MS,
+  TAP_DEDUPE_MS,
+  TAP_SCROLL_GRACE_MS,
   hasLayer,
   idleTimerRunning,
   initialChromeState,

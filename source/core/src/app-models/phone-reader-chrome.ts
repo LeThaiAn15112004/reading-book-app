@@ -23,13 +23,17 @@ export interface ChromeState {
   toast: ChromeToast | null
   /** Measured top bar height, else the safe-area top (FR-012). */
   topInsetPx: number
+  /** When the last tap on the page was acted on (ms, the caller's clock); null = none yet for this book. */
+  lastTapAt: number | null
 }
 
 export type ChromeEvent =
   | { type: 'open-book'; bookId: string | null }
-  | { type: 'tap-middle' }
+  /** `at` (ms) enables the one-tap-one-toggle rule; the store stamps it. */
+  | { type: 'tap-middle'; at?: number }
   | { type: 'page-turned' }
-  | { type: 'scrolled' }
+  /** `at` (ms) enables the scroll grace after a tap; the store stamps it. */
+  | { type: 'scrolled'; at?: number }
   | { type: 'idle-elapsed' }
   | { type: 'show-bars' }
   | { type: 'layer-open'; layer: ChromeLayer }
@@ -43,9 +47,17 @@ export type ChromeEvent =
 export const CHROME_IDLE_MS = 4000
 /** A toast stays this long. */
 export const CHROME_TOAST_MS = 2400
+/**
+ * One physical tap may reach the chrome twice (two listeners — e.g. the renderer's blank tap and the page fallback, or
+ * `pointerup` and `click`): a second `tap-middle` this soon after the first is the same tap and is ignored, so a tap
+ * always switches the bars exactly once.
+ */
+export const TAP_DEDUPE_MS = 300
+/** A scroll this soon after a tap is the tap's own side effect (focus, a renderer re-layout), not reading on. */
+export const TAP_SCROLL_GRACE_MS = 500
 
 export function initialChromeState(bookId: string | null = null): ChromeState {
-  return { bookId, barsVisible: false, layers: [], sliderDragging: false, toast: null, topInsetPx: 0 }
+  return { bookId, barsVisible: false, layers: [], sliderDragging: false, toast: null, topInsetPx: 0, lastTapAt: null }
 }
 
 export function reduceChrome(state: ChromeState, event: ChromeEvent): ChromeState {
@@ -54,11 +66,20 @@ export function reduceChrome(state: ChromeState, event: ChromeEvent): ChromeStat
       // Keeps the measured inset: it belongs to the screen, not the book.
       return { ...initialChromeState(event.bookId), topInsetPx: state.topInsetPx }
     case 'tap-middle': {
-      if (state.layers.length > 0) return { ...state, layers: state.layers.slice(0, -1) }
-      return { ...state, barsVisible: !state.barsVisible }
+      const at = event.at
+      if (at !== undefined && state.lastTapAt !== null && at - state.lastTapAt >= 0 && at - state.lastTapAt < TAP_DEDUPE_MS) {
+        return state
+      }
+      const lastTapAt = at ?? state.lastTapAt
+      if (state.layers.length > 0) return { ...state, layers: state.layers.slice(0, -1), lastTapAt }
+      return { ...state, barsVisible: !state.barsVisible, lastTapAt }
     }
-    case 'page-turned':
     case 'scrolled':
+      if (event.at !== undefined && state.lastTapAt !== null && event.at - state.lastTapAt < TAP_SCROLL_GRACE_MS) {
+        return state
+      }
+      return state.barsVisible ? { ...state, barsVisible: false } : state
+    case 'page-turned':
       return state.barsVisible ? { ...state, barsVisible: false } : state
     case 'idle-elapsed':
       if (!state.barsVisible || state.layers.length > 0 || state.sliderDragging) return state

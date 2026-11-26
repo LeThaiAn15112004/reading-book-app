@@ -87,12 +87,18 @@ export const usePhoneReaderChromeStore = create<PhoneReaderChromeStore>()((set, 
     ...initialChromeState(),
     live: EMPTY_LIVE,
 
-    dispatch: (event) => {
+    dispatch: (raw) => {
+      // The store owns the clock: every tap / scroll is stamped here, so the one-tap-one-toggle rule and the scroll
+      // grace after a tap (core `TAP_DEDUPE_MS` / `TAP_SCROLL_GRACE_MS`) hold whichever listener reported it.
+      const event: ChromeEvent =
+        (raw.type === 'tap-middle' || raw.type === 'scrolled') && raw.at === undefined
+          ? { ...raw, at: performance.now() }
+          : raw
       const before = get()
       const next = reduceChrome(before, event)
       if (next !== before) {
-        const { bookId, barsVisible, layers, sliderDragging, toast, topInsetPx } = next
-        set({ bookId, barsVisible, layers, sliderDragging, toast, topInsetPx })
+        const { bookId, barsVisible, layers, sliderDragging, toast, topInsetPx, lastTapAt } = next
+        set({ bookId, barsVisible, layers, sliderDragging, toast, topInsetPx, lastTapAt })
       }
       // Every interaction restarts the countdown; the timer's own event and toasts do not count as one.
       syncIdle(event.type !== 'idle-elapsed' && event.type !== 'toast' && event.type !== 'toast-expired')

@@ -30,6 +30,12 @@ const SLIDE_MS = 180
 /** The tap's release and the renderer's blank click belong together only this close in time. */
 const PAIR_MS = 600
 const LINK_SELECTOR = 'a[href], button, input, textarea, select, [role="button"], [role="link"]'
+/**
+ * Main-document areas whose renderer reports its own blank taps (TXT / Markdown surface, the PDF pages). A tap anywhere
+ * else on the page — the safe-area bands, the EPUB synthetic cover and the space around the EPUB frames, the empty
+ * viewport around a PDF page — has no renderer to report it, so the gestures act on it themselves.
+ */
+const RENDERER_TAP_SELECTOR = '[data-txt-surface], [data-md-surface], [data-pdf-status]'
 
 export interface PhonePageGesturesOptions {
   view: GestureView
@@ -56,6 +62,8 @@ interface Tracking {
   last: GesturePoint
   early: { dx: number; dy: number }
   startedOnMarkOrLink: boolean
+  /** Started where no renderer reports blank taps (see `RENDERER_TAP_SELECTOR`): the tap is acted on here. */
+  unowned: boolean
   selectionSeen: boolean
   layersOpen: boolean
   zoomEdge: ZoomEdge | null
@@ -102,11 +110,13 @@ export function usePhonePageGestures(options: PhonePageGesturesOptions) {
     const o = optionsRef.current
     o.onActivity?.()
     const element = target instanceof (doc.defaultView ?? window).Element ? (target as Element) : null
+    const onLink = Boolean(element?.closest(LINK_SELECTOR))
     trackRef.current = {
       start: point,
       last: point,
       early: { dx: 0, dy: 0 },
-      startedOnMarkOrLink: Boolean(element?.closest(LINK_SELECTOR)) || Boolean(o.isMarkAt?.(point.x, point.y)),
+      startedOnMarkOrLink: onLink || Boolean(o.isMarkAt?.(point.x, point.y)),
+      unowned: doc === document && element !== null && !onLink && !element.closest(RENDERER_TAP_SELECTOR),
       selectionSeen: hasSelection(doc),
       layersOpen: !o.allowed(),
       zoomEdge: o.view === 'page' ? (o.zoomEdge?.() ?? null) : null,
@@ -196,6 +206,11 @@ export function usePhonePageGestures(options: PhonePageGesturesOptions) {
       if (track.following) setTransform(0, !reducedMotion())
       dxRef.current = 0
       if (result.kind === 'tap-prev' || result.kind === 'tap-next' || result.kind === 'tap-middle') {
+        if (track.unowned) {
+          blankAtRef.current = null
+          o.onTap(result.kind)
+          return
+        }
         const blankAt = blankAtRef.current
         blankAtRef.current = null
         if (blankAt !== null && performance.now() - blankAt <= PAIR_MS) o.onTap(result.kind)
@@ -223,7 +238,7 @@ export function usePhonePageGestures(options: PhonePageGesturesOptions) {
     }
   }, [])
 
-  // Main-document touches on the page (PDF, the EPUB cover). Touch events keep coming while the browser pans a zoomed
+  // Main-document touches on the page (every view: PDF, the EPUB cover, the bands no renderer covers). Touch events keep coming while the browser pans a zoomed
   // page, unlike pointer events (which are cancelled), so a swipe from the edge is still seen (FR-013b).
   const rootCleanupRef = useRef<(() => void) | null>(null)
   const bindRoot = useCallback(
