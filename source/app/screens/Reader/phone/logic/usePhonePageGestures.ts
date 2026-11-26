@@ -29,6 +29,8 @@ import type { EpubPagePointerEvent } from '../../../../components/reader/rendere
 const SLIDE_MS = 180
 /** The tap's release and the renderer's blank click belong together only this close in time. */
 const PAIR_MS = 600
+/** A scroll this soon after the finger left (a zoomed page still gliding) is still the user's. */
+const USER_SCROLL_TAIL_MS = 300
 const LINK_SELECTOR = 'a[href], button, input, textarea, select, [role="button"], [role="link"]'
 /**
  * Main-document areas whose renderer reports its own blank taps (TXT / Markdown surface, the PDF pages). A tap anywhere
@@ -88,6 +90,8 @@ export function usePhonePageGestures(options: PhonePageGesturesOptions) {
   const pendingTapRef = useRef<{ kind: GestureKind; at: number } | null>(null)
   /** A blank click that came before its tap was classified (PDF: `pointerup` precedes `touchend`). */
   const blankAtRef = useRef<number | null>(null)
+  /** When the last touch on the page ended (outer clock). */
+  const lastEndAtRef = useRef(-Infinity)
   const frameRef = useRef<number | null>(null)
   const dxRef = useRef(0)
 
@@ -166,6 +170,7 @@ export function usePhonePageGestures(options: PhonePageGesturesOptions) {
     (point: GesturePoint | null) => {
       const track = trackRef.current
       trackRef.current = null
+      lastEndAtRef.current = performance.now()
       if (frameRef.current !== null) cancelAnimationFrame(frameRef.current)
       frameRef.current = null
       if (!track) return
@@ -299,5 +304,15 @@ export function usePhonePageGestures(options: PhonePageGesturesOptions) {
     [begin, move, end],
   )
 
-  return { bindRoot, onEpubPointer, consumeTap }
+  /**
+   * A finger is on the page, or just left it. In Page view the user cannot scroll the text — pages turn by
+   * `turn()` — so a scroll without a finger is the renderer's own (epub.js re-laying its frames after a turn, a page
+   * render) and must not count as reading on.
+   */
+  const isUserScroll = useCallback(
+    () => trackRef.current !== null || performance.now() - lastEndAtRef.current < USER_SCROLL_TAIL_MS,
+    [],
+  )
+
+  return { bindRoot, onEpubPointer, consumeTap, isUserScroll }
 }

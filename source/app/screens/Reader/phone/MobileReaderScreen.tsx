@@ -58,6 +58,9 @@ export default function MobileReaderScreen() {
   const handleScrolled = useCallback(() => {
     if (phoneChrome.get().sliderDragging) return
     if (performance.now() - sliderReleasedAtRef.current < SLIDER_SCROLL_GRACE_MS) return
+    // Page view: only a scroll the finger drives (panning a zoomed PDF page) is reading on. epub.js scrolls its own
+    // frames a moment after a turn; counting that hid the bars the next tap had just shown (two taps needed).
+    if (viewRef.current === 'page' && !gesturesRef.current?.isUserScroll()) return
     dispatch({ type: 'scrolled' })
   }, [dispatch])
   const events = useMemo<SurfacePageEvents>(
