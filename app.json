@@ -44,6 +44,7 @@
       "expo-sqlite",
       "./source/app/platforms/native/plugins/with-loopback-cleartext.js",
       "./source/app/platforms/native/plugins/with-short-native-build-dir.js",
+      "./source/app/platforms/native/plugins/with-launcher-label.js",
       "expo-image",
       "expo-status-bar",
       [
