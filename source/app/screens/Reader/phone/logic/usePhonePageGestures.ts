@@ -6,9 +6,11 @@
  *
  *   - swipe-next / swipe-prev → the page slides with the finger (Page view, transform only, one write per frame),
  *     then `turn()`; a cancelled or impossible turn springs back. Reduced motion: no slide.
- *   - taps are only REMEMBERED on release; the renderer's own "blank click" (`onSurfaceClick` / `onBlankClick`), which
- *     fires only when the tap was not on a mark or a link, consumes them (`consumeTap`). So a tap on a mark opens it
- *     and never also turns the page.
+ *   - a tap acts only when BOTH halves are seen: the classifier's answer (on release) and the renderer's own "blank
+ *     click" (`onSurfaceClick` / `onBlankClick`, `consumeTap`), which fires only when the tap was not on a mark or a
+ *     link. So a tap on a mark opens it and never also turns the page. The two may come in either order: EPUB reports
+ *     on `click` (after the release), PDF on `pointerup` — which Android dispatches BEFORE `touchend`, where the
+ *     main-document release is classified.
  *
  * Tracking lives in a plain closure object, not React state: it changes on every pointer move and never renders.
  */
@@ -25,6 +27,8 @@ import {
 import type { EpubPagePointerEvent } from '../../../../components/reader/renderers/epub'
 
 const SLIDE_MS = 180
+/** The tap's release and the renderer's blank click belong together only this close in time. */
+const PAIR_MS = 600
 const LINK_SELECTOR = 'a[href], button, input, textarea, select, [role="button"], [role="link"]'
 
 export interface PhonePageGesturesOptions {
@@ -74,6 +78,8 @@ export function usePhonePageGestures(options: PhonePageGesturesOptions) {
 
   const trackRef = useRef<Tracking | null>(null)
   const pendingTapRef = useRef<{ kind: GestureKind; at: number } | null>(null)
+  /** A blank click that came before its tap was classified (PDF: `pointerup` precedes `touchend`). */
+  const blankAtRef = useRef<number | null>(null)
   const frameRef = useRef<number | null>(null)
   const dxRef = useRef(0)
 
@@ -108,6 +114,7 @@ export function usePhonePageGestures(options: PhonePageGesturesOptions) {
       doc,
     }
     pendingTapRef.current = null
+    blankAtRef.current = null
   }, [])
 
   const move = useCallback(
@@ -189,7 +196,12 @@ export function usePhonePageGestures(options: PhonePageGesturesOptions) {
       if (track.following) setTransform(0, !reducedMotion())
       dxRef.current = 0
       if (result.kind === 'tap-prev' || result.kind === 'tap-next' || result.kind === 'tap-middle') {
-        pendingTapRef.current = { kind: result.kind, at: performance.now() }
+        const blankAt = blankAtRef.current
+        blankAtRef.current = null
+        if (blankAt !== null && performance.now() - blankAt <= PAIR_MS) o.onTap(result.kind)
+        else pendingTapRef.current = { kind: result.kind, at: performance.now() }
+      } else {
+        blankAtRef.current = null
       }
     },
     [setTransform],
@@ -199,10 +211,13 @@ export function usePhonePageGestures(options: PhonePageGesturesOptions) {
   const consumeTap = useCallback(() => {
     const pending = pendingTapRef.current
     pendingTapRef.current = null
-    // A click follows its pointerup within a frame or two; an old one is not this click's.
-    if (!pending || performance.now() - pending.at > 600) {
+    if (!pending) {
+      // The tap is not classified yet (its release comes next): `end` acts on it.
+      blankAtRef.current = performance.now()
       return
     }
+    // A click follows its release within a frame or two; an old one is not this click's.
+    if (performance.now() - pending.at > PAIR_MS) return
     if (pending.kind === 'tap-prev' || pending.kind === 'tap-next' || pending.kind === 'tap-middle') {
       optionsRef.current.onTap(pending.kind)
     }
