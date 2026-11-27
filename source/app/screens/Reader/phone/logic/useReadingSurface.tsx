@@ -581,7 +581,11 @@ export function useReadingSurface({
               : undefined,
           zoomEdge: format === 'pdf' && view === 'page' ? zoomEdge : undefined,
           isMarkAt:
-            format === 'epub' ? (x, y) => Boolean(epubApiRef.current?.getHighlightAtPoint(x, y)) : undefined,
+            format === 'epub'
+              ? (x, y) => Boolean(epubApiRef.current?.getHighlightAtPoint(x, y))
+              : format === 'pdf'
+                ? (x, y) => Boolean(pdfApiRef.current?.isTargetAt(x, y))
+                : undefined,
         }
       : null
 

@@ -189,6 +189,12 @@ export interface PdfRendererApi {
   renderThumbnail: (page: number, cssWidth: number, signal: AbortSignal) => Promise<HTMLCanvasElement | null>
   /** Measure 1-based `page` from the document itself (its own size and rotation); null if unavailable. */
   measurePage: (page: number) => Promise<PdfPageCssSize | null>
+  /**
+   * Something of the page's own is under client (`x`, `y`): a mark, a note, an attachment icon, a stroke / shape.
+   * The phone asks this when a touch starts, so a tap there is the renderer's (it opens / selects it) and never also a
+   * page tap (bars / page turn).
+   */
+  isTargetAt: (x: number, y: number) => boolean
 }
 
 export type PdfSearchTarget = { pageIndex: number; occurrence: number; count: number }
@@ -1163,9 +1169,13 @@ export function PdfRenderer({
     [],
   )
 
+  /** The latest hit test (its helpers are re-created each render); read by `apiRef.isTargetAt`. */
+  const hitTestRef = useRef<(x: number, y: number) => boolean>(() => false)
+
   useEffect(() => {
     if (!apiRef) return
     apiRef.current = {
+      isTargetAt: (x, y) => hitTestRef.current(x, y),
       renderThumbnail,
       measurePage: async (pageNumber) => {
         const pdf = docRef.current
@@ -2175,6 +2185,14 @@ export function PdfRenderer({
     const pins = hit ? attachmentsByPageRef.current.get(hit.index) : undefined
     return point && pins ? attachmentPinAt(pins, point[0], point[1]) : null
   }
+
+  hitTestRef.current = (x, y) =>
+    Boolean(
+      annotationAt(x, y) ||
+        (attachmentsByPageRef.current.size > 0 && attachmentAt(x, y)) ||
+        (typewritersByPageRef.current.size > 0 && typewriterAt(x, y)) ||
+        (outlinesOnRef.current && targetAt(x, y)),
+    )
 
   /** Select / Hand: a press on an icon selects it; on a Readmate-made one it may become a drag (never opens the panel). */
   const beginAttachmentPress = (event: ReactPointerEvent<HTMLDivElement>, pin: PdfAttachmentPin) => {

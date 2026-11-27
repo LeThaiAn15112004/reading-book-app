@@ -4,13 +4,18 @@
  * cover) and the pointer stream EPUB forwards from its section frames (`EpubRenderer.onPagePointer`) — and turns its
  * answers into page turns and chrome events.
  *
+ * Swipe and single tap are two separate recognizers (core `recognizeSwipe` / `recognizeTap`, ranked by
+ * `classifyGesture`); this hook only tracks the finger and acts on the answer:
+ *
  *   - swipe-next / swipe-prev → the page slides with the finger (Page view, transform only, one write per frame),
  *     then `turn()`; a cancelled or impossible turn springs back. Reduced motion: no slide.
- *   - a tap acts only when BOTH halves are seen: the classifier's answer (on release) and the renderer's own "blank
- *     click" (`onSurfaceClick` / `onBlankClick`, `consumeTap`), which fires only when the tap was not on a mark or a
- *     link. So a tap on a mark opens it and never also turns the page. The two may come in either order: EPUB reports
- *     on `click` (after the release), PDF on `pointerup` — which Android dispatches BEFORE `touchend`, where the
- *     main-document release is classified.
+ *   - a tap is decided HERE, by the one tap rule (< 10 px, < 350 ms), never by a renderer's own click thresholds
+ *     (PDF's blank click is a 4 px mouse rule, EPUB's needs a `click` the WebView may drop). Whether the tap belongs
+ *     to the page or to the renderer is a hit test when the finger goes down (`isMarkAt`: a mark, a note, an icon; or a
+ *     link / control): the renderer's tap opens / selects that thing and is never also a page tap. In Page view every
+ *     tap on the page is acted on here; the renderers' blank clicks only close their own UI. In Scroll view the
+ *     renderers report the taps on their surface (the browser's own `click`, which a scroll cancels), and only the
+ *     taps no renderer covers are acted on here.
  *
  * Tracking lives in a plain closure object, not React state: it changes on every pointer move and never renders.
  */
@@ -27,8 +32,6 @@ import {
 import type { EpubPagePointerEvent } from '../../../../components/reader/renderers/epub'
 
 const SLIDE_MS = 180
-/** The tap's release and the renderer's blank click belong together only this close in time. */
-const PAIR_MS = 600
 /** A scroll this soon after the finger left (a zoomed page still gliding) is still the user's. */
 const USER_SCROLL_TAIL_MS = 300
 const LINK_SELECTOR = 'a[href], button, input, textarea, select, [role="button"], [role="link"]'
@@ -87,9 +90,6 @@ export function usePhonePageGestures(options: PhonePageGesturesOptions) {
   optionsRef.current = options
 
   const trackRef = useRef<Tracking | null>(null)
-  const pendingTapRef = useRef<{ kind: GestureKind; at: number } | null>(null)
-  /** A blank click that came before its tap was classified (PDF: `pointerup` precedes `touchend`). */
-  const blankAtRef = useRef<number | null>(null)
   /** When the last touch on the page ended (outer clock). */
   const lastEndAtRef = useRef(-Infinity)
   const frameRef = useRef<number | null>(null)
@@ -127,8 +127,6 @@ export function usePhonePageGestures(options: PhonePageGesturesOptions) {
       following: false,
       doc,
     }
-    pendingTapRef.current = null
-    blankAtRef.current = null
   }, [])
 
   const move = useCallback(
@@ -211,37 +209,12 @@ export function usePhonePageGestures(options: PhonePageGesturesOptions) {
       if (track.following) setTransform(0, !reducedMotion())
       dxRef.current = 0
       if (result.kind === 'tap-prev' || result.kind === 'tap-next' || result.kind === 'tap-middle') {
-        if (track.unowned) {
-          blankAtRef.current = null
-          o.onTap(result.kind)
-          return
-        }
-        const blankAt = blankAtRef.current
-        blankAtRef.current = null
-        if (blankAt !== null && performance.now() - blankAt <= PAIR_MS) o.onTap(result.kind)
-        else pendingTapRef.current = { kind: result.kind, at: performance.now() }
-      } else {
-        blankAtRef.current = null
+        // Page view: every page tap is decided here. Scroll view: only where no renderer reports its own taps.
+        if (o.view === 'page' || track.unowned) o.onTap(result.kind)
       }
     },
     [setTransform],
   )
-
-  /** The renderer saw a blank click: act on the tap just classified (if any). */
-  const consumeTap = useCallback(() => {
-    const pending = pendingTapRef.current
-    pendingTapRef.current = null
-    if (!pending) {
-      // The tap is not classified yet (its release comes next): `end` acts on it.
-      blankAtRef.current = performance.now()
-      return
-    }
-    // A click follows its release within a frame or two; an old one is not this click's.
-    if (performance.now() - pending.at > PAIR_MS) return
-    if (pending.kind === 'tap-prev' || pending.kind === 'tap-next' || pending.kind === 'tap-middle') {
-      optionsRef.current.onTap(pending.kind)
-    }
-  }, [])
 
   // Main-document touches on the page (every view: PDF, the EPUB cover, the bands no renderer covers). Touch events keep coming while the browser pans a zoomed
   // page, unlike pointer events (which are cancelled), so a swipe from the edge is still seen (FR-013b).
@@ -314,5 +287,5 @@ export function usePhonePageGestures(options: PhonePageGesturesOptions) {
     [],
   )
 
-  return { bindRoot, onEpubPointer, consumeTap, isUserScroll }
+  return { bindRoot, onEpubPointer, isUserScroll }
 }

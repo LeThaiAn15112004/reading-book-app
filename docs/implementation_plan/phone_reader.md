@@ -10,7 +10,7 @@ two holders: ONE reading surface and ONE chrome store. No migration, no new IPC 
 | Module | What | Tests |
 |---|---|---|
 | `phone-reader-chrome.ts` | `reduceChrome(state, event)`: bars, ordered layer stack (`selection · toc · marks · appearance · mark · confirm`), slider flag, toast, top inset; `swipesAllowed`, `idleTimerRunning`; `CHROME_IDLE_MS` 4 s, `CHROME_TOAST_MS` 2.4 s | `tests/app-models/phone-reader-chrome.test.ts` |
-| `reader-gesture.ts` | `classifyGesture` (swipe / edge tap / middle tap / none; thresholds of R2) and `isSwipeCandidate` (the page follows the finger) | `tests/app-models/reader-gesture.test.ts` |
+| `reader-gesture.ts` | Two separate recognizers — `recognizeTap` (single tap: < 10 px, < 350 ms; edge / middle) and `recognizeSwipe` (page-turn swipe) — ranked by `classifyGesture` (swipe > tap > none; thresholds of R2), and `isSwipeCandidate` (the page follows the finger) | `tests/app-models/reader-gesture.test.ts` |
 | `reader-place.ts` | `chapterNameFor` (last contents entry at or before the place), `placeFor` (FR-010a per format / view), `bookmarkLabelFor` | `tests/app-models/reader-place.test.ts` |
 
 ## Shared UI
@@ -32,7 +32,7 @@ two holders: ONE reading surface and ONE chrome store. No migration, no new IPC 
 |---|---|
 | `logic/useReadingSurface.tsx` | The ONLY per-format branch: builds `ReadingSurface` (`logic/readingSurface.ts`) and the renderer element from `useReaderCore`, `useReaderAnnotations`, `useReaderTxt`, `usePdfSelectionMenu`, `useReaderZoomControls`. PDF Page / Scroll from `book.prefs.viewMode` (Page = `flow="paged"`, fitted to the screen) |
 | `logic/phoneReaderChromeStore.ts` | zustand, session-only: chrome state (core reducer) + the idle / toast timers + the renderers' live values (Markdown headings, pending selections, text percent). Reason in `specs/008-shared-core-architecture/contracts/phone-ui.md` |
-| `logic/usePhonePageGestures.ts` | Touches (main document) + EPUB frame pointers → classifier; finger-following transform on the page wrapper; taps consumed only by the renderer's blank click |
+| `logic/usePhonePageGestures.ts` | Touches (main document) + EPUB frame pointers → classifier; finger-following transform on the page wrapper. Page view: every tap is decided here (one tap rule), the renderer only answers a hit test when the finger goes down (`isMarkAt`: EPUB marks, PDF `isTargetAt` — marks, notes, icons, strokes) and its blank click only closes its own UI. Scroll view: the renderers report taps on their surface; only taps no renderer covers are acted on here |
 | `MobileReaderScreen.tsx` | Composition only: bars, sheets, selection bar, mark sheet, toast; layers follow the surface |
 | `components/*` | `MobileReaderBars` (one-row bottom bar, fade, slider commits once), `MobileAppearanceSheet` (theme = app setting, view, zoom, text), `MobileSelectionBar` (one step), `MobileMarkSheet` (+ delete confirm layer), `MobileMarksSheet`, `MobileTocSheet`, `MobileSheet` (`useBackClose`), `MobileReaderIcons`, `useLiveSelection` (auto-requests the renderer's selection menu once a selection is stable) |
 

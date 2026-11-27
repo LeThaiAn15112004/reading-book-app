@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { classifyGesture, isSwipeCandidate, type GestureInput } from '../../src/app-models/reader-gesture.js'
+import {
+  classifyGesture,
+  isSwipeCandidate,
+  recognizeSwipe,
+  recognizeTap,
+  type GestureInput,
+} from '../../src/app-models/reader-gesture.js'
 
 const W = 400
 
@@ -108,5 +114,34 @@ describe('isSwipeCandidate (the page follows the finger)', () => {
     expect(isSwipeCandidate({ ...base, dx: -30, selectionSeen: true })).toBe(false)
     expect(isSwipeCandidate({ ...base, dx: -30, view: 'scroll' })).toBe(false)
     expect(isSwipeCandidate({ ...base, dx: -30, zoomEdge: { left: true, right: false } })).toBe(false)
+  })
+})
+
+describe('recognizeTap / recognizeSwipe — one rule each, never both', () => {
+  it('a finger tap that wobbles 4–9 px is still a tap (the phone rule, not a mouse drag threshold)', () => {
+    for (const d of [4, 6, 9]) {
+      expect(recognizeTap(gesture({ dx: d, dy: -d, ms: 120, maxMoveBeforeMs350: { dx: d, dy: -d } }))).toBe('tap-middle')
+    }
+  })
+
+  it('10 px or more, or 350 ms or more, is not a tap', () => {
+    expect(recognizeTap(gesture({ dx: 10, ms: 120 }))).toBeNull()
+    expect(recognizeTap(gesture({ dy: 12, ms: 120 }))).toBeNull()
+    expect(recognizeTap(gesture({ ms: 350 }))).toBeNull()
+  })
+
+  it('a tap is never a swipe and a swipe is never a tap', () => {
+    const tap = gesture({ dx: 5, ms: 80 })
+    expect(recognizeSwipe(tap)).toBeNull()
+    expect(recognizeTap(tap)).toBe('tap-middle')
+    const swipe = gesture({ dx: -150 })
+    expect(recognizeTap(swipe)).toBeNull()
+    expect(recognizeSwipe(swipe)).toBe('swipe-next')
+  })
+
+  it('classifyGesture ranks them: swipe, then tap, else none', () => {
+    expect(kind(gesture({ dx: -150 }))).toBe('swipe-next')
+    expect(kind(gesture({ dx: 5, ms: 80 }))).toBe('tap-middle')
+    expect(kind(gesture({ dx: -30, ms: 400 }))).toBe('none')
   })
 })

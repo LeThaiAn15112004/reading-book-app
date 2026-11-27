@@ -66,13 +66,15 @@ export default function MobileReaderScreen() {
   const events = useMemo<SurfacePageEvents>(
     () => ({
       onBlankTap: () => {
+        // Page view: the page gestures decide every tap themselves (one tap rule, `recognizeTap`); the renderer's blank
+        // click has already closed its own UI and means nothing more here.
+        if (viewRef.current === 'page') return
         // A tap beside a selection only drops it.
         if (surfaceNowRef.current?.selection) {
           surfaceNowRef.current.clearSelection()
           return
         }
-        if (viewRef.current === 'page') gesturesRef.current?.consumeTap()
-        else dispatch({ type: 'tap-middle' })
+        dispatch({ type: 'tap-middle' })
       },
       onScrolled: handleScrolled,
       onEpubPointer: (event) => gesturesRef.current?.onEpubPointer(event),

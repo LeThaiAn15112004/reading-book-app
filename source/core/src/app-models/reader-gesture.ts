@@ -91,33 +91,54 @@ export function isSwipeCandidate(input: SwipeCandidateInput): boolean {
   return edgeAllows(input.dx, input.zoomEdge)
 }
 
-/** What a finished touch means. Anything that is not clearly a swipe or a tap is `none`: the browser keeps it. */
-export function classifyGesture(input: GestureInput): GestureResult {
+export type TapKind = Extract<GestureKind, 'tap-prev' | 'tap-next' | 'tap-middle'>
+export type SwipeKind = Extract<GestureKind, 'swipe-next' | 'swipe-prev'>
+
+/**
+ * Single tap, on its own (no swipe rule here): a short, still press. The ONE tap rule of the phone page — the
+ * renderers' own "blank click" thresholds (e.g. PDF's 4 px mouse drag threshold) never decide a phone tap.
+ * Null = not a tap. A tap that started on a mark / link or with text selected is not the page's: the renderer or the
+ * browser owns it.
+ */
+export function recognizeTap(input: GestureInput): TapKind | null {
+  const ax = Math.abs(input.end.x - input.start.x)
+  const ay = Math.abs(input.end.y - input.start.y)
+  const dt = input.end.t - input.start.t
+  if (ax >= TAP_MAX_PX || ay >= TAP_MAX_PX || dt >= TAP_MAX_MS) return null
+  if (input.startedOnMarkOrLink || input.selectionSeen) return null
+  // With a layer open a tap on the page only closes it (the reducer's `tap-middle`), it never turns.
+  if (input.layersOpen || input.view === 'scroll' || input.width <= 0) return 'tap-middle'
+  const share = input.start.x / input.width
+  if (share < EDGE_SHARE) return 'tap-prev'
+  if (share > 1 - EDGE_SHARE) return 'tap-next'
+  return 'tap-middle'
+}
+
+/** Horizontal page-turn swipe, on its own (no tap rule here). Page view only. Null = not a swipe. */
+export function recognizeSwipe(input: GestureInput): SwipeKind | null {
+  if (input.view !== 'page') return null
+  if (input.layersOpen || input.selectionSeen || input.startedOnMarkOrLink) return null
+  if (!startedEarly(input.maxMoveBeforeMs350)) return null
   const dx = input.end.x - input.start.x
-  const dy = input.end.y - input.start.y
-  const dt = Math.max(1, input.end.t - input.start.t)
   const ax = Math.abs(dx)
-  const ay = Math.abs(dy)
-
-  // Tap.
-  if (ax < TAP_MAX_PX && ay < TAP_MAX_PX && dt < TAP_MAX_MS) {
-    if (input.startedOnMarkOrLink || input.selectionSeen) return none
-    // With a layer open a tap on the page only closes it (the reducer's `tap-middle`), it never turns.
-    if (input.layersOpen || input.view === 'scroll' || input.width <= 0) return { kind: 'tap-middle' }
-    const share = input.start.x / input.width
-    if (share < EDGE_SHARE) return { kind: 'tap-prev' }
-    if (share > 1 - EDGE_SHARE) return { kind: 'tap-next' }
-    return { kind: 'tap-middle' }
-  }
-
-  // Swipe.
-  if (input.view !== 'page') return none
-  if (input.layersOpen || input.selectionSeen || input.startedOnMarkOrLink) return none
-  if (!startedEarly(input.maxMoveBeforeMs350)) return none
-  if (ax < SWIPE_MIN_PX || ax < SWIPE_RATIO * ay) return none
-  if (!edgeAllows(dx, input.zoomEdge)) return none
+  const ay = Math.abs(input.end.y - input.start.y)
+  const dt = Math.max(1, input.end.t - input.start.t)
+  if (ax < SWIPE_MIN_PX || ax < SWIPE_RATIO * ay) return null
+  if (!edgeAllows(dx, input.zoomEdge)) return null
   const farEnough = input.width > 0 && ax >= SWIPE_COMMIT_SHARE * input.width
   const fastEnough = ax / dt >= SWIPE_COMMIT_VELOCITY
-  if (!farEnough && !fastEnough) return none
-  return { kind: dx < 0 ? 'swipe-next' : 'swipe-prev' }
+  if (!farEnough && !fastEnough) return null
+  return dx < 0 ? 'swipe-next' : 'swipe-prev'
+}
+
+/**
+ * What a finished touch means: the one place that ranks the recognizers (a swipe wins over a tap; the two cannot both
+ * match, a swipe moves ≥ 48 px and a tap < 10 px). Anything else is `none`: the browser keeps it.
+ */
+export function classifyGesture(input: GestureInput): GestureResult {
+  const swipe = recognizeSwipe(input)
+  if (swipe) return { kind: swipe }
+  const tap = recognizeTap(input)
+  if (tap) return { kind: tap }
+  return none
 }
