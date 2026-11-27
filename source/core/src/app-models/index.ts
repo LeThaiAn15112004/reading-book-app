@@ -302,14 +302,15 @@ export {
 } from './reader-place.js'
 export {
   PAGE_ALIGN_EPSILON_PX,
-  SELECTION_PAGE_TURN_COOLDOWN_MS,
-  SELECTION_SETTLE_MS,
-  decidePagedSelectionScroll,
-  initialPagedSelectionScrollState,
+  SELECTION_EDGE_DWELL_MS,
+  SELECTION_EDGE_LINES,
+  isPageAligned,
+  pageIndexAt,
   pageScrollLeft,
-  type PagedSelectionScrollDecision,
-  type PagedSelectionScrollInput,
-  type PagedSelectionScrollState,
+  selectionEdgeAt,
+  turnedPageScrollLeft,
+  type SelectionEdge,
+  type SelectionEdgeInput,
 } from './paged-selection-scroll.js'
 export {
   EDGE_SHARE,
