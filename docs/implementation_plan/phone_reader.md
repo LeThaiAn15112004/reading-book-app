@@ -11,6 +11,7 @@ two holders: ONE reading surface and ONE chrome store. No migration, no new IPC 
 |---|---|---|
 | `phone-reader-chrome.ts` | `reduceChrome(state, event)`: bars, ordered layer stack (`selection · toc · marks · appearance · mark · confirm`), slider flag, toast, top inset; `swipesAllowed`, `idleTimerRunning`; `CHROME_IDLE_MS` 4 s, `CHROME_TOAST_MS` 2.4 s | `tests/app-models/phone-reader-chrome.test.ts` |
 | `reader-gesture.ts` | Two separate recognizers — `recognizeTap` (single tap: < 10 px, < 350 ms; edge / middle) and `recognizeSwipe` (page-turn swipe) — ranked by `classifyGesture` (swipe > tap > none; thresholds of R2), and `isSwipeCandidate` (the page follows the finger) | `tests/app-models/reader-gesture.test.ts` |
+| `paged-selection-scroll.ts` | EPUB Page view: a selection dragged to an edge turns ONE whole page in that direction (forward or back, ≤ 1 page / 500 ms) instead of the browser leaving epub.js's paginated box between two pages; right after the selection ends a leftover drift snaps to the nearest page; no selection = untouched. Applied on the box's `scroll` event by `renderers/epub/epubjs/selection-page-snap.ts` (Desktop too) | `tests/app-models/paged-selection-scroll.test.ts` |
 | `reader-place.ts` | `chapterNameFor` (last contents entry at or before the place), `placeFor` (FR-010a per format / view), `bookmarkLabelFor` | `tests/app-models/reader-place.test.ts` |
 
 ## Shared UI

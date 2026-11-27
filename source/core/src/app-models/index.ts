@@ -301,6 +301,17 @@ export {
   type PlaceView,
 } from './reader-place.js'
 export {
+  PAGE_ALIGN_EPSILON_PX,
+  SELECTION_PAGE_TURN_COOLDOWN_MS,
+  SELECTION_SETTLE_MS,
+  decidePagedSelectionScroll,
+  initialPagedSelectionScrollState,
+  pageScrollLeft,
+  type PagedSelectionScrollDecision,
+  type PagedSelectionScrollInput,
+  type PagedSelectionScrollState,
+} from './paged-selection-scroll.js'
+export {
   EDGE_SHARE,
   SWIPE_COMMIT_SHARE,
   SWIPE_COMMIT_VELOCITY,

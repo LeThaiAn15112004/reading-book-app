@@ -66,6 +66,7 @@ import {
   waitForSectionResources,
 } from './epubjs/host-layout'
 import { createMarksController } from './epubjs/marks-controller'
+import { attachSelectionPageSnap } from './epubjs/selection-page-snap'
 import {
   currentSectionDocument,
   ePub,
@@ -567,6 +568,8 @@ export async function openEpubjs(
   let selectionCb: ((info: EpubSelectionInfo | null) => void) | null = null
 
   const marks = createMarksController(activeRendition)
+  // Page view: a selection dragged to an edge turns whole pages, never leaves the page between two (spec 019).
+  const detachSelectionPageSnap = attachSelectionPageSnap(activeRendition, () => viewMode !== 'scroll')
 
   /**
    * epub.js's own `selected` event (below) only fires while a selection is being made or
@@ -1452,6 +1455,7 @@ export async function openEpubjs(
       spineExcerptCache.dispose()
       try {
         activeRendition.off('selected', handleSelected)
+        detachSelectionPageSnap()
         marks.dispose()
         activeRendition.off('rendered', applySearchHighlights)
         activeRendition.off('rendered', applyReadAloudHighlight)
